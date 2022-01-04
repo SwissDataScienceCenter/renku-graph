@@ -32,7 +32,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
 class RateLimitSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {

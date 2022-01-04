@@ -261,7 +261,6 @@ object RestClient {
   import eu.timepit.refined.auto._
 
   import scala.concurrent.duration._
-  import scala.language.postfixOps
 
   val SleepAfterConnectionIssue:        FiniteDuration          = 10 seconds
   val MaxRetriesAfterConnectionTimeout: Int Refined NonNegative = 10

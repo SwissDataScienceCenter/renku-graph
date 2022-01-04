@@ -97,7 +97,7 @@ class StatsFinderImpl[F[_]: Async](
                    (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
                 OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
               GROUP BY sync_time.category_name
-            )  UNION ALL (
+            ) UNION ALL (
               SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               WHERE proj.project_id NOT IN (
@@ -120,6 +120,10 @@ class StatsFinderImpl[F[_]: Async](
                 FROM subscription_category_sync_time
                 WHERE category_name = $categoryNameEncoder
               ) 
+            ) UNION ALL (
+              SELECT event_type AS category_name, COUNT(DISTINCT id) AS count
+              FROM status_change_events_queue
+              GROUP BY event_type
             )
           ) all_counts
           GROUP BY all_counts.category_name

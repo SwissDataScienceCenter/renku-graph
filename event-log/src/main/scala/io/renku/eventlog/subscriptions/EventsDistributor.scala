@@ -28,7 +28,6 @@ import io.renku.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private trait EventsDistributor[F[_]] {

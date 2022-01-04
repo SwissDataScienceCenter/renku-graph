@@ -56,7 +56,6 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.language.postfixOps
 import scala.util.Random
 
 class RestClientSpec

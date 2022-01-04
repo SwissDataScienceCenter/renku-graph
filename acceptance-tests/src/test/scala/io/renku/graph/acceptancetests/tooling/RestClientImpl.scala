@@ -27,7 +27,6 @@ import org.http4s._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class RestClientImpl(implicit logger: Logger[IO])
     extends RestClient[IO, RestClientImpl](Throttler.noThrottling, retryInterval = 500 millis, maxRetries = 1) {

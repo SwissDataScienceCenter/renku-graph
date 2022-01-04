@@ -20,11 +20,14 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.Show
 import cats.implicits.showInterpolator
+import io.circe.literal._
+import io.circe.{Decoder, Encoder}
 import io.renku.eventlog.EventMessage
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, ZippedEventPayload}
 import io.renku.graph.model.projects
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
 private sealed trait StatusChangeEvent extends Product with Serializable
 
@@ -110,6 +113,23 @@ private object StatusChangeEvent {
     implicit lazy val show: Show[ProjectEventsToNew] = Show.show { case ProjectEventsToNew(project) =>
       show"$project, status = $New"
     }
+
+    implicit lazy val encoder: Encoder[ProjectEventsToNew] = Encoder.instance {
+      case ProjectEventsToNew(Project(id, path)) => json"""{
+        "project": {
+          "id": ${id.value},
+          "path": ${path.value}
+        }    
+      }"""
+    }
+    implicit lazy val decoder: Decoder[ProjectEventsToNew] = cursor =>
+      for {
+        id   <- cursor.downField("project").downField("id").as[projects.Id]
+        path <- cursor.downField("project").downField("path").as[projects.Path]
+      } yield ProjectEventsToNew(Project(id, path))
+
+    implicit lazy val eventType: StatusChangeEventsQueue.EventType[ProjectEventsToNew] =
+      StatusChangeEventsQueue.EventType("PROJECT_EVENTS_TO_NEW")
   }
 
   implicit def show[E <: StatusChangeEvent](implicit concreteShow: Show[E]): Show[E] = concreteShow

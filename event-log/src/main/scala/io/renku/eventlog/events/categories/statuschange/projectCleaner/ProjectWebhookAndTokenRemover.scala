@@ -48,6 +48,7 @@ private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](accessToken
                                                                      tokenRepositoryUrl: TokenRepositoryUrl
 ) extends RestClient[F, ProjectWebhookAndTokenRemover[F]](Throttler.noThrottling[F])
     with ProjectWebhookAndTokenRemover[F] {
+
   override def removeWebhookAndToken(project: Project): F[Unit] = for {
     accessToken <- accessTokenFinder
                      .findAccessToken(project.id)(AccessTokenFinder.projectIdToPath)

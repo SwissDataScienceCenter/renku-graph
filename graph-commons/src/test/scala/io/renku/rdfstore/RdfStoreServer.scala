@@ -28,7 +28,6 @@ import org.apache.jena.fuseki.main.FusekiServer
 
 import java.net.BindException
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 object RdfStoreServer extends IOApp {
 
