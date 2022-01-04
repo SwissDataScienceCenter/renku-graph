@@ -56,10 +56,8 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
   import triplesRemover._
 
   override def run(): F[Unit] = (reProvisioningNeeded() recoverWith tryAgain(reProvisioningNeeded())) >>= {
-    case true =>
-      triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
-    case false =>
-      versionPairUpdater.update(versionCompatibilityPairs.head) >> Logger[F].info("Triples Store up to date")
+    case true  => triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
+    case false => Logger[F].info("Triples Store up to date")
   }
 
   private def triggerReProvisioning = measureExecutionTime {
