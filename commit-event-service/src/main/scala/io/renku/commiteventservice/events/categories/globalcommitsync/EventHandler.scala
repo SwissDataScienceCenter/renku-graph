@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,6 +35,7 @@ import io.renku.events.consumers._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{EventRequestContent, consumers}
 import io.renku.graph.model.events.{CategoryName, CommitId}
+import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -100,11 +101,12 @@ private[events] object EventHandler {
 
   def apply[F[_]: Async: NonEmptyParallel: Logger](
       subscriptionMechanism: SubscriptionMechanism[F],
+      gitLabClient:          GitLabClient[F],
       gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[EventHandler[F]] = for {
     concurrentProcessesLimiter    <- ConcurrentProcessesLimiter(processesLimit)
-    globalCommitEventSynchronizer <- CommitsSynchronizer(gitLabThrottler, executionTimeRecorder)
+    globalCommitEventSynchronizer <- CommitsSynchronizer(gitLabClient, gitLabThrottler, executionTimeRecorder)
   } yield new EventHandler[F](categoryName,
                               globalCommitEventSynchronizer,
                               subscriptionMechanism,

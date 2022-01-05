@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,7 +24,6 @@ import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, _}
-import io.renku.eventlog.events.categories.statuschange.projectCleaner.ProjectCleaner
 import io.renku.graph.model.events.EventStatus.{FailureStatus, ProcessingStatus}
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
@@ -38,36 +37,33 @@ private trait DBUpdater[F[_], E <: StatusChangeEvent] {
 private object DBUpdater {
 
   type EventUpdaterFactory[F[_], E <: StatusChangeEvent] =
-    (DeliveryInfoRemover[F], LabeledHistogram[F, SqlStatement.Name]) => F[DBUpdater[F, E]]
+    (StatusChangeEventsQueue[F], DeliveryInfoRemover[F], LabeledHistogram[F, SqlStatement.Name]) => F[DBUpdater[F, E]]
 
   implicit def factoryToTriplesGeneratorUpdater[F[_]: Async]: EventUpdaterFactory[F, ToTriplesGenerated] =
-    (infoRemover, execTimes) =>
+    (_, infoRemover, execTimes) =>
       new ToTriplesGeneratedUpdater(infoRemover, execTimes).pure[F].widen[DBUpdater[F, ToTriplesGenerated]]
 
   implicit def factoryToTriplesStoreUpdater[F[_]: Async]: EventUpdaterFactory[F, ToTriplesStore] =
-    (infoRemover, execTimes) =>
+    (_, infoRemover, execTimes) =>
       new ToTriplesStoreUpdater(infoRemover, execTimes).pure[F].widen[DBUpdater[F, ToTriplesStore]]
 
   implicit def factoryToFailureUpdater[F[_]: Async]
-      : EventUpdaterFactory[F, ToFailure[ProcessingStatus, FailureStatus]] = (infoRemover, execTimes) =>
+      : EventUpdaterFactory[F, ToFailure[ProcessingStatus, FailureStatus]] = (_, infoRemover, execTimes) =>
     new ToFailureUpdater(infoRemover, execTimes).pure[F].widen[DBUpdater[F, ToFailure[ProcessingStatus, FailureStatus]]]
 
   implicit def factoryRollbackToNewUpdater[F[_]: MonadCancelThrow]: EventUpdaterFactory[F, RollbackToNew] =
-    (_, execTimes) => new RollbackToNewUpdater(execTimes).pure[F].widen[DBUpdater[F, RollbackToNew]]
+    (_, _, execTimes) => new RollbackToNewUpdater(execTimes).pure[F].widen[DBUpdater[F, RollbackToNew]]
 
   implicit def factoryRollbackToTriplesGeneratedUpdater[F[_]: MonadCancelThrow]
-      : EventUpdaterFactory[F, RollbackToTriplesGenerated] = (_, execTimes) =>
+      : EventUpdaterFactory[F, RollbackToTriplesGenerated] = (_, _, execTimes) =>
     new RollbackToTriplesGeneratedUpdater(execTimes).pure[F].widen[DBUpdater[F, RollbackToTriplesGenerated]]
 
   implicit def factoryToAwaitingDeletionUpdater[F[_]: MonadCancelThrow]: EventUpdaterFactory[F, ToAwaitingDeletion] =
-    (_, execTimes) => new ToAwaitingDeletionUpdater(execTimes).pure[F].widen[DBUpdater[F, ToAwaitingDeletion]]
+    (_, _, execTimes) => new ToAwaitingDeletionUpdater(execTimes).pure[F].widen[DBUpdater[F, ToAwaitingDeletion]]
 
-  implicit def factoryToAllEventsNewUpdater[F[_]: MonadCancelThrow]: EventUpdaterFactory[F, AllEventsToNew] =
-    (_, execTimes) => new AllEventsToNewUpdater[F](execTimes).pure[F].widen[DBUpdater[F, AllEventsToNew]]
+  implicit def factoryToProjectEventsNewHandler[F[_]: Async: Logger]: EventUpdaterFactory[F, ProjectEventsToNew] =
+    (eventsQueue, _, _) => new ProjectEventsToNewHandler[F](eventsQueue).pure[F].widen[DBUpdater[F, ProjectEventsToNew]]
 
-  implicit def factoryToProjectEventsNewUpdater[F[_]: Async: Logger]: EventUpdaterFactory[F, ProjectEventsToNew] =
-    (_, execTimes) =>
-      for {
-        projectCleaner <- ProjectCleaner[F](execTimes)
-      } yield new ProjectEventsToNewUpdater[F](projectCleaner, execTimes)
+  implicit def factoryToAllEventsNewUpdater[F[_]: Async: Logger]: EventUpdaterFactory[F, AllEventsToNew] =
+    (_, _, execTimes) => AllEventsToNewUpdater(execTimes).widen[DBUpdater[F, AllEventsToNew]]
 }

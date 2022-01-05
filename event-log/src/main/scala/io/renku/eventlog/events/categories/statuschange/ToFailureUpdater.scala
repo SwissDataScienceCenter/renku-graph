@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -59,13 +59,13 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
     SqlStatement[F](name = Refined.unsafeApply(s"to_${event.newStatus.value.toLowerCase} - status update"))
       .command[FailureStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ ProcessingStatus](
         sql"""UPDATE event
-                SET status = $eventFailureStatusEncoder,
-                  execution_date = $executionDateEncoder,
-                  message = $eventMessageEncoder
-                WHERE event_id = $eventIdEncoder 
-                  AND project_id = $projectIdEncoder 
-                  AND status = $eventProcessingStatusEncoder
-                 """.command
+              SET status = $eventFailureStatusEncoder,
+                execution_date = $executionDateEncoder,
+                message = $eventMessageEncoder
+              WHERE event_id = $eventIdEncoder 
+                AND project_id = $projectIdEncoder 
+                AND status = $eventProcessingStatusEncoder
+               """.command
       )
       .arguments(
         event.newStatus ~

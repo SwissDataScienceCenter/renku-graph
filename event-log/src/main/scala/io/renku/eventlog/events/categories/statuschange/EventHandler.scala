@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,8 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.EitherT
-import cats.effect.Concurrent
-import cats.effect.kernel.{Async, Spawn}
+import cats.effect.{Async, Spawn}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.DecodingFailure
@@ -29,7 +28,7 @@ import io.renku.eventlog.events.categories.statuschange.DBUpdater.EventUpdaterFa
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import io.renku.eventlog.{EventLogDB, EventMessage}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult, Project}
+import io.renku.events.consumers._
 import io.renku.events.{EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
@@ -39,8 +38,9 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private class EventHandler[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
+private class EventHandler[F[_]: Async: Logger](
     override val categoryName: CategoryName,
+    eventsQueue:               StatusChangeEventsQueue[F],
     statusChanger:             StatusChanger[F],
     deliveryInfoRemover:       DeliveryInfoRemover[F],
     queriesExecTimes:          LabeledHistogram[F, SqlStatement.Name]
@@ -94,7 +94,7 @@ private class EventHandler[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
   private def executeUpdate[E <: StatusChangeEvent](
       event:                 E
   )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = (for {
-    factory <- updaterFactory(deliveryInfoRemover, queriesExecTimes)
+    factory <- updaterFactory(eventsQueue, deliveryInfoRemover, queriesExecTimes)
     result <- statusChanger
                 .updateStatuses(event)(factory)
                 .flatTap(_ => Logger[F].logInfo(event, "Processed"))
@@ -103,8 +103,9 @@ private class EventHandler[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
 
 private object EventHandler {
 
-  def apply[F[_]: MonadThrow: Async: Spawn: Concurrent: Logger](
+  def apply[F[_]: Async: Logger](
       sessionResource:                    SessionResource[F, EventLogDB],
+      eventsQueue:                        StatusChangeEventsQueue[F],
       queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
@@ -120,7 +121,16 @@ private object EventHandler {
                        )
                      )
     statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](sessionResource, gaugesUpdater))
-  } yield new EventHandler[F](categoryName, statusChanger, deliveryInfoRemover, queriesExecTimes)
+    _             <- registerHandlers(eventsQueue, statusChanger, queriesExecTimes)
+  } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queriesExecTimes)
+
+  private def registerHandlers[F[_]: Async: Logger](eventsQueue: StatusChangeEventsQueue[F],
+                                                    statusChanger:    StatusChanger[F],
+                                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ) = for {
+    projectsToNewUpdater <- ProjectEventsToNewUpdater(queriesExecTimes)
+    _ <- eventsQueue.register[ProjectEventsToNew](statusChanger.updateStatuses(_)(projectsToNewUpdater))
+  } yield ()
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
 

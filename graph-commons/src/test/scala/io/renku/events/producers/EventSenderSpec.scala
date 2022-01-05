@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,7 +35,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class EventSenderSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
 
@@ -86,43 +85,43 @@ class EventSenderSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbi
         reset()
       }
     }
-  }
 
-  val failureResponses = List(
-    "connection error"   -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
-    "other client error" -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt)
-  )
+    val failureResponses = List(
+      "connection error"   -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
+      "other client error" -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt)
+    )
 
-  failureResponses foreach { case (responseName, failureResponse) =>
-    s"retry in case of $responseName" in new TestCase {
-      val eventRequest = post(urlEqualTo(s"/events"))
-        .inScenario("Retry")
+    failureResponses foreach { case (responseName, failureResponse) =>
+      s"retry in case of $responseName" in new TestCase {
+        val eventRequest = post(urlEqualTo(s"/events"))
+          .inScenario("Retry")
 
-      stubFor {
-        eventRequest
-          .whenScenarioStateIs(Scenario.STARTED)
-          .willSetStateTo("Error")
-          .willReturn(failureResponse)
+        stubFor {
+          eventRequest
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("Error")
+            .willReturn(failureResponse)
+        }
+
+        stubFor {
+          eventRequest
+            .whenScenarioStateIs("Error")
+            .willSetStateTo("Successful")
+            .willReturn(failureResponse)
+        }
+
+        stubFor {
+          eventRequest
+            .whenScenarioStateIs("Successful")
+            .willReturn(aResponse().withStatus(Accepted.code))
+        }
+
+        eventSender
+          .sendEvent(eventRequestContentNoPayloads.generateOne, nonBlankStrings().generateOne.value)
+          .unsafeRunSync() shouldBe ()
+
+        reset()
       }
-
-      stubFor {
-        eventRequest
-          .whenScenarioStateIs("Error")
-          .willSetStateTo("Successful")
-          .willReturn(failureResponse)
-      }
-
-      stubFor {
-        eventRequest
-          .whenScenarioStateIs("Successful")
-          .willReturn(aResponse().withStatus(Accepted.code))
-      }
-
-      eventSender
-        .sendEvent(eventRequestContentNoPayloads.generateOne, nonBlankStrings().generateOne.value)
-        .unsafeRunSync() shouldBe ()
-
-      reset()
     }
   }
 

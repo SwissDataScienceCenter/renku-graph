@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,8 +21,9 @@ package io.renku.graph.model.entities
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
+import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{datasets, entities}
+import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,16 +36,16 @@ class PublicationEventSpec extends AnyWordSpec with should.Matchers with ScalaCh
     "turn JsonLD PublicationEvent entity into the PublicationEvent object" in {
       val startDate = timestampsNotInTheFuture.generateOne
       val dataset   = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+
       forAll(publicationEventFactories(startDate)) { eventFactory: (Dataset[Dataset.Provenance] => PublicationEvent) =>
         val event = eventFactory(dataset)
-        event.asJsonLD.cursor.as[entities.PublicationEvent](
-          entities.PublicationEvent.decoder(
-            dataset.asJsonLD.entityId
-              .map(_.show)
-              .map(datasets.ResourceId(_))
-              .getOrElse(fail("No entity id found on dataset"))
-          )
-        ) shouldBe event.to[entities.PublicationEvent].asRight
+        implicit val eventDecoder: JsonLDDecoder[entities.PublicationEvent] = entities.PublicationEvent.decoder(
+          dataset.to[entities.Dataset[entities.Dataset.Provenance]].identification
+        )
+
+        event.asJsonLD.flatten.fold(throw _, identity).cursor.as[List[entities.PublicationEvent]] shouldBe List(
+          event.to[entities.PublicationEvent]
+        ).asRight
       }
     }
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -51,7 +51,14 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit
 
   def run(services: ServiceRun*)(implicit ioRuntime: IORuntime): IO[Unit] = for {
     _ <- semaphore.acquire
-    _ <- services.toList.map(start).parSequence
+    _ <- whenNotStarted(services.toList) {
+           for {
+             _ <- services.toList.map(start).parSequence
+             _ <- Logger[IO].info("Waiting for the services to finish init tasks")
+             _ <- Temporal[IO].sleep(20 seconds)
+             _ <- Logger[IO].info("Waiting for the services to finish init tasks - done")
+           } yield ()
+         }
     _ <- semaphore.release
   } yield ()
 
@@ -71,6 +78,12 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit
         } yield ()
     }
   }
+
+  private def whenNotStarted(services: List[ServiceRun])(fa: IO[Unit]): IO[Unit] =
+    services.map(_.serviceClient.ping).sequence.map(_.exists(_ == ServiceDown)) >>= {
+      case true  => fa
+      case false => ().pure[IO]
+    }
 
   private def verifyServiceReady(serviceRun: ServiceRun): IO[Unit] =
     serviceRun.serviceClient.ping >>= {

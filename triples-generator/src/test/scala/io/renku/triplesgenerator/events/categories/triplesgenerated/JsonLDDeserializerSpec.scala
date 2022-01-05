@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.data.EitherT
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.events.consumers
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
@@ -31,8 +32,8 @@ import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, Com
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
 import io.renku.http.client.AccessToken
+import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, JsonLD, Property}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
@@ -168,7 +169,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "fail if the payload is invalid" in new TestCase {
-      val project = anyProjectEntities.generateOne
+      val project = projectEntities(anyVisibility).generateOne
 
       givenFindProjectInfo(project.path)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
@@ -178,13 +179,15 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = JsonLD
-              .arr(project.asJsonLD,
-                   JsonLD.entity(EntityId.of(httpUrls().generateOne),
-                                 entities.Activity.entityTypes,
-                                 Map.empty[Property, JsonLD]
-                   )
+            payload = project
+              .to[entities.ProjectWithoutParent]
+              .copy(activities =
+                activityEntities
+                  .withDateBefore(project.dateCreated)
+                  .generateFixedSizeList(1)
+                  .map(_.to[entities.Activity])
               )
+              .asJsonLD
               .flatten
               .fold(throw _, identity)
           )

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -92,9 +92,10 @@ object Dataset {
       identification:   Identification
   ): ValidatedNel[String, Unit] = publishingEvents
     .map {
-      case event if event.about == identification.resourceId => ().validNel[String]
+      case event if event.datasetResourceId == identification.resourceId => ().validNel[String]
       case event =>
-        s"PublishingEvent ${event.resourceId} refers to ${event.about} which is not ${identification.resourceId}".invalidNel
+        (show"PublicationEvent ${event.resourceId} refers to ${event.about} " +
+          show"that points to ${event.datasetResourceId} but should be pointing to ${identification.resourceId}").invalidNel
     }
     .sequence
     .void
@@ -303,11 +304,14 @@ object Dataset {
                                                                                           Option[InitialVersion],
                                                                                           Option[InvalidationTime]
     ) => Result[Provenance] = {
-      case (Some(dateCreated), None, None, None, None, _, None) =>
+      case (Some(dateCreated), None, None, None, None, maybeOriginalId, None)
+          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
         Internal(identification.resourceId, identification.identifier, dateCreated, creators).asRight
-      case (None, Some(datePublished), None, Some(sameAs), None, _, None) =>
+      case (None, Some(datePublished), None, Some(sameAs), None, maybeOriginalId, None)
+          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
         ImportedExternal(identification.resourceId, identification.identifier, sameAs, datePublished, creators).asRight
-      case (Some(dateCreated), None, Some(sameAs), None, None, _, None) =>
+      case (Some(dateCreated), None, Some(sameAs), None, None, maybeOriginalId, None)
+          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
         ImportedInternalAncestorInternal(identification.resourceId,
                                          identification.identifier,
                                          sameAs,
@@ -315,7 +319,8 @@ object Dataset {
                                          dateCreated,
                                          creators
         ).asRight
-      case (None, Some(datePublished), Some(sameAs), None, None, _, None) =>
+      case (None, Some(datePublished), Some(sameAs), None, None, maybeOriginalId, None)
+          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
         ImportedInternalAncestorExternal(identification.resourceId,
                                          identification.identifier,
                                          sameAs,
@@ -355,6 +360,11 @@ object Dataset {
 
     private implicit lazy val creatorsOrdering: Ordering[Person] = Ordering.by(_.name.value)
   }
+
+  private def originalIdEqualCurrentId(maybeOriginalIdentifier: Option[InitialVersion],
+                                       identification:          Identification
+  ): Boolean =
+    maybeOriginalIdentifier.isEmpty || maybeOriginalIdentifier.exists(_.value == identification.identifier.value)
 
   final case class AdditionalInfo(
       maybeDescription: Option[Description],
@@ -446,7 +456,7 @@ object Dataset {
       provenance        <- cursor.as[Provenance](Provenance.decoder(identification))
       additionalInfo    <- cursor.as[AdditionalInfo]
       parts             <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
-      publicationEvents <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification.resourceId)))
+      publicationEvents <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification)))
       dataset <-
         Dataset
           .from(identification, provenance, additionalInfo, parts, publicationEvents)

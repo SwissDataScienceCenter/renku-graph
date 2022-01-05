@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -144,8 +144,9 @@ class EventHandlerSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val statusChanger       = mock[StatusChanger[IO]]
     val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
     val queryExec           = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val handler             = new EventHandler[IO](categoryName, statusChanger, deliveryInfoRemover, queryExec)
+    val handler = new EventHandler[IO](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queryExec)
 
     def stubUpdateStatuses[E <: StatusChangeEvent](updateResult: IO[Unit])(implicit show: Show[E]): E => (E, String) =
       event => {

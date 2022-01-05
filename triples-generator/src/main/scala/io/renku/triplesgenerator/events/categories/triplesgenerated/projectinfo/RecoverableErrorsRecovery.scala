@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
-import org.http4s.Status.{Forbidden, ServiceUnavailable, Unauthorized}
+import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
 
 private trait RecoverableErrorsRecovery {
 
@@ -35,7 +35,7 @@ private trait RecoverableErrorsRecovery {
         .asLeft[OUT]
         .leftWiden[ProcessingRecoverableError]
         .pure[F]
-    case exception @ UnexpectedResponseException(ServiceUnavailable | Forbidden | Unauthorized, _) =>
+    case exception @ UnexpectedResponseException(Unauthorized | Forbidden | BadGateway | ServiceUnavailable, _) =>
       TransformationRecoverableError(exception.getMessage, exception.getCause)
         .asLeft[OUT]
         .leftWiden[ProcessingRecoverableError]

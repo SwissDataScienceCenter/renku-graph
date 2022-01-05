@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,12 +39,21 @@ import skunk.{Session, ~}
 import java.time.Instant
 import scala.util.control.NonFatal
 
-private class ProjectEventsToNewUpdater[F[_]: Async: Logger](
+private trait ProjectEventsToNewUpdater[F[_]] extends DBUpdater[F, ProjectEventsToNew]
+
+private object ProjectEventsToNewUpdater {
+  def apply[F[_]: Async: Logger](
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[DBUpdater[F, ProjectEventsToNew]] =
+    ProjectCleaner[F](queriesExecTimes).map(new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes))
+}
+
+private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
     projectCleaner:   ProjectCleaner[F],
     queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[F, ProjectEventsToNew] {
+    with ProjectEventsToNewUpdater[F] {
 
   override def updateDB(event: ProjectEventsToNew): UpdateResult[F] = for {
     statuses             <- updateStatuses(event.project)

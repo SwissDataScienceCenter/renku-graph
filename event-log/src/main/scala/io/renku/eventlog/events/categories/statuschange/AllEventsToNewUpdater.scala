@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,100 +18,88 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
+import cats.Applicative
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.circe.Encoder
+import io.circe.literal._
+import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.ExecutionDate
-import io.renku.eventlog.TypeSerializers._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.AllEventsToNew
+import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.Project
+import io.renku.events.producers.EventSender
 import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
-import skunk.Session
-import skunk.SqlState.DeadlockDetected
+import io.renku.tinytypes.json.TinyTypeEncoders
+import org.typelevel.log4cats.Logger
+import skunk._
 import skunk.implicits._
 
-import java.time.Instant
-
-private class AllEventsToNewUpdater[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
-    now:              () => Instant = () => Instant.now
+private class AllEventsToNewUpdater[F[_]: Async](
+    eventSender:      EventSender[F],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[F, AllEventsToNew] {
+    with DBUpdater[F, AllEventsToNew]
+    with TypeSerializers
+    with TinyTypeEncoders {
 
-  override def updateDB(event: AllEventsToNew): UpdateResult[F] = clearDB() recoverWith retryOnDeadlock()
+  private val applicative: Applicative[F] = Applicative[F]
+
+  import applicative._
+  import eventSender._
+
+  override def updateDB(event: AllEventsToNew): UpdateResult[F] =
+    createEventsResource(sendEventIfFound(_))
+      .map(_ => DBUpdateResults.ForProjects.empty)
 
   override def onRollback(event: AllEventsToNew) = Kleisli.pure(())
 
-  private def clearDB(): Kleisli[F, Session[F], DBUpdateResults] = for {
-    _ <- updateStatuses()
-    _ <- removeAllProcessingTimes()
-    _ <- removeAllPayloads()
-    _ <- removeAllDeliveryInfos()
-    _ <- removeAwaitingDeletionEvents()
-  } yield DBUpdateResults.ForAllProjects
-
-  private def updateStatuses() = measureExecutionTime {
-    SqlStatement(name = "all_to_new - status update")
-      .command[ExecutionDate](
-        sql"""UPDATE event evt
-              SET status = '#${EventStatus.New.value}', 
-                  execution_date = $executionDateEncoder, 
-                  message = NULL
-              WHERE #${`status IN`(EventStatus.all diff Set(EventStatus.Skipped, EventStatus.AwaitingDeletion))} 
-           """.command
+  private def createEventsResource(
+      f: Cursor[F, ProjectEventsToNew] => F[Unit]
+  ): Kleisli[F, Session[F], Unit] = measureExecutionTime {
+    SqlStatement(name = "all_to_new - find projects")
+      .select[Void, ProjectEventsToNew](
+        sql"""SELECT proj.project_id, proj.project_path
+                FROM project proj
+                ORDER BY proj.latest_event_date ASC"""
+          .query(projectIdDecoder ~ projectPathDecoder)
+          .map { case (id: projects.Id) ~ (path: projects.Path) => ProjectEventsToNew(Project(id, path)) }
       )
-      .arguments(ExecutionDate(now()))
-      .build
+      .arguments(Void)
+      .buildCursorResource(f)
   }
 
-  private def removeAllProcessingTimes() = measureExecutionTime {
-    SqlStatement(name = "all_to_new - processing_times removal")
-      .command[skunk.Void](
-        sql"""TRUNCATE TABLE status_processing_time""".command
-      )
-      .arguments(skunk.Void)
-      .build
-      .void
-  }
+  private def sendEventIfFound(cursor: Cursor[F, ProjectEventsToNew], checkForMore: Boolean = true): F[Unit] =
+    whenA(checkForMore) {
+      cursor.fetch(1) >>= {
+        case (Nil, _) => ().pure[F]
+        case (event :: _, areMore) =>
+          sendEvent(
+            EventRequestContent.NoPayload(event.asJson),
+            show"$categoryName: Generating ${ProjectEventsToNew.eventType} for ${event.project} failed"
+          ) >> sendEventIfFound(cursor, areMore)
+      }
+    }
 
-  private def removeAllPayloads() = measureExecutionTime {
-    SqlStatement(name = "all_to_new - payloads removal")
-      .command[skunk.Void](
-        sql"""TRUNCATE TABLE event_payload""".command
-      )
-      .arguments(skunk.Void)
-      .build
-      .void
+  private implicit val encoder: Encoder[ProjectEventsToNew] = Encoder.instance { event =>
+    json"""{
+      "categoryName": ${categoryName.value},
+      "project": {
+        "id":   ${event.project.id},
+        "path": ${event.project.path}
+      },
+      "newStatus": ${EventStatus.New}
+    }"""
   }
+}
 
-  private def removeAwaitingDeletionEvents() = measureExecutionTime {
-    SqlStatement(name = "all_to_new - awaiting_deletions removal")
-      .command[EventStatus](
-        sql"""DELETE FROM event
-              WHERE status = $eventStatusEncoder
-        """.command
-      )
-      .arguments(EventStatus.AwaitingDeletion)
-      .build
-      .void
-  }
-
-  private def removeAllDeliveryInfos() = measureExecutionTime {
-    SqlStatement(name = "all_to_new - delivery removal")
-      .command[skunk.Void](
-        sql"""TRUNCATE TABLE event_delivery""".command
-      )
-      .arguments(skunk.Void)
-      .build
-      .void
-  }
-
-  private def retryOnDeadlock(): PartialFunction[Throwable, Kleisli[F, Session[F], DBUpdateResults]] = {
-    case DeadlockDetected(_) => clearDB()
-  }
-
-  private def `status IN`(statuses: Set[EventStatus]) =
-    s"status IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"
+private object AllEventsToNewUpdater {
+  def apply[F[_]: Async: Logger](
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[AllEventsToNewUpdater[F]] = EventSender[F] map (new AllEventsToNewUpdater(_, queriesExecTimes))
 }

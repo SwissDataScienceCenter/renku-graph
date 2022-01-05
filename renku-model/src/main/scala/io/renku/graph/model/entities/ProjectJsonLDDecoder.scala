@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -51,10 +51,9 @@ object ProjectJsonLDDecoder {
         activities       <- cursor.downField(renku / "hasActivity").as[List[Activity]].map(_.sortBy(_.startTime))
         datasets         <- cursor.downField(renku / "hasDataset").as[List[Dataset[Dataset.Provenance]]]
         resourceId       <- ResourceId(gitLabInfo.path).asRight
-        earliestDate = List(dateCreated, gitLabInfo.dateCreated).min
         project <- newProject(gitLabInfo,
                               resourceId,
-                              earliestDate,
+                              dateCreated = List(dateCreated, gitLabInfo.dateCreated).min,
                               maybeDescription,
                               agent,
                               keywords,
