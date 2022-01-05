@@ -43,6 +43,7 @@ trait LabeledGauge[F[_], LabelValue] extends Gauge[F] {
   def increment(labelValue: LabelValue):           F[Unit]
   def decrement(labelValue: LabelValue):           F[Unit]
   def reset(): F[Unit]
+  def clear(): F[Unit]
 }
 
 class SingleValueGaugeImpl[F[_]: MonadThrow] private[metrics] (protected val gauge: LibGauge)
@@ -82,9 +83,11 @@ class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue] private[metrics] (
 
   override def reset(): F[Unit] = for {
     newValues <- resetDataFetch()
-    _         <- MonadThrow[F].catchNonFatal(gauge.clear())
+    _         <- clear()
     _         <- MonadThrow[F].catchNonFatal(newValues foreach set)
   } yield ()
+
+  override def clear(): F[Unit] = MonadThrow[F].catchNonFatal(gauge.clear())
 }
 
 object Gauge {
