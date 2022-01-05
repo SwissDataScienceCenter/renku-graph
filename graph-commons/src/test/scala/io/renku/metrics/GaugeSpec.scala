@@ -148,6 +148,23 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
     }
   }
 
+  "clear" should {
+
+    "remove all entries" in new TestCase {
+
+      // before re-provisioning
+      val labelValue1 = projectPaths.generateOne
+      val value1      = nonNegativeDoubles().generateOne.value
+      gauge.set(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
+
+      underlying.collectAllSamples should contain only ((label, labelValue1.value, value1))
+
+      gauge.clear() shouldBe MonadThrow[Try].unit
+
+      underlying.collectAllSamples.isEmpty shouldBe true
+    }
+  }
+
   "increment" should {
 
     "increment value for the given label value" in new TestCase {

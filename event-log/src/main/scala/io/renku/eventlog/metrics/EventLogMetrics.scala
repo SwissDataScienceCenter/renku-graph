@@ -49,6 +49,7 @@ class EventLogMetricsImpl[F[_]: Temporal: Logger](
 
   private def provisionCategoryNames = for {
     eventsByCategoryName <- statsFinder.countEventsByCategoryName()
+    _                    <- categoryNameEventsGauge.clear()
     _                    <- (eventsByCategoryName map toCategoryNameEventsGauge).toList.sequence
   } yield ()
 
