@@ -124,13 +124,13 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger](sessionResource: 
     }
   }
 
-  private def process[E <: StatusChangeEvent](stringPayload: String, handler: HandlerDef[E]) = {
+  private def process[E <: StatusChangeEvent](stringPayload: String, handlerDef: HandlerDef[E]) = {
     for {
       json  <- MonadThrow[F].fromEither(parse(stringPayload))
-      event <- MonadThrow[F].fromEither(json.as(handler.decoder))
-      _     <- handler handler event
+      event <- MonadThrow[F].fromEither(json.as(handlerDef.decoder))
+      _     <- handlerDef.handler(event)
     } yield ()
-  } recoverWith loggingError(stringPayload, handler)
+  } recoverWith loggingError(stringPayload, handlerDef)
 
   private def findEvent[E](eventType: EventType[E]): Kleisli[F, Session[F], Option[(Int, String)]] =
     measureExecutionTime {
