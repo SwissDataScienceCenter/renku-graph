@@ -18,7 +18,6 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
-import TriplesUploadResult._
 import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
@@ -29,11 +28,14 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators._
+import io.renku.http.client.RestClientError.BadRequestException
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -50,44 +52,52 @@ class TriplesUploaderSpec
 
   "upload" should {
 
-    s"return $DeliverySuccess if uploading triples to the Store was successful" in new TestCase {
+    s"succeeds if uploading triples to the Store was successful" in new TestCase {
 
       givenUploader(returning = ok())
 
-      triplesUploader.uploadTriples(triples).value.unsafeRunSync() shouldBe DeliverySuccess.asRight
+      triplesUploader.uploadTriples(triples).value.unsafeRunSync() shouldBe ().asRight
     }
 
-    (BadRequest +: InternalServerError +: Nil) foreach { status =>
-      s"return $NonRecoverableFailure if remote client responds with a $status" in new TestCase {
-        val errorMessage = nonEmptyStrings().generateOne
+    s"fail if remote client responds with a $BadRequest" in new TestCase {
+      val errorMessage = nonEmptyStrings().generateOne
 
-        givenUploader(returning = aResponse().withStatus(status.code).withBody(errorMessage))
+      givenUploader(returning = aResponse().withStatus(BadRequest.code).withBody(errorMessage))
 
-        intercept[NonRecoverableFailure] {
-          triplesUploader.uploadTriples(triples).value.unsafeRunSync()
-        } shouldBe NonRecoverableFailure(s"Failed to upload triples $errorMessage")
+      intercept[BadRequestException] {
+        triplesUploader.uploadTriples(triples).value.unsafeRunSync()
       }
     }
 
-    s"return $RecoverableFailure if remote responds with status different than $Ok, $BadRequest or $InternalServerError" in new TestCase {
+    Set(Forbidden, Unauthorized) foreach { status =>
+      s"return Auth $RecoverableFailure if remote responds with $status " in new TestCase {
 
-      val errorMessage = nonEmptyStrings().generateOne
+        val errorMessage = nonEmptyStrings().generateOne
+        givenUploader(returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
-      givenUploader(returning = unauthorized().withBody(errorMessage))
-
-      triplesUploader.uploadTriples(triples).value.unsafeRunSync() shouldBe RecoverableFailure(
-        s"$Unauthorized: $errorMessage"
-      ).asLeft
+        val Left(error) = triplesUploader.uploadTriples(triples).value.unsafeRunSync()
+        error shouldBe a[AuthRecoverableError]
+      }
     }
 
-    s"return $RecoverableFailure for connectivity issues" in new TestCase {
+    s"return Log-worthy $RecoverableFailure if remote responds with status different than " +
+      s"OK, BAD_REQUEST, FORBIDDEN, OR UNAUTHORIZED" in new TestCase {
+
+        val errorMessage = nonEmptyStrings().generateOne
+        givenUploader(returning = serviceUnavailable().withBody(errorMessage))
+
+        val Left(error) = triplesUploader.uploadTriples(triples).value.unsafeRunSync()
+        error shouldBe a[LogWorthyRecoverableError]
+      }
+
+    s"return Log-worthy $RecoverableFailure for connectivity issues" in new TestCase {
 
       givenUploader(returning = aResponse.withFault(CONNECTION_RESET_BY_PEER))
 
       val Left(failure) = triplesUploader.uploadTriples(triples).value.unsafeRunSync()
 
-      failure       shouldBe a[RecoverableFailure]
-      failure.message should startWith(s"POST $externalServiceBaseUrl/${rdfStoreConfig.datasetName}/data error")
+      failure          shouldBe a[LogWorthyRecoverableError]
+      failure.getMessage should startWith(s"POST $externalServiceBaseUrl/${rdfStoreConfig.datasetName}/data error")
     }
   }
 

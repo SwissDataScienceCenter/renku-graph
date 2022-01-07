@@ -25,7 +25,6 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.RestClientError
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import org.scalacheck.Gen
@@ -46,5 +45,5 @@ private[triplesgenerated] object Generators {
   } yield Queries(pre, post)
 
   lazy val recoverableClientErrors: Gen[RestClientError] =
-    Gen.oneOf(clientExceptions, connectivityExceptions, unexpectedResponseExceptions, Gen.const(UnauthorizedException))
+    Gen.oneOf(clientExceptions, connectivityExceptions, unexpectedResponseExceptions)
 }

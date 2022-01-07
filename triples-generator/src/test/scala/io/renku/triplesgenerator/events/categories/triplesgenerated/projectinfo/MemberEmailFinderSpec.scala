@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 package projectinfo
 
-import TriplesGeneratedGenerators.transformationRecoverableErrors
 import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
@@ -45,6 +44,7 @@ import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -278,7 +278,7 @@ class MemberEmailFinderSpec
 
       `/api/v4/users/:id/events?action=pushed`(member.gitLabId) returning okJson(events.asJson.noSpaces)
 
-      val error = transformationRecoverableErrors.generateOne
+      val error = processingRecoverableErrors.generateOne
       (commitAuthorFinder
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
         .expects(
