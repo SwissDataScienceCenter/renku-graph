@@ -29,7 +29,6 @@ import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
-import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -73,8 +72,8 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
 
         val Success(Left(recoverableError)) = step.run(project).value
 
-        recoverableError            shouldBe a[TransformationRecoverableError]
-        recoverableError.getMessage shouldBe "Problem finding activity details in KG"
+        recoverableError          shouldBe a[ProcessingRecoverableError]
+        recoverableError.getMessage should startWith("Problem finding activity details in KG")
       }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error " +
@@ -95,8 +94,8 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
 
         val Success(Left(recoverableError)) = step.run(project).value
 
-        recoverableError            shouldBe a[TransformationRecoverableError]
-        recoverableError.getMessage shouldBe "Problem finding activity details in KG"
+        recoverableError          shouldBe a[ProcessingRecoverableError]
+        recoverableError.getMessage should startWith("Problem finding activity details in KG")
       }
 
     "fail with NonRecoverableFailure if calls to KG fails with an unknown exception " +

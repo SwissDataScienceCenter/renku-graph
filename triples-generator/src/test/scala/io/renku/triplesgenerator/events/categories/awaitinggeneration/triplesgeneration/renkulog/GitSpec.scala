@@ -28,7 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.LogWorthyRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitImpl, RepositoryPath}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -62,7 +62,7 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
     )
 
     recoverableFailureMessagesToCheck foreach { recoverableError =>
-      s"return $GenerationRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
+      s"return $LogWorthyRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
 
         val errorMessage = sentenceContaining(recoverableError).generateOne.value
         val commandResultException = ShelloutException {
@@ -76,7 +76,7 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
           .throwing(commandResultException)
 
         git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Left(
-          GenerationRecoverableError(
+          LogWorthyRecoverableError(
             s"git clone failed with: ${commandResultException.result.toString}"
           )
         )
