@@ -16,18 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.awaitinggeneration
+package io.renku.triplesgenerator.generators
 
-import io.renku.events.consumers.ConsumersModelGenerators._
-import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.events.EventId
+import io.renku.generators.Generators._
+import Implicits._
+import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
 import org.scalacheck.Gen
 
-private object EventProcessingGenerators {
+object ErrorGenerators {
 
-  implicit val commitEvents: Gen[CommitEvent] = for {
-    commitId <- commitIds
-    project  <- projectsGen
-  } yield CommitEvent(EventId(commitId.value), project, commitId)
+  lazy val logWorthyRecoverableErrors: Gen[LogWorthyRecoverableError] = for {
+    message    <- nonEmptyStrings()
+    maybeCause <- exceptions.toGeneratorOfOptions
+  } yield LogWorthyRecoverableError(message, maybeCause.getOrElse(null))
 
+  lazy val authRecoverableErrors: Gen[AuthRecoverableError] = for {
+    message <- nonEmptyStrings()
+  } yield AuthRecoverableError(message)
+
+  lazy val processingRecoverableErrors: Gen[ProcessingRecoverableError] =
+    Gen.oneOf(logWorthyRecoverableErrors, authRecoverableErrors)
 }

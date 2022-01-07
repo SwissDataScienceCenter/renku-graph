@@ -28,7 +28,7 @@ import io.renku.graph.model.entities.{Dataset, Project}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, RecoverableErrorsRecovery, TransformationStep}
 import org.typelevel.log4cats.Logger
 
 private[transformation] trait DatasetTransformer[F[_]] {
@@ -36,13 +36,15 @@ private[transformation] trait DatasetTransformer[F[_]] {
 }
 
 private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
-    kgDatasetInfoFinder: KGDatasetInfoFinder[F],
-    updatesCreator:      UpdatesCreator,
-    projectFunctions:    ProjectFunctions
+    kgDatasetInfoFinder:       KGDatasetInfoFinder[F],
+    updatesCreator:            UpdatesCreator,
+    projectFunctions:          ProjectFunctions,
+    recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends DatasetTransformer[F] {
 
   import kgDatasetInfoFinder._
   import projectFunctions._
+  import recoverableErrorsRecovery._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Dataset Details Updates", createTransformation)
@@ -51,7 +53,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
     EitherT {
       (updateTopmostSameAs(project -> Queries.empty) >>= updatePersonLinks >>= updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
-        .recoverWith(maybeToRecoverableError("Problem finding dataset details in KG"))
+        .recoverWith(maybeRecoverableError("Problem finding dataset details in KG"))
     }
 
   private lazy val updateTopmostSameAs: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>

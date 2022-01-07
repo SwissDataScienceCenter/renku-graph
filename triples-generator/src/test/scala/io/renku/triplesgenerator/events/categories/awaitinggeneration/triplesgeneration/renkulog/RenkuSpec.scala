@@ -24,7 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.LogWorthyRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{RenkuImpl, RepositoryPath}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -58,13 +58,13 @@ class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFa
       } shouldBe exception
     }
 
-    s"return $GenerationRecoverableError if calling 'renku export' results in a 137 exit code" in new TestCase {
+    s"return $LogWorthyRecoverableError if calling 'renku export' results in a 137 exit code" in new TestCase {
       val exception = ShelloutException(CommandResult(exitCode = 137, chunks = Nil))
       renkuExport.expects(path.value).throws(exception)
 
       val Left(error) = renku.export(path).value.unsafeRunSync()
 
-      error            shouldBe a[GenerationRecoverableError]
+      error            shouldBe a[LogWorthyRecoverableError]
       error.getMessage shouldBe "Not enough memory"
     }
   }

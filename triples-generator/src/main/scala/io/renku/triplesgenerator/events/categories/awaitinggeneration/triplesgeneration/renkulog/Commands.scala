@@ -31,9 +31,8 @@ import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -115,7 +114,7 @@ private object Commands {
     def clone(
         repositoryUrl:                       ServiceUrl,
         workDirectory:                       Path
-    )(implicit destinationDirectory:         RepositoryPath): EitherT[F, GenerationRecoverableError, Unit]
+    )(implicit destinationDirectory:         RepositoryPath): EitherT[F, ProcessingRecoverableError, Unit]
     def rm(fileName:                         Path)(implicit repositoryDirectory: RepositoryPath): F[Unit]
     def status(implicit repositoryDirectory: RepositoryPath): F[String]
   }
@@ -130,7 +129,6 @@ private object Commands {
   ) extends Git[F] {
     import cats.data.EitherT
     import cats.syntax.all._
-    import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
     override def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit] =
       MonadThrow[F].catchNonFatal {
@@ -144,13 +142,13 @@ private object Commands {
     override def clone(
         repositoryUrl:               ServiceUrl,
         workDirectory:               Path
-    )(implicit destinationDirectory: RepositoryPath): EitherT[F, GenerationRecoverableError, Unit] =
-      EitherT[F, GenerationRecoverableError, Unit] {
+    )(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, Unit] =
+      EitherT[F, ProcessingRecoverableError, Unit] {
         MonadThrow[F]
           .catchNonFatal {
             doClone(repositoryUrl, destinationDirectory, workDirectory)
           }
-          .map(_ => ().asRight[GenerationRecoverableError])
+          .map(_ => ().asRight[ProcessingRecoverableError])
           .recoverWith(relevantError)
       }
 
@@ -174,15 +172,18 @@ private object Commands {
       "Could not resolve host:",
       "Host is unreachable"
     )
-    private lazy val relevantError: PartialFunction[Throwable, F[Either[GenerationRecoverableError, Unit]]] = {
+    private lazy val relevantError: PartialFunction[Throwable, F[Either[ProcessingRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"
 
         MonadThrow[F].catchNonFatal(result.toString()) flatMap {
           case out if recoverableErrors exists out.contains =>
-            GenerationRecoverableError(errorMessage(result.toString())).asLeft[Unit].pure[F]
+            LogWorthyRecoverableError(errorMessage(result.toString()))
+              .asLeft[Unit]
+              .leftWiden[ProcessingRecoverableError]
+              .pure[F]
           case _ =>
-            new Exception(errorMessage(result.toString())).raiseError[F, Either[GenerationRecoverableError, Unit]]
+            new Exception(errorMessage(result.toString())).raiseError[F, Either[ProcessingRecoverableError, Unit]]
         }
     }
   }
@@ -222,7 +223,7 @@ private object Commands {
           } yield wrappedTriples.asRight[ProcessingRecoverableError]
         }.recoverWith {
           case ShelloutException(result) if result.exitCode == 137 =>
-            GenerationRecoverableError("Not enough memory").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
+            LogWorthyRecoverableError("Not enough memory").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
         }
       }
   }

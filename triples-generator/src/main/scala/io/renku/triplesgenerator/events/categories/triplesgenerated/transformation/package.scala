@@ -18,17 +18,13 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.Applicative
 import cats.data.EitherT
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
 import io.renku.graph.model.entities.Project
-import io.renku.http.client.RestClientError._
 import io.renku.jsonld.EntityId
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
-import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 
 package object transformation {
 
@@ -39,15 +35,4 @@ package object transformation {
       if (value.trim.isEmpty) "Empty entityId found in the generated triples".asLeft[EntityId]
       else EntityId.of(value).asRight[String]
     }
-
-  private[transformation] def maybeToRecoverableError[F[_]: Applicative](
-      recoverableErrorMessage: String
-  ): PartialFunction[Throwable, F[Either[ProcessingRecoverableError, (Project, Queries)]]] = {
-    case e @ (_: UnexpectedResponseException | _: ConnectivityException | _: ClientException |
-        _: UnauthorizedException) =>
-      TransformationRecoverableError(recoverableErrorMessage, e)
-        .asLeft[(Project, Queries)]
-        .leftWiden[ProcessingRecoverableError]
-        .pure[F]
-  }
 }

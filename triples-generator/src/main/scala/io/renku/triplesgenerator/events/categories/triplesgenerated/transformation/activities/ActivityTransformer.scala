@@ -26,7 +26,7 @@ import cats.syntax.all._
 import io.renku.graph.model.entities.Project
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
+import io.renku.triplesgenerator.events.categories.triplesgenerated.{RecoverableErrorsRecovery, TransformationStep}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
 import org.typelevel.log4cats.Logger
 
@@ -41,12 +41,14 @@ private[transformation] object ActivityTransformer {
 }
 
 private[transformation] class ActivityTransformerImpl[F[_]: MonadThrow](
-    kgInfoFinder:   KGInfoFinder[F],
-    updatesCreator: UpdatesCreator
+    kgInfoFinder:              KGInfoFinder[F],
+    updatesCreator:            UpdatesCreator,
+    recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ActivityTransformer[F] {
 
   import eu.timepit.refined.auto._
   import kgInfoFinder._
+  import recoverableErrorsRecovery._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Activity Updates", createTransformation)
@@ -55,7 +57,7 @@ private[transformation] class ActivityTransformerImpl[F[_]: MonadThrow](
     EitherT {
       (updateAuthorLinks(project -> Queries.empty) >>= updateAssociationAgentLinks)
         .map(_.asRight[ProcessingRecoverableError])
-        .recoverWith(maybeToRecoverableError("Problem finding activity details in KG"))
+        .recoverWith(maybeRecoverableError("Problem finding activity details in KG"))
     }
 
   private lazy val updateAuthorLinks: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>

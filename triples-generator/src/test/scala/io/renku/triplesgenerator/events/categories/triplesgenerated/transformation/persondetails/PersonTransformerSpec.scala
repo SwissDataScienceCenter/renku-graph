@@ -25,11 +25,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import io.renku.triplesgenerator.events.categories.Errors.LogWorthyRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
-import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -93,8 +93,8 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
 
       val Success(Left(recoverableError)) = step.run(project).value
 
-      recoverableError            shouldBe a[TransformationRecoverableError]
-      recoverableError.getMessage shouldBe "Problem finding person details in KG"
+      recoverableError          shouldBe a[LogWorthyRecoverableError]
+      recoverableError.getMessage should startWith("Problem finding person details in KG")
     }
 
     "fail with NonRecoverableFailure if finding matching Person in KG fails with an unknown exception" in new TestCase {
