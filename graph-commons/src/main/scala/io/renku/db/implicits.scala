@@ -23,9 +23,8 @@ import skunk.PreparedQuery
 
 object implicits {
 
-  implicit class PreparedQueryOps[F[_], In, Out](
-      preparedQuery: PreparedQuery[F, In, Out]
-  ) {
+  implicit class PreparedQueryOps[F[_], In, Out](preparedQuery: PreparedQuery[F, In, Out]) {
+
     def toList(implicit sync: Async[F]): In => F[List[Out]] = args =>
       preparedQuery.stream(args, chunkSize = 32).compile.toList
   }

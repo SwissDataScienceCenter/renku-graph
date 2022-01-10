@@ -421,8 +421,7 @@ private class TriplesGeneratedEventFinderSpec
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply
 
-  private def readyStatuses = Gen
-    .oneOf(EventStatus.TriplesGenerated, EventStatus.TransformationRecoverableFailure)
+  private def readyStatuses = Gen.oneOf(TriplesGenerated, TransformationRecoverableFailure)
 
   private def createEvent(status:        EventStatus,
                           eventDate:     EventDate = eventDates.generateOne,
