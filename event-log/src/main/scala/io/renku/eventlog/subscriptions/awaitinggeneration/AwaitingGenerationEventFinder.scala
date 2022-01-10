@@ -81,52 +81,45 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
     }
 
   private def findProjectsWithEventsInQueue = measureExecutionTime {
-    val executionDateNow = ExecutionDate(now())
     SqlStatement(
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
-    ).select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
+    ).select[ExecutionDate ~ Int, ProjectInfo](
       sql"""
       SELECT
         proj.project_id,
         proj.project_path,
         proj.latest_event_date,
         (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = proj.project_id AND evt_int.status = '#${GeneratingTriples.value}') AS current_occupancy
-      FROM project proj
-      WHERE 
-        EXISTS (
-          SELECT evt.event_id
-          FROM event evt
-          WHERE evt.project_id = proj.project_id 
-            AND #${`status IN`(New, GenerationRecoverableFailure)}
-            AND execution_date <= $executionDateEncoder
-          LIMIT 1
-        ) 
-        AND NOT EXISTS (
-          SELECT candidate_events.event_id
+      FROM (
+        SELECT candidate_events.project_id
+        FROM (
+          SELECT DISTINCT ON (evt.project_id) evt.project_id, evt.status
           FROM (
-            SELECT evt.event_id, evt.status
+            SELECT DISTINCT evt.project_id
             FROM event evt
-            WHERE evt.project_id = proj.project_id 
-              AND execution_date <= $executionDateEncoder
-            ORDER BY evt.event_date DESC
-            LIMIT 1
-          ) candidate_events
-          WHERE candidate_events.status = '#${GeneratingTriples.value}'
-            OR candidate_events.status = '#${TriplesGenerated.value}'
-            OR candidate_events.status = '#${TransformingTriples.value}'
-            OR candidate_events.status = '#${TransformationRecoverableFailure.value}'
-            OR candidate_events.status = '#${TriplesStore.value}'
-            OR candidate_events.status = '#${AwaitingDeletion.value}'
-            OR candidate_events.status = '#${Deleting.value}'
-        )
+            WHERE #${`status IN`(New, GenerationRecoverableFailure)}
+          ) candidate_projects
+          JOIN event evt ON evt.project_id = candidate_projects.project_id AND evt.execution_date <= $executionDateEncoder
+          ORDER BY evt.project_id DESC, evt.event_date DESC
+        ) candidate_events
+        WHERE #${`status NOT IN`(GeneratingTriples,
+                                 TriplesGenerated,
+                                 TransformingTriples,
+                                 TransformationRecoverableFailure,
+                                 TriplesStore,
+                                 AwaitingDeletion,
+                                 Deleting
+      )}
+      ) projects
+      JOIN project proj ON proj.project_id = projects.project_id
       ORDER BY proj.latest_event_date DESC
       LIMIT $int4
       """
         .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
-        .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
-          ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+        .map { case (id: projects.Id) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
+          ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
         }
-    ).arguments(executionDateNow ~ executionDateNow ~ projectsFetchingLimit.value)
+    ).arguments(ExecutionDate(now()) ~ projectsFetchingLimit.value)
       .build(_.toList)
   }
 
@@ -134,9 +127,7 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
     SqlStatement(
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find total occupancy")
     ).select[EventStatus, Long](
-      sql"""
-      SELECT count(event_id) from event where status = $eventStatusEncoder
-      """.query(int8)
+      sql"""SELECT count(event_id) FROM event WHERE status = $eventStatusEncoder""".query(int8)
     ).arguments(GeneratingTriples)
       .build[Id](_.unique)
   }
@@ -169,6 +160,9 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     s"status IN (${NonEmptyList.of(status, otherStatuses: _*).toList.map(el => s"'$el'").mkString(",")})"
+
+  private def `status NOT IN`(status: EventStatus, otherStatuses: EventStatus*) =
+    s"status NOT IN (${NonEmptyList.of(status, otherStatuses: _*).toList.map(el => s"'$el'").mkString(",")})"
 
   private lazy val selectProject: List[(subscriptions.ProjectIds, Priority)] => Option[subscriptions.ProjectIds] = {
     case Nil                          => None

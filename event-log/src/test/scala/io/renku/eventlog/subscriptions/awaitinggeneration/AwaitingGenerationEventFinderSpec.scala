@@ -225,7 +225,7 @@ private class AwaitingGenerationEventFinderSpec
         )
       }
 
-    "find the latest events from each the projects" in new TestCase {
+    "find the latest events from each project" in new TestCase {
 
       val events = readyStatuses
         .generateNonEmptyList(minElements = 2)
@@ -345,7 +345,7 @@ private class AwaitingGenerationEventFinderSpec
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply
 
-  private def readyStatuses = Gen.oneOf(EventStatus.New, EventStatus.GenerationRecoverableFailure)
+  private def readyStatuses = Gen.oneOf(New, GenerationRecoverableFailure)
 
   private def createEvent(status:        EventStatus,
                           eventDate:     EventDate = eventDates.generateOne,
