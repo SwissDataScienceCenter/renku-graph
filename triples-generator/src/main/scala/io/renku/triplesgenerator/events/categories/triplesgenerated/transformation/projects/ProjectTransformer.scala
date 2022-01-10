@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,18 +26,20 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
+import io.renku.triplesgenerator.events.categories.triplesgenerated.{RecoverableErrorsRecovery, TransformationStep}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
 import org.typelevel.log4cats.Logger
 
-trait ProjectTransformer[F[_]] {
+private[transformation] trait ProjectTransformer[F[_]] {
   def createTransformationStep: TransformationStep[F]
 }
 
-class ProjectTransformerImpl[F[_]: MonadThrow](
-    kGProjectFinder: KGProjectFinder[F],
-    updatesCreator:  UpdatesCreator
+private class ProjectTransformerImpl[F[_]: MonadThrow](
+    kGProjectFinder:           KGProjectFinder[F],
+    updatesCreator:            UpdatesCreator,
+    recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ProjectTransformer[F] {
+  import recoverableErrorsRecovery._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Project Details Updates", createTransformation)
@@ -52,11 +54,11 @@ class ProjectTransformerImpl[F[_]: MonadThrow](
             (project, Queries.preDataQueriesOnly(updatesCreator.prepareUpdates(project, kgProjectInfo)))
               .asRight[ProcessingRecoverableError]
         }
-        .recoverWith(maybeToRecoverableError("Problem finding project details in KG"))
+        .recoverWith(maybeRecoverableError("Problem finding project details in KG"))
     }
 }
 
-object ProjectTransformer {
+private[transformation] object ProjectTransformer {
   def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ProjectTransformer[F]] = for {
     kgProjectFinder <- KGProjectFinder(timeRecorder)
   } yield new ProjectTransformerImpl[F](kgProjectFinder, UpdatesCreator)

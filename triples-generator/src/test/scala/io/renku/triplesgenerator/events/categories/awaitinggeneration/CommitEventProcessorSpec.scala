@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,12 +39,11 @@ import io.renku.jsonld.JsonLD
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
@@ -104,14 +103,14 @@ class CommitEventProcessorSpec
       logError(commitEvent, exception)
     }
 
-    s"succeed and mark event with RecoverableFailure if finding triples fails with $GenerationRecoverableError" in new TestCase {
+    s"succeed and mark event with RecoverableFailure if finding triples fails with $LogWorthyRecoverableError" in new TestCase {
 
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(commitEvent.project.path)
         .returning(maybeAccessToken.pure[Try])
 
-      val exception = GenerationRecoverableError(nonBlankStrings().generateOne.value)
+      val exception = LogWorthyRecoverableError(nonBlankStrings().generateOne.value)
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commitEvent, maybeAccessToken)

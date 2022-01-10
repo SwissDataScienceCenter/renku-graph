@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,7 +29,6 @@ import io.renku.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Queries}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -57,7 +56,7 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
       encodeAndSendProject >>=
       executeAllPostDataUploadQueries
   }
-    .leftMap(recoverableFailure => RecoverableFailure(recoverableFailure.getMessage))
+    .leftMap(RecoverableFailure)
     .map(_ => DeliverySuccess)
     .leftWiden[TriplesUploadResult]
     .merge
@@ -73,11 +72,7 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
     )
 
   private lazy val executeAllPreDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
-    case projectAndQueries @ (_, Queries(preQueries, _)) =>
-      execute(preQueries).bimap(
-        error => TransformationRecoverableError(s"Failed to execute pre-data-upload queries: ${error.message}", error),
-        _ => projectAndQueries
-      )
+    case projectAndQueries @ (_, Queries(preQueries, _)) => execute(preQueries).map(_ => projectAndQueries)
   }
 
   private lazy val encodeAndSendProject: ((Project, Queries)) => ProjectWithQueries[F] = {
@@ -89,23 +84,16 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
                       NonRecoverableFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}", error)
                         .raiseError[F, ProcessingRecoverableError]
                     )
-        _ <- triplesUploader
-               .uploadTriples(jsonLD)
-               .leftMap(error => TransformationRecoverableError(s"Failed to upload json-ld: ${error.message}", error))
-               .leftWiden[ProcessingRecoverableError]
+        _ <- triplesUploader.uploadTriples(jsonLD)
       } yield projectAndQueries
   }
 
   private lazy val executeAllPostDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
-    case projectAndQueries @ (_, Queries(_, postQueries)) =>
-      execute(postQueries).bimap(
-        error => TransformationRecoverableError(s"Failed to execute post-data-upload queries: ${error.message}", error),
-        _ => projectAndQueries
-      )
+    case projectAndQueries @ (_, Queries(_, postQueries)) => execute(postQueries).map(_ => projectAndQueries)
   }
 
-  private def execute(queries: List[SparqlQuery]): EitherT[F, RecoverableFailure, DeliverySuccess] =
-    queries.foldLeft(EitherT.rightT[F, RecoverableFailure](DeliverySuccess)) { (previousResult, query) =>
+  private def execute(queries: List[SparqlQuery]): EitherT[F, ProcessingRecoverableError, Unit] =
+    queries.foldLeft(EitherT.rightT[F, ProcessingRecoverableError](())) { (previousResult, query) =>
       previousResult >> updatesUploader.send(query)
     }
 
@@ -142,9 +130,11 @@ private[triplesgenerated] object TriplesUploadResult {
     val message: String = "Delivery success"
   }
 
-  sealed trait TriplesUploadFailure                    extends TriplesUploadResult
-  final case class RecoverableFailure(message: String) extends Exception(message) with TriplesUploadFailure
-  sealed trait NonRecoverableFailure                   extends Exception with TriplesUploadFailure
+  sealed trait TriplesUploadFailure extends TriplesUploadResult
+  final case class RecoverableFailure(error: ProcessingRecoverableError) extends TriplesUploadFailure {
+    override val message: String = error.getMessage
+  }
+  sealed trait NonRecoverableFailure extends Exception with TriplesUploadFailure
   object NonRecoverableFailure {
     case class NonRecoverableFailureWithCause(message: String, cause: Throwable)
         extends Exception(message, cause)

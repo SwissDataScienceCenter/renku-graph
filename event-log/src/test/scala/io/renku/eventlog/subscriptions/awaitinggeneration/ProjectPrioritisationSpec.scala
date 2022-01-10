@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,7 +35,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant.now
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.Try
 
 private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers with MockFactory {

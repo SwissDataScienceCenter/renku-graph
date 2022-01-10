@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -226,11 +226,9 @@ class ProjectEventsToNewUpdaterSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val projectCleaner   = mock[ProjectCleaner[IO]]
-    val dbUpdater        = new ProjectEventsToNewUpdater[IO](projectCleaner, queriesExecTimes, currentTime)
+    val dbUpdater        = new ProjectEventsToNewUpdaterImpl[IO](projectCleaner, queriesExecTimes, currentTime)
     val now              = Instant.now()
 
     currentTime.expects().returning(now)
-
   }
-
 }

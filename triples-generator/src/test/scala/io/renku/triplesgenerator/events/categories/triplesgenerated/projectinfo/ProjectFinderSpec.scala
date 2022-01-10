@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -44,14 +44,14 @@ import io.renku.json.JsonOps._
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeEncoders
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import org.http4s.Status.{Forbidden, ServiceUnavailable, Unauthorized}
+import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
+import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
-import scala.language.{postfixOps, reflectiveCalls}
+import scala.language.reflectiveCalls
 
 class ProjectFinderSpec
     extends AnyWordSpec
@@ -105,19 +105,26 @@ class ProjectFinderSpec
       finder.findProject(path).value.unsafeRunSync() shouldBe None.asRight
     }
 
-    Set(
-      "connection problem" -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
-      "client problem"     -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt),
-      "ServiceUnavailable" -> aResponse().withStatus(ServiceUnavailable.code),
-      "Forbidden"          -> aResponse().withStatus(Forbidden.code),
-      "Unauthorized"       -> aResponse().withStatus(Unauthorized.code)
-    ) foreach { case (problemName, response) =>
+    val shouldBeLogWorthy = (failure: ProcessingRecoverableError) => failure shouldBe a[LogWorthyRecoverableError]
+    val shouldBeAuth      = (failure: ProcessingRecoverableError) => failure shouldBe a[AuthRecoverableError]
+
+    forAll(
+      Table(
+        ("Problem Name", "Failing Response", "Expected Failure type"),
+        ("connection problem", aResponse().withFault(CONNECTION_RESET_BY_PEER), shouldBeLogWorthy),
+        ("client problem", aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt), shouldBeLogWorthy),
+        ("BadGateway", aResponse().withStatus(BadGateway.code), shouldBeLogWorthy),
+        ("ServiceUnavailable", aResponse().withStatus(ServiceUnavailable.code), shouldBeLogWorthy),
+        ("Forbidden", aResponse().withStatus(Forbidden.code), shouldBeAuth),
+        ("Unauthorized", aResponse().withStatus(Unauthorized.code), shouldBeAuth)
+      )
+    ) { case (problemName, response, failureTypeAssertion) =>
       s"return a Recoverable Failure for $problemName when fetching project info" in new TestCase {
         val path = projectPaths.generateOne
         `/api/v4/projects`(path) returning response
 
         val Left(failure) = finder.findProject(path).value.unsafeRunSync()
-        failure shouldBe a[ProcessingRecoverableError]
+        failureTypeAssertion(failure)
       }
 
       s"return a Recoverable Failure for $problemName when fetching creator" in new TestCase {
@@ -128,7 +135,7 @@ class ProjectFinderSpec
         `/api/v4/users`(creator.gitLabId) returning response
 
         val Left(failure) = finder.findProject(projectInfo.path).value.unsafeRunSync()
-        failure shouldBe a[ProcessingRecoverableError]
+        failureTypeAssertion(failure)
       }
     }
   }

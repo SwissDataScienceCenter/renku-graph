@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -50,7 +50,6 @@ import skunk.{Command, Session, ~}
 import java.lang.Thread.sleep
 import java.time.Instant
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class ZombieEventDetectionSpec
     extends AnyFeatureSpec

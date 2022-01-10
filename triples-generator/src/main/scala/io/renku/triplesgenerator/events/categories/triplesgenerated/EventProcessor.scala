@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,7 +31,7 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator
@@ -94,17 +94,18 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
     case DeliverySuccess =>
       (Uploaded(triplesGeneratedEvent): UploadingResult)
         .pure[F]
-    case error @ RecoverableFailure(message) =>
-      Logger[F]
-        .error(error)(
-          s"${logMessageCommon(triplesGeneratedEvent)} $message"
-        )
-        .map(_ => RecoverableError(triplesGeneratedEvent, error))
+    case RecoverableFailure(error) =>
+      error match {
+        case error @ LogWorthyRecoverableError(message, _) =>
+          Logger[F]
+            .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} $message")
+            .map(_ => RecoverableError(triplesGeneratedEvent, error))
+        case error @ AuthRecoverableError(_, _) =>
+          RecoverableError(triplesGeneratedEvent, error).pure[F].widen[UploadingResult]
+      }
     case error: NonRecoverableFailure =>
       Logger[F]
-        .error(error)(
-          s"${logMessageCommon(triplesGeneratedEvent)} ${error.message}"
-        )
+        .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} ${error.message}")
         .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
   }
 

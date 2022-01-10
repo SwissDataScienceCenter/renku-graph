@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,6 @@ import io.renku.metrics._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 trait EventLogMetrics[F[_]] {
@@ -50,6 +49,7 @@ class EventLogMetricsImpl[F[_]: Temporal: Logger](
 
   private def provisionCategoryNames = for {
     eventsByCategoryName <- statsFinder.countEventsByCategoryName()
+    _                    <- categoryNameEventsGauge.clear()
     _                    <- (eventsByCategoryName map toCategoryNameEventsGauge).toList.sequence
   } yield ()
 

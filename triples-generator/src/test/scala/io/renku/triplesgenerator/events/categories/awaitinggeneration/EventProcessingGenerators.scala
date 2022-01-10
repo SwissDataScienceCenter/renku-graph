@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,10 +19,8 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import io.renku.events.consumers.ConsumersModelGenerators._
-import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventId
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen
 
 private object EventProcessingGenerators {
@@ -32,7 +30,4 @@ private object EventProcessingGenerators {
     project  <- projectsGen
   } yield CommitEvent(EventId(commitId.value), project, commitId)
 
-  lazy val generationRecoverableErrors: Gen[GenerationRecoverableError] = for {
-    message <- nonEmptyStrings()
-  } yield GenerationRecoverableError(message)
 }

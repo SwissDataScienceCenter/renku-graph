@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -145,6 +145,23 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (labelValue, value) =>
         (label, labelValue.value, value)
       }
+    }
+  }
+
+  "clear" should {
+
+    "remove all entries" in new TestCase {
+
+      // before re-provisioning
+      val labelValue1 = projectPaths.generateOne
+      val value1      = nonNegativeDoubles().generateOne.value
+      gauge.set(labelValue1 -> value1) shouldBe MonadThrow[Try].unit
+
+      underlying.collectAllSamples should contain only ((label, labelValue1.value, value1))
+
+      gauge.clear() shouldBe MonadThrow[Try].unit
+
+      underlying.collectAllSamples.isEmpty shouldBe true
     }
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,10 +27,10 @@ import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, TopmostSameAs}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, users}
 import io.renku.rdfstore.SparqlQuery
+import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
-import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator.TransformationRecoverableError
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -170,8 +170,8 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val Success(Left(recoverableError)) = step.run(project).value
 
-      recoverableError            shouldBe a[TransformationRecoverableError]
-      recoverableError.getMessage shouldBe "Problem finding dataset details in KG"
+      recoverableError          shouldBe a[ProcessingRecoverableError]
+      recoverableError.getMessage should startWith("Problem finding dataset details in KG")
     }
 
     "fail with NonRecoverableFailure if finding calls to KG fails with an unknown exception" in new TestCase {

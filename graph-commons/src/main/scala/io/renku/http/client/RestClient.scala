@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -261,7 +261,6 @@ object RestClient {
   import eu.timepit.refined.auto._
 
   import scala.concurrent.duration._
-  import scala.language.postfixOps
 
   val SleepAfterConnectionIssue:        FiniteDuration          = 10 seconds
   val MaxRetriesAfterConnectionTimeout: Int Refined NonNegative = 10

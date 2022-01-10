@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -30,7 +30,6 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.language.postfixOps
 import scala.util.Random
 
 private trait SubscribersRegistry[F[_]] {

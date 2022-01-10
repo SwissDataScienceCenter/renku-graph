@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -27,24 +27,24 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.jsonld.JsonLD
 import io.renku.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQueryTimeRecorder}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult.{DeliverySuccess, RecoverableFailure}
+import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
-import scala.util.control.NonFatal
 
 private trait TriplesUploader[F[_]] {
-  def uploadTriples(triples: JsonLD): EitherT[F, RecoverableFailure, DeliverySuccess]
+  def uploadTriples(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit]
 }
 
 private class TriplesUploaderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F],
-    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:    Duration = 6 minutes,
-    requestTimeout: Duration = 5 minutes
+    rdfStoreConfig:   RdfStoreConfig,
+    timeRecorder:     SparqlQueryTimeRecorder[F],
+    recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery,
+    retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:      Duration = 6 minutes,
+    requestTimeout:   Duration = 5 minutes
 ) extends RdfStoreClientImpl(rdfStoreConfig,
                              timeRecorder,
                              retryInterval = retryInterval,
@@ -54,40 +54,18 @@ private class TriplesUploaderImpl[F[_]: Async: Logger](
     )
     with TriplesUploader[F] {
 
-  import TriplesUploadResult._
   import org.http4s.Status._
   import org.http4s.{Request, Response, Status}
 
-  override def uploadTriples(triples: JsonLD): EitherT[F, RecoverableFailure, DeliverySuccess] = EitherT {
-    upload[Either[TriplesUploadFailure, DeliverySuccess]](triples)(mapResponse) recoverWith deliveryFailure
-  }.leftSemiflatMap(leftOrFail)
+  override def uploadTriples(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
+    upload[Either[ProcessingRecoverableError, Unit]](triples)(
+      mapResponse
+    ) recoverWith recoveryStrategy.maybeRecoverableError
+  }
 
   private lazy val mapResponse
-      : PartialFunction[(Status, Request[F], Response[F]), F[Either[TriplesUploadFailure, DeliverySuccess]]] = {
-    case (Ok, _, _)                         => DeliverySuccess.asRight[TriplesUploadFailure].pure[F]
-    case (BadRequest, _, response)          => singleLineBody(response) map toNonRecoverableFailure
-    case (InternalServerError, _, response) => singleLineBody(response) map toNonRecoverableFailure
-    case (other, _, response)               => singleLineBody(response) map toRecoverableFailure(other)
-  }
-
-  private def singleLineBody(response: Response[F]): F[String] = response.as[String].map(LogMessage.toSingleLine)
-
-  private def toNonRecoverableFailure(responseMessage: String): Either[TriplesUploadFailure, DeliverySuccess] =
-    NonRecoverableFailure(s"Failed to upload triples $responseMessage").asLeft[DeliverySuccess]
-
-  private def toRecoverableFailure(status: Status)(
-      responseMessage:                     String
-  ): Either[TriplesUploadFailure, DeliverySuccess] =
-    RecoverableFailure(s"$status: $responseMessage").asLeft[DeliverySuccess]
-
-  private def deliveryFailure: PartialFunction[Throwable, F[Either[TriplesUploadFailure, DeliverySuccess]]] = {
-    case NonFatal(exception) =>
-      RecoverableFailure(exception.getMessage).asLeft[DeliverySuccess].leftWiden[TriplesUploadFailure].pure[F]
-  }
-
-  private lazy val leftOrFail: TriplesUploadFailure => F[RecoverableFailure] = {
-    case failure: NonRecoverableFailure => failure.raiseError[F, RecoverableFailure]
-    case failure: RecoverableFailure    => failure.pure[F]
+      : PartialFunction[(Status, Request[F], Response[F]), F[Either[ProcessingRecoverableError, Unit]]] = {
+    case (Ok, _, _) => ().asRight[ProcessingRecoverableError].pure[F]
   }
 }
 
@@ -99,6 +77,13 @@ private object TriplesUploader {
                                  idleTimeout:    Duration = 6 minutes,
                                  requestTimeout: Duration = 5 minutes
   ): F[TriplesUploaderImpl[F]] = MonadThrow[F].catchNonFatal(
-    new TriplesUploaderImpl[F](rdfStoreConfig, timeRecorder, retryInterval, maxRetries, idleTimeout, requestTimeout)
+    new TriplesUploaderImpl[F](rdfStoreConfig,
+                               timeRecorder,
+                               RecoverableErrorsRecovery,
+                               retryInterval,
+                               maxRetries,
+                               idleTimeout,
+                               requestTimeout
+    )
   )
 }

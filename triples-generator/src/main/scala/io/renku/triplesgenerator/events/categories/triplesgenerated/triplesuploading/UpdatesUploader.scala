@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,23 +24,27 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import io.renku.http.client.RestClientError.BadRequestException
 import io.renku.rdfstore._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult.{DeliverySuccess, RecoverableFailure}
+import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult.NonRecoverableFailure
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
 private trait UpdatesUploader[F[_]] {
-  def send(updateQuery: SparqlQuery): EitherT[F, RecoverableFailure, DeliverySuccess]
+  def send(updateQuery: SparqlQuery): EitherT[F, ProcessingRecoverableError, Unit]
 }
 
 private class UpdatesUploaderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F],
-    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:    Duration = 5 minutes,
-    requestTimeout: Duration = 4 minutes
+    rdfStoreConfig:   RdfStoreConfig,
+    timeRecorder:     SparqlQueryTimeRecorder[F],
+    recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery,
+    retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:      Duration = 5 minutes,
+    requestTimeout:   Duration = 4 minutes
 ) extends RdfStoreClientImpl[F](rdfStoreConfig,
                                 timeRecorder,
                                 retryInterval,
@@ -50,41 +54,27 @@ private class UpdatesUploaderImpl[F[_]: Async: Logger](
     )
     with UpdatesUploader[F] {
 
-  import LogMessage._
-  import TriplesUploadResult._
-  import org.http4s.Status.{BadRequest, Ok}
+  import org.http4s.Status.Ok
   import org.http4s.{Request, Response, Status}
+  import recoveryStrategy._
 
-  import scala.util.control.NonFatal
+  override def send(updateQuery: SparqlQuery): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
+    updateWitMapping(updateQuery, responseMapper).recoverWith(
+      maybeRecoverableError[F, Unit](
+        s"Triples transformation update '${updateQuery.name}' failed"
+      ) orElse toNonRecoverableFailure(updateQuery)
+    )
+  }
 
-  override def send(updateQuery: SparqlQuery): EitherT[F, RecoverableFailure, DeliverySuccess] = EitherT {
-    updateWitMapping(updateQuery, responseMapper(updateQuery)) recoverWith deliveryFailure
-  }.leftSemiflatMap(leftOrFail)
-
-  private def responseMapper(
-      updateQuery: SparqlQuery
-  ): PartialFunction[(Status, Request[F], Response[F]), F[Either[TriplesUploadFailure, DeliverySuccess]]] = {
-    case (Ok, _, _)                => DeliverySuccess.asRight[TriplesUploadFailure].pure[F]
-    case (BadRequest, _, response) => (response.as[String] map toSingleLine) map toNonRecoverableFailure(updateQuery)
-    case (other, _, response)      => response.as[String] map toSingleLine map toDeliveryFailure(other)
+  private lazy val responseMapper
+      : PartialFunction[(Status, Request[F], Response[F]), F[Either[ProcessingRecoverableError, Unit]]] = {
+    case (Ok, _, _) => ().asRight[ProcessingRecoverableError].pure[F]
   }
 
   private def toNonRecoverableFailure(
-      updateQuery:   SparqlQuery
-  )(responseMessage: String): Either[TriplesUploadFailure, DeliverySuccess] =
-    NonRecoverableFailure(s"Triples transformation update '${updateQuery.name}' failed: $responseMessage")
-      .asLeft[DeliverySuccess]
-
-  private def toDeliveryFailure(status: Status)(message: String): Either[TriplesUploadFailure, DeliverySuccess] =
-    RecoverableFailure(s"Triples transformation update failed: $status: $message").asLeft[DeliverySuccess]
-
-  private def deliveryFailure: PartialFunction[Throwable, F[Either[TriplesUploadFailure, DeliverySuccess]]] = {
-    case NonFatal(exception) =>
-      RecoverableFailure(exception.getMessage).asLeft[DeliverySuccess].leftWiden[TriplesUploadFailure].pure[F]
-  }
-
-  private lazy val leftOrFail: TriplesUploadFailure => F[RecoverableFailure] = {
-    case failure: NonRecoverableFailure => failure.raiseError[F, RecoverableFailure]
-    case failure: RecoverableFailure    => failure.pure[F]
+      updateQuery: SparqlQuery
+  ): PartialFunction[Throwable, F[Either[ProcessingRecoverableError, Unit]]] = { case error: BadRequestException =>
+    NonRecoverableFailure(s"Triples transformation update '${updateQuery.name}' failed", error)
+      .raiseError[F, Either[ProcessingRecoverableError, Unit]]
   }
 }

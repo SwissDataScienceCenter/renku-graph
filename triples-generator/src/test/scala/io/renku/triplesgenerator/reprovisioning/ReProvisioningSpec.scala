@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -35,7 +35,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
@@ -71,8 +70,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
 
-      (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
-
       reProvisioning.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("Triples Store up to date"))
@@ -82,11 +79,8 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(exception.raiseError[IO, Boolean])
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
-
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
       }
 
       reProvisioning.run().unsafeRunSync() shouldBe ()

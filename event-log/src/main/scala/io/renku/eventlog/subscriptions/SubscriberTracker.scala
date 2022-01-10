@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -48,9 +48,9 @@ private class SubscriberTrackerImpl[F[_]: MonadCancelThrow](
       SqlStatement(name = "subscriber - add")
         .command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId](
           sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
-                  VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
-                  ON CONFLICT (delivery_url, source_url)
-                  DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
+                VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
+                ON CONFLICT (delivery_url, source_url)
+                DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
                """.command
         )
         .arguments(

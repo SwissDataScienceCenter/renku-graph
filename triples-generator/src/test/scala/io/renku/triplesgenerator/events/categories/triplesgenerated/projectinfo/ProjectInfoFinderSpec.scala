@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 package projectinfo
 
-import TriplesGeneratedGenerators._
 import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
@@ -35,6 +34,7 @@ import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -164,7 +164,7 @@ class ProjectInfoFinderSpec
     "fail with a RecoverableError if finding project fails recoverably" in new TestCase {
       val path = projectPaths.generateOne
 
-      val error = transformationRecoverableErrors.generateOne
+      val error = processingRecoverableErrors.generateOne
       (projectFinder
         .findProject(_: projects.Path)(_: Option[AccessToken]))
         .expects(path, maybeAccessToken)
@@ -181,7 +181,7 @@ class ProjectInfoFinderSpec
         .expects(info.path, maybeAccessToken)
         .returning(EitherT.rightT[IO, ProcessingRecoverableError](info.some))
 
-      val error = transformationRecoverableErrors.generateOne
+      val error = processingRecoverableErrors.generateOne
       (membersFinder
         .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
         .expects(info.path, maybeAccessToken)
@@ -202,7 +202,7 @@ class ProjectInfoFinderSpec
         .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
         .expects(info.path, maybeAccessToken)
         .returning(EitherT.rightT[IO, ProcessingRecoverableError](members))
-      val error = transformationRecoverableErrors.generateOne
+      val error = processingRecoverableErrors.generateOne
       members foreach { member =>
         (memberEmailFinder
           .findMemberEmail(_: ProjectMember, _: Project)(_: Option[AccessToken]))
