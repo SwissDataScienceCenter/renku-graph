@@ -166,7 +166,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       "which are not invalidated" in {
         val (importedInternalAncestorInternal ::~ importedInternalAncestorExternal ::~ _ ::~ _ ::~ _ ::~ _, project) =
           anyProjectEntities
-            .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal))
+            .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal()))
             .addDataset(datasetEntities(provenanceImportedInternalAncestorExternal))
             .addDataset(datasetEntities(provenanceInternal))
             .addDataset(datasetEntities(provenanceImportedExternal))
@@ -174,7 +174,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
             .generateOne
 
         val originalImportedInternal =
-          datasetEntities(provenanceImportedInternalAncestorInternal)(renkuBaseUrl)(project.dateCreated).generateOne
+          datasetEntities(provenanceImportedInternalAncestorInternal())(renkuBaseUrl)(project.dateCreated).generateOne
         val projectWithAllDatasets =
           project.addDatasets(originalImportedInternal, originalImportedInternal.invalidateNow).to[entities.Project]
 
@@ -191,7 +191,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceImportedExternal))
-        .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal))
+        .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal()))
         .addDataset(datasetEntities(provenanceImportedInternalAncestorExternal))
         .generateOne
 
@@ -215,7 +215,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
         anyProjectEntities
           .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
           .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
-          .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal))
+          .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal()))
           .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorExternal))
           .generateOne
       val (beforeModification, modified, modificationInvalidated) =
