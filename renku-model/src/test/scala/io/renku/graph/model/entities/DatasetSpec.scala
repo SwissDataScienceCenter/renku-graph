@@ -56,11 +56,11 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     forAll {
       Table(
-        "DS generator"                                              -> "DS type",
-        datasetEntities(provenanceInternal)                         -> "Internal",
-        datasetEntities(provenanceImportedExternal)                 -> "Imported External",
-        datasetEntities(provenanceImportedInternalAncestorInternal) -> "Imported Internal Ancestor External",
-        datasetEntities(provenanceImportedInternalAncestorExternal) -> "Imported Internal Ancestor Internal"
+        "DS generator"                                                -> "DS type",
+        datasetEntities(provenanceInternal)                           -> "Internal",
+        datasetEntities(provenanceImportedExternal)                   -> "Imported External",
+        datasetEntities(provenanceImportedInternalAncestorInternal()) -> "Imported Internal Ancestor External",
+        datasetEntities(provenanceImportedInternalAncestorExternal)   -> "Imported Internal Ancestor Internal"
       )
     } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
       s"fail if originalIdentifier on an $dsType dataset is different than its identifier" in {
@@ -114,7 +114,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     "succeed if dataset parts are older than the modified or imported internal dataset" in {
       List(
         datasetAndModificationEntities(provenanceNonModified).map(_._2),
-        datasetEntities(provenanceImportedInternalAncestorInternal).decoupledFromProject
+        datasetEntities(provenanceImportedInternalAncestorInternal()).decoupledFromProject
       ) foreach { datasetGen =>
         val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val olderPart = updatePartDateAfter(
@@ -223,7 +223,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           provenanceImportedInternalAncestorExternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
         ).decoupledFromProject.generateOne.to[entities.Dataset[Provenance.ImportedInternal]],
         datasetEntities(
-          provenanceImportedInternalAncestorInternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
+          provenanceImportedInternalAncestorInternal().asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
         ).decoupledFromProject.generateOne.to[entities.Dataset[Provenance.ImportedInternal]]
       ) foreach { dataset =>
         val newTopmostSameAs = datasetTopmostSameAs.generateOne
