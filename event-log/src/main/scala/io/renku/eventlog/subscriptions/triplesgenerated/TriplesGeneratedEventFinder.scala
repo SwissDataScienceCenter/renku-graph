@@ -85,7 +85,7 @@ private class TriplesGeneratedEventFinderImpl[F[_]: Async](
           proj.latest_event_date,
           (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = proj.project_id AND evt_int.status = '#${TransformingTriples.value}') AS current_occupancy
         FROM (
-          SELECT candidate_events.status, candidate_events.project_id
+          SELECT candidate_events.project_id
           FROM (
             SELECT DISTINCT ON (evt.project_id) evt.project_id, evt.status
             FROM event evt
