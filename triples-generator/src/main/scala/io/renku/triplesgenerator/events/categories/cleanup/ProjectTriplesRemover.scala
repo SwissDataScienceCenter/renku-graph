@@ -31,7 +31,6 @@ import io.renku.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQuery, Sparq
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 private trait ProjectTriplesRemover[F[_]] {
   def removeTriples(of: projects.Path): F[Unit]
