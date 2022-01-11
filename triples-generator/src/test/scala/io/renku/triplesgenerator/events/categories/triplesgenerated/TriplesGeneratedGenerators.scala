@@ -27,8 +27,7 @@ private object TriplesGeneratedGenerators {
 
   implicit val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
     eventId  <- eventIds
-    project  <- projectsGen
+    project  <- consumerProjects
     entities <- jsonLDEntities
   } yield TriplesGeneratedEvent(eventId, project, entities)
-
 }

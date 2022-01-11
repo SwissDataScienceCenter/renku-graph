@@ -27,7 +27,7 @@ private object EventProcessingGenerators {
 
   implicit val commitEvents: Gen[CommitEvent] = for {
     commitId <- commitIds
-    project  <- projectsGen
+    project  <- consumerProjects
   } yield CommitEvent(EventId(commitId.value), project, commitId)
 
 }
