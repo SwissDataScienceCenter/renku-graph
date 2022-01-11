@@ -35,7 +35,7 @@ import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.~
-
+import java.time.Duration
 import java.time.Instant
 
 private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
@@ -69,7 +69,7 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
       )
       .arguments(
         event.newStatus ~
-          ExecutionDate(now()) ~
+          ExecutionDate(now().plusMillis(event.executionDelay.getOrElse(Duration.ofMillis(0)).toMillis)) ~
           event.message ~
           event.eventId.id ~
           event.eventId.projectId ~
@@ -118,7 +118,9 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
            """.query(eventIdDecoder)
       )
       .arguments(
-        ExecutionDate(now()) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
+        ExecutionDate(
+          now().plusMillis(event.executionDelay.getOrElse(Duration.ofMillis(0)).toMillis)
+        ) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
       )
       .build(_.toList)
       .mapResult { ids =>

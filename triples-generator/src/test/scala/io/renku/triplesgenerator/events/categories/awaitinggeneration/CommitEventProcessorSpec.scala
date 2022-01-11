@@ -28,7 +28,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
-import io.renku.graph.model.events.EventStatus.New
+import io.renku.graph.model.events.EventStatus.{FailureStatus, New}
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects.Path
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -41,6 +41,7 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
+import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
@@ -116,7 +117,7 @@ class CommitEventProcessorSpec
         .expects(commitEvent, maybeAccessToken)
         .returning(leftT[Try, JsonLD](exception))
 
-      expectEventMarkedAsRecoverableFailure(commitEvent, exception)
+      expectEventMarkedAsRecoverableFailure(commitEvent, exception, ExecutionDelay(Duration.ofMinutes(5)))
 
       eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
@@ -203,13 +204,23 @@ class CommitEventProcessorSpec
       )
     }
 
-    def expectEventMarkedAsRecoverableFailure(commit: CommitEvent, exception: Throwable) =
-      (eventStatusUpdater.toFailure _)
-        .expects(commit.compoundEventId, commit.project.path, EventStatus.GenerationRecoverableFailure, exception)
+    def expectEventMarkedAsRecoverableFailure(commit:         CommitEvent,
+                                              exception:      Throwable,
+                                              executionDelay: ExecutionDelay = ExecutionDelay(Duration.ofSeconds(0))
+    ) =
+      (eventStatusUpdater
+        .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable, _: ExecutionDelay))
+        .expects(commit.compoundEventId,
+                 commit.project.path,
+                 EventStatus.GenerationRecoverableFailure,
+                 exception,
+                 executionDelay
+        )
         .returning(().pure[Try])
 
     def expectEventMarkedAsNonRecoverableFailure(commit: CommitEvent, exception: Throwable) =
-      (eventStatusUpdater.toFailure _)
+      (eventStatusUpdater
+        .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable))
         .expects(commit.compoundEventId, commit.project.path, EventStatus.GenerationNonRecoverableFailure, exception)
         .returning(().pure[Try])
 

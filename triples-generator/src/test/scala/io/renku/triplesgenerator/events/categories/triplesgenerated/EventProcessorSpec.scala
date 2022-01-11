@@ -28,7 +28,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.entities.Project
-import io.renku.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
+import io.renku.graph.model.events.EventStatus.{FailureStatus, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities._
@@ -44,6 +44,7 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
+import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
 import io.renku.triplesgenerator.events.categories.triplesgenerated.EventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators._
@@ -342,6 +343,7 @@ class EventProcessorSpec
   private lazy val eventsProcessingTimes = eventsProcessingTimesBuilder.create()
 
   private trait TestCase {
+
     val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
 
     implicit val maybeAccessToken: Option[AccessToken] = Gen.option(accessTokens).generateOne
@@ -385,13 +387,20 @@ class EventProcessorSpec
       .expects(event, maybeAccessToken)
       .returning(returning)
 
-    def expectEventMarkedAsRecoverableFailure(event: TriplesGeneratedEvent, exception: Throwable) =
-      (eventStatusUpdater.toFailure _)
-        .expects(event.compoundEventId, event.project.path, TransformationRecoverableFailure, exception)
+    def expectEventMarkedAsRecoverableFailure(event: TriplesGeneratedEvent, exception: ProcessingRecoverableError) = {
+      val executionDelay = exception match {
+        case _: AuthRecoverableError      => ExecutionDelay(Duration.ofHours(1))
+        case _: LogWorthyRecoverableError => ExecutionDelay(Duration.ofMinutes(5))
+      }
+      (eventStatusUpdater
+        .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable, _: ExecutionDelay))
+        .expects(event.compoundEventId, event.project.path, TransformationRecoverableFailure, exception, executionDelay)
         .returning(().pure[Try])
+    }
 
     def expectEventMarkedAsNonRecoverableFailure(event: TriplesGeneratedEvent, exception: Throwable) =
-      (eventStatusUpdater.toFailure _)
+      (eventStatusUpdater
+        .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable))
         .expects(event.compoundEventId, event.project.path, TransformationNonRecoverableFailure, exception)
         .returning(().pure[Try])
 

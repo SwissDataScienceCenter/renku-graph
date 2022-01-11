@@ -37,7 +37,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.Instant
+import java.time.{Duration, Instant}
 
 class ToFailureUpdaterSpec
     extends AnyWordSpec
@@ -51,9 +51,9 @@ class ToFailureUpdaterSpec
 
     "change status of the given event from ProcessingStatus to FailureStatus" in new TestCase {
       Set(
-        createFailureEvent(GeneratingTriples, GenerationNonRecoverableFailure),
-        createFailureEvent(GeneratingTriples, GenerationRecoverableFailure),
-        createFailureEvent(TransformingTriples, TransformationRecoverableFailure)
+        createFailureEvent(GeneratingTriples, GenerationNonRecoverableFailure, None),
+        createFailureEvent(GeneratingTriples, GenerationRecoverableFailure, None),
+        createFailureEvent(TransformingTriples, TransformationRecoverableFailure, None)
       ) foreach { statusChangeEvent =>
         (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
@@ -78,7 +78,8 @@ class ToFailureUpdaterSpec
           projectPath,
           eventMessages.generateOne,
           TransformingTriples,
-          TransformationNonRecoverableFailure
+          TransformationNonRecoverableFailure,
+          None
         )
 
         val eventToUpdate = addEvent(
@@ -126,10 +127,10 @@ class ToFailureUpdaterSpec
         val message = eventMessages.generateOne
 
         Set(
-          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationNonRecoverableFailure),
-          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationRecoverableFailure),
-          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationNonRecoverableFailure),
-          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationRecoverableFailure)
+          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationNonRecoverableFailure, None),
+          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationRecoverableFailure, None),
+          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationNonRecoverableFailure, None),
+          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationRecoverableFailure, None)
         ) foreach { statusChangeEvent =>
           (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
@@ -149,7 +150,8 @@ class ToFailureUpdaterSpec
                             projectPath,
                             eventMessages.generateOne,
                             GeneratingTriples,
-                            GenerationNonRecoverableFailure
+                            GenerationNonRecoverableFailure,
+                            None
       )
 
       (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
@@ -173,10 +175,19 @@ class ToFailureUpdaterSpec
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def createFailureEvent[C <: ProcessingStatus, N <: FailureStatus](currentStatus: C, newStatus: N)(implicit
-        evidence:                                                                    AllowedCombination[C, N]
+    def createFailureEvent[C <: ProcessingStatus, N <: FailureStatus](currentStatus:  C,
+                                                                      newStatus:      N,
+                                                                      executionDelay: Option[Duration]
+    )(implicit
+        evidence: AllowedCombination[C, N]
     ): ToFailure[C, N] =
-      ToFailure(addEvent(currentStatus), projectPath, eventMessages.generateOne, currentStatus, newStatus)
+      ToFailure(addEvent(currentStatus),
+                projectPath,
+                eventMessages.generateOne,
+                currentStatus,
+                newStatus,
+                executionDelay
+      )
 
     def addEvent[S <: ProcessingStatus](status: S): CompoundEventId = {
       val eventId = CompoundEventId(eventIds.generateOne, projectId)
