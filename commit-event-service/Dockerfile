@@ -28,5 +28,12 @@ ENV TZ UTC
 RUN apk add --no-cache tzdata curl bash && \
     chown -R daemon:daemon .
 
+ENV GID=90060
+RUN addgroup -g "$GID" -S cesgroup && \
+    adduser --disabled-password -g "$GID" -D -u 9006 cesuser && \
+    chmod 555 -R /opt/commit-event-service
+
+USER cesuser
+
 ENTRYPOINT ["bin/commit-event-service"]
 CMD []
