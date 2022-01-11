@@ -23,6 +23,7 @@ import io.renku.graph.model.entities.CommandParameterBase.{CommandInput, Command
 import io.renku.graph.model.plans.{Command, DateCreated, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
 import io.renku.graph.model.{InvalidationTime, commandParameters}
 import io.renku.jsonld.JsonLDDecoder
+import io.renku.jsonld.JsonLDDecoder.decodeList
 
 final case class Plan(resourceId:               ResourceId,
                       name:                     Name,
@@ -84,7 +85,7 @@ object Plan {
       maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
       dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
       maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
-      keywords              <- cursor.downField(schema / "keywords").as[List[Keyword]]
+      keywords              <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten)
       parameters            <- cursor.downField(renku / "hasArguments").as[List[CommandParameter]]
       inputs                <- cursor.downField(renku / "hasInputs").as[List[CommandInput]]
       outputs               <- cursor.downField(renku / "hasOutputs").as[List[CommandOutput]]
