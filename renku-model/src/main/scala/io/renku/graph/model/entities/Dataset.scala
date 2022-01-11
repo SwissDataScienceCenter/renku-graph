@@ -392,10 +392,10 @@ object Dataset {
         import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
         for {
           maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
-          keywords         <- cursor.downField(schema / "keywords").as[List[Keyword]].map(_.sorted)
-          images           <- cursor.downField(schema / "image").as[List[Image]].map(_.sortBy(_.position))
-          maybeLicense     <- cursor.downField(schema / "license").as[Option[License]]
-          maybeVersion     <- cursor.downField(schema / "version").as[Option[Version]]
+          keywords     <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten).map(_.sorted)
+          images       <- cursor.downField(schema / "image").as[List[Image]].map(_.sortBy(_.position))
+          maybeLicense <- cursor.downField(schema / "license").as[Option[License]]
+          maybeVersion <- cursor.downField(schema / "version").as[Option[Version]]
         } yield AdditionalInfo(maybeDescription, keywords, images, maybeLicense, maybeVersion)
     }
   }
