@@ -25,8 +25,8 @@ COPY --from=builder /work/commit-event-service/target/universal/stage .
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
-RUN apk add --no-cache tzdata curl bash && \
+RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
-ENTRYPOINT ["bin/commit-event-service"]
-CMD []
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["bin/commit-event-service"]
