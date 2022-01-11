@@ -28,5 +28,12 @@ ENV TZ UTC
 RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
+ENV GID=90050
+RUN addgroup -g "$GID" -S elgroup && \
+    adduser --disabled-password -g "$GID" -D -u 9005 eluser && \
+    chmod 555 -R /opt/event-log
+
+USER eluser
+
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["bin/event-log"]

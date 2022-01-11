@@ -30,12 +30,22 @@ RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py
     python3 -m pip install --upgrade 'pip==21.3.1' && \
     python3 -m pip install jinja2 && \
     python3 -m pip install 'git+https://github.com/SwissDataScienceCenter/renku-python.git@develop' 'sentry-sdk==0.18.0'  && \
-    chown -R daemon:daemon . && \
-    git config --global user.name 'renku'  && \
+    chown -R daemon:daemon .
+
+COPY triples-generator/entrypoint.sh /entrypoint.sh
+
+ENV GID=90020
+RUN addgroup -g "$GID" -S tggroup && \
+    adduser --disabled-password -g "$GID" -D -u 9002 tguser && \
+    chmod 555 -R /opt/triples-generator && \
+    chmod 555 -R /entrypoint.sh
+
+USER tguser
+
+RUN git config --global user.name 'renku'  && \
     git config --global user.email 'renku@renkulab.io'  && \
     git config --global filter.lfs.smudge "git-lfs smudge --skip %f"  && \
     git config --global filter.lfs.process "git-lfs filter-process --skip"
 
-COPY triples-generator/entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 CMD ["bin/triples-generator"]
