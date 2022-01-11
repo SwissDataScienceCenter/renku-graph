@@ -28,5 +28,12 @@ ENV TZ UTC
 RUN apk add --no-cache tzdata curl bash && \
     chown -R daemon:daemon .
 
+ENV GID=90040
+RUN addgroup -g "$GID" -S kggroup && \
+    adduser --disabled-password -g "$GID" -D -u 9004 kguser && \
+    chmod 555 -R /opt/knowledge-graph
+
+USER kguser
+
 ENTRYPOINT ["bin/knowledge-graph"]
 CMD []
