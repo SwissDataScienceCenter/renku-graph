@@ -26,7 +26,7 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
 # Installing Renku and other dependencies
-RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo && \
+RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo tini && \
     python3 -m pip install --upgrade 'pip==21.3.1' && \
     python3 -m pip install jinja2 && \
     python3 -m pip install 'git+https://github.com/SwissDataScienceCenter/renku-python.git@develop' 'sentry-sdk==0.18.0'  && \
@@ -37,5 +37,5 @@ RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py
     git config --global filter.lfs.process "git-lfs filter-process --skip"
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 CMD ["bin/triples-generator"]
