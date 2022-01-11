@@ -19,10 +19,9 @@
 package io.renku.eventlog.events.categories.statuschange.projectCleaner
 
 import cats.effect.IO
-import cats.implicits.toShow
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
-import io.renku.eventlog.events.categories.statuschange.Generators.consumerProjects
+import io.renku.events.consumers.ConsumersModelGenerators._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions

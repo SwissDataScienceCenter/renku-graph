@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
-import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.graph.model.EventsGenerators.{batchDates, eventBodies, eventIds, eventStatuses}
 import model.Event
@@ -28,7 +28,7 @@ import org.scalacheck.Gen
 private object Generators {
   lazy val events: Gen[Event] = for {
     eventId      <- eventIds
-    project      <- projectsGen
+    project      <- consumerProjects
     date         <- eventDates
     batchDate    <- batchDates
     body         <- eventBodies

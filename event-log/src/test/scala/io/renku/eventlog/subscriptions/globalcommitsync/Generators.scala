@@ -28,7 +28,7 @@ import org.scalacheck.Gen
 private object Generators {
 
   val globalCommitSyncEvents: Gen[GlobalCommitSyncEvent] = for {
-    project             <- projectsGen
+    project             <- consumerProjects
     commitsCount        <- positiveLongs().map(_.value).toGeneratorOf(CommitsCount)
     latestCommit        <- commitIds
     currentLastSyncDate <- lastSyncedDates.toGeneratorOfOptions

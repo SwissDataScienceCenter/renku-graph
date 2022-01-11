@@ -34,7 +34,7 @@ object ConsumersModelGenerators {
     case None          => EventRequestContent.NoPayload(event)
   }
 
-  implicit lazy val projectsGen: Gen[Project] = for {
+  implicit lazy val consumerProjects: Gen[Project] = for {
     projectId <- projectIds
     path      <- projectPaths
   } yield Project(projectId, path)

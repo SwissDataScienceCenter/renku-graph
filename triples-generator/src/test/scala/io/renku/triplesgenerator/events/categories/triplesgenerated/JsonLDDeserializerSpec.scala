@@ -22,6 +22,7 @@ import cats.data.EitherT
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.events.consumers
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -167,6 +168,42 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
       error            shouldBe a[IllegalStateException]
       error.getMessage shouldBe show"2 Project entities found in the JsonLD for $eventProject"
     }
+
+    "fail if the project found in the payload is different than the project in the event" in new TestCase {
+      val project      = anyProjectEntities.generateOne
+      val eventProject = consumerProjects.generateOne
+
+      givenFindProjectInfo(eventProject.path)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
+
+      val Failure(error) = deserializer.deserializeToModel {
+        triplesGeneratedEvents.generateOne.copy(
+          project = eventProject,
+          payload = JsonLD.arr(project.asJsonLD).flatten.fold(throw _, identity)
+        )
+      }.value
+
+      error            shouldBe a[IllegalStateException]
+      error.getMessage shouldBe show"Event for project $eventProject contains payload for project ${project.path}"
+    }
+
+    "successfully deserialize JsonLD to the model " +
+      "if project from the payload has the same path in case insensitive way as the project in the event" in new TestCase {
+        val project      = anyProjectEntities.generateOne
+        val eventProject = consumers.Project(projectIds.generateOne, projects.Path(project.path.value.toUpperCase()))
+
+        givenFindProjectInfo(eventProject.path)
+          .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
+
+        val Success(results) = deserializer.deserializeToModel {
+          triplesGeneratedEvents.generateOne.copy(
+            project = eventProject,
+            payload = JsonLD.arr(project.asJsonLD).flatten.fold(throw _, identity)
+          )
+        }.value
+
+        results shouldBe project.to[entities.Project].asRight
+      }
 
     "fail if the payload is invalid" in new TestCase {
       val project = projectEntities(anyVisibility).generateOne

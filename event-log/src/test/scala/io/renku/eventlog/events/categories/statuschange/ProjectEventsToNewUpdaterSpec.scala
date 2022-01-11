@@ -25,9 +25,9 @@ import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog._
-import io.renku.eventlog.events.categories.statuschange.Generators.consumerProjects
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.categories.statuschange.projectCleaner.ProjectCleaner
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
