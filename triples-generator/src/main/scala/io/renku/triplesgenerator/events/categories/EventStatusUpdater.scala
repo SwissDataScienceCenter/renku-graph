@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.categories
 
 import cats.effect.{Async, Sync}
 import cats.syntax.all._
+import io.circe.Encoder
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
 import io.renku.events
@@ -29,9 +30,16 @@ import io.renku.events.producers.EventSender
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
+import io.renku.json.JsonOps._
 import io.renku.jsonld.JsonLD
+import io.renku.tinytypes.constraints.DurationNotNegative
 import io.renku.tinytypes.json.TinyTypeEncoders
+import io.renku.tinytypes.json.TinyTypeEncoders.durationEncoder
+import io.renku.tinytypes.{DurationTinyType, TinyTypeFactory}
+import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
 import org.typelevel.log4cats.Logger
+
+import java.time.Duration
 
 private trait EventStatusUpdater[F[_]] {
   def toTriplesGenerated(eventId:        CompoundEventId,
@@ -50,6 +58,13 @@ private trait EventStatusUpdater[F[_]] {
                 projectPath: projects.Path,
                 eventStatus: FailureStatus,
                 exception:   Throwable
+  ): F[Unit]
+
+  def toFailure(eventId:        CompoundEventId,
+                projectPath:    projects.Path,
+                eventStatus:    FailureStatus,
+                exception:      Throwable,
+                executionDelay: ExecutionDelay
   ): F[Unit]
 
   def projectToNew(project: Project): F[Unit]
@@ -93,7 +108,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
                               projectPath:    projects.Path,
                               processingTime: EventProcessingTime
   ): F[Unit] = eventSender.sendEvent(
-    eventContent = EventRequestContent.NoPayload(json"""{ 
+    eventContent = EventRequestContent.NoPayload(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id": ${eventId.id},
       "project": {
@@ -126,6 +141,20 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
                          projectPath: projects.Path,
                          eventStatus: FailureStatus,
                          exception:   Throwable
+  ): F[Unit] = toFailure(eventId, projectPath, eventStatus, exception, None)
+
+  override def toFailure(eventId:        CompoundEventId,
+                         projectPath:    projects.Path,
+                         eventStatus:    FailureStatus,
+                         exception:      Throwable,
+                         executionDelay: ExecutionDelay
+  ): F[Unit] = toFailure(eventId, projectPath, eventStatus, exception, Some(executionDelay))
+
+  def toFailure(eventId:             CompoundEventId,
+                projectPath:         projects.Path,
+                eventStatus:         FailureStatus,
+                exception:           Throwable,
+                maybeExecutionDelay: Option[ExecutionDelay]
   ): F[Unit] = eventSender.sendEvent(
     eventContent = EventRequestContent.NoPayload(json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
@@ -136,7 +165,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
       },
       "newStatus": $eventStatus,
       "message":   ${ErrorMessage.withStackTrace(exception).value}
-    }"""),
+    }""".addIfDefined("executionDelay" -> maybeExecutionDelay)),
     errorMessage = s"$categoryName: Change event status as $eventStatus failed"
   )
 
@@ -161,4 +190,11 @@ private object EventStatusUpdater {
   def apply[F[_]: Async: Logger](categoryName: CategoryName): F[EventStatusUpdater[F]] = for {
     eventSender <- EventSender[F]
   } yield new EventStatusUpdaterImpl(eventSender, categoryName, Zip)
+
+  final class ExecutionDelay private (val value: Duration) extends AnyVal with DurationTinyType
+  object ExecutionDelay extends TinyTypeFactory[ExecutionDelay](new ExecutionDelay(_)) with DurationNotNegative {
+
+    implicit val encoder: Encoder[ExecutionDelay] = durationEncoder
+
+  }
 }

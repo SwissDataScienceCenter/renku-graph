@@ -172,7 +172,7 @@ class StatusChangerSpec
     case ProjectEventsToNew(project)              => genUpdateResult(project.path)
     case ToTriplesGenerated(_, projectPath, _, _) => genUpdateResult(projectPath)
     case ToTriplesStore(_, projectPath, _)        => genUpdateResult(projectPath)
-    case ToFailure(_, projectPath, _, currentStatus, newStatus) =>
+    case ToFailure(_, projectPath, _, currentStatus, newStatus, _) =>
       Gen.const(
         DBUpdateResults.ForProjects(projectPath, Map(currentStatus -> -1, newStatus -> 1))
       )

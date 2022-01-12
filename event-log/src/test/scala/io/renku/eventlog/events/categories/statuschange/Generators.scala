@@ -25,6 +25,8 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import org.scalacheck.Gen
+import io.renku.generators.Generators.Implicits._
+import java.time.Duration
 
 private object Generators {
 
@@ -41,15 +43,42 @@ private object Generators {
     processingTime <- eventProcessingTimes
   } yield ToTriplesStore(eventId, projectPath, processingTime)
 
+  private lazy val executionDelays: Gen[Duration] = Gen.choose(0L, 10L).map(Duration.ofSeconds)
+
   lazy val toFailureEvents = for {
-    eventId     <- compoundEventIds
-    projectPath <- projectPaths
-    message     <- eventMessages
+    eventId        <- compoundEventIds
+    projectPath    <- projectPaths
+    message        <- eventMessages
+    executionDelay <- executionDelays.toGeneratorOfOptions
     event <- Gen.oneOf(
-               ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationRecoverableFailure),
-               ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationNonRecoverableFailure),
-               ToFailure(eventId, projectPath, message, TransformingTriples, TransformationRecoverableFailure),
-               ToFailure(eventId, projectPath, message, TransformingTriples, TransformationNonRecoverableFailure)
+               ToFailure(eventId,
+                         projectPath,
+                         message,
+                         GeneratingTriples,
+                         GenerationRecoverableFailure,
+                         executionDelay
+               ),
+               ToFailure(eventId,
+                         projectPath,
+                         message,
+                         GeneratingTriples,
+                         GenerationNonRecoverableFailure,
+                         executionDelay
+               ),
+               ToFailure(eventId,
+                         projectPath,
+                         message,
+                         TransformingTriples,
+                         TransformationRecoverableFailure,
+                         executionDelay
+               ),
+               ToFailure(eventId,
+                         projectPath,
+                         message,
+                         TransformingTriples,
+                         TransformationNonRecoverableFailure,
+                         executionDelay
+               )
              )
   } yield event
 
