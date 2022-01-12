@@ -53,13 +53,13 @@ private object StatusChangeEvent {
     }
   }
 
-  final case class ToFailure[+C <: ProcessingStatus, +N <: FailureStatus](eventId:        CompoundEventId,
-                                                                          projectPath:    projects.Path,
-                                                                          message:        EventMessage,
-                                                                          currentStatus:  C,
-                                                                          newStatus:      N,
-                                                                          executionDelay: Option[Duration]
-  )(implicit evidence:                                                                    AllowedCombination[C, N])
+  final case class ToFailure[+C <: ProcessingStatus, +N <: FailureStatus](eventId:             CompoundEventId,
+                                                                          projectPath:         projects.Path,
+                                                                          message:             EventMessage,
+                                                                          currentStatus:       C,
+                                                                          newStatus:           N,
+                                                                          maybeExecutionDelay: Option[Duration]
+  )(implicit evidence:                                                                         AllowedCombination[C, N])
       extends StatusChangeEvent
   object ToFailure {
     implicit lazy val show: Show[ToFailure[ProcessingStatus, FailureStatus]] = Show.show {

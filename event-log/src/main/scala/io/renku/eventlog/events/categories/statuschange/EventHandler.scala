@@ -194,7 +194,7 @@ private object EventHandler {
                                          message,
                                          GeneratingTriples,
                                          status,
-                                         executionDelay
+                                         maybeExecutionDelay = None
                                ).asRight
                              case status: TransformationRecoverableFailure =>
                                ToFailure(eventId,
@@ -210,7 +210,7 @@ private object EventHandler {
                                          message,
                                          TransformingTriples,
                                          status,
-                                         executionDelay
+                                         maybeExecutionDelay = None
                                ).asRight
                              case status =>
                                DecodingFailure(s"Unrecognized event status $status", Nil)

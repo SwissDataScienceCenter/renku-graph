@@ -69,7 +69,7 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
       )
       .arguments(
         event.newStatus ~
-          ExecutionDate(now().plusMillis(event.executionDelay.getOrElse(Duration.ofMillis(0)).toMillis)) ~
+          ExecutionDate(now().plusMillis(event.maybeExecutionDelay.getOrElse(Duration.ofMillis(0)).toMillis)) ~
           event.message ~
           event.eventId.id ~
           event.eventId.projectId ~
@@ -119,7 +119,7 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
       )
       .arguments(
         ExecutionDate(
-          now().plusMillis(event.executionDelay.getOrElse(Duration.ofMillis(0)).toMillis)
+          now().plusMillis(event.maybeExecutionDelay.getOrElse(Duration.ofMillis(0)).toMillis)
         ) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
       )
       .build(_.toList)

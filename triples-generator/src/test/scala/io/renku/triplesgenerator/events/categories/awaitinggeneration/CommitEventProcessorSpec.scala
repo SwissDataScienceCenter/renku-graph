@@ -39,12 +39,13 @@ import io.renku.jsonld.JsonLD
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
+import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
@@ -111,13 +112,13 @@ class CommitEventProcessorSpec
       givenFetchingAccessToken(commitEvent.project.path)
         .returning(maybeAccessToken.pure[Try])
 
-      val exception = LogWorthyRecoverableError(nonBlankStrings().generateOne.value)
+      val exception = processingRecoverableErrors.generateOne
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commitEvent, maybeAccessToken)
         .returning(leftT[Try, JsonLD](exception))
 
-      expectEventMarkedAsRecoverableFailure(commitEvent, exception, ExecutionDelay(Duration.ofMinutes(5)))
+      expectEventMarkedAsRecoverableFailure(commitEvent, exception)
 
       eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
@@ -204,10 +205,11 @@ class CommitEventProcessorSpec
       )
     }
 
-    def expectEventMarkedAsRecoverableFailure(commit:         CommitEvent,
-                                              exception:      Throwable,
-                                              executionDelay: ExecutionDelay = ExecutionDelay(Duration.ofSeconds(0))
-    ) =
+    def expectEventMarkedAsRecoverableFailure(commit: CommitEvent, exception: ProcessingRecoverableError) = {
+      val executionDelay = exception match {
+        case _: AuthRecoverableError      => ExecutionDelay(Duration.ofHours(1))
+        case _: LogWorthyRecoverableError => ExecutionDelay(Duration.ofMinutes(5))
+      }
       (eventStatusUpdater
         .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable, _: ExecutionDelay))
         .expects(commit.compoundEventId,
@@ -217,6 +219,7 @@ class CommitEventProcessorSpec
                  executionDelay
         )
         .returning(().pure[Try])
+    }
 
     def expectEventMarkedAsNonRecoverableFailure(commit: CommitEvent, exception: Throwable) =
       (eventStatusUpdater

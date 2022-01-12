@@ -70,7 +70,7 @@ class ToFailureUpdaterSpec
         statusChangeEvent.newStatus match {
           case _: GenerationRecoverableFailure | _: TransformationRecoverableFailure =>
             executionDate.value shouldBe >(Instant.now())
-          case _ => executionDate.value shouldBe <(Instant.now())
+          case _ => executionDate.value shouldBe <=(Instant.now())
         }
 
         executionStatus shouldBe statusChangeEvent.newStatus
