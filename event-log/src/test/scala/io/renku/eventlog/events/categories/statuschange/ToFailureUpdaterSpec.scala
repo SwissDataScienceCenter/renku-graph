@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
@@ -52,8 +53,8 @@ class ToFailureUpdaterSpec
     "change status of the given event from ProcessingStatus to FailureStatus" in new TestCase {
       Set(
         createFailureEvent(GeneratingTriples, GenerationNonRecoverableFailure, None),
-        createFailureEvent(GeneratingTriples, GenerationRecoverableFailure, None),
-        createFailureEvent(TransformingTriples, TransformationRecoverableFailure, None)
+        createFailureEvent(GeneratingTriples, GenerationRecoverableFailure, Duration.ofHours(100).some),
+        createFailureEvent(TransformingTriples, TransformationRecoverableFailure, Duration.ofHours(100).some)
       ) foreach { statusChangeEvent =>
         (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
@@ -64,9 +65,16 @@ class ToFailureUpdaterSpec
           Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
         )
 
-        val updatedEvent = findEvent(statusChangeEvent.eventId)
-        updatedEvent.map(_._2)     shouldBe Some(statusChangeEvent.newStatus)
-        updatedEvent.flatMap(_._3) shouldBe Some(statusChangeEvent.message)
+        val Some((executionDate, executionStatus, Some(message))) = findEvent(statusChangeEvent.eventId)
+
+        statusChangeEvent.newStatus match {
+          case _: GenerationRecoverableFailure | _: TransformationRecoverableFailure =>
+            executionDate.value shouldBe >(Instant.now())
+          case _ => executionDate.value shouldBe <(Instant.now())
+        }
+
+        executionStatus shouldBe statusChangeEvent.newStatus
+        message         shouldBe statusChangeEvent.message
       }
     }
 
