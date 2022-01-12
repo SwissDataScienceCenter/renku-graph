@@ -36,6 +36,7 @@ import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
+import java.time.{Duration => JDuration}
 import scala.util.control.NonFatal
 
 private class EventHandler[F[_]: Async: Logger](
@@ -176,15 +177,41 @@ private object EventHandler {
       projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
       message     <- request.event.hcursor.downField("message").as[EventMessage]
       eventId = CompoundEventId(id, projectId)
+      executionDelay <-
+        request.event.hcursor.downField("executionDelay").as[Option[JDuration]]
       statusChangeEvent <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
                              case status: GenerationRecoverableFailure =>
-                               ToFailure(eventId, projectPath, message, GeneratingTriples, status).asRight
+                               ToFailure(eventId,
+                                         projectPath,
+                                         message,
+                                         GeneratingTriples,
+                                         status,
+                                         executionDelay
+                               ).asRight
                              case status: GenerationNonRecoverableFailure =>
-                               ToFailure(eventId, projectPath, message, GeneratingTriples, status).asRight
+                               ToFailure(eventId,
+                                         projectPath,
+                                         message,
+                                         GeneratingTriples,
+                                         status,
+                                         maybeExecutionDelay = None
+                               ).asRight
                              case status: TransformationRecoverableFailure =>
-                               ToFailure(eventId, projectPath, message, TransformingTriples, status).asRight
+                               ToFailure(eventId,
+                                         projectPath,
+                                         message,
+                                         TransformingTriples,
+                                         status,
+                                         executionDelay
+                               ).asRight
                              case status: TransformationNonRecoverableFailure =>
-                               ToFailure(eventId, projectPath, message, TransformingTriples, status).asRight
+                               ToFailure(eventId,
+                                         projectPath,
+                                         message,
+                                         TransformingTriples,
+                                         status,
+                                         maybeExecutionDelay = None
+                               ).asRight
                              case status =>
                                DecodingFailure(s"Unrecognized event status $status", Nil)
                                  .asLeft[ToFailure[ProcessingStatus, FailureStatus]]

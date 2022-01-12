@@ -31,7 +31,7 @@ import io.renku.jsonld.JsonLD
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
@@ -99,11 +99,16 @@ private class CommitEventProcessor[F[_]: MonadThrow: Logger](
                                          triples,
                                          processingTime
         )
-      case RecoverableError(commit, message) =>
-        statusUpdater.toFailure(CompoundEventId(commit.eventId, commit.project.id),
-                                commit.project.path,
-                                EventStatus.GenerationRecoverableFailure,
-                                message
+      case RecoverableError(commit, cause) =>
+        statusUpdater.toFailure(
+          CompoundEventId(commit.eventId, commit.project.id),
+          commit.project.path,
+          EventStatus.GenerationRecoverableFailure,
+          cause,
+          executionDelay = cause match {
+            case _: AuthRecoverableError => ExecutionDelay(Duration.ofHours(1))
+            case _ => ExecutionDelay(Duration.ofMinutes(5))
+          }
         )
       case NonRecoverableError(commit, cause) =>
         statusUpdater.toFailure(CompoundEventId(commit.eventId, commit.project.id),
@@ -164,7 +169,7 @@ private class CommitEventProcessor[F[_]: MonadThrow: Logger](
       override lazy val toString: String = TriplesGenerated.toString()
     }
 
-    case class RecoverableError(commit: CommitEvent, cause: Throwable) extends GenerationError {
+    case class RecoverableError(commit: CommitEvent, cause: ProcessingRecoverableError) extends GenerationError {
       override lazy val toString: String = GenerationRecoverableFailure.toString
     }
 

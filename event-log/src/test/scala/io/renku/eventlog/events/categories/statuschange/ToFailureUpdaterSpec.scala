@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
@@ -37,7 +38,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.Instant
+import java.time.{Duration, Instant}
 
 class ToFailureUpdaterSpec
     extends AnyWordSpec
@@ -51,9 +52,9 @@ class ToFailureUpdaterSpec
 
     "change status of the given event from ProcessingStatus to FailureStatus" in new TestCase {
       Set(
-        createFailureEvent(GeneratingTriples, GenerationNonRecoverableFailure),
-        createFailureEvent(GeneratingTriples, GenerationRecoverableFailure),
-        createFailureEvent(TransformingTriples, TransformationRecoverableFailure)
+        createFailureEvent(GeneratingTriples, GenerationNonRecoverableFailure, None),
+        createFailureEvent(GeneratingTriples, GenerationRecoverableFailure, Duration.ofHours(100).some),
+        createFailureEvent(TransformingTriples, TransformationRecoverableFailure, Duration.ofHours(100).some)
       ) foreach { statusChangeEvent =>
         (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
@@ -64,9 +65,16 @@ class ToFailureUpdaterSpec
           Map(statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 1)
         )
 
-        val updatedEvent = findEvent(statusChangeEvent.eventId)
-        updatedEvent.map(_._2)     shouldBe Some(statusChangeEvent.newStatus)
-        updatedEvent.flatMap(_._3) shouldBe Some(statusChangeEvent.message)
+        val Some((executionDate, executionStatus, Some(message))) = findEvent(statusChangeEvent.eventId)
+
+        statusChangeEvent.newStatus match {
+          case _: GenerationRecoverableFailure | _: TransformationRecoverableFailure =>
+            executionDate.value shouldBe >(Instant.now())
+          case _ => executionDate.value shouldBe <=(Instant.now())
+        }
+
+        executionStatus shouldBe statusChangeEvent.newStatus
+        message         shouldBe statusChangeEvent.message
       }
     }
 
@@ -78,7 +86,8 @@ class ToFailureUpdaterSpec
           projectPath,
           eventMessages.generateOne,
           TransformingTriples,
-          TransformationNonRecoverableFailure
+          TransformationNonRecoverableFailure,
+          None
         )
 
         val eventToUpdate = addEvent(
@@ -126,10 +135,10 @@ class ToFailureUpdaterSpec
         val message = eventMessages.generateOne
 
         Set(
-          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationNonRecoverableFailure),
-          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationRecoverableFailure),
-          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationNonRecoverableFailure),
-          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationRecoverableFailure)
+          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationNonRecoverableFailure, None),
+          ToFailure(eventId, projectPath, message, GeneratingTriples, GenerationRecoverableFailure, None),
+          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationNonRecoverableFailure, None),
+          ToFailure(eventId, projectPath, message, TransformingTriples, TransformationRecoverableFailure, None)
         ) foreach { statusChangeEvent =>
           (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
@@ -149,7 +158,8 @@ class ToFailureUpdaterSpec
                             projectPath,
                             eventMessages.generateOne,
                             GeneratingTriples,
-                            GenerationNonRecoverableFailure
+                            GenerationNonRecoverableFailure,
+                            None
       )
 
       (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
@@ -173,10 +183,19 @@ class ToFailureUpdaterSpec
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
 
-    def createFailureEvent[C <: ProcessingStatus, N <: FailureStatus](currentStatus: C, newStatus: N)(implicit
-        evidence:                                                                    AllowedCombination[C, N]
+    def createFailureEvent[C <: ProcessingStatus, N <: FailureStatus](currentStatus:  C,
+                                                                      newStatus:      N,
+                                                                      executionDelay: Option[Duration]
+    )(implicit
+        evidence: AllowedCombination[C, N]
     ): ToFailure[C, N] =
-      ToFailure(addEvent(currentStatus), projectPath, eventMessages.generateOne, currentStatus, newStatus)
+      ToFailure(addEvent(currentStatus),
+                projectPath,
+                eventMessages.generateOne,
+                currentStatus,
+                newStatus,
+                executionDelay
+      )
 
     def addEvent[S <: ProcessingStatus](status: S): CompoundEventId = {
       val eventId = CompoundEventId(eventIds.generateOne, projectId)
