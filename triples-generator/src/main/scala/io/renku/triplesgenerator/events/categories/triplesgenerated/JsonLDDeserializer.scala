@@ -88,7 +88,7 @@ private class JsonLDDeserializerImpl[F[_]: MonadThrow](
     }
 
   private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => F[T] = err =>
-    new IllegalStateException(s"Finding Project entity in the JsonLD for ${event.project.show} failed", err)
+    new IllegalStateException(show"Finding Project entity in the JsonLD for ${event.project} failed", err)
       .raiseError[F, T]
 }
 
