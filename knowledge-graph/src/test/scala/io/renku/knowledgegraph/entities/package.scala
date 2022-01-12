@@ -16,21 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
+package io.renku.knowledgegraph
 
-import io.renku.graph.model.{projects, users}
+import io.renku.graph.model.testentities
 
-object model {
+package object entities {
 
-  sealed trait Entity
-
-  final case class Project(
-      name:             projects.Name,
-      path:             projects.Path,
-      visibility:       projects.Visibility,
-      dateCreated:      projects.DateCreated,
-      maybeCreator:     Option[users.Name],
-      keywords:         List[projects.Keyword],
-      maybeDescription: Option[projects.Description]
-  ) extends Entity
+  private[entities] implicit def projectConverter[E <: testentities.Project]: E => model.Project = project =>
+    model.Project(
+      project.name,
+      project.path,
+      project.visibility,
+      project.dateCreated,
+      project.maybeCreator.map(_.name),
+      project.keywords.toList.sorted,
+      project.maybeDescription
+    )
 }
