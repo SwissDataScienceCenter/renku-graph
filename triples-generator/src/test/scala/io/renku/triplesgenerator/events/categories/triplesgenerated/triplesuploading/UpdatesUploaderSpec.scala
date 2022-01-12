@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading
 
 import cats.effect.IO
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
@@ -32,13 +33,13 @@ import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{FusekiBaseUrl, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult.{DeliverySuccess, InvalidUpdatesFailure, RecoverableFailure}
-import org.http4s.Status
+import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
+import org.http4s.Status.{Forbidden, Unauthorized}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
 
@@ -47,37 +48,52 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
     s"return $DeliverySuccess if all the given updates pass" in new TestCase {
       givenStore(forUpdate = query, returning = ok())
 
-      updater.send(query).unsafeRunSync() shouldBe DeliverySuccess
+      updater.send(query).value.unsafeRunSync() shouldBe ().asRight
     }
 
-    s"return $InvalidUpdatesFailure if the given updates is invalid (RDF store responds with BAD_REQUEST 400)" in new TestCase {
+    s"return $NonRecoverableFailure if the given updates is invalid (RDF store responds with BAD_REQUEST 400)" in new TestCase {
 
-      val errorMessage = nonEmptyStrings().generateOne
-      givenStore(forUpdate = query, returning = badRequest().withBody(errorMessage))
+      givenStore(forUpdate = query, returning = badRequest())
 
-      updater.send(query).unsafeRunSync() shouldBe InvalidUpdatesFailure(
-        s"Triples curation update '${query.name}' failed: $errorMessage"
+      intercept[NonRecoverableFailure](updater.send(query).value.unsafeRunSync()).getMessage should startWith(
+        "Triples transformation update 'curation update' failed"
       )
     }
 
-    s"return $RecoverableFailure if remote responds with status different than OK or BAD_REQUEST" in new TestCase {
+    Set(Forbidden, Unauthorized) foreach { status =>
+      s"return Auth $RecoverableFailure if remote responds with $status " in new TestCase {
 
-      val errorMessage = nonEmptyStrings().generateOne
-      givenStore(forUpdate = query, returning = serviceUnavailable().withBody(errorMessage))
+        val errorMessage = nonEmptyStrings().generateOne
+        givenStore(forUpdate = query, returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
-      updater.send(query).unsafeRunSync() shouldBe RecoverableFailure(
-        s"Triples curation update failed: ${Status.ServiceUnavailable}: $errorMessage"
-      )
+        val Left(error) = updater.send(query).value.unsafeRunSync()
+        error          shouldBe a[AuthRecoverableError]
+        error.getMessage should startWith("Triples transformation update 'curation update' failed:")
+      }
     }
 
-    s"return $RecoverableFailure for connectivity issues" in new TestCase {
+    s"return Log-worthy $RecoverableFailure if remote responds with status different than " +
+      s"OK, BAD_REQUEST, FORBIDDEN, OR UNAUTHORIZED" in new TestCase {
+
+        val errorMessage = nonEmptyStrings().generateOne
+        givenStore(forUpdate = query, returning = serviceUnavailable().withBody(errorMessage))
+
+        val Left(error) = updater.send(query).value.unsafeRunSync()
+
+        error          shouldBe a[LogWorthyRecoverableError]
+        error.getMessage should startWith("Triples transformation update 'curation update' failed:")
+      }
+
+    s"return Log-worthy $RecoverableFailure for connectivity issues" in new TestCase {
 
       givenStore(forUpdate = query, returning = aResponse.withFault(CONNECTION_RESET_BY_PEER))
 
-      val failure = updater.send(query).unsafeRunSync()
+      val Left(failure) = updater.send(query).value.unsafeRunSync()
 
-      failure       shouldBe a[RecoverableFailure]
-      failure.message should startWith(s"POST $externalServiceBaseUrl/${rdfStoreConfig.datasetName}/update error")
+      failure shouldBe a[LogWorthyRecoverableError]
+      failure.getMessage should startWith(
+        s"Triples transformation update 'curation update' failed: POST $externalServiceBaseUrl/${rdfStoreConfig.datasetName}/update error"
+      )
     }
   }
 

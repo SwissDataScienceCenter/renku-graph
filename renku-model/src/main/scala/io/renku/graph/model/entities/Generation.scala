@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -49,22 +49,14 @@ object Generation {
 
   def decoder(activityId: activities.ResourceId): JsonLDDecoder[Generation] =
     JsonLDDecoder.entity(entityTypes, withActivity(activityId)) { cursor =>
-      val multipleToNone: List[OutputEntity] => Either[DecodingFailure, Option[OutputEntity]] = {
-        case entity :: Nil => Right(Some(entity))
-        case _             => Right(None)
-      }
-
       for {
         resourceId         <- cursor.downEntityId.as[generations.ResourceId]
         activityResourceId <- cursor.downField(prov / "activity").downEntityId.as[activities.ResourceId]
-        entity <- cursor.top
-                    .map {
-                      _.cursor
-                        .as[List[OutputEntity]](decodeList(Entity.outputEntityDecoder(resourceId)))
-                        .flatMap(multipleToNone)
-                    }
-                    .flatMap(_.sequence)
-                    .getOrElse(Left(DecodingFailure(s"Generation $resourceId without or with multiple entities ", Nil)))
+        entity <- cursor.focusTop
+                    .as[List[OutputEntity]](decodeList(Entity.outputEntityDecoder(resourceId))) >>= {
+                    case entity :: Nil => entity.asRight
+                    case _ => DecodingFailure(s"Generation $resourceId without or with multiple entities ", Nil).asLeft
+                  }
       } yield Generation(resourceId, activityResourceId, entity)
     }
 }

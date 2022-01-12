@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -38,7 +38,14 @@ import io.renku.jsonld.syntax._
 trait ModelOps extends Dataset.ProvenanceOps {
 
   implicit class PersonOps(person: Person) {
-    lazy val resourceId: users.ResourceId = users.ResourceId(person.asEntityId)
+    lazy val resourceId: users.ResourceId = person.maybeGitLabId match {
+      case Some(gitLabId) => users.ResourceId(gitLabId)
+      case None =>
+        person.maybeEmail match {
+          case Some(email) => users.ResourceId(email)
+          case None        => users.ResourceId(person.name)
+        }
+    }
 
     def to[T](implicit convert: Person => T):              T         = convert(person)
     def toMaybe[T](implicit convert: Person => Option[T]): Option[T] = convert(person)
@@ -94,6 +101,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
           child.maybeCreator,
           child.visibility,
           ForksCount.Zero,
+          child.keywords,
           child.members,
           parentProject.version,
           parentProject.activities,
@@ -381,7 +389,8 @@ trait ModelOps extends Dataset.ProvenanceOps {
       new Plan(plan.id,
                plan.name,
                plan.maybeDescription,
-               plan.command,
+               plan.maybeCommand,
+               plan.dateCreated,
                plan.maybeProgrammingLanguage,
                plan.keywords,
                plan.commandParameterFactories,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -59,8 +59,8 @@ private class SubscriptionMechanismImpl[F[_]: MonadThrow: Temporal: Logger](
       _                   <- postToEventLog(subscriptionPayload)
     } yield ()
   } recoverWith { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"$categoryName: Problem with notifying event-log")
-    exception.raiseError[F, Unit]
+    Logger[F].error(exception)(s"$categoryName: Problem with notifying event-log") >>
+      exception.raiseError[F, Unit]
   }
 
   override def run(): F[Unit] =

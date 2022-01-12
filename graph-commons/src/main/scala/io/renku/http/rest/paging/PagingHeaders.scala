@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,17 +24,17 @@ import io.renku.http.rest.paging.model.Page.first
 import io.renku.tinytypes.UrlTinyType
 import io.renku.tinytypes.constraints.UrlOps
 import org.http4s.Header
-import org.typelevel.ci.CIString
+import org.typelevel.ci._
 
 object PagingHeaders {
 
-  val Total:      CIString = CIString("Total")
-  val TotalPages: CIString = CIString("Total-Pages")
-  val PerPage:    CIString = CIString("Per-Page")
-  val Page:       CIString = CIString("Page")
-  val NextPage:   CIString = CIString("Next-Page")
-  val PrevPage:   CIString = CIString("Prev-Page")
-  val Link:       CIString = CIString("Link")
+  val Total:      CIString = ci"Total"
+  val TotalPages: CIString = ci"Total-Pages"
+  val PerPage:    CIString = ci"Per-Page"
+  val Page:       CIString = ci"Page"
+  val NextPage:   CIString = ci"Next-Page"
+  val PrevPage:   CIString = ci"Prev-Page"
+  val Link:       CIString = ci"Link"
 
   def from[F[_], ResourceUrl <: UrlTinyType](response: PagingResponse[_])(implicit
       resourceUrl:                                     ResourceUrl,

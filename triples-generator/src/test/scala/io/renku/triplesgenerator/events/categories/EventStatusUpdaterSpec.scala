@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,6 +24,7 @@ import io.circe.literal._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
 import io.renku.events.EventRequestContent
+import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -197,6 +198,29 @@ class EventStatusUpdaterSpec
     }
   }
 
+  "projectToNew" should {
+
+    s"send a projectToNew status change event" in new TestCase {
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: String))
+        .expects(
+          EventRequestContent.NoPayload(
+            json"""{
+              "categoryName": "EVENTS_STATUS_CHANGE",
+              "project": {
+                "id":   ${eventId.projectId.value},
+                "path": ${projectPath.value}
+              },
+              "newStatus": ${New.value}
+            }"""
+          ),
+          s"$categoryName: Change project events status as $New failed"
+        )
+        .returning(IO.unit)
+
+      updater.projectToNew(Project(eventId.projectId, projectPath)).unsafeRunSync() shouldBe ()
+    }
+  }
   private trait TestCase {
     val eventId     = compoundEventIds.generateOne
     val projectPath = projectPaths.generateOne

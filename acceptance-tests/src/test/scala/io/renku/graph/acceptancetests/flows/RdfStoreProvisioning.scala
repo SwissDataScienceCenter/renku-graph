@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -37,7 +37,6 @@ import org.scalatest.matchers.should
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 trait RdfStoreProvisioning
     extends ModelImplicits
@@ -54,9 +53,14 @@ trait RdfStoreProvisioning
   )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion = {
     `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
 
-    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
 
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+
+    `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                          project,
+                                                                          commitId
+    )
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 

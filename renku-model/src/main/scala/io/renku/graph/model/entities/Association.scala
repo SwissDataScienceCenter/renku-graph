@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,31 +18,64 @@
 
 package io.renku.graph.model.entities
 
+import cats.syntax.all._
+import io.circe.DecodingFailure
+import io.renku.graph.model.GitLabApiUrl
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.associations.ResourceId
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
-final case class Association(resourceId: ResourceId, agent: Agent, plan: Plan)
+sealed trait Association {
+  type AgentType
+  val resourceId: ResourceId
+  val agent:      AgentType
+  val plan:       Plan
+}
 
 object Association {
 
+  final case class WithRenkuAgent(resourceId: ResourceId, agent: Agent, plan: Plan) extends Association {
+    type AgentType = Agent
+  }
+  final case class WithPersonAgent(resourceId: ResourceId, agent: Person, plan: Plan) extends Association {
+    type AgentType = Person
+  }
+
   val entityTypes: EntityTypes = EntityTypes of (prov / "Association")
 
-  implicit lazy val encoder: JsonLDEncoder[Association] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      entity.resourceId.asEntityId,
-      entityTypes,
-      prov / "agent"   -> entity.agent.asJsonLD,
-      prov / "hadPlan" -> entity.plan.resourceId.asEntityId.asJsonLD
-    )
+  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Association] = JsonLDEncoder.instance {
+    case WithRenkuAgent(resourceId, agent, plan) =>
+      JsonLD.entity(
+        resourceId.asEntityId,
+        entityTypes,
+        prov / "agent"   -> agent.asJsonLD,
+        prov / "hadPlan" -> plan.resourceId.asEntityId.asJsonLD
+      )
+    case WithPersonAgent(resourceId, agent, plan) =>
+      JsonLD.entity(
+        resourceId.asEntityId,
+        entityTypes,
+        prov / "agent"   -> agent.asJsonLD,
+        prov / "hadPlan" -> plan.resourceId.asEntityId.asJsonLD
+      )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[Association] = JsonLDDecoder.entity(entityTypes) { cursor =>
+  implicit lazy val decoder: JsonLDDecoder[Association] = JsonLDDecoder.entity(entityTypes) { implicit cursor =>
     for {
       resourceId <- cursor.downEntityId.as[ResourceId]
-      agent      <- cursor.downField(prov / "agent").as[Agent]
       plan       <- cursor.downField(prov / "hadPlan").as[Plan]
-    } yield Association(resourceId, agent, plan)
+      association <- cursor.downField(prov / "agent").as[Option[Agent]] match {
+                       case Right(Some(agent)) => Association.WithRenkuAgent(resourceId, agent, plan).asRight
+                       case _                  => tryAsPersonAgent(resourceId, plan)
+                     }
+    } yield association
   }
+
+  private def tryAsPersonAgent(resourceId: ResourceId, plan: Plan)(implicit cursor: Cursor) =
+    cursor.downField(prov / "agent").as[Option[Person]] >>= {
+      case Some(agent) => Association.WithPersonAgent(resourceId, agent, plan).asRight
+      case None =>
+        DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
+    }
 }

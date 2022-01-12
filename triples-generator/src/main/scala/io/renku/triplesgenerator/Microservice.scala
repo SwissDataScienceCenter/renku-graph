@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -33,7 +33,7 @@ import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
-import io.renku.microservices.IOMicroservice
+import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.config.{TriplesGeneration, VersionCompatibilityConfig}
@@ -72,18 +72,22 @@ object Microservice extends IOMicroservice {
     membersSyncSubscription <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
     triplesGeneratedSubscription <-
       events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry, gitLabThrottler, sparqlTimeRecorder)
+    cleanUpSubscription <- events.categories.cleanup.SubscriptionFactory(sparqlTimeRecorder)
     eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                 awaitingGenerationSubscription,
                                 membersSyncSubscription,
-                                triplesGeneratedSubscription
+                                triplesGeneratedSubscription,
+                                cleanUpSubscription
                               )
     reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, sparqlTimeRecorder)
     reProvisioning          <- ReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder)
     eventProcessingEndpoint <- EventEndpoint(eventConsumersRegistry, reProvisioningStatus)
+    serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
     microserviceRoutes =
       new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry), config.some).routes
     exitCode <- microserviceRoutes.use { routes =>
                   new MicroserviceRunner[IO](
+                    serviceReadinessChecker,
                     certificateLoader,
                     gitCertificateInstaller,
                     sentryInitializer,
@@ -97,6 +101,7 @@ object Microservice extends IOMicroservice {
 }
 
 private class MicroserviceRunner[F[_]: Spawn: Logger](
+    serviceReadinessChecker:         ServiceReadinessChecker[F],
     certificateLoader:               CertificateLoader[F],
     gitCertificateInstaller:         GitCertificateInstaller[F],
     sentryInitializer:               SentryInitializer[F],
@@ -108,12 +113,11 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
 
   def run(): F[ExitCode] = {
     for {
-      _        <- certificateLoader.run()
-      _        <- gitCertificateInstaller.run()
-      _        <- sentryInitializer.run()
-      _        <- cliVersionCompatibilityVerifier.run()
-      _        <- Spawn[F].start(eventConsumersRegistry.run())
-      _        <- Spawn[F].start(reProvisioning.run())
+      _ <- certificateLoader.run()
+      _ <- gitCertificateInstaller.run()
+      _ <- sentryInitializer.run()
+      _ <- cliVersionCompatibilityVerifier.run()
+      _ <- Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> reProvisioning.run() >> eventConsumersRegistry.run())
       exitCode <- httpServer.run()
     } yield exitCode
   } recoverWith logAndThrow

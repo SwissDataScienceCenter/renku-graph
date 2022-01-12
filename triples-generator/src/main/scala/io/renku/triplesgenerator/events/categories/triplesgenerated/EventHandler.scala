@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.Show
+import cats.{NonEmptyParallel, Parallel, Show}
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.effect._
@@ -93,7 +93,7 @@ private[events] object EventHandler {
   import ConfigLoader.find
   import eu.timepit.refined.pureconfig._
 
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
       metricsRegistry:       MetricsRegistry,
       gitLabThrottler:       Throttler[F, GitLab],
       timeRecorder:          SparqlQueryTimeRecorder[F],

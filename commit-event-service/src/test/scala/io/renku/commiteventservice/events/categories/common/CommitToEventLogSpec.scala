@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,7 +24,7 @@ import io.renku.commiteventservice.events.categories.commitsync.categoryName
 import io.renku.commiteventservice.events.categories.common.CommitEvent._
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
-import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -90,7 +90,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
 
     val startCommit = commitInfos.generateOne
     val batchDate   = BatchDate(Instant.now)
-    val project     = projectsGen.generateOne
+    val project     = consumerProjects.generateOne
 
     val commitEventSender = mock[CommitEventSender[Try]]
 

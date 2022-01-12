@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import io.renku.graph.model.GraphModelGenerators.{userGitLabIds, userNames, userResourceIds}
+import io.renku.graph.model.RenkuBaseUrl
 import org.scalacheck.Gen
 
 private object Generators {
@@ -28,7 +29,7 @@ private object Generators {
     name <- userNames
   } yield GitLabProjectMember(id, name)
 
-  implicit val kgProjectMembers: Gen[KGProjectMember] = for {
+  implicit def kgProjectMembers(implicit renkuBaseUrl: RenkuBaseUrl): Gen[KGProjectMember] = for {
     memberId <- userResourceIds
     gitLabId <- userGitLabIds
   } yield KGProjectMember(memberId, gitLabId)

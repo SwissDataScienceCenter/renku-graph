@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,24 +19,17 @@
 package io.renku.webhookservice.hookvalidation
 
 import cats.effect.IO
-import com.github.tomakehurst.wiremock.client.WireMock._
-import io.circe.Json
+import cats.syntax.all._
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.graph.model.projects.Id
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.WebhookServiceGenerators._
-import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
-import io.renku.webhookservice.model.ProjectHookUrl
-import org.http4s.Status
-import org.scalacheck.Gen
+import io.renku.webhookservice.hookfetcher.ProjectHookFetcher
+import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -51,131 +44,42 @@ class ProjectHookVerifierSpec
   "checkHookPresence" should {
 
     "return true if there's a hook with url pointing to expected project hook url - personal access token case" in new TestCase {
+      val idsAndUrls = hookIdAndUrls.generateNonEmptyList().toList :+ HookIdAndUrl(nonEmptyStrings().generateOne,
+                                                                                   projectHookId.projectHookUrl
+      )
+      val accessToken = accessTokens.generateOne
+      (projectHookFetcher.fetchProjectHooks _).expects(projectId, accessToken).returns(idsAndUrls.pure[IO])
 
-      val personalAccessToken = personalAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(okJson(withHooks(projectId, oneHookUrl = projectHookId.projectHookUrl)))
-      }
-
-      verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync() shouldBe true
-    }
-
-    "return true if there's a hook with url pointing to expected project hook url - oauth token case" in new TestCase {
-
-      val oauthAccessToken = oauthAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(okJson(withHooks(projectId, oneHookUrl = projectHookId.projectHookUrl)))
-      }
-
-      verifier.checkHookPresence(projectHookId, oauthAccessToken).unsafeRunSync() shouldBe true
+      verifier.checkHookPresence(projectHookId, accessToken).unsafeRunSync() shouldBe true
     }
 
     "return false if there's no hook with url pointing to expected project hook url" in new TestCase {
+      val idsAndUrls  = hookIdAndUrls.generateNonEmptyList().toList
+      val accessToken = accessTokens.generateOne
+      (projectHookFetcher.fetchProjectHooks _).expects(projectId, accessToken).returns(idsAndUrls.pure[IO])
 
-      val oauthAccessToken = oauthAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(
-            okJson(
-              withHooks(projectId, oneHookUrl = projectHookUrls generateDifferentThan projectHookId.projectHookUrl)
-            )
-          )
-      }
-
-      verifier.checkHookPresence(projectHookId, oauthAccessToken).unsafeRunSync() shouldBe false
+      verifier.checkHookPresence(projectHookId, accessToken).unsafeRunSync() shouldBe false
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-
-      val personalAccessToken = personalAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(unauthorized())
-      }
+      val exception   = exceptions.generateOne
+      val accessToken = accessTokens.generateOne
+      (projectHookFetcher.fetchProjectHooks _)
+        .expects(projectId, accessToken)
+        .returns(exception.raiseError[IO, List[HookIdAndUrl]])
 
       intercept[Exception] {
-        verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
-      } shouldBe UnauthorizedException
+        verifier.checkHookPresence(projectHookId, accessToken).unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
     }
 
-    "return a RuntimeException if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
-
-      val personalAccessToken = personalAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(serviceUnavailable().withBody("some error"))
-      }
-
-      intercept[Exception] {
-        verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.ServiceUnavailable}; body: some error"
-    }
-
-    "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
-
-      val personalAccessToken = personalAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(okJson("{}"))
-      }
-
-      intercept[Exception] {
-        verifier.checkHookPresence(projectHookId, personalAccessToken).unsafeRunSync()
-      }.getMessage should startWith(
-        s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
-      )
-    }
   }
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
-    val projectHookId = projectHookIds.generateOne
-    val projectId     = projectHookId.projectId
-
-    val verifier = new ProjectHookVerifierImpl[IO](gitLabUrl, Throttler.noThrottling)
+    val projectHookId      = projectHookIds.generateOne
+    val projectId          = projectHookId.projectId
+    val projectHookFetcher = mock[ProjectHookFetcher[IO]]
+    val verifier           = new ProjectHookVerifierImpl[IO](projectHookFetcher, Throttler.noThrottling)
   }
-
-  private def withHooks(projectId: Id, oneHookUrl: ProjectHookUrl): String =
-    Json
-      .arr(
-        hook(
-          url = projectHookUrls.generateOne,
-          projectId = projectId
-        ),
-        hook(
-          url = oneHookUrl,
-          projectId = projectId
-        ),
-        hook(
-          url = projectHookUrls.generateOne,
-          projectId = projectId
-        )
-      )
-      .toString()
-
-  private def hook(projectId: Id, url: ProjectHookUrl): Json = Json.obj(
-    "id"         -> Json.fromInt(positiveInts().generateOne.value),
-    "url"        -> Json.fromString(url.value),
-    "project_id" -> Json.fromInt(projectId.value)
-  )
-
-  private lazy val projectHookIds: Gen[HookIdentifier] = for {
-    projectId <- projectIds
-    hookUrl   <- projectHookUrls
-  } yield HookIdentifier(projectId, hookUrl)
 }

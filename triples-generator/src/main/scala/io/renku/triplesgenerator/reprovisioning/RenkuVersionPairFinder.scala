@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -55,7 +55,7 @@ private class RenkuVersionPairFinderImpl[F[_]: Async: Logger](
     case Nil         => Option.empty[RenkuVersionPair].pure[F]
     case head :: Nil => head.some.pure[F]
     case versionPairs =>
-      new IllegalStateException(s"Too many Version pair found: $versionPairs")
+      new IllegalStateException(s"Too many Version pairs found: $versionPairs")
         .raiseError[F, Option[RenkuVersionPair]]
   }
 }

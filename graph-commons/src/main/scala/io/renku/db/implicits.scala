@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,9 +23,8 @@ import skunk.PreparedQuery
 
 object implicits {
 
-  implicit class PreparedQueryOps[F[_], In, Out](
-      preparedQuery: PreparedQuery[F, In, Out]
-  ) {
+  implicit class PreparedQueryOps[F[_], In, Out](preparedQuery: PreparedQuery[F, In, Out]) {
+
     def toList(implicit sync: Async[F]): In => F[List[Out]] = args =>
       preparedQuery.stream(args, chunkSize = 32).compile.toList
   }

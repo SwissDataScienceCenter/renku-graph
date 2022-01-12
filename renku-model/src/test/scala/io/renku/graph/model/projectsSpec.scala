@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -142,7 +142,7 @@ class VisibilitySpec extends AnyWordSpec with should.Matchers {
   }
 }
 
-class ResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class ProjectResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "ResourceId" should {
 

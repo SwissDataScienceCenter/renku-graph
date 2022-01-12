@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -127,9 +127,9 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger](
   private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
     name = "ds free-text search",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema", text -> "text"),
-    s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
+    s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?someExemplarProjectPath ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
         |WHERE {        
-        |  SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+        |  SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs (MIN(?exemplarProjectPath) AS ?someExemplarProjectPath) ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |  WHERE {
         |    {
         |      SELECT ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount) (MIN(?projectDate) AS ?minProjectDate)
@@ -194,9 +194,9 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger](
         |      }
         |    }
         |  }
-        |  GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?keyword
+        |  GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?keyword
         |}
-        |GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?exemplarProjectPath ?projectsCount ?images
+        |GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?someExemplarProjectPath ?projectsCount ?images
         |${`ORDER BY`(sort)}
         |""".stripMargin
   )
@@ -248,7 +248,7 @@ private object DatasetsFinderImpl {
       maybeDateCreated    <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
       maybePublishedDate  <- cursor.downField("maybePublishedDate").downField("value").as[Option[DatePublished]]
       projectsCount       <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
-      exemplarProjectPath <- cursor.downField("exemplarProjectPath").downField("value").as[projects.Path]
+      exemplarProjectPath <- cursor.downField("someExemplarProjectPath").downField("value").as[projects.Path]
       keywords            <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
       images              <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
       maybeDescription    <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
@@ -256,17 +256,16 @@ private object DatasetsFinderImpl {
                 .orElse(maybePublishedDate)
                 .map(_.asRight)
                 .getOrElse(DecodingFailure("No dateCreated or publishedDate found", Nil).asLeft)
-    } yield DatasetSearchResult(
-      id,
-      title,
-      name,
-      maybeDescription,
-      Set.empty,
-      date,
-      exemplarProjectPath,
-      projectsCount,
-      keywords,
-      images
+    } yield DatasetSearchResult(id,
+                                title,
+                                name,
+                                maybeDescription,
+                                Set.empty,
+                                date,
+                                exemplarProjectPath,
+                                projectsCount,
+                                keywords,
+                                images
     )
   }
 }

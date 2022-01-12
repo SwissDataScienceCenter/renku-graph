@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,12 +19,15 @@
 package io.renku.commiteventservice
 
 import cats.effect._
+import cats.syntax.all._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.HttpServer
+import io.renku.interpreters.TestLogger
+import io.renku.microservices.ServiceReadinessChecker
 import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -45,6 +48,7 @@ class MicroserviceRunnerSpec
 
         given(certificateLoader).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
+        (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
         given(eventConsumersRegistry).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -76,19 +80,19 @@ class MicroserviceRunnerSpec
 
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(eventConsumersRegistry).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
 
-      intercept[Exception] {
-        runner.run().unsafeRunSync()
-      } shouldBe exception
+      intercept[Exception](runner.run().unsafeRunSync()) shouldBe exception
     }
 
     "return Success ExitCode even if Event Consumers Registry initialisation fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -97,15 +101,17 @@ class MicroserviceRunnerSpec
   }
 
   private trait TestCase {
-    val certificateLoader      = mock[CertificateLoader[IO]]
-    val sentryInitializer      = mock[SentryInitializer[IO]]
-    val eventConsumersRegistry = mock[EventConsumersRegistry[IO]]
-    val httpServer             = mock[HttpServer[IO]]
-    val runner = new MicroserviceRunner(
-      certificateLoader,
-      sentryInitializer,
-      eventConsumersRegistry,
-      httpServer
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val serviceReadinessChecker = mock[ServiceReadinessChecker[IO]]
+    val certificateLoader       = mock[CertificateLoader[IO]]
+    val sentryInitializer       = mock[SentryInitializer[IO]]
+    val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
+    val httpServer              = mock[HttpServer[IO]]
+    val runner = new MicroserviceRunner(serviceReadinessChecker,
+                                        certificateLoader,
+                                        sentryInitializer,
+                                        eventConsumersRegistry,
+                                        httpServer
     )
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,7 +20,9 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.data.EitherT
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.events.consumers
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -31,10 +33,11 @@ import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, Com
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
 import io.renku.http.client.AccessToken
+import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, JsonLD, Property}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
+import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -166,8 +169,44 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
       error.getMessage shouldBe show"2 Project entities found in the JsonLD for $eventProject"
     }
 
+    "fail if the project found in the payload is different than the project in the event" in new TestCase {
+      val project      = anyProjectEntities.generateOne
+      val eventProject = consumerProjects.generateOne
+
+      givenFindProjectInfo(eventProject.path)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
+
+      val Failure(error) = deserializer.deserializeToModel {
+        triplesGeneratedEvents.generateOne.copy(
+          project = eventProject,
+          payload = JsonLD.arr(project.asJsonLD).flatten.fold(throw _, identity)
+        )
+      }.value
+
+      error            shouldBe a[IllegalStateException]
+      error.getMessage shouldBe show"Event for project $eventProject contains payload for project ${project.path}"
+    }
+
+    "successfully deserialize JsonLD to the model " +
+      "if project from the payload has the same path in case insensitive way as the project in the event" in new TestCase {
+        val project      = anyProjectEntities.generateOne
+        val eventProject = consumers.Project(projectIds.generateOne, projects.Path(project.path.value.toUpperCase()))
+
+        givenFindProjectInfo(eventProject.path)
+          .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
+
+        val Success(results) = deserializer.deserializeToModel {
+          triplesGeneratedEvents.generateOne.copy(
+            project = eventProject,
+            payload = JsonLD.arr(project.asJsonLD).flatten.fold(throw _, identity)
+          )
+        }.value
+
+        results shouldBe project.to[entities.Project].asRight
+      }
+
     "fail if the payload is invalid" in new TestCase {
-      val project = anyProjectEntities.generateOne
+      val project = projectEntities(anyVisibility).generateOne
 
       givenFindProjectInfo(project.path)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
@@ -177,13 +216,15 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = JsonLD
-              .arr(project.asJsonLD,
-                   JsonLD.entity(EntityId.of(httpUrls().generateOne),
-                                 entities.Activity.entityTypes,
-                                 Map.empty[Property, JsonLD]
-                   )
+            payload = project
+              .to[entities.ProjectWithoutParent]
+              .copy(activities =
+                activityEntities
+                  .withDateBefore(project.dateCreated)
+                  .generateFixedSizeList(1)
+                  .map(_.to[entities.Activity])
               )
+              .asJsonLD
               .flatten
               .fold(throw _, identity)
           )
@@ -199,11 +240,13 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     def gitLabProjectInfo(project: Project) = GitLabProjectInfo(
+      projectIds.generateOne,
       project.name,
       project.path,
       project.dateCreated,
       project.maybeDescription,
       project.maybeCreator.map(_.to[ProjectMember]),
+      project.keywords,
       project.members.map(_.to[ProjectMember]),
       project.visibility,
       maybeParentPath = project match {
@@ -215,11 +258,16 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     val projectInfoFinder = mock[ProjectInfoFinder[Try]]
     val deserializer      = new JsonLDDeserializerImpl[Try](projectInfoFinder, renkuBaseUrl)
 
-    private implicit lazy val toProjectMember: Person => ProjectMember = person =>
-      ProjectMember(person.name,
-                    users.Username(person.name.value),
-                    person.maybeGitLabId.getOrElse(fail("Project person without GitLabId"))
+    private implicit lazy val toProjectMember: Person => ProjectMember = person => {
+      val member = ProjectMember(person.name,
+                                 users.Username(person.name.value),
+                                 person.maybeGitLabId.getOrElse(fail("Project person without GitLabId"))
       )
+      person.maybeEmail match {
+        case Some(email) => member.add(email)
+        case None        => member
+      }
+    }
 
     def givenFindProjectInfo(projectPath: projects.Path) = new {
       def returning(result: EitherT[Try, ProcessingRecoverableError, Option[GitLabProjectInfo]]) =

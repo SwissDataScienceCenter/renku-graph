@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,15 +31,23 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
   import ProjectFunctions._
 
   "findAllPersons" should {
-    "collect project members, project creator, activities' authors and datasets' creators" in {
+    "collect project members, project creator, activities' authors, associations' agents and datasets' creators" in {
       forAll(
         anyProjectEntities
-          .withActivities(activityEntities(planEntities()))
+          .withActivities(activityEntities(planEntities()),
+                          activityEntities(planEntities()).modify(toAssociationPersonAgent)
+          )
           .withDatasets(datasetEntities(provenanceNonModified))
           .map(_.to[entities.Project])
       ) { project =>
-        findAllPersons(project) shouldBe project.members ++ project.maybeCreator ++ project.activities
-          .map(_.author) ++ project.datasets.flatMap(_.provenance.creators)
+        findAllPersons(project) shouldBe project.members ++
+          project.maybeCreator ++
+          project.datasets.flatMap(_.provenance.creators) ++
+          project.activities.map(_.author) ++
+          project.activities.flatMap(_.association.agent match {
+            case p: entities.Person => List(p)
+            case _ => List.empty[entities.Person]
+          })
       }
     }
   }
@@ -86,6 +94,27 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map {
         case activity if activity.author == entitiesOldPerson => activity.copy(author = newPerson)
         case activity                                         => activity
+      }
+    }
+
+    "replace the old person with the new on all activities' associations" in {
+
+      val project = anyProjectEntities
+        .withActivities(
+          activityEntities(planEntities()).modify(toAssociationPersonAgent(oldPerson)),
+          activityEntities(planEntities())
+        )
+        .generateOne
+        .to[entities.Project]
+
+      val entitiesOldPerson = oldPerson.to[entities.Person]
+      val newPerson         = personEntities().generateOne.to[entities.Person]
+
+      update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map { activity =>
+        activity.association match {
+          case assoc: entities.Association.WithPersonAgent => activity.copy(association = assoc.copy(agent = newPerson))
+          case _ => activity
+        }
       }
     }
 
@@ -137,7 +166,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       "which are not invalidated" in {
         val (importedInternalAncestorInternal ::~ importedInternalAncestorExternal ::~ _ ::~ _ ::~ _ ::~ _, project) =
           anyProjectEntities
-            .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal))
+            .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal()))
             .addDataset(datasetEntities(provenanceImportedInternalAncestorExternal))
             .addDataset(datasetEntities(provenanceInternal))
             .addDataset(datasetEntities(provenanceImportedExternal))
@@ -145,7 +174,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
             .generateOne
 
         val originalImportedInternal =
-          datasetEntities(provenanceImportedInternalAncestorInternal)(renkuBaseUrl)(project.dateCreated).generateOne
+          datasetEntities(provenanceImportedInternalAncestorInternal())(renkuBaseUrl)(project.dateCreated).generateOne
         val projectWithAllDatasets =
           project.addDatasets(originalImportedInternal, originalImportedInternal.invalidateNow).to[entities.Project]
 
@@ -162,7 +191,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceImportedExternal))
-        .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal))
+        .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal()))
         .addDataset(datasetEntities(provenanceImportedInternalAncestorExternal))
         .generateOne
 
@@ -186,7 +215,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
         anyProjectEntities
           .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
           .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
-          .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal))
+          .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal()))
           .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorExternal))
           .generateOne
       val (beforeModification, modified, modificationInvalidated) =

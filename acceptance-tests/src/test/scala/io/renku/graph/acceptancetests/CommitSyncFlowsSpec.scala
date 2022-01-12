@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -56,8 +56,8 @@ class CommitSyncFlowsSpec
       val missedCommitId    = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, nonMissedCommitId)
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, missedCommitId)
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, nonMissedCommitId)
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, missedCommitId)
 
       And("fetch latest commit endpoint returns the non missed commit")
       `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id,
@@ -93,7 +93,7 @@ class CommitSyncFlowsSpec
                                                                                             missedCommitId
       )
 
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, missedCommitId)
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, missedCommitId)
 
       When("commit synchronisation process kicks-off")
       db.EventLog.execute { session =>

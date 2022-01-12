@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,14 +23,12 @@ import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import io.renku.config.GitLab
 import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.projects.Id
 import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
-import io.renku.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
-import io.renku.webhookservice.model.ProjectHookUrl
+import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
 import io.renku.webhookservice.tokenrepository._
 import org.typelevel.log4cats.Logger
 
@@ -135,8 +133,7 @@ object HookValidator {
       gitLabThrottler: Throttler[F, GitLab]
   ): F[HookValidator[F]] = for {
     tokenRepositoryUrl    <- TokenRepositoryUrl[F]()
-    gitLabUrl             <- GitLabUrlLoader[F]()
-    projectHookVerifier   <- ProjectHookVerifier[F](gitLabUrl, gitLabThrottler)
+    projectHookVerifier   <- ProjectHookVerifier[F](gitLabThrottler)
     accessTokenAssociator <- AccessTokenAssociator[F]
     accessTokenRemover    <- AccessTokenRemover[F]
   } yield new HookValidatorImpl[F](

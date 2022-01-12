@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,6 +28,7 @@ import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
+import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Queries}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -49,59 +50,60 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
   import TriplesUploadResult._
   import io.renku.jsonld.syntax._
 
-  override def run(steps: List[TransformationStep[F]], project: Project): F[TriplesUploadResult] =
-    runAllSteps(project, steps) >>= {
-      case (updatedProject, _: DeliverySuccess) => encodeAndSend(updatedProject)
-      case (_, failure)                         => failure.pure[F]
+  override def run(steps: List[TransformationStep[F]], project: Project): F[TriplesUploadResult] = {
+    runAll(steps)(project) >>=
+      executeAllPreDataUploadQueries >>=
+      encodeAndSendProject >>=
+      executeAllPostDataUploadQueries
+  }
+    .leftMap(RecoverableFailure)
+    .map(_ => DeliverySuccess)
+    .leftWiden[TriplesUploadResult]
+    .merge
+    .recoverWith(transformationFailure(project))
+    .widen[TriplesUploadResult]
+
+  private def runAll(steps: List[TransformationStep[F]])(project: Project): ProjectWithQueries[F] =
+    steps.foldLeft(EitherT.rightT[F, ProcessingRecoverableError](project -> Queries.empty))(
+      (previousProjectWithQueries, step) =>
+        previousProjectWithQueries >>= { case (project, queries) =>
+          (step run project).map { case (updatedProject, stepQueries) => updatedProject -> (queries |+| stepQueries) }
+        }
+    )
+
+  private lazy val executeAllPreDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
+    case projectAndQueries @ (_, Queries(preQueries, _)) => execute(preQueries).map(_ => projectAndQueries)
+  }
+
+  private lazy val encodeAndSendProject: ((Project, Queries)) => ProjectWithQueries[F] = {
+    case projectAndQueries @ (project, _) =>
+      for {
+        jsonLD <- EitherT
+                    .fromEither[F](project.asJsonLD.flatten)
+                    .leftSemiflatMap(error =>
+                      NonRecoverableFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}", error)
+                        .raiseError[F, ProcessingRecoverableError]
+                    )
+        _ <- triplesUploader.uploadTriples(jsonLD)
+      } yield projectAndQueries
+  }
+
+  private lazy val executeAllPostDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
+    case projectAndQueries @ (_, Queries(_, postQueries)) => execute(postQueries).map(_ => projectAndQueries)
+  }
+
+  private def execute(queries: List[SparqlQuery]): EitherT[F, ProcessingRecoverableError, Unit] =
+    queries.foldLeft(EitherT.rightT[F, ProcessingRecoverableError](())) { (previousResult, query) =>
+      previousResult >> updatesUploader.send(query)
     }
 
-  private def runAllSteps(project: Project, steps: List[TransformationStep[F]]): F[(Project, TriplesUploadResult)] =
-    steps.foldLeft((project, DeliverySuccess: TriplesUploadResult).pure[F])((lastStepResults, nextStep) =>
-      lastStepResults >>= {
-        case (_, _: TriplesUploadFailure) => lastStepResults
-        case (previousMetadata, _)        => runSingleStep(nextStep, previousMetadata)
-      }
-    )
-
-  private def runSingleStep(nextStep: TransformationStep[F], previousProject: Project) = {
-    for {
-      stepResults    <- nextStep run previousProject
-      sendingResults <- EitherT.right[ProcessingRecoverableError](execute(stepResults.queries))
-    } yield stepResults.project -> sendingResults
-  }
-    .leftMap(recoverableFailure =>
-      previousProject -> (RecoverableFailure(recoverableFailure.getMessage): TriplesUploadResult)
-    )
-    .merge
-    .recoverWith(transformationFailure(previousProject, nextStep))
-
-  private def execute(queries: List[SparqlQuery]) =
-    queries
-      .foldLeft((DeliverySuccess: TriplesUploadResult).pure[F]) { (lastResult, query) =>
-        lastResult >>= {
-          case _: DeliverySuccess => updatesUploader send query
-          case _ => lastResult
-        }
-      }
-
   private def transformationFailure(
-      project:            Project,
-      transformationStep: TransformationStep[F]
-  ): PartialFunction[Throwable, F[(Project, TriplesUploadResult)]] = { case NonFatal(exception) =>
-    (project,
-     InvalidUpdatesFailure(s"${transformationStep.name} transformation step failed: $exception"): TriplesUploadResult
-    ).pure[F]
+      project: Project
+  ): PartialFunction[Throwable, F[TriplesUploadResult]] = { case NonFatal(exception) =>
+    NonRecoverableFailure(s"Transformation of ${project.path} failed: $exception", exception)
+      .pure[F]
+      .widen[TriplesUploadResult]
   }
-
-  private def encodeAndSend(project: Project) =
-    project.asJsonLD.flatten
-      .leftMap(error =>
-        InvalidTriplesFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}")
-          .pure[F]
-          .widen[TriplesUploadResult]
-      )
-      .map(triplesUploader.uploadTriples)
-      .merge
 }
 
 private[triplesgenerated] object TransformationStepsRunner {
@@ -128,8 +130,24 @@ private[triplesgenerated] object TriplesUploadResult {
     val message: String = "Delivery success"
   }
 
-  sealed trait TriplesUploadFailure                       extends TriplesUploadResult
-  final case class RecoverableFailure(message: String)    extends Exception(message) with TriplesUploadFailure
-  final case class InvalidTriplesFailure(message: String) extends Exception(message) with TriplesUploadFailure
-  final case class InvalidUpdatesFailure(message: String) extends Exception(message) with TriplesUploadFailure
+  sealed trait TriplesUploadFailure extends TriplesUploadResult
+  final case class RecoverableFailure(error: ProcessingRecoverableError) extends TriplesUploadFailure {
+    override val message: String = error.getMessage
+  }
+  sealed trait NonRecoverableFailure extends Exception with TriplesUploadFailure
+  object NonRecoverableFailure {
+    case class NonRecoverableFailureWithCause(message: String, cause: Throwable)
+        extends Exception(message, cause)
+        with NonRecoverableFailure
+    case class NonRecoverableFailureWithoutCause(message: String) extends Exception(message) with NonRecoverableFailure
+
+    def apply(message: String, cause: Throwable): NonRecoverableFailure = NonRecoverableFailureWithCause(message, cause)
+    def apply(message: String):                   NonRecoverableFailure = NonRecoverableFailureWithoutCause(message)
+
+    def unapply(nonRecoverableFailure: NonRecoverableFailure): Option[(String, Option[Throwable])] =
+      nonRecoverableFailure match {
+        case NonRecoverableFailureWithCause(message, cause) => Some(message, Some(cause))
+        case NonRecoverableFailureWithoutCause(message)     => Some(message, None)
+      }
+  }
 }

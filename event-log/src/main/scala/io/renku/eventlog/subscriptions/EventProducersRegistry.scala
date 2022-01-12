@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -86,6 +86,7 @@ object EventProducersRegistry {
                                                                       queriesExecTimes,
                                                                       subscriberTracker
                                 )
+    cleanUpEventCategory <- cleanup.SubscriptionCategory(subscriberTracker, queriesExecTimes)
     zombieEventsCategory <- zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
   } yield new EventProducersRegistryImpl(
     Set[SubscriptionCategory[F]](
@@ -94,6 +95,7 @@ object EventProducersRegistry {
       commitSyncCategory,
       globalCommitSyncCategory,
       triplesGeneratedCategory,
+      cleanUpEventCategory,
       zombieEventsCategory
     )
   )

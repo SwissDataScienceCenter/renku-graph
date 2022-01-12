@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,15 +20,15 @@ package io.renku.graph.model.testentities
 package generators
 
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{nonEmptyStrings, sentences, timestamps}
+import io.renku.generators.Generators.{nonBlankStrings, sentences, timestamps}
 import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
-import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, PartId, TopmostSameAs}
+import io.renku.graph.model._
+import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, InternalSameAs, PartId, TopmostSameAs}
 import io.renku.graph.model.testentities.Dataset.{AdditionalInfo, Identification, Provenance}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
-import io.renku.graph.model._
 import io.renku.tinytypes.InstantTinyType
-import eu.timepit.refined.auto._
 import monocle.Lens
 import org.scalacheck.Gen
 
@@ -69,7 +69,7 @@ trait DatasetEntitiesGenerators {
 
   def datasetAndModificationEntities[P <: Dataset.Provenance](
       provenance:          ProvenanceGen[P],
-      projectDateCreated:  projects.DateCreated = projectCreatedDates().generateOne
+      projectDateCreated:  projects.DateCreated = projects.DateCreated(Instant.EPOCH)
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[(Dataset[P], Dataset[Dataset.Provenance.Modified])] = for {
     original <- datasetEntities(provenance)(renkuBaseUrl)(projectDateCreated)
     modified <- modifiedDatasetEntities(original, projectDateCreated)
@@ -159,12 +159,14 @@ trait DatasetEntitiesGenerators {
                                                                     creators
         )
 
-  val provenanceImportedInternalAncestorInternal: ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] =
+  def provenanceImportedInternalAncestorInternal(
+      sameAsGen: Gen[InternalSameAs] = datasetInternalSameAs
+  ): ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] =
     (identifier, projectDateCreated) =>
       implicit renkuBaseUrl =>
         for {
           date     <- datasetCreatedDates(projectDateCreated.value)
-          sameAs   <- datasetInternalSameAs
+          sameAs   <- sameAsGen
           creators <- personEntities.toGeneratorOfSet(maxElements = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
@@ -174,10 +176,26 @@ trait DatasetEntitiesGenerators {
                                                                     creators
         )
 
+  def provenanceImportedInternalAncestorInternal(
+      sameAs:        InternalSameAs,
+      topmostSameAs: TopmostSameAs
+  ): ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] =
+    (identifier, projectDateCreated) =>
+      implicit renkuBaseUrl =>
+        for {
+          date     <- datasetCreatedDates(projectDateCreated.value)
+          creators <- personEntities.toGeneratorOfSet(maxElements = 1)
+        } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
+                                                                    sameAs,
+                                                                    topmostSameAs,
+                                                                    InitialVersion(identifier),
+                                                                    date,
+                                                                    creators
+        )
   val provenanceImportedInternal: ProvenanceGen[Dataset.Provenance.ImportedInternal] = Random.shuffle {
     List(
       provenanceImportedInternalAncestorExternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]],
-      provenanceImportedInternalAncestorInternal.asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
+      provenanceImportedInternalAncestorInternal().asInstanceOf[ProvenanceGen[Dataset.Provenance.ImportedInternal]]
     )
   }.head
 
@@ -206,7 +224,7 @@ trait DatasetEntitiesGenerators {
 
   def publicationEventFactories(minDateCreated: Instant): Gen[Dataset[Provenance] => PublicationEvent] = for {
     maybeDescription <- sentences().map(_.value).map(publicationEvents.Description.apply).toGeneratorOfOptions
-    name             <- nonEmptyStrings() map publicationEvents.Name.apply
+    name             <- nonBlankStrings(minLength = 5).map(_.value).map(publicationEvents.Name.apply)
     startDate        <- timestamps(minDateCreated, max = Instant.now()) map publicationEvents.StartDate.apply
   } yield PublicationEvent(_, maybeDescription, name, startDate)
 

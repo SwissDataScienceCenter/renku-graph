@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -37,8 +37,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, categoryName}
 import org.scalacheck.Gen
@@ -73,7 +72,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         (git
           .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
           .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-          .returning(rightT[IO, GenerationRecoverableError](()))
+          .returning(rightT[IO, ProcessingRecoverableError](()))
 
         (git
           .checkout(_: CommitId)(_: RepositoryPath))
@@ -128,7 +127,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         (git
           .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
           .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-          .returning(rightT[IO, GenerationRecoverableError](()))
+          .returning(rightT[IO, ProcessingRecoverableError](()))
 
         (git
           .checkout(_: CommitId)(_: RepositoryPath))
@@ -189,7 +188,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         (git
           .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
           .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-          .returning(rightT[IO, GenerationRecoverableError](()))
+          .returning(rightT[IO, ProcessingRecoverableError](()))
 
         (git
           .checkout(_: CommitId)(_: RepositoryPath))
@@ -217,7 +216,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(payload)
       }
 
-    s"return $GenerationRecoverableError if 'renku export' returns one" in new TestCase {
+    s"return $LogWorthyRecoverableError if 'renku export' returns one" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -232,7 +231,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .checkout(_: CommitId)(_: RepositoryPath))
@@ -246,7 +245,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .expects(commitEvent, repositoryDirectory)
         .returning(IO.unit)
 
-      val error = GenerationRecoverableError(nonBlankStrings().generateOne)
+      val error = LogWorthyRecoverableError(nonBlankStrings().generateOne)
       (renku
         .`export`(_: RepositoryPath))
         .expects(repositoryDirectory)
@@ -261,7 +260,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Left(error)
     }
 
-    s"return $GenerationRecoverableError if cloning the repo returns such error" in new TestCase {
+    s"return $LogWorthyRecoverableError if cloning the repo returns such error" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -274,7 +273,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
-      val exception = GenerationRecoverableError(nonBlankStrings().generateOne.value)
+      val exception = LogWorthyRecoverableError(nonBlankStrings().generateOne.value)
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
@@ -350,7 +349,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-        .returning(EitherT.liftF[IO, GenerationRecoverableError, Unit](IO.raiseError(exception)))
+        .returning(EitherT.liftF[IO, ProcessingRecoverableError, Unit](IO.raiseError(exception)))
 
       (file
         .deleteDirectory(_: Path))
@@ -383,7 +382,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       val exception = exceptions.generateOne
       (git
@@ -419,7 +418,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .checkout(_: CommitId)(_: RepositoryPath))
@@ -460,7 +459,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .checkout(_: CommitId)(_: RepositoryPath))
@@ -508,7 +507,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .checkout(_: CommitId)(_: RepositoryPath))
@@ -558,7 +557,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .checkout(_: CommitId)(_: RepositoryPath))
@@ -601,7 +600,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .checkout(_: CommitId)(_: RepositoryPath))
@@ -649,7 +648,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (git
         .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
         .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .checkout(_: CommitId)(_: RepositoryPath))

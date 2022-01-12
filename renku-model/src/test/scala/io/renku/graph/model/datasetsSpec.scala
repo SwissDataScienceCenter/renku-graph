@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,6 +26,8 @@ import io.circe.syntax._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
+import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.constraints.{NonBlank, RelativePath}
@@ -37,6 +39,13 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with Schemas {
 
   import SameAs._
+
+  "ResourceId" should {
+    "be renderable as RDF resource" in {
+      val id = datasetResourceIds.generateOne
+      id.showAs[RdfResource] shouldBe s"<${sparqlEncode(id.value)}>"
+    }
+  }
 
   "Identifier" should {
     "be a NonBlank" in {

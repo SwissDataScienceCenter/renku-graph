@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities.CommandParameterBase._
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.{planCommands, _}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.lineage.LineageGenerators._
@@ -195,6 +195,41 @@ class NodeDetailsFinderSpec
           project.path
         )
         .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode)
+    }
+
+    "find details of a Plan with no command" in new TestCase {
+      val input +: output +: errOutput +: Nil =
+        entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
+
+      val project: Project = anyProjectEntities
+        .addActivity(project =>
+          executionPlanners(
+            planEntities(
+              CommandInput.streamedFromLocation(input),
+              CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
+              CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
+            ).andThen(genPlan => genPlan.map(_.copy(maybeCommand = None))),
+            project
+          ).map(
+            _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne) // add some override values
+              .buildProvenanceUnsafe()
+          )
+        )
+        .generateOne
+
+      loadToStore(project)
+
+      val activity = project.activities.head
+      val ids = Set(
+        ExecutionInfo(activity.asEntityId.show, activity.startTime.value)
+      )
+
+      nodeDetailsFinder
+        .findDetails( // returns a set of nodes. A node as a location, a label, and set of types
+          ids, // execution info has entityId and date
+          project.path
+        )
+        .unsafeRunSync() shouldBe Set(NodeDef(activity).toNode) // a node def is the same as a node
     }
 
     "return no results if no ids given" in new TestCase {

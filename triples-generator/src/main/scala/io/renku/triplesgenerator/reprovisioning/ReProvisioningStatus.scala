@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,7 +34,6 @@ import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 trait ReProvisioningStatus[F[_]] {
   def underReProvisioning(): F[Boolean]
@@ -95,8 +94,8 @@ private class ReProvisioningStatusImpl[F[_]: Async: Logger](
       Prefixes of renku -> "renku",
       s"""|DELETE { ?s ?p ?o }
           |WHERE {
-          | ?s ?p ?o;
-          |    a renku:ReProvisioning.
+          | ?s a renku:ReProvisioning;
+          |    ?p ?o.
           |}
           |""".stripMargin
     )

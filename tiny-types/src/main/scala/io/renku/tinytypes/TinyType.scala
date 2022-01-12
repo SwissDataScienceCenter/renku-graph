@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -84,11 +84,10 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
 
   final def unapply(tinyType: TT): Some[TT#V] = Some(tinyType.value)
 
-  final def from(value: TT#V): Either[IllegalArgumentException, TT] =
-    for {
-      transformed <- transform(value) leftMap flattenErrors
-      validated   <- validate(transformed)
-    } yield validated
+  final def from(value: TT#V): Either[IllegalArgumentException, TT] = for {
+    transformed <- transform(value) leftMap flattenErrors
+    validated   <- validate(transformed)
+  } yield validated
 
   private def validate(value: TT#V): Either[IllegalArgumentException, TT] = {
     val maybeErrors = validateConstraints(value)

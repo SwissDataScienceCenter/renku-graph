@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -56,6 +56,8 @@ private class TriplesGeneratedEventFinderImpl[F[_]: Async](
     with EventFinder[F, TriplesGeneratedEvent]
     with SubscriptionTypeSerializers {
 
+  import projectPrioritisation._
+
   override def popEvent(): F[Option[TriplesGeneratedEvent]] = sessionResource.useK {
     for {
       maybeProjectAndEvent <- findEventAndUpdateForProcessing()
@@ -66,51 +68,47 @@ private class TriplesGeneratedEventFinderImpl[F[_]: Async](
   }
 
   private def findEventAndUpdateForProcessing() = for {
-    maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
-                      .map(projectPrioritisation.prioritise)
-                      .map(selectProject)
-    maybeIdAndProjectAndBody <- maybeProject
-                                  .map(idAndPath => measureExecutionTime(findNewestEvent(idAndPath)))
-                                  .getOrElse(Kleisli.pure(Option.empty[TriplesGeneratedEvent]))
+    maybeProject <- findProjectsWithEventsInQueue.map(prioritise).map(selectProject)
+    maybeIdAndProjectAndBody <-
+      maybeProject.map(findNewestEvent).getOrElse(Kleisli.pure(Option.empty[TriplesGeneratedEvent]))
     maybeBody <- markAsTransformingTriples(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
 
-  private def findProjectsWithEventsInQueue = SqlStatement(
-    name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
-  ).select[ExecutionDate ~ Int, ProjectInfo](
-    sql"""
-        SELECT DISTINCT
-          proj.project_id,
+  private def findProjectsWithEventsInQueue = measureExecutionTime {
+    SqlStatement(
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
+    ).select[ExecutionDate ~ Int, ProjectInfo](
+      sql"""
+        SELECT
+          candidate_projects.project_id,
           proj.project_path,
           proj.latest_event_date,
-          (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = '#${TransformingTriples.value}') as current_occupancy
-        FROM project proj
-        WHERE 
-          EXISTS (
-            SELECT candidate_events.event_id
-            FROM (
-              SELECT evt.event_id, evt.status
-              FROM event evt
-              JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id AND evt.project_id = evt_payload.project_id
-              WHERE evt.project_id = proj.project_id 
-                AND #${`status IN`(TransformingTriples, TriplesGenerated, TransformationRecoverableFailure)} 
-                AND execution_date <= $executionDateEncoder
-              ORDER BY evt.event_date DESC
-              LIMIT 1
-            ) candidate_events
-            WHERE candidate_events.status <> '#${TransformingTriples.value}'
-          )
+          (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = proj.project_id AND evt_int.status = '#${TransformingTriples.value}') AS current_occupancy
+        FROM (
+          SELECT candidate_events.project_id
+          FROM (
+            SELECT DISTINCT ON (evt.project_id) evt.project_id, evt.status
+            FROM event evt
+            JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id AND evt.project_id = evt_payload.project_id
+            WHERE #${`status IN`(TransformingTriples, TriplesGenerated, TransformationRecoverableFailure)}
+              AND execution_date <= $executionDateEncoder
+            ORDER BY evt.project_id DESC, evt.event_date DESC
+          ) candidate_events
+          WHERE candidate_events.status <> '#${TransformingTriples.value}'
+        ) candidate_projects
+        JOIN project proj ON proj.project_id = candidate_projects.project_id
         ORDER BY proj.latest_event_date DESC
-        LIMIT $int4
+        LIMIT $int4;
       """
-      .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
-      .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
-        ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
-      }
-  ).arguments(ExecutionDate(now()) ~ projectsFetchingLimit.value)
-    .build(_.toList)
+        .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
+        .map { case (id: projects.Id) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
+          ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+        }
+    ).arguments(ExecutionDate(now()) ~ projectsFetchingLimit.value)
+      .build(_.toList)
+  }
 
-  private def findNewestEvent(idAndPath: ProjectIds) = {
+  private def findNewestEvent(idAndPath: ProjectIds) = measureExecutionTime {
     val executionDate = ExecutionDate(now())
     SqlStatement(name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest"))
       .select[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, TriplesGeneratedEvent](sql"""

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -193,8 +193,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
       throttler.release() >> ClientException(LogMessage(request.request, exception), exception).raiseError[F, T]
   }
 
-  protected type ResponseMapping[ResultType] =
-    PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
+  protected type ResponseMapping[ResultType] = ResponseMappingF[F, ResultType]
 
   private implicit class HttpRequestOps(request: HttpRequest[F]) {
     lazy val toHistogramLabel: Option[String Refined NonEmpty] = request match {
@@ -251,7 +250,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
         val multipart = Multipart[F](parts)
         request
           .withEntity(multipart)
-          .withHeaders(multipart.headers.headers.filterNot(_.name == CIString("transfer-encoding")))
+          .withHeaders(multipart.headers.headers.filterNot(_.name == ci"transfer-encoding"))
       }
     }
   }
@@ -262,10 +261,12 @@ object RestClient {
   import eu.timepit.refined.auto._
 
   import scala.concurrent.duration._
-  import scala.language.postfixOps
 
   val SleepAfterConnectionIssue:        FiniteDuration          = 10 seconds
   val MaxRetriesAfterConnectionTimeout: Int Refined NonNegative = 10
+
+  type ResponseMappingF[F[_], ResultType] =
+    PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
 
   def validateUri[F[_]: MonadThrow](uri: String): F[Uri] =
     MonadThrow[F].fromEither(Uri.fromString(uri))
@@ -298,8 +299,8 @@ object RestClient {
 
     override def encode[F[_]](name: String, value: ByteArrayTinyType with ZippedContent): Part[F] = Part(
       Headers(
-        `Content-Disposition`("form-data", Map(CIString("name") -> name)),
-        Header.Raw(CIString("Content-Transfer-Encoding"), "binary"),
+        `Content-Disposition`("form-data", Map(ci"name" -> name)),
+        Header.Raw(ci"Content-Transfer-Encoding", "binary"),
         `Content-Type`(MediaType.application.zip)
       ),
       body = Stream.emits(value.value)

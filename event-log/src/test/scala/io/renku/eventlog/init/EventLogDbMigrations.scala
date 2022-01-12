@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,7 @@ import io.renku.interpreters.TestLogger
 trait EventLogDbMigrations {
   self: InMemoryEventLogDb =>
 
-  private implicit lazy val logger = TestLogger[IO]()
+  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 
   protected type Migration = { def run(): IO[Unit] }
 
@@ -43,10 +43,11 @@ trait EventLogDbMigrations {
     SubscriptionCategorySyncTimeTableCreator(sessionResource)
   protected lazy val statusesProcessingTimeTableCreator: Migration =
     StatusesProcessingTimeTableCreator(sessionResource)
-  protected lazy val subscriberTableCreator:    Migration = SubscriberTableCreator(sessionResource)
-  protected lazy val eventDeliveryTableCreator: Migration = EventDeliveryTableCreator(sessionResource)
-  protected lazy val timestampZoneAdder:        Migration = TimestampZoneAdder(sessionResource)
-  protected lazy val payloadTypeChanger:        Migration = PayloadTypeChanger(sessionResource)
+  protected lazy val subscriberTableCreator:         Migration = SubscriberTableCreator(sessionResource)
+  protected lazy val eventDeliveryTableCreator:      Migration = EventDeliveryTableCreator(sessionResource)
+  protected lazy val timestampZoneAdder:             Migration = TimestampZoneAdder(sessionResource)
+  protected lazy val payloadTypeChanger:             Migration = PayloadTypeChanger(sessionResource)
+  protected lazy val statusChangeEventsTableCreator: Migration = StatusChangeEventsTableCreator(sessionResource)
 
   protected lazy val allMigrations: List[Migration] = List(
     eventLogTableCreator,
@@ -63,6 +64,7 @@ trait EventLogDbMigrations {
     subscriberTableCreator,
     eventDeliveryTableCreator,
     timestampZoneAdder,
-    payloadTypeChanger
+    payloadTypeChanger,
+    statusChangeEventsTableCreator
   )
 }

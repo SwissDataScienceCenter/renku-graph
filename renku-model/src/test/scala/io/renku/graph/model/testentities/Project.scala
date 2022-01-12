@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model._
-import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Name, Path, Visibility}
+import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 
 sealed trait Project extends Project.ProjectOps with Product with Serializable {
@@ -35,6 +35,7 @@ sealed trait Project extends Project.ProjectOps with Product with Serializable {
   val maybeCreator:     Option[Person]
   val visibility:       Visibility
   val forksCount:       ForksCount
+  val keywords:         Set[Keyword]
   val members:          Set[Person]
   val version:          SchemaVersion
   val activities:       List[Activity]
@@ -53,6 +54,7 @@ final case class ProjectWithoutParent(path:             Path,
                                       maybeCreator:     Option[Person],
                                       visibility:       Visibility,
                                       forksCount:       ForksCount,
+                                      keywords:         Set[Keyword],
                                       members:          Set[Person],
                                       version:          SchemaVersion,
                                       activities:       List[Activity],
@@ -113,6 +115,7 @@ final case class ProjectWithParent(path:             Path,
                                    maybeCreator:     Option[Person],
                                    visibility:       Visibility,
                                    forksCount:       ForksCount,
+                                   keywords:         Set[Keyword],
                                    members:          Set[Person],
                                    version:          SchemaVersion,
                                    activities:       List[Activity],
@@ -174,6 +177,7 @@ object Project {
           project.dateCreated,
           project.maybeCreator.map(_.to[entities.Person]),
           project.visibility,
+          project.keywords,
           project.members.map(_.to[entities.Person]),
           project.version,
           project.activities.map(_.to[entities.Activity]),
@@ -195,6 +199,7 @@ object Project {
           project.dateCreated,
           project.maybeCreator.map(_.to[entities.Person]),
           project.visibility,
+          project.keywords,
           project.members.map(_.to[entities.Person]),
           project.version,
           project.activities.map(_.to[entities.Activity]),

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,6 +25,5 @@ import skunk.Session
 package object statuschange {
   val categoryName: CategoryName = CategoryName("EVENTS_STATUS_CHANGE")
 
-  private[statuschange] type UpdateResult[F[_]] =
-    Kleisli[F, Session[F], DBUpdateResults]
+  private[statuschange] type UpdateResult[F[_]] = Kleisli[F, Session[F], DBUpdateResults]
 }

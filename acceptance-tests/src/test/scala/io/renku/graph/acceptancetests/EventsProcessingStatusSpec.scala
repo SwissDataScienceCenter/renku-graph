@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,13 +25,13 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.AccessTokenPresence
+import io.renku.graph.acceptancetests.flows.{AccessTokenPresence, RdfStoreProvisioning}
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
+import io.renku.jsonld.syntax._
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
@@ -46,6 +46,7 @@ class EventsProcessingStatusSpec
     with ModelImplicits
     with GivenWhenThen
     with GraphServices
+    with RdfStoreProvisioning
     with AccessTokenPresence
     with Eventually
     with AcceptanceTestPatience
@@ -64,18 +65,13 @@ class EventsProcessingStatusSpec
       Then("the status endpoint should return NOT_FOUND")
       webhookServiceClient.GET(s"projects/${project.id}/events/status").status shouldBe NotFound
 
-      When("there is a webhook but no events in the Event Log")
-      givenHookValidationToHookExists(project)
+      Given("there's an access token for the user")
+      givenAccessTokenPresentFor(project)
 
-      Then("the status endpoint should return OK with done = total = 0")
-      val noEventsResponse = webhookServiceClient GET s"projects/${project.id}/events/status"
-      noEventsResponse.status shouldBe Ok
-      val noEventsResponseJson = noEventsResponse.jsonBody.hcursor
-      noEventsResponseJson.downField("done").as[Int]        shouldBe Right(0)
-      noEventsResponseJson.downField("total").as[Int]       shouldBe Right(0)
-      noEventsResponseJson.downField("progress").as[Double] shouldBe a[Left[_, _]]
+      When("there is a webhook created")
+      `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
 
-      When("there are events under processing")
+      And("there are events under processing")
       sendEventsForProcessing(project)
 
       Then("the status endpoint should return OK with some progress info")
@@ -94,33 +90,32 @@ class EventsProcessingStatusSpec
     }
   }
 
-  private def givenHookValidationToHookExists(project: data.Project)(implicit accessToken: AccessToken): Unit = {
-    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
-
-    givenAccessTokenPresentFor(project)
-
-    `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
-  }
-
   private def sendEventsForProcessing(project: data.Project)(implicit accessToken: AccessToken) = {
 
     val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
 
     `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds: _*)
 
+    `data in the RDF store`(project, project.entitiesProject.asJsonLD, allCommitIds.head)
+
     val theMostRecentEventDate = Instant.now()
-    allCommitIds.foldLeft(Option.empty[CommitId]) { (maybePreviousCommitId, commitId) =>
+    allCommitIds.tail.foldLeft(allCommitIds.head) { (previousCommitId, commitId) =>
       // GitLab to return commit info about all the parent commits
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project,
                                                                                           commitId,
-                                                                                          maybePreviousCommitId.toSet,
+                                                                                          Set(previousCommitId),
                                                                                           theMostRecentEventDate
+      )
+
+      `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                            project,
+                                                                            commitId
       )
 
       // making the triples generation process happy and not throwing exceptions to the logs
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
-      Some(commitId)
+      commitId
     }
 
     webhookServiceClient

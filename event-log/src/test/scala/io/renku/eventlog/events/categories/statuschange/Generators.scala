@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,7 +20,7 @@ package io.renku.eventlog.events.categories.statuschange
 
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
-import io.renku.events.consumers.Project
+import io.renku.events.consumers.ConsumersModelGenerators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
@@ -69,7 +69,6 @@ private object Generators {
   } yield ToAwaitingDeletion(eventId, projectPath)
 
   lazy val projectEventToNewEvents = for {
-    projectId   <- projectIds
-    projectPath <- projectPaths
-  } yield ProjectEventsToNew(Project(projectId, projectPath))
+    project <- consumerProjects
+  } yield ProjectEventsToNew(project)
 }

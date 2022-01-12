@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -92,7 +92,7 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
       "updatedAt":  ${project.updatedAt.value},
       "urls":       ${project.urls},
       "forking":    ${project.forking},
-      "tags":       ${project.tags.map(_.value).toList},
+      "keywords":   ${project.keywords.map(_.value).toList.sorted},
       "starsCount": ${project.starsCount.value},
       "permissions":${project.permissions},
       "statistics": ${project.statistics},

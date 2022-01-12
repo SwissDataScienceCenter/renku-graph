@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.Schemas.{rdf, schema}
+import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.users
 import io.renku.graph.model.users.{GitLabId, ResourceId}
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -42,11 +42,25 @@ private class KGPersonFinderImpl[F[_]: Async: Logger](
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
-  def findPersonIds(
-      membersToAdd: Set[GitLabProjectMember]
-  ): F[Set[(GitLabProjectMember, Option[ResourceId])]] = for {
+  def findPersonIds(membersToAdd: Set[GitLabProjectMember]): F[Set[(GitLabProjectMember, Option[ResourceId])]] = for {
     gitLabIdsAndIds <- queryExpecting[Set[(GitLabId, ResourceId)]](using = query(membersToAdd)).map(_.toMap)
   } yield membersToAdd.map(member => member -> gitLabIdsAndIds.get(member.gitLabId))
+
+  private def query(membersToAdd: Set[GitLabProjectMember]) = SparqlQuery.of(
+    name = "persons by gitLabId",
+    Prefixes of schema -> "schema",
+    s"""|SELECT DISTINCT ?personId ?gitLabId
+        |WHERE {
+        |  ?personId a schema:Person;
+        |            schema:sameAs ?sameAsId.
+        |             
+        |  ?sameAsId schema:additionalType  'GitLab';
+        |            schema:identifier      ?gitLabId.
+        |             
+        |  FILTER (?gitLabId IN (${membersToAdd.map(_.gitLabId).mkString(", ")}))
+        |}
+        |""".stripMargin
+  )
 
   private implicit lazy val recordsDecoder: Decoder[Set[(GitLabId, ResourceId)]] = { cursor =>
     import Decoder._
@@ -61,22 +75,6 @@ private class KGPersonFinderImpl[F[_]: Async: Logger](
 
     cursor.downField("results").downField("bindings").as(decodeList(tuples)).map(_.toSet)
   }
-
-  private def query(membersToAdd: Set[GitLabProjectMember]) = SparqlQuery.of(
-    name = "persons by gitLabId",
-    Prefixes.of(schema -> "schema", rdf -> "rdf"),
-    s"""|SELECT DISTINCT ?personId ?gitLabId
-        |WHERE {
-        |  ?personId  rdf:type      schema:Person;
-        |             schema:sameAs ?sameAsId.
-        |             
-        |  ?sameAsId  schema:additionalType  'GitLab';
-        |             schema:identifier      ?gitLabId.
-        |             
-        |  FILTER (?gitLabId IN (${membersToAdd.map(_.gitLabId).mkString(", ")}))
-        |}
-        |""".stripMargin
-  )
 }
 
 private object KGPersonFinder {

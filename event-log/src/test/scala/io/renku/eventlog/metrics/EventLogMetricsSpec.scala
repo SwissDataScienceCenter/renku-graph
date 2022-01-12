@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,7 +39,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.language.{postfixOps, reflectiveCalls}
+import scala.language.reflectiveCalls
 
 class EventLogMetricsSpec
     extends AnyWordSpec
@@ -95,6 +95,19 @@ class EventLogMetricsSpec
         )
       }
     }
+
+    "remove an entry from the categoryNameEventsGauge if it does not exist in the new set of values" in new TestCase {
+      val categoryNameCount1 = categoryNameCounts.generateOne
+      givenCountEventsByCategoryNameMethodToReturn add categoryNameCount1.pure[IO]
+      val categoryNameCount2 = categoryNameCounts.generateOne
+      givenCountEventsByCategoryNameMethodToReturn add categoryNameCount2.pure[IO]
+
+      metrics.run().unsafeRunAndForget()
+
+      eventually {
+        categoryNameEventsGauge.categoryNameValues.asScala shouldBe categoryNameCount2
+      }
+    }
   }
 
   private trait TestGauges {
@@ -112,6 +125,7 @@ class EventLogMetricsSpec
       override def increment(labelValue: CategoryName)        = fail("Spec shouldn't be calling that")
       override def decrement(labelValue: CategoryName)        = fail("Spec shouldn't be calling that")
       override def reset()                                    = fail("Spec shouldn't be calling that")
+      override def clear()                                    = categoryNameValues.clear().pure[IO]
       protected override def gauge                            = fail("Spec shouldn't be calling that")
     }
 
@@ -128,6 +142,7 @@ class EventLogMetricsSpec
       override def increment(labelValue: EventStatus)        = fail("Spec shouldn't be calling that")
       override def decrement(labelValue: EventStatus)        = fail("Spec shouldn't be calling that")
       override def reset()                                   = fail("Spec shouldn't be calling that")
+      override def clear()                                   = statusValues.clear().pure[IO]
       protected override def gauge                           = fail("Spec shouldn't be calling that")
     }
 

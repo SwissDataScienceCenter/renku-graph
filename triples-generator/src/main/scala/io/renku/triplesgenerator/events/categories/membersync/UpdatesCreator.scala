@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
-import io.renku.graph.model.Schemas.{rdf, schema}
+import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.users.GitLabId
@@ -33,9 +33,8 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl) {
 
-  def insertion(
-      projectPath: projects.Path,
-      members:     Set[(GitLabProjectMember, Option[users.ResourceId])]
+  def insertion(projectPath: projects.Path,
+                members:     Set[(GitLabProjectMember, Option[users.ResourceId])]
   ): List[SparqlQuery] = {
     val (queriesForNewPersons, queriesForExistingPersons) =
       (separateUsersNotYetInKG.pure[List] ap members.toList).separate
@@ -50,7 +49,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
         SparqlQuery
           .of(
             name = "unlink project member",
-            Prefixes.of(schema -> "schema", rdf -> "rdf"),
+            Prefixes of schema -> "schema",
             s"""|DELETE DATA { 
                 |  $linkTriple
                 |}
@@ -66,7 +65,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
     val membersCreations = resourceIdsAndMembers.map { resourceIdsAndMember =>
       SparqlQuery.of(
         name = "create project member",
-        Prefixes.of(schema -> "schema", rdf -> "rdf"),
+        Prefixes of schema -> "schema",
         s"""|INSERT DATA { 
             |  ${generatePersonTriples(resourceIdsAndMember)}
             |}
@@ -79,7 +78,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
         .map { linkTriple =>
           SparqlQuery.of(
             name = "link project member",
-            Prefixes.of(schema -> "schema", rdf -> "rdf"),
+            Prefixes of schema -> "schema",
             s"""|INSERT DATA { 
                 |  $linkTriple
                 |}
@@ -98,7 +97,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
     membersAlreadyInKG.map { case (_, resourceId) => generateLinkTriple(projectPath, resourceId) }.map { linkTriple =>
       SparqlQuery.of(
         name = "link project member",
-        Prefixes.of(schema -> "schema", rdf -> "rdf"),
+        Prefixes of schema -> "schema",
         s"""|INSERT DATA {
             |  $linkTriple
             |}
@@ -112,11 +111,11 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
   private lazy val generatePersonTriples: ((users.ResourceId, GitLabProjectMember)) => String = {
     case (resourceId, member) =>
       val creatorResource = resourceId.showAs[RdfResource]
-      val sameAsId        = (gitLabApiUrl / "users" / member.gitLabId).showAs[RdfResource]
-      s"""|  $creatorResource rdf:type <http://schema.org/Person>;
-          |                   schema:name '${sparqlEncode(member.name.value)}';
-          |                   schema:sameAs $sameAsId.
-          |  $sameAsId rdf:type schema:URL;
+      val sameAsId        = entities.Person.toSameAsEntityId(member.gitLabId)(gitLabApiUrl).show
+      s"""|$creatorResource a schema:Person;
+          |                 schema:name '${sparqlEncode(member.name.value)}';
+          |                 schema:sameAs <$sameAsId>.
+          |<$sameAsId> a schema:URL;
           |            schema:identifier ${member.gitLabId};
           |            schema:additionalType 'GitLab'.
           |""".stripMargin

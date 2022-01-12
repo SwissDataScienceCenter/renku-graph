@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -75,7 +75,7 @@ object DatasetPart {
     )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[DatasetPart] = JsonLDDecoder.entity(entityTypes) { cursor =>
+  implicit lazy val decoder: JsonLDDecoder[DatasetPart] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
     for {
       resourceId            <- cursor.downEntityId.as[PartResourceId]
       external              <- cursor.downField(renku / "external").as[PartExternal]

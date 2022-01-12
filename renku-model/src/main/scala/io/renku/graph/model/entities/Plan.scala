@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,15 +19,17 @@
 package io.renku.graph.model.entities
 
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.{InvalidationTime, commandParameters}
 import io.renku.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import io.renku.graph.model.plans.{Command, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
+import io.renku.graph.model.plans.{Command, DateCreated, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
+import io.renku.graph.model.{InvalidationTime, commandParameters}
 import io.renku.jsonld.JsonLDDecoder
+import io.renku.jsonld.JsonLDDecoder.decodeList
 
 final case class Plan(resourceId:               ResourceId,
                       name:                     Name,
                       maybeDescription:         Option[Description],
-                      command:                  Command,
+                      maybeCommand:             Option[Command],
+                      dateCreated:              DateCreated,
                       maybeProgrammingLanguage: Option[ProgrammingLanguage],
                       keywords:                 List[Keyword],
                       parameters:               List[CommandParameter],
@@ -62,7 +64,8 @@ object Plan {
       entityTypes,
       schema / "name"                -> plan.name.asJsonLD,
       schema / "description"         -> plan.maybeDescription.asJsonLD,
-      renku / "command"              -> plan.command.asJsonLD,
+      renku / "command"              -> plan.maybeCommand.asJsonLD,
+      schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
       schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
       schema / "keywords"            -> plan.keywords.asJsonLD,
       renku / "hasArguments"         -> plan.parameters.asJsonLD,
@@ -73,15 +76,16 @@ object Plan {
     )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[Plan] = JsonLDDecoder.entity(entityTypes) { cursor =>
+  implicit lazy val decoder: JsonLDDecoder[Plan] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
     import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
     for {
       resourceId            <- cursor.downEntityId.as[ResourceId]
       name                  <- cursor.downField(schema / "name").as[Name]
       maybeDescription      <- cursor.downField(schema / "description").as[Option[Description]]
-      command               <- cursor.downField(renku / "command").as[Command]
+      maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
+      dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
       maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
-      keywords              <- cursor.downField(schema / "keywords").as[List[Keyword]]
+      keywords              <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten)
       parameters            <- cursor.downField(renku / "hasArguments").as[List[CommandParameter]]
       inputs                <- cursor.downField(renku / "hasInputs").as[List[CommandInput]]
       outputs               <- cursor.downField(renku / "hasOutputs").as[List[CommandOutput]]
@@ -90,7 +94,8 @@ object Plan {
     } yield Plan(resourceId,
                  name,
                  maybeDescription,
-                 command,
+                 maybeCommand,
+                 dateCreated,
                  maybeProgrammingLang,
                  keywords,
                  parameters,

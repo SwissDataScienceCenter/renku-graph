@@ -8,6 +8,12 @@
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
@@ -16,7 +22,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 2,
-  "iteration": 1607521600529,
+  "iteration": 1638267756868,
   "links": [],
   "panels": [
     {
@@ -27,19 +33,7 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": null
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
+          "links": []
         },
         "overrides": []
       },
@@ -69,15 +63,16 @@
       "linewidth": 1,
       "nullPointMode": "null",
       "options": {
-        "dataLinks": []
+        "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.0.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [
         {
+          "$$hashKey": "object:109",
           "alias": "Person match rate",
           "yaxis": 2
         }
@@ -87,13 +82,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "avg by (entities)(entities_count{kubernetes_name=\"[[kube_env_name]]-knowledge-graph\"})",
+          "exemplar": true,
+          "expr": "avg by (entities)(entities_count{kubernetes_name=\"${kube_env_name}-knowledge-graph\", kubernetes_namespace=\"${env_namespace}\"})",
           "interval": "",
           "legendFormat": "{{entities}}",
           "refId": "A"
         },
         {
-          "expr": "(avg by (entities)(entities_count{kubernetes_name=\"[[kube_env_name]]-knowledge-graph\", entities=\"Person with GitLabId\"})) / scalar(avg by (entities)(entities_count{kubernetes_name=\"[[kube_env_name]]-knowledge-graph\", entities=\"Person\"}))",
+          "exemplar": true,
+          "expr": "(avg by (entities)(entities_count{kubernetes_name=\"${kube_env_name}-knowledge-graph\", kubernetes_namespace=\"${env_namespace}\", entities=\"Person with GitLabId\"})) / scalar(avg by (entities)(entities_count{kubernetes_name=\"${kube_env_name}-knowledge-graph\", kubernetes_namespace=\"${env_namespace}\", entities=\"Person\"}))",
           "interval": "",
           "legendFormat": "Person match rate",
           "refId": "B"
@@ -119,6 +116,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:556",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -127,6 +125,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:557",
           "format": "percentunit",
           "label": null,
           "logBase": 1,
@@ -148,7 +147,7 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "custom": {}
+          "links": []
         },
         "overrides": []
       },
@@ -182,9 +181,10 @@
       "linewidth": 1,
       "nullPointMode": "null",
       "options": {
-        "dataLinks": []
+        "alertThreshold": true
       },
       "percentage": false,
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -194,13 +194,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "max(histogram_quantile(0.95, rate(sparql_execution_times_bucket{kubernetes_name=\"[[kube_env_name]]-knowledge-graph\"}[5m]))) by (query_id)",
+          "exemplar": true,
+          "expr": "max(histogram_quantile(0.95, rate(sparql_execution_times_bucket{kubernetes_name=\"${kube_env_name}-knowledge-graph\", kubernetes_namespace=\"${env_namespace}\"}[5m]))) by (query_id)",
           "interval": "",
           "legendFormat": "{{query_id}}",
           "refId": "A"
         },
         {
-          "expr": "max(histogram_quantile(0.95, rate(sparql_execution_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[5m]))) by (query_id)",
+          "exemplar": true,
+          "expr": "max(histogram_quantile(0.95, rate(sparql_execution_times_bucket{kubernetes_name=\"${kube_env_name}-triples-generator\", kubernetes_namespace=\"${env_namespace}\"}[5m]))) by (query_id)",
+          "interval": "",
           "legendFormat": "{{query_id}}",
           "refId": "B"
         }
@@ -225,6 +228,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:251",
           "format": "s",
           "label": null,
           "logBase": 1,
@@ -233,6 +237,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:252",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -254,7 +259,7 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "custom": {}
+          "links": []
         },
         "overrides": []
       },
@@ -288,9 +293,10 @@
       "linewidth": 1,
       "nullPointMode": "null",
       "options": {
-        "dataLinks": []
+        "alertThreshold": true
       },
       "percentage": false,
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -300,14 +306,18 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "max(histogram_quantile(0.5, rate(sparql_execution_times_bucket{kubernetes_name=\"[[kube_env_name]]-knowledge-graph\"}[5m]))) by (query_id)",
+          "exemplar": true,
+          "expr": "max(histogram_quantile(0.5, rate(sparql_execution_times_bucket{kubernetes_name=\"${kube_env_name}-knowledge-graph\", kubernetes_namespace=\"${env_namespace}\"}[5m]))) by (query_id)",
           "hide": false,
+          "interval": "",
           "legendFormat": "{{query_id}}",
           "refId": "A"
         },
         {
-          "expr": "max(histogram_quantile(0.5, rate(sparql_execution_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[5m]))) by (query_id)",
+          "exemplar": true,
+          "expr": "max(histogram_quantile(0.5, rate(sparql_execution_times_bucket{kubernetes_name=\"${kube_env_name}-triples-generator\", kubernetes_namespace=\"${env_namespace}\"}[5m]))) by (query_id)",
           "hide": false,
+          "interval": "",
           "legendFormat": "{{query_id}}",
           "refId": "B"
         }
@@ -354,8 +364,8 @@
       }
     }
   ],
-  "refresh": "30s",
-  "schemaVersion": 25,
+  "refresh": "",
+  "schemaVersion": 30,
   "style": "dark",
   "tags": [
     "renku"
@@ -366,27 +376,58 @@
         "allValue": null,
         "current": {
           "selected": true,
-          "text": "kuba-renku",
-          "value": "kuba-renku"
+          "text": "david-renku",
+          "value": "david-renku"
         },
         "datasource": "Prometheus",
-        "definition": "server_request_count",
+        "definition": "server_request_count_total",
+        "description": null,
+        "error": null,
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Env name",
         "multi": false,
         "name": "kube_env_name",
         "options": [],
-        "query": "server_request_count",
+        "query": {
+          "query": "server_request_count_total",
+          "refId": "StandardVariableQuery"
+        },
         "refresh": 1,
-        "regex": "/.*kubernetes_name=\"([\\w-]*)-knowledge-graph\".*/",
+        "regex": "/.*release=\"([\\w-]*)\".*/",
         "skipUrlSync": false,
         "sort": 2,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
+      },
+      {
+        "allValue": null,
+        "current": {
+          "selected": false,
+          "text": "david",
+          "value": "david"
+        },
+        "datasource": null,
+        "definition": "server_request_count_total",
+        "description": null,
+        "error": null,
+        "hide": 0,
+        "includeAll": true,
+        "label": "Env namespace",
+        "multi": false,
+        "name": "env_namespace",
+        "options": [],
+        "query": {
+          "query": "server_request_count_total",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "/.*namespace=\"([\\w-]*)\".*/",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -410,5 +451,5 @@
   "timezone": "",
   "title": "Renku Knowledge Graph",
   "uid": "n0um168Zk",
-  "version": 13
+  "version": 20
 }

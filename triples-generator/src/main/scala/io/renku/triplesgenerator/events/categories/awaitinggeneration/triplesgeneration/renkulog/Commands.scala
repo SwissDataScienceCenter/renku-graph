@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,6 +22,7 @@ import ammonite.ops.Path
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.kernel.Async
+import cats.syntax.all._
 import io.renku.config.ServiceUrl
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabUrl, projects}
@@ -30,9 +31,9 @@ import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
@@ -84,19 +85,23 @@ private object Commands {
   }
 
   object File {
-    def apply[F[_]: MonadThrow]: File[F] = new FileImpl[F]
+    def apply[F[_]: MonadThrow: Logger]: File[F] = new FileImpl[F]
   }
 
-  class FileImpl[F[_]: MonadThrow] extends File[F] {
+  class FileImpl[F[_]: MonadThrow: Logger] extends File[F] {
 
     override def mkdir(newDir: Path): F[Path] = MonadThrow[F].catchNonFatal {
       ops.mkdir ! newDir
       newDir
     }
 
-    override def deleteDirectory(repositoryDirectory: Path): F[Unit] = MonadThrow[F].catchNonFatal {
-      ops.rm ! repositoryDirectory
-    }
+    override def deleteDirectory(repositoryDirectory: Path): F[Unit] = MonadThrow[F]
+      .catchNonFatal {
+        ops.rm ! repositoryDirectory
+      }
+      .recoverWith { case NonFatal(ex) =>
+        Logger[F].error(ex)("Error when deleting repo directory")
+      }
 
     override def exists(fileName: Path): F[Boolean] = MonadThrow[F].catchNonFatal {
       ops.exists(fileName)
@@ -109,7 +114,7 @@ private object Commands {
     def clone(
         repositoryUrl:                       ServiceUrl,
         workDirectory:                       Path
-    )(implicit destinationDirectory:         RepositoryPath): EitherT[F, GenerationRecoverableError, Unit]
+    )(implicit destinationDirectory:         RepositoryPath): EitherT[F, ProcessingRecoverableError, Unit]
     def rm(fileName:                         Path)(implicit repositoryDirectory: RepositoryPath): F[Unit]
     def status(implicit repositoryDirectory: RepositoryPath): F[String]
   }
@@ -120,11 +125,10 @@ private object Commands {
 
   class GitImpl[F[_]: MonadThrow](
       doClone: (ServiceUrl, RepositoryPath, Path) => CommandResult = (url, destinationDir, workDir) =>
-        %%("git", "clone", url.toString, destinationDir.toString)(workDir)
+        %%("git", "clone", "--no-checkout", url.toString, destinationDir.toString)(workDir)
   ) extends Git[F] {
     import cats.data.EitherT
     import cats.syntax.all._
-    import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
     override def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit] =
       MonadThrow[F].catchNonFatal {
@@ -138,13 +142,13 @@ private object Commands {
     override def clone(
         repositoryUrl:               ServiceUrl,
         workDirectory:               Path
-    )(implicit destinationDirectory: RepositoryPath): EitherT[F, GenerationRecoverableError, Unit] =
-      EitherT[F, GenerationRecoverableError, Unit] {
+    )(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, Unit] =
+      EitherT[F, ProcessingRecoverableError, Unit] {
         MonadThrow[F]
           .catchNonFatal {
             doClone(repositoryUrl, destinationDirectory, workDirectory)
           }
-          .map(_ => ().asRight[GenerationRecoverableError])
+          .map(_ => ().asRight[ProcessingRecoverableError])
           .recoverWith(relevantError)
       }
 
@@ -157,21 +161,29 @@ private object Commands {
       %%("git", "status")(repositoryDirectory.value).out.string
     }
 
-    private val recoverableErrors = Set("SSL_ERROR_SYSCALL",
-                                        "the remote end hung up unexpectedly",
-                                        "The requested URL returned error: 502",
-                                        "Could not resolve host:",
-                                        "Host is unreachable"
+    private val recoverableErrors = Set(
+      "SSL_ERROR_SYSCALL",
+      "the remote end hung up unexpectedly",
+      "The requested URL returned error: 502",
+      "The requested URL returned error: 503",
+      "The requested URL returned error: 504",
+      "Error in the HTTP2 framing layer",
+      "HTTP/2 stream 3 was not closed cleanly before end of the underlying stream",
+      "Could not resolve host:",
+      "Host is unreachable"
     )
-    private lazy val relevantError: PartialFunction[Throwable, F[Either[GenerationRecoverableError, Unit]]] = {
+    private lazy val relevantError: PartialFunction[Throwable, F[Either[ProcessingRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"
 
-        MonadThrow[F].catchNonFatal(result.out.string) flatMap {
+        MonadThrow[F].catchNonFatal(result.toString()) flatMap {
           case out if recoverableErrors exists out.contains =>
-            GenerationRecoverableError(errorMessage(result.toString())).asLeft[Unit].pure[F]
+            LogWorthyRecoverableError(errorMessage(result.toString()))
+              .asLeft[Unit]
+              .leftWiden[ProcessingRecoverableError]
+              .pure[F]
           case _ =>
-            new Exception(errorMessage(result.toString())).raiseError[F, Either[GenerationRecoverableError, Unit]]
+            new Exception(errorMessage(result.toString())).raiseError[F, Either[ProcessingRecoverableError, Unit]]
         }
     }
   }
@@ -193,7 +205,7 @@ private object Commands {
 
     override def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit] =
       MonadThrow[F]
-        .catchNonFatal(%%("renku", "migrate")(destinationDirectory.value))
+        .catchNonFatal(%%("renku", "migrate", "--preserve-identifiers")(destinationDirectory.value))
         .void
         .recoverWith { case NonFatal(exception) =>
           new Exception(
@@ -211,7 +223,7 @@ private object Commands {
           } yield wrappedTriples.asRight[ProcessingRecoverableError]
         }.recoverWith {
           case ShelloutException(result) if result.exitCode == 137 =>
-            GenerationRecoverableError("Not enough memory").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
+            LogWorthyRecoverableError("Not enough memory").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
         }
       }
   }

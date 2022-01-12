@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,17 +28,13 @@ private[init] object CliVersionLoader {
 
   private implicit val cliVersionLoader: ConfigReader[CliVersion] = stringTinyTypeReader(CliVersion)
 
-  def apply[F[_]]()(implicit ME: MonadError[F, Throwable]): F[CliVersion] =
-    apply(findRenkuVersion)
+  def apply[F[_]]()(implicit ME: MonadError[F, Throwable]): F[CliVersion] = apply(findRenkuVersion)
 
-  private[init] def apply[F[_]](
-      renkuVersionFinder: F[CliVersion]
-  )(implicit ME:          MonadError[F, Throwable]): F[CliVersion] =
-    renkuVersionFinder
+  private[init] def apply[F[_]](renkuVersionFinder: F[CliVersion])(implicit
+      ME:                                           MonadError[F, Throwable]
+  ): F[CliVersion] = renkuVersionFinder
 
-  private def findRenkuVersion[F[_]](implicit
-      ME: MonadError[F, Throwable]
-  ): F[CliVersion] = {
+  private def findRenkuVersion[F[_]](implicit ME: MonadError[F, Throwable]): F[CliVersion] = {
     import ammonite.ops._
     import cats.syntax.all._
 

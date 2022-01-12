@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,6 +39,7 @@ object PublicationEvent {
   ): PublicationEvent => entities.PublicationEvent = publicationEvent =>
     entities.PublicationEvent(
       publicationEvents.ResourceId(publicationEvent.asEntityId.show),
+      About((renkuBaseUrl / "urls" / "datasets" / publicationEvent.dataset.identifier).show),
       datasets.ResourceId(publicationEvent.dataset.asEntityId.show),
       publicationEvent.maybeDescription,
       publicationEvent.name,

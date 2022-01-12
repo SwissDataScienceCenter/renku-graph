@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -32,7 +32,7 @@ private[categories] object Generators {
 
   implicit val commits: Gen[Commit] = for {
     id      <- commitIds
-    project <- projectsGen
+    project <- consumerProjects
   } yield Commit(id, project)
 
   implicit val projectInfos: Gen[ProjectInfo] = for {
@@ -52,7 +52,7 @@ private[categories] object Generators {
 
   implicit lazy val newCommitEvents: Gen[CommitEvent] = for {
     commitId      <- commitIds
-    project       <- projectsGen
+    project       <- consumerProjects
     message       <- commitMessages
     committedDate <- committedDates
     author        <- authors
@@ -63,7 +63,7 @@ private[categories] object Generators {
 
   implicit lazy val skippedCommitEvents: Gen[SkippedCommitEvent] = for {
     commitId      <- commitIds
-    project       <- projectsGen
+    project       <- consumerProjects
     message       <- commitMessages
     committedDate <- committedDates
     author        <- authors

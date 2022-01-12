@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -57,26 +57,25 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel](
     gitLabProject <- findProjectInGitLab(path, Some(accessToken))
   } yield gitLabProject
 
-  private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) =
-    Project(
-      id = gitLabProject.id,
-      path = path,
-      name = kgProject.name,
-      maybeDescription = kgProject.maybeDescription orElse gitLabProject.maybeDescription,
-      visibility = kgProject.visibility,
-      created = Creation(
-        date = kgProject.created.date,
-        maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
-      ),
-      updatedAt = gitLabProject.updatedAt,
-      urls = gitLabProject.urls,
-      forking = Forking(gitLabProject.forksCount, kgProject.maybeParent.toParentProject),
-      tags = gitLabProject.tags,
-      starsCount = gitLabProject.starsCount,
-      permissions = gitLabProject.permissions,
-      statistics = gitLabProject.statistics,
-      version = kgProject.version
-    )
+  private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) = Project(
+    id = gitLabProject.id,
+    path = path,
+    name = kgProject.name,
+    maybeDescription = kgProject.maybeDescription,
+    visibility = kgProject.visibility,
+    created = Creation(
+      date = kgProject.created.date,
+      maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
+    ),
+    updatedAt = gitLabProject.updatedAt,
+    urls = gitLabProject.urls,
+    forking = Forking(gitLabProject.forksCount, kgProject.maybeParent.toParentProject),
+    keywords = kgProject.keywords,
+    starsCount = gitLabProject.starsCount,
+    permissions = gitLabProject.permissions,
+    statistics = gitLabProject.statistics,
+    version = kgProject.version
+  )
 
   private implicit class ParentOps(maybeParent: Option[Parent]) {
     lazy val toParentProject: Option[ParentProject] =

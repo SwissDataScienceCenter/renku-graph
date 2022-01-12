@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,7 +19,8 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
-import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import io.renku.graph.model.views.{EntityIdJsonLdOps, RdfResource, TinyTypeJsonLDOps}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{BoundedInstant, Url}
 
@@ -31,7 +32,11 @@ object activities {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId] {
+    implicit object RdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
+      override def render(id: ResourceId): String = s"<${sparqlEncode(id.show)}>"
+    }
+  }
 
   final class StartTime private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object StartTime

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,6 +31,9 @@ object publicationEvents {
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
       with EntityIdJsonLdOps[ResourceId]
+
+  class About private (val value: String) extends AnyVal with StringTinyType
+  implicit object About extends TinyTypeFactory[About](new About(_)) with Url with EntityIdJsonLdOps[About]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description

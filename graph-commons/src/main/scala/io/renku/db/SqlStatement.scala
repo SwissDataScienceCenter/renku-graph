@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -67,12 +67,19 @@ object SqlStatement {
   }
 
   case class Select[F[_]: MonadCancelThrow, In, Out](query: Query[In, Out], name: Name, args: In) {
+
     def build[FF[_]](
         queryExecution: PreparedQuery[F, In, Out] => In => F[FF[Out]]
     ): SqlStatement[F, FF[Out]] = SqlStatement[F, FF[Out]](
       Kleisli(session => session.prepare(query).use(queryExecution(_)(args))),
       name
     )
+
+    def buildCursorResource(f: Cursor[F, Out] => F[Unit]): SqlStatement[F, Unit] =
+      SqlStatement[F, Unit](
+        Kleisli(session => session.prepare(query).use(_.cursor(args).use(f))),
+        name
+      )
   }
 
   case class Command[F[_]: MonadCancelThrow, In](

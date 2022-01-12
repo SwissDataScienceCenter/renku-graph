@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,22 +31,41 @@ final case class Person(
 
 object Person {
 
-  def apply(
-      name:  Name,
-      email: Email
-  ): Person = Person(name, Some(email))
+  def apply(name: Name, email: Email): Person = Person(name, Some(email))
 
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def toEntitiesPerson(implicit renkuBaseUrl: RenkuBaseUrl): Person => entities.Person = person =>
-    entities.Person(
-      users.ResourceId(person.asEntityId),
-      person.name,
-      person.maybeEmail,
-      person.maybeAffiliation,
-      person.maybeGitLabId
-    )
+  implicit def toEntitiesPerson(implicit renkuBaseUrl: RenkuBaseUrl): Person => entities.Person = {
+    case Person(name, maybeEmail, maybeAffiliation, Some(gitLabId)) =>
+      entities.Person.WithGitLabId(users.ResourceId(gitLabId), gitLabId, name, maybeEmail, maybeAffiliation)
+    case Person(name, Some(email), maybeAffiliation, None) =>
+      entities.Person.WithEmail(users.ResourceId(email), name, email, maybeAffiliation)
+    case Person(name, None, maybeAffiliation, None) =>
+      entities.Person.WithNameOnly(users.ResourceId(name), name, maybeAffiliation)
+  }
+
+  implicit def toMaybeEntitiesPersonWithGitLabId(implicit
+      renkuBaseUrl: RenkuBaseUrl
+  ): Person => Option[entities.Person.WithGitLabId] = {
+    case Person(name, maybeEmail, maybeAffiliation, Some(gitLabId)) =>
+      entities.Person.WithGitLabId(users.ResourceId(gitLabId), gitLabId, name, maybeEmail, maybeAffiliation).some
+    case _ => None
+  }
+
+  implicit lazy val toMaybeEntitiesPersonWithEmail: Person => Option[entities.Person.WithEmail] = {
+    case Person(name, Some(email), maybeAffiliation, None) =>
+      entities.Person.WithEmail(users.ResourceId(email), name, email, maybeAffiliation).some
+    case _ => None
+  }
+
+  implicit def toMaybeEntitiesPersonWithName(implicit
+      renkuBaseUrl: RenkuBaseUrl
+  ): Person => Option[entities.Person.WithNameOnly] = {
+    case Person(name, None, maybeAffiliation, None) =>
+      entities.Person.WithNameOnly(users.ResourceId(name), name, maybeAffiliation).some
+    case _ => None
+  }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
     JsonLDEncoder.instance(_.to[entities.Person].asJsonLD)
@@ -54,7 +73,7 @@ object Person {
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Person] =
     EntityIdEncoder.instance {
       case Person(_, _, _, Some(gitLabId)) => EntityId of users.ResourceId(gitLabId).show
-      case Person(_, Some(email), _, _)    => EntityId of s"mailto:$email"
-      case Person(name, _, _, _)           => EntityId of (renkuBaseUrl / "users" / name)
+      case Person(_, Some(email), _, _)    => EntityId of users.ResourceId(email).show
+      case Person(name, _, _, _)           => EntityId of users.ResourceId(name).show
     }
 }

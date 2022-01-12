@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
+import cats.{Applicative, MonadThrow, NonEmptyParallel, Parallel}
 import io.circe.DecodingFailure
 import io.renku.config.GitLab
 import io.renku.control.Throttler
@@ -32,6 +32,7 @@ import io.renku.graph.model.entities._
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
 import org.typelevel.log4cats.Logger
 
 private trait JsonLDDeserializer[F[_]] {
@@ -70,32 +71,31 @@ private class JsonLDDeserializerImpl[F[_]: MonadThrow](
   private def extractProject(projectInfo: GitLabProjectInfo, event: TriplesGeneratedEvent) =
     EitherT.right[ProcessingRecoverableError] {
       for {
-        projects <- event.payload.cursor
-                      .as[List[Project]](decodeList(Project.decoder(projectInfo)))
-                      .fold(raiseError(event), _.pure[F])
+        projects <- event.payload.cursor.as(decodeList(Project.decoder(projectInfo))).fold(raiseError(event), _.pure[F])
         project <- projects match {
                      case project :: Nil => project.pure[F]
                      case other =>
                        new IllegalStateException(
-                         s"${other.size} Project entities found in the JsonLD for ${event.project.show}"
+                         show"${other.size} Project entities found in the JsonLD for ${event.project}"
                        ).raiseError[F, Project]
                    }
-        _ <- whenA(event.project.path != project.path)(
+        _ <- whenA(event.project.path.value.toLowerCase() != project.path.value.toLowerCase())(
                new IllegalStateException(
-                 s"Event for project ${event.project.show} contains payload for project ${project.path}"
+                 show"Event for project ${event.project} contains payload for project ${project.path}"
                ).raiseError[F, Unit]
              )
       } yield project
     }
 
-  private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => F[T] =
-    err =>
-      new IllegalStateException(s"Finding Project entity in the JsonLD for ${event.project.show} failed", err)
-        .raiseError[F, T]
+  private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => F[T] = err =>
+    new IllegalStateException(show"Finding Project entity in the JsonLD for ${event.project} failed", err)
+      .raiseError[F, T]
 }
 
 private object JsonLDDeserializer {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[JsonLDDeserializer[F]] = for {
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
+      gitLabThrottler: Throttler[F, GitLab]
+  ): F[JsonLDDeserializer[F]] = for {
     renkuBaseUrl      <- RenkuBaseUrlLoader[F]()
     projectInfoFinder <- ProjectInfoFinder(gitLabThrottler)
   } yield new JsonLDDeserializerImpl[F](projectInfoFinder, renkuBaseUrl)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -50,7 +50,6 @@ import skunk.{Command, Session, ~}
 import java.lang.Thread.sleep
 import java.time.Instant
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class ZombieEventDetectionSpec
     extends AnyFeatureSpec
@@ -74,7 +73,6 @@ class ZombieEventDetectionSpec
   ) {
     implicit val accessToken: AccessToken = accessTokens.generateOne
     val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
-    val projectId = project.id
     val commitId  = commitIds.generateOne
     val eventDate = eventDates.generateOne
 
@@ -85,10 +83,10 @@ class ZombieEventDetectionSpec
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
     And("the event commit in GitLab")
-    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
 
     And("the event classified as zombie is the latest commit in GitLab")
-    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(projectId, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
 
     And("access token is present")
     givenAccessTokenPresentFor(project)
@@ -102,8 +100,8 @@ class ZombieEventDetectionSpec
 
     Then("the zombie chasing functionality should re-do the event")
     eventually {
-      EventLog.findEvents(projectId, status = GeneratingTriples).isEmpty shouldBe true
-      EventLog.findEvents(projectId, status = TriplesStore)              shouldBe List(commitId)
+      EventLog.findEvents(project.id, status = GeneratingTriples).isEmpty shouldBe true
+      EventLog.findEvents(project.id, status = TriplesStore)              shouldBe List(commitId)
     }
   }
 

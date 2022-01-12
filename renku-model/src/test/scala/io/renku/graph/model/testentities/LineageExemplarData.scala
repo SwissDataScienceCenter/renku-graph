@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,16 +34,8 @@ import io.renku.graph.model.testentities.ParameterValue.LocationParameterValue.{
 import io.renku.graph.model.testentities.Plan.CommandParameters
 import io.renku.jsonld.syntax.JsonEncoderOps
 
-/**  ====================== Exemplar data visualization ======================
-  * zhbikes folder   clean_data
-  *           \      /
-  *          run plan 1
-  *               \
-  *              bikesParquet   plot_data
-  *                       \     /
-  *                      run plan 2
-  *                       /     \
-  *                grid_plot   cumulative
+/** ====================== Exemplar data visualization ====================== zhbikes folder clean_data \ / run plan 1 \
+  * bikesParquet plot_data \ / run plan 2 / \ grid_plot cumulative
   */
 object LineageExemplarData {
 
@@ -94,9 +86,10 @@ object LineageExemplarData {
       )
     }
 
-    val plan1 = Plan(
+    val plan1 = Plan.of(
       plans.Name("plan1"),
-      Command("python"),
+      Command("python").some,
+      planDatesCreated(after = project.dateCreated).generateOne,
       CommandParameters.of(CommandInput.fromLocation(cleanData),
                            CommandInput.fromLocation(zhbikesFolder),
                            CommandOutput.fromLocation(bikesParquet)
@@ -112,9 +105,10 @@ object LineageExemplarData {
       .buildProvenanceGraph
       .fold(errors => throw new Exception(errors.toList.mkString), identity)
 
-    val plan2 = Plan(
+    val plan2 = Plan.of(
       plans.Name("plan2"),
-      Command("python"),
+      Command("python").some,
+      planDatesCreated(after = project.dateCreated).generateOne,
       CommandParameters.of(
         CommandInput.fromLocation(plotData),
         CommandInput.fromLocation(bikesParquet),
@@ -207,6 +201,10 @@ object NodeDef {
   )
 
   private implicit lazy val activityShow: Show[Activity] = Show.show { activity =>
+    val commandComponent = activity.association.plan.maybeCommand match {
+      case Some(command) => s"$command "
+      case None          => ""
+    }
     activity.parameters
       .collect {
         case parameter @ CommandInputValue(_, _, valueReference: ExplicitCommandParameter, _) =>
@@ -218,7 +216,7 @@ object NodeDef {
       }
       .sortBy(_._2)
       .map(_._1.show)
-      .mkString(s"${activity.association.plan.command} ", " ", "")
+      .mkString(start = commandComponent, sep = " ", end = "")
   }
 
   private implicit def parameterValueShow[P <: ParameterValue]: Show[P] = Show.show {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -51,13 +51,20 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit
 
   def run(services: ServiceRun*)(implicit ioRuntime: IORuntime): IO[Unit] = for {
     _ <- semaphore.acquire
-    _ <- services.toList.map(start).parSequence
+    _ <- whenNotStarted(services.toList) {
+           for {
+             _ <- services.toList.map(start).parSequence
+             _ <- Logger[IO].info("Waiting for the services to finish init tasks")
+             _ <- Temporal[IO].sleep(20 seconds)
+             _ <- Logger[IO].info("Waiting for the services to finish init tasks - done")
+           } yield ()
+         }
     _ <- semaphore.release
   } yield ()
 
   private def start(serviceRun: ServiceRun)(implicit ioRuntime: IORuntime): IO[Unit] = {
     import serviceRun._
-    serviceClient.ping.flatMap {
+    serviceClient.ping >>= {
       case ServiceUp => IO.unit
       case _ =>
         for {
@@ -70,11 +77,16 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }
-
   }
 
+  private def whenNotStarted(services: List[ServiceRun])(fa: IO[Unit]): IO[Unit] =
+    services.map(_.serviceClient.ping).sequence.map(_.exists(_ == ServiceDown)) >>= {
+      case true  => fa
+      case false => ().pure[IO]
+    }
+
   private def verifyServiceReady(serviceRun: ServiceRun): IO[Unit] =
-    serviceRun.serviceClient.ping flatMap {
+    serviceRun.serviceClient.ping >>= {
       case ServiceUp => serviceRun.postServiceStart.sequence >> logger.info(s"Service ${serviceRun.name} started")
       case _         => Temporal[IO].delayBy(verifyServiceReady(serviceRun), 500 millis)
     }
@@ -83,8 +95,14 @@ class ServicesRunner(semaphore: Semaphore[IO])(implicit
     ServicesState.cancelTokens.asScala.find { case (key, _) => key.name == service.name } match {
       case None => throw new IllegalStateException(s"'${service.name}' service not found, it is already stopped")
       case Some((service, cancelToken)) =>
-        (service.onServiceStop.sequence >> cancelToken >> logger.info(s"${service.name} service stopping"))
-          .unsafeRunSync()
+        { service.onServiceStop.sequence >> cancelToken >> verifyServiceStopped(service) }.unsafeRunSync()
     }
 
+  private def verifyServiceStopped(serviceRun: ServiceRun): IO[Unit] =
+    serviceRun.serviceClient.ping >>= {
+      case ServiceDown => logger.info(s"Service ${serviceRun.name} stopped")
+      case _ =>
+        logger.info(s"Kill signal sent to ${serviceRun.name} but it's still running...") >>
+          Temporal[IO].delayBy(verifyServiceStopped(serviceRun), 500 millis)
+    }
 }

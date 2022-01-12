@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,31 +21,89 @@ package io.renku.graph.model
 import cats.syntax.all._
 import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.graph.model.views.{EntityIdJsonLdOps, RdfResource, TinyTypeJsonLDOps}
-import io.renku.jsonld.EntityId
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt}
 
 object users {
 
-  final class ResourceId private (val value: String) extends AnyVal with StringTinyType
+  sealed trait ResourceId extends Any with StringTinyType
   implicit object ResourceId
-      extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with NonBlank
+      extends TinyTypeFactory[ResourceId](ResourceIdFactory)
+      with Constraints[String]
       with EntityIdJsonLdOps[ResourceId] {
 
-    def apply(id: EntityId): ResourceId = ResourceId(id.value.toString)
-    def apply(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): ResourceId = ResourceId(
-      (renkuBaseUrl / "users" / gitLabId).show
+    addConstraint(
+      check = value =>
+        value.trim.matches(GitLabIdBased.validator) ||
+          value.trim.matches(EmailBased.validator) ||
+          value.trim.matches(NameBased.validator),
+      message = (v: String) => s"$v is not a valid $typeName"
     )
+
+    final class GitLabIdBased private[users] (val value: String) extends AnyVal with ResourceId
+    object GitLabIdBased
+        extends TinyTypeFactory[GitLabIdBased](new GitLabIdBased(_))
+        with EntityIdJsonLdOps[GitLabIdBased]
+        with Constraints[String]
+        with NonBlank {
+      private[users] val validator = "^http(s)?://.*/persons/(\\d+)$"
+      addConstraint(
+        check = _.trim.matches(validator),
+        message = (v: String) => s"$v is not valid $typeName"
+      )
+    }
+
+    final class EmailBased private[users] (val value: String) extends AnyVal with ResourceId
+    object EmailBased
+        extends TinyTypeFactory[EmailBased](new EmailBased(_))
+        with EntityIdJsonLdOps[EmailBased]
+        with Constraints[String]
+        with NonBlank {
+      private[users] val validator = "^mailto:(.*)@.*$"
+      addConstraint(
+        check = _.trim.matches(validator),
+        message = (v: String) => s"$v is not valid $typeName"
+      )
+    }
+
+    final class NameBased private[users] (val value: String) extends AnyVal with ResourceId
+    object NameBased
+        extends TinyTypeFactory[NameBased](new NameBased(_))
+        with EntityIdJsonLdOps[NameBased]
+        with Constraints[String]
+        with NonBlank {
+      private[users] val validator = "^http(s)?://.*/persons/.+$"
+      addConstraint(
+        check = _.trim.matches(validator),
+        message = (v: String) => s"$v is not valid $typeName"
+      )
+    }
+
+    def apply(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): GitLabIdBased =
+      new GitLabIdBased((renkuBaseUrl / "persons" / gitLabId).show)
+
+    def apply(email: Email): EmailBased = new EmailBased(show"mailto:$email")
+
+    def apply(name: Name)(implicit renkuBaseUrl: RenkuBaseUrl): NameBased =
+      new NameBased((renkuBaseUrl / "persons" / name).show)
 
     implicit object UsersResourceIdRdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
       private val localPartExtractor = "^mailto:(.*)@.*$".r
 
       override def render(id: ResourceId): String = id.value match {
         case localPartExtractor(localPart) => s"<${id.value.replace(localPart, sparqlEncode(localPart))}>"
-        case otherId                       => s"<$otherId>"
+        case otherId                       => s"<${sparqlEncode(otherId)}>"
       }
     }
+  }
+
+  private object ResourceIdFactory extends (String => ResourceId) {
+    override def apply(value: String): ResourceId =
+      ResourceId.GitLabIdBased
+        .from(value)
+        .orElse(ResourceId.EmailBased.from(value))
+        .orElse(ResourceId.NameBased.from(value))
+        .getOrElse(throw new IllegalArgumentException(s"$value is not a valid ${ResourceId.typeName}"))
   }
 
   final class GitLabId private (val value: Int) extends AnyVal with IntTinyType

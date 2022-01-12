@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -94,15 +94,15 @@ class EdgesFinderSpec
       val plan = planEntities(CommandInput.fromLocation(in1),
                               CommandInput.fromLocation(in2),
                               CommandOutput.fromLocation(out1)
-      ).generateOne
+      )(planCommands)(project.dateCreated).generateOne
 
-      val activity1 = executionPlanners(fixed(plan), project).generateOne
+      val activity1 = executionPlanners(_ => fixed(plan), project).generateOne
         .planInputParameterValuesFromChecksum(in1 -> entityChecksums.generateOne, in2 -> entityChecksums.generateOne)
         .buildProvenanceUnsafe()
 
       val in3  = entityLocations.generateOne
       val out2 = entityLocations.generateOne
-      val activity2 = executionPlanners(fixed(plan), project).generateOne
+      val activity2 = executionPlanners(_ => fixed(plan), project).generateOne
         .planInputParameterOverrides(in1 -> Entity.InputEntity(in3, entityChecksums.generateOne))
         .planInputParameterValuesFromChecksum(in2 -> entityChecksums.generateOne)
         .planOutputParameterOverrides(out1 -> out2)

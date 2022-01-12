@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -28,9 +28,7 @@ import skunk.Transaction
 import scala.util.control.NonFatal
 
 private trait StatusChanger[F[_]] {
-  def updateStatuses[E <: StatusChangeEvent](event: E)(implicit
-      dbUpdater:                                    DBUpdater[F, E]
-  ): F[Unit]
+  def updateStatuses[E <: StatusChangeEvent](event: E)(implicit dbUpdater: DBUpdater[F, E]): F[Unit]
 }
 
 private class StatusChangerImpl[F[_]: MonadCancelThrow](
@@ -40,24 +38,21 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow](
 
   import gaugesUpdater._
 
-  override def updateStatuses[E <: StatusChangeEvent](
-      event:            E
-  )(implicit dbUpdater: DBUpdater[F, E]): F[Unit] = sessionResource.useWithTransactionK {
-    Kleisli { case (transaction, session) =>
-      {
-        for {
-          savepoint     <- Kleisli.liftF(transaction.savepoint)
-          updateResults <- dbUpdater.updateDB(event) recoverWith rollback(transaction)(savepoint)(event)
-          _ <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case NonFatal(_) => Kleisli.pure(()) }
-        } yield ()
-      } run session
+  override def updateStatuses[E <: StatusChangeEvent](event: E)(implicit dbUpdater: DBUpdater[F, E]): F[Unit] =
+    sessionResource.useWithTransactionK {
+      Kleisli { case (transaction, session) =>
+        {
+          for {
+            savepoint     <- Kleisli.liftF(transaction.savepoint)
+            updateResults <- dbUpdater.updateDB(event) recoverWith rollback(transaction)(savepoint)(event)
+            _ <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case NonFatal(_) => Kleisli.pure(()) }
+          } yield ()
+        } run session
+      }
     }
-  }
 
-  private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(
-      savepoint:                                            transaction.Savepoint
-  )(event:                                                  E)(implicit
-      dbUpdater:                                            DBUpdater[F, E]
+  private def rollback[E <: StatusChangeEvent](transaction: Transaction[F])(savepoint: transaction.Savepoint)(event: E)(
+      implicit dbUpdater:                                   DBUpdater[F, E]
   ): PartialFunction[Throwable, UpdateResult[F]] = { case NonFatal(err) =>
     Kleisli.liftF {
       for {

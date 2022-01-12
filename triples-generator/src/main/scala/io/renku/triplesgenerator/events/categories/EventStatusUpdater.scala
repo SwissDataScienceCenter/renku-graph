@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,8 +24,9 @@ import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
 import io.renku.events
 import io.renku.events.EventRequestContent
+import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
-import io.renku.graph.model.events.EventStatus.{FailureStatus, TriplesGenerated, TriplesStore}
+import io.renku.graph.model.events.EventStatus.{FailureStatus, New, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.jsonld.JsonLD
@@ -50,6 +51,8 @@ private trait EventStatusUpdater[F[_]] {
                 eventStatus: FailureStatus,
                 exception:   Throwable
   ): F[Unit]
+
+  def projectToNew(project: Project): F[Unit]
 }
 
 private class EventStatusUpdaterImpl[F[_]: Sync](
@@ -135,6 +138,18 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
       "message":   ${ErrorMessage.withStackTrace(exception).value}
     }"""),
     errorMessage = s"$categoryName: Change event status as $eventStatus failed"
+  )
+
+  override def projectToNew(project: Project): F[Unit] = eventSender.sendEvent(
+    eventContent = EventRequestContent.NoPayload(json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "project": {
+        "id":   ${project.id},
+        "path": ${project.path}
+      },
+      "newStatus": $New
+    }"""),
+    errorMessage = s"$categoryName: Change project events status as $New failed"
   )
 }
 

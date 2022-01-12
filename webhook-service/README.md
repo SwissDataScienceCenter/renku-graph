@@ -12,6 +12,7 @@ This microservice:
 |  GET   | ```/ping```                               | To check if service is healthy                        |
 |  GET   | ```/projects/:id/events/status```         | Gives info about processing progress of recent events |
 |  POST  | ```/projects/:id/webhooks```              | Creates a webhook for a project in GitLab             |
+| DELETE | ```/projects/:id/webhooks```              | Deletes a webhook for a project in Gitlab             |
 |  POST  | ```/projects/:id/webhooks/validation```   | Validates the project's webhook                       |
 |  POST  | ```/webhooks/events```                    | Consumes push events sent from GitLab                 |
      
@@ -65,22 +66,42 @@ Examples of valid responses:
 
 #### POST /projects/:id/webhooks
 
-Creates a webhook for a project with the given `project id`.
+creates a webhook for a project with the given `project id`.
 
-**Request format**
+**request format**
 
-The endpoint requires an authorization token passed in the request header as:
-- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
-- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+the endpoint requires an authorization token passed in the request header as:
+- `authorization: bearer <token>` with oauth token obtained from gitlab
+- `private-token: <token>` with user's personal access token in gitlab
 
-**Response**
+**response**
 
-| Status                     | Description                                                                                     |
+| status                     | description                                                                                     |
 |----------------------------|-------------------------------------------------------------------------------------------------|
-| OK (200)                   | When hook already exists for the project                                                        |
-| CREATED (201)              | When a new hook was created                                                                     |
-| UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `AUTHORIZATION: BEARER` in the header or it's invalid |
-| INTERNAL SERVER ERROR (500)| When there are problems with webhook creation                                                   |
+| ok (200)                   | when hook already exists for the project                                                        |
+| created (201)              | when a new hook was created                                                                     |
+| unauthorized (401)         | when there is neither `private-token` nor `authorization: bearer` in the header or it's invalid |
+| internal server error (500)| when there are problems with webhook creation                                                   |
+
+#### DELETE /projects/:id/webhooks
+
+deletes a webhook for a project with the given `project id`.
+
+**request format**
+
+the endpoint requires an authorization token passed in the request header as:
+- `authorization: bearer <token>` with oauth token obtained from gitlab
+- `private-token: <token>` with user's personal access token in gitlab
+
+**response**
+
+| status                     | description                                                                                     |
+|----------------------------|-------------------------------------------------------------------------------------------------|
+| ok (200)                   | when hook is successfully deleted                                                               |
+| not found (404)            | when the project does not exists                                                                | 
+| unauthorized (401)         | when there is neither `private-token` nor `authorization: bearer` in the header or it's invalid |
+| internal server error (500)| when there are problems with webhook creation                                                   |
+
 
 #### POST /projects/:id/webhooks/validation
 
@@ -148,7 +169,7 @@ docker build -f webhook-service/Dockerfile -t webhook-service .
 - run the service
 
 ```bash
-docker run --rm -e 'HOOK_TOKEN_SECRET=<generated with openssl rand -hex 8|base64>' -e 'GITLAB_BASE_URL=<gitlab-url>' -e 'EVENT_LOG_POSTGRES_HOST=<postgres-host>' -e 'EVENT_LOG_POSTGRES_USER=<user>' -e 'EVENT_LOG_POSTGRES_PASSWORD=<password>' -p 9001:9001 webhook-service
+docker run --rm -e 'HOOK_TOKEN_SECRET=<generated with openssl rand -hex 8|base64>' -e 'GITLAB_BASE_URL=<gitlab-url>' -p 9001:9001 webhook-service
 ```
 
 - play with the endpoint

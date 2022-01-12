@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,7 +29,6 @@ import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf, uuid}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
-import java.util.UUID
 import scala.util.Random
 
 object GraphModelGenerators {
@@ -76,15 +75,16 @@ object GraphModelGenerators {
               )
   } yield Name(s"$first $second")
 
-  implicit val userResourceIds: Gen[users.ResourceId] = userResourceIds(userEmails.toGeneratorOfOptions)
-  def userResourceIds(maybeEmail: Option[Email]): Gen[users.ResourceId] = userResourceIds(Gen.const(maybeEmail))
-  def userResourceIds(maybeEmailGen: Gen[Option[Email]]): Gen[users.ResourceId] = for {
-    maybeEmail <- maybeEmailGen
-  } yield users.ResourceId
-    .from(maybeEmail.map(email => s"mailto:$email").getOrElse(s"_:${UUID.randomUUID()}"))
-    .fold(throw _, identity)
+  def userGitLabResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[users.ResourceId.GitLabIdBased] =
+    userGitLabIds map users.ResourceId.apply
+  val userEmailResourceId: Gen[users.ResourceId.EmailBased] = userEmails map users.ResourceId.apply
+  def userNameResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[users.ResourceId.NameBased] =
+    userNames map users.ResourceId.apply
+  implicit def userResourceIds(implicit renkuBaseUrl: RenkuBaseUrl): Gen[users.ResourceId] =
+    Gen.oneOf(userGitLabResourceId, userEmailResourceId, userNameResourceId)
 
-  implicit val userGitLabIds: Gen[users.GitLabId] = Gen.uuid.map(_ => users.GitLabId(Random.nextInt(100000000) + 1))
+  implicit lazy val userGitLabIds: Gen[users.GitLabId] =
+    Gen.uuid.map(_ => users.GitLabId(Random.nextInt(100000000) + 1))
 
   implicit val projectIds:   Gen[Id]            = Gen.uuid.map(_ => Id(Random.nextInt(1000000) + 1))
   implicit val projectNames: Gen[projects.Name] = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
@@ -114,6 +114,9 @@ object GraphModelGenerators {
       path <- projectPaths
     } yield ResourceId.from(s"$renkuBaseUrl/projects/$path").fold(throw _, identity)
 
+  implicit val projectKeywords: Gen[projects.Keyword] =
+    nonBlankStrings(minLength = 5).map(v => projects.Keyword(v.value))
+
   implicit val projectSchemaVersions: Gen[SchemaVersion] = Gen
     .listOfN(3, positiveInts(max = 50))
     .map(_.mkString("."))
@@ -132,10 +135,13 @@ object GraphModelGenerators {
   implicit val datasetImageUris:       Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
   implicit val datasetExternalSameAs: Gen[ExternalSameAs] =
     validatedUrls map SameAs.external map (_.fold(throw _, identity))
-  implicit val datasetInternalSameAs: Gen[InternalSameAs] = for {
-    url <- renkuBaseUrls
-    id  <- datasetIdentifiers
+  def datasetInternalSameAsFrom(renkuBaseUrlGen: Gen[RenkuBaseUrl] = renkuBaseUrls,
+                                datasetIdGen:    Gen[Identifier] = datasetIdentifiers
+  ): Gen[InternalSameAs] = for {
+    url <- renkuBaseUrlGen
+    id  <- datasetIdGen
   } yield SameAs.internal(url / "datasets" / id).fold(throw _, identity)
+  implicit val datasetInternalSameAs = datasetInternalSameAsFrom()
   implicit val datasetSameAs:        Gen[SameAs]        = Gen.oneOf(datasetExternalSameAs, datasetInternalSameAs)
   implicit val datasetTopmostSameAs: Gen[TopmostSameAs] = datasetSameAs.map(TopmostSameAs.apply)
   implicit val datasetDerivedFroms:  Gen[DerivedFrom]   = validatedUrls map (_.value) map DerivedFrom.apply
@@ -154,9 +160,9 @@ object GraphModelGenerators {
   lazy val datasetDates: Gen[Date] =
     Gen.oneOf(datasetCreatedDates(), datasetPublishedDates(DatePublished(LocalDate.EPOCH)))
 
-  implicit val datasetKeywords: Gen[Keyword] = nonBlankStrings(minLength = 5) map (_.value) map Keyword.apply
-  implicit val datasetLicenses: Gen[License] = httpUrls() map License.apply
-  implicit val datasetVersions: Gen[Version] = semanticVersions map Version.apply
+  implicit val datasetKeywords: Gen[datasets.Keyword] = nonBlankStrings(minLength = 5) map (_.value) map Keyword.apply
+  implicit val datasetLicenses: Gen[datasets.License] = httpUrls() map License.apply
+  implicit val datasetVersions: Gen[datasets.Version] = semanticVersions map Version.apply
 
   implicit val datasetPartExternals: Gen[PartExternal] = booleans map PartExternal.apply
   implicit val datasetPartSources:   Gen[PartSource]   = httpUrls() map PartSource.apply

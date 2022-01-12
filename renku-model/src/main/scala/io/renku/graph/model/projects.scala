@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -164,4 +164,7 @@ object projects {
     final class NonZero private (val value: Int) extends AnyVal with ForksCount
     object NonZero                               extends TinyTypeFactory[NonZero](new NonZero(_)) with PositiveInt
   }
+
+  final class Keyword private (val value: String) extends AnyVal with StringTinyType
+  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank with TinyTypeJsonLDOps[Keyword]
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,7 +34,7 @@ object ConsumersModelGenerators {
     case None          => EventRequestContent.NoPayload(event)
   }
 
-  implicit lazy val projectsGen: Gen[Project] = for {
+  implicit lazy val consumerProjects: Gen[Project] = for {
     projectId <- projectIds
     path      <- projectPaths
   } yield Project(projectId, path)

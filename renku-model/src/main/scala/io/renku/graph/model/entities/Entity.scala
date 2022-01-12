@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -77,15 +77,14 @@ object Entity {
     }
   }
 
-  implicit lazy val entityDecoder: JsonLDDecoder[Entity] =
-    JsonLDDecoder.entity(fileEntityTypes, withStrictEntityTypes) { cursor =>
+  implicit lazy val decoder: JsonLDDecoder[Entity] =
+    JsonLDDecoder.cacheableEntity(fileEntityTypes, withStrictEntityTypes) { cursor =>
       for {
-        resourceId  <- cursor.downEntityId.as[ResourceId]
-        entityTypes <- cursor.getEntityTypes
-        location    <- cursor.downField(prov / "atLocation").as[Location](locationDecoder(entityTypes))
-        checksum    <- cursor.downField(renku / "checksum").as[Checksum]
-        maybeGenerationIds <-
-          cursor.downField(prov / "qualifiedGeneration").as[List[generations.ResourceId]]
+        resourceId         <- cursor.downEntityId.as[ResourceId]
+        entityTypes        <- cursor.getEntityTypes
+        location           <- cursor.downField(prov / "atLocation").as[Location](locationDecoder(entityTypes))
+        checksum           <- cursor.downField(renku / "checksum").as[Checksum]
+        maybeGenerationIds <- cursor.downField(prov / "qualifiedGeneration").as[List[generations.ResourceId]]
       } yield maybeGenerationIds match {
         case Nil           => InputEntity(resourceId, location, checksum)
         case generationIds => OutputEntity(resourceId, location, checksum, generationIds)

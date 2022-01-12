@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -30,6 +30,7 @@ import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import io.renku.webhookservice.hookcreation.HookCreationEndpoint
+import io.renku.webhookservice.hookdeletion.HookDeletionEndpoint
 import io.renku.webhookservice.hookvalidation.HookValidationEndpoint
 import org.http4s.Status._
 import org.http4s._
@@ -83,6 +84,20 @@ class MicroserviceRoutesSpec
 
       response.status shouldBe responseStatus
     }
+    "define a DELETE webhooks/events endpoint returning response from the endpoint" in new TestCase {
+
+      val projectId      = projectIds.generateOne
+      val responseStatus = Gen.oneOf(Ok, BadRequest).generateOne
+      val request        = Request[IO](Method.DELETE, uri"/projects" / projectId.toString / "webhooks")
+      (hookDeletionEndpoint
+        .deleteHook(_: projects.Id, _: AuthUser))
+        .expects(projectId, authUser)
+        .returning(IO.pure(Response[IO](responseStatus)))
+
+      val response = routes.call(request)
+
+      response.status shouldBe responseStatus
+    }
 
     "define a GET projects/:id/events/status endpoint returning response from the endpoint" in new TestCase {
 
@@ -114,7 +129,6 @@ class MicroserviceRoutesSpec
         .returning(IO.pure(Response[IO](responseStatus)))
 
       val response = routes.call(request)
-
       response.status shouldBe responseStatus
     }
 
@@ -158,6 +172,7 @@ class MicroserviceRoutesSpec
     val authenticationResponse   = OptionT.some[IO](authUser)
     val hookEventEndpoint        = mock[HookEventEndpoint[IO]]
     val hookCreationEndpoint     = mock[HookCreationEndpoint[IO]]
+    val hookDeletionEndpoint     = mock[HookDeletionEndpoint[IO]]
     val hookValidationEndpoint   = mock[HookValidationEndpoint[IO]]
     val processingStatusEndpoint = mock[ProcessingStatusEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
@@ -165,6 +180,7 @@ class MicroserviceRoutesSpec
       hookEventEndpoint,
       hookCreationEndpoint,
       hookValidationEndpoint,
+      hookDeletionEndpoint,
       processingStatusEndpoint,
       givenAuthMiddleware(returning = authenticationResponse),
       routesMetrics

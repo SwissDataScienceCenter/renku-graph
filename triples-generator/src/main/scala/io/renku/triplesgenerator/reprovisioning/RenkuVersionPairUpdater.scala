@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -48,8 +48,8 @@ private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger](
       Prefixes of renku -> "renku",
       s"""|DELETE { ?s ?p ?o }
           |WHERE {
-          | ?s ?p ?o;
-          |    a renku:VersionPair.
+          | ?s a renku:VersionPair;
+          |    ?p ?o;
           |}
           |""".stripMargin
     )

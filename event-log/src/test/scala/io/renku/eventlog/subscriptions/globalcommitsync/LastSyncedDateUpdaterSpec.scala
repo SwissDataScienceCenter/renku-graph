@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -26,7 +26,7 @@ import io.renku.db.SqlStatement.Name
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
-import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.lastSyncedDates
@@ -89,7 +89,7 @@ class LastSyncedDateUpdaterSpec
   }
 
   private trait TestCase {
-    val project = projectsGen.generateOne
+    val project = consumerProjects.generateOne
     val updater = new LastSyncedDateUpdateImpl[IO](sessionResource, TestLabeledHistogram[Name]("query_id"))
 
     upsertProject(project.id, project.path, eventDates.generateOne)

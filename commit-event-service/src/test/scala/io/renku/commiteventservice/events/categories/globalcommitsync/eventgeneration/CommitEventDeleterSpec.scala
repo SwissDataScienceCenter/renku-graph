@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -22,7 +22,7 @@ package eventgeneration
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common.UpdateResult.{Deleted, Failed}
 import io.renku.commiteventservice.events.categories.common.{CommitEventsRemover, SynchronizationSummary, UpdateResult}
-import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.personalAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
@@ -39,7 +39,7 @@ class CommitEventDeleterSpec extends AnyWordSpec with should.Matchers with MockF
   "deleteExtraneousCommits" should {
 
     "successfully delete commits" in new TestCase {
-      val project         = projectsGen.generateOne
+      val project         = consumerProjects.generateOne
       val commitsToDelete = commitIds.generateNonEmptyList().toList
 
       commitsToDelete foreach {
@@ -54,7 +54,7 @@ class CommitEventDeleterSpec extends AnyWordSpec with should.Matchers with MockF
 
     "return synchronization summary of failed events " +
       "if EventStatusPatcher returns Failure while sending the deletion status" in new TestCase {
-        val project         = projectsGen.generateOne
+        val project         = consumerProjects.generateOne
         val commitsToDelete = commitIds.generateNonEmptyList().toList
 
         val failure = Failed(nonEmptyStrings().generateOne, exceptions.generateOne)
@@ -70,7 +70,7 @@ class CommitEventDeleterSpec extends AnyWordSpec with should.Matchers with MockF
 
     "return synchronization summary of failed events " +
       "if EventStatusPatcher fails while sending the deletion status" in new TestCase {
-        val project         = projectsGen.generateOne
+        val project         = consumerProjects.generateOne
         val commitsToDelete = commitIds.generateNonEmptyList().toList
 
         val exception = exceptions.generateOne

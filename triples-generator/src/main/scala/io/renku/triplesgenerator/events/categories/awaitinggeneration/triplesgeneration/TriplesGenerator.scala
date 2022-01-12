@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -40,10 +40,6 @@ private[awaitinggeneration] trait TriplesGenerator[F[_]] {
 }
 
 private[awaitinggeneration] object TriplesGenerator {
-
-  final case class GenerationRecoverableError(message: String)
-      extends Exception(message)
-      with ProcessingRecoverableError
 
   def apply[F[_]: Async: Logger](config: Config = ConfigFactory.load): F[TriplesGenerator[F]] =
     TriplesGeneration[F](config) flatMap {

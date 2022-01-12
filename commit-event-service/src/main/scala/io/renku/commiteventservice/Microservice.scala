@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,7 +18,8 @@
 
 package io.renku.commiteventservice
 
-import cats.effect.{ExitCode, IO}
+import cats.effect.{ExitCode, IO, Spawn}
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -28,10 +29,11 @@ import io.renku.config.sentry.SentryInitializer
 import io.renku.control.{RateLimit, Throttler}
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
-import io.renku.microservices.IOMicroservice
+import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import org.typelevel.log4cats.Logger
 
 object Microservice extends IOMicroservice {
@@ -44,36 +46,38 @@ object Microservice extends IOMicroservice {
     sentryInitializer     <- SentryInitializer[IO]
     gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+    gitLabClient          <- GitLabClient[IO](gitLabThrottler)
     executionTimeRecorder <- ExecutionTimeRecorder[IO]()
     commitSyncCategory <-
       events.categories.commitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
     globalCommitSyncCategory <-
-      events.categories.globalcommitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
-    eventConsumersRegistry <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-    metricsRegistry        <- MetricsRegistry[IO]()
-    microserviceRoutes     <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO](metricsRegistry))
+      events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, gitLabThrottler, executionTimeRecorder)
+    eventConsumersRegistry  <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
+    metricsRegistry         <- MetricsRegistry[IO]()
+    serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
+    microserviceRoutes      <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO](metricsRegistry))
     exitcode <- microserviceRoutes.routes.use { routes =>
-                  new MicroserviceRunner(
-                    certificateLoader,
-                    sentryInitializer,
-                    eventConsumersRegistry,
-                    HttpServer[IO](serverPort = ServicePort.value, routes)
+                  new MicroserviceRunner[IO](serviceReadinessChecker,
+                                             certificateLoader,
+                                             sentryInitializer,
+                                             eventConsumersRegistry,
+                                             HttpServer[IO](serverPort = ServicePort.value, routes)
                   ).run()
                 }
   } yield exitcode
 }
 
-class MicroserviceRunner(certificateLoader:      CertificateLoader[IO],
-                         sentryInitializer:      SentryInitializer[IO],
-                         eventConsumersRegistry: EventConsumersRegistry[IO],
-                         httpServer:             HttpServer[IO]
+class MicroserviceRunner[F[_]: Spawn: Logger](serviceReadinessChecker: ServiceReadinessChecker[F],
+                                              certificateLoader:      CertificateLoader[F],
+                                              sentryInitializer:      SentryInitializer[F],
+                                              eventConsumersRegistry: EventConsumersRegistry[F],
+                                              httpServer:             HttpServer[F]
 ) {
 
-  def run(): IO[ExitCode] = for {
+  def run(): F[ExitCode] = for {
     _      <- certificateLoader.run()
     _      <- sentryInitializer.run()
-    _      <- eventConsumersRegistry.run().start
+    _      <- Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run())
     result <- httpServer.run()
   } yield result
-
 }

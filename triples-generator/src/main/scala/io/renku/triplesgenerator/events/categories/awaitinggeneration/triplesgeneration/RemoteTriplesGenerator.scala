@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -30,9 +30,8 @@ import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.constraints.Url
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.typelevel.log4cats.Logger
 
 // This TriplesGenerator supposed to be used by the acceptance-tests only
@@ -70,7 +69,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
         triples       <- MonadThrow[F].fromEither(parse(triplesInJson))
       } yield triples.asRight[ProcessingRecoverableError]
     } recoverWith { case UnauthorizedException =>
-      GenerationRecoverableError("Unauthorized exception").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
+      AuthRecoverableError("Unauthorized exception").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
     }
   }
 

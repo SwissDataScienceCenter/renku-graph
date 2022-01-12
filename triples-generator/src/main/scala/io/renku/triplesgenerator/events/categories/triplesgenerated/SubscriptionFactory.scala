@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
+import cats.{NonEmptyParallel, Parallel}
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.config.GitLab
@@ -30,7 +31,7 @@ import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
       metricsRegistry: MetricsRegistry,
       gitLabThrottler: Throttler[F, GitLab],
       timeRecorder:    SparqlQueryTimeRecorder[F]

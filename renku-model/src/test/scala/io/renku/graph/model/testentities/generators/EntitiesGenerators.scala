@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -58,7 +58,7 @@ trait EntitiesGenerators extends ProjectEntitiesGenerators with ActivityGenerato
   implicit lazy val personEntities: Gen[Person] = personEntities()
 
   def personEntities(
-      maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfNones,
+      maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfOptions,
       maybeEmails:    Gen[Option[Email]] = userEmails.toGeneratorOfOptions
   ): Gen[Person] = for {
     name             <- userNames

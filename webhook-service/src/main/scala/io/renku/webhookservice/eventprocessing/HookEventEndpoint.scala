@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,7 +34,7 @@ import io.renku.webhookservice.model.{CommitSyncRequest, HookToken, Project}
 import org.http4s._
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
-import org.typelevel.ci.CIString
+import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -75,7 +75,7 @@ class HookEventEndpointImpl[F[_]: Concurrent: Logger](
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
   private def findHookToken(request: Request[F]): F[SerializedHookToken] =
-    request.headers.get(CIString("X-Gitlab-Token")) match {
+    request.headers.get(ci"X-Gitlab-Token") match {
       case None => UnauthorizedException.raiseError[F, SerializedHookToken]
       case Some(NonEmptyList(rawToken, _)) =>
         SerializedHookToken

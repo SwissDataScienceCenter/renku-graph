@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -158,7 +158,7 @@ class ProjectEndpointSpec
       updatedAt        <- cursor.downField("updatedAt").as[DateUpdated]
       urls             <- cursor.downField("urls").as[Urls]
       forks            <- cursor.downField("forking").as[Forking]
-      tags             <- cursor.downField("tags").as[List[Tag]].map(_.toSet)
+      keywords         <- cursor.downField("keywords").as[Set[Keyword]]
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
       permissions      <- cursor.downField("permissions").as[Permissions]
       statistics       <- cursor.downField("statistics").as[Statistics]
@@ -172,7 +172,7 @@ class ProjectEndpointSpec
                     updatedAt,
                     urls,
                     forks,
-                    tags,
+                    keywords,
                     starsCount,
                     permissions,
                     statistics,

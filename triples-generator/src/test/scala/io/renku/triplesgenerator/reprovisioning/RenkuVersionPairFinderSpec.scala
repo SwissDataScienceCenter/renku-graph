@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -60,7 +60,7 @@ class RenkuVersionPairFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
 
       intercept[IllegalStateException] {
         versionPairFinder.find().unsafeRunSync()
-      }.getMessage should startWith("Too many Version pair found:")
+      }.getMessage should startWith("Too many Version pairs found:")
     }
   }
 

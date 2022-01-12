@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -57,6 +57,8 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
     with subscriptions.SubscriptionTypeSerializers
     with TypeSerializers {
 
+  import projectPrioritisation._
+
   override def popEvent(): F[Option[AwaitingGenerationEvent]] = sessionResource.useK {
     for {
       maybeProjectAwaitingGenerationEvent <- findEventAndUpdateForProcessing
@@ -68,18 +70,17 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
   private def findEventAndUpdateForProcessing = for {
     maybeProject <- selectCandidateProject()
     maybeIdAndProjectAndBody <- maybeProject
-                                  .map(idAndPath => measureExecutionTime(findLatestEvent(idAndPath)))
+                                  .map(findLatestEvent)
                                   .getOrElse(Kleisli.pure(Option.empty[AwaitingGenerationEvent]))
     maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
 
   private def selectCandidateProject() =
-    (measureExecutionTime(findProjectsWithEventsInQueue), measureExecutionTime(findTotalOccupancy)).parMapN {
-      case (potentialProjects, totalOccupancy) =>
-        ((projectPrioritisation.prioritise _).tupled >>> selectProject)(potentialProjects, totalOccupancy)
+    (findProjectsWithEventsInQueue, findTotalOccupancy) parMapN { case (potentialProjects, totalOccupancy) =>
+      ((prioritise _).tupled >>> selectProject)(potentialProjects, totalOccupancy)
     }
 
-  private def findProjectsWithEventsInQueue =
+  private def findProjectsWithEventsInQueue = measureExecutionTime {
     SqlStatement(
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
     ).select[ExecutionDate ~ Int, ProjectInfo](
@@ -88,43 +89,50 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
         proj.project_id,
         proj.project_path,
         proj.latest_event_date,
-        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = '#${GeneratingTriples.value}') as current_occupancy
-      FROM project proj
-      WHERE 
-        EXISTS (
-          SELECT candidate_events.event_id
+        (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = proj.project_id AND evt_int.status = '#${GeneratingTriples.value}') AS current_occupancy
+      FROM (
+        SELECT candidate_events.project_id
+        FROM (
+          SELECT DISTINCT ON (evt.project_id) evt.project_id, evt.status
           FROM (
-            SELECT evt.event_id, evt.status
+            SELECT DISTINCT evt.project_id
             FROM event evt
-            WHERE evt.project_id = proj.project_id 
-              AND #${`status IN`(New, GenerationRecoverableFailure, GeneratingTriples)} 
-              AND execution_date <= $executionDateEncoder
-            ORDER BY evt.event_date DESC
-            LIMIT 1
-          ) candidate_events
-          WHERE candidate_events.status <> '#${GeneratingTriples.value}'
-        )
+            WHERE #${`status IN`(New, GenerationRecoverableFailure)}
+          ) candidate_projects
+          JOIN event evt ON evt.project_id = candidate_projects.project_id AND evt.execution_date <= $executionDateEncoder
+          ORDER BY evt.project_id DESC, evt.event_date DESC
+        ) candidate_events
+        WHERE #${`status NOT IN`(GeneratingTriples,
+                                 TriplesGenerated,
+                                 TransformingTriples,
+                                 TransformationRecoverableFailure,
+                                 TriplesStore,
+                                 AwaitingDeletion,
+                                 Deleting
+      )}
+      ) projects
+      JOIN project proj ON proj.project_id = projects.project_id
       ORDER BY proj.latest_event_date DESC
       LIMIT $int4
       """
         .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
-        .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) =>
-          ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+        .map { case (id: projects.Id) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
+          ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
         }
     ).arguments(ExecutionDate(now()) ~ projectsFetchingLimit.value)
       .build(_.toList)
+  }
 
-  private def findTotalOccupancy: SqlStatement[F, Long] =
+  private def findTotalOccupancy = measureExecutionTime {
     SqlStatement(
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find total occupancy")
     ).select[EventStatus, Long](
-      sql"""
-      SELECT count(event_id) from event where status = $eventStatusEncoder
-      """.query(int8)
+      sql"""SELECT count(event_id) FROM event WHERE status = $eventStatusEncoder""".query(int8)
     ).arguments(GeneratingTriples)
       .build[Id](_.unique)
+  }
 
-  private def findLatestEvent(idAndPath: subscriptions.ProjectIds) = {
+  private def findLatestEvent(idAndPath: subscriptions.ProjectIds) = measureExecutionTime {
     val executionDate = ExecutionDate(now())
     SqlStatement(
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find latest")
@@ -153,9 +161,12 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     s"status IN (${NonEmptyList.of(status, otherStatuses: _*).toList.map(el => s"'$el'").mkString(",")})"
 
+  private def `status NOT IN`(status: EventStatus, otherStatuses: EventStatus*) =
+    s"status NOT IN (${NonEmptyList.of(status, otherStatuses: _*).toList.map(el => s"'$el'").mkString(",")})"
+
   private lazy val selectProject: List[(subscriptions.ProjectIds, Priority)] => Option[subscriptions.ProjectIds] = {
     case Nil                          => None
-    case (projectIdAndPath, _) +: Nil => Some(projectIdAndPath)
+    case (projectIdAndPath, _) :: Nil => Some(projectIdAndPath)
     case many                         => pickRandomlyFrom(prioritiesList(from = many))
   }
 
@@ -198,15 +209,14 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
 
   private def maybeUpdateMetrics(maybeProject: Option[subscriptions.ProjectIds],
                                  maybeBody:    Option[AwaitingGenerationEvent]
-  ) =
-    (maybeBody, maybeProject) mapN { case (_, subscriptions.ProjectIds(_, projectPath)) =>
-      Kleisli.liftF {
-        for {
-          _ <- waitingEventsGauge decrement projectPath
-          _ <- underProcessingGauge increment projectPath
-        } yield ()
-      }
-    } getOrElse Kleisli.pure[F, Session[F], Unit](())
+  ) = (maybeBody, maybeProject) mapN { case (_, subscriptions.ProjectIds(_, projectPath)) =>
+    Kleisli.liftF {
+      for {
+        _ <- waitingEventsGauge decrement projectPath
+        _ <- underProcessingGauge increment projectPath
+      } yield ()
+    }
+  } getOrElse Kleisli.pure[F, Session[F], Unit](())
 
   private val awaitingGenerationEventGet: Decoder[AwaitingGenerationEvent] =
     (compoundEventIdDecoder ~ projectPathDecoder ~ eventBodyDecoder).gmap[AwaitingGenerationEvent]
@@ -214,7 +224,7 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
 
 private object AwaitingGenerationEventFinder {
 
-  private val ProjectsFetchingLimit: Int Refined Positive = 10
+  private val ProjectsFetchingLimit: Int Refined Positive = 20
 
   def apply[F[_]: MonadCancelThrow: Async: Parallel](
       sessionResource:      SessionResource[F, EventLogDB],

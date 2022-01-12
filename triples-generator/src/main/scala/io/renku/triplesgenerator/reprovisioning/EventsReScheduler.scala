@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,16 +39,14 @@ private class EventsReSchedulerImpl[F[_]: Async: Logger](
   import org.http4s.Status.Accepted
   import org.http4s.{Request, Response, Status}
 
-  override def triggerEventsReScheduling(): F[Unit] =
-    for {
-      uri <- validateUri(s"$eventLogUrl/events")
-      sendingResult <-
-        send(
-          request(POST, uri).withMultipartBuilder
-            .addPart("event", json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}""")
-            .build()
-        )(mapResponse)
-    } yield sendingResult
+  override def triggerEventsReScheduling(): F[Unit] = for {
+    uri <- validateUri(s"$eventLogUrl/events")
+    result <- send(
+                request(POST, uri).withMultipartBuilder
+                  .addPart("event", json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}""")
+                  .build()
+              )(mapResponse)
+  } yield result
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = { case (Accepted, _, _) =>
     ().pure[F]

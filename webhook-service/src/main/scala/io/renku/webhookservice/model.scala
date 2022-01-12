@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -44,7 +44,8 @@ object model {
     ): F[ProjectHookUrl] =
       SelfUrl[F](config).map(from)
 
-    def from(selfUrl: SelfUrl): ProjectHookUrl = new ProjectHookUrl((selfUrl / "webhooks" / "events").value)
+    def from(selfUrl: SelfUrl):        ProjectHookUrl = new ProjectHookUrl((selfUrl / "webhooks" / "events").value)
+    def fromGitlab(gitlabUrl: String): ProjectHookUrl = new ProjectHookUrl(gitlabUrl)
   }
 
   final class SelfUrl private (val value: String) extends AnyVal with UrlTinyType
@@ -58,4 +59,6 @@ object model {
     ): F[SelfUrl] =
       find[F, SelfUrl]("services.self.url", config)
   }
+  final case class HookIdentifier(projectId: Id, projectHookUrl: ProjectHookUrl)
+
 }

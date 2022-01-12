@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -39,7 +39,8 @@ private trait Converters {
         project.visibility,
         project.parent.to[Parent].some,
         project.version,
-        project.maybeDescription
+        project.maybeDescription,
+        project.keywords
       )
     case project: Project =>
       KGProject(
@@ -51,7 +52,8 @@ private trait Converters {
         project.visibility,
         maybeParent = None,
         project.version,
-        project.maybeDescription
+        project.maybeDescription,
+        project.keywords
       )
   }
 

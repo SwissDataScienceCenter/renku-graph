@@ -11,7 +11,7 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositor
     export PATH="/usr/local/sbt/bin:$PATH" && \
     apk update && apk add --no-cache --virtual .build-dependencies bash wget tar && \
     mkdir -p "/usr/local/sbt" && \
-    wget -qO - --no-check-certificate "https://github.com/sbt/sbt/releases/download/v1.5.5/sbt-1.5.5.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.5.7/sbt-1.5.7.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
     sbt "project token-repository" stage && \
     apk del .build-dependencies
 
@@ -27,6 +27,13 @@ ENV TZ UTC
 
 RUN apk add --no-cache tzdata curl bash && \
     chown -R daemon:daemon .
+
+ENV GID=90030
+RUN addgroup -g "$GID" -S trgroup && \
+    adduser --disabled-password -g "$GID" -D -u 9003 truser && \
+    chmod 555 -R /opt/token-repository
+
+USER truser
 
 ENTRYPOINT ["bin/token-repository"]
 CMD []

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -56,15 +56,13 @@ class ReProvisioningImpl[F[_]: Temporal: Logger](
   import triplesRemover._
 
   override def run(): F[Unit] = (reProvisioningNeeded() recoverWith tryAgain(reProvisioningNeeded())) >>= {
-    case true =>
-      triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
-    case false =>
-      versionPairUpdater.update(versionCompatibilityPairs.head) >> Logger[F].info("Triples Store up to date")
+    case true  => triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
+    case false => Logger[F].info("Triples Store up to date")
   }
 
   private def triggerReProvisioning = measureExecutionTime {
     for {
-      _ <- Logger[F].info("Triples Store is not on the required schema version - kicking-off re-provisioning")
+      _ <- Logger[F].info("Kicking-off re-provisioning")
       _ <- setRunningStatusInTS()
       _ <- versionPairUpdater
              .update(versionCompatibilityPairs.head)

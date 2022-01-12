@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -31,6 +31,7 @@ import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableE
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl, RepositoryPath}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, logMessageCommon}
+import org.typelevel.log4cats.Logger
 
 import java.security.SecureRandom
 
@@ -131,7 +132,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
 
 private[events] object RenkuLogTriplesGenerator {
 
-  def apply[F[_]: Async](): F[TriplesGenerator[F]] = for {
+  def apply[F[_]: Async: Logger](): F[TriplesGenerator[F]] = for {
     gitLabUrl <- GitLabUrlLoader[F]()
   } yield new RenkuLogTriplesGenerator(
     new GitLabRepoUrlFinderImpl[F](gitLabUrl),

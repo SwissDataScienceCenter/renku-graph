@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,12 +19,15 @@
 package io.renku.graph.model
 
 import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
-import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt, Url}
-import io.renku.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank, NonNegativeInt, Url}
+import io.renku.tinytypes.{InstantTinyType, IntTinyType, StringTinyType, TinyTypeFactory}
+
+import java.time.Instant
 
 object plans {
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
+
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
@@ -46,14 +49,24 @@ object plans {
   implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank with TinyTypeJsonLDOps[Keyword]
 
   final class ProgrammingLanguage private (val value: String) extends AnyVal with StringTinyType
+
   implicit object ProgrammingLanguage
       extends TinyTypeFactory[ProgrammingLanguage](new ProgrammingLanguage(_))
       with NonBlank
       with TinyTypeJsonLDOps[ProgrammingLanguage]
 
   final class SuccessCode private (val value: Int) extends AnyVal with IntTinyType
+
   implicit object SuccessCode
       extends TinyTypeFactory[SuccessCode](new SuccessCode(_))
       with NonNegativeInt
       with TinyTypeJsonLDOps[SuccessCode]
+
+  final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
+
+  implicit object DateCreated
+      extends TinyTypeFactory[DateCreated](new DateCreated(_))
+      with InstantNotInTheFuture
+      with TinyTypeJsonLDOps[DateCreated]
+
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -71,13 +71,12 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger](
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
   ): F[ResultType] = runQuery(using, mapResponse, RdfUpdate)
 
-  protected def queryExpecting[ResultType](
-      using:          SparqlQuery
-  )(implicit decoder: Decoder[ResultType]): F[ResultType] = runQuery(
-    using,
-    toFullResponseMapper(responseMapperFor[ResultType]),
-    RdfQuery
-  )
+  protected def queryExpecting[ResultType](using: SparqlQuery)(implicit decoder: Decoder[ResultType]): F[ResultType] =
+    runQuery(
+      using,
+      toFullResponseMapper(responseMapperFor[ResultType]),
+      RdfQuery
+    )
 
   protected def upload(jsonLD: JsonLD): F[Unit] = upload[Unit](jsonLD)(jsonUploadMapResponse)
 

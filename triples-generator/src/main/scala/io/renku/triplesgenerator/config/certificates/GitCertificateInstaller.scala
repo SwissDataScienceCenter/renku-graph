@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -29,14 +29,13 @@ trait GitCertificateInstaller[F[_]] {
 }
 
 object GitCertificateInstaller {
-  def apply[F[_]: MonadThrow: Logger]: F[GitCertificateInstaller[F]] =
-    MonadThrow[F].catchNonFatal {
-      new GitCertificateInstallerImpl[F](
-        () => Certificate.fromConfig[F](),
-        CertificateSaver(),
-        GitConfigModifier()
-      )
-    }
+  def apply[F[_]: MonadThrow: Logger]: F[GitCertificateInstaller[F]] = MonadThrow[F].catchNonFatal {
+    new GitCertificateInstallerImpl[F](
+      () => Certificate.fromConfig[F](),
+      CertificateSaver[F],
+      GitConfigModifier[F]
+    )
+  }
 }
 
 class GitCertificateInstallerImpl[F[_]: MonadThrow: Logger](
@@ -58,8 +57,6 @@ class GitCertificateInstallerImpl[F[_]: MonadThrow: Logger](
   } recoverWith logMessage
 
   private lazy val logMessage: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F]
-      .error(exception)("Certificate installation for Git failed")
-      .flatMap(_ => exception.raiseError[F, Unit])
+    Logger[F].error(exception)("Certificate installation for Git failed") >>= (_ => exception.raiseError[F, Unit])
   }
 }
