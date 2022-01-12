@@ -112,6 +112,8 @@ class GaugeResetSchedulerSpec
         Option(givenResetMethodToReturn.poll()) getOrElse IO.unit
       }
 
+      override def clear(): IO[Unit] = fail("Spec shouldn't be calling that")
+
       override def set(labelValue: (Double, Double)): IO[Unit] =
         fail("Spec shouldn't be calling that")
 

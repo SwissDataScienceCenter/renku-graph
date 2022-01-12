@@ -19,20 +19,15 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
 import io.renku.events.consumers.ConsumersModelGenerators._
-import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventId
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen
 
 private object EventProcessingGenerators {
 
   implicit val commitEvents: Gen[CommitEvent] = for {
     commitId <- commitIds
-    project  <- projectsGen
+    project  <- consumerProjects
   } yield CommitEvent(EventId(commitId.value), project, commitId)
 
-  lazy val generationRecoverableErrors: Gen[GenerationRecoverableError] = for {
-    message <- nonEmptyStrings()
-  } yield GenerationRecoverableError(message)
 }

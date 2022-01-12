@@ -19,7 +19,7 @@
 package io.renku.events.consumers
 
 import cats.data.EitherT
-import cats.data.EitherT.fromEither
+import cats.data.EitherT._
 import cats.syntax.all._
 import cats.{Monad, MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure, Json}
@@ -32,30 +32,24 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 trait EventHandler[F[_]] {
-  def tryHandling(request: EventRequestContent): F[EventSchedulingResult]
-
-  protected def createHandlingProcess(
-      request: EventRequestContent
-  ): F[EventHandlingProcess[F]]
+  def tryHandling(request:                     EventRequestContent): F[EventSchedulingResult]
+  protected def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]]
 }
 
-abstract class EventHandlerWithProcessLimiter[F[_]: Monad](
-    processesLimiter: ConcurrentProcessesLimiter[F]
-) extends EventHandler[F] {
+abstract class EventHandlerWithProcessLimiter[F[_]: Monad](processesLimiter: ConcurrentProcessesLimiter[F])
+    extends EventHandler[F] {
 
   val categoryName: CategoryName
 
   final override def tryHandling(request: EventRequestContent): F[EventSchedulingResult] = {
     for {
       _                    <- fromEither[F](request.event.validateCategoryName)
-      eventHandlingProcess <- EitherT.right(createHandlingProcess(request))
-      r                    <- EitherT.right[EventSchedulingResult](processesLimiter tryExecuting eventHandlingProcess)
-    } yield r
+      eventHandlingProcess <- right(createHandlingProcess(request))
+      result               <- right[EventSchedulingResult](processesLimiter tryExecuting eventHandlingProcess)
+    } yield result
   }.merge
 
-  protected def createHandlingProcess(
-      request: EventRequestContent
-  ): F[EventHandlingProcess[F]]
+  protected def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]]
 
   implicit class JsonOps(json: Json) {
 
@@ -94,9 +88,7 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad](
     }
   }
 
-  protected implicit class LoggerOps(
-      logger:    Logger[F]
-  )(implicit ME: MonadThrow[F]) {
+  protected implicit class LoggerOps(logger: Logger[F])(implicit ME: MonadThrow[F]) {
 
     def log[EventInfo](
         eventInfo: EventInfo
@@ -118,9 +110,7 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad](
     ): F[Unit] = logger.error(exception)(show"$categoryName: $eventInfo -> Failure")
   }
 
-  protected implicit class EitherTOps[T](
-      operation: F[T]
-  )(implicit ME: MonadThrow[F]) {
+  protected implicit class EitherTOps[T](operation: F[T])(implicit ME: MonadThrow[F]) {
 
     def toRightT(
         recoverTo: EventSchedulingResult
@@ -132,9 +122,9 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad](
       operation.map(_.asRight[EventSchedulingResult]) recover asSchedulingError
     }
 
-    private def as(
-        result: EventSchedulingResult
-    ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(_) => Left(result) }
+    private def as(result: EventSchedulingResult): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
+      case NonFatal(_) => Left(result)
+    }
 
     private lazy val asSchedulingError: PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
       case NonFatal(exception) => Left(SchedulingError(exception))

@@ -32,9 +32,8 @@ private class ProjectPrioritisation {
   import ProjectPrioritisation.Priority._
 
   def prioritise(projects: List[ProjectInfo]): List[(ProjectIds, Priority)] =
-    findPrioritiesBasedOnMostRecentActivity(projects).map { case (projectIds, priority, _) =>
-      (projectIds, priority)
-    }
+    findPrioritiesBasedOnMostRecentActivity(projects)
+      .map { case (projectIds, priority, _) => (projectIds, priority) }
 
   private lazy val findPrioritiesBasedOnMostRecentActivity
       : List[ProjectInfo] => List[(ProjectIds, Priority, Int Refined NonNegative)] = {

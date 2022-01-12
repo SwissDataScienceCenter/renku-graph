@@ -28,7 +28,7 @@ import io.renku.graph.model.entities.{Person, Project}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, TransformationStep}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, RecoverableErrorsRecovery, TransformationStep}
 import org.typelevel.log4cats.Logger
 
 private[transformation] trait PersonTransformer[F[_]] {
@@ -36,15 +36,17 @@ private[transformation] trait PersonTransformer[F[_]] {
 }
 
 private class PersonTransformerImpl[F[_]: MonadThrow](
-    kgPersonFinder:   KGPersonFinder[F],
-    personMerger:     PersonMerger,
-    updatesCreator:   UpdatesCreator,
-    projectFunctions: ProjectFunctions
+    kgPersonFinder:            KGPersonFinder[F],
+    personMerger:              PersonMerger,
+    updatesCreator:            UpdatesCreator,
+    projectFunctions:          ProjectFunctions,
+    recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends PersonTransformer[F] {
 
   import personMerger._
   import projectFunctions._
   import updatesCreator._
+  import recoverableErrorsRecovery._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Person Details Updates", createTransformation)
@@ -56,7 +58,7 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
           updateProjectAndPreDataQueries(previousResultsF, person)
         }
         .map(_.asRight[ProcessingRecoverableError])
-        .recoverWith(maybeToRecoverableError("Problem finding person details in KG"))
+        .recoverWith(maybeRecoverableError("Problem finding person details in KG"))
     }
 
   private lazy val updateProjectAndPreDataQueries: (F[(Project, Queries)], Person) => F[(Project, Queries)] = {

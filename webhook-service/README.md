@@ -169,7 +169,7 @@ docker build -f webhook-service/Dockerfile -t webhook-service .
 - run the service
 
 ```bash
-docker run --rm -e 'HOOK_TOKEN_SECRET=<generated with openssl rand -hex 8|base64>' -e 'GITLAB_BASE_URL=<gitlab-url>' -e 'EVENT_LOG_POSTGRES_HOST=<postgres-host>' -e 'EVENT_LOG_POSTGRES_USER=<user>' -e 'EVENT_LOG_POSTGRES_PASSWORD=<password>' -p 9001:9001 webhook-service
+docker run --rm -e 'HOOK_TOKEN_SECRET=<generated with openssl rand -hex 8|base64>' -e 'GITLAB_BASE_URL=<gitlab-url>' -p 9001:9001 webhook-service
 ```
 
 - play with the endpoint

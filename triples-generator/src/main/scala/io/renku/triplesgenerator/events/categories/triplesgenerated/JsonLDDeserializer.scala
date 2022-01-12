@@ -71,26 +71,24 @@ private class JsonLDDeserializerImpl[F[_]: MonadThrow](
   private def extractProject(projectInfo: GitLabProjectInfo, event: TriplesGeneratedEvent) =
     EitherT.right[ProcessingRecoverableError] {
       for {
-        projects <- event.payload.cursor
-                      .as[List[Project]](decodeList(Project.decoder(projectInfo)))
-                      .fold(raiseError(event), _.pure[F])
+        projects <- event.payload.cursor.as(decodeList(Project.decoder(projectInfo))).fold(raiseError(event), _.pure[F])
         project <- projects match {
                      case project :: Nil => project.pure[F]
                      case other =>
                        new IllegalStateException(
-                         s"${other.size} Project entities found in the JsonLD for ${event.project.show}"
+                         show"${other.size} Project entities found in the JsonLD for ${event.project}"
                        ).raiseError[F, Project]
                    }
-        _ <- whenA(event.project.path != project.path)(
+        _ <- whenA(event.project.path.value.toLowerCase() != project.path.value.toLowerCase())(
                new IllegalStateException(
-                 s"Event for project ${event.project.show} contains payload for project ${project.path}"
+                 show"Event for project ${event.project} contains payload for project ${project.path}"
                ).raiseError[F, Unit]
              )
       } yield project
     }
 
   private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => F[T] = err =>
-    new IllegalStateException(s"Finding Project entity in the JsonLD for ${event.project.show} failed", err)
+    new IllegalStateException(show"Finding Project entity in the JsonLD for ${event.project} failed", err)
       .raiseError[F, T]
 }
 

@@ -22,7 +22,6 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.activities.ActivityTransformer
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.datasets.DatasetTransformer
@@ -50,14 +49,6 @@ private[triplesgenerated] class TransformationStepsCreatorImpl[F[_]: MonadThrow]
 }
 
 private[triplesgenerated] object TransformationStepsCreator {
-
-  final case class TransformationRecoverableError(message: String, cause: Throwable)
-      extends Exception(message, cause)
-      with ProcessingRecoverableError
-
-  object TransformationRecoverableError {
-    def apply(message: String): TransformationRecoverableError = TransformationRecoverableError(message, null)
-  }
 
   def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[TransformationStepsCreator[F]] = for {
     personTransformer   <- PersonTransformer(timeRecorder)

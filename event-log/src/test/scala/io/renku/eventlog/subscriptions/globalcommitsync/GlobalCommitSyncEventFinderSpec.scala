@@ -26,7 +26,7 @@ import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
 import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
-import io.renku.events.consumers.ConsumersModelGenerators.projectsGen
+import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -64,11 +64,11 @@ class GlobalCommitSyncEventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
-        val project0                 = projectsGen.generateOne
+        val project0                 = consumerProjects.generateOne
         val (eventId0, oldEventDate) = genCommitIdAndDate(olderThanAWeek = true, project0.id)
         addEvent(eventId0, oldEventDate, project0.path)
 
-        val project1                    = projectsGen.generateOne
+        val project1                    = consumerProjects.generateOne
         val (eventId1, latestEventDate) = genCommitIdAndDate(olderThanAWeek = false, project1.id)
         addEvent(eventId1, latestEventDate, project1.path)
 
@@ -92,13 +92,13 @@ class GlobalCommitSyncEventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
-        val project0                               = projectsGen.generateOne
+        val project0                               = consumerProjects.generateOne
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, project0.id)
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(olderThanAWeek = false, project0.id)
         addEvent(project0Event0Id, project0Event0Date, project0.path)
         addEvent(project0Event1Id, project0Event1Date, project0.path)
 
-        val project1                               = projectsGen.generateOne
+        val project1                               = consumerProjects.generateOne
         val (project1Event0Id, project1Event0Date) = genCommitIdAndDate(olderThanAWeek = true, project1.id)
         val (project1Event1Id, project1Event1Date) = genCommitIdAndDate(olderThanAWeek = true, project1.id)
         addEvent(project1Event0Id, project1Event0Date, project1.path)
@@ -119,7 +119,7 @@ class GlobalCommitSyncEventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
-        val project0           = projectsGen.generateOne
+        val project0           = consumerProjects.generateOne
         val project0LastSynced = genLastSynced(false)
 
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
@@ -140,7 +140,7 @@ class GlobalCommitSyncEventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe None
 
-        val project0           = projectsGen.generateOne
+        val project0           = consumerProjects.generateOne
         val project0LastSynced = genLastSynced(true)
 
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, projectId = project0.id)
@@ -149,7 +149,7 @@ class GlobalCommitSyncEventFinderSpec
         addEvent(project0Event1Id, project0Event1Date, project0.path)
         upsertLastSynced(project0.id, categoryName, project0LastSynced)
 
-        val project1           = projectsGen.generateOne
+        val project1           = consumerProjects.generateOne
         val project1LastSynced = genLastSynced(true)
 
         val project1Event0Id   = genCompoundEventId(projectId = project1.id)
@@ -176,7 +176,7 @@ class GlobalCommitSyncEventFinderSpec
         currentTime.expects().returning(now)
         finder.popEvent().unsafeRunSync() shouldBe None
 
-        val project0           = projectsGen.generateOne
+        val project0           = consumerProjects.generateOne
         val project0LastSynced = genLastSynced(true)
 
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, projectId = project0.id)
@@ -201,7 +201,7 @@ class GlobalCommitSyncEventFinderSpec
         currentTime.expects().returning(now)
         finder.popEvent().unsafeRunSync() shouldBe None
 
-        val project0           = projectsGen.generateOne
+        val project0           = consumerProjects.generateOne
         val project0LastSynced = genLastSynced(true)
 
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)

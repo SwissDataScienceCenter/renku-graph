@@ -32,6 +32,7 @@ import io.renku.graph.model.{GitLabApiUrl, projects, users}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
 import org.http4s.{EntityDecoder, InvalidMessageBodyFailure, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 

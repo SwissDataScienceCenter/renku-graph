@@ -91,6 +91,22 @@ Accepts an event as multipart requests.
 }
 ```
 
+- **CLEAN_UP**
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "CLEAN_UP",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  }
+}
+```
+
 ##### Response
 
 | Status                     | Description                                                                  |
