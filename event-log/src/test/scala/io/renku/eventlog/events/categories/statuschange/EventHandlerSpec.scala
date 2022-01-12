@@ -183,7 +183,7 @@ class EventHandlerSpec
       "newStatus":    "TRIPLES_STORE",
       "processingTime": ${processingTime.value}
     }"""
-    case StatusChangeEvent.ToFailure(eventId, path, message, _, newStatus) =>
+    case StatusChangeEvent.ToFailure(eventId, path, message, _, newStatus, executionDelay) =>
       json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
@@ -192,7 +192,8 @@ class EventHandlerSpec
         "path":       ${path.value}
       },
       "newStatus":    ${newStatus.value},
-      "message":      ${message.value}
+      "message":      ${message.value},
+      "executionDelay": $executionDelay
     }"""
     case StatusChangeEvent.RollbackToNew(eventId, path) =>
       json"""{

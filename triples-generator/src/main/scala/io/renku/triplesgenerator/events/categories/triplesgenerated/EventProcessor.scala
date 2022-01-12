@@ -135,7 +135,16 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
         .recoverWith(logEventLogUpdateError(event, "done"))
     case (_, RecoverableError(event, cause)) =>
       statusUpdater
-        .toFailure(event.compoundEventId, event.project.path, EventStatus.TransformationRecoverableFailure, cause)
+        .toFailure(
+          event.compoundEventId,
+          event.project.path,
+          EventStatus.TransformationRecoverableFailure,
+          cause,
+          executionDelay = cause match {
+            case _: AuthRecoverableError => ExecutionDelay(Duration.ofHours(1))
+            case _ => ExecutionDelay(Duration.ofMinutes(5))
+          }
+        )
         .recoverWith(logEventLogUpdateError(event, "as failed recoverably"))
     case (_, NonRecoverableError(event, cause)) =>
       statusUpdater
@@ -184,7 +193,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
   private object UploadingResult {
     case class Uploaded(event: TriplesGeneratedEvent) extends UploadingResult
 
-    case class RecoverableError(event: TriplesGeneratedEvent, cause: Throwable) extends UploadingError
+    case class RecoverableError(event: TriplesGeneratedEvent, cause: ProcessingRecoverableError) extends UploadingError
 
     case class NonRecoverableError(event: TriplesGeneratedEvent, cause: Throwable) extends UploadingError
   }

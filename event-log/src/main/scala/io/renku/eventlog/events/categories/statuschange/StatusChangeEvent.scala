@@ -28,6 +28,7 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.tinytypes.json.TinyTypeDecoders._
+import java.time.Duration
 
 private sealed trait StatusChangeEvent extends Product with Serializable
 
@@ -52,16 +53,17 @@ private object StatusChangeEvent {
     }
   }
 
-  final case class ToFailure[+C <: ProcessingStatus, +N <: FailureStatus](eventId:       CompoundEventId,
-                                                                          projectPath:   projects.Path,
-                                                                          message:       EventMessage,
-                                                                          currentStatus: C,
-                                                                          newStatus:     N
-  )(implicit evidence:                                                                   AllowedCombination[C, N])
+  final case class ToFailure[+C <: ProcessingStatus, +N <: FailureStatus](eventId:             CompoundEventId,
+                                                                          projectPath:         projects.Path,
+                                                                          message:             EventMessage,
+                                                                          currentStatus:       C,
+                                                                          newStatus:           N,
+                                                                          maybeExecutionDelay: Option[Duration]
+  )(implicit evidence:                                                                         AllowedCombination[C, N])
       extends StatusChangeEvent
   object ToFailure {
     implicit lazy val show: Show[ToFailure[ProcessingStatus, FailureStatus]] = Show.show {
-      case ToFailure(eventId, projectPath, _, _, newStatus) =>
+      case ToFailure(eventId, projectPath, _, _, newStatus, _) =>
         s"$eventId, projectPath = $projectPath, status = $newStatus - update"
     }
   }
