@@ -37,7 +37,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.graph.model.Schemas.{renku, schema}
-  import io.renku.graph.model.projects
+  import io.renku.graph.model.{datasets, projects}
   import io.renku.rdfstore.SparqlQuery
   import io.renku.rdfstore.SparqlQuery.Prefixes
 
@@ -47,45 +47,117 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
   private def query() = SparqlQuery.of(
     name = "cross-entity search",
     Prefixes.of(schema -> "schema", renku -> "renku"),
-    s"""|SELECT ?entityType ?name ?path ?visibility ?dateCreated ?maybeCreatorName (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeDescription
+    s"""|SELECT *
         |WHERE {
-        |  BIND ('project' AS ?entityType)
-        |  ?projectId a schema:Project;
-        |             schema:name ?name;
-        |             renku:projectPath ?path;
-        |             renku:projectVisibility ?visibility;
-        |             schema:dateCreated ?dateCreated.
-        |  OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
-        |  OPTIONAL { ?projectId schema:keywords ?keyword }
-        |  OPTIONAL { ?projectId schema:description ?maybeDescription }
+        |  {
+        |    SELECT ?entityType ?name ?path ?visibility ?dateCreated ?maybeCreatorName 
+        |      ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+        |    WHERE {
+        |      BIND ('project' AS ?entityType)
+        |      ?projectId a schema:Project;
+        |                 schema:name ?name;
+        |                 renku:projectPath ?path;
+        |                 renku:projectVisibility ?visibility;
+        |                 schema:dateCreated ?dateCreated.
+        |      OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
+        |      OPTIONAL { ?projectId schema:description ?maybeDescription }
+        |      OPTIONAL { ?projectId schema:keywords ?keyword }
+        |    }
+        |    GROUP BY ?entityType ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
+        |  } UNION {
+        |    SELECT ?entityType ?name (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
+        |      ?maybeDateCreated ?maybeDatePublished 
+        |      (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorsNames)
+        |      ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+        |    WHERE {
+        |      BIND ('dataset' AS ?entityType)
+        |      ?dsId a schema:Dataset;
+        |            renku:slug ?name.
+        |      ?projectId renku:hasDataset ?dsId;
+        |                 renku:projectVisibility ?visibility.
+        |      OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
+        |      OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
+        |      OPTIONAL { ?dsId schema:datePublished ?maybeDatePublished }.
+        |      OPTIONAL { ?dsId schema:description ?maybeDescription }
+        |      OPTIONAL { ?dsId schema:keywords ?keyword }
+        |    }
+        |    GROUP BY ?entityType ?name ?maybeDateCreated ?maybeDatePublished ?maybeDescription
+        |  }
         |}
-        |GROUP BY ?entityType ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
+        |ORDER BY ?name
         |""".stripMargin
   )
 
   private implicit lazy val recordsDecoder: Decoder[List[Entity]] = {
     import Decoder._
     import io.circe.DecodingFailure
-    import io.renku.graph.model.projects._
     import io.renku.graph.model.users
     import io.renku.tinytypes.json.TinyTypeDecoders._
+    import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+
+    def toListOf[TT <: StringTinyType, TTF <: TinyTypeFactory[TT]](implicit
+        ttFactory: TTF
+    ): Option[String] => Decoder.Result[List[TT]] =
+      _.map(_.split(',').toList.map(v => ttFactory.from(v)).sequence.map(_.sortBy(_.value))).sequence
+        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+        .map(_.getOrElse(List.empty))
+
+    implicit val projectDecoder: Decoder[Entity.Project] = { cursor =>
+      for {
+        name             <- cursor.downField("name").downField("value").as[projects.Name]
+        path             <- cursor.downField("path").downField("value").as[projects.Path]
+        visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
+        dateCreated      <- cursor.downField("dateCreated").downField("value").as[projects.DateCreated]
+        maybeCreatorName <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
+        keywords <-
+          cursor
+            .downField("keywords")
+            .downField("value")
+            .as[Option[String]]
+            .flatMap(toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword))
+        maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[projects.Description]]
+      } yield Entity.Project(name, path, visibility, dateCreated, maybeCreatorName, keywords, maybeDescription)
+    }
+
+    implicit val datasetDecoder: Decoder[Entity.Dataset] = { cursor =>
+      for {
+        name <- cursor.downField("name").downField("value").as[datasets.Name]
+        visibility <-
+          cursor
+            .downField("visibilities")
+            .downField("value")
+            .as[Option[String]]
+            .flatMap(toListOf[projects.Visibility, projects.Visibility.type](projects.Visibility))
+            .map(list =>
+              list
+                .find(_ == projects.Visibility.Public)
+                .orElse(list.find(_ == projects.Visibility.Internal))
+                .getOrElse(projects.Visibility.Private)
+            )
+        maybeDateCreated <- cursor.downField("maybeDateCreated").downField("value").as[Option[datasets.DateCreated]]
+        maybeDatePublished <-
+          cursor.downField("maybeDatePublished").downField("value").as[Option[datasets.DatePublished]]
+        date <- Either.fromOption(maybeDateCreated.orElse(maybeDatePublished),
+                                  ifNone = DecodingFailure("No dataset date", Nil)
+                )
+        creators <- cursor
+                      .downField("creatorsNames")
+                      .downField("value")
+                      .as[Option[String]]
+                      .flatMap(toListOf[users.Name, users.Name.type](users.Name))
+        keywords <- cursor
+                      .downField("keywords")
+                      .downField("value")
+                      .as[Option[String]]
+                      .flatMap(toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword))
+        maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[datasets.Description]]
+      } yield Entity.Dataset(name, visibility, date, creators, keywords, maybeDescription)
+    }
 
     val entity: Decoder[Entity] = { cursor =>
-      val toListOfKeywords: Option[String] => Decoder.Result[List[Keyword]] =
-        _.map(_.split(',').toList.map(Keyword.from).sequence.map(_.sorted)).sequence
-          .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
-          .map(_.getOrElse(List.empty))
-
-      cursor.downField("entityType").downField("value").as[String] >>= { case "project" =>
-        for {
-          name             <- cursor.downField("name").downField("value").as[projects.Name]
-          path             <- cursor.downField("path").downField("value").as[projects.Path]
-          visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
-          dateCreated      <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-          maybeCreatorName <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
-          keywords <- cursor.downField("keywords").downField("value").as[Option[String]].flatMap(toListOfKeywords)
-          maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
-        } yield Project(name, path, visibility, dateCreated, maybeCreatorName, keywords, maybeDescription)
+      cursor.downField("entityType").downField("value").as[String] >>= {
+        case "project" => cursor.as[Entity.Project]
+        case "dataset" => cursor.as[Entity.Dataset]
       }
     }
 

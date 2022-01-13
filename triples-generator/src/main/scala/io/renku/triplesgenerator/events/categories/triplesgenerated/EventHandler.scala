@@ -53,9 +53,7 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 
   private type IdAndBody = (CompoundEventId, EventBody)
 
-  override def createHandlingProcess(
-      request: EventRequestContent
-  ): F[EventHandlingProcess[F]] =
+  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess.withWaitingForCompletion[F](
       processing => startProcessingEvent(request, processing),
       releaseProcess = subscriptionMechanism.renewSubscription()

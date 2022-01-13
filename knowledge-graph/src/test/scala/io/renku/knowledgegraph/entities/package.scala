@@ -18,12 +18,13 @@
 
 package io.renku.knowledgegraph
 
-import io.renku.graph.model.testentities
+import entities.model._
+import io.renku.graph.model.{RenkuBaseUrl, testentities}
 
 package object entities {
 
-  private[entities] implicit def projectConverter[E <: testentities.Project]: E => model.Project = project =>
-    model.Project(
+  private[entities] implicit def projectConverter[E <: testentities.Project]: E => Entity.Project = project =>
+    Entity.Project(
       project.name,
       project.path,
       project.visibility,
@@ -32,4 +33,24 @@ package object entities {
       project.keywords.toList.sorted,
       project.maybeDescription
     )
+
+  private[entities] implicit def datasetConverter[E <: testentities.Project]
+      : ((E, testentities.Dataset[testentities.Dataset.Provenance])) => Entity.Dataset = { case (project, dataset) =>
+    Entity.Dataset(
+      dataset.identification.name,
+      project.visibility,
+      dataset.provenance.date,
+      dataset.provenance.creators.map(_.name).toList.sorted,
+      dataset.additionalInfo.keywords.sorted,
+      dataset.additionalInfo.maybeDescription
+    )
+  }
+
+  private[entities] implicit class ProjectDatasetOps[P <: testentities.Project](
+      projectAndDataset:   (P, testentities.Dataset[testentities.Dataset.Provenance])
+  )(implicit renkuBaseUrl: RenkuBaseUrl) {
+
+    def to[T](implicit convert: ((P, testentities.Dataset[testentities.Dataset.Provenance])) => T): T =
+      convert(projectAndDataset)
+  }
 }

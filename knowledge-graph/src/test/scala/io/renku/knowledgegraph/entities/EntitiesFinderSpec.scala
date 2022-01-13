@@ -40,7 +40,10 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(project)
 
-      finder.findEntities().unsafeRunSync() shouldBe List(project.to[model.Project])
+      finder.findEntities().unsafeRunSync() shouldBe {
+        project.to[model.Entity.Project] ::
+          project.datasets.map(ds => (project -> ds).to[model.Entity.Dataset])
+      }.sortBy(_.name.value)
     }
   }
 

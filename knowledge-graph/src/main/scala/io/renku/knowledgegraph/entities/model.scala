@@ -18,19 +18,38 @@
 
 package io.renku.knowledgegraph.entities
 
-import io.renku.graph.model.{projects, users}
+import io.renku.graph.model.{datasets, projects, users}
+import io.renku.tinytypes.StringTinyType
 
 object model {
 
-  sealed trait Entity
+  sealed trait Entity extends Product with Serializable {
+    type Name <: StringTinyType
+    def name: Name
+  }
 
-  final case class Project(
-      name:             projects.Name,
-      path:             projects.Path,
-      visibility:       projects.Visibility,
-      dateCreated:      projects.DateCreated,
-      maybeCreator:     Option[users.Name],
-      keywords:         List[projects.Keyword],
-      maybeDescription: Option[projects.Description]
-  ) extends Entity
+  object Entity {
+    final case class Project(
+        name:             projects.Name,
+        path:             projects.Path,
+        visibility:       projects.Visibility,
+        dateCreated:      projects.DateCreated,
+        maybeCreator:     Option[users.Name],
+        keywords:         List[projects.Keyword],
+        maybeDescription: Option[projects.Description]
+    ) extends Entity {
+      override type Name = projects.Name
+    }
+
+    final case class Dataset(
+        name:             datasets.Name,
+        visibility:       projects.Visibility,
+        date:             datasets.Date,
+        creators:         List[users.Name],
+        keywords:         List[datasets.Keyword],
+        maybeDescription: Option[datasets.Description]
+    ) extends Entity {
+      override type Name = datasets.Name
+    }
+  }
 }
