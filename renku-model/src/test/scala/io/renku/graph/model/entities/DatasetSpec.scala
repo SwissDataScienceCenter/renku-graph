@@ -57,7 +57,6 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     forAll {
       Table(
         "DS generator"                                                -> "DS type",
-        datasetEntities(provenanceInternal)                           -> "Internal",
         datasetEntities(provenanceImportedExternal)                   -> "Imported External",
         datasetEntities(provenanceImportedInternalAncestorInternal()) -> "Imported Internal Ancestor External",
         datasetEntities(provenanceImportedInternalAncestorExternal)   -> "Imported Internal Ancestor Internal"
@@ -84,6 +83,26 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           s"Cannot decode entity with ${dataset.resourceId}: DecodingFailure at : Invalid dataset data"
         )
       }
+    }
+
+    "treat DS as Internal if there's neither sameAs nor derivedFrom but only originalIdentifier different than this DS identifier" in {
+      val dataset = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+
+      val datasetJson = parse {
+        dataset.asJsonLD.toJson
+          .deepMerge(
+            Json.obj(
+              (renku / "originalIdentifier").show -> json"""{"@value": ${datasetInitialVersions.generateOne.show}}"""
+            )
+          )
+      }.fold(throw _, identity)
+        .flatten
+        .fold(throw _, identity)
+
+      datasetJson.cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
+        dataset.copy(publicationEvents = Nil)
+      ).asRight
     }
 
     "fail if dataset parts are older than the internal or imported external dataset" in {

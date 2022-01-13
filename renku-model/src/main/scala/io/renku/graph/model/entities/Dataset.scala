@@ -283,14 +283,14 @@ object Dataset {
                                    .leftFlatMap(_ => Option.empty[ExternalSameAs].asRight)
           maybeDerivedFrom <-
             cursor.downField(prov / "wasDerivedFrom").as[Option[DerivedFrom]](decodeOption(DerivedFrom.jsonLDDecoder))
-          maybeInitialVersion   <- cursor.downField(renku / "originalIdentifier").as[Option[InitialVersion]]
-          maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
+          maybeOriginalIdentifier <- cursor.downField(renku / "originalIdentifier").as[Option[InitialVersion]]
+          maybeInvalidationTime   <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
           provenance <- createProvenance(identification, creators.toSet)(maybeDateCreated,
                                                                          maybeDatePublished,
                                                                          maybeInternalSameAs,
                                                                          maybeExternalSameAs,
                                                                          maybeDerivedFrom,
-                                                                         maybeInitialVersion,
+                                                                         maybeOriginalIdentifier,
                                                                          maybeInvalidationTime
                         )
         } yield provenance
@@ -304,8 +304,7 @@ object Dataset {
                                                                                           Option[InitialVersion],
                                                                                           Option[InvalidationTime]
     ) => Result[Provenance] = {
-      case (Some(dateCreated), None, None, None, None, maybeOriginalId, None)
-          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
+      case (Some(dateCreated), None, None, None, None, _, None) =>
         Internal(identification.resourceId, identification.identifier, dateCreated, creators).asRight
       case (None, Some(datePublished), None, Some(sameAs), None, maybeOriginalId, None)
           if originalIdEqualCurrentId(maybeOriginalId, identification) =>
@@ -328,11 +327,11 @@ object Dataset {
                                          datePublished,
                                          creators
         ).asRight
-      case (Some(dateCreated), None, None, None, Some(derivedFrom), Some(initialVersion), maybeInvalidationTime) =>
+      case (Some(dateCreated), None, None, None, Some(derivedFrom), Some(originalId), maybeInvalidationTime) =>
         Modified(identification.resourceId,
                  derivedFrom,
                  TopmostDerivedFrom(derivedFrom),
-                 initialVersion,
+                 originalId,
                  dateCreated,
                  creators,
                  maybeInvalidationTime
@@ -342,7 +341,7 @@ object Dataset {
             maybeInternalSameAs,
             maybeExternalSameAs,
             maybeDerivedFrom,
-            maybeInitialVersion,
+            maybeOriginalIdentifier,
             maybeInvalidationTime
           ) =>
         DecodingFailure(
@@ -352,7 +351,7 @@ object Dataset {
             s"internalSameAs: $maybeInternalSameAs, " +
             s"externalSameAs: $maybeExternalSameAs, " +
             s"derivedFrom: $maybeDerivedFrom, " +
-            s"initialVersion: $maybeInitialVersion, " +
+            s"originalIdentifier: $maybeOriginalIdentifier, " +
             s"maybeInvalidationTime: $maybeInvalidationTime",
           Nil
         ).asLeft
