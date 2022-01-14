@@ -25,7 +25,7 @@ COPY --from=builder /work/token-repository/target/universal/stage .
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
-RUN apk add --no-cache tzdata curl bash && \
+RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
 ENV GID=90030
@@ -35,5 +35,5 @@ RUN addgroup -g "$GID" -S trgroup && \
 
 USER truser
 
-ENTRYPOINT ["bin/token-repository"]
-CMD []
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["bin/token-repository"]
