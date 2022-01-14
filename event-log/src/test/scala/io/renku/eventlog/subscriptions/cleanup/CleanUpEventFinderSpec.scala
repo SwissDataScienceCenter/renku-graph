@@ -16,13 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.awaitinggeneration
+package io.renku.eventlog.subscriptions.cleanup
 
 import io.renku.eventlog._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import io.renku.eventlog.subscriptions.cleanup.CleanUpEventFinderImpl
+import io.renku.metrics.TestLabeledHistogram
+import io.renku.db.SqlStatement
+import eu.timepit.refined.auto._
 
 private class CleanUpEventFinderSpec
     extends AnyWordSpec
@@ -31,6 +35,14 @@ private class CleanUpEventFinderSpec
     with MockFactory
     with should.Matchers {
 
-  "popEvent" should {}
+  "popEvent" should {
+    "find the oldest awaiting deletion event" in new TestCase {}
 
+    "return no event if the event date is in the future" in new TestCase {}
+
+  }
+  private trait TestCase {
+    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val finder           = new CleanUpEventFinderImpl(queriesExecTimes)
+  }
 }
