@@ -78,12 +78,17 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
   private lazy val encodeAndSendProject: ((Project, Queries)) => ProjectWithQueries[F] = {
     case projectAndQueries @ (project, _) =>
       for {
-        jsonLD <- EitherT
-                    .fromEither[F](project.asJsonLD.flatten)
-                    .leftSemiflatMap(error =>
-                      NonRecoverableFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}", error)
-                        .raiseError[F, ProcessingRecoverableError]
-                    )
+        jsonLD <- {
+          val json = project.asJsonLD
+          EitherT
+            .fromEither[F](json.flatten)
+            .leftSemiflatMap(error =>
+              NonRecoverableFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}\n${json.toJson}",
+                                    error
+              )
+                .raiseError[F, ProcessingRecoverableError]
+            )
+        }
         _ <- triplesUploader.uploadTriples(jsonLD)
       } yield projectAndQueries
   }
