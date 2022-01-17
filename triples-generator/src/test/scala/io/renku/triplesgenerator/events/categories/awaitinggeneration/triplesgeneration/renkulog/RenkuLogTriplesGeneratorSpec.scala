@@ -31,11 +31,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.GraphModelGenerators.{projectIds, renkuBaseUrls}
 import io.renku.graph.model.events.{CommitId, EventId}
-import io.renku.graph.model.projects
+import io.renku.graph.model.{RenkuBaseUrl, entities, projects}
 import io.renku.http.client.AccessToken
-import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{JsonLD, Property}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
@@ -53,9 +54,10 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
     "create a temp directory, " +
       "clone the repo into it, " +
       "check out the commit, " +
+      "check if it's a renku repo, " +
       "do not clean the repo if .gitattributes files is committed" +
       "call 'renku migrate', " +
-      "call 'renku export', " +
+      "call 'renku graph export', " +
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
 
@@ -78,6 +80,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .checkout(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(IO.unit)
+
+        (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
 
         (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(true.pure[IO])
 
@@ -108,9 +112,10 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
     "create a temp directory, " +
       "clone the repo into it, " +
       "check out the commit, " +
+      "check it it's a renku repo, " +
       "clean the repo if it's not clean " +
       "call 'renku migrate', " +
-      "call 'renku export', " +
+      "call 'renku graph export', " +
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
 
@@ -133,6 +138,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .checkout(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(IO.unit)
+
+        (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
 
         (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(true.pure[IO])
 
@@ -170,8 +177,9 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
     "create a temp directory, " +
       "clone the repo into it, " +
       "check out the commit, " +
+      "check if it's a renku repo" +
       "call 'renku migrate', " +
-      "call 'renku export', " +
+      "call 'renku graph export', " +
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
 
@@ -195,6 +203,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .expects(commitId, repositoryDirectory)
           .returning(IO.unit)
 
+        (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
+
         (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
         (renku
@@ -216,7 +226,51 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Right(payload)
       }
 
-    s"return $LogWorthyRecoverableError if 'renku export' returns one" in new TestCase {
+    "create a temp directory, " +
+      "clone the repo into it, " +
+      "check out the commit, " +
+      "check if it's a renku repo" +
+      "return the minimal project payload if it's not a renku repo" in new TestCase {
+
+        (file
+          .mkdir(_: Path))
+          .expects(repositoryDirectory.value)
+          .returning(IO.pure(repositoryDirectory.value))
+
+        (gitLabRepoUrlFinder
+          .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
+          .expects(projectPath, maybeAccessToken)
+          .returning(IO.pure(gitRepositoryUrl))
+
+        (git
+          .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+          .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
+          .returning(rightT[IO, ProcessingRecoverableError](()))
+
+        (git
+          .checkout(_: CommitId)(_: RepositoryPath))
+          .expects(commitId, repositoryDirectory)
+          .returning(IO.unit)
+
+        (file.exists(_: Path)).expects(renkuRepoFilePath).returning(false.pure[IO])
+
+        (file
+          .deleteDirectory(_: Path))
+          .expects(repositoryDirectory.value)
+          .returning(IO.unit)
+          .atLeastOnce()
+
+        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe
+          JsonLD
+            .entity(
+              projects.ResourceId(commitEvent.project.path).asEntityId,
+              entities.Project.entityTypes,
+              Map.empty[Property, JsonLD]
+            )
+            .asRight
+      }
+
+    s"return $LogWorthyRecoverableError if 'renku graph export' returns one" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -238,6 +292,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
+      (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
       (renku
@@ -428,7 +483,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       val exception = exceptions.generateOne
       (file
         .exists(_: Path))
-        .expects(dirtyRepoFilePath)
+        .expects(renkuRepoFilePath)
         .returning(IO.raiseError(exception))
 
       (file
@@ -466,6 +521,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
+      (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(true.pure[IO])
 
       (git
@@ -514,6 +570,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
+      (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(true.pure[IO])
 
       (git
@@ -564,6 +621,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
+      (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
       val exception = exceptions.generateOne
@@ -585,7 +643,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       actual.getCause   shouldBe exception
     }
 
-    "fail if calling 'renku export' fails" in new TestCase {
+    "fail if calling 'renku graph export' fails" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -607,6 +665,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
+      (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
       (renku
@@ -655,6 +714,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
+      (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
       (renku
@@ -684,6 +744,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
 
   private trait TestCase {
     implicit lazy val maybeAccessToken: Option[AccessToken] = Gen.option(accessTokens).generateOne
+    implicit lazy val renkuBaseUrl:     RenkuBaseUrl        = renkuBaseUrls.generateOne
     lazy val repositoryName = nonEmptyStrings().generateOne
     lazy val projectPath    = projects.Path(s"user/$repositoryName")
     lazy val gitRepositoryUrl = serviceUrls.generateOne / maybeAccessToken
@@ -703,6 +764,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
     )
     val payload:           JsonLD = jsonLDEntities.generateOne
     val dirtyRepoFilePath: Path   = repositoryDirectory.value / ".gitattributes"
+    val renkuRepoFilePath: Path   = repositoryDirectory.value / ".renku"
 
     val gitLabRepoUrlFinder = mock[GitLabRepoUrlFinder[IO]]
     val file                = mock[Commands.File[IO]]
