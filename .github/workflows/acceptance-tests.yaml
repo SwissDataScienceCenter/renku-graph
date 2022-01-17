@@ -29,7 +29,7 @@ jobs:
       test-enabled: ${{ steps.deploy-comment.outputs.test-enabled}}
     steps:
       - id: deploy-comment
-        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v0.3.2
+        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v0.4.0
         with:
           string: /deploy
           pr_ref: ${{ github.event.number }}
@@ -41,7 +41,7 @@ jobs:
       name: renku-ci-gr-${{ github.event.number }}
     steps:
       - name: deploy-pr
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v0.3.2
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v0.4.0
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
@@ -100,7 +100,7 @@ jobs:
           helm test ${RENKU_RELEASE} --namespace ${RENKU_RELEASE} --timeout 140m --logs
       - name: Download artifact for packaging on failure
         if: failure()
-        uses: SwissDataScienceCenter/renku-actions/download-test-artifacts@v0.3.2
+        uses: SwissDataScienceCenter/renku-actions/download-test-artifacts@v0.4.0
         env:
           RENKU_VALUES: ${{ secrets.CI_RENKU_VALUES }}
           TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
@@ -116,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: renku teardown
-        uses: SwissDataScienceCenter/renku-actions/teardown-renku@v0.3.2
+        uses: SwissDataScienceCenter/renku-actions/teardown-renku@v0.4.0
         env:
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
           KUBECONFIG: "${{ github.workspace }}/renkubot-kube.config"
