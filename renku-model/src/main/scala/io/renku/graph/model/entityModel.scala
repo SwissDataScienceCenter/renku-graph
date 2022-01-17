@@ -61,7 +61,7 @@ object entityModel {
       def apply(folder: Location.Folder, filename: String): Location.File = Location.File(s"$folder/$filename")
     }
 
-    final class Folder private (val value: String) extends Location with LocationLike
+    final class Folder private (val value: String) extends Location
     object Folder extends TinyTypeFactory[Folder](new Folder(_)) with RelativePath with TinyTypeJsonLDOps[Folder]
 
     final class FileOrFolder private (val value: String) extends LocationLike
