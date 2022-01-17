@@ -63,7 +63,7 @@ private object Generators {
                          message,
                          GeneratingTriples,
                          GenerationNonRecoverableFailure,
-                         executionDelay
+                         maybeExecutionDelay = None
                ),
                ToFailure(eventId,
                          projectPath,
@@ -77,7 +77,7 @@ private object Generators {
                          message,
                          TransformingTriples,
                          TransformationNonRecoverableFailure,
-                         executionDelay
+                         maybeExecutionDelay = None
                )
              )
   } yield event
