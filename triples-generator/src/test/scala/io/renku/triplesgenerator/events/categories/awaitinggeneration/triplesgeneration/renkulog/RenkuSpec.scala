@@ -43,7 +43,7 @@ class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFa
 
       renkuExport.expects(path.value).returning(commandResult)
 
-      val Right(triples) = renku.export(path).value.unsafeRunSync()
+      val Right(triples) = renku.graphExport(path).value.unsafeRunSync()
 
       triples shouldBe commandBody
     }
@@ -54,7 +54,7 @@ class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFa
       renkuExport.expects(path.value).throws(exception)
 
       intercept[Exception] {
-        renku.export(path).value.unsafeRunSync()
+        renku.graphExport(path).value.unsafeRunSync()
       } shouldBe exception
     }
 
@@ -62,7 +62,7 @@ class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFa
       val exception = ShelloutException(CommandResult(exitCode = 137, chunks = Nil))
       renkuExport.expects(path.value).throws(exception)
 
-      val Left(error) = renku.export(path).value.unsafeRunSync()
+      val Left(error) = renku.graphExport(path).value.unsafeRunSync()
 
       error            shouldBe a[LogWorthyRecoverableError]
       error.getMessage shouldBe "Not enough memory"

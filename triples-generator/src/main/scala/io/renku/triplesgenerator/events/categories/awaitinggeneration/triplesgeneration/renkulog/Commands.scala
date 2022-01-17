@@ -191,8 +191,8 @@ private object Commands {
   }
 
   trait Renku[F[_]] {
-    def migrate(commitEvent:                  CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit]
-    def export(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD]
+    def migrate(commitEvent:            CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit]
+    def graphExport(implicit directory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD]
   }
 
   object Renku {
@@ -216,11 +216,11 @@ private object Commands {
           ).raiseError[F, Unit]
         }
 
-    override def export(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] =
+    override def graphExport(implicit directory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] =
       EitherT {
         {
           for {
-            triplesAsString <- MonadThrow[F].catchNonFatal(renkuExport(destinationDirectory.value).out.string.trim)
+            triplesAsString <- MonadThrow[F].catchNonFatal(renkuExport(directory.value).out.string.trim)
             wrappedTriples  <- MonadThrow[F].fromEither(parse(triplesAsString))
           } yield wrappedTriples.asRight[ProcessingRecoverableError]
         }.recoverWith {

@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
 import cats.data.EitherT
+import cats.data.EitherT._
 import cats.effect.Async
 import cats.effect.implicits._
 import cats.syntax.all._
@@ -68,7 +69,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   ): F[Either[ProcessingRecoverableError, JsonLD]] = {
     for {
       _      <- prepareRepository(commitEvent)
-      _      <- EitherT.liftF(cleanUpRepository())
+      _      <- liftF(cleanUpRepository())
       result <- migrateAndLog(commitEvent)
     } yield result
   }.value
@@ -77,9 +78,9 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
       maybeAccessToken:                      Option[AccessToken],
       repoDirectory:                         RepositoryPath
   ): EitherT[F, ProcessingRecoverableError, Unit] = for {
-    repositoryUrl <- EitherT.liftF(findRepositoryUrl(commitEvent.project.path))
+    repositoryUrl <- liftF(findRepositoryUrl(commitEvent.project.path))
     _             <- git.clone(repositoryUrl, workDirectory)
-    _             <- EitherT.liftF(git checkout commitEvent.commitId)
+    _             <- liftF(git checkout commitEvent.commitId)
   } yield ()
 
   private def cleanUpRepository()(implicit repoDirectory: RepositoryPath) = {
@@ -98,8 +99,8 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   private def migrateAndLog(
       commitEvent:          CommitEvent
   )(implicit repoDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] = for {
-    _       <- EitherT.liftF(renku migrate commitEvent)
-    triples <- renku.`export`
+    _       <- liftF(renku migrate commitEvent)
+    triples <- renku.graphExport
   } yield triples
 
   private def createRepositoryDirectory(projectPath: projects.Path): F[Path] =

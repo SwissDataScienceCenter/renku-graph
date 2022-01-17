@@ -92,7 +92,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .returning(IO.unit)
 
         (renku
-          .`export`(_: RepositoryPath))
+          .graphExport(_: RepositoryPath))
           .expects(repositoryDirectory)
           .returning(rightT[IO, ProcessingRecoverableError](payload))
 
@@ -154,7 +154,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .returning(IO.unit)
 
         (renku
-          .`export`(_: RepositoryPath))
+          .graphExport(_: RepositoryPath))
           .expects(repositoryDirectory)
           .returning(rightT[IO, ProcessingRecoverableError](payload))
 
@@ -203,7 +203,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .returning(IO.unit)
 
         (renku
-          .`export`(_: RepositoryPath))
+          .graphExport(_: RepositoryPath))
           .expects(repositoryDirectory)
           .returning(rightT[IO, ProcessingRecoverableError](payload))
 
@@ -247,7 +247,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
 
       val error = LogWorthyRecoverableError(nonBlankStrings().generateOne)
       (renku
-        .`export`(_: RepositoryPath))
+        .graphExport(_: RepositoryPath))
         .expects(repositoryDirectory)
         .returning(leftT(error))
 
@@ -616,7 +616,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
 
       val exception = exceptions.generateOne
       (renku
-        .`export`(_: RepositoryPath))
+        .graphExport(_: RepositoryPath))
         .expects(repositoryDirectory)
         .returning(EitherT.right[ProcessingRecoverableError](exception.raiseError[IO, JsonLD]))
 
@@ -663,7 +663,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.unit)
 
       (renku
-        .export(_: RepositoryPath))
+        .graphExport(_: RepositoryPath))
         .expects(repositoryDirectory)
         .returning(rightT(payload))
 
