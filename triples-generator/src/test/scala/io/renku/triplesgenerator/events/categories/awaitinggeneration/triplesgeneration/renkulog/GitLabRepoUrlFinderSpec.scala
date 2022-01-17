@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
-import cats.MonadError
+import cats.syntax.all._
 import io.renku.config.ServiceUrl
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -44,41 +44,37 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
 
       s"return '$protocol://$host:$port/$path.git' when no access token" in new TestCase {
 
-        val maybeAccessToken = Option.empty[AccessToken]
+        implicit val maybeAccessToken: Option[AccessToken] = Option.empty
 
         val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
-        repoUrlFinder.findRepositoryUrl(path, maybeAccessToken) shouldBe context.pure(
-          ServiceUrl(s"$protocol://$host:$port/$path.git")
-        )
+        repoUrlFinder.findRepositoryUrl(path) shouldBe
+          ServiceUrl(s"$protocol://$host:$port/$path.git").pure[Try]
       }
 
       s"return '$protocol://gitlab-ci-token:<token>@$host:$port/$path.git' for personal access token" in new TestCase {
 
-        val accessToken = personalAccessTokens.generateOne
+        implicit val token @ Some(accessToken) = personalAccessTokens.generateSome
 
         val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
-        repoUrlFinder.findRepositoryUrl(path, Some(accessToken)) shouldBe context.pure(
-          ServiceUrl(s"$protocol://gitlab-ci-token:${accessToken.value}@$host:$port/$path.git")
-        )
+        repoUrlFinder.findRepositoryUrl(path) shouldBe
+          ServiceUrl(s"$protocol://gitlab-ci-token:${accessToken.value}@$host:$port/$path.git").pure[Try]
       }
 
       s"return '$protocol://oauth2:<token>@$host:$port/$path.git' for personal access token" in new TestCase {
 
-        val accessToken = oauthAccessTokens.generateOne
+        implicit val token @ Some(accessToken) = oauthAccessTokens.generateSome
 
         val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
-        repoUrlFinder.findRepositoryUrl(path, Some(accessToken)) shouldBe context.pure(
-          ServiceUrl(s"$protocol://oauth2:${accessToken.value}@$host:$port/$path.git")
-        )
+        repoUrlFinder.findRepositoryUrl(path) shouldBe
+          ServiceUrl(s"$protocol://oauth2:${accessToken.value}@$host:$port/$path.git").pure[Try]
       }
     }
   }
 
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
     val newRepoUrlFinder: GitLabUrl => GitLabRepoUrlFinder[Try] = new GitLabRepoUrlFinderImpl[Try](_)
   }
 

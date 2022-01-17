@@ -77,9 +77,9 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
       maybeAccessToken:                      Option[AccessToken],
       repoDirectory:                         RepositoryPath
   ): EitherT[F, ProcessingRecoverableError, Unit] = for {
-    repositoryUrl <- EitherT.liftF(findRepositoryUrl(commitEvent.project.path, maybeAccessToken))
+    repositoryUrl <- EitherT.liftF(findRepositoryUrl(commitEvent.project.path))
     _             <- git.clone(repositoryUrl, workDirectory)
-    _             <- EitherT.liftF(git.checkout(commitEvent.commitId))
+    _             <- EitherT.liftF(git checkout commitEvent.commitId)
   } yield ()
 
   private def cleanUpRepository()(implicit repoDirectory: RepositoryPath) = {

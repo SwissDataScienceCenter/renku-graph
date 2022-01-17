@@ -65,7 +65,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .returning(IO.pure(repositoryDirectory.value))
 
         (gitLabRepoUrlFinder
-          .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+          .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
           .expects(projectPath, maybeAccessToken)
           .returning(IO.pure(gitRepositoryUrl))
 
@@ -120,7 +120,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .returning(IO.pure(repositoryDirectory.value))
 
         (gitLabRepoUrlFinder
-          .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+          .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
           .expects(projectPath, maybeAccessToken)
           .returning(IO.pure(gitRepositoryUrl))
 
@@ -181,7 +181,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .returning(IO.pure(repositoryDirectory.value))
 
         (gitLabRepoUrlFinder
-          .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+          .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
           .expects(projectPath, maybeAccessToken)
           .returning(IO.pure(gitRepositoryUrl))
 
@@ -224,7 +224,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -269,7 +269,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
 
       implicit override lazy val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -314,7 +314,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
 
       val exception = exceptions.generateOne
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.raiseError(exception))
 
@@ -341,7 +341,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       val accessToken = accessTokens.generateOne
       implicit override lazy val maybeAccessToken: Option[AccessToken] = Some(accessToken)
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -375,7 +375,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -411,7 +411,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -452,7 +452,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -500,7 +500,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -550,7 +550,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -593,7 +593,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
@@ -641,7 +641,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
         .returning(IO.pure(gitRepositoryUrl))
 
