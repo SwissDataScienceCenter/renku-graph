@@ -100,7 +100,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: renku teardown
-      - name: renku teardown
         uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v0.4.1
         env:
           HELM_RELEASE_REGEX: "^renku-ci-gr-${{ github.event.number }}$"
