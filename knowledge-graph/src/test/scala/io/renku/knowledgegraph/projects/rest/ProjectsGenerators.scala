@@ -38,10 +38,7 @@ import org.scalacheck.Gen
 private object ProjectsGenerators {
 
   implicit val projects: Gen[Project] = for {
-    kgProject <-
-      Gen
-        .oneOf(anyProjectEntities, projectWithParentEntities(anyVisibility))
-        .map(_.to[KGProject])
+    kgProject     <- anyProjectEntities.map(_.to[KGProject])
     gitLabProject <- gitLabProjects
   } yield Project(
     id = gitLabProject.id,
@@ -71,7 +68,7 @@ private object ProjectsGenerators {
     starsCount = gitLabProject.starsCount,
     permissions = gitLabProject.permissions,
     statistics = gitLabProject.statistics,
-    version = kgProject.version
+    maybeVersion = kgProject.maybeVersion
   )
 
   implicit lazy val gitLabProjects: Gen[GitLabProject] = for {

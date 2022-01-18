@@ -68,10 +68,10 @@ class DatasetEndpointSpec
     "respond with OK and the found NonModifiedDataset" in new TestCase {
       forAll(
         Gen.oneOf(
-          anyProjectEntities
+          anyRenkuProjectEntities
             .addDataset(datasetEntities(provenanceImportedExternal))
             .map((importedExternalToNonModified _).tupled),
-          anyProjectEntities
+          anyRenkuProjectEntities
             .addDatasetAndModification(datasetEntities(provenanceInternal))
             .map { case (_ ::~ modified, project) => modified -> project }
             .map((modifiedToModified _).tupled)

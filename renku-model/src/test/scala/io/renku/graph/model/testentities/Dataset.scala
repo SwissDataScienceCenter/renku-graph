@@ -225,7 +225,7 @@ object Dataset {
                             additionalInfo:            AdditionalInfo,
                             parts:                     List[DatasetPart],
                             publicationEventFactories: List[Dataset[Provenance] => PublicationEvent],
-                            project:                   Project
+                            project:                   RenkuProject
   ): ValidatedNel[String, Dataset[P]] =
     from(identification, provenance, additionalInfo, parts, publicationEventFactories, project.topAncestorDateCreated)
 

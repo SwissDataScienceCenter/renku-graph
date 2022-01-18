@@ -45,7 +45,7 @@ class WebhookCreationSpec
 
     Scenario("Graph Services hook is present on the project in GitLab") {
 
-      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount.zero).generateOne
+      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.zero).generateOne
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
@@ -67,7 +67,7 @@ class WebhookCreationSpec
     Scenario("No Graph Services webhook on the project in GitLab") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount.one).generateOne
+      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.one).generateOne
 
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()

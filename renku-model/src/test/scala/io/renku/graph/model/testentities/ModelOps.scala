@@ -51,14 +51,6 @@ trait ModelOps extends Dataset.ProvenanceOps {
     def toMaybe[T](implicit convert: Person => Option[T]): Option[T] = convert(person)
   }
 
-  implicit class ProjectWithParentOps(project: ProjectWithParent)(implicit
-      renkuBaseUrl:                            RenkuBaseUrl
-  ) extends AbstractProjectOps[ProjectWithParent](project)
-
-  implicit class ProjectWithoutParentOps(project: ProjectWithoutParent)(implicit
-      renkuBaseUrl:                               RenkuBaseUrl
-  ) extends AbstractProjectOps[ProjectWithoutParent](project)
-
   implicit class ProjectOps(project: Project)(implicit
       renkuBaseUrl:                  RenkuBaseUrl
   ) extends AbstractProjectOps[Project](project)
@@ -67,22 +59,41 @@ trait ModelOps extends Dataset.ProvenanceOps {
       renkuBaseUrl:                                        RenkuBaseUrl
   ) {
 
+    def to[T](implicit convert: P => T): T = convert(project)
+  }
+
+  implicit class RenkuProjectWithParentOps(project: RenkuProject.WithParent)(implicit
+      renkuBaseUrl:                                 RenkuBaseUrl
+  ) extends AbstractRenkuProjectOps[RenkuProject.WithParent](project)
+
+  implicit class RenkuProjectWithoutParentOps(project: RenkuProject.WithoutParent)(implicit
+      renkuBaseUrl:                                    RenkuBaseUrl
+  ) extends AbstractRenkuProjectOps[RenkuProject.WithoutParent](project)
+
+  implicit class RenkuProjectOps(project: RenkuProject)(implicit
+      renkuBaseUrl:                       RenkuBaseUrl
+  ) extends AbstractRenkuProjectOps[RenkuProject](project)
+
+  abstract class AbstractRenkuProjectOps[P <: RenkuProject](project: P)(implicit
+      renkuBaseUrl:                                                  RenkuBaseUrl
+  ) {
+
     lazy val resourceId: projects.ResourceId = projects.ResourceId(project.asEntityId)
 
     def to[T](implicit convert: P => T): T = convert(project)
 
-    def forkOnce(): (Project, ProjectWithParent) = {
+    def forkOnce(): (RenkuProject, RenkuProject.WithParent) = {
       val (parent, childGen) = fork(times = 1)
       parent -> childGen.head
     }
 
     def fork(
         times: Int Refined Positive
-    ): (Project, NonEmptyList[ProjectWithParent]) = {
+    ): (RenkuProject, NonEmptyList[RenkuProject.WithParent]) = {
       val parent = project match {
-        case proj: ProjectWithParent =>
+        case proj: RenkuProject.WithParent =>
           proj.copy(forksCount = ForksCount(Refined.unsafeApply(proj.forksCount.value + times.value)))
-        case proj: ProjectWithoutParent =>
+        case proj: RenkuProject.WithoutParent =>
           proj.copy(forksCount = ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
       }
       parent -> (1 until times.value).foldLeft(NonEmptyList.one(newChildGen(parent).generateOne))((childrenGens, _) =>
@@ -90,9 +101,9 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
     }
 
-    private def newChildGen(parentProject: Project) =
-      projectEntities(fixed(parentProject.visibility), minDateCreated = parentProject.dateCreated).map(child =>
-        ProjectWithParent(
+    private def newChildGen(parentProject: RenkuProject) =
+      renkuProjectEntities(fixed(parentProject.visibility), minDateCreated = parentProject.dateCreated).map(child =>
+        RenkuProject.WithParent(
           child.path,
           child.name,
           child.maybeDescription,
@@ -112,7 +123,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def importDataset[PIN <: Dataset.Provenance, POUT <: Dataset.Provenance](
         dataset:              Dataset[PIN]
-    )(implicit newProvenance: ProvenanceImportFactory[PIN, POUT]): (Dataset[POUT], Project) = {
+    )(implicit newProvenance: ProvenanceImportFactory[PIN, POUT]): (Dataset[POUT], RenkuProject) = {
       val newIdentifier = datasetIdentifiers.generateOne
       val importedDS = dataset.copy(
         identification = dataset.identification.copy(identifier = newIdentifier),
@@ -125,6 +136,60 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
       importedDS -> (project addDatasets importedDS)
     }
+  }
+
+  implicit class NonRenkuProjectWithParentOps(project: NonRenkuProject.WithParent)(implicit
+      renkuBaseUrl:                                    RenkuBaseUrl
+  ) extends AbstractNonRenkuProjectOps[NonRenkuProject.WithParent](project)
+
+  implicit class NonRenkuProjectWithoutParentOps(project: NonRenkuProject.WithoutParent)(implicit
+      renkuBaseUrl:                                       RenkuBaseUrl
+  ) extends AbstractNonRenkuProjectOps[NonRenkuProject.WithoutParent](project)
+
+  implicit class NonRenkuProjectOps(project: NonRenkuProject)(implicit
+      renkuBaseUrl:                          RenkuBaseUrl
+  ) extends AbstractNonRenkuProjectOps[NonRenkuProject](project)
+
+  abstract class AbstractNonRenkuProjectOps[P <: NonRenkuProject](project: P)(implicit
+      renkuBaseUrl:                                                        RenkuBaseUrl
+  ) {
+
+    def to[T](implicit convert: P => T): T = convert(project)
+
+    def forkOnce(): (NonRenkuProject, NonRenkuProject.WithParent) = {
+      val (parent, childGen) = fork(times = 1)
+      parent -> childGen.head
+    }
+
+    def fork(
+        times: Int Refined Positive
+    ): (NonRenkuProject, NonEmptyList[NonRenkuProject.WithParent]) = {
+      val parent = project match {
+        case proj: NonRenkuProject.WithParent =>
+          proj.copy(forksCount = ForksCount(Refined.unsafeApply(proj.forksCount.value + times.value)))
+        case proj: NonRenkuProject.WithoutParent =>
+          proj.copy(forksCount = ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
+      }
+      parent -> (1 until times.value).foldLeft(NonEmptyList.one(newChildGen(parent).generateOne))((childrenGens, _) =>
+        newChildGen(parent).generateOne :: childrenGens
+      )
+    }
+
+    private def newChildGen(parentProject: NonRenkuProject) =
+      nonRenkuProjectEntities(fixed(parentProject.visibility), minDateCreated = parentProject.dateCreated).map(child =>
+        NonRenkuProject.WithParent(
+          child.path,
+          child.name,
+          child.maybeDescription,
+          child.dateCreated,
+          child.maybeCreator,
+          child.visibility,
+          ForksCount.Zero,
+          child.keywords,
+          child.members,
+          parentProject
+        )
+      )
   }
 
   implicit class DatasetOps[P <: Dataset.Provenance](dataset: Dataset[P])(implicit renkuBaseUrl: RenkuBaseUrl) {

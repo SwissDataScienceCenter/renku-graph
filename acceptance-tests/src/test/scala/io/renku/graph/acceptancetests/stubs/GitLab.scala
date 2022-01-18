@@ -40,7 +40,7 @@ import io.renku.graph.acceptancetests.tooling.{GraphServices, TestLogger}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.Id
-import io.renku.graph.model.testentities.{Person, ProjectWithParent}
+import io.renku.graph.model.testentities.{Parent, Person, Project}
 import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, users}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -300,7 +300,7 @@ trait GitLab {
       }
     }""".deepMerge(
         project.entitiesProject match {
-          case withParent: ProjectWithParent =>
+          case withParent: Project with Parent =>
             json"""{"forked_from_project":  {"path_with_namespace": ${withParent.parent.path.value}} }"""
           case _ => Json.obj()
         }

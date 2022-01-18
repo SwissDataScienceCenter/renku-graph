@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
-import io.renku.graph.model.testentities.{::~, activityEntities, anyProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, projectEntities, projectWithParentEntities, provenanceInternal, provenanceLens, provenanceNonModified, _}
+import io.renku.graph.model.testentities.{::~, activityEntities, anyRenkuProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, provenanceInternal, provenanceLens, provenanceNonModified, renkuProjectEntities, renkuProjectWithParentEntities, _}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -31,9 +31,9 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
   import ProjectFunctions._
 
   "findAllPersons" should {
-    "collect project members, project creator, activities' authors, associations' agents and datasets' creators" in {
+    "collect renku project members, project creator, activities' authors, associations' agents and datasets' creators" in {
       forAll(
-        anyProjectEntities
+        anyRenkuProjectEntities
           .withActivities(activityEntities(planEntities()),
                           activityEntities(planEntities()).modify(toAssociationPersonAgent)
           )
@@ -50,6 +50,12 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
           })
       }
     }
+
+    "collect non-renku project members and creator" in {
+      forAll(anyNonRenkuProjectEntities.map(_.to[entities.Project])) { project =>
+        findAllPersons(project) shouldBe project.members ++ project.maybeCreator
+      }
+    }
   }
 
   "update - person" should {
@@ -57,11 +63,19 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
     "replace the old person with the new on project" in {
       Set(
-        projectEntities(anyVisibility)
+        renkuProjectEntities(anyVisibility)
           .modify(
             _.copy(maybeCreator = Some(oldPerson), members = Set(oldPerson, personEntities.generateOne))
           ),
-        projectWithParentEntities(anyVisibility)
+        renkuProjectWithParentEntities(anyVisibility)
+          .modify(
+            _.copy(maybeCreator = Some(oldPerson), members = Set(oldPerson, personEntities.generateOne))
+          ),
+        nonRenkuProjectEntities(anyVisibility)
+          .modify(
+            _.copy(maybeCreator = Some(oldPerson), members = Set(oldPerson, personEntities.generateOne))
+          ),
+        nonRenkuProjectWithParentEntities(anyVisibility)
           .modify(
             _.copy(maybeCreator = Some(oldPerson), members = Set(oldPerson, personEntities.generateOne))
           )
@@ -80,7 +94,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
     "replace the old person with the new on all activities" in {
 
-      val project = anyProjectEntities
+      val project = anyRenkuProjectEntities
         .withActivities(
           activityEntities(planEntities()).modify(_.copy(author = oldPerson)),
           activityEntities(planEntities())
@@ -99,7 +113,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
     "replace the old person with the new on all activities' associations" in {
 
-      val project = anyProjectEntities
+      val project = anyRenkuProjectEntities
         .withActivities(
           activityEntities(planEntities()).modify(toAssociationPersonAgent(oldPerson)),
           activityEntities(planEntities())
@@ -120,7 +134,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
     "replace the old person with the new on all datasets" in {
 
-      val project = anyProjectEntities
+      val project = anyRenkuProjectEntities
         .withDatasets(
           datasetEntities(provenanceNonModified).modify(
             provenanceLens.modify(creatorsLens.modify(_ => Set(oldPerson, personEntities.generateOne)))
@@ -145,7 +159,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
   "update - dataset" should {
 
     "replace the old dataset with the new one" in {
-      val (_, project) = anyProjectEntities
+      val (_, project) = anyRenkuProjectEntities
         .addDataset(datasetEntities(provenanceNonModified))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
@@ -165,7 +179,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
     "return all datasets with ImportedInternalAncestorExternal or ImportedInternalAncestorInternal provenance" +
       "which are not invalidated" in {
         val (importedInternalAncestorInternal ::~ importedInternalAncestorExternal ::~ _ ::~ _ ::~ _ ::~ _, project) =
-          anyProjectEntities
+          anyRenkuProjectEntities
             .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal()))
             .addDataset(datasetEntities(provenanceImportedInternalAncestorExternal))
             .addDataset(datasetEntities(provenanceInternal))
@@ -187,7 +201,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
   "findModifiedDatasets" should {
     "return all datasets with Provenance.Modified which are not invalidations" in {
-      val (_ ::~ modified ::~ _ ::~ _ ::~ _ ::~ _, project) = anyProjectEntities
+      val (_ ::~ modified ::~ _ ::~ _ ::~ _ ::~ _, project) = anyRenkuProjectEntities
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceImportedExternal))
@@ -212,7 +226,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
     "find all invalidated datasets and not valid datasets or invalidation datasets" in {
 
       val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _, project) =
-        anyProjectEntities
+        anyRenkuProjectEntities
           .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
           .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
           .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal()))

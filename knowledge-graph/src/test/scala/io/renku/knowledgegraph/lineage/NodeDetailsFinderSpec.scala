@@ -53,7 +53,7 @@ class NodeDetailsFinderSpec
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
 
-      val project = anyProjectEntities
+      val project = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
             planEntities(
@@ -85,7 +85,7 @@ class NodeDetailsFinderSpec
 
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
-      val project = anyProjectEntities
+      val project = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
             planEntities(
@@ -123,7 +123,7 @@ class NodeDetailsFinderSpec
       val input  = entityLocations.generateOne
       val output = entityLocations.generateOne
 
-      val project = anyProjectEntities
+      val project = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
             planEntities(
@@ -169,7 +169,7 @@ class NodeDetailsFinderSpec
       val input +: output +: errOutput +: Nil =
         entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
 
-      val project = anyProjectEntities
+      val project = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
             planEntities(
@@ -201,7 +201,7 @@ class NodeDetailsFinderSpec
       val input +: output +: errOutput +: Nil =
         entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
 
-      val project: Project = anyProjectEntities
+      val project: RenkuProject = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
             planEntities(

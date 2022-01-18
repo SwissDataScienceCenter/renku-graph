@@ -51,7 +51,7 @@ private object model {
                            starsCount:       StarsCount,
                            permissions:      Permissions,
                            statistics:       Statistics,
-                           version:          SchemaVersion
+                           maybeVersion:     Option[SchemaVersion]
   )
 
   object Project {
