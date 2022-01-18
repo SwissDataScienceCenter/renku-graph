@@ -28,19 +28,26 @@ import io.renku.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
 import io.renku.metrics.LabeledHistogram
 import io.renku.db.SqlStatement
+import io.renku.db.SessionResource
+import io.renku.metrics.LabeledGauge
+import io.renku.eventlog.EventLogDB
+import io.renku.graph.model.projects
 
 private[subscriptions] object SubscriptionCategory {
 
   val name: CategoryName = CategoryName("CLEAN_UP")
 
   def apply[F[_]: Async: Parallel: Logger](
-      subscriberTracker: SubscriberTracker[F],
-      queriesExecTimes:  LabeledHistogram[F, SqlStatement.Name]
+      subscriberTracker:     SubscriberTracker[F],
+      sessionResource:       SessionResource[F, EventLogDB],
+      awaitingDeletionGauge: LabeledGauge[F, projects.Path],
+      deletingGauge:         LabeledGauge[F, projects.Path],
+      queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers      <- Subscribers(name, subscriberTracker)
     eventDelivery    <- EventDelivery.noOp[F, CleanUpEvent]
     dispatchRecovery <- LoggingDispatchRecovery[F, CleanUpEvent](name)
-    eventFinder      <- CleanUpEventFinder(queriesExecTimes)
+    eventFinder      <- CleanUpEventFinder(sessionResource, awaitingDeletionGauge, deletingGauge, queriesExecTimes)
     eventsDistributor <-
       EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)
     deserializer <-

@@ -70,11 +70,15 @@ object Microservice extends IOMicroservice {
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder)
         underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder)
         underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder)
+        awaitingDeletionGauge       <- AwaitingDeletionGauge(metricsRegistry, statsFinder)
+        deletingGauge               <- DeletingGauge(metricsRegistry, statsFinder)
         metricsResetScheduler <- GaugeResetScheduler[IO, projects.Path](
                                    List(awaitingGenerationGauge,
                                         underTriplesGenerationGauge,
                                         awaitingTransformationGauge,
-                                        underTransformationGauge
+                                        underTransformationGauge,
+                                        awaitingDeletionGauge,
+                                        deletingGauge
                                    ),
                                    MetricsConfigProvider()
                                  )
@@ -116,6 +120,8 @@ object Microservice extends IOMicroservice {
                                     underTriplesGenerationGauge,
                                     awaitingTransformationGauge,
                                     underTransformationGauge,
+                                    awaitingDeletionGauge,
+                                    deletingGauge,
                                     queriesExecTimes
                                   )
         subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
