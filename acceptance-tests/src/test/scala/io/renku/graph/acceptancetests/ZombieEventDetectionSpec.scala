@@ -72,7 +72,7 @@ class ZombieEventDetectionSpec
       s"should be detected and re-processes"
   ) {
     implicit val accessToken: AccessToken = accessTokens.generateOne
-    val project   = dataProjects(projectEntities(visibilityPublic)).generateOne
+    val project   = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
     val commitId  = commitIds.generateOne
     val eventDate = eventDates.generateOne
 

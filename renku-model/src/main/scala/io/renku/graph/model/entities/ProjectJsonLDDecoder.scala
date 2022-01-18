@@ -18,6 +18,7 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.Validated
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.{renku, schema}
@@ -42,25 +43,26 @@ object ProjectJsonLDDecoder {
       }
 
       for {
-        agent            <- cursor.downField(schema / "agent").as[CliVersion]
-        version          <- cursor.downField(schema / "schemaVersion").as[SchemaVersion]
-        dateCreated      <- cursor.downField(schema / "dateCreated").as[DateCreated]
+        maybeAgent       <- cursor.downField(schema / "agent").as[Option[CliVersion]]
+        maybeVersion     <- cursor.downField(schema / "schemaVersion").as[Option[SchemaVersion]]
+        maybeDateCreated <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
         maybeDescription <- maybeDescriptionR
         keywords         <- keywordsR
         allPersons       <- findAllPersons(gitLabInfo)
         activities       <- cursor.downField(renku / "hasActivity").as[List[Activity]].map(_.sortBy(_.startTime))
         datasets         <- cursor.downField(renku / "hasDataset").as[List[Dataset[Dataset.Provenance]]]
         resourceId       <- ResourceId(gitLabInfo.path).asRight
-        project <- newProject(gitLabInfo,
-                              resourceId,
-                              dateCreated = List(dateCreated, gitLabInfo.dateCreated).min,
-                              maybeDescription,
-                              agent,
-                              keywords,
-                              version,
-                              allPersons,
-                              activities,
-                              datasets
+        project <- newProject(
+                     gitLabInfo,
+                     resourceId,
+                     dateCreated = (gitLabInfo.dateCreated :: maybeDateCreated.toList).min,
+                     maybeDescription,
+                     maybeAgent,
+                     keywords,
+                     maybeVersion,
+                     allPersons,
+                     activities,
+                     datasets
                    )
       } yield project
     }
@@ -79,16 +81,16 @@ object ProjectJsonLDDecoder {
                          resourceId:       ResourceId,
                          dateCreated:      DateCreated,
                          maybeDescription: Option[Description],
-                         agent:            CliVersion,
+                         maybeAgent:       Option[CliVersion],
                          keywords:         Set[Keyword],
-                         version:          SchemaVersion,
+                         maybeVersion:     Option[SchemaVersion],
                          allJsonLdPersons: Set[Person],
                          activities:       List[Activity],
                          datasets:         List[Dataset[Dataset.Provenance]]
-  )(implicit renkuBaseUrl:                 RenkuBaseUrl) = {
-    gitLabInfo.maybeParentPath match {
-      case Some(parentPath) =>
-        ProjectWithParent
+  )(implicit renkuBaseUrl:                 RenkuBaseUrl): Either[DecodingFailure, Project] = {
+    (maybeAgent, maybeVersion, gitLabInfo.maybeParentPath) match {
+      case (Some(agent), Some(version), Some(parentPath)) =>
+        RenkuProject.WithParent
           .from(
             resourceId,
             gitLabInfo.path,
@@ -105,8 +107,9 @@ object ProjectJsonLDDecoder {
             datasets,
             parentResourceId = ResourceId(parentPath)
           )
-      case None =>
-        ProjectWithoutParent
+          .widen[Project]
+      case (Some(agent), Some(version), None) =>
+        RenkuProject.WithoutParent
           .from(
             resourceId,
             gitLabInfo.path,
@@ -122,6 +125,45 @@ object ProjectJsonLDDecoder {
             activities,
             datasets
           )
+          .widen[Project]
+      case (None, None, Some(parentPath)) =>
+        NonRenkuProject
+          .WithParent(
+            resourceId,
+            gitLabInfo.path,
+            gitLabInfo.name,
+            maybeDescription,
+            dateCreated,
+            maybeCreator(allJsonLdPersons)(gitLabInfo),
+            gitLabInfo.visibility,
+            keywords,
+            members(allJsonLdPersons)(gitLabInfo),
+            parentResourceId = ResourceId(parentPath)
+          )
+          .validNel[String]
+          .widen[Project]
+      case (None, None, None) =>
+        NonRenkuProject
+          .WithoutParent(
+            resourceId,
+            gitLabInfo.path,
+            gitLabInfo.name,
+            maybeDescription,
+            dateCreated,
+            maybeCreator(allJsonLdPersons)(gitLabInfo),
+            gitLabInfo.visibility,
+            keywords,
+            members(allJsonLdPersons)(gitLabInfo)
+          )
+          .validNel[String]
+          .widen[Project]
+      case (maybeAgent, maybeVersion, maybeParent) =>
+        Validated.invalidNel[String, Project](
+          s"Invalid project data " +
+            s"agent: $maybeAgent, " +
+            s"schemaVersion: $maybeVersion, " +
+            s"parent: $maybeParent"
+        )
     }
   }.toEither
     .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))

@@ -51,7 +51,7 @@ class CommitSyncFlowsSpec
     Scenario("There's a commit in GitLab for which there's no event in EL") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project           = dataProjects(projectEntities(visibilityPublic), CommitsCount(2)).generateOne
+      val project           = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount(2)).generateOne
       val nonMissedCommitId = commitIds.generateOne
       val missedCommitId    = commitIds.generateOne
 

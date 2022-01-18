@@ -35,6 +35,9 @@ trait TinyTypeEncoders {
   implicit def intEncoder[TT <: IntTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromInt(ttValue.value))
 
+  implicit def longEncoder[TT <: LongTinyType]: Encoder[TT] =
+    Encoder.instance[TT](ttValue => Json.fromLong(ttValue.value))
+
   implicit def localDateEncoder[TT <: LocalDateTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromString(ttValue.value.toString))
 

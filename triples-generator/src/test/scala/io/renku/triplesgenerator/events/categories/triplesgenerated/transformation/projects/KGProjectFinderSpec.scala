@@ -44,8 +44,8 @@ class KGProjectFinderSpec
     "return name, derivedFrom, visibility, description and keywords for a given project ResourceId" in new TestCase {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val maybeParent = project match {
-          case projectWithParent: entities.ProjectWithParent    => Some(projectWithParent.parentResourceId)
-          case _:                 entities.ProjectWithoutParent => None
+          case project: entities.Project with entities.Parent => project.parentResourceId.some
+          case _ => None
         }
 
         loadToStore(project)
@@ -62,13 +62,15 @@ class KGProjectFinderSpec
     "return no keywords if there are any for the given project" in new TestCase {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val maybeParent = project match {
-          case projectWithParent: entities.ProjectWithParent    => Some(projectWithParent.parentResourceId)
-          case _:                 entities.ProjectWithoutParent => None
+          case project: entities.Project with entities.Parent => project.parentResourceId.some
+          case _ => None
         }
 
         val projectNoKeywords = project match {
-          case p: entities.ProjectWithParent    => p.copy(keywords = Set.empty)
-          case p: entities.ProjectWithoutParent => p.copy(keywords = Set.empty)
+          case p: entities.RenkuProject.WithParent       => p.copy(keywords = Set.empty)
+          case p: entities.RenkuProject.WithoutParent    => p.copy(keywords = Set.empty)
+          case p: entities.NonRenkuProject.WithParent    => p.copy(keywords = Set.empty)
+          case p: entities.NonRenkuProject.WithoutParent => p.copy(keywords = Set.empty)
         }
 
         loadToStore(projectNoKeywords)

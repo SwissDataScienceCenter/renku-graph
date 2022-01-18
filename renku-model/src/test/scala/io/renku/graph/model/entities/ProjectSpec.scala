@@ -91,7 +91,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           val mergedMember3 = dataset1.provenance.creators.find(byEmail(member3)).map(merge(_, member3))
 
           jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
-            entities.ProjectWithoutParent(
+            entities.RenkuProject.WithoutParent(
               resourceId,
               info.path,
               info.name,
@@ -146,7 +146,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         val mergedMember3 = dataset1.provenance.creators.find(byEmail(member3)).map(merge(_, member3))
 
         jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
-          entities.ProjectWithParent(
+          entities.RenkuProject.WithParent(
             resourceId,
             info.path,
             info.name,
@@ -161,6 +161,57 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
               .sortBy(_.startTime),
             addTo(dataset1, Set(mergedCreator.some, mergedMember3).flatten) :: dataset2 :: Nil,
+            projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project")))
+          )
+        ).asRight
+      }
+    }
+
+    "turn non-renku JsonLD Project entity without parent into the NonRenkuProject object" in {
+      forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None))) { projectInfo =>
+        val creator    = projectMembersWithEmail.generateOne
+        val members    = projectMembers.generateSet()
+        val info       = projectInfo.copy(maybeCreator = creator.some, members = members)
+        val resourceId = projects.ResourceId(info.path)
+
+        val jsonLD = minimalCliLikeJsonLD(resourceId)
+
+        jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
+          entities.NonRenkuProject.WithoutParent(
+            resourceId,
+            info.path,
+            info.name,
+            info.maybeDescription,
+            info.dateCreated,
+            creator.some.map(_.toPerson),
+            info.visibility,
+            info.keywords,
+            members.map(_.toPerson)
+          )
+        ).asRight
+      }
+    }
+
+    "turn non-renku JsonLD Project entity with parent into the NonRenkuProject object" in {
+      forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = projectPaths.generateSome))) { projectInfo =>
+        val creator    = projectMembersWithEmail.generateOne
+        val members    = projectMembers.generateSet()
+        val info       = projectInfo.copy(maybeCreator = creator.some, members = members)
+        val resourceId = projects.ResourceId(info.path)
+
+        val jsonLD = minimalCliLikeJsonLD(resourceId)
+
+        jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
+          entities.NonRenkuProject.WithParent(
+            resourceId,
+            info.path,
+            info.name,
+            info.maybeDescription,
+            info.dateCreated,
+            creator.some.map(_.toPerson),
+            info.visibility,
+            info.keywords,
+            members.map(_.toPerson),
             projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project")))
           )
         ).asRight
@@ -327,7 +378,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       )
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.ProjectWithParent(
+        entities.RenkuProject.WithParent(
           resourceId,
           projectInfo.path,
           projectInfo.name,
@@ -406,7 +457,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       )
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.ProjectWithoutParent(
+        entities.RenkuProject.WithoutParent(
           resourceId,
           projectInfo.path,
           projectInfo.name,
@@ -474,7 +525,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       )
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.ProjectWithoutParent(
+        entities.RenkuProject.WithoutParent(
           resourceId,
           projectInfo.path,
           projectInfo.name,
@@ -518,7 +569,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       )
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.ProjectWithoutParent(
+        entities.RenkuProject.WithoutParent(
           resourceId,
           projectInfo.path,
           projectInfo.name,
@@ -560,7 +611,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       )
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.ProjectWithoutParent(
+        entities.RenkuProject.WithoutParent(
           resourceId,
           projectInfo.path,
           projectInfo.name,
@@ -602,7 +653,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       )
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
-        entities.ProjectWithoutParent(
+        entities.RenkuProject.WithoutParent(
           resourceId,
           projectInfo.path,
           projectInfo.name,
@@ -623,10 +674,10 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
   "encode" should {
 
-    "produce JsonLD with all the relevant properties" in {
-      forAll(projectEntitiesWithDatasetsAndActivities.map(_.to[entities.Project])) { project =>
+    "produce JsonLD with all the relevant properties or a Renku Project" in {
+      forAll(renkuProjectEntitiesWithDatasetsAndActivities.map(_.to[entities.RenkuProject])) { project =>
         val maybeParentId = project match {
-          case p: entities.ProjectWithParent => p.parentResourceId.some
+          case p: entities.RenkuProject.WithParent => p.parentResourceId.some
           case _ => Option.empty[projects.ResourceId]
         }
 
@@ -651,6 +702,34 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               renku / "hasDataset"        -> project.datasets.asJsonLD,
               prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
             ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
+          )
+          .toJson
+      }
+    }
+
+    "produce JsonLD with all the relevant properties or a non-Renku Project" in {
+      forAll(anyNonRenkuProjectEntities.map(_.to[entities.NonRenkuProject])) { project =>
+        val maybeParentId = project match {
+          case p: entities.NonRenkuProject.WithParent => p.parentResourceId.some
+          case _ => Option.empty[projects.ResourceId]
+        }
+
+        project.asJsonLD.toJson shouldBe JsonLD
+          .arr(
+            JsonLD.entity(
+              EntityId.of(project.resourceId.show),
+              entities.Project.entityTypes,
+              schema / "name"             -> project.name.asJsonLD,
+              renku / "projectPath"       -> project.path.asJsonLD,
+              renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+              schema / "description"      -> project.maybeDescription.asJsonLD,
+              schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "creator"          -> project.maybeCreator.asJsonLD,
+              renku / "projectVisibility" -> project.visibility.asJsonLD,
+              schema / "keywords"         -> project.keywords.asJsonLD,
+              schema / "member"           -> project.members.toList.asJsonLD,
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+            )
           )
           .toJson
       }
@@ -690,6 +769,16 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       .flatten
       .fold(throw _, identity)
   }
+
+  private def minimalCliLikeJsonLD(resourceId: projects.ResourceId) =
+    JsonLD
+      .entity(
+        resourceId.asEntityId,
+        EntityTypes.of(prov / "Location", schema / "Project"),
+        Map.empty[Property, JsonLD]
+      )
+      .flatten
+      .fold(throw _, identity)
 
   private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
 

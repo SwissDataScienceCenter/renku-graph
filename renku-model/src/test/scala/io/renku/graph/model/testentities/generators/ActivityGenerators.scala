@@ -103,7 +103,7 @@ trait ActivityGenerators {
         dateCreated  <- planDatesCreated(after = projectDateCreated)
       } yield Plan.of(name, maybeCommand, dateCreated, CommandParameters.of(parameterFactories: _*))
 
-  def executionPlanners(planGen: projects.DateCreated => Gen[Plan], project: Project): Gen[ExecutionPlanner] =
+  def executionPlanners(planGen: projects.DateCreated => Gen[Plan], project: RenkuProject): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)
 
   def executionPlanners(planGen:            projects.DateCreated => Gen[Plan],

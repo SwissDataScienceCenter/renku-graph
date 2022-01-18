@@ -32,247 +32,295 @@ sealed trait Project extends Product with Serializable {
   val path:             Path
   val name:             Name
   val maybeDescription: Option[Description]
-  val agent:            CliVersion
   val dateCreated:      DateCreated
   val maybeCreator:     Option[Person]
   val visibility:       Visibility
   val keywords:         Set[Keyword]
   val members:          Set[Person]
-  val version:          SchemaVersion
-  val activities:       List[Activity]
-  val datasets:         List[Dataset[Dataset.Provenance]]
 
-  lazy val plans:      Set[Plan]       = activities.map(_.association.plan).toSet
+  val activities: List[Activity]
+  val datasets:   List[Dataset[Dataset.Provenance]]
+  val plans:      Set[Plan]
   lazy val namespaces: List[Namespace] = path.toNamespaces
 }
 
-final case class ProjectWithoutParent(resourceId:       ResourceId,
-                                      path:             Path,
-                                      name:             Name,
-                                      maybeDescription: Option[Description],
-                                      agent:            CliVersion,
-                                      dateCreated:      DateCreated,
-                                      maybeCreator:     Option[Person],
-                                      visibility:       Visibility,
-                                      keywords:         Set[Keyword],
-                                      members:          Set[Person],
-                                      version:          SchemaVersion,
-                                      activities:       List[Activity],
-                                      datasets:         List[Dataset[Dataset.Provenance]]
-) extends Project
-
-object ProjectWithoutParent extends ProjectFactory {
-
-  def from(resourceId:       ResourceId,
-           path:             Path,
-           name:             Name,
-           maybeDescription: Option[Description],
-           agent:            CliVersion,
-           dateCreated:      DateCreated,
-           maybeCreator:     Option[Person],
-           visibility:       Visibility,
-           keywords:         Set[Keyword],
-           members:          Set[Person],
-           version:          SchemaVersion,
-           activities:       List[Activity],
-           datasets:         List[Dataset[Dataset.Provenance]]
-  ): ValidatedNel[String, ProjectWithoutParent] =
-    (validateDates(dateCreated, activities, datasets), validateDatasets(datasets))
-      .mapN { (_, _) =>
-        val (syncedActivities, syncedDatasets) =
-          syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
-        ProjectWithoutParent(resourceId,
-                             path,
-                             name,
-                             maybeDescription,
-                             agent,
-                             dateCreated,
-                             maybeCreator,
-                             visibility,
-                             keywords,
-                             members,
-                             version,
-                             syncedActivities,
-                             syncedDatasets
-        )
-      }
-
-  private def validateDates(dateCreated: DateCreated,
-                            activities:  List[Activity],
-                            datasets:    List[Dataset[Provenance]]
-  ): ValidatedNel[String, Unit] =
-    activities
-      .map { activity =>
-        import activity._
-        if ((startTime.value compareTo dateCreated.value) >= 0) ().validNel[String]
-        else s"Activity $resourceId startTime $startTime is older than project $dateCreated".invalidNel
-      }
-      .sequence
-      .void |+| datasets
-      .map {
-        def compareDateWithProject(dataset: Dataset[Provenance], dsCreated: model.datasets.DateCreated) =
-          if ((dsCreated.value compareTo dateCreated.value) >= 0) ().validNel[String]
-          else
-            s"Dataset ${dataset.identification.identifier} date $dsCreated is older than project $dateCreated".invalidNel
-
-        dataset =>
-          dataset.provenance match {
-            case p: Provenance.Internal => compareDateWithProject(dataset, p.date)
-            case p: Provenance.Modified => compareDateWithProject(dataset, p.date)
-            case _ => ().validNel[String]
-          }
-      }
-      .sequence
-      .void |+| activities
-      .map { activity =>
-        import activity.association.plan
-        if ((plan.dateCreated.value compareTo dateCreated.value) >= 0) ().validNel[String]
-        else s"Plan ${plan.resourceId} dateCreated ${plan.dateCreated} is older than project $dateCreated".invalidNel
-      }
-      .sequence
-      .void
+sealed trait NonRenkuProject extends Project with Product with Serializable {
+  lazy val activities: List[Activity]                    = Nil
+  lazy val datasets:   List[Dataset[Dataset.Provenance]] = Nil
+  lazy val plans:      Set[Plan]                         = Set.empty
 }
 
-final case class ProjectWithParent(resourceId:       ResourceId,
-                                   path:             Path,
-                                   name:             Name,
-                                   maybeDescription: Option[Description],
-                                   agent:            CliVersion,
-                                   dateCreated:      DateCreated,
-                                   maybeCreator:     Option[Person],
-                                   visibility:       Visibility,
-                                   keywords:         Set[Keyword],
-                                   members:          Set[Person],
-                                   version:          SchemaVersion,
-                                   activities:       List[Activity],
-                                   datasets:         List[Dataset[Dataset.Provenance]],
-                                   parentResourceId: ResourceId
-) extends Project
-
-object ProjectWithParent extends ProjectFactory {
-
-  def from(resourceId:       ResourceId,
-           path:             Path,
-           name:             Name,
-           maybeDescription: Option[Description],
-           agent:            CliVersion,
-           dateCreated:      DateCreated,
-           maybeCreator:     Option[Person],
-           visibility:       Visibility,
-           keywords:         Set[Keyword],
-           members:          Set[Person],
-           version:          SchemaVersion,
-           activities:       List[Activity],
-           datasets:         List[Dataset[Dataset.Provenance]],
-           parentResourceId: ResourceId
-  ): ValidatedNel[String, ProjectWithParent] = validateDatasets(datasets) map { _ =>
-    val (syncedActivities, syncedDatasets) =
-      syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
-    ProjectWithParent(
-      resourceId,
-      path,
-      name,
-      maybeDescription,
-      agent,
-      dateCreated,
-      maybeCreator,
-      visibility,
-      keywords,
-      members,
-      version,
-      syncedActivities,
-      syncedDatasets,
-      parentResourceId
-    )
-  }
+sealed trait Parent {
+  self: Project =>
+  val parentResourceId: ResourceId
 }
 
-trait ProjectFactory {
+object NonRenkuProject {
 
-  protected def validateDatasets(datasets: List[Dataset[Provenance]]): ValidatedNel[String, Unit] = {
-    val toDatasetsWithBrokenDerivedFrom: Dataset[Provenance] => Option[Dataset[Provenance.Modified]] = dataset =>
-      dataset.provenance match {
-        case prov: Dataset.Provenance.Modified =>
-          datasets.find(_.resourceId.value == prov.derivedFrom.value) match {
-            case Some(_) => Option.empty[Dataset[Provenance.Modified]]
-            case _       => dataset.asInstanceOf[Dataset[Provenance.Modified]].some
-          }
-        case _ => Option.empty[Dataset[Provenance.Modified]]
-      }
+  final case class WithoutParent(resourceId:       ResourceId,
+                                 path:             Path,
+                                 name:             Name,
+                                 maybeDescription: Option[Description],
+                                 dateCreated:      DateCreated,
+                                 maybeCreator:     Option[Person],
+                                 visibility:       Visibility,
+                                 keywords:         Set[Keyword],
+                                 members:          Set[Person]
+  ) extends NonRenkuProject
 
-    datasets flatMap toDatasetsWithBrokenDerivedFrom match {
-      case Nil => ().validNel[String]
-      case first :: other =>
-        NonEmptyList
-          .of(first, other: _*)
-          .map(ds =>
-            show"Dataset ${ds.identification.identifier} is derived from non-existing dataset ${ds.provenance.derivedFrom}"
+  final case class WithParent(resourceId:       ResourceId,
+                              path:             Path,
+                              name:             Name,
+                              maybeDescription: Option[Description],
+                              dateCreated:      DateCreated,
+                              maybeCreator:     Option[Person],
+                              visibility:       Visibility,
+                              keywords:         Set[Keyword],
+                              members:          Set[Person],
+                              parentResourceId: ResourceId
+  ) extends NonRenkuProject
+      with Parent
+}
+
+sealed trait RenkuProject extends Project with Product with Serializable {
+  val agent:      CliVersion
+  val version:    SchemaVersion
+  val activities: List[Activity]
+  val datasets:   List[Dataset[Dataset.Provenance]]
+
+  lazy val plans: Set[Plan] = activities.map(_.association.plan).toSet
+}
+
+object RenkuProject {
+  final case class WithoutParent(resourceId:       ResourceId,
+                                 path:             Path,
+                                 name:             Name,
+                                 maybeDescription: Option[Description],
+                                 agent:            CliVersion,
+                                 dateCreated:      DateCreated,
+                                 maybeCreator:     Option[Person],
+                                 visibility:       Visibility,
+                                 keywords:         Set[Keyword],
+                                 members:          Set[Person],
+                                 version:          SchemaVersion,
+                                 activities:       List[Activity],
+                                 datasets:         List[Dataset[Dataset.Provenance]]
+  ) extends RenkuProject
+
+  object WithoutParent extends ProjectFactory {
+
+    def from(resourceId:       ResourceId,
+             path:             Path,
+             name:             Name,
+             maybeDescription: Option[Description],
+             agent:            CliVersion,
+             dateCreated:      DateCreated,
+             maybeCreator:     Option[Person],
+             visibility:       Visibility,
+             keywords:         Set[Keyword],
+             members:          Set[Person],
+             version:          SchemaVersion,
+             activities:       List[Activity],
+             datasets:         List[Dataset[Dataset.Provenance]]
+    ): ValidatedNel[String, RenkuProject.WithoutParent] =
+      (validateDates(dateCreated, activities, datasets), validateDatasets(datasets))
+        .mapN { (_, _) =>
+          val (syncedActivities, syncedDatasets) =
+            syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
+          RenkuProject.WithoutParent(resourceId,
+                                     path,
+                                     name,
+                                     maybeDescription,
+                                     agent,
+                                     dateCreated,
+                                     maybeCreator,
+                                     visibility,
+                                     keywords,
+                                     members,
+                                     version,
+                                     syncedActivities,
+                                     syncedDatasets
           )
-          .invalid[Unit]
-    }
-  }
-
-  protected def syncPersons(projectPersons: Set[Person],
-                            activities:     List[Activity],
-                            datasets:       List[Dataset[Provenance]]
-  ): (List[Activity], List[Dataset[Provenance]]) =
-    activities.updatePersons(from = projectPersons) -> datasets.updateCreators(from = projectPersons)
-
-  private implicit class ActivitiesOps(activities: List[Activity]) {
-
-    def updatePersons(from: Set[Person]): List[Activity] =
-      (updateAuthors(from) andThen updateAssociationAgents(from))(activities)
-
-    private def updateAuthors(from: Set[Person]): List[Activity] => List[Activity] =
-      activitiesLens.modify { activity =>
-        from
-          .find(byEmail(activity.author))
-          .map(person => activityAuthorLens.modify(_ => person)(activity))
-          .getOrElse(activity)
-      }
-
-    private def updateAssociationAgents(from: Set[Person]): List[Activity] => List[Activity] =
-      activitiesLens.modify { activity =>
-        activity.association match {
-          case _:     Association.WithRenkuAgent => activity
-          case assoc: Association.WithPersonAgent =>
-            from
-              .find(byEmail(assoc.agent))
-              .map(person => activity.copy(association = assoc.copy(agent = person)))
-              .getOrElse(activity)
         }
-      }
+
+    private def validateDates(dateCreated: DateCreated,
+                              activities:  List[Activity],
+                              datasets:    List[Dataset[Provenance]]
+    ): ValidatedNel[String, Unit] =
+      activities
+        .map { activity =>
+          import activity._
+          if ((startTime.value compareTo dateCreated.value) >= 0) ().validNel[String]
+          else s"Activity $resourceId startTime $startTime is older than project $dateCreated".invalidNel
+        }
+        .sequence
+        .void |+| datasets
+        .map {
+          def compareDateWithProject(dataset: Dataset[Provenance], dsCreated: model.datasets.DateCreated) =
+            if ((dsCreated.value compareTo dateCreated.value) >= 0) ().validNel[String]
+            else
+              s"Dataset ${dataset.identification.identifier} date $dsCreated is older than project $dateCreated".invalidNel
+
+          dataset =>
+            dataset.provenance match {
+              case p: Provenance.Internal => compareDateWithProject(dataset, p.date)
+              case p: Provenance.Modified => compareDateWithProject(dataset, p.date)
+              case _ => ().validNel[String]
+            }
+        }
+        .sequence
+        .void |+| activities
+        .map { activity =>
+          import activity.association.plan
+          if ((plan.dateCreated.value compareTo dateCreated.value) >= 0) ().validNel[String]
+          else s"Plan ${plan.resourceId} dateCreated ${plan.dateCreated} is older than project $dateCreated".invalidNel
+        }
+        .sequence
+        .void
   }
 
-  private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
+  final case class WithParent(resourceId:       ResourceId,
+                              path:             Path,
+                              name:             Name,
+                              maybeDescription: Option[Description],
+                              agent:            CliVersion,
+                              dateCreated:      DateCreated,
+                              maybeCreator:     Option[Person],
+                              visibility:       Visibility,
+                              keywords:         Set[Keyword],
+                              members:          Set[Person],
+                              version:          SchemaVersion,
+                              activities:       List[Activity],
+                              datasets:         List[Dataset[Dataset.Provenance]],
+                              parentResourceId: ResourceId
+  ) extends RenkuProject
+      with Parent
 
-    def updateCreators(from: Set[Person]): List[Dataset[Provenance]] = {
-      val creatorsUpdate = creatorsLens.modify { creator =>
-        from.find(byEmail(creator)).getOrElse(creator)
-      }
-      datasetsLens.modify(
-        provenanceLens.modify(provCreatorsLens.modify(creatorsUpdate))
-      )(datasets)
+  object WithParent extends ProjectFactory {
+
+    def from(resourceId:       ResourceId,
+             path:             Path,
+             name:             Name,
+             maybeDescription: Option[Description],
+             agent:            CliVersion,
+             dateCreated:      DateCreated,
+             maybeCreator:     Option[Person],
+             visibility:       Visibility,
+             keywords:         Set[Keyword],
+             members:          Set[Person],
+             version:          SchemaVersion,
+             activities:       List[Activity],
+             datasets:         List[Dataset[Dataset.Provenance]],
+             parentResourceId: ResourceId
+    ): ValidatedNel[String, RenkuProject.WithParent] = validateDatasets(datasets) map { _ =>
+      val (syncedActivities, syncedDatasets) =
+        syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
+      RenkuProject.WithParent(
+        resourceId,
+        path,
+        name,
+        maybeDescription,
+        agent,
+        dateCreated,
+        maybeCreator,
+        visibility,
+        keywords,
+        members,
+        version,
+        syncedActivities,
+        syncedDatasets,
+        parentResourceId
+      )
     }
   }
 
-  private lazy val byEmail: Person => Person => Boolean = { person1 => person2 =>
-    (person1.maybeEmail -> person2.maybeEmail).mapN(_ == _).getOrElse(false)
-  }
+  trait ProjectFactory {
 
-  private val activitiesLens: Traversal[List[Activity], Activity] = Traversal.fromTraverse[List, Activity]
-  private val activityAuthorLens = Lens[Activity, Person](_.author)(p => a => a.copy(author = p))
+    protected def validateDatasets(datasets: List[Dataset[Provenance]]): ValidatedNel[String, Unit] = {
+      val toDatasetsWithBrokenDerivedFrom: Dataset[Provenance] => Option[Dataset[Provenance.Modified]] = dataset =>
+        dataset.provenance match {
+          case prov: Dataset.Provenance.Modified =>
+            datasets.find(_.resourceId.value == prov.derivedFrom.value) match {
+              case Some(_) => Option.empty[Dataset[Provenance.Modified]]
+              case _       => dataset.asInstanceOf[Dataset[Provenance.Modified]].some
+            }
+          case _ => Option.empty[Dataset[Provenance.Modified]]
+        }
 
-  private val datasetsLens   = Traversal.fromTraverse[List, Dataset[Provenance]]
-  private val provenanceLens = Lens[Dataset[Provenance], Provenance](_.provenance)(p => d => d.copy(provenance = p))
-  private val creatorsLens   = Traversal.fromTraverse[List, Person]
-  private val provCreatorsLens = Lens[Provenance, List[Person]](_.creators.toList) { crts =>
-    {
-      case p: Provenance.Internal                         => p.copy(creators = crts.toSet)
-      case p: Provenance.ImportedExternal                 => p.copy(creators = crts.toSet)
-      case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = crts.toSet)
-      case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = crts.toSet)
-      case p: Provenance.Modified                         => p.copy(creators = crts.toSet)
+      datasets flatMap toDatasetsWithBrokenDerivedFrom match {
+        case Nil => ().validNel[String]
+        case first :: other =>
+          NonEmptyList
+            .of(first, other: _*)
+            .map(ds =>
+              show"Dataset ${ds.identification.identifier} is derived from non-existing dataset ${ds.provenance.derivedFrom}"
+            )
+            .invalid[Unit]
+      }
+    }
+
+    protected def syncPersons(projectPersons: Set[Person],
+                              activities:     List[Activity],
+                              datasets:       List[Dataset[Provenance]]
+    ): (List[Activity], List[Dataset[Provenance]]) =
+      activities.updatePersons(from = projectPersons) -> datasets.updateCreators(from = projectPersons)
+
+    private implicit class ActivitiesOps(activities: List[Activity]) {
+
+      def updatePersons(from: Set[Person]): List[Activity] =
+        (updateAuthors(from) andThen updateAssociationAgents(from))(activities)
+
+      private def updateAuthors(from: Set[Person]): List[Activity] => List[Activity] =
+        activitiesLens.modify { activity =>
+          from
+            .find(byEmail(activity.author))
+            .map(person => activityAuthorLens.modify(_ => person)(activity))
+            .getOrElse(activity)
+        }
+
+      private def updateAssociationAgents(from: Set[Person]): List[Activity] => List[Activity] =
+        activitiesLens.modify { activity =>
+          activity.association match {
+            case _:     Association.WithRenkuAgent => activity
+            case assoc: Association.WithPersonAgent =>
+              from
+                .find(byEmail(assoc.agent))
+                .map(person => activity.copy(association = assoc.copy(agent = person)))
+                .getOrElse(activity)
+          }
+        }
+    }
+
+    private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
+
+      def updateCreators(from: Set[Person]): List[Dataset[Provenance]] = {
+        val creatorsUpdate = creatorsLens.modify { creator =>
+          from.find(byEmail(creator)).getOrElse(creator)
+        }
+        datasetsLens.modify(
+          provenanceLens.modify(provCreatorsLens.modify(creatorsUpdate))
+        )(datasets)
+      }
+    }
+
+    private lazy val byEmail: Person => Person => Boolean = { person1 => person2 =>
+      (person1.maybeEmail -> person2.maybeEmail).mapN(_ == _).getOrElse(false)
+    }
+
+    private val activitiesLens: Traversal[List[Activity], Activity] = Traversal.fromTraverse[List, Activity]
+    private val activityAuthorLens = Lens[Activity, Person](_.author)(p => a => a.copy(author = p))
+
+    private val datasetsLens   = Traversal.fromTraverse[List, Dataset[Provenance]]
+    private val provenanceLens = Lens[Dataset[Provenance], Provenance](_.provenance)(p => d => d.copy(provenance = p))
+    private val creatorsLens   = Traversal.fromTraverse[List, Person]
+    private val provCreatorsLens = Lens[Provenance, List[Person]](_.creators.toList) { crts =>
+      {
+        case p: Provenance.Internal                         => p.copy(creators = crts.toSet)
+        case p: Provenance.ImportedExternal                 => p.copy(creators = crts.toSet)
+        case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = crts.toSet)
+        case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = crts.toSet)
+        case p: Provenance.Modified                         => p.copy(creators = crts.toSet)
+      }
     }
   }
 }
@@ -288,32 +336,55 @@ object Project {
   implicit def encoder[P <: Project](implicit
       renkuBaseUrl: RenkuBaseUrl,
       gitLabApiUrl: GitLabApiUrl
-  ): JsonLDEncoder[P] = JsonLDEncoder.instance { project =>
-    val maybeDerivedFrom = project match {
-      case p: ProjectWithParent => p.parentResourceId.asEntityId.some
-      case _ => None
-    }
-    JsonLD.arr(
-      JsonLD.entity(
-        project.resourceId.asEntityId,
-        entityTypes,
-        schema / "name"             -> project.name.asJsonLD,
-        renku / "projectPath"       -> project.path.asJsonLD,
-        renku / "projectNamespaces" -> project.namespaces.asJsonLD,
-        schema / "description"      -> project.maybeDescription.asJsonLD,
-        schema / "agent"            -> project.agent.asJsonLD,
-        schema / "dateCreated"      -> project.dateCreated.asJsonLD,
-        schema / "creator"          -> project.maybeCreator.asJsonLD,
-        renku / "projectVisibility" -> project.visibility.asJsonLD,
-        schema / "keywords"         -> project.keywords.asJsonLD,
-        schema / "member"           -> project.members.toList.asJsonLD,
-        schema / "schemaVersion"    -> project.version.asJsonLD,
-        renku / "hasActivity"       -> project.activities.asJsonLD,
-        renku / "hasPlan"           -> project.plans.toList.asJsonLD,
-        renku / "hasDataset"        -> project.datasets.asJsonLD,
-        prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
-      ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
-    )
+  ): JsonLDEncoder[P] = JsonLDEncoder.instance {
+    case project: RenkuProject =>
+      val maybeDerivedFrom = project match {
+        case p: RenkuProject.WithParent => p.parentResourceId.asEntityId.some
+        case _ => None
+      }
+      JsonLD.arr(
+        JsonLD.entity(
+          project.resourceId.asEntityId,
+          entityTypes,
+          schema / "name"             -> project.name.asJsonLD,
+          renku / "projectPath"       -> project.path.asJsonLD,
+          renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+          schema / "description"      -> project.maybeDescription.asJsonLD,
+          schema / "agent"            -> project.agent.asJsonLD,
+          schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+          schema / "creator"          -> project.maybeCreator.asJsonLD,
+          renku / "projectVisibility" -> project.visibility.asJsonLD,
+          schema / "keywords"         -> project.keywords.asJsonLD,
+          schema / "member"           -> project.members.toList.asJsonLD,
+          schema / "schemaVersion"    -> project.version.asJsonLD,
+          renku / "hasActivity"       -> project.activities.asJsonLD,
+          renku / "hasPlan"           -> project.plans.toList.asJsonLD,
+          renku / "hasDataset"        -> project.datasets.asJsonLD,
+          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+        ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
+      )
+
+    case project: NonRenkuProject =>
+      val maybeDerivedFrom = project match {
+        case p: NonRenkuProject.WithParent => p.parentResourceId.asEntityId.some
+        case _ => None
+      }
+      JsonLD.arr {
+        JsonLD.entity(
+          project.resourceId.asEntityId,
+          entityTypes,
+          schema / "name"             -> project.name.asJsonLD,
+          renku / "projectPath"       -> project.path.asJsonLD,
+          renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+          schema / "description"      -> project.maybeDescription.asJsonLD,
+          schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+          schema / "creator"          -> project.maybeCreator.asJsonLD,
+          renku / "projectVisibility" -> project.visibility.asJsonLD,
+          schema / "keywords"         -> project.keywords.asJsonLD,
+          schema / "member"           -> project.members.toList.asJsonLD,
+          prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
+        )
+      }
   }
 
   def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
