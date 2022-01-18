@@ -27,6 +27,7 @@ jobs:
       renku-notebooks: ${{ steps.deploy-comment.outputs.renku-notebooks}}
       renku-ui: ${{ steps.deploy-comment.outputs.renku-ui}}
       test-enabled: ${{ steps.deploy-comment.outputs.test-enabled}}
+      persist: ${{ steps.deploy-comment.outputs.persist}}
     steps:
       - id: deploy-comment
         uses: SwissDataScienceCenter/renku-actions/check-pr-description@v0.4.1
