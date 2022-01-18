@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 import KGProjectFinder.KGProjectInfo
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.entities.{Project, ProjectWithParent, ProjectWithoutParent}
+import io.renku.graph.model.entities.{Parent, Project}
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -53,7 +53,7 @@ private object UpdatesCreator extends UpdatesCreator {
     }
 
   private def maybeParentDeletion(project: Project, kgProjectInfo: KGProjectInfo): Option[SparqlQuery] = project match {
-    case p: ProjectWithParent =>
+    case p: Project with Parent =>
       Option.when(kgProjectInfo._2.isEmpty || kgProjectInfo._2.exists(_ != p.parentResourceId)) {
         val resource = project.resourceId.showAs[RdfResource]
         SparqlQuery.of(
@@ -64,21 +64,20 @@ private object UpdatesCreator extends UpdatesCreator {
               |""".stripMargin
         )
       }
-    case _: ProjectWithoutParent => None
+    case _ => None
   }
 
-  private def visibilityDeletion(project: Project, kgProjectInfo: KGProjectInfo) = Option.when(
-    project.visibility != kgProjectInfo._3
-  ) {
-    val resource = project.resourceId.showAs[RdfResource]
-    SparqlQuery.of(
-      name = "transformation - project visibility delete",
-      Prefixes.of(renku -> "renku"),
-      s"""|DELETE { $resource renku:projectVisibility ?visibility }
-          |WHERE  { $resource renku:projectVisibility ?visibility }
-          |""".stripMargin
-    )
-  }
+  private def visibilityDeletion(project: Project, kgProjectInfo: KGProjectInfo) =
+    Option.when(project.visibility != kgProjectInfo._3) {
+      val resource = project.resourceId.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "transformation - project visibility delete",
+        Prefixes.of(renku -> "renku"),
+        s"""|DELETE { $resource renku:projectVisibility ?visibility }
+            |WHERE  { $resource renku:projectVisibility ?visibility }
+            |""".stripMargin
+      )
+    }
 
   private def descriptionDeletion(project: Project, kgProjectInfo: KGProjectInfo) = Option.when(
     (kgProjectInfo._4, project.maybeDescription) match {

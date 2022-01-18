@@ -38,8 +38,8 @@ class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
     "remove all the triples from the storage except for CLI version" in new TestCase {
       loadToStore(
-        anyProjectEntities.generateOne.asJsonLD,
-        anyProjectEntities.generateOne.asJsonLD,
+        anyRenkuProjectEntities.generateOne.asJsonLD,
+        anyRenkuProjectEntities.generateOne.asJsonLD,
         renkuVersionPairs.generateOne.asJsonLD,
         ReProvisioningInfo(ReProvisioningInfo.Status.Running, microserviceBaseUrls.generateOne).asJsonLD
       )

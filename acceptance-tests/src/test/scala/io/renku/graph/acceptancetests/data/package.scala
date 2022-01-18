@@ -37,7 +37,7 @@ package object data extends RdfStoreData {
   val renkuResourcesUrl:   renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
 
   def dataProjects(
-      projectGen:   Gen[testentities.Project],
+      projectGen:   Gen[testentities.RenkuProject],
       commitsCount: CommitsCount = CommitsCount.one
   ): Gen[Project] = for {
     project     <- projectGen
@@ -49,7 +49,7 @@ package object data extends RdfStoreData {
     statistics  <- statisticsObjects.map(_.copy(commitsCount = commitsCount))
   } yield Project(project, id, updatedAt, urls, starsCount, permissions, statistics)
 
-  def dataProjects(project: testentities.Project): Gen[Project] = dataProjects(fixed(project))
+  def dataProjects(project: testentities.RenkuProject): Gen[Project] = dataProjects(fixed(project))
 
   implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl         <- sshUrls

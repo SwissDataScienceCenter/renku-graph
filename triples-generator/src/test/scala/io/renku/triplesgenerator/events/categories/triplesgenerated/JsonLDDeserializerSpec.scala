@@ -49,8 +49,8 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
 
   "deserializeToModel" should {
 
-    "successfully deserialize JsonLD to the model" in new TestCase {
-      val project = anyProjectEntities
+    "successfully deserialize JsonLD to the model - case of a Renku Project" in new TestCase {
+      val project = anyRenkuProjectEntities
         .withDatasets(datasetEntities(provenanceNonModified))
         .withActivities(activityEntities)
         .generateOne
@@ -66,6 +66,24 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
               .arr(project.asJsonLD :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*)
               .flatten
               .fold(throw _, identity)
+          )
+        )
+        .value
+
+      results shouldBe project.to[entities.Project].asRight
+    }
+
+    "successfully deserialize JsonLD to the model - case of a Non-Renku Project" in new TestCase {
+      val project = anyNonRenkuProjectEntities.generateOne
+
+      givenFindProjectInfo(project.path)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
+
+      val Success(results) = deserializer
+        .deserializeToModel(
+          triplesGeneratedEvents.generateOne.copy(
+            project = consumers.Project(projectIds.generateOne, project.path),
+            payload = project.asJsonLD.flatten.fold(throw _, identity)
           )
         )
         .value
@@ -112,22 +130,10 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "fail if no project is found in the JsonLD" in new TestCase {
-      val project = anyProjectEntities
-        .withDatasets(datasetEntities(provenanceNonModified))
-        .withActivities(activityEntities)
-        .generateOne
+      val project = anyRenkuProjectEntities.withDatasets(datasetEntities(provenanceNonModified)).generateOne
 
       givenFindProjectInfo(project.path)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
-
-      val triples = JsonLD
-        .arr(
-          project.activities.map(_.asJsonLD) :::
-            project.activities.map(_.plan.asJsonLD) :::
-            project.datasets.map(_.asJsonLD): _*
-        )
-        .flatten
-        .fold(throw _, identity)
 
       val eventProject = consumers.Project(projectIds.generateOne, project.path)
 
@@ -135,13 +141,13 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .deserializeToModel(
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
-            payload = triples
+            payload = JsonLD.arr(project.datasets.map(_.asJsonLD): _*).flatten.fold(throw _, identity)
           )
         )
         .value
 
       error            shouldBe a[IllegalStateException]
-      error.getMessage shouldBe s"0 Project entities found in the JsonLD for ${eventProject.show}"
+      error.getMessage shouldBe show"0 Project entities found in the JsonLD for $eventProject"
     }
 
     "fail if there are other projects in the JsonLD" in new TestCase {
@@ -206,7 +212,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
       }
 
     "fail if the payload is invalid" in new TestCase {
-      val project = projectEntities(anyVisibility).generateOne
+      val project = renkuProjectEntities(anyVisibility).generateOne
 
       givenFindProjectInfo(project.path)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError](gitLabProjectInfo(project).some))
@@ -217,7 +223,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
           triplesGeneratedEvents.generateOne.copy(
             project = eventProject,
             payload = project
-              .to[entities.ProjectWithoutParent]
+              .to[entities.RenkuProject.WithoutParent]
               .copy(activities =
                 activityEntities
                   .withDateBefore(project.dateCreated)
@@ -232,7 +238,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         .value
 
       error            shouldBe a[IllegalStateException]
-      error.getMessage shouldBe s"Finding Project entity in the JsonLD for ${eventProject.show} failed"
+      error.getMessage shouldBe show"Finding Project entity in the JsonLD for $eventProject failed"
     }
   }
 
@@ -250,8 +256,8 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
       project.members.map(_.to[ProjectMember]),
       project.visibility,
       maybeParentPath = project match {
-        case p: ProjectWithParent    => p.parent.path.some
-        case _: ProjectWithoutParent => None
+        case p: Project with Parent => p.parent.path.some
+        case _ => None
       }
     )
 

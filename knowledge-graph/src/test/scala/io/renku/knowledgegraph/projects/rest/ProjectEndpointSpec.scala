@@ -72,7 +72,7 @@ class ProjectEndpointSpec
           .expects(project.path, maybeAuthUser)
           .returning(project.some.pure[IO])
 
-        val response = getProject(project.path, maybeAuthUser).unsafeRunSync()
+        val response = endpoint.getProject(project.path, maybeAuthUser).unsafeRunSync()
 
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -101,7 +101,7 @@ class ProjectEndpointSpec
         .expects(path, maybeAuthUser)
         .returning(None.pure[IO])
 
-      val response = getProject(path, maybeAuthUser).unsafeRunSync()
+      val response = endpoint.getProject(path, maybeAuthUser).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -122,7 +122,7 @@ class ProjectEndpointSpec
         .expects(path, maybeAuthUser)
         .returning(exception.raiseError[IO, Option[Project]])
 
-      val response = getProject(path, maybeAuthUser).unsafeRunSync()
+      val response = endpoint.getProject(path, maybeAuthUser).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -134,15 +134,11 @@ class ProjectEndpointSpec
   }
 
   private trait TestCase {
-    val projectFinder     = mock[ProjectFinder[IO]]
-    val renkuResourcesUrl = renkuResourcesUrls.generateOne
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val projectFinder         = mock[ProjectFinder[IO]]
+    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val getProject = new ProjectEndpointImpl[IO](
-      projectFinder,
-      renkuResourcesUrl,
-      executionTimeRecorder
-    ).getProject _
+    val endpoint              = new ProjectEndpointImpl[IO](projectFinder, renkuResourcesUrl, executionTimeRecorder)
   }
 
   private implicit val projectEntityDecoder: EntityDecoder[IO, Project] = jsonOf[IO, Project]
@@ -162,7 +158,7 @@ class ProjectEndpointSpec
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
       permissions      <- cursor.downField("permissions").as[Permissions]
       statistics       <- cursor.downField("statistics").as[Statistics]
-      version          <- cursor.downField("version").as[SchemaVersion]
+      maybeVersion     <- cursor.downField("version").as[Option[SchemaVersion]]
     } yield Project(id,
                     path,
                     name,
@@ -176,7 +172,7 @@ class ProjectEndpointSpec
                     starsCount,
                     permissions,
                     statistics,
-                    version
+                    maybeVersion
     )
 
   private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>

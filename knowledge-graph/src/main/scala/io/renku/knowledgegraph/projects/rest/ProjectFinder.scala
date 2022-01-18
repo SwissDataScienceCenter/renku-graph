@@ -30,7 +30,7 @@ import io.renku.graph.tokenrepository.AccessTokenFinder._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.model._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
-import io.renku.knowledgegraph.projects.rest.KGProjectFinder.{KGProject, Parent}
+import io.renku.knowledgegraph.projects.rest.KGProjectFinder.{KGParent, KGProject}
 import org.typelevel.log4cats.Logger
 
 import scala.util.Try
@@ -74,10 +74,10 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel](
     starsCount = gitLabProject.starsCount,
     permissions = gitLabProject.permissions,
     statistics = gitLabProject.statistics,
-    version = kgProject.version
+    maybeVersion = kgProject.maybeVersion
   )
 
-  private implicit class ParentOps(maybeParent: Option[Parent]) {
+  private implicit class ParentOps(maybeParent: Option[KGParent]) {
     lazy val toParentProject: Option[ParentProject] =
       (maybeParent -> maybeParent.flatMap(_.resourceId.as[Try, Path].toOption)) mapN { case (parent, path) =>
         ParentProject(

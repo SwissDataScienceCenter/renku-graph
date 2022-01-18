@@ -49,7 +49,7 @@ class EdgesFinderSpec
     "return all the edges of the given project " +
       "case when the user is not authenticated and the project is public" in new TestCase {
 
-        val exemplarData = LineageExemplarData(projectEntities(visibilityPublic).generateOne)
+        val exemplarData = LineageExemplarData(renkuProjectEntities(visibilityPublic).generateOne)
 
         import exemplarData._
 
@@ -81,12 +81,15 @@ class EdgesFinderSpec
         )
       }
 
-    /** in1 in2 in3 in2 \ / \ / plan plan
-      * | | out1 out2
+    /** in1 in2 in3 in2 
+      *   \ /     \ / 
+     *    plan   plan
+      *     |     |
+     *     out1  out2
       */
     "return all the edges including executions with overridden inputs/outputs" in new TestCase {
 
-      val project = projectEntities(visibilityPublic).generateOne
+      val project = renkuProjectEntities(visibilityPublic).generateOne
 
       val in1  = entityLocations.generateOne
       val in2  = entityLocations.generateOne
@@ -133,7 +136,7 @@ class EdgesFinderSpec
 
     "return None if the project is not public " +
       "case when the user is not a member of the project or not authenticated" in new TestCase {
-        val exemplarData = LineageExemplarData(projectEntities(visibilityNonPublic).generateOne)
+        val exemplarData = LineageExemplarData(renkuProjectEntities(visibilityNonPublic).generateOne)
 
         loadToStore(exemplarData.project)
 
@@ -151,7 +154,7 @@ class EdgesFinderSpec
         val authUser = authUsers.generateOne
 
         val exemplarData = LineageExemplarData(
-          projectEntities(visibilityNonPublic).generateOne.copy(
+          renkuProjectEntities(visibilityNonPublic).generateOne.copy(
             members = Set(personEntities.generateOne.copy(maybeGitLabId = Some(authUser.id)))
           )
         )

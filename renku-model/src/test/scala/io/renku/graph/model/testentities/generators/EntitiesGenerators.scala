@@ -40,7 +40,13 @@ private object Instances {
   implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
 }
 
-trait EntitiesGenerators extends ProjectEntitiesGenerators with ActivityGenerators with DatasetEntitiesGenerators {
+trait EntitiesGenerators
+    extends RenkuProjectEntitiesGenerators
+    with NonRenkuProjectEntitiesGenerators
+    with ProjectEntitiesGenerators
+    with ActivityGenerators
+    with DatasetEntitiesGenerators {
+
   implicit val renkuBaseUrl: RenkuBaseUrl = Instances.renkuBaseUrl
   implicit val gitLabUrl:    GitLabUrl    = Instances.gitLabUrl
   implicit val gitLabApiUrl: GitLabApiUrl = Instances.gitLabApiUrl

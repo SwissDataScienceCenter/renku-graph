@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sortBys
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
-import io.renku.graph.model.testentities.{Dataset, HavingInvalidationTime, Person, Project}
+import io.renku.graph.model.testentities.{Dataset, HavingInvalidationTime, Person, RenkuProject}
 import io.renku.graph.model.{RenkuBaseUrl, testentities}
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.datasets.model._
@@ -37,10 +37,10 @@ package object rest {
   implicit lazy val personToCreator: Person => DatasetCreator =
     person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
 
-  implicit lazy val projectToDatasetProject: Project => DatasetProject =
+  implicit lazy val projectToDatasetProject: RenkuProject => DatasetProject =
     project => DatasetProject(project.path, project.name)
 
-  def internalToNonModified(dataset: Dataset[Dataset.Provenance.Internal], project: Project)(implicit
+  def internalToNonModified(dataset: Dataset[Dataset.Provenance.Internal], project: RenkuProject)(implicit
       renkuBaseUrl:                  RenkuBaseUrl
   ): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
@@ -59,8 +59,8 @@ package object rest {
     dataset.additionalInfo.images
   )
 
-  def importedExternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedExternal], project: Project)(implicit
-      renkuBaseUrl:                          RenkuBaseUrl
+  def importedExternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedExternal], project: RenkuProject)(
+      implicit renkuBaseUrl:                 RenkuBaseUrl
   ): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
@@ -78,8 +78,8 @@ package object rest {
     dataset.additionalInfo.images
   )
 
-  def importedInternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedInternal], project: Project)(implicit
-      renkuBaseUrl:                          RenkuBaseUrl
+  def importedInternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedInternal], project: RenkuProject)(
+      implicit renkuBaseUrl:                 RenkuBaseUrl
   ): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
@@ -97,7 +97,7 @@ package object rest {
     dataset.additionalInfo.images
   )
 
-  def modifiedToModified(dataset: Dataset[Dataset.Provenance.Modified], project: Project)(implicit
+  def modifiedToModified(dataset: Dataset[Dataset.Provenance.Modified], project: RenkuProject)(implicit
       renkuBaseUrl:               RenkuBaseUrl
   ): ModifiedDataset = ModifiedDataset(
     ResourceId(dataset.asEntityId.show),

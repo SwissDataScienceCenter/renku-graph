@@ -51,7 +51,9 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there are Input Parameter Values for non-existing Usage Entities" in {
       val location = entityLocations.generateOne
       val activity =
-        executionPlanners(planEntities(CommandInput.fromLocation(location)), anyProjectEntities.generateOne).generateOne
+        executionPlanners(planEntities(CommandInput.fromLocation(location)),
+                          anyRenkuProjectEntities.generateOne
+        ).generateOne
           .planInputParameterValuesFromChecksum(location -> entityChecksums.generateOne)
           .buildProvenanceUnsafe()
 
@@ -86,7 +88,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
       val location = entityLocations.generateOne
       val activity = executionPlanners(
         planEntities(CommandOutput.fromLocation(location)),
-        anyProjectEntities.generateOne
+        anyRenkuProjectEntities.generateOne
       ).generateOne.buildProvenanceUnsafe()
 
       lazy val replaceEntityLocation: Vector[JsonLD] => JsonLD = { array =>
@@ -117,7 +119,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     }
 
     "fail if there is no Agent entity" in {
-      val activity = executionPlanners(planEntities(), anyProjectEntities.generateOne).generateOne
+      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 
@@ -147,7 +149,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     }
 
     "fail if there is no Author entity" in {
-      val activity = executionPlanners(planEntities(), anyProjectEntities.generateOne).generateOne
+      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 

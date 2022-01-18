@@ -40,9 +40,9 @@ class UpdatesCreatorSpec
   "queriesUnlinkingCreators" should {
 
     "prepare delete query for activity of which author exists in KG but not on the model" in {
-      val kgProject = projectEntities(anyVisibility)
+      val kgProject = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()))
-        .map(_.to[entities.ProjectWithoutParent])
+        .map(_.to[entities.RenkuProject])
         .generateOne
 
       loadToStore(kgProject)
@@ -62,9 +62,9 @@ class UpdatesCreatorSpec
     }
 
     "prepare no queries if there's no author in KG" in {
-      val kgProject = projectEntities(anyVisibility)
+      val kgProject = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()))
-        .map(_.to[entities.ProjectWithoutParent])
+        .map(_.to[entities.RenkuProject])
         .generateOne
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
@@ -73,9 +73,9 @@ class UpdatesCreatorSpec
     }
 
     "prepare no queries if there's no change in Activity author" in {
-      val kgProject = projectEntities(anyVisibility)
+      val kgProject = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()))
-        .map(_.to[entities.ProjectWithoutParent])
+        .map(_.to[entities.RenkuProject])
         .generateOne
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
@@ -87,9 +87,9 @@ class UpdatesCreatorSpec
   "queriesUnlinkingAgent" should {
 
     "prepare delete query for association a person agent which exists in KG but not on the model" in {
-      val kgProject = projectEntities(anyVisibility)
+      val kgProject = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
-        .map(_.to[entities.ProjectWithoutParent])
+        .map(_.to[entities.RenkuProject])
         .generateOne
 
       loadToStore(kgProject)
@@ -112,9 +112,9 @@ class UpdatesCreatorSpec
     }
 
     "prepare no queries for association with SoftwareAgent" in {
-      val kgProject = projectEntities(anyVisibility)
+      val kgProject = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()))
-        .map(_.to[entities.ProjectWithoutParent])
+        .map(_.to[entities.RenkuProject])
         .generateOne
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
@@ -124,9 +124,9 @@ class UpdatesCreatorSpec
     }
 
     "prepare no queries if there's no Person agent in KG" in {
-      val kgProject = projectEntities(anyVisibility)
+      val kgProject = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
-        .map(_.to[entities.ProjectWithoutParent])
+        .map(_.to[entities.RenkuProject])
         .generateOne
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
@@ -135,9 +135,9 @@ class UpdatesCreatorSpec
     }
 
     "prepare no queries if there's no change in association's person agent" in {
-      val kgProject = projectEntities(anyVisibility)
+      val kgProject = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
-        .map(_.to[entities.ProjectWithoutParent])
+        .map(_.to[entities.RenkuProject])
         .generateOne
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))

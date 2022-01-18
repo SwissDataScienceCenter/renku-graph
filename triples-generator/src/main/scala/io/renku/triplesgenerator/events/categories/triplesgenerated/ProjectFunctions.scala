@@ -167,24 +167,30 @@ private object ProjectFunctions extends ProjectFunctions {
   private object Lenses {
     val membersLens = Traversal.fromTraverse[List, Person]
     val projectMembersLens = Lens[Project, List[Person]](_.members.toList)(persons => {
-      case p: ProjectWithoutParent => p.copy(members = persons.toSet)
-      case p: ProjectWithParent    => p.copy(members = persons.toSet)
+      case p: RenkuProject.WithoutParent    => p.copy(members = persons.toSet)
+      case p: RenkuProject.WithParent       => p.copy(members = persons.toSet)
+      case p: NonRenkuProject.WithoutParent => p.copy(members = persons.toSet)
+      case p: NonRenkuProject.WithParent    => p.copy(members = persons.toSet)
     })
     val projectCreatorLens = Lens[Project, Option[Person]](_.maybeCreator)(maybeCreator => {
-      case p: ProjectWithoutParent => p.copy(maybeCreator = maybeCreator)
-      case p: ProjectWithParent    => p.copy(maybeCreator = maybeCreator)
+      case p: RenkuProject.WithoutParent    => p.copy(maybeCreator = maybeCreator)
+      case p: RenkuProject.WithParent       => p.copy(maybeCreator = maybeCreator)
+      case p: NonRenkuProject.WithoutParent => p.copy(maybeCreator = maybeCreator)
+      case p: NonRenkuProject.WithParent    => p.copy(maybeCreator = maybeCreator)
     })
 
     val projectActivitiesLens = Lens[Project, List[Activity]](_.activities)(activities => {
-      case p: ProjectWithoutParent => p.copy(activities = activities)
-      case p: ProjectWithParent    => p.copy(activities = activities)
+      case p: RenkuProject.WithoutParent => p.copy(activities = activities)
+      case p: RenkuProject.WithParent    => p.copy(activities = activities)
+      case p: NonRenkuProject            => p
     })
     val activitiesLens: Traversal[List[Activity], Activity] = Traversal.fromTraverse[List, Activity]
     val activityAuthorLens = Lens[Activity, Person](_.author)(p => a => a.copy(author = p))
 
     val projectDatasetsLens = Lens[Project, List[Dataset[Dataset.Provenance]]](_.datasets)(datasets => {
-      case p: ProjectWithoutParent => p.copy(datasets = datasets)
-      case p: ProjectWithParent    => p.copy(datasets = datasets)
+      case p: RenkuProject.WithoutParent => p.copy(datasets = datasets)
+      case p: RenkuProject.WithParent    => p.copy(datasets = datasets)
+      case p: NonRenkuProject            => p
     })
     val datasetsLens   = Traversal.fromTraverse[List, Dataset[Provenance]]
     val provenanceLens = Lens[Dataset[Provenance], Provenance](_.provenance)(p => d => d.copy(provenance = p))

@@ -55,8 +55,8 @@ class StatsFinderSpec
     "return info about number of objects by types" in new TestCase {
 
       val projectsWithDatasets =
-        anyProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateNonEmptyList().toList
-      val projectsWithActivities = anyProjectEntities
+        anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateNonEmptyList().toList
+      val projectsWithActivities = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()))
         .generateNonEmptyList(minElements = 10, maxElements = 50)
         .toList

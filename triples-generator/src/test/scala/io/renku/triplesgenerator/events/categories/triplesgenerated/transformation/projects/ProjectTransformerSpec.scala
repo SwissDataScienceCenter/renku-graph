@@ -97,7 +97,8 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val step = transformer.createTransformationStep
 
-      step.run(project).value shouldBe exception.raiseError[Try, Either[ProcessingRecoverableError, (Project, Queries)]]
+      step.run(project).value shouldBe exception
+        .raiseError[Try, Either[ProcessingRecoverableError, (RenkuProject, Queries)]]
     }
   }
 
@@ -107,6 +108,6 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     val updatesCreator  = mock[UpdatesCreator]
     val transformer     = new ProjectTransformerImpl[Try](kgProjectFinder, updatesCreator)
 
-    val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
+    val project = renkuProjectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
   }
 }
