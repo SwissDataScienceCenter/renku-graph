@@ -73,7 +73,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
       _ <- prepareRepository(commitEvent)
       result <- right[ProcessingRecoverableError](checkRenkuProject) >>= {
                   case true  => EitherT(cleanUpRepository() >> migrateAndLog(commitEvent).value)
-                  case false => noRenkuProjectPayload(commitEvent)
+                  case false => nonRenkuProjectPayload(commitEvent)
                 }
     } yield result
   }.value
@@ -110,13 +110,18 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
     triples <- renku.graphExport
   } yield triples
 
-  private def noRenkuProjectPayload(commitEvent: CommitEvent): EitherT[F, ProcessingRecoverableError, JsonLD] =
-    rightT[F, ProcessingRecoverableError] {
-      JsonLD.entity(
-        projects.ResourceId(commitEvent.project.path).asEntityId,
-        entities.Project.entityTypes,
-        Map.empty[Property, JsonLD]
-      )
+  private def nonRenkuProjectPayload(commitEvent: CommitEvent): EitherT[F, ProcessingRecoverableError, JsonLD] =
+    EitherT {
+      JsonLD
+        .entity(
+          projects.ResourceId(commitEvent.project.path).asEntityId,
+          entities.Project.entityTypes,
+          Map.empty[Property, JsonLD]
+        )
+        .flatten
+        .fold(_.raiseError[F, Either[ProcessingRecoverableError, JsonLD]],
+              _.asRight[ProcessingRecoverableError].pure[F]
+        )
     }
 
   private def createRepositoryDirectory(projectPath: projects.Path): F[Path] =

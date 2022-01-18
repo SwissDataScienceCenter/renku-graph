@@ -260,14 +260,14 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .returning(IO.unit)
           .atLeastOnce()
 
-        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe
+        triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe JsonLD.arr {
           JsonLD
             .entity(
               projects.ResourceId(commitEvent.project.path).asEntityId,
               entities.Project.entityTypes,
               Map.empty[Property, JsonLD]
             )
-            .asRight
+        }.asRight
       }
 
     s"return $LogWorthyRecoverableError if 'renku graph export' returns one" in new TestCase {
