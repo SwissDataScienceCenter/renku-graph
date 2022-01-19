@@ -22,7 +22,7 @@ import cats.data.ValidatedNel
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.datasets._
-import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternal, ImportedInternalAncestorExternal, ImportedInternalAncestorInternal, Modified}
+import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
 import io.renku.graph.model.{GitLabApiUrl, InvalidationTime, RenkuBaseUrl}
 
@@ -206,6 +206,11 @@ object Dataset {
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(resourceId.asEntityId)
     }
 
+    private[Dataset] sealed trait FixableFailure extends Product with Serializable
+    private[Dataset] object FixableFailure {
+      case object MissingDerivedFrom extends FixableFailure
+    }
+
     private[Dataset] implicit def encoder(implicit
         renkuBaseUrl: RenkuBaseUrl,
         gitLabApiUrl: GitLabApiUrl
@@ -264,7 +269,7 @@ object Dataset {
         )
     }
 
-    private[Dataset] def decoder(identification: Identification): JsonLDDecoder[Provenance] =
+    private[Dataset] def decoder(identification: Identification): JsonLDDecoder[(Provenance, Option[FixableFailure])] =
       JsonLDDecoder.entity(entityTypes) { cursor =>
         import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
         for {
@@ -285,57 +290,64 @@ object Dataset {
             cursor.downField(prov / "wasDerivedFrom").as[Option[DerivedFrom]](decodeOption(DerivedFrom.jsonLDDecoder))
           maybeOriginalIdentifier <- cursor.downField(renku / "originalIdentifier").as[Option[InitialVersion]]
           maybeInvalidationTime   <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-          provenance <- createProvenance(identification, creators.toSet)(maybeDateCreated,
-                                                                         maybeDatePublished,
-                                                                         maybeInternalSameAs,
-                                                                         maybeExternalSameAs,
-                                                                         maybeDerivedFrom,
-                                                                         maybeOriginalIdentifier,
-                                                                         maybeInvalidationTime
-                        )
-        } yield provenance
+          provenanceAndFixableFailure <- createProvenance(identification, creators.toSet)(maybeDateCreated,
+                                                                                          maybeDatePublished,
+                                                                                          maybeInternalSameAs,
+                                                                                          maybeExternalSameAs,
+                                                                                          maybeDerivedFrom,
+                                                                                          maybeOriginalIdentifier,
+                                                                                          maybeInvalidationTime
+                                         )
+        } yield provenanceAndFixableFailure
       }
 
-    private def createProvenance(identification: Identification, creators: Set[Person]): (Option[DateCreated],
-                                                                                          Option[DatePublished],
-                                                                                          Option[InternalSameAs],
-                                                                                          Option[ExternalSameAs],
-                                                                                          Option[DerivedFrom],
-                                                                                          Option[InitialVersion],
-                                                                                          Option[InvalidationTime]
-    ) => Result[Provenance] = {
-      case (Some(dateCreated), None, None, None, None, _, None) =>
-        Internal(identification.resourceId, identification.identifier, dateCreated, creators).asRight
+    private def createProvenance(id: Identification, creators: Set[Person]): (Option[DateCreated],
+                                                                              Option[DatePublished],
+                                                                              Option[InternalSameAs],
+                                                                              Option[ExternalSameAs],
+                                                                              Option[DerivedFrom],
+                                                                              Option[InitialVersion],
+                                                                              Option[InvalidationTime]
+    ) => Result[(Provenance, Option[FixableFailure])] = {
+      case (Some(dateCreated), None, None, None, None, maybeOriginalId, None)
+          if originalIdEqualCurrentId(maybeOriginalId, id) =>
+        (Internal(id.resourceId, id.identifier, dateCreated, creators) -> None).asRight
+      case (Some(dateCreated), None, None, None, None, Some(_), None) =>
+        (Internal(id.resourceId,
+                  id.identifier,
+                  dateCreated,
+                  creators
+        ) -> FixableFailure.MissingDerivedFrom.some).asRight
       case (None, Some(datePublished), None, Some(sameAs), None, maybeOriginalId, None)
-          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
-        ImportedExternal(identification.resourceId, identification.identifier, sameAs, datePublished, creators).asRight
+          if originalIdEqualCurrentId(maybeOriginalId, id) =>
+        (ImportedExternal(id.resourceId, id.identifier, sameAs, datePublished, creators) -> None).asRight
       case (Some(dateCreated), None, Some(sameAs), None, None, maybeOriginalId, None)
-          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
-        ImportedInternalAncestorInternal(identification.resourceId,
-                                         identification.identifier,
-                                         sameAs,
-                                         TopmostSameAs(sameAs),
-                                         dateCreated,
-                                         creators
-        ).asRight
+          if originalIdEqualCurrentId(maybeOriginalId, id) =>
+        (ImportedInternalAncestorInternal(id.resourceId,
+                                          id.identifier,
+                                          sameAs,
+                                          TopmostSameAs(sameAs),
+                                          dateCreated,
+                                          creators
+        ) -> None).asRight
       case (None, Some(datePublished), Some(sameAs), None, None, maybeOriginalId, None)
-          if originalIdEqualCurrentId(maybeOriginalId, identification) =>
-        ImportedInternalAncestorExternal(identification.resourceId,
-                                         identification.identifier,
-                                         sameAs,
-                                         TopmostSameAs(sameAs),
-                                         datePublished,
-                                         creators
-        ).asRight
+          if originalIdEqualCurrentId(maybeOriginalId, id) =>
+        (ImportedInternalAncestorExternal(id.resourceId,
+                                          id.identifier,
+                                          sameAs,
+                                          TopmostSameAs(sameAs),
+                                          datePublished,
+                                          creators
+        ) -> None).asRight
       case (Some(dateCreated), None, None, None, Some(derivedFrom), Some(originalId), maybeInvalidationTime) =>
-        Modified(identification.resourceId,
-                 derivedFrom,
-                 TopmostDerivedFrom(derivedFrom),
-                 originalId,
-                 dateCreated,
-                 creators,
-                 maybeInvalidationTime
-        ).asRight
+        (Modified(id.resourceId,
+                  derivedFrom,
+                  TopmostDerivedFrom(derivedFrom),
+                  originalId,
+                  dateCreated,
+                  creators,
+                  maybeInvalidationTime
+        ) -> None).asRight
       case (maybeDateCreated,
             maybeDatePublished,
             maybeInternalSameAs,
@@ -450,15 +462,31 @@ object Dataset {
   }
 
   implicit lazy val decoder: JsonLDDecoder[Dataset[Provenance]] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
+    import Dataset.Provenance.FixableFailure
+    import Dataset.Provenance.FixableFailure.MissingDerivedFrom
+
+    def fixProvenanceDate(provenanceAndFixableFailure: (Provenance, Option[FixableFailure]),
+                          parts:                       List[DatasetPart]
+    ): Provenance = provenanceAndFixableFailure match {
+      case (prov: Provenance.Internal, Some(MissingDerivedFrom)) =>
+        prov.copy(date = (prov.date :: parts.map(_.dateCreated)).min)
+      case (prov, _) => prov
+    }
+
     for {
-      identification    <- cursor.as[Identification]
-      provenance        <- cursor.as[Provenance](Provenance.decoder(identification))
-      additionalInfo    <- cursor.as[AdditionalInfo]
-      parts             <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
-      publicationEvents <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification)))
+      identification              <- cursor.as[Identification]
+      provenanceAndFixableFailure <- cursor.as(Provenance.decoder(identification))
+      additionalInfo              <- cursor.as[AdditionalInfo]
+      parts                       <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
+      publicationEvents           <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification)))
       dataset <-
         Dataset
-          .from(identification, provenance, additionalInfo, parts, publicationEvents)
+          .from(identification,
+                fixProvenanceDate(provenanceAndFixableFailure, parts),
+                additionalInfo,
+                parts,
+                publicationEvents
+          )
           .toEither
           .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
     } yield dataset
