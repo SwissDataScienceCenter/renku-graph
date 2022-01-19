@@ -86,7 +86,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "treat DS with originalIdentifier but no derivedFrom as Internal -" +
-      "drop originalIdentifier and move parts' dates to the DS creation date" in {
+      "drop originalIdentifier and move its dateCreated to the oldest parts' date" in {
         val dataset = {
           val ds    = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
           val part1 = datasetPartEntities(ds.provenance.date.instant).generateOne
@@ -95,7 +95,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           ds.copy(parts = List(part1, part2))
         }.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
 
-        assume(dataset.parts.exists(_.dateCreated.instant isBefore dataset.provenance.date.instant))
+        assert(dataset.parts.exists(_.dateCreated.instant isBefore dataset.provenance.date.instant))
 
         val datasetJson = parse {
           dataset.asJsonLD.toJson
@@ -109,12 +109,33 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         datasetJson.cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
           dataset.copy(
             publicationEvents = Nil,
-            parts = dataset.parts.map(part =>
-              if (part.dateCreated.instant isBefore dataset.provenance.date.instant)
-                part.copy(dateCreated = dataset.provenance.date)
-              else part
-            )
+            provenance = dataset.provenance.copy(date = dataset.parts.map(_.dateCreated).min)
           )
+        ).asRight
+      }
+
+    "treat DS with originalIdentifier but no derivedFrom as Internal -" +
+      "drop originalIdentifier and keep its dateCreated if parts' dates are younger than the DS" in {
+        val dataset = {
+          val ds    = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+          val part1 = datasetPartEntities(ds.provenance.date.instant).generateOne
+          val part2 = datasetPartEntities(ds.provenance.date.instant).generateOne
+          ds.copy(parts = List(part1, part2))
+        }.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+
+        assert((dataset.provenance.date.instant compareTo dataset.parts.map(_.dateCreated).min.instant) <= 0)
+
+        val datasetJson = parse {
+          dataset.asJsonLD.toJson
+            .deepMerge(
+              Json.obj(
+                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetInitialVersions.generateOne.show}}"""
+              )
+            )
+        }.flatMap(_.flatten).fold(throw _, identity)
+
+        datasetJson.cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
+          dataset.copy(publicationEvents = Nil)
         ).asRight
       }
 

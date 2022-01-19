@@ -465,13 +465,12 @@ object Dataset {
     import Dataset.Provenance.FixableFailure
     import Dataset.Provenance.FixableFailure.MissingDerivedFrom
 
-    def fix(parts: List[DatasetPart]): ((Provenance, Option[FixableFailure])) => List[DatasetPart] = {
+    def fixProvenanceDate(provenanceAndFixableFailure: (Provenance, Option[FixableFailure]),
+                          parts:                       List[DatasetPart]
+    ): Provenance = provenanceAndFixableFailure match {
       case (prov: Provenance.Internal, Some(MissingDerivedFrom)) =>
-        parts.map { part =>
-          if (part.dateCreated.instant isBefore prov.date.instant) part.copy(dateCreated = prov.date)
-          else part
-        }
-      case _ => parts
+        prov.copy(date = (prov.date :: parts.map(_.dateCreated)).min)
+      case (prov, _) => prov
     }
 
     for {
@@ -483,9 +482,9 @@ object Dataset {
       dataset <-
         Dataset
           .from(identification,
-                provenanceAndFixableFailure._1,
+                fixProvenanceDate(provenanceAndFixableFailure, parts),
                 additionalInfo,
-                fix(parts)(provenanceAndFixableFailure),
+                parts,
                 publicationEvents
           )
           .toEither
