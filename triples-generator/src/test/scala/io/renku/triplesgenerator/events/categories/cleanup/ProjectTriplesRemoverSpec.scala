@@ -48,7 +48,7 @@ class ProjectTriplesRemoverSpec
   "removeTriples" should {
 
     "remove all activities, datasets and their dependant entities, of a project and the project itself" in new TestCase {
-      forAll(projectEntitiesWithDatasetsAndActivities) { projectData =>
+      forAll(renkuProjectEntitiesWithDatasetsAndActivities) { projectData =>
         loadToStore(projectData.asJsonLD)
 
         projectTriplesRemover.removeTriples(projectData.path).unsafeRunSync()
@@ -59,7 +59,7 @@ class ProjectTriplesRemoverSpec
 
     "remove all entities which are linked only to the current project " +
       "and the project itself" in new TestCase {
-        forAll(projectEntitiesWithDatasetsAndActivities) { project =>
+        forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
           val (projectData, child) = project.forkOnce()
 
           loadToStore(projectData.asJsonLD, child.asJsonLD)
@@ -72,7 +72,8 @@ class ProjectTriplesRemoverSpec
       }
     "update the hierarchy of the datasets and remove all entities which are linked only to the current project " +
       "of a project and the project itself - case when the removed dataset is in the middle of the hierarchy" in new TestCase {
-        val topProject = projectEntities(anyVisibility).withDatasets(datasetEntities(provenanceNonModified)).generateOne
+        val topProject =
+          renkuProjectEntities(anyVisibility).withDatasets(datasetEntities(provenanceNonModified)).generateOne
         val topDataset = topProject.datasets.head
 
         val projectToDelete =
@@ -99,7 +100,7 @@ class ProjectTriplesRemoverSpec
       "of a project and the project itself - case when the removed dataset is topmost dataset in the hierarchy" in new TestCase {
 
         val projectToDelete =
-          projectEntities(anyVisibility).withDatasets(datasetEntities(provenanceInternal)).generateOne
+          renkuProjectEntities(anyVisibility).withDatasets(datasetEntities(provenanceInternal)).generateOne
         val topDataset = projectToDelete.datasets.head
 
         val project = projectWithImportingDataset(topDataset.identification.identifier)().generateOne
@@ -132,10 +133,10 @@ class ProjectTriplesRemoverSpec
     "update the hierarchy of the datasets and remove all entities which are linked only to the current project " +
       "of a project and the project itself - case when the removed dataset is modified and imported in a different project" in new TestCase {
         val topProject =
-          projectEntities(anyVisibility).withDatasets(datasetEntities(provenanceInternal)).generateOne
+          renkuProjectEntities(anyVisibility).withDatasets(datasetEntities(provenanceInternal)).generateOne
         val topDataset = topProject.datasets.head
 
-        val (_ ::~ modifiedDataset, projectToDelete) = projectEntities(anyVisibility)
+        val (_ ::~ modifiedDataset, projectToDelete) = renkuProjectEntities(anyVisibility)
           .addDatasetAndModification(datasetEntities(provenanceInternal))
           .generateOne
 
@@ -164,7 +165,7 @@ class ProjectTriplesRemoverSpec
   private def projectWithImportingDataset(sameAs:         Identifier,
                                           minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
   )(topmostSameAs:                                        Identifier = sameAs) =
-    projectEntities(anyVisibility, minDateCreated)
+    renkuProjectEntities(anyVisibility, minDateCreated)
       .withDatasets(
         datasetEntities(
           provenanceImportedInternalAncestorInternal(

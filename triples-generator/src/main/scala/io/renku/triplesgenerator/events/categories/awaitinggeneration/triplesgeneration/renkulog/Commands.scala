@@ -48,14 +48,16 @@ private object Commands {
   object RepositoryPath extends TinyTypeFactory[RepositoryPath](new RepositoryPath(_))
 
   trait GitLabRepoUrlFinder[F[_]] {
-    def findRepositoryUrl(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): F[ServiceUrl]
+    def findRepositoryUrl(projectPath: projects.Path)(implicit maybeAccessToken: Option[AccessToken]): F[ServiceUrl]
   }
 
   class GitLabRepoUrlFinderImpl[F[_]: MonadThrow](gitLabUrl: GitLabUrl) extends GitLabRepoUrlFinder[F] {
 
     import java.net.URL
 
-    override def findRepositoryUrl(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): F[ServiceUrl] =
+    override def findRepositoryUrl(projectPath: projects.Path)(implicit
+        maybeAccessToken:                       Option[AccessToken]
+    ): F[ServiceUrl] =
       merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectPath)
 
     private lazy val findUrlTokenPart: Option[AccessToken] => String = {
@@ -189,8 +191,8 @@ private object Commands {
   }
 
   trait Renku[F[_]] {
-    def migrate(commitEvent:                  CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit]
-    def export(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD]
+    def migrate(commitEvent:            CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit]
+    def graphExport(implicit directory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD]
   }
 
   object Renku {
@@ -214,11 +216,11 @@ private object Commands {
           ).raiseError[F, Unit]
         }
 
-    override def export(implicit destinationDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] =
+    override def graphExport(implicit directory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] =
       EitherT {
         {
           for {
-            triplesAsString <- MonadThrow[F].catchNonFatal(renkuExport(destinationDirectory.value).out.string.trim)
+            triplesAsString <- MonadThrow[F].catchNonFatal(renkuExport(directory.value).out.string.trim)
             wrappedTriples  <- MonadThrow[F].fromEither(parse(triplesAsString))
           } yield wrappedTriples.asRight[ProcessingRecoverableError]
         }.recoverWith {

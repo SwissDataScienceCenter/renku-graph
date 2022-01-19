@@ -30,6 +30,7 @@ import io.renku.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -44,7 +45,7 @@ class KGProjectFinderSpec
   "findProject" should {
 
     "return details of the project with the given path when there's no parent" in new TestCase {
-      forAll(projectEntities(anyVisibility)) { project =>
+      forAll(Gen.oneOf(renkuProjectEntities(anyVisibility), nonRenkuProjectEntities(anyVisibility))) { project =>
         loadToStore(anyProjectEntities.generateOne, project)
 
         kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
@@ -53,7 +54,9 @@ class KGProjectFinderSpec
     }
 
     "return details of the project with the given path if it has a parent project - public projects" in new TestCase {
-      forAll(projectWithParentEntities(visibilityPublic)) { project =>
+      forAll(
+        Gen.oneOf(renkuProjectWithParentEntities(visibilityPublic), nonRenkuProjectWithParentEntities(visibilityPublic))
+      ) { project =>
         loadToStore(project, project.parent)
 
         kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
@@ -64,12 +67,14 @@ class KGProjectFinderSpec
     "return details of the project with the given path if it has a parent project - non-public projects" in new TestCase {
       val user         = authUsers.generateOne
       val userAsMember = personEntities.generateOne.copy(maybeGitLabId = user.id.some)
-      val project      = projectWithParentEntities(visibilityNonPublic).generateOne.copy(members = Set(userAsMember))
+      val project = Gen
+        .oneOf(
+          renkuProjectWithParentEntities(visibilityNonPublic).map(_.copy(members = Set(userAsMember))),
+          nonRenkuProjectWithParentEntities(visibilityNonPublic).map(_.copy(members = Set(userAsMember)))
+        )
+        .generateOne
 
-      val parent: Project = project.parent match {
-        case p: ProjectWithParent    => p.copy(members = Set(userAsMember))
-        case p: ProjectWithoutParent => p.copy(members = Set(userAsMember))
-      }
+      val parent = replaceMembers(Set(userAsMember))(project.parent)
 
       loadToStore(project, parent)
 
@@ -80,14 +85,18 @@ class KGProjectFinderSpec
     "return details of the project with the given path without info about the parent " +
       "if the user has no rights to access the parent project" in new TestCase {
         val user = authUsers.generateOne
-        val project = projectWithParentEntities(visibilityNonPublic).generateOne.copy(
-          members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
-        )
+        val project = Gen
+          .oneOf(
+            renkuProjectWithParentEntities(visibilityNonPublic).map(
+              _.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
+            ),
+            nonRenkuProjectWithParentEntities(visibilityNonPublic).map(
+              _.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
+            )
+          )
+          .generateOne
 
-        val parent: Project = project.parent match {
-          case p: ProjectWithParent    => p.copy(members = Set.empty)
-          case p: ProjectWithoutParent => p.copy(members = Set.empty)
-        }
+        val parent = replaceMembers(Set.empty)(project.parent)
 
         loadToStore(project, parent)
 
@@ -105,5 +114,12 @@ class KGProjectFinderSpec
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
     val kgProjectFinder      = new KGProjectFinderImpl[IO](rdfStoreConfig, timeRecorder)
+  }
+
+  private def replaceMembers(members: Set[Person]): Project => Project = {
+    case p: RenkuProject.WithParent       => p.copy(members = members)
+    case p: RenkuProject.WithoutParent    => p.copy(members = members)
+    case p: NonRenkuProject.WithParent    => p.copy(members = members)
+    case p: NonRenkuProject.WithoutParent => p.copy(members = members)
   }
 }

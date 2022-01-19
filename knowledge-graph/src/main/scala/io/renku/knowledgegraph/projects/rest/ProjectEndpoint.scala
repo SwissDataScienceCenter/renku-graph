@@ -28,6 +28,7 @@ import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.json.JsonOps._
 import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.knowledgegraph.projects.model._
 import io.renku.logging.ExecutionTimeRecorder
@@ -50,9 +51,10 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
     with ProjectEndpoint[F] {
 
   import executionTimeRecorder._
+  import io.circe.Encoder
   import io.circe.literal._
   import io.circe.syntax._
-  import io.circe.{Encoder, Json}
+  import io.renku.tinytypes.json.TinyTypeEncoders._
   import org.http4s.circe._
 
   def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]] = measureExecutionTime {
@@ -62,19 +64,16 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
       .recoverWith(httpResult(path))
   } map logExecutionTimeWhen(finishedSuccessfully(path))
 
-  private def toHttpResult(
-      path: projects.Path
-  ): Option[Project] => F[Response[F]] = {
+  private def toHttpResult(path: projects.Path): Option[Project] => F[Response[F]] = {
     case None          => NotFound(InfoMessage(s"No '$path' project found"))
     case Some(project) => Ok(project.asJson)
   }
 
-  private def httpResult(
-      path: projects.Path
-  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(s"Finding '$path' project failed")
-    Logger[F].error(exception)(errorMessage.value)
-    InternalServerError(errorMessage)
+  private def httpResult(path: projects.Path): PartialFunction[Throwable, F[Response[F]]] = {
+    case NonFatal(exception) =>
+      val errorMessage = ErrorMessage(s"Finding '$path' project failed")
+      Logger[F].error(exception)(errorMessage.value)
+      InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[F], String] = {
@@ -84,57 +83,57 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
 
   private implicit lazy val projectEncoder: Encoder[Project] = Encoder.instance[Project] { project =>
     json"""{
-      "identifier": ${project.id.value},
-      "path":       ${project.path.value},
-      "name":       ${project.name.value},
-      "visibility": ${project.visibility.value},
+      "identifier": ${project.id},
+      "path":       ${project.path},
+      "name":       ${project.name},
+      "visibility": ${project.visibility},
       "created":    ${project.created},
-      "updatedAt":  ${project.updatedAt.value},
+      "updatedAt":  ${project.updatedAt},
       "urls":       ${project.urls},
       "forking":    ${project.forking},
-      "keywords":   ${project.keywords.map(_.value).toList.sorted},
-      "starsCount": ${project.starsCount.value},
+      "keywords":   ${project.keywords.toList.sorted},
+      "starsCount": ${project.starsCount},
       "permissions":${project.permissions},
-      "statistics": ${project.statistics},
-      "version":    ${project.version.value}
+      "statistics": ${project.statistics}
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
-    ) deepMerge (project.maybeDescription.map(desc => json"""{"description": ${desc.value}}""") getOrElse Json.obj())
+    ).addIfDefined("description" -> project.maybeDescription)
+      .addIfDefined("version" -> project.maybeVersion)
   }
 
   private implicit lazy val creatorEncoder: Encoder[Creator] = Encoder.instance[Creator] { creator =>
     json"""{
-      "name":  ${creator.name.value}
-    }""" deepMerge (creator.maybeEmail.map(email => json"""{"email": ${email.value}}""") getOrElse Json.obj())
+      "name":  ${creator.name}
+    }""" addIfDefined ("email" -> creator.maybeEmail)
   }
 
   private implicit lazy val urlsEncoder: Encoder[Urls] = Encoder.instance[Urls] { urls =>
     json"""{
-      "ssh":    ${urls.ssh.value},
-      "http":   ${urls.http.value},
-      "web":    ${urls.web.value}
-    }""" deepMerge (urls.maybeReadme.map(readme => json"""{"readme": ${readme.value}}""") getOrElse Json.obj())
+      "ssh":    ${urls.ssh},
+      "http":   ${urls.http},
+      "web":    ${urls.web}
+    }""" addIfDefined ("readme" -> urls.maybeReadme)
   }
 
   private implicit lazy val forkingEncoder: Encoder[Forking] = Encoder.instance[Forking] { forks =>
     json"""{
-      "forksCount": ${forks.forksCount.value}
-    }""" deepMerge (forks.maybeParent.map(parent => json"""{"parent": $parent}""") getOrElse Json.obj())
+      "forksCount": ${forks.forksCount}
+    }""" addIfDefined ("parent" -> forks.maybeParent)
   }
 
   private implicit lazy val parentProjectEncoder: Encoder[ParentProject] = Encoder.instance[ParentProject] { parent =>
     json"""{
-      "path":    ${parent.path.value},
-      "name":    ${parent.name.value},
+      "path":    ${parent.path},
+      "name":    ${parent.name},
       "created": ${parent.created}
     }"""
   }
 
   private implicit lazy val creationEncoder: Encoder[Creation] = Encoder.instance[Creation] { created =>
     json"""{
-      "dateCreated": ${created.date.value}
-    }""" deepMerge (created.maybeCreator.map(creator => json"""{"creator": $creator}""") getOrElse Json.obj())
+      "dateCreated": ${created.date}
+    }""" addIfDefined ("creator" -> created.maybeCreator)
   }
 
   private implicit lazy val permissionsEncoder: Encoder[Permissions] = Encoder.instance[Permissions] {
@@ -161,11 +160,11 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
 
   private implicit lazy val statisticsEncoder: Encoder[Statistics] = Encoder.instance[Statistics] { stats =>
     json"""{
-      "commitsCount":     ${stats.commitsCount.value},
-      "storageSize":      ${stats.storageSize.value},
-      "repositorySize":   ${stats.repositorySize.value},
-      "lfsObjectsSize":   ${stats.lsfObjectsSize.value},
-      "jobArtifactsSize": ${stats.jobArtifactsSize.value}
+      "commitsCount":     ${stats.commitsCount},
+      "storageSize":      ${stats.storageSize},
+      "repositorySize":   ${stats.repositorySize},
+      "lfsObjectsSize":   ${stats.lsfObjectsSize},
+      "jobArtifactsSize": ${stats.jobArtifactsSize}
     }"""
   }
 }

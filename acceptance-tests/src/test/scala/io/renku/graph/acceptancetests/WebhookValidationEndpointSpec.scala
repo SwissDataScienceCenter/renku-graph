@@ -36,7 +36,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
   Feature("Existence of a Graph Services hook can be validated") {
 
     Scenario("There's a Graph Services hook on a Public project in GitLab") {
-      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount.zero).generateOne
+      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.zero).generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
@@ -56,7 +56,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
     Scenario("There's no Graph Services hook on a Public project in GitLab") {
 
-      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount.zero).generateOne
+      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.zero).generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()
@@ -76,7 +76,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
     Scenario("There's a Graph Services hook on a non-public project in GitLab") {
 
-      val project = dataProjects(projectEntities(visibilityNonPublic)).generateOne
+      val project = dataProjects(renkuProjectEntities(visibilityNonPublic)).generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()

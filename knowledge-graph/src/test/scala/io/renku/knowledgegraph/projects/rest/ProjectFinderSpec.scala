@@ -239,6 +239,6 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       starsCount = gitLabProject.starsCount,
       permissions = gitLabProject.permissions,
       statistics = gitLabProject.statistics,
-      version = kgProject.version
+      maybeVersion = kgProject.maybeVersion
     )
 }

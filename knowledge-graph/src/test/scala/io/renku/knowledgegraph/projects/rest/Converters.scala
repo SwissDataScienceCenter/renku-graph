@@ -29,7 +29,7 @@ private object Converters extends Converters
 private trait Converters {
 
   implicit lazy val entitiesToKGProject: Project => KGProject = {
-    case project: ProjectWithParent =>
+    case project: RenkuProject.WithParent =>
       KGProject(
         project.path,
         project.name,
@@ -37,12 +37,12 @@ private trait Converters {
                         project.maybeCreator.map(person => ProjectCreator(person.maybeEmail, person.name))
         ),
         project.visibility,
-        project.parent.to[Parent].some,
-        project.version,
+        project.parent.to[KGParent].some,
+        project.version.some,
         project.maybeDescription,
         project.keywords
       )
-    case project: Project =>
+    case project: RenkuProject.WithoutParent =>
       KGProject(
         project.path,
         project.name,
@@ -51,14 +51,41 @@ private trait Converters {
         ),
         project.visibility,
         maybeParent = None,
-        project.version,
+        project.version.some,
         project.maybeDescription,
         project.keywords
       )
+    case project: NonRenkuProject.WithParent =>
+      KGProject(
+        project.path,
+        project.name,
+        ProjectCreation(project.dateCreated,
+                        project.maybeCreator.map(person => ProjectCreator(person.maybeEmail, person.name))
+        ),
+        project.visibility,
+        project.parent.to[KGParent].some,
+        maybeVersion = None,
+        project.maybeDescription,
+        project.keywords
+      )
+    case project: NonRenkuProject.WithoutParent =>
+      KGProject(
+        project.path,
+        project.name,
+        ProjectCreation(project.dateCreated,
+                        project.maybeCreator.map(person => ProjectCreator(person.maybeEmail, person.name))
+        ),
+        project.visibility,
+        maybeParent = None,
+        maybeVersion = None,
+        project.maybeDescription,
+        project.keywords
+      )
+    case other => throw new IllegalArgumentException(s"Project of unsupported type $other")
   }
 
-  implicit lazy val entitiesToParent: Project => Parent = project =>
-    Parent(
+  implicit lazy val entitiesToParent: Project => KGParent = project =>
+    KGParent(
       projects.ResourceId(project.asEntityId),
       project.name,
       ProjectCreation(project.dateCreated,

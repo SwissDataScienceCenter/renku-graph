@@ -30,7 +30,7 @@ import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisibility, projectEntities}
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisibility, renkuProjectEntities}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.jsonld.syntax._
@@ -50,7 +50,7 @@ class EventsResourceSpec
     Scenario("As a user I would like to see all events from the project with the given path") {
       val commits:              List[events.CommitId] = commitIds.generateNonEmptyList(maxElements = 6).toList
       implicit val accessToken: AccessToken           = accessTokens.generateOne
-      val project = dataProjects(projectEntities(anyVisibility), CommitsCount(commits.size)).generateOne
+      val project = dataProjects(renkuProjectEntities(anyVisibility), CommitsCount(commits.size)).generateOne
 
       When("there are no events for the given project in EL")
       Then("the resource should return OK with an empty array")

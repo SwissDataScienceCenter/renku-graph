@@ -213,7 +213,7 @@ object ExecutionPlanner {
 
   private type ActivityData = (activities.StartTime, Person, CliVersion)
 
-  def of(plan: Plan, activityTime: activities.StartTime, author: Person, project: Project): ExecutionPlanner =
+  def of(plan: Plan, activityTime: activities.StartTime, author: Person, project: RenkuProject): ExecutionPlanner =
     of(plan, activityTime, author, project.agent, project.topAncestorDateCreated)
 
   def of(plan:               Plan,

@@ -45,11 +45,11 @@ class ProjectDatasetsFinderSpec
 
     "return the very last modification of a dataset for the given project" in new TestCase {
       val (original ::~ modification1, project) =
-        projectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+        renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
       val (modification2, projectComplete) = project.addDataset(modification1.createModification())
 
       loadToStore(
-        projectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne._2,
+        renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne._2,
         projectComplete
       )
 
@@ -67,7 +67,7 @@ class ProjectDatasetsFinderSpec
     }
 
     "return non-modified datasets and the very last modifications of project's datasets" in new TestCase {
-      val (dataset1 ::~ dataset2 ::~ modified2, project) = projectEntities(anyVisibility)
+      val (dataset1 ::~ dataset2 ::~ modified2, project) = renkuProjectEntities(anyVisibility)
         .addDataset(datasetEntities(provenanceImportedExternal))
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .generateOne
@@ -94,9 +94,9 @@ class ProjectDatasetsFinderSpec
 
     "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
       val (original, originalProject) =
-        anyProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+        anyRenkuProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
       val (dataset1 ::~ dataset2, project) =
-        anyProjectEntities.importDataset(original).importDataset(original).generateOne
+        anyRenkuProjectEntities.importDataset(original).importDataset(original).generateOne
 
       assume(dataset1.provenance.topmostSameAs == dataset2.provenance.topmostSameAs)
       assume(dataset1.provenance.topmostSameAs == original.provenance.topmostSameAs)
@@ -126,7 +126,7 @@ class ProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset" in new TestCase {
-      val (_ ::~ _ ::~ dataset2, project) = projectEntities(anyVisibility)
+      val (_ ::~ _ ::~ dataset2, project) = renkuProjectEntities(anyVisibility)
         .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
@@ -146,7 +146,7 @@ class ProjectDatasetsFinderSpec
 
     "not returned deleted dataset when its latest version was deleted" in new TestCase {
       val (_ ::~ modification, project) =
-        projectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+        renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
 
       loadToStore(project.addDatasets(modification.invalidateNow))
 

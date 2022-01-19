@@ -49,14 +49,14 @@ class UpdatesCreatorSpec
       "select one the dataset with the oldest date " +
       "and update all datasets which have topmostSameAs pointing to the deleted DS with the selected resourceId" in {
         val grandparent  = datasetEntities(provenanceInternal).decoupledFromProject.generateOne.copy(parts = Nil)
-        val (parent1, _) = anyProjectEntities.importDataset(grandparent).generateOne
-        val (child1, _)  = anyProjectEntities.importDataset(parent1).generateOne
+        val (parent1, _) = anyRenkuProjectEntities.importDataset(grandparent).generateOne
+        val (child1, _)  = anyRenkuProjectEntities.importDataset(parent1).generateOne
         val parent2 = {
-          val (ds, _) = anyProjectEntities.importDataset(grandparent).generateOne
+          val (ds, _) = anyRenkuProjectEntities.importDataset(grandparent).generateOne
           provenanceLens[Dataset.Provenance.ImportedInternalAncestorInternal]
             .modify(_.copy(date = datasetCreatedDates(min = parent1.provenance.date.instant).generateOne))(ds)
         }
-        val (child2, _) = anyProjectEntities.importDataset(parent2).generateOne
+        val (child2, _) = anyRenkuProjectEntities.importDataset(parent2).generateOne
 
         val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
         val entitiesParent1 = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
@@ -108,14 +108,14 @@ class UpdatesCreatorSpec
       "find datasets which have sameAs pointing to the deleted dataset " +
       "update their sameAs to their topmostSameAs" in {
         val grandparent = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne.copy(parts = Nil)
-        val (parent1, _) = anyProjectEntities.importDataset(grandparent).generateOne
-        val (child1, _)  = anyProjectEntities.importDataset(parent1).generateOne
+        val (parent1, _) = anyRenkuProjectEntities.importDataset(grandparent).generateOne
+        val (child1, _)  = anyRenkuProjectEntities.importDataset(parent1).generateOne
         val parent2 = {
-          val (ds, _) = anyProjectEntities.importDataset(grandparent).generateOne
+          val (ds, _) = anyRenkuProjectEntities.importDataset(grandparent).generateOne
           provenanceLens[Dataset.Provenance.ImportedInternalAncestorExternal]
             .modify(_.copy(date = datasetPublishedDates(parent1.provenance.date).generateOne))(ds)
         }
-        val (child2, _) = anyProjectEntities.importDataset(parent2).generateOne
+        val (child2, _) = anyRenkuProjectEntities.importDataset(parent2).generateOne
 
         val entitiesGrandparent = grandparent.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
         val entitiesParent1 = parent1.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
@@ -193,9 +193,9 @@ class UpdatesCreatorSpec
         s"in case of $datasetType dataset, " +
         "find datasets which have sameAs pointing to the deleted dataset " +
         "update their sameAs to the deleted dataset sameAs" in {
-          val (parent, _) = anyProjectEntities.importDataset(grandparent)(importedInternal).generateOne
-          val (child1, _) = anyProjectEntities.importDataset(parent)(importedInternal).generateOne
-          val (child2, _) = anyProjectEntities.importDataset(parent)(importedInternal).generateOne
+          val (parent, _) = anyRenkuProjectEntities.importDataset(grandparent)(importedInternal).generateOne
+          val (child1, _) = anyRenkuProjectEntities.importDataset(parent)(importedInternal).generateOne
+          val (child2, _) = anyRenkuProjectEntities.importDataset(parent)(importedInternal).generateOne
 
           val entitiesGrandparent =
             grandparent.widen[Dataset.Provenance].to[entities.Dataset[entities.Dataset.Provenance]]

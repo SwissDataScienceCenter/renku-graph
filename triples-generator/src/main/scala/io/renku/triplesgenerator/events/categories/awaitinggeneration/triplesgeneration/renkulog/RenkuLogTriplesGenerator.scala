@@ -19,14 +19,15 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
 import cats.data.EitherT
+import cats.data.EitherT._
 import cats.effect.Async
 import cats.effect.implicits._
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.projects
+import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import io.renku.graph.model.{RenkuBaseUrl, entities, projects}
 import io.renku.http.client.AccessToken
-import io.renku.jsonld.JsonLD
+import io.renku.jsonld.{JsonLD, Property}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl, RepositoryPath}
@@ -36,12 +37,13 @@ import org.typelevel.log4cats.Logger
 import java.security.SecureRandom
 
 private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[renkulog] (
-    gitRepoUrlFinder: GitLabRepoUrlFinder[F],
-    renku:            Commands.Renku[F],
-    file:             Commands.File[F],
-    git:              Commands.Git[F],
-    randomLong:       () => Long
-) extends TriplesGenerator[F] {
+    gitRepoUrlFinder:    GitLabRepoUrlFinder[F],
+    renku:               Commands.Renku[F],
+    file:                Commands.File[F],
+    git:                 Commands.Git[F],
+    randomLong:          () => Long
+)(implicit renkuBaseUrl: RenkuBaseUrl)
+    extends TriplesGenerator[F] {
 
   private val applicative = Applicative[F]
 
@@ -49,6 +51,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   import applicative._
   import file._
   import gitRepoUrlFinder._
+  import io.renku.jsonld.syntax._
 
   private val workDirectory: Path = root / "tmp"
   private val repositoryDirectoryFinder = ".*/(.*)$".r
@@ -67,9 +70,11 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
       repoDirectory:                             RepositoryPath
   ): F[Either[ProcessingRecoverableError, JsonLD]] = {
     for {
-      _      <- prepareRepository(commitEvent)
-      _      <- EitherT.liftF(cleanUpRepository())
-      result <- migrateAndLog(commitEvent)
+      _ <- prepareRepository(commitEvent)
+      result <- right[ProcessingRecoverableError](checkRenkuProject) >>= {
+                  case true  => EitherT(cleanUpRepository() >> migrateAndLog(commitEvent).value)
+                  case false => nonRenkuProjectPayload(commitEvent)
+                }
     } yield result
   }.value
 
@@ -77,14 +82,17 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
       maybeAccessToken:                      Option[AccessToken],
       repoDirectory:                         RepositoryPath
   ): EitherT[F, ProcessingRecoverableError, Unit] = for {
-    repositoryUrl <- EitherT.liftF(findRepositoryUrl(commitEvent.project.path, maybeAccessToken))
-    _             <- git.clone(repositoryUrl, workDirectory)
-    _             <- EitherT.liftF(git.checkout(commitEvent.commitId))
+    repositoryUrl <- liftF(findRepositoryUrl(commitEvent.project.path))
+    _             <- git clone (repositoryUrl, workDirectory)
+    _             <- liftF(git checkout commitEvent.commitId)
   } yield ()
 
-  private def cleanUpRepository()(implicit repoDirectory: RepositoryPath) = {
+  private def checkRenkuProject(implicit repoDirectory: RepositoryPath): F[Boolean] =
+    file.exists(repoDirectory.value / ".renku")
+
+  private def cleanUpRepository()(implicit repoDirectory: RepositoryPath): F[Unit] = {
     val gitAttributeFilePath = repoDirectory.value / gitAttributeFileName
-    file.exists(gitAttributeFilePath).flatMap {
+    file.exists(gitAttributeFilePath) >>= {
       case false => MonadThrow[F].unit
       case true =>
         for {
@@ -98,9 +106,23 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   private def migrateAndLog(
       commitEvent:          CommitEvent
   )(implicit repoDirectory: RepositoryPath): EitherT[F, ProcessingRecoverableError, JsonLD] = for {
-    _       <- EitherT.liftF(renku migrate commitEvent)
-    triples <- renku.`export`
+    _       <- liftF(renku migrate commitEvent)
+    triples <- renku.graphExport
   } yield triples
+
+  private def nonRenkuProjectPayload(commitEvent: CommitEvent): EitherT[F, ProcessingRecoverableError, JsonLD] =
+    EitherT {
+      JsonLD
+        .entity(
+          projects.ResourceId(commitEvent.project.path).asEntityId,
+          entities.Project.entityTypes,
+          Map.empty[Property, JsonLD]
+        )
+        .flatten
+        .fold(_.raiseError[F, Either[ProcessingRecoverableError, JsonLD]],
+              _.asRight[ProcessingRecoverableError].pure[F]
+        )
+    }
 
   private def createRepositoryDirectory(projectPath: projects.Path): F[Path] =
     mkdir(tempDirectoryName(repositoryNameFrom(projectPath)))
@@ -133,12 +155,16 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
 private[events] object RenkuLogTriplesGenerator {
 
   def apply[F[_]: Async: Logger](): F[TriplesGenerator[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new RenkuLogTriplesGenerator(
-    new GitLabRepoUrlFinderImpl[F](gitLabUrl),
-    Commands.Renku[F],
-    Commands.File[F],
-    Commands.Git[F],
-    randomLong = new SecureRandom().nextLong _
-  )
+    gitLabUrl    <- GitLabUrlLoader[F]()
+    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
+  } yield {
+    implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
+    new RenkuLogTriplesGenerator(
+      new GitLabRepoUrlFinderImpl[F](gitLabUrl),
+      Commands.Renku[F],
+      Commands.File[F],
+      Commands.Git[F],
+      randomLong = new SecureRandom().nextLong _
+    )
+  }
 }

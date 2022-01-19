@@ -46,7 +46,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       "update the datasets with the topmostSameAs found for sameAs in KG " +
       "and create update queries" in new TestCase {
 
-        val (dataset1 ::~ dataset2, project) = anyProjectEntities
+        val (dataset1 ::~ dataset2, project) = anyRenkuProjectEntities
           .addDataset(datasetEntities(provenanceImportedInternal))
           .addDataset(datasetEntities(provenanceImportedInternal))
           .generateOne
@@ -97,7 +97,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     "prepare updates for deleted datasets" in new TestCase {
       val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _,
            projectWithAllDatasets
-      ) = anyProjectEntities
+      ) = anyRenkuProjectEntities
         .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
         .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
         .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal()))
@@ -156,7 +156,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
-      val (dataset, project) = anyProjectEntities
+      val (dataset, project) = anyRenkuProjectEntities
         .addDataset(datasetEntities(provenanceImportedInternal))
         .generateOne
         .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], _.to[entities.Project])
@@ -175,7 +175,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "fail with NonRecoverableFailure if finding calls to KG fails with an unknown exception" in new TestCase {
-      val (dataset, project) = anyProjectEntities
+      val (dataset, project) = anyRenkuProjectEntities
         .addDataset(datasetEntities(provenanceImportedInternal))
         .generateOne
         .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], _.to[entities.Project])
