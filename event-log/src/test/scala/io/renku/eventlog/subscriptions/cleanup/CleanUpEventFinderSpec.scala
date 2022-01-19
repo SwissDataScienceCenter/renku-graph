@@ -50,62 +50,66 @@ class CleanUpEventFinderSpec
     with should.Matchers {
 
   "popEvent" should {
-    s"find the project with the oldest event in status $AwaitingDeletion and mark all awaiting deletion event of the project as $Deleting" in new TestCase {
-      val projectId   = projectIds.generateOne
-      val projectPath = projectPaths.generateOne
+    s"find the project with the oldest event in status $AwaitingDeletion and " +
+      s"mark all awaiting deletion event of the project as $Deleting" in new TestCase {
+        val projectId   = projectIds.generateOne
+        val projectPath = projectPaths.generateOne
 
-      val (event1Id, notOldestEventDate) = createEvent(
-        status = AwaitingDeletion,
-        executionDate = timestamps(max = now).generateAs(ExecutionDate),
-        projectId = projectId,
-        projectPath = projectPath
-      )
+        val (event1Id, notOldestExecutionDate) = createEvent(
+          status = AwaitingDeletion,
+          executionDate = timestamps(max = now).generateAs(ExecutionDate),
+          projectId = projectId,
+          projectPath = projectPath
+        )
 
-      val (event2Id, oldestEventDate) = createEvent(
-        status = AwaitingDeletion,
-        executionDate = timestamps(max = notOldestEventDate.value).generateAs(ExecutionDate),
-        projectId = projectId,
-        projectPath = projectPath
-      )
-      val (event3Id, _) = createEvent(
-        status =
-          Gen.oneOf(EventStatus.all.filter(status => status != AwaitingDeletion && status != Deleting)).generateOne,
-        executionDate = timestamps(max = now).generateAs(ExecutionDate),
-        projectId = projectId,
-        projectPath = projectPath
-      )
-      val project2Id   = projectIds.generateOne
-      val project2Path = projectPaths.generateOne
-      val (event4id, _) = createEvent(
-        status = AwaitingDeletion,
-        executionDate = timestamps(min = oldestEventDate.value, max = now).generateAs(ExecutionDate),
-        projectId = project2Id,
-        projectPath = project2Path
-      )
+        val (event2Id, oldestExecutionDate) = createEvent(
+          status = AwaitingDeletion,
+          executionDate = timestamps(max = notOldestExecutionDate.value).generateAs(ExecutionDate),
+          projectId = projectId,
+          projectPath = projectPath
+        )
 
-      findEvents(Deleting) shouldBe List.empty
+        val (event3Id, _) = createEvent(
+          status =
+            Gen.oneOf(EventStatus.all.filter(status => status != AwaitingDeletion && status != Deleting)).generateOne,
+          executionDate = timestamps(max = now).generateAs(ExecutionDate),
+          projectId = projectId,
+          projectPath = projectPath
+        )
 
-      expectAwaitingDeletionGaugeUpdate(projectPath, -2)
-      expectDeletingGaugeUpdate(projectPath, 2)
+        val project2Id   = projectIds.generateOne
+        val project2Path = projectPaths.generateOne
+        val (event4id, _) = createEvent(
+          status = AwaitingDeletion,
+          executionDate = timestamps(min = oldestExecutionDate.value.minus(5, ChronoUnit.MINUTES), max = now)
+            .generateAs(ExecutionDate),
+          projectId = project2Id,
+          projectPath = project2Path
+        )
 
-      finder.popEvent().unsafeRunSync() shouldBe Some(
-        CleanUpEvent(Project(projectId, projectPath))
-      )
+        findEvents(Deleting) shouldBe List.empty
 
-      findEvents(Deleting).noBatchDate shouldBe List((event1Id, executionDate), (event2Id, executionDate))
+        expectAwaitingDeletionGaugeUpdate(projectPath, -2)
+        expectDeletingGaugeUpdate(projectPath, 2)
 
-      expectAwaitingDeletionGaugeUpdate(project2Path, -1)
-      expectDeletingGaugeUpdate(project2Path, 1)
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          CleanUpEvent(event2Id, Project(projectId, projectPath))
+        )
 
-      finder.popEvent().unsafeRunSync() shouldBe Some(
-        CleanUpEvent(Project(project2Id, project2Path))
-      )
+        findEvents(Deleting).noBatchDate shouldBe List((event1Id, executionDate), (event2Id, executionDate))
 
-      finder.popEvent().unsafeRunSync() shouldBe None
+        expectAwaitingDeletionGaugeUpdate(project2Path, -1)
+        expectDeletingGaugeUpdate(project2Path, 1)
 
-      queriesExecTimes.verifyExecutionTimeMeasured("clean_up - find oldest", "clean_up - update status")
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          CleanUpEvent(event4id, Project(project2Id, project2Path))
+        )
 
-    }
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+        queriesExecTimes.verifyExecutionTimeMeasured("clean_up - find oldest", "clean_up - update status")
+
+      }
 
     "return no event if the execution date is in the future" in new TestCase {
       val projectId   = projectIds.generateOne
@@ -156,7 +160,7 @@ class CleanUpEventFinderSpec
                     executionDate: ExecutionDate,
                     projectId:     projects.Id = projectIds.generateOne,
                     projectPath:   projects.Path = projectPaths.generateOne
-    ): (CompoundEventId, EventDate) = {
+    ): (CompoundEventId, ExecutionDate) = {
       val eventId   = compoundEventIds.generateOne.copy(projectId = projectId)
       val eventBody = eventBodies.generateOne
       val batchDate = batchDates.generateOne
@@ -164,7 +168,7 @@ class CleanUpEventFinderSpec
 
       storeEvent(eventId, status, executionDate, eventDate, eventBody, batchDate = batchDate, projectPath = projectPath)
 
-      (eventId, eventDate)
+      (eventId, executionDate)
     }
 
   }

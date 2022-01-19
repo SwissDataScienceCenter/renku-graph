@@ -21,8 +21,9 @@ package io.renku.eventlog.subscriptions.cleanup
 import cats.Show
 import cats.syntax.all._
 import io.renku.events.consumers.Project
+import io.renku.graph.model.events
 
-private final case class CleanUpEvent(project: Project)
+private final case class CleanUpEvent(eventId: events.CompoundEventId, project: Project)
 
 private object CleanUpEvent {
   implicit lazy val show: Show[CleanUpEvent] =

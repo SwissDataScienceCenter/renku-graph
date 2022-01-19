@@ -74,7 +74,7 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel](
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
     ).select[events.EventStatus ~ ExecutionDate, CleanUpEvent](
       sql"""
-       SELECT evt.project_id, prj.project_path
+       SELECT evt.event_id, evt.project_id, prj.project_path
        FROM event evt
        JOIN  project prj ON prj.project_id = evt.project_id 
        WHERE evt.status = $eventStatusEncoder
@@ -88,7 +88,7 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel](
   }
 
   private def updateForProcessing(maybeCleanUpEvent: Option[CleanUpEvent]) =
-    maybeCleanUpEvent map { case CleanUpEvent(Project(projectId, _)) =>
+    maybeCleanUpEvent map { case CleanUpEvent(_, Project(projectId, _)) =>
       measureExecutionTime {
         SqlStatement(
           name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
@@ -112,7 +112,7 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel](
     } getOrElse Kleisli.pure[F, Session[F], Int](0)
 
   private def maybeUpdateMetrics(maybeCleanUpEventAndCount: Option[(CleanUpEvent, Int)]) =
-    maybeCleanUpEventAndCount map { case (CleanUpEvent(Project(_, projectPath)), updatedEventsCount) =>
+    maybeCleanUpEventAndCount map { case (CleanUpEvent(_, Project(_, projectPath)), updatedEventsCount) =>
       Kleisli.liftF {
         for {
           _ <- awaitingDeletionGauge.update((projectPath, updatedEventsCount.toDouble * -1))
@@ -122,7 +122,9 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel](
     } getOrElse Kleisli.pure[F, Session[F], Unit](())
 
   private val cleanUpEventGet: Decoder[CleanUpEvent] =
-    projectDecoder.gmap[CleanUpEvent]
+    (eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder).map { case eventId ~ projectId ~ projectPath =>
+      CleanUpEvent(events.CompoundEventId(eventId, projectId), Project(projectId, projectPath))
+    }
 }
 
 private object CleanUpEventFinder {

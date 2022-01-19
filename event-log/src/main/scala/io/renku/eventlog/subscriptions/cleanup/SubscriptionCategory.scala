@@ -44,8 +44,11 @@ private[subscriptions] object SubscriptionCategory {
       deletingGauge:         LabeledGauge[F, projects.Path],
       queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers      <- Subscribers(name, subscriberTracker)
-    eventDelivery    <- EventDelivery.noOp[F, CleanUpEvent]
+    subscribers <- Subscribers(name, subscriberTracker)
+    eventDelivery <- EventDelivery[F, CleanUpEvent](sessionResource,
+                                                    compoundEventIdExtractor = (_: CleanUpEvent).eventId,
+                                                    queriesExecTimes
+                     )
     dispatchRecovery <- LoggingDispatchRecovery[F, CleanUpEvent](name)
     eventFinder      <- CleanUpEventFinder(sessionResource, awaitingDeletionGauge, deletingGauge, queriesExecTimes)
     eventsDistributor <-
