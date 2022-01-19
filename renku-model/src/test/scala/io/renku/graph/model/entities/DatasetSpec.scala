@@ -85,33 +85,49 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       }
     }
 
-    "treat DS as Internal if there's neither sameAs nor derivedFrom but only originalIdentifier different than this DS identifier" in {
-      val dataset = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
-        .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+    "treat DS with originalIdentifier but no derivedFrom as Internal -" +
+      "drop originalIdentifier and move parts' dates to the DS creation date" in {
+        val dataset = {
+          val ds    = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+          val part1 = datasetPartEntities(ds.provenance.date.instant).generateOne
+          val part2 = datasetPartEntities(ds.provenance.date.instant).generateOne
+            .copy(dateCreated = timestamps(max = ds.provenance.date.instant).generateAs(datasets.DateCreated))
+          ds.copy(parts = List(part1, part2))
+        }.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
 
-      val datasetJson = parse {
-        dataset.asJsonLD.toJson
-          .deepMerge(
-            Json.obj(
-              (renku / "originalIdentifier").show -> json"""{"@value": ${datasetInitialVersions.generateOne.show}}"""
+        assume(dataset.parts.exists(_.dateCreated.instant isBefore dataset.provenance.date.instant))
+
+        val datasetJson = parse {
+          dataset.asJsonLD.toJson
+            .deepMerge(
+              Json.obj(
+                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetInitialVersions.generateOne.show}}"""
+              )
+            )
+        }.flatMap(_.flatten).fold(throw _, identity)
+
+        datasetJson.cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
+          dataset.copy(
+            publicationEvents = Nil,
+            parts = dataset.parts.map(part =>
+              if (part.dateCreated.instant isBefore dataset.provenance.date.instant)
+                part.copy(dateCreated = dataset.provenance.date)
+              else part
             )
           )
-      }.fold(throw _, identity)
-        .flatten
-        .fold(throw _, identity)
+        ).asRight
+      }
 
-      datasetJson.cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(
-        dataset.copy(publicationEvents = Nil)
-      ).asRight
-    }
-
-    "fail if dataset parts are older than the internal or imported external dataset" in {
-      List(
-        datasetEntities(provenanceInternal).decoupledFromProject,
-        datasetEntities(provenanceImportedExternal).decoupledFromProject,
-        datasetEntities(provenanceImportedInternalAncestorExternal).decoupledFromProject
-      ) foreach { datasetGen =>
-        val dataset = datasetGen.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+    forAll {
+      Table(
+        "DS generator"                                              -> "DS type",
+        datasetEntities(provenanceInternal)                         -> "Internal",
+        datasetEntities(provenanceImportedExternal)                 -> "Imported External",
+        datasetEntities(provenanceImportedInternalAncestorExternal) -> "Imported Internal Ancestor External"
+      )
+    } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
+      s"fail if dataset parts are older than the dataset - case of an $dsType DS" in {
+        val dataset = dsGen.decoupledFromProject.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
         val invalidPart = updatePartDateAfter(
           datasetPartEntities(timestampsNotInTheFuture.generateOne).generateOne.to[entities.DatasetPart]
         )(dataset.provenance)
