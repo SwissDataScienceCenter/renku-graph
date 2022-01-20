@@ -33,7 +33,7 @@ import io.renku.tinytypes.constraints._
 import java.net.{MalformedURLException, URL}
 import java.time.Instant
 
-final case class Project(entitiesProject: testentities.Project,
+final case class Project(entitiesProject: testentities.RenkuProject,
                          id:              Id,
                          updatedAt:       DateUpdated,
                          urls:            Urls,

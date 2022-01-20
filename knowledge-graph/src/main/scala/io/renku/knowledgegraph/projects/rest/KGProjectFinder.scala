@@ -51,15 +51,17 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
   private def query(path: Path, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "project by id",
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
-    s"""|SELECT ?name ?visibility ?maybeDescription ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
+    s"""|SELECT ?name ?visibility ?maybeDescription ?dateCreated ?maybeCreatorName ?maybeCreatorEmail 
+        |       ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail 
+        |       ?maybeSchemaVersion (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
         |WHERE {
         |  ?projectId a schema:Project;
         |             renku:projectPath '$path';
         |             schema:name ?name;
         |             renku:projectVisibility ?visibility;
-        |             schema:schemaVersion ?schemaVersion;
         |             schema:dateCreated ?dateCreated.
-        |  OPTIONAL { ?projectId schema:description ?maybeDescription . }
+        |  OPTIONAL { ?projectId schema:schemaVersion ?maybeSchemaVersion }
+        |  OPTIONAL { ?projectId schema:description ?maybeDescription }
         |  OPTIONAL { ?projectId schema:keywords ?keyword }
         |  OPTIONAL {
         |    ?projectId schema:creator ?maybeCreatorId.
@@ -81,7 +83,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
         |    }
         |  }
         |}
-        |GROUP BY ?name ?visibility ?maybeDescription ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion
+        |GROUP BY ?name ?visibility ?maybeDescription ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeSchemaVersion
         |""".stripMargin
   )
 
@@ -130,7 +132,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
                                      .downField("maybeParentCreatorEmail")
                                      .downField("value")
                                      .as[Option[users.Email]]
-        version <- cursor.downField("schemaVersion").downField("value").as[SchemaVersion]
+        maybeVersion <- cursor.downField("maybeSchemaVersion").downField("value").as[Option[SchemaVersion]]
       } yield KGProject(
         path,
         name,
@@ -138,14 +140,14 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
         visibility,
         maybeParent =
           (maybeParentId, maybeParentName, maybeParentDateCreated) mapN { case (parentId, name, dateCreated) =>
-            Parent(parentId,
-                   name,
-                   ProjectCreation(dateCreated,
-                                   maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))
-                   )
+            KGParent(parentId,
+                     name,
+                     ProjectCreation(dateCreated,
+                                     maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))
+                     )
             )
           },
-        version,
+        maybeVersion,
         maybeDescription,
         keywords
       )
@@ -169,15 +171,15 @@ private object KGProjectFinder {
                              name:             Name,
                              created:          ProjectCreation,
                              visibility:       Visibility,
-                             maybeParent:      Option[Parent],
-                             version:          SchemaVersion,
+                             maybeParent:      Option[KGParent],
+                             maybeVersion:     Option[SchemaVersion],
                              maybeDescription: Option[Description],
                              keywords:         Set[Keyword]
   )
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
 
-  final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation)
+  final case class KGParent(resourceId: ResourceId, name: Name, created: ProjectCreation)
 
   final case class ProjectCreator(maybeEmail: Option[users.Email], name: users.Name)
 

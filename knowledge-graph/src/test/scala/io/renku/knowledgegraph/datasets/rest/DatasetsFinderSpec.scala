@@ -84,7 +84,7 @@ class DatasetsFinderSpec
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of non-modified datasets" in new TestCase {
 
-          val projects = projectEntities(visibilityPublic)
+          val projects = renkuProjectEntities(visibilityPublic)
             .withDatasets(datasetEntities(provenanceImportedExternal))
             .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
             .toList
@@ -286,7 +286,7 @@ class DatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with more than one level of modification and forks not on the 1st level" in new TestCase {
 
-          val (dataset ::~ datasetModification, project ::~ fork) =
+          val (_ ::~ datasetModification, project ::~ fork) =
             publicProjectEntities
               .addDatasetAndModification(datasetEntities(provenanceImportedExternal))
               .forkOnce()
@@ -737,7 +737,7 @@ class DatasetsFinderSpec
         val (publicDataset, publicProject) =
           publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
         val (_, privateProject) =
-          projectEntities(fixed(nonPublic)).addDataset(datasetEntities(provenanceInternal)).generateOne
+          renkuProjectEntities(fixed(nonPublic)).addDataset(datasetEntities(provenanceInternal)).generateOne
 
         loadToStore(publicProject, privateProject)
 
@@ -754,7 +754,7 @@ class DatasetsFinderSpec
           publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
         val (_, privateProjectWithPublicDataset) =
-          projectEntities(fixed(nonPublic)).importDataset(publicDataset).generateOne
+          renkuProjectEntities(fixed(nonPublic)).importDataset(publicDataset).generateOne
 
         loadToStore(publicProject, privateProjectWithPublicDataset)
 
@@ -777,13 +777,13 @@ class DatasetsFinderSpec
 
       val userWithGitlabId = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
       val (privateDatasetWithAccess, privateProjectWithAccess) =
-        projectEntities(visibilityNonPublic)
+        renkuProjectEntities(visibilityNonPublic)
           .modify(_.copy(members = Set(userWithGitlabId)))
           .addDataset(datasetEntities(provenanceInternal))
           .generateOne
 
       val (_, privateProjectWithoutAccess) =
-        projectEntities(visibilityNonPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+        renkuProjectEntities(visibilityNonPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
 
       loadToStore(publicProject, privateProjectWithAccess, privateProjectWithoutAccess)
 
@@ -810,11 +810,11 @@ class DatasetsFinderSpec
         val (publicDataset, publicProject) =
           publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
         val (privateDatasetWithoutAccess, privateProjectWithoutAccess) =
-          projectEntities(visibilityNonPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+          renkuProjectEntities(visibilityNonPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
 
         val userWithGitlabId = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
         val (privateDatasetWithAccess, privateProjectWithAccess) =
-          projectEntities(visibilityNonPublic)
+          renkuProjectEntities(visibilityNonPublic)
             .modify(_.copy(members = Set(userWithGitlabId)))
             .importDataset(privateDatasetWithoutAccess)
             .generateOne
@@ -849,13 +849,13 @@ class DatasetsFinderSpec
     )
   }
 
-  private lazy val publicProjectEntities: Gen[ProjectWithoutParent] = projectEntities(visibilityPublic)
+  private lazy val publicProjectEntities: Gen[RenkuProject.WithoutParent] = renkuProjectEntities(visibilityPublic)
 
   implicit class PersonOps(person: Person) {
     lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, accessTokens.generateOne)
   }
 
-  private implicit class DatasetOps(datasetAndProject: (Dataset[Dataset.Provenance], Project)) {
+  private implicit class DatasetOps(datasetAndProject: (Dataset[Dataset.Provenance], RenkuProject)) {
 
     private lazy val (dataset, project) = datasetAndProject
 
@@ -874,7 +874,7 @@ class DatasetsFinderSpec
       )
   }
 
-  private implicit class ProjectsListOps(datasetsAndProjects: List[(Dataset[Dataset.Provenance], Project)]) {
+  private implicit class ProjectsListOps(datasetsAndProjects: List[(Dataset[Dataset.Provenance], RenkuProject)]) {
 
     def toDatasetSearchResult(matchIdFrom: List[DatasetSearchResult], projectsCount: Int): Option[DatasetSearchResult] =
       datasetsAndProjects

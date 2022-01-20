@@ -25,7 +25,7 @@ COPY --from=builder /work/event-log/target/universal/stage .
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
-RUN apk add --no-cache tzdata curl bash && \
+RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
 ENV GID=90050
@@ -35,5 +35,5 @@ RUN addgroup -g "$GID" -S elgroup && \
 
 USER eluser
 
-ENTRYPOINT ["bin/event-log"]
-CMD []
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["bin/event-log"]

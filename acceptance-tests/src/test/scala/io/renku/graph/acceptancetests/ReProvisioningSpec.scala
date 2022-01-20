@@ -68,8 +68,8 @@ class ReProvisioningSpec
 
       val newSchemaVersion = SchemaVersion(nonEmptyStrings().generateOne)
       val testEntitiesProjectWithNewSchemaVersion = project.entitiesProject match {
-        case p: testentities.ProjectWithParent    => p.copy(version = newSchemaVersion)
-        case p: testentities.ProjectWithoutParent => p.copy(version = newSchemaVersion)
+        case p: testentities.RenkuProject.WithParent    => p.copy(version = newSchemaVersion)
+        case p: testentities.RenkuProject.WithoutParent => p.copy(version = newSchemaVersion)
       }
 
       `GET <triples-generator>/projects/:id/commits/:id returning OK`(project,
@@ -102,7 +102,7 @@ class ReProvisioningSpec
     implicit val accessToken: AccessToken = user.accessToken
     val initialProjectSchemaVersion = SchemaVersion("8")
 
-    val testEntitiesProject = projectEntities(visibilityPublic)
+    val testEntitiesProject = renkuProjectEntities(visibilityPublic)
       .map(_.copy(version = initialProjectSchemaVersion))
       .withActivities(activityEntities(planEntities()))
       .generateOne

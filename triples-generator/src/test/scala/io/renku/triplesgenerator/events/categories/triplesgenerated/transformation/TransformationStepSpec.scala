@@ -42,10 +42,10 @@ class TransformationStepSpec extends AnyWordSpec with MockFactory with should.Ma
       val stepTransformation = mockFunction[entities.Project, ProjectWithQueries[Try]]
       val step               = TransformationStep(nonBlankStrings().generateOne, stepTransformation)
 
-      val project = projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
+      val project = renkuProjectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
 
       val result = EitherT.rightT[Try, ProcessingRecoverableError](
-        (projectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project], queriesGen.generateOne)
+        (renkuProjectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project], queriesGen.generateOne)
       )
       stepTransformation.expects(project).returning(result)
 

@@ -30,7 +30,7 @@ import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.projects.{DateCreated, ForksCount}
 import io.renku.graph.model.testentities
-import io.renku.graph.model.testentities.Project._
+import io.renku.graph.model.testentities.RenkuProject._
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
@@ -55,7 +55,7 @@ class ProjectsResourcesSpec
 
   private val (parentProject, project) = {
     val creator = personEntities(withGitLabId, withEmail).generateOne
-    val (parent, child) = projectEntities(visibilityPublic)
+    val (parent, child) = renkuProjectEntities(visibilityPublic)
       .withDatasets(datasetEntities(provenanceInternal))
       .generateOne
       .copy(maybeCreator = creator.some, members = personEntities(withGitLabId).generateFixedSizeSet() + creator)
@@ -164,9 +164,9 @@ object ProjectsResources {
     }""" addIfDefined ("readme" -> urls.maybeReadme.map(_.value))
   }
 
-  private implicit lazy val forkingEncoder: Encoder[(ForksCount, testentities.Project)] =
+  private implicit lazy val forkingEncoder: Encoder[(ForksCount, testentities.RenkuProject)] =
     Encoder.instance {
-      case (forksCount, project: testentities.ProjectWithParent) => json"""{
+      case (forksCount, project: testentities.RenkuProject.WithParent) => json"""{
       "forksCount": ${forksCount.value},
       "parent": {
         "path":    ${project.parent.path.value},

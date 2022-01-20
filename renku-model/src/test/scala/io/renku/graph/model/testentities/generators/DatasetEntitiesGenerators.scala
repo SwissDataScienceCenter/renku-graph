@@ -239,7 +239,7 @@ trait DatasetEntitiesGenerators {
 
     def createMultiple(max: Int): List[DatasetGenFactory[P]] = List.fill(Random.nextInt(max - 1) + 1)(factory)
 
-    def toGeneratorFor(project: Project): Gen[Dataset[P]] = factory(project.dateCreated)
+    def toGeneratorFor(project: RenkuProject): Gen[Dataset[P]] = factory(project.dateCreated)
 
     def withDateAfter(projectDate: projects.DateCreated): Gen[Dataset[P]] = factory(projectDate)
 

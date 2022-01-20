@@ -35,10 +35,10 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
   "findActivityAuthor" should {
 
     "return activity author's resourceIds" in new TestCase {
-      val project = projectEntities(anyVisibility)
+      val project = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()))
         .generateOne
-        .to[entities.ProjectWithoutParent]
+        .to[entities.RenkuProject]
 
       val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
 
@@ -58,10 +58,10 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
   "findAssociationPersonAgent" should {
 
     "return activity association person agent resourceIds" in new TestCase {
-      val project = projectEntities(anyVisibility)
+      val project = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
         .generateOne
-        .to[entities.ProjectWithoutParent]
+        .to[entities.RenkuProject]
 
       val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
 
@@ -82,10 +82,10 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
     }
 
     "return no agent if there's association with SoftwareAgent agent" in new TestCase {
-      val project = projectEntities(anyVisibility)
+      val project = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()))
         .generateOne
-        .to[entities.ProjectWithoutParent]
+        .to[entities.RenkuProject]
 
       val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
 

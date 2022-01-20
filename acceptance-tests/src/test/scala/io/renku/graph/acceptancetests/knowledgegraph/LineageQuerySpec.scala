@@ -48,7 +48,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
 
     val (exemplarData, project) = {
       val lineageData = LineageExemplarData(
-        projectEntities(visibilityPublic)
+        renkuProjectEntities(visibilityPublic)
           .map(
             _.copy(
               path = projects.Path("public/lineage-project"),
@@ -110,7 +110,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
     Scenario("As an authenticated user I would like to find lineage of project I am a member of with a GraphQL query") {
 
       val accessibleExemplarData = LineageExemplarData(
-        projectEntities(visibilityNonPublic).generateOne.copy(
+        renkuProjectEntities(visibilityNonPublic).generateOne.copy(
           path = model.projects.Path("accessible/member-project"),
           members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
         )
@@ -128,7 +128,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       val response = knowledgeGraphClient.POST(
         namedLineageQuery,
         variables = Map(
-          "projectPath" -> projectEntities(visibilityNonPublic).generateOne
+          "projectPath" -> renkuProjectEntities(visibilityNonPublic).generateOne
             .copy(
               path = model.projects.Path("accessible/member-project"),
               members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
@@ -151,7 +151,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
     Scenario("As an authenticated user I should not be able to find lineage of project I am not a member of") {
 
       val privateExemplarData = LineageExemplarData(
-        projectEntities(visibilityNonPublic).generateOne.copy(
+        renkuProjectEntities(visibilityNonPublic).generateOne.copy(
           path = model.projects.Path("private/secret-project"),
           members = Set.empty
         )
@@ -184,7 +184,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
     Scenario("As an unauthenticated user I should not be able to find a lineage from a private project") {
       Given("some data in the RDF Store with a project I am a member of")
       val exemplarData = LineageExemplarData(
-        projectEntities(visibilityNonPublic).generateOne.copy(
+        renkuProjectEntities(visibilityNonPublic).generateOne.copy(
           path = model.projects.Path("unauthenticated/private-project")
         )
       )

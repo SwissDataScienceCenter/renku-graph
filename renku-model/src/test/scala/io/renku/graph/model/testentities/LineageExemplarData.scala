@@ -40,7 +40,7 @@ import io.renku.jsonld.syntax.JsonEncoderOps
 object LineageExemplarData {
 
   final case class ExemplarData(
-      project:               Project,
+      project:               RenkuProject,
       `zhbikes folder`:      NodeDef,
       `clean_data entity`:   NodeDef,
       `bikesparquet entity`: NodeDef,
@@ -56,7 +56,7 @@ object LineageExemplarData {
   )
 
   def apply(
-      project:             Project = projectEntities(visibilityPublic, forksCountGen = anyForksCount).generateOne
+      project: RenkuProject = renkuProjectEntities(visibilityPublic, forksCountGen = anyForksCount).generateOne
   )(implicit renkuBaseUrl: RenkuBaseUrl): ExemplarData = {
 
     val zhbikesFolder = Location.Folder("data/zhbikes")
