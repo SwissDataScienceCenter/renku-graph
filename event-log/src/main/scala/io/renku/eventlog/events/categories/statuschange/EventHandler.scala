@@ -59,6 +59,7 @@ private class EventHandler[F[_]: Async: Logger](
       requestAs[RollbackToNew],
       requestAs[RollbackToTriplesGenerated],
       requestAs[ToAwaitingDeletion],
+      requestAs[RollbackToAwaitingDeletion],
       requestAs[ProjectEventsToNew],
       requestAs[AllEventsToNew]
     )(request)
@@ -256,6 +257,18 @@ private object EventHandler {
              case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
            }
     } yield ToAwaitingDeletion(CompoundEventId(id, projectId), projectPath)
+  }
+
+  private implicit lazy val eventRollbackToAwaitingDeletionDecoder
+      : EventRequestContent => Either[DecodingFailure, RollbackToAwaitingDeletion] = { request =>
+    for {
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
+      _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+             case AwaitingDeletion => Right(())
+             case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+           }
+    } yield RollbackToAwaitingDeletion(Project(projectId, projectPath))
   }
 
   private implicit lazy val eventToProjectEventToNewDecoder

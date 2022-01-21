@@ -30,7 +30,7 @@ import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, nonNegativeInts}
+import io.renku.generators.Generators.{exceptions, nonNegativeInts, positiveInts}
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
@@ -43,6 +43,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.implicits._
 import skunk.{Session, ~}
+import io.renku.events.consumers.Project
 
 class StatusChangerSpec
     extends AnyWordSpec
@@ -182,6 +183,11 @@ class StatusChangerSpec
       Gen.const(DBUpdateResults.ForProjects(projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1)))
     case ToAwaitingDeletion(_, projectPath) =>
       Gen.const(DBUpdateResults.ForProjects(projectPath, Map(eventStatuses.generateOne -> -1, AwaitingDeletion -> 1)))
+    case RollbackToAwaitingDeletion(Project(_, projectPath)) =>
+      val updatedRows = positiveInts(max = 40).generateOne
+      Gen.const(
+        DBUpdateResults.ForProjects(projectPath, Map(Deleting -> -updatedRows, AwaitingDeletion -> updatedRows))
+      )
   }
 
   private def genUpdateResult(forProject: projects.Path) = for {
