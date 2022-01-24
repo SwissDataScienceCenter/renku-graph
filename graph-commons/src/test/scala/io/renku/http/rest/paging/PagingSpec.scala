@@ -18,18 +18,18 @@
 
 package io.renku.http.rest.paging
 
+import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.model.{Page, PerPage, Total}
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Success, Try}
-
-class PagingSpec extends AnyWordSpec with should.Matchers {
+class PagingSpec extends AnyWordSpec with should.Matchers with IOSpec {
 
   "findPage" should {
 
@@ -38,11 +38,11 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
 
         val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
 
-        val resultsFinder = new ResultsFinder(returning = results.pure[Try])()
+        val resultsFinder = new ResultsFinder(returning = results.pure[IO])()
 
         val pagingRequest = PagingRequest(Page.first, PerPage(7))
 
-        val Success(response) = resultsFinder.find(pagingRequest)
+        val response = resultsFinder.find(pagingRequest).unsafeRunSync()
 
         response.results                  shouldBe results
         response.pagingInfo.pagingRequest shouldBe pagingRequest
@@ -54,11 +54,11 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
 
         val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
 
-        val resultsFinder = new ResultsFinder(returning = results.pure[Try])()
+        val resultsFinder = new ResultsFinder(returning = results.pure[IO])()
 
         val pagingRequest = PagingRequest(Page.first, PerPage(6))
 
-        val Success(response) = resultsFinder.find(pagingRequest)
+        val response = resultsFinder.find(pagingRequest).unsafeRunSync()
 
         response.results                  shouldBe results
         response.pagingInfo.pagingRequest shouldBe pagingRequest
@@ -69,11 +69,11 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
       "if not the first page is requested and there are no results" in {
 
         val total         = Total(5)
-        val resultsFinder = new ResultsFinder(returning = Nil.pure[Try])(total)
+        val resultsFinder = new ResultsFinder(returning = Nil.pure[IO])(total.pure[IO])
 
         val pagingRequest = PagingRequest(Page(2), PerPage(6))
 
-        val Success(response) = resultsFinder.find(pagingRequest)
+        val response = resultsFinder.find(pagingRequest).unsafeRunSync()
 
         response.results                  shouldBe Nil
         response.pagingInfo.pagingRequest shouldBe pagingRequest
@@ -85,11 +85,11 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
 
         val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
 
-        val resultsFinder = new ResultsFinder(returning = results.pure[Try])()
+        val resultsFinder = new ResultsFinder(returning = results.pure[IO])()
 
         val pagingRequest = PagingRequest(Page.first, PerPage(5))
 
-        val Success(response) = resultsFinder.find(pagingRequest)
+        val response = resultsFinder.find(pagingRequest).unsafeRunSync()
 
         response.results                  shouldBe results.take(PerPage(5).value)
         response.pagingInfo.pagingRequest shouldBe pagingRequest
@@ -98,20 +98,20 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
   }
 
   private class ResultsFinder(
-      returning: Try[List[Int]]
-  )(total:       Total = returning.map(_.size).map(Total(_)).getOrElse(Total(0)))
+      returning: IO[List[Int]]
+  )(total:       IO[Total] = returning.map(_.size).map(Total(_)))
       extends Paging[Int] {
 
-    private implicit val resultsFinder: PagedResultsFinder[Try, Int] = new PagedResultsFinder[Try, Int] {
+    private implicit val resultsFinder: PagedResultsFinder[IO, Int] = new PagedResultsFinder[IO, Int] {
 
-      override def findResults(paging: PagingRequest): Try[List[Int]] = {
+      override def findResults(paging: PagingRequest): IO[List[Int]] = {
         val startIdx = (paging.page.value - 1) * paging.perPage.value
         returning.map(_.slice(startIdx, startIdx + paging.perPage.value))
       }
 
-      override def findTotal(): Try[Total] = total.pure[Try]
+      override def findTotal(): IO[Total] = total
     }
 
-    def find(paging: PagingRequest): Try[PagingResponse[Int]] = findPage[Try](paging)
+    def find(paging: PagingRequest): IO[PagingResponse[Int]] = findPage[IO](paging)
   }
 }
