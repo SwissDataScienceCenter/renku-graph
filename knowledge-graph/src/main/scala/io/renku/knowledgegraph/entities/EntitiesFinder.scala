@@ -58,7 +58,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
           |      {
           |        SELECT DISTINCT ?projectId
           |        WHERE { 
-          |          ?projectId text:query (schema:name '$query').
+          |          ?projectId text:query (schema:name schema:keywords '$query').
           |          ?projectId a schema:Project
           |        }
           |      }
@@ -81,7 +81,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
           |       {
           |        SELECT DISTINCT ?dsId
           |        WHERE { 
-          |          ?dsId text:query (renku:slug '$query').
+          |          ?dsId text:query (renku:slug schema:keywords '$query').
           |          ?dsId a schema:Dataset
           |        }
           |      }

@@ -26,6 +26,7 @@ import io.renku.graph.model.{datasets, projects}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.graph.model.GraphModelGenerators._
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -52,7 +53,6 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       val query = nonBlankStrings().generateOne
 
       val matchingProject = renkuProjectEntities(visibilityPublic)
-        .withDatasets(datasetEntities(provenanceNonModified))
         .modify(_.copy(name = sentenceContaining(query).map(_.value).generateAs(projects.Name)))
         .generateOne
 
@@ -61,6 +61,37 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
           datasetEntities(provenanceNonModified).modify(
             identificationLens.modify(
               _.copy(name = sentenceContaining(query).map(_.value).generateAs(datasets.Name))
+            )
+          )
+        )
+        .generateOne
+
+      loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
+
+      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+        matchingProject.to[model.Entity.Project],
+        (matchingDSProject -> matchingDS).to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "return entities which keywords matches the given query, sorted by name" in new TestCase {
+      val query = nonBlankStrings().generateOne
+
+      val matchingProject = renkuProjectEntities(visibilityPublic)
+        .modify(
+          _.copy(keywords =
+            Set(sentenceContaining(query).map(_.value).generateAs(projects.Keyword), projectKeywords.generateOne)
+          )
+        )
+        .generateOne
+
+      val matchingDS ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceNonModified).modify(
+            additionalInfoLens.modify(
+              _.copy(keywords =
+                List(sentenceContaining(query).map(_.value).generateAs(datasets.Keyword), datasetKeywords.generateOne)
+              )
             )
           )
         )

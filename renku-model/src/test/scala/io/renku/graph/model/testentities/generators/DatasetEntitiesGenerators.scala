@@ -266,6 +266,9 @@ trait DatasetEntitiesGenerators {
   implicit def provenanceLens[P <: Dataset.Provenance]: Lens[Dataset[P], P] =
     Lens[Dataset[P], P](_.provenance)(prov => ds => ds.copy(provenance = prov))
 
+  implicit def additionalInfoLens[P <: Dataset.Provenance]: Lens[Dataset[P], AdditionalInfo] =
+    Lens[Dataset[P], AdditionalInfo](_.additionalInfo)(additionalInfo => ds => ds.copy(additionalInfo = additionalInfo))
+
   implicit def creatorsLens[P <: Dataset.Provenance]: Lens[P, Set[Person]] =
     Lens[P, Set[Person]](_.creators) { creators =>
       {
