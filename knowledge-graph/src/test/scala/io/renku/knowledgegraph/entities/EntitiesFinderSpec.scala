@@ -104,6 +104,31 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         (matchingDSProject -> matchingDS).to[model.Entity.Dataset]
       ).sortBy(_.name.value)
     }
+
+    "return entities which description matches the given query, sorted by name" in new TestCase {
+      val query = nonBlankStrings().generateOne
+
+      val matchingProject = renkuProjectEntities(visibilityPublic)
+        .modify(_.copy(maybeDescription = sentenceContaining(query).map(_.value).generateAs(projects.Description).some))
+        .generateOne
+
+      val matchingDS ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceNonModified).modify(
+            additionalInfoLens.modify(
+              _.copy(maybeDescription = sentenceContaining(query).map(_.value).generateAs(datasets.Description).some)
+            )
+          )
+        )
+        .generateOne
+
+      loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
+
+      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+        matchingProject.to[model.Entity.Project],
+        (matchingDSProject -> matchingDS).to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
   }
 
   private trait TestCase {
