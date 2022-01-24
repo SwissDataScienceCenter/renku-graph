@@ -18,7 +18,7 @@
 
 package io.renku.http.rest.paging
 
-import cats.MonadThrow
+import cats.{MonadThrow, NonEmptyParallel}
 import cats.syntax.all._
 import io.renku.http.rest.paging.model.Total
 
@@ -27,22 +27,14 @@ trait Paging[Result] {
   import Paging.PagedResultsFinder
 
   def findPage[F[_]: MonadThrow](paging: PagingRequest)(implicit
-      resultsFinder: PagedResultsFinder[F, Result]
-  ): F[PagingResponse[Result]] = for {
-    results  <- resultsFinder.findResults(paging)
-    response <- prepareResponse(results, paging)
-  } yield response
-
-  private def prepareResponse[F[_]: MonadThrow](
-      results:              List[Result],
-      pagingRequest:        PagingRequest
-  )(implicit resultsFinder: PagedResultsFinder[F, Result]) = for {
-    total <- if (results.nonEmpty && results.size < pagingRequest.perPage.value)
-               Total((pagingRequest.page.value - 1) * pagingRequest.perPage.value + results.size).pure[F]
-             else
-               resultsFinder.findTotal()
-    response <- PagingResponse.from[F, Result](results, pagingRequest, total)
-  } yield response
+      resultsFinder: PagedResultsFinder[F, Result],
+      parallel:      NonEmptyParallel[F]
+  ): F[PagingResponse[Result]] = {
+    import resultsFinder._
+    (findResults(paging), findTotal()).parMapN { case (results, total) =>
+      PagingResponse.from[F, Result](results, paging, total)
+    }.flatten
+  }
 }
 
 object Paging {
