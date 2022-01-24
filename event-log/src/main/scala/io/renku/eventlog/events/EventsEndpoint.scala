@@ -20,7 +20,7 @@ package io.renku.eventlog.events
 
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
+import cats.{MonadThrow, NonEmptyParallel, Show}
 import io.circe.{Encoder, Json}
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog._
@@ -73,8 +73,8 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
 
 object EventsEndpoint {
 
-  def apply[F[_]: Async: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                 queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: Async: NonEmptyParallel: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                                   queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
   ): F[EventsEndpoint[F]] = for {
     eventsFinder <- EventsFinder(sessionResource, queriesExecTimes)
     eventlogUrl  <- EventLogUrl()
