@@ -58,7 +58,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
           |      {
           |        SELECT DISTINCT ?projectId
           |        WHERE { 
-          |          ?projectId text:query (schema:name schema:keywords schema:description '$query').
+          |          ?projectId text:query (schema:name schema:keywords schema:description renku:projectNamespaces '$query').
           |          ?projectId a schema:Project
           |        }
           |      }

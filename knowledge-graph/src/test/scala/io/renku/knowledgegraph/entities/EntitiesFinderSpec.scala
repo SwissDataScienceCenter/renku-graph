@@ -129,6 +129,20 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         (matchingDSProject -> matchingDS).to[model.Entity.Dataset]
       ).sortBy(_.name.value)
     }
+
+    "return project entities which namespace matches the given query, sorted by name" in new TestCase {
+      val query = nonBlankStrings().generateOne
+
+      val matchingProject = renkuProjectEntities(visibilityPublic)
+        .modify(_.copy(path = projects.Path(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
+        .generateOne
+
+      loadToStore(matchingProject, projectEntities(visibilityPublic).generateOne)
+
+      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+        matchingProject.to[model.Entity.Project]
+      ).sortBy(_.name.value)
+    }
   }
 
   private trait TestCase {
