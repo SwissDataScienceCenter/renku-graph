@@ -20,6 +20,7 @@ package io.renku.graph.model.testentities
 package generators
 
 import io.renku.graph.model.entities.Project.ProjectMember
+import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.users
 import monocle.Lens
 import org.scalacheck.Gen
@@ -27,11 +28,13 @@ import org.scalacheck.Gen
 trait ProjectEntitiesGenerators {
   self: EntitiesGenerators with RenkuProjectEntitiesGenerators with NonRenkuProjectEntitiesGenerators =>
 
-  lazy val anyProjectEntities: Gen[Project] = Gen.oneOf(
-    renkuProjectEntities(anyVisibility),
-    renkuProjectWithParentEntities(anyVisibility),
-    nonRenkuProjectEntities(anyVisibility),
-    nonRenkuProjectWithParentEntities(anyVisibility)
+  lazy val anyProjectEntities: Gen[Project] = projectEntities(anyVisibility)
+
+  def projectEntities(visibilityGen: Gen[Visibility]): Gen[Project] = Gen.oneOf(
+    renkuProjectEntities(visibilityGen),
+    renkuProjectWithParentEntities(visibilityGen),
+    nonRenkuProjectEntities(visibilityGen),
+    nonRenkuProjectWithParentEntities(visibilityGen)
   )
 
   implicit class ProjectGenFactoryOps(projectGen: Gen[Project]) {

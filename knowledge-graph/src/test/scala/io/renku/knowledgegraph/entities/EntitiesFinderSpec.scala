@@ -19,7 +19,10 @@
 package io.renku.knowledgegraph.entities
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.{datasets, projects}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
@@ -33,17 +36,42 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
   "findEntities" should {
 
     "return all entities sorted by name if no query is given" in new TestCase {
-      val project = projectEntities(visibilityPublic)
+      val project = renkuProjectEntities(visibilityPublic)
         .withDatasets(datasetEntities(provenanceNonModified))
-        .withActivities(activityEntities(planEntities()))
         .generateOne
 
       loadToStore(project)
 
-      finder.findEntities().unsafeRunSync() shouldBe {
+      finder.findEntities(queryParam = None).unsafeRunSync() shouldBe {
         project.to[model.Entity.Project] ::
           project.datasets.map(ds => (project -> ds).to[model.Entity.Dataset])
       }.sortBy(_.name.value)
+    }
+
+    "return entities which name matches the given query, sorted by name" in new TestCase {
+      val query = nonBlankStrings().generateOne
+
+      val matchingProject = renkuProjectEntities(visibilityPublic)
+        .withDatasets(datasetEntities(provenanceNonModified))
+        .modify(_.copy(name = sentenceContaining(query).map(_.value).generateAs(projects.Name)))
+        .generateOne
+
+      val matchingDS ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceNonModified).modify(
+            identificationLens.modify(
+              _.copy(name = sentenceContaining(query).map(_.value).generateAs(datasets.Name))
+            )
+          )
+        )
+        .generateOne
+
+      loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
+
+      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+        matchingProject.to[model.Entity.Project],
+        (matchingDSProject -> matchingDS).to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
     }
   }
 

@@ -260,6 +260,9 @@ trait DatasetEntitiesGenerators {
       projectCreationDate => factory(projectCreationDate).map(f)
   }
 
+  implicit def identificationLens[P <: Dataset.Provenance]: Lens[Dataset[P], Identification] =
+    Lens[Dataset[P], Identification](_.identification)(identification => ds => ds.copy(identification = identification))
+
   implicit def provenanceLens[P <: Dataset.Provenance]: Lens[Dataset[P], P] =
     Lens[Dataset[P], P](_.provenance)(prov => ds => ds.copy(provenance = prov))
 
