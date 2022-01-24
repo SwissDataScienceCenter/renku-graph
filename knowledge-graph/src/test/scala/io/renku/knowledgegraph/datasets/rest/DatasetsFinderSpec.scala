@@ -161,7 +161,10 @@ class DatasetsFinderSpec
           result.results shouldBe List(
             (dataset1, project1),
             (dataset2, project2)
-          ).toDatasetSearchResult(matchIdFrom = result.results, projectsCount = 3).toList
+          ).toDatasetSearchResult(matchIdFrom = result.results,
+                                  projectsCount = 3,
+                                  matchProjectFrom = List(project1, project2, project2Fork)
+          ).toList
           result.pagingInfo.total shouldBe Total(1)
         }
 
@@ -258,7 +261,9 @@ class DatasetsFinderSpec
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
-          result.results          shouldBe List((dataset -> project).toDatasetSearchResult(projectsCount = 2))
+          result.results shouldBe List(
+            dataset.toDatasetSearchResult(projectsCount = 2, result.results, List(project, fork))
+          )
           result.pagingInfo.total shouldBe Total(1)
         }
 
@@ -300,7 +305,7 @@ class DatasetsFinderSpec
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
             .unsafeRunSync()
 
-          result.results should contain theSameElementsAs List(
+          result.results shouldBe List(
             (datasetModification, project).toDatasetSearchResult(projectsCount = 1),
             (modificationOfModificationOnFork, forkUpdated).toDatasetSearchResult(projectsCount = 1)
           ).sortBy(_.title)
@@ -661,8 +666,11 @@ class DatasetsFinderSpec
         .results
 
       results shouldBe List(
-        (dataset1, project1).toDatasetSearchResult(projectsCount = 2),
-        (dataset2, project2).toDatasetSearchResult(projectsCount = project2Forks.size + 1),
+        dataset1.toDatasetSearchResult(projectsCount = 2, results, List(project1, project1Fork)),
+        dataset2.toDatasetSearchResult(projectsCount = project2Forks.size + 1,
+                                       results,
+                                       project2 :: project2Forks.toList
+        ),
         (dataset3, project3).toDatasetSearchResult(projectsCount = 1)
       ).sortBy(_.projectsCount)
     }
@@ -855,11 +863,35 @@ class DatasetsFinderSpec
     lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, accessTokens.generateOne)
   }
 
-  private implicit class DatasetOps(datasetAndProject: (Dataset[Dataset.Provenance], RenkuProject)) {
+  private implicit class DatasetAndProjectOps(datasetAndProject: (Dataset[Dataset.Provenance], RenkuProject)) {
 
     private lazy val (dataset, project) = datasetAndProject
 
-    def toDatasetSearchResult(projectsCount: Int): DatasetSearchResult =
+    def toDatasetSearchResult(projectsCount: Int): DatasetSearchResult = DatasetSearchResult(
+      dataset.identification.identifier,
+      dataset.identification.title,
+      dataset.identification.name,
+      dataset.additionalInfo.maybeDescription,
+      dataset.provenance.creators.map(_.to[DatasetCreator]),
+      dataset.provenance.date,
+      project.path,
+      ProjectsCount(projectsCount),
+      dataset.additionalInfo.keywords.sorted,
+      dataset.additionalInfo.images
+    )
+  }
+
+  private implicit class DatasetOps(dataset: Dataset[Dataset.Provenance]) {
+
+    def toDatasetSearchResult(projectsCount:    Int,
+                              results:          List[DatasetSearchResult],
+                              matchProjectFrom: List[RenkuProject]
+    ): DatasetSearchResult = {
+      val matchingResult =
+        results
+          .find(_.id == dataset.identification.identifier)
+          .getOrElse(fail("Cannot find matching DS in the results"))
+
       DatasetSearchResult(
         dataset.identification.identifier,
         dataset.identification.title,
@@ -867,18 +899,25 @@ class DatasetsFinderSpec
         dataset.additionalInfo.maybeDescription,
         dataset.provenance.creators.map(_.to[DatasetCreator]),
         dataset.provenance.date,
-        project.path,
+        matchProjectFrom
+          .find(_.path == matchingResult.exemplarProjectPath)
+          .map(_.path)
+          .getOrElse(fail("Cannot find matching exemplar project path in the results")),
         ProjectsCount(projectsCount),
         dataset.additionalInfo.keywords.sorted,
         dataset.additionalInfo.images
       )
+    }
   }
 
   private implicit class ProjectsListOps(datasetsAndProjects: List[(Dataset[Dataset.Provenance], RenkuProject)]) {
 
-    def toDatasetSearchResult(matchIdFrom: List[DatasetSearchResult], projectsCount: Int): Option[DatasetSearchResult] =
+    def toDatasetSearchResult(matchIdFrom:      List[DatasetSearchResult],
+                              projectsCount:    Int,
+                              matchProjectFrom: List[RenkuProject] = datasetsAndProjects.map(_._2)
+    ): Option[DatasetSearchResult] =
       datasetsAndProjects
         .find { case (dataset, _) => matchIdFrom.exists(_.id == dataset.identifier) }
-        .map(_.toDatasetSearchResult(projectsCount))
+        .map { case (ds, _) => ds.toDatasetSearchResult(projectsCount, matchIdFrom, matchProjectFrom) }
   }
 }
