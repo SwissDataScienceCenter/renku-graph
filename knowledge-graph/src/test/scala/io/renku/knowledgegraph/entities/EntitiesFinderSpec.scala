@@ -45,14 +45,14 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(project)
 
-      finder.findEntities(Filters(maybeQuery = None, maybeEntityType = None)).unsafeRunSync() shouldBe List(
+      finder.findEntities(Filters()).unsafeRunSync() shouldBe List(
         project.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
     }
   }
 
-  "findEntities - with query" should {
+  "findEntities - with query filter" should {
 
     "return entities which name matches the given query, sorted by name" in new TestCase {
       val query = nonBlankStrings().generateOne
@@ -74,7 +74,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .findEntities(Filters(maybeQuery = Query(query.value).some))
         .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
@@ -107,7 +107,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .findEntities(Filters(maybeQuery = Query(query.value).some))
         .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
@@ -134,7 +134,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .findEntities(Filters(maybeQuery = Query(query.value).some))
         .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
@@ -151,7 +151,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .findEntities(Filters(maybeQuery = Query(query.value).some))
         .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project]
       ).sortBy(_.name.value)
@@ -186,7 +186,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .findEntities(Filters(maybeQuery = Query(query.value).some))
         .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
@@ -194,7 +194,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     }
   }
 
-  "findEntities - with entity type" should {
+  "findEntities - with entity type filter" should {
 
     "return only projects when 'project' type given" in new TestCase {
       val _ ::~ project = renkuProjectEntities(visibilityPublic)
@@ -204,7 +204,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(project)
 
       finder
-        .findEntities(Filters(maybeEntityType = EntityType.Project.some, maybeQuery = None))
+        .findEntities(Filters(maybeEntityType = EntityType.Project.some))
         .unsafeRunSync() shouldBe List(project.to[model.Entity.Project]).sortBy(_.name.value)
     }
 
@@ -216,8 +216,55 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(project)
 
       finder
-        .findEntities(Filters(maybeEntityType = EntityType.Dataset.some, maybeQuery = None))
+        .findEntities(Filters(maybeEntityType = EntityType.Dataset.some))
         .unsafeRunSync() shouldBe List(dsAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
+    }
+  }
+
+  "findEntities - with creator filter" should {
+
+    "return entities with matching creator only" in new TestCase {
+      val creator = userNames.generateOne
+
+      val matchingProject = renkuProjectEntities(visibilityPublic)
+        .modify(creatorLens.modify(_ => personEntities.generateOne.copy(name = creator).some))
+        .generateOne
+
+      val matchingDsAndProject @ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceNonModified).modify(
+            provenanceLens.modify(
+              creatorsLens.modify(_ =>
+                Set(
+                  personEntities.generateOne,
+                  personEntities.generateOne.copy(name = creator)
+                )
+              )
+            )
+          )
+        )
+        .generateOne
+
+      loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
+
+      finder
+        .findEntities(Filters(maybeCreator = creator.some))
+        .unsafeRunSync() shouldBe List(
+        matchingProject.to[model.Entity.Project],
+        matchingDsAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "return no entities when no match on creator" in new TestCase {
+      val dsAndProject @ _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Filters(maybeCreator = userNames.generateSome))
+        .unsafeRunSync() shouldBe Nil
     }
   }
 

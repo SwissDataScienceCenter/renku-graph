@@ -90,6 +90,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |               renku:projectVisibility ?visibility;
         |               schema:dateCreated ?dateCreated.
         |    OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
+        |    ${filters.maybeOnCreatorName("?maybeCreatorName")}
         |    OPTIONAL { ?projectId schema:description ?maybeDescription }
         |    OPTIONAL { ?projectId schema:keywords ?keyword }
         |  }
@@ -100,38 +101,66 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
 
   private def maybeDatasetsQuery(filters: Filters) = (filters whenRequesting EntityType.Dataset) {
     s"""|{
-        |  SELECT ?entityType ?name (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
-        |    ?maybeDateCreated ?maybeDatePublished
-        |    (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorsNames)
-        |    ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+        |  SELECT ?entityType ?name ?visibilities ?maybeDateCreated 
+        |    ?maybeDatePublished ?creatorsNames ?maybeDescription ?keywords
         |  WHERE {
-        |     {
-        |      SELECT DISTINCT ?dsId
+        |    {
+        |      SELECT ?entityType ?name (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
+        |        ?maybeDateCreated ?maybeDatePublished
+        |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorsNames)
+        |        ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
         |      WHERE {
-        |        {
-        |          ?id text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
-        |        } {
-        |          ?id a schema:Dataset
-        |          BIND (?id AS ?dsId)
-        |        } UNION {
-        |          ?dsId schema:creator ?id;
-        |                a schema:Dataset.
+        |         {
+        |          SELECT DISTINCT ?dsId
+        |          WHERE {
+        |            {
+        |              ?id text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
+        |            } {
+        |              ?id a schema:Dataset
+        |              BIND (?id AS ?dsId)
+        |            } UNION {
+        |              ?dsId schema:creator ?id;
+        |                    a schema:Dataset.
+        |            }
+        |          }
         |        }
+        |        BIND ('dataset' AS ?entityType)
+        |        ?dsId renku:slug ?name.
+        |        ?projectId renku:hasDataset ?dsId;
+        |                   renku:projectVisibility ?visibility.
+        |        OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
+        |        OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
+        |        OPTIONAL { ?dsId schema:datePublished ?maybeDatePublished }.
+        |        OPTIONAL { ?dsId schema:description ?maybeDescription }
+        |        OPTIONAL { ?dsId schema:keywords ?keyword }
         |      }
+        |      GROUP BY ?entityType ?name ?maybeDateCreated ?maybeDatePublished ?maybeDescription
         |    }
-        |    BIND ('dataset' AS ?entityType)
-        |    ?dsId renku:slug ?name.
-        |    ?projectId renku:hasDataset ?dsId;
-        |               renku:projectVisibility ?visibility.
-        |    OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
-        |    OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
-        |    OPTIONAL { ?dsId schema:datePublished ?maybeDatePublished }.
-        |    OPTIONAL { ?dsId schema:description ?maybeDescription }
-        |    OPTIONAL { ?dsId schema:keywords ?keyword }
+        |    ${filters.maybeOnCreatorsNames("?creatorsNames")}
         |  }
-        |  GROUP BY ?entityType ?name ?maybeDateCreated ?maybeDatePublished ?maybeDescription
         |}
         |""".stripMargin
+  }
+
+  private implicit class FiltersOps(filters: Filters) {
+    lazy val query: String = filters.maybeQuery.map(_.value).getOrElse("*")
+
+    def whenRequesting(entityType: Filters.EntityType)(query: => String): Option[String] =
+      Option.when(filters.maybeEntityType.forall(_ == entityType))(query)
+
+    def maybeOnCreatorName(variableName: String): String =
+      filters.maybeCreator
+        .map { creator =>
+          s"FILTER (IF (BOUND($variableName), $variableName = '$creator', false))"
+        }
+        .getOrElse("")
+
+    def maybeOnCreatorsNames(variableName: String): String =
+      filters.maybeCreator
+        .map { creator =>
+          s"FILTER (IF (BOUND($variableName), CONTAINS($variableName, '$creator'), false))"
+        }
+        .getOrElse("")
   }
 
   private implicit lazy val recordsDecoder: Decoder[List[Entity]] = {
@@ -208,12 +237,5 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
     }
 
     _.downField("results").downField("bindings").as(decodeList(entity))
-  }
-
-  private implicit class FiltersOps(filters: Filters) {
-    lazy val query: String = filters.maybeQuery.map(_.value).getOrElse("*")
-
-    def whenRequesting(entityType: Filters.EntityType)(query: => String): Option[String] =
-      Option.when(filters.maybeEntityType.forall(_ == entityType))(query)
   }
 }
