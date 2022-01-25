@@ -1,15 +1,18 @@
 package io.renku.knowledgegraph.entities
 
 import io.renku.graph.model.{projects, users}
-import io.renku.tinytypes.constraints.NonBlank
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
+import io.renku.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
+
+import java.time.Instant
 
 object Endpoint {
 
-  final case class Filters(maybeQuery:      Option[Endpoint.Filters.Query] = None,
-                           maybeEntityType: Option[Endpoint.Filters.EntityType] = None,
+  final case class Filters(maybeQuery:      Option[Filters.Query] = None,
+                           maybeEntityType: Option[Filters.EntityType] = None,
                            maybeCreator:    Option[users.Name] = None,
-                           maybeVisibility: Option[projects.Visibility] = None
+                           maybeVisibility: Option[projects.Visibility] = None,
+                           maybeDate:       Option[Filters.Date] = None
   )
 
   object Filters {
@@ -28,5 +31,8 @@ object Endpoint {
         throw new IllegalArgumentException(s"'$value' unknown EntityType")
       }
     }
+
+    final class Date private (val value: Instant) extends AnyVal with InstantTinyType
+    object Date                                   extends TinyTypeFactory[Date](new Date(_)) with InstantNotInTheFuture
   }
 }

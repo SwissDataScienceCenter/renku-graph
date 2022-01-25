@@ -33,15 +33,17 @@ private trait EntitiesFinder[F[_]] {
 private class EntitiesFinderImpl[F[_]: Async: Logger](
     rdfStoreConfig: RdfStoreConfig,
     timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder, printQueries = true)
     with EntitiesFinder[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
-  import io.renku.graph.model.Schemas.{renku, schema, text}
+  import io.renku.graph.model.Schemas.{renku, schema, text, xsd}
   import io.renku.graph.model.{datasets, projects}
   import io.renku.rdfstore.SparqlQuery
   import io.renku.rdfstore.SparqlQuery.Prefixes
+
+  import java.time.{LocalDateTime, ZoneOffset}
 
   override def findEntities(filters: Filters): F[List[Entity]] =
     queryExpecting[List[Entity]](using = query(filters))
@@ -49,7 +51,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
   private def query(filters: Filters) =
     SparqlQuery.of(
       name = "cross-entity search",
-      Prefixes.of(renku -> "renku", schema -> "schema", text -> "text"),
+      Prefixes.of(renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
       s"""|SELECT ?entityType ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription ?keywords
           |  ?visibilities ?maybeDateCreated ?maybeDatePublished ?creatorsNames
           |WHERE {
@@ -90,6 +92,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |               renku:projectVisibility ?visibility;
         |               schema:dateCreated ?dateCreated.
         |    ${filters.maybeOnVisibility("?visibility")}
+        |    ${filters.maybeOnProjectDateCreated("?dateCreated")}
         |    OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
         |    ${filters.maybeOnCreatorName("?maybeCreatorName")}
         |    OPTIONAL { ?projectId schema:description ?maybeDescription }
@@ -133,6 +136,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |        OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
         |        OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
         |        OPTIONAL { ?dsId schema:datePublished ?maybeDatePublished }.
+        |        ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
         |        OPTIONAL { ?dsId schema:description ?maybeDescription }
         |        OPTIONAL { ?dsId schema:keywords ?keyword }
         |      }
@@ -169,6 +173,29 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
     def maybeOnVisibility(variableName: String): String =
       filters.maybeVisibility
         .map(visibility => s"FILTER ($variableName = '$visibility')")
+        .getOrElse("")
+
+    def maybeOnProjectDateCreated(variableName: String): String =
+      filters.maybeDate
+        .map(date => s"FILTER ($variableName = xsd:dateTime('$date'))")
+        .getOrElse("")
+
+    def maybeOnDatasetDates(dateCreatedVariable: String, datePublishedVariable: String): String =
+      filters.maybeDate
+        .map(date =>
+          "FILTER (" +
+            s"IF (" +
+            s"  BOUND($dateCreatedVariable), " +
+            s"    $dateCreatedVariable = xsd:dateTime('$date'), " +
+            s"    (IF (" +
+            s"      BOUND($datePublishedVariable), " +
+            s"        $datePublishedVariable = xsd:date('${LocalDateTime.ofInstant(date.value, ZoneOffset.UTC).toLocalDate}'), " +
+            s"        false" +
+            s"      )" +
+            s"    )" +
+            s"  )" +
+            s")"
+        )
         .getOrElse("")
   }
 

@@ -174,7 +174,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
             renku  -> "renku",
             wfdesc -> "wfdesc",
             wfprov -> "wfprov",
-            schema -> "schema"
+            schema -> "schema",
+            xsd    -> "xsd"
           ),
           query
         )

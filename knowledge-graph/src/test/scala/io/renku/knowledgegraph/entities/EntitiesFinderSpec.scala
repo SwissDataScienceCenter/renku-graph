@@ -34,6 +34,8 @@ import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.{LocalDateTime, ZoneOffset}
+
 class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryRdfStore with IOSpec {
 
   "findEntities - no filters" should {
@@ -290,6 +292,68 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder
         .findEntities(Filters(maybeVisibility = visibilityNonPublic.generateSome))
+        .unsafeRunSync() shouldBe Nil
+    }
+  }
+
+  "findEntities - with date filter" should {
+
+    "return entities with matching date only" in new TestCase {
+      val date = dateParams.generateOne
+
+      val matchingDS ::~ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+        .modify(_.copy(dateCreated = projects.DateCreated(date.value)))
+        .addDataset(
+          datasetEntities(provenanceInternal)
+            .modify(provenanceLens[Dataset.Provenance.Internal].modify(_.copy(date = datasets.DateCreated(date.value))))
+        )
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(matchingDSProject, projectEntities(visibilityPublic).generateOne)
+
+      finder
+        .findEntities(Filters(maybeDate = date.some))
+        .unsafeRunSync() shouldBe List(
+        matchingDSProject.to[model.Entity.Project],
+        (matchingDS -> matchingDSProject).to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "return entities with matching date only - case of DatePublished" in new TestCase {
+      val date = dateParams.generateOne
+
+      val matchingDS ::~ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceImportedExternal)
+            .modify(
+              provenanceLens[Dataset.Provenance.ImportedExternal]
+                .modify(
+                  _.copy(date = datasets.DatePublished(LocalDateTime.ofInstant(date.value, ZoneOffset.UTC).toLocalDate))
+                )
+            )
+        )
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(matchingDSProject, projectEntities(visibilityPublic).generateOne)
+
+      finder
+        .findEntities(Filters(maybeDate = date.some))
+        .unsafeRunSync() shouldBe List(
+        (matchingDS -> matchingDSProject).to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "return no entities when no match on date" in new TestCase {
+      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Filters(maybeDate = dateParams.generateSome))
         .unsafeRunSync() shouldBe Nil
     }
   }

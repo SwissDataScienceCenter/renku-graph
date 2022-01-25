@@ -205,7 +205,7 @@ object CommonGraphGenerators {
     SparqlQuery.Prefix("wfdesc", Schemas.wfdesc),
     SparqlQuery.Prefix("rdf", Schemas.rdf),
     SparqlQuery.Prefix("rdfs", Schemas.rdfs),
-    SparqlQuery.Prefix("xmlSchema", Schemas.xml),
+    SparqlQuery.Prefix("xsd", Schemas.xsd),
     SparqlQuery.Prefix("schema", Schemas.schema),
     SparqlQuery.Prefix("renku", Schemas.renku)
   )
