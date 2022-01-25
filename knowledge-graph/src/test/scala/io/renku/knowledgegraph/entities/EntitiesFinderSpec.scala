@@ -234,12 +234,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             provenanceLens.modify(
-              creatorsLens.modify(_ =>
-                Set(
-                  personEntities.generateOne,
-                  personEntities.generateOne.copy(name = creator)
-                )
-              )
+              creatorsLens.modify(_ => Set(personEntities.generateOne, personEntities.generateOne.copy(name = creator)))
             )
           )
         )
@@ -255,8 +250,8 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       ).sortBy(_.name.value)
     }
 
-    "return no entities when no match on creator" in new TestCase {
-      val dsAndProject @ _ ::~ project = renkuProjectEntities(visibilityPublic)
+    "return no entities when no match on visibility" in new TestCase {
+      val _ ::~ project = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -264,6 +259,37 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder
         .findEntities(Filters(maybeCreator = userNames.generateSome))
+        .unsafeRunSync() shouldBe Nil
+    }
+  }
+
+  "findEntities - with visibility filter" should {
+
+    "return entities with matching visibility only" in new TestCase {
+
+      val matchingDsAndProject @ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(matchingDSProject, projectEntities(visibilityNonPublic).generateOne)
+
+      finder
+        .findEntities(Filters(maybeVisibility = projects.Visibility.Public.some))
+        .unsafeRunSync() shouldBe List(
+        matchingDSProject.to[model.Entity.Project],
+        matchingDsAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "return no entities when no match on creator" in new TestCase {
+      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Filters(maybeVisibility = visibilityNonPublic.generateSome))
         .unsafeRunSync() shouldBe Nil
     }
   }

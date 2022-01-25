@@ -89,6 +89,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |               renku:projectPath ?path;
         |               renku:projectVisibility ?visibility;
         |               schema:dateCreated ?dateCreated.
+        |    ${filters.maybeOnVisibility("?visibility")}
         |    OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
         |    ${filters.maybeOnCreatorName("?maybeCreatorName")}
         |    OPTIONAL { ?projectId schema:description ?maybeDescription }
@@ -128,6 +129,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |        ?dsId renku:slug ?name.
         |        ?projectId renku:hasDataset ?dsId;
         |                   renku:projectVisibility ?visibility.
+        |        ${filters.maybeOnVisibility("?visibility")}
         |        OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
         |        OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
         |        OPTIONAL { ?dsId schema:datePublished ?maybeDatePublished }.
@@ -143,6 +145,8 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
   }
 
   private implicit class FiltersOps(filters: Filters) {
+    import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+
     lazy val query: String = filters.maybeQuery.map(_.value).getOrElse("*")
 
     def whenRequesting(entityType: Filters.EntityType)(query: => String): Option[String] =
@@ -151,15 +155,20 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
     def maybeOnCreatorName(variableName: String): String =
       filters.maybeCreator
         .map { creator =>
-          s"FILTER (IF (BOUND($variableName), $variableName = '$creator', false))"
+          s"FILTER (IF (BOUND($variableName), $variableName = '${sparqlEncode(creator.show)}', false))"
         }
         .getOrElse("")
 
     def maybeOnCreatorsNames(variableName: String): String =
       filters.maybeCreator
         .map { creator =>
-          s"FILTER (IF (BOUND($variableName), CONTAINS($variableName, '$creator'), false))"
+          s"FILTER (IF (BOUND($variableName), CONTAINS($variableName, '${sparqlEncode(creator.show)}'), false))"
         }
+        .getOrElse("")
+
+    def maybeOnVisibility(variableName: String): String =
+      filters.maybeVisibility
+        .map(visibility => s"FILTER ($variableName = '$visibility')")
         .getOrElse("")
   }
 

@@ -1,6 +1,6 @@
 package io.renku.knowledgegraph.entities
 
-import io.renku.graph.model.users
+import io.renku.graph.model.{projects, users}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -8,7 +8,8 @@ object Endpoint {
 
   final case class Filters(maybeQuery:      Option[Endpoint.Filters.Query] = None,
                            maybeEntityType: Option[Endpoint.Filters.EntityType] = None,
-                           maybeCreator:    Option[users.Name] = None
+                           maybeCreator:    Option[users.Name] = None,
+                           maybeVisibility: Option[projects.Visibility] = None
   )
 
   object Filters {
