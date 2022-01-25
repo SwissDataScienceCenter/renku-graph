@@ -28,7 +28,7 @@ package object entities {
 
   val queryParams: Gen[Endpoint.QueryParam] = nonBlankStrings(minLength = 5) map (_.value) map Endpoint.QueryParam.apply
 
-  private[entities] implicit def projectConverter[E <: testentities.Project]: E => Entity.Project = project =>
+  private[entities] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
     Entity.Project(
       project.name,
       project.path,
@@ -39,8 +39,8 @@ package object entities {
       project.maybeDescription
     )
 
-  private[entities] implicit def datasetConverter[E <: testentities.Project]
-      : ((E, testentities.Dataset[testentities.Dataset.Provenance])) => Entity.Dataset = { case (project, dataset) =>
+  private[entities] implicit def datasetConverter[P <: testentities.Project]
+      : ((testentities.Dataset[testentities.Dataset.Provenance], P)) => Entity.Dataset = { case (dataset, project) =>
     Entity.Dataset(
       dataset.identification.name,
       project.visibility,
@@ -51,11 +51,10 @@ package object entities {
     )
   }
 
-  private[entities] implicit class ProjectDatasetOps[P <: testentities.Project](
-      projectAndDataset:   (P, testentities.Dataset[testentities.Dataset.Provenance])
-  )(implicit renkuBaseUrl: RenkuBaseUrl) {
-
-    def to[T](implicit convert: ((P, testentities.Dataset[testentities.Dataset.Provenance])) => T): T =
-      convert(projectAndDataset)
+  private[entities] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance,
+                                                     +P <: testentities.Project
+  ](datasetAndProject: (testentities.Dataset[PROV], P))(implicit renkuBaseUrl: RenkuBaseUrl) {
+    def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T =
+      convert(datasetAndProject)
   }
 }

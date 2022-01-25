@@ -58,8 +58,15 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
           |      {
           |        SELECT DISTINCT ?projectId
           |        WHERE { 
-          |          ?projectId text:query (schema:name schema:keywords schema:description renku:projectNamespaces '$query').
-          |          ?projectId a schema:Project
+          |          {
+          |            ?id text:query (schema:name schema:keywords schema:description renku:projectNamespaces '$query')
+          |          } {
+          |            ?id a schema:Project
+          |            BIND (?id AS ?projectId)
+          |          } UNION {
+          |            ?projectId schema:creator ?id;
+          |                       a schema:Project.
+          |          }
           |        }
           |      }
           |      BIND ('project' AS ?entityType)
@@ -80,9 +87,16 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
           |    WHERE {
           |       {
           |        SELECT DISTINCT ?dsId
-          |        WHERE { 
-          |          ?dsId text:query (renku:slug schema:keywords schema:description '$query').
-          |          ?dsId a schema:Dataset
+          |        WHERE {
+          |          {
+          |            ?id text:query (renku:slug schema:keywords schema:description schema:name '$query').
+          |          } {
+          |            ?id a schema:Dataset
+          |            BIND (?id AS ?dsId)
+          |          } UNION {
+          |            ?dsId schema:creator ?id;
+          |                  a schema:Dataset.
+          |          }
           |        }
           |      }
           |      BIND ('dataset' AS ?entityType)

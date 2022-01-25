@@ -22,11 +22,11 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.{datasets, projects}
+import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{datasets, projects, users}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.graph.model.GraphModelGenerators._
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -37,16 +37,16 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
   "findEntities" should {
 
     "return all entities sorted by name if no query is given" in new TestCase {
-      val project = renkuProjectEntities(visibilityPublic)
-        .withDatasets(datasetEntities(provenanceNonModified))
+      val matchingDsAndProject @ _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
       loadToStore(project)
 
-      finder.findEntities(queryParam = None).unsafeRunSync() shouldBe {
-        project.to[model.Entity.Project] ::
-          project.datasets.map(ds => (project -> ds).to[model.Entity.Dataset])
-      }.sortBy(_.name.value)
+      finder.findEntities(queryParam = None).unsafeRunSync() shouldBe List(
+        project.to[model.Entity.Project],
+        matchingDsAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
     }
 
     "return entities which name matches the given query, sorted by name" in new TestCase {
@@ -56,7 +56,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .modify(_.copy(name = sentenceContaining(query).map(_.value).generateAs(projects.Name)))
         .generateOne
 
-      val matchingDS ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+      val matchingDsAndProject @ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             identificationLens.modify(
@@ -70,7 +70,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
-        (matchingDSProject -> matchingDS).to[model.Entity.Dataset]
+        matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
     }
 
@@ -85,7 +85,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         )
         .generateOne
 
-      val matchingDS ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+      val matchingDsAndProject @ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             additionalInfoLens.modify(
@@ -101,7 +101,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
-        (matchingDSProject -> matchingDS).to[model.Entity.Dataset]
+        matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
     }
 
@@ -112,7 +112,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .modify(_.copy(maybeDescription = sentenceContaining(query).map(_.value).generateAs(projects.Description).some))
         .generateOne
 
-      val matchingDS ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+      val matchingDsAndProject @ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             additionalInfoLens.modify(
@@ -126,7 +126,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
-        (matchingDSProject -> matchingDS).to[model.Entity.Dataset]
+        matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
     }
 
@@ -141,6 +141,40 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project]
+      ).sortBy(_.name.value)
+    }
+
+    "return entities which creator name matches the given query, sorted by name" in new TestCase {
+      val query = nonBlankStrings().generateOne
+
+      val matchingProject = renkuProjectEntities(visibilityPublic)
+        .modify(
+          creatorLens.modify(_ =>
+            personEntities.generateOne.copy(name = sentenceContaining(query).map(_.value).generateAs(users.Name)).some
+          )
+        )
+        .generateOne
+
+      val matchingDsAndProject @ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceNonModified).modify(
+            provenanceLens.modify(
+              creatorsLens.modify(_ =>
+                Set(
+                  personEntities.generateOne.copy(name = sentenceContaining(query).map(_.value).generateAs(users.Name)),
+                  personEntities.generateOne
+                )
+              )
+            )
+          )
+        )
+        .generateOne
+
+      loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
+
+      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+        matchingProject.to[model.Entity.Project],
+        matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
     }
   }
