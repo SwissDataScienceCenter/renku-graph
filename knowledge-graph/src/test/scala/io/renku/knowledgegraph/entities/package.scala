@@ -19,14 +19,16 @@
 package io.renku.knowledgegraph
 
 import entities.model._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.model.{RenkuBaseUrl, testentities}
 import org.scalacheck.Gen
-import eu.timepit.refined.auto._
 
 package object entities {
+  import Endpoint._
 
-  val queryParams: Gen[Endpoint.QueryParam] = nonBlankStrings(minLength = 5) map (_.value) map Endpoint.QueryParam.apply
+  val queryParams: Gen[Filters.Query]      = nonBlankStrings(minLength = 5).map(v => Filters.Query(v.value))
+  val typeParams:  Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
 
   private[entities] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
     Entity.Project(

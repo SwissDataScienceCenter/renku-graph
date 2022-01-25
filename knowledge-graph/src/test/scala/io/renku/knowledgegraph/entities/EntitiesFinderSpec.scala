@@ -18,6 +18,8 @@
 
 package io.renku.knowledgegraph.entities
 
+import Endpoint._
+import Filters._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
@@ -34,7 +36,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryRdfStore with IOSpec {
 
-  "findEntities" should {
+  "findEntities - no filters" should {
 
     "return all entities sorted by name if no query is given" in new TestCase {
       val matchingDsAndProject @ _ ::~ project = renkuProjectEntities(visibilityPublic)
@@ -43,11 +45,14 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(project)
 
-      finder.findEntities(queryParam = None).unsafeRunSync() shouldBe List(
+      finder.findEntities(Filters(maybeQuery = None, maybeEntityType = None)).unsafeRunSync() shouldBe List(
         project.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
     }
+  }
+
+  "findEntities - with query" should {
 
     "return entities which name matches the given query, sorted by name" in new TestCase {
       val query = nonBlankStrings().generateOne
@@ -68,7 +73,9 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
-      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+      finder
+        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
@@ -99,7 +106,9 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
-      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+      finder
+        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
@@ -124,7 +133,9 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
-      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+      finder
+        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
@@ -139,7 +150,9 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(matchingProject, projectEntities(visibilityPublic).generateOne)
 
-      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+      finder
+        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project]
       ).sortBy(_.name.value)
     }
@@ -172,10 +185,39 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
-      finder.findEntities(queryParam = Endpoint.QueryParam(query.value).some).unsafeRunSync() shouldBe List(
+      finder
+        .findEntities(Filters(maybeQuery = Query(query.value).some, maybeEntityType = None))
+        .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
+    }
+  }
+
+  "findEntities - with entity type" should {
+
+    "return only projects when 'project' type given" in new TestCase {
+      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Filters(maybeEntityType = EntityType.Project.some, maybeQuery = None))
+        .unsafeRunSync() shouldBe List(project.to[model.Entity.Project]).sortBy(_.name.value)
+    }
+
+    "return only datasets when 'dataset' type given" in new TestCase {
+      val dsAndProject @ _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Filters(maybeEntityType = EntityType.Dataset.some, maybeQuery = None))
+        .unsafeRunSync() shouldBe List(dsAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
     }
   }
 
