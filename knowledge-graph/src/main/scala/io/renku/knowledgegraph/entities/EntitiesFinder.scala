@@ -27,7 +27,7 @@ import model._
 import org.typelevel.log4cats.Logger
 
 private trait EntitiesFinder[F[_]] {
-  def findEntities(filters: Filters): F[List[Entity]]
+  def findEntities(filters: Filters, sorting: Sorting.By): F[List[Entity]]
 }
 
 private class EntitiesFinderImpl[F[_]: Async: Logger](
@@ -45,20 +45,20 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
 
   import java.time.{Instant, ZoneOffset}
 
-  override def findEntities(filters: Filters): F[List[Entity]] =
-    queryExpecting[List[Entity]](using = query(filters))
+  override def findEntities(filters: Filters, sorting: Sorting.By): F[List[Entity]] =
+    queryExpecting[List[Entity]](using = query(filters, sorting))
 
-  private def query(filters: Filters) =
+  private def query(filters: Filters, sorting: Sorting.By) =
     SparqlQuery.of(
       name = "cross-entity search",
       Prefixes.of(renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
-      s"""|SELECT ?entityType ?matchingScore ?name ?path ?visibility ?dateCreated 
+      s"""|SELECT ?entityType ?matchingScore ?name ?path ?visibility ?date 
           |  ?maybeCreatorName ?maybeDescription ?keywords ?visibilities 
           |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames
           |WHERE {
           |  ${subqueries(filters).mkString(" UNION ")}
           |}
-          |ORDER BY ?name
+          |${`ORDER BY`(sorting)}
           |""".stripMargin
     )
 
@@ -70,7 +70,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
 
   private def maybeProjectsQuery(filters: Filters) = (filters whenRequesting EntityType.Project) {
     s"""|{
-        |  SELECT ?entityType ?matchingScore ?name ?path ?visibility ?dateCreated ?maybeCreatorName
+        |  SELECT ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName
         |    ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
         |  WHERE { 
         |    {
@@ -92,27 +92,28 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |    ?projectId schema:name ?name;
         |               renku:projectPath ?path;
         |               renku:projectVisibility ?visibility;
-        |               schema:dateCreated ?dateCreated.
+        |               schema:dateCreated ?date.
         |    ${filters.maybeOnVisibility("?visibility")}
-        |    ${filters.maybeOnProjectDateCreated("?dateCreated")}
+        |    ${filters.maybeOnProjectDateCreated("?date")}
         |    OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
         |    ${filters.maybeOnCreatorName("?maybeCreatorName")}
         |    OPTIONAL { ?projectId schema:description ?maybeDescription }
         |    OPTIONAL { ?projectId schema:keywords ?keyword }
         |  }
-        |  GROUP BY ?entityType ?matchingScore ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
+        |  GROUP BY ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName ?maybeDescription
         |}
         |""".stripMargin
   }
 
   private def maybeDatasetsQuery(filters: Filters) = (filters whenRequesting EntityType.Dataset) {
     s"""|{
-        |  SELECT ?entityType ?matchingScore ?name ?visibilities ?maybeDateCreated 
-        |    ?maybeDatePublished ?creatorsNames ?maybeDescription ?keywords
+        |  SELECT ?entityType ?matchingScore ?name ?visibilities 
+        |    ?maybeDateCreated ?maybeDatePublished ?date 
+        |    ?creatorsNames ?maybeDescription ?keywords
         |  WHERE {
         |    {
         |      SELECT ?entityType ?matchingScore ?name (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
-        |        ?maybeDateCreated ?maybeDatePublished
+        |        ?maybeDateCreated ?maybeDatePublished ?date
         |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorsNames)
         |        ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
         |      WHERE {
@@ -142,8 +143,9 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |        ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
         |        OPTIONAL { ?dsId schema:description ?maybeDescription }
         |        OPTIONAL { ?dsId schema:keywords ?keyword }
+        |        BIND(IF(BOUND(?maybeDateCreated), ?maybeDateCreated, ?maybeDatePublished) AS ?date)
         |      }
-        |      GROUP BY ?entityType ?matchingScore ?name ?maybeDateCreated ?maybeDatePublished ?maybeDescription
+        |      GROUP BY ?entityType ?matchingScore ?name ?maybeDateCreated ?maybeDatePublished ?date ?maybeDescription
         |    }
         |    ${filters.maybeOnCreatorsNames("?creatorsNames")}
         |  }
@@ -180,8 +182,8 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
 
     def maybeOnProjectDateCreated(variableName: String): String =
       filters.maybeDate
-        .map(date => s"""|BIND (${date.encodeAsXsdZonedDate} AS ?date)
-                         |FILTER (xsd:date($variableName) = ?date)""".stripMargin)
+        .map(date => s"""|BIND (${date.encodeAsXsdZonedDate} AS ?dateZoned)
+                         |FILTER (xsd:date($variableName) = ?dateZoned)""".stripMargin)
         .getOrElse("")
 
     def maybeOnDatasetDates(dateCreatedVariable: String, datePublishedVariable: String): String =
@@ -210,6 +212,12 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
     }
   }
 
+  private def `ORDER BY`(sorting: Sorting.By): String = sorting.property match {
+    case Sorting.ByName          => s"ORDER BY ${sorting.direction}(?name)"
+    case Sorting.ByDate          => s"ORDER BY ${sorting.direction}(?date)"
+    case Sorting.ByMatchingScore => s"ORDER BY ${sorting.direction}(?matchingScore)"
+  }
+
   private implicit lazy val recordsDecoder: Decoder[List[Entity]] = {
     import Decoder._
     import io.circe.DecodingFailure
@@ -230,7 +238,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         name             <- cursor.downField("name").downField("value").as[projects.Name]
         path             <- cursor.downField("path").downField("value").as[projects.Path]
         visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
-        dateCreated      <- cursor.downField("dateCreated").downField("value").as[projects.DateCreated]
+        dateCreated      <- cursor.downField("date").downField("value").as[projects.DateCreated]
         maybeCreatorName <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
         keywords <-
           cursor

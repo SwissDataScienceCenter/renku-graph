@@ -75,10 +75,10 @@ object SortBy {
 
   object Direction {
 
-    final case object Asc extends Direction("asc")
+    final case object Asc extends Direction("ASC")
     type Asc = Asc.type
 
-    final case object Desc extends Direction("desc")
+    final case object Desc extends Direction("DESC")
     type Desc = Desc.type
 
     private val all: Set[Direction] = Set(Asc, Desc)

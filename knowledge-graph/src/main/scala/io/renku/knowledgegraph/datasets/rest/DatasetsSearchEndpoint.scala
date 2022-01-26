@@ -207,12 +207,9 @@ object DatasetsSearchEndpoint {
 
     sealed trait SearchProperty extends Property
 
-    final case object TitleProperty extends Property("title") with SearchProperty
-
-    final case object DateProperty extends Property("date") with SearchProperty
-
+    final case object TitleProperty         extends Property("title") with SearchProperty
+    final case object DateProperty          extends Property("date") with SearchProperty
     final case object DatePublishedProperty extends Property("datePublished") with SearchProperty
-
     final case object ProjectsCountProperty extends Property("projectsCount") with SearchProperty
 
     override lazy val properties: Set[SearchProperty] = Set(

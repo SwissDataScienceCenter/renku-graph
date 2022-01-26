@@ -23,11 +23,13 @@ import Filters._
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{datasets, projects, users}
+import io.renku.http.rest.SortBy
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
@@ -48,7 +50,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(project)
 
-      finder.findEntities(Filters()).unsafeRunSync() shouldBe List(
+      finder.findEntities(Filters(), Sorting.default).unsafeRunSync() shouldBe List(
         project.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
@@ -77,7 +79,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some))
+        .findEntities(Filters(maybeQuery = Query(query.value).some), Sorting.default)
         .unsafeRunSync()
         .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project],
@@ -111,7 +113,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some))
+        .findEntities(Filters(maybeQuery = Query(query.value).some), Sorting.default)
         .unsafeRunSync()
         .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project],
@@ -139,7 +141,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some))
+        .findEntities(Filters(maybeQuery = Query(query.value).some), Sorting.default)
         .unsafeRunSync()
         .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project],
@@ -157,7 +159,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some))
+        .findEntities(Filters(maybeQuery = Query(query.value).some), Sorting.default)
         .unsafeRunSync()
         .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project]
@@ -193,7 +195,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeQuery = Query(query.value).some))
+        .findEntities(Filters(maybeQuery = Query(query.value).some), Sorting.default)
         .unsafeRunSync()
         .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project],
@@ -212,7 +214,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(project)
 
       finder
-        .findEntities(Filters(maybeEntityType = EntityType.Project.some))
+        .findEntities(Filters(maybeEntityType = EntityType.Project.some), Sorting.default)
         .unsafeRunSync() shouldBe List(project.to[model.Entity.Project]).sortBy(_.name.value)
     }
 
@@ -224,7 +226,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(project)
 
       finder
-        .findEntities(Filters(maybeEntityType = EntityType.Dataset.some))
+        .findEntities(Filters(maybeEntityType = EntityType.Dataset.some), Sorting.default)
         .unsafeRunSync() shouldBe List(dsAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
     }
   }
@@ -251,7 +253,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingProject, matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeCreator = creator.some))
+        .findEntities(Filters(maybeCreator = creator.some), Sorting.default)
         .unsafeRunSync() shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
@@ -266,7 +268,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(project)
 
       finder
-        .findEntities(Filters(maybeCreator = userNames.generateSome))
+        .findEntities(Filters(maybeCreator = userNames.generateSome), Sorting.default)
         .unsafeRunSync() shouldBe Nil
     }
   }
@@ -282,7 +284,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingDSProject, projectEntities(visibilityNonPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeVisibility = projects.Visibility.Public.some))
+        .findEntities(Filters(maybeVisibility = projects.Visibility.Public.some), Sorting.default)
         .unsafeRunSync() shouldBe List(
         matchingDSProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
@@ -297,7 +299,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(project)
 
       finder
-        .findEntities(Filters(maybeVisibility = visibilityNonPublic.generateSome))
+        .findEntities(Filters(maybeVisibility = visibilityNonPublic.generateSome), Sorting.default)
         .unsafeRunSync() shouldBe Nil
     }
   }
@@ -324,7 +326,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeDate = date.some))
+        .findEntities(Filters(maybeDate = date.some), Sorting.default)
         .unsafeRunSync() shouldBe List(
         matchingDSProject.to[model.Entity.Project],
         (matchingDS -> matchingDSProject).to[model.Entity.Dataset]
@@ -348,7 +350,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(matchingDSProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Filters(maybeDate = date.some))
+        .findEntities(Filters(maybeDate = date.some), Sorting.default)
         .unsafeRunSync() shouldBe List(
         (matchingDS -> matchingDSProject).to[model.Entity.Dataset]
       ).sortBy(_.name.value)
@@ -362,8 +364,28 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(project)
 
       finder
-        .findEntities(Filters(maybeDate = dateParams.generateSome))
+        .findEntities(Filters(maybeDate = dateParams.generateSome), Sorting.default)
         .unsafeRunSync() shouldBe Nil
+    }
+  }
+
+  "findEntities - with sorting" should {
+
+    "be sorting by name if requested" in new TestCase {
+      val matchingDsAndProject @ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(matchingDSProject)
+
+      val direction = sortingDirections.generateOne
+
+      finder
+        .findEntities(Filters(), Sorting.By(Sorting.ByName, direction))
+        .unsafeRunSync() shouldBe List(
+        matchingDSProject.to[model.Entity.Project],
+        matchingDsAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value).use(direction)
     }
   }
 
@@ -377,6 +399,11 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     lazy val skipMatchingScore: List[model.Entity] = results.map {
       case proj: model.Entity.Project => proj.copy(matchingScore = model.MatchingScore.min)
       case ds:   model.Entity.Dataset => ds.copy(matchingScore = model.MatchingScore.min)
+    }
+
+    lazy val use: SortBy.Direction => List[model.Entity] = {
+      case SortBy.Direction.Asc  => results
+      case SortBy.Direction.Desc => results.reverse
     }
   }
 }

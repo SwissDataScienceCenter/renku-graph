@@ -1,6 +1,7 @@
 package io.renku.knowledgegraph.entities
 
 import io.renku.graph.model.{projects, users}
+import io.renku.http.rest.SortBy.Direction
 import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
 import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
 
@@ -34,5 +35,20 @@ object Endpoint {
 
     final class Date private (val value: LocalDate) extends AnyVal with LocalDateTinyType
     object Date extends TinyTypeFactory[Date](new Date(_)) with LocalDateNotInTheFuture
+  }
+
+  object Sorting extends io.renku.http.rest.SortBy {
+
+    type PropertyType = SortProperty
+
+    sealed trait SortProperty extends Property
+
+    final case object ByName          extends Property("name") with SortProperty
+    final case object ByMatchingScore extends Property("matchingScore") with SortProperty
+    final case object ByDate          extends Property("date") with SortProperty
+
+    lazy val default: Sorting.By = Sorting.By(ByName, Direction.Asc)
+
+    override lazy val properties: Set[SortProperty] = Set(ByName, ByMatchingScore, ByDate)
   }
 }
