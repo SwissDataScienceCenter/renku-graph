@@ -43,7 +43,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       val memberToRemove1 = personEntities(withGitLabId).generateOne
       val memberToStay    = personEntities(withGitLabId).generateOne
       val allMembers      = Set(memberToRemove0, memberToRemove1, memberToStay)
-      val project         = anyProjectEntities.modify(membersLens.modify(_ => allMembers)).generateOne
+      val project         = anyRenkuProjectEntities.modify(membersLens.modify(_ => allMembers)).generateOne
 
       loadToStore(project)
 
@@ -65,7 +65,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
     "prepare queries to insert links for members existing in KG" in {
       val member     = gitLabProjectMembers.generateOne
       val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
-      val project    = anyProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
+      val project    = anyRenkuProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
 
       loadToStore(project.asJsonLD, personInKG.asJsonLD)
 
@@ -83,7 +83,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
     "prepare queries to insert links and new person for members non-existing in KG" in {
 
-      val project = anyProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
+      val project = anyRenkuProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
 
       loadToStore(project)
 

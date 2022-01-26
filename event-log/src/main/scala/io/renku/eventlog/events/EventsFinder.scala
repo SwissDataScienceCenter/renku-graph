@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events
 
-import cats.MonadThrow
+import cats.{MonadThrow, NonEmptyParallel}
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
@@ -36,7 +36,7 @@ private trait EventsFinder[F[_]] {
   def findEvents(request: EventsEndpoint.Request): F[PagingResponse[EventInfo]]
 }
 
-private class EventsFinderImpl[F[_]: Async](
+private class EventsFinderImpl[F[_]: Async: NonEmptyParallel](
     sessionResource:  SessionResource[F, EventLogDB],
     queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
 ) extends DbClient[F](Some(queriesExecTimes))
@@ -224,8 +224,8 @@ private class EventsFinderImpl[F[_]: Async](
 }
 
 private object EventsFinder {
-  def apply[F[_]: Async](sessionResource: SessionResource[F, EventLogDB],
-                         queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: Async: NonEmptyParallel](sessionResource: SessionResource[F, EventLogDB],
+                                           queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
   ): F[EventsFinder[F]] = MonadThrow[F].catchNonFatal(
     new EventsFinderImpl(sessionResource, queriesExecTimes)
   )

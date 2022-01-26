@@ -83,7 +83,7 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
   private def findProjectsWithEventsInQueue = measureExecutionTime {
     SqlStatement(
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
-    ).select[ExecutionDate ~ Int, ProjectInfo](
+    ).select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
       sql"""
       SELECT
         proj.project_id,
@@ -93,14 +93,21 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
       FROM (
         SELECT candidate_events.project_id
         FROM (
-          SELECT DISTINCT ON (evt.project_id) evt.project_id, evt.status
+          SELECT
+            candidate_projects.project_id,
+            (
+              SELECT e.status 
+              FROM event e 
+              WHERE e.project_id = candidate_projects.project_id AND e.execution_date <= $executionDateEncoder
+              ORDER BY e.event_date DESC 
+              LIMIT 1
+            ) AS status
           FROM (
-            SELECT DISTINCT evt.project_id
+            SELECT DISTINCT project_id
             FROM event evt
             WHERE #${`status IN`(New, GenerationRecoverableFailure)}
+               AND execution_date <= $executionDateEncoder
           ) candidate_projects
-          JOIN event evt ON evt.project_id = candidate_projects.project_id AND evt.execution_date <= $executionDateEncoder
-          ORDER BY evt.project_id DESC, evt.event_date DESC
         ) candidate_events
         WHERE #${`status NOT IN`(GeneratingTriples,
                                  TriplesGenerated,
@@ -119,7 +126,7 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
         .map { case (id: projects.Id) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
           ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
         }
-    ).arguments(ExecutionDate(now()) ~ projectsFetchingLimit.value)
+    ).arguments(ExecutionDate(now()) ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
       .build(_.toList)
   }
 

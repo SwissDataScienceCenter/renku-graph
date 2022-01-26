@@ -36,7 +36,7 @@ class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
 
     "return SecurityRecord with project visibility, path and all project members" in new TestCase {
       val (dataset, project) =
-        projectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne
+        renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne
 
       loadToStore(project)
 
@@ -47,7 +47,7 @@ class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
 
     "return SecurityRecord with project visibility, path and no member is project has none" in new TestCase {
       val (dataset, project) =
-        projectEntities(anyVisibility)
+        renkuProjectEntities(anyVisibility)
           .map(_.copy(members = Set.empty))
           .addDataset(datasetEntities(provenanceNonModified))
           .generateOne
@@ -61,7 +61,7 @@ class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
 
     "return SecurityRecords with projects visibilities, paths and members" in new TestCase {
       val (dataset, parentProject ::~ project) =
-        projectEntities(anyVisibility)
+        renkuProjectEntities(anyVisibility)
           .map(_.copy(members = Set.empty))
           .addDataset(datasetEntities(provenanceNonModified))
           .forkOnce()

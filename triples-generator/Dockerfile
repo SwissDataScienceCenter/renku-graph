@@ -29,7 +29,7 @@ ENV TZ UTC
 RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo tini && \
     python3 -m pip install --upgrade 'pip==21.3.1' && \
     python3 -m pip install jinja2 && \
-    python3 -m pip install 'git+https://github.com/SwissDataScienceCenter/renku-python.git@develop' 'sentry-sdk==0.18.0'  && \
+    python3 -m pip install 'renku==1.0.2' 'sentry-sdk==0.18.0'  && \
     chown -R daemon:daemon .
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh

@@ -40,7 +40,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
     Scenario("Valid events get through to the RDF store") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project  = dataProjects(projectEntities(visibilityPublic)).generateOne
+      val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commitId = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
@@ -76,7 +76,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
     Scenario("A non recoverable generation error arises and the events are reported as failed") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project  = dataProjects(projectEntities(visibilityPublic)).generateOne
+      val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commitId = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
@@ -109,7 +109,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
     ) {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project  = dataProjects(projectEntities(visibilityPublic)).generateOne
+      val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commitId = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
@@ -142,7 +142,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
     Scenario("A non recoverable transformation error arises and the events are reported as a non recoverable failure") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project  = dataProjects(projectEntities(visibilityPublic)).generateOne
+      val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commitId = commitIds.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")

@@ -52,11 +52,10 @@ class RdfStoreClientImplSpec
     with MockFactory
     with should.Matchers {
 
-  "IORdfStoreClient" should {
-    type IORdfStoreClient = RdfStoreClientImpl[IO]
-
+  "RdfStoreClientImpl" should {
     "be a IORestClient" in new QueryClientTestCase {
-      client shouldBe a[IORdfStoreClient]
+      type IORdfStoreClientImpl = RdfStoreClientImpl[IO]
+      client shouldBe a[IORdfStoreClientImpl]
       client shouldBe a[RestClient[IO, _]]
     }
   }
@@ -114,7 +113,7 @@ class RdfStoreClientImplSpec
 
     import io.circe.literal._
 
-    "do a single call to the store if not full page returned" in new QueryClientTestCase {
+    "do a call for total even if not full page is returned" in new QueryClientTestCase {
 
       val items = nonEmptyList(nonBlankStrings(), maxElements = 1).generateOne.map(_.value).toList
       val responseBody =
@@ -123,6 +122,7 @@ class RdfStoreClientImplSpec
             "bindings": $items
           }
         }"""
+
       val pagingRequest = PagingRequest(Page.first, PerPage(2))
 
       stubFor {
@@ -134,6 +134,26 @@ class RdfStoreClientImplSpec
           .willReturn(okJson(responseBody.noSpaces))
       }
 
+      val totalResponseBody = json"""{
+        "results": {
+          "bindings": [
+            {
+              "total": {
+                "value": ${items.size}
+              }
+            }
+          ]
+        }
+      }"""
+      stubFor {
+        post(s"/${rdfStoreConfig.datasetName}/sparql")
+          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+          .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
+          .withHeader("accept", equalTo("application/sparql-results+json"))
+          .withRequestBody(equalTo(s"query=${urlEncode(client.query.toCountQuery.toString)}"))
+          .willReturn(okJson(totalResponseBody.noSpaces))
+      }
+
       val results = client.callWith(pagingRequest).unsafeRunSync()
 
       results.results                  shouldBe items
@@ -141,7 +161,7 @@ class RdfStoreClientImplSpec
       results.pagingInfo.total         shouldBe Total(items.size)
     }
 
-    "do an additional call to fetch the total if a full page is returned" in new QueryClientTestCase {
+    "do a call to for total if a full page is returned" in new QueryClientTestCase {
 
       val allItems      = nonEmptyList(nonBlankStrings(), minElements = 5).generateOne.map(_.value).toList
       val pagingRequest = PagingRequest(Page.first, PerPage(4))
