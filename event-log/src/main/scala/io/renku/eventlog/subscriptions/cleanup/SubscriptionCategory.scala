@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.cleanup.CleanUpEventEncoder.encodeEvent
-import io.renku.graph.model.events.CategoryName
+import io.renku.graph.model.events._
 import org.typelevel.log4cats.Logger
 import io.renku.metrics.LabeledHistogram
 import io.renku.db.SqlStatement
@@ -45,9 +45,10 @@ private[subscriptions] object SubscriptionCategory {
       queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers <- Subscribers(name, subscriberTracker)
-    eventDelivery <- EventDelivery[F, CleanUpEvent](sessionResource,
-                                                    compoundEventIdExtractor = (_: CleanUpEvent).eventId,
-                                                    queriesExecTimes
+    eventDelivery <- EventDelivery[F, CleanUpEvent](
+                       sessionResource,
+                       compoundEventIdExtractor = (event: CleanUpEvent) => DeletingProjectDeliverId(event.project.id),
+                       queriesExecTimes
                      )
     dispatchRecovery <- LoggingDispatchRecovery[F, CleanUpEvent](name)
     eventFinder      <- CleanUpEventFinder(sessionResource, awaitingDeletionGauge, deletingGauge, queriesExecTimes)

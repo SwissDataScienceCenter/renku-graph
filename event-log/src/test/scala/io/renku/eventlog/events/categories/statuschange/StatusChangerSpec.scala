@@ -68,7 +68,7 @@ class StatusChangerSpec
     "rollback, run the updater's onRollback and fail if db update raises an error" in new NonMockedTestCase {
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
-      findAllDeliveries            shouldBe List(eventId -> subscriberId)
+      findAllEventDeliveries            shouldBe List(eventId -> subscriberId)
 
       val event: StatusChangeEvent = ToTriplesGenerated(eventId,
                                                         projectPaths.generateOne,
@@ -81,7 +81,7 @@ class StatusChangerSpec
       }
 
       findEvent(eventId).map(_._2) shouldBe Some(initialStatus)
-      findAllDeliveries            shouldBe Nil
+      findAllEventDeliveries            shouldBe Nil
     }
 
     "succeed if updating the gauge fails" in new MockedTestCase {

@@ -39,7 +39,7 @@ import eu.timepit.refined.api.Refined
 
 import skunk._
 import skunk.implicits._
-import io.renku.graph.model.events
+import io.renku.graph.model.events._
 import io.renku.events.consumers.Project
 import cats.data.Kleisli
 import skunk.data.Completion
@@ -57,42 +57,42 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel](
 
   override def popEvent(): F[Option[CleanUpEvent]] = sessionResource.useK {
     for {
-      maybeCleanUpEventAndCount <- findEventAndUpdateForProcessing
-      _                         <- maybeUpdateMetrics(maybeCleanUpEventAndCount)
-    } yield maybeCleanUpEventAndCount.map(_._1)
+      maybeCleanUpEvent <- findEventAndUpdateForProcessing
+      _                 <- maybeUpdateMetrics(maybeCleanUpEvent)
+    } yield maybeCleanUpEvent.map(_._1)
   }
 
   private def findEventAndUpdateForProcessing = for {
-    maybeCleanUpEvent <- findEvent
-    updatedRows       <- updateForProcessing(maybeCleanUpEvent)
-  } yield maybeCleanUpEvent.map(cleanUpEvent => (cleanUpEvent, updatedRows))
+    maybeProject      <- findProject
+    maybeCleanUpEvent <- updateForProcessing(maybeProject)
+  } yield maybeCleanUpEvent
 
-  private def findEvent = measureExecutionTime {
+  private def findProject = measureExecutionTime {
 
     val executionDate = ExecutionDate(now())
     SqlStatement(
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
-    ).select[events.EventStatus ~ ExecutionDate, CleanUpEvent](
+    ).select[EventStatus ~ ExecutionDate, Project](
       sql"""
-       SELECT evt.event_id, evt.project_id, prj.project_path
+       SELECT evt.project_id, prj.project_path
        FROM event evt
        JOIN  project prj ON prj.project_id = evt.project_id 
        WHERE evt.status = $eventStatusEncoder
          AND evt.execution_date < $executionDateEncoder
-       ORDER BY evt.event_date ASC
+       ORDER BY evt.execution_date ASC
        LIMIT 1
        """
-        .query(cleanUpEventGet)
+        .query(projectDecoder)
     ).arguments(AwaitingDeletion ~ executionDate)
       .build(_.option)
   }
 
-  private def updateForProcessing(maybeCleanUpEvent: Option[CleanUpEvent]) =
-    maybeCleanUpEvent map { case CleanUpEvent(_, Project(projectId, _)) =>
+  private def updateForProcessing(maybeProject: Option[Project]) =
+    maybeProject map { case project @ Project(projectId, _) =>
       measureExecutionTime {
         SqlStatement(
           name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
-        ).command[events.EventStatus ~ ExecutionDate ~ events.EventStatus ~ projects.Id](
+        ).command[EventStatus ~ ExecutionDate ~ EventStatus ~ projects.Id](
           sql"""
            UPDATE event
            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
@@ -101,30 +101,23 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel](
        """.command
         ).arguments(Deleting ~ ExecutionDate(now()) ~ AwaitingDeletion ~ projectId)
           .build
-          .flatMapResult {
-            case Completion.Update(updatedRows) => updatedRows.pure[F]
-            case completion =>
-              new Exception(
-                s"Could not update events to status $Deleting for project: $projectId. Value returned was : $completion"
-              ).raiseError[F, Int]
+          .mapResult {
+            case Completion.Update(count) =>
+              (CleanUpEvent(project) -> count).some
+            case _ => Option.empty[(CleanUpEvent, Int)]
           }
       }
-    } getOrElse Kleisli.pure[F, Session[F], Int](0)
+    } getOrElse Kleisli.pure(Option.empty[(CleanUpEvent, Int)])
 
-  private def maybeUpdateMetrics(maybeCleanUpEventAndCount: Option[(CleanUpEvent, Int)]) =
-    maybeCleanUpEventAndCount map { case (CleanUpEvent(_, Project(_, projectPath)), updatedEventsCount) =>
+  private def maybeUpdateMetrics(maybeCleanUpEvent: Option[(CleanUpEvent, Int)]) =
+    maybeCleanUpEvent map { case (CleanUpEvent(Project(_, projectPath)), updatedRows) =>
       Kleisli.liftF {
         for {
-          _ <- awaitingDeletionGauge.update((projectPath, updatedEventsCount.toDouble * -1))
-          _ <- deletingGauge.update((projectPath, updatedEventsCount))
+          _ <- awaitingDeletionGauge.update((projectPath, updatedRows * -1))
+          _ <- deletingGauge.update((projectPath, updatedRows))
         } yield ()
       }
     } getOrElse Kleisli.pure[F, Session[F], Unit](())
-
-  private val cleanUpEventGet: Decoder[CleanUpEvent] =
-    (eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder).map { case eventId ~ projectId ~ projectPath =>
-      CleanUpEvent(events.CompoundEventId(eventId, projectId), Project(projectId, projectPath))
-    }
 }
 
 private object CleanUpEventFinder {

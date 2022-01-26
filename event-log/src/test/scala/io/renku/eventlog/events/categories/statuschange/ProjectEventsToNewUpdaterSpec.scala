@@ -113,7 +113,7 @@ class ProjectEventsToNewUpdaterSpec
       findEvent(CompoundEventId(skippedEvent, projectId)).map(_._2)          shouldBe Some(EventStatus.Skipped)
       findEvent(CompoundEventId(awaitingDeletionEvent, projectId)).map(_._2) shouldBe Some(EventStatus.AwaitingDeletion)
       findEvent(CompoundEventId(deletingEvent, projectId)).map(_._2)         shouldBe None
-      findAllDeliveries shouldBe List(otherProjectEventId -> subscriberId)
+      findAllEventDeliveries shouldBe List(otherProjectEventId -> subscriberId)
 
       val latestEventDate: EventDate =
         (List(skippedEventDate, awaitingDeletionEventDate) ::: eventsAndDates.map(_._2)).max

@@ -37,12 +37,26 @@ object events {
   final class CategoryName private (val value: String) extends AnyVal with StringTinyType
   implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank
 
-  final case class CompoundEventId(id: EventId, projectId: projects.Id) {
+  sealed trait EventDeliveryId {
+    def projectId: projects.Id
+  }
+
+  final case class CompoundEventId(id: EventId, projectId: projects.Id) extends EventDeliveryId {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }
 
   object CompoundEventId {
     implicit lazy val show: Show[CompoundEventId] = Show.show(id => show"id = ${id.id}, projectId = ${id.projectId}")
+  }
+
+  final case class DeletingProjectDeliverId(projectId: projects.Id) extends EventDeliveryId {
+    def eventTypeId:            EventTypeId = EventTypeId("DELETING")
+    override lazy val toString: String      = s"deleting project delivery event, projectId = $projectId"
+  }
+
+  object DeletingProjectDeliverId {
+    implicit lazy val show: Show[DeletingProjectDeliverId] =
+      Show.show(id => show"projectId = ${id.projectId}")
   }
 
   final case class EventDetails(id: EventId, projectId: projects.Id, eventBody: EventBody) {
@@ -67,8 +81,13 @@ object events {
     protected[this] override def maybeMax: Option[Instant] = instantNow.plus(24, HOURS).some
   }
 
-  final class EventId private (val value: String) extends AnyVal with StringTinyType
-  implicit object EventId                         extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
+  final class ProjectDeliveryId private (val value: String) extends AnyVal with StringTinyType
+  implicit object ProjectDeliveryId extends TinyTypeFactory[ProjectDeliveryId](new ProjectDeliveryId(_)) with NonBlank
+
+  final class EventId private (val value: String)     extends AnyVal with StringTinyType
+  implicit object EventId                             extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
+  final class EventTypeId private (val value: String) extends AnyVal with StringTinyType
+  implicit object EventTypeId extends TinyTypeFactory[EventTypeId](new EventTypeId(_)) with NonBlank
 
   final class EventBody private (val value: String) extends AnyVal with StringTinyType
   implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank {
