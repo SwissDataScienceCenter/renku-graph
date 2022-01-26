@@ -20,6 +20,7 @@ package io.renku.tinytypes.json
 
 import io.circe.{Encoder, Json}
 import io.renku.tinytypes._
+import io.renku.tinytypes.constraints.FiniteFloat
 
 trait TinyTypeEncoders {
 
@@ -37,6 +38,9 @@ trait TinyTypeEncoders {
 
   implicit def longEncoder[TT <: LongTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromLong(ttValue.value))
+
+  implicit def floatEncoder[TT <: FloatTinyType, TTF <: TinyTypeFactory[TT] with FiniteFloat]: Encoder[TT] =
+    Encoder.instance[TT](ttValue => Json.fromFloatOrString(ttValue.value))
 
   implicit def localDateEncoder[TT <: LocalDateTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromString(ttValue.value.toString))

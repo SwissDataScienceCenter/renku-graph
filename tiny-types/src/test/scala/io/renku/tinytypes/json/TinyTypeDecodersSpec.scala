@@ -95,6 +95,14 @@ class TinyTypeDecodersSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
+  "floatDecoder" should {
+
+    "decode JSON Float value" in {
+      val value = Arbitrary.arbFloat.arbitrary.generateOne
+      json"""$value""".as[FloatTestType] shouldBe Right(FloatTestType(value))
+    }
+  }
+
   "localDateDecoder" should {
 
     "decode JSON String value" in {
