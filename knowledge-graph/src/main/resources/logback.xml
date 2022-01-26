@@ -13,27 +13,11 @@
         <appender-ref ref="STDOUT"/>
     </appender>
 
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>/tmp/microservice-access.log</file>
-        <encoder>
-            <charset>UTF-8</charset>
-            <pattern>%d %-5level %logger{5} - %message%n</pattern>
-        </encoder>
-    </appender>
-
     <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>ERROR</level>
         </filter>
     </appender>
-
-    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
-        <appender-ref ref="FILE"/>
-    </appender>
-
-    <logger name="org.http4s.blaze.channel.nio1.NIO1SocketServerGroup" level="INFO" additivity="false">
-        <appender-ref ref="ASYNC_FILE"/>
-    </logger>
 
     <logger name="application" level="INFO" additivity="false">
         <appender-ref ref="ASYNC_STDOUT"/>
