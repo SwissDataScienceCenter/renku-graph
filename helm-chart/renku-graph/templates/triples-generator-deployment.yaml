@@ -91,7 +91,8 @@ spec:
             httpGet:
               path: /ping
               port: http-triples-gn
-            periodSeconds: 10
+            timeoutSeconds: 60
+            periodSeconds: 60
             successThreshold: 1
             failureThreshold: 10
             {{- if .Values.triplesGenerator.renkuPythonDevVersion }}
