@@ -49,6 +49,8 @@ trait EventLogDbMigrations {
   protected lazy val payloadTypeChanger:             Migration = PayloadTypeChanger(sessionResource)
   protected lazy val statusChangeEventsTableCreator: Migration = StatusChangeEventsTableCreator(sessionResource)
 
+  protected lazy val eventDeliveryEventTypeAdder: Migration = EventDeliveryEventTypeAdder(sessionResource)
+
   protected lazy val allMigrations: List[Migration] = List(
     eventLogTableCreator,
     projectPathAdder,
@@ -65,6 +67,7 @@ trait EventLogDbMigrations {
     eventDeliveryTableCreator,
     timestampZoneAdder,
     payloadTypeChanger,
-    statusChangeEventsTableCreator
+    statusChangeEventsTableCreator,
+    eventDeliveryEventTypeAdder
   )
 }

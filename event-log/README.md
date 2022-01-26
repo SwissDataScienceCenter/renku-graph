@@ -692,11 +692,12 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | delivery_url VARCHAR     PK NOT NULL |
 | delivery_id  VARCHAR(19)    NOT NULL |
 
-| event_delivery                          |
-|-----------------------------------------|
-| event_id     VARCHAR     PK FK NOT NULL |
-| project_id   INT4        PK FK NOT NULL |
-| delivery_id  VARCHAR(19)       NOT NULL |
+| event_delivery                            |
+|-------------------------------------------|
+| event_id      VARCHAR      FK UK NULL     |
+| project_id    INT4         FK UK NOT NULL |
+| delivery_id   VARCHAR(19)        NOT NULL |
+| event_type_id VARCHAR         UK NULL     | 
 
 | status_change_events_queue       |
 |----------------------------------|

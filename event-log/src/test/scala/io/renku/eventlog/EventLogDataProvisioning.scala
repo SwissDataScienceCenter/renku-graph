@@ -28,7 +28,7 @@ import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
-import io.renku.graph.model.events.{BatchDate, CategoryName, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, LastSyncedDate, ZippedEventPayload}
+import io.renku.graph.model.events.{BatchDate, CategoryName, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, EventTypeId, LastSyncedDate, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.microservices.MicroserviceBaseUrl
@@ -283,13 +283,30 @@ trait EventLogDataProvisioning {
     }
   }
 
-  protected def findAllDeliveries: List[(CompoundEventId, SubscriberId)] = execute {
+  protected def findAllEventDeliveries: List[(CompoundEventId, SubscriberId)] = execute {
     Kleisli { session =>
       val query: Query[Void, (CompoundEventId, SubscriberId)] =
         sql"""SELECT event_id, project_id, delivery_id
-              FROM event_delivery"""
+              FROM event_delivery WHERE event_id IS NOT NULL"""
           .query(eventIdDecoder ~ projectIdDecoder ~ subscriberIdDecoder)
-          .map { case eventId ~ projectId ~ subscriberId => (CompoundEventId(eventId, projectId), subscriberId) }
+          .map { case eventId ~ projectId ~ subscriberId =>
+            (CompoundEventId(eventId, projectId), subscriberId)
+          }
+
+      session.execute(query)
+    }
+  }
+
+  protected def findAllProjectDeliveries: List[(projects.Id, SubscriberId, EventTypeId)] = execute {
+    Kleisli { session =>
+      val query: Query[Void, (projects.Id, SubscriberId, EventTypeId)] =
+        sql"""SELECT project_id, delivery_id, event_type_id
+              FROM event_delivery WHERE event_id IS NULL"""
+          .query(projectIdDecoder ~ subscriberIdDecoder ~ eventTypeIdDecoder)
+          .map { case projectId ~ subscriberId ~ eventTypeId =>
+            (projectId, subscriberId, eventTypeId)
+          }
+
       session.execute(query)
     }
   }
