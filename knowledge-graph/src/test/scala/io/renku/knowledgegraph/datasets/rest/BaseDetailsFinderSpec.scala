@@ -44,19 +44,19 @@ class BaseDetailsFinderSpec
 
     "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
       Set(
-        anyProjectEntities
+        anyRenkuProjectEntities
           .addDataset(datasetEntities(provenanceInternal))
           .map { case (ds, project) => (ds, project, internalToNonModified(ds, project)) }
           .generateOne,
-        anyProjectEntities
+        anyRenkuProjectEntities
           .addDataset(datasetEntities(provenanceImportedExternal))
           .map { case (ds, project) => (ds, project, importedExternalToNonModified(ds, project)) }
           .generateOne,
-        anyProjectEntities
+        anyRenkuProjectEntities
           .addDataset(datasetEntities(provenanceImportedInternalAncestorInternal()))
           .map { case (ds, project) => (ds, project, importedInternalToNonModified(ds, project)) }
           .generateOne,
-        anyProjectEntities
+        anyRenkuProjectEntities
           .addDataset(datasetEntities(provenanceImportedInternalAncestorExternal))
           .map { case (ds, project) => (ds, project, importedInternalToNonModified(ds, project)) }
           .generateOne
@@ -79,7 +79,7 @@ class BaseDetailsFinderSpec
 
     "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
       forAll(
-        anyProjectEntities.addDatasetAndModification(datasetEntities(provenanceNonModified)),
+        anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceNonModified)),
         blankStrings()
       ) { case ((_ ::~ dataset, project), description) =>
         modifiedToResultSet(project, dataset, description).as[List[model.Dataset]](datasetsDecoder) shouldBe List(
@@ -95,7 +95,7 @@ class BaseDetailsFinderSpec
     }
   }
 
-  private def nonModifiedToResultSet(project:     testentities.Project,
+  private def nonModifiedToResultSet(project:     testentities.RenkuProject,
                                      dataset:     testentities.Dataset[testentities.Dataset.Provenance.NonModified],
                                      description: String
   )(implicit renkuBaseUrl:                        RenkuBaseUrl) = {
@@ -123,7 +123,7 @@ class BaseDetailsFinderSpec
     json"""{"results": {"bindings": [$binding]}}"""
   }
 
-  private def modifiedToResultSet(project:     testentities.Project,
+  private def modifiedToResultSet(project:     testentities.RenkuProject,
                                   dataset:     testentities.Dataset[testentities.Dataset.Provenance.Modified],
                                   description: String
   ) = {

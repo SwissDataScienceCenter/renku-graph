@@ -44,6 +44,8 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import io.renku.events.consumers.Project
+import io.renku.json.JsonOps._
+
 
 class EventHandlerSpec
     extends AnyWordSpec
@@ -160,13 +162,11 @@ class EventHandlerSpec
   }
 
   private implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
-    case StatusChangeEvent.AllEventsToNew =>
-      json"""{
+    case StatusChangeEvent.AllEventsToNew => json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "newStatus":    "NEW"
     }"""
-    case StatusChangeEvent.ToTriplesGenerated(eventId, path, processingTime, _) =>
-      json"""{
+    case StatusChangeEvent.ToTriplesGenerated(eventId, path, processingTime, _) => json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
       "project": {
@@ -176,8 +176,7 @@ class EventHandlerSpec
       "newStatus":    "TRIPLES_GENERATED",
       "processingTime": ${processingTime.value}
     }"""
-    case StatusChangeEvent.ToTriplesStore(eventId, path, processingTime) =>
-      json"""{
+    case StatusChangeEvent.ToTriplesStore(eventId, path, processingTime) => json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
       "project": {
@@ -187,8 +186,7 @@ class EventHandlerSpec
       "newStatus":    "TRIPLES_STORE",
       "processingTime": ${processingTime.value}
     }"""
-    case StatusChangeEvent.ToFailure(eventId, path, message, _, newStatus, executionDelay) =>
-      json"""{
+    case StatusChangeEvent.ToFailure(eventId, path, message, _, newStatus, maybeExecutionDelay) => json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
       "project": {
@@ -196,11 +194,9 @@ class EventHandlerSpec
         "path":       ${path.value}
       },
       "newStatus":    ${newStatus.value},
-      "message":      ${message.value},
-      "executionDelay": $executionDelay
-    }"""
-    case StatusChangeEvent.RollbackToNew(eventId, path) =>
-      json"""{
+      "message":      ${message.value}
+    }""" addIfDefined ("executionDelay" -> maybeExecutionDelay)
+    case StatusChangeEvent.RollbackToNew(eventId, path) => json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
       "project": {
@@ -209,8 +205,7 @@ class EventHandlerSpec
       },
       "newStatus":    "NEW"
     }"""
-    case StatusChangeEvent.RollbackToTriplesGenerated(eventId, path) =>
-      json"""{
+    case StatusChangeEvent.RollbackToTriplesGenerated(eventId, path) => json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
       "project": {
@@ -219,8 +214,7 @@ class EventHandlerSpec
       },
       "newStatus":    "TRIPLES_GENERATED"
     }"""
-    case StatusChangeEvent.ToAwaitingDeletion(eventId, path) =>
-      json"""{
+    case StatusChangeEvent.ToAwaitingDeletion(eventId, path) => json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "id":           ${eventId.id.value},
       "project": {
@@ -229,8 +223,7 @@ class EventHandlerSpec
       },
       "newStatus":    "AWAITING_DELETION"
     }"""
-    case StatusChangeEvent.RollbackToAwaitingDeletion(Project(id, path)) =>
-      json"""{
+    case StatusChangeEvent.RollbackToAwaitingDeletion(Project(id, path)) => json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "project": {
         "id":         ${id.value},
@@ -238,8 +231,7 @@ class EventHandlerSpec
       },
       "newStatus":    "AWAITING_DELETION"
     }"""
-    case StatusChangeEvent.ProjectEventsToNew(project) =>
-      json"""{
+    case StatusChangeEvent.ProjectEventsToNew(project) => json"""{
       "categoryName": "EVENTS_STATUS_CHANGE",
       "project": {
         "id":         ${project.id.value},

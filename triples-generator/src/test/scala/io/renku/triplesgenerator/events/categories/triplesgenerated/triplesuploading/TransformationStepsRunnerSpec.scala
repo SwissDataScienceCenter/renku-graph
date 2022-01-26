@@ -129,8 +129,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(originalProject)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError]((step1Project, step1Queries)))
 
-      val recoverableError =
-        logWorthyRecoverableErrors.generateOne
+      val recoverableError = logWorthyRecoverableErrors.generateOne
       (updatesUploader.send _)
         .expects(step1Queries.preDataUploadQueries.head)
         .returning(EitherT.leftT(recoverableError))
@@ -171,8 +170,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       // preparing a project for which json-ld flattening fails
       val Some(person) = personEntities(withGitLabId).generateOne.toMaybe[entities.Person.WithGitLabId]
-      val step1Project = projectEntities(anyVisibility).generateOne
-        .to[entities.ProjectWithoutParent]
+      val step1Project = renkuProjectEntities(anyVisibility).generateOne
+        .to[entities.RenkuProject.WithoutParent]
         .copy(
           maybeCreator = person.some,
           members = Set(person.copy(name = userNames.generateOne))
@@ -207,8 +206,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       uploader.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
                    originalProject
-      ) shouldBe RecoverableFailure(failure)
-        .pure[Try]
+      ) shouldBe RecoverableFailure(failure).pure[Try]
     }
 
     s"return $NonRecoverableFailure if triples uploading failed with NonRecoverableFailure" in new TestCase {

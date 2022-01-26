@@ -35,7 +35,7 @@ class ProjectPathRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemory
   "apply" should {
 
     "return SecurityRecords with project visibility and all project members" in new TestCase {
-      val project = projectEntities(anyVisibility).generateOne
+      val project = anyProjectEntities.generateOne
 
       loadToStore(project)
 
@@ -45,7 +45,7 @@ class ProjectPathRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemory
     }
 
     "return SecurityRecords with project visibility and no member is project has none" in new TestCase {
-      val project = projectEntities(anyVisibility).generateOne.copy(members = Set.empty)
+      val project = renkuProjectEntities(anyVisibility).generateOne.copy(members = Set.empty)
 
       loadToStore(project)
 

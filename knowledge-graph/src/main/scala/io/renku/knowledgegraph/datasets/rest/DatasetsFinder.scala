@@ -127,76 +127,69 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger](
   private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
     name = "ds free-text search",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema", text -> "text"),
-    s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?someExemplarProjectPath ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
-        |WHERE {        
-        |  SELECT ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs (MIN(?exemplarProjectPath) AS ?someExemplarProjectPath) ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
-        |  WHERE {
-        |    {
-        |      SELECT ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount) (MIN(?projectDate) AS ?minProjectDate)
-        |      WHERE {
-        |        {
-        |          SELECT DISTINCT ?sameAs
-        |          WHERE {
-        |            {
-        |              SELECT DISTINCT ?id
-        |              WHERE { ?id text:query (schema:name schema:description renku:slug schema:keywords '$phrase') }
-        |            } {
-        |              ?id a schema:Dataset;
-        |              	   renku:topmostSameAs ?sameAs.
-        |            } UNION {
-        |              ?id a schema:Person.
-        |              ?luceneDsId schema:creator ?id;
-        |                          a schema:Dataset;
-        |                          renku:topmostSameAs ?sameAs.
-        |            }
+    s"""|SELECT ?identifier ?name ?slug ?maybeDescription ?maybeDatePublished ?maybeDateCreated ?date 
+        |  ?maybeDerivedFrom ?sameAs (SAMPLE(?projectPath) AS ?projectSamplePath) ?projectsCount         
+        |  (GROUP_CONCAT(?keyword; separator='|') AS ?keywords)
+        |  (GROUP_CONCAT(?encodedImageUrl; separator='|') AS ?images) 
+        |WHERE { 
+        |  { 
+        |    SELECT ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount) (SAMPLE(?dsId) AS ?dsIdSample) (SAMPLE(?projectId) AS ?projectIdSample) 
+        |    WHERE { 
+        |      { 
+        |        SELECT ?sameAs ?projectId ?dsId 
+        |          (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds) 
+        |          (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
+        |        WHERE {
+        |          {
+        |            SELECT DISTINCT ?id
+        |            WHERE { ?id text:query (schema:name schema:description renku:slug schema:keywords '$phrase') }
+        |          } {
+        |            ?id a schema:Dataset.
+        |            BIND(?id AS ?dsId)
+        |          } UNION {
+        |            ?id a schema:Person.
+        |            ?dsId schema:creator ?id;
+        |                  a schema:Dataset.
         |          }
-        |        } {
-        |          ?dsId a schema:Dataset;
-        |                ^renku:hasDataset ?projectId;
-        |                renku:topmostSameAs ?sameAs.
-        |          FILTER NOT EXISTS {
-        |            ?dsId prov:invalidatedAtTime ?invalidationTime.
-        |          }
-        |          FILTER NOT EXISTS {
-        |            ?someId prov:wasDerivedFrom/schema:url ?dsId;
-        |                    ^renku:hasDataset ?projectId; 
-        |          }
-        |          ?projectId schema:dateCreated ?projectDate.
+        |          ?dsId renku:topmostSameAs ?sameAs;
+        |                ^renku:hasDataset ?projectId.
         |          ${projectMemberFilterQuery(maybeUser)}
+        |          OPTIONAL {
+        |            ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
+        |                       ^renku:hasDataset ?childProjectId.
+        |          }
+        |          OPTIONAL {
+        |            ?dsId prov:invalidatedAtTime ?invalidationTime;
+        |                  ^renku:hasDataset ?projectIdWhereInvalidated
+        |          }
         |        }
+        |        GROUP BY ?sameAs ?projectId ?dsId
         |      }
-        |      GROUP BY ?sameAs
-        |      HAVING (COUNT(*) > 0)
-        |    } {
-        |      ?dsIdExample a schema:Dataset;
-        |                   renku:topmostSameAs ?sameAs;
-        |                   schema:identifier ?identifier;
-        |                   schema:name ?name;
-        |                   renku:slug ?slug;
-        |                   ^renku:hasDataset ?exemplarProjectId.
-        |      ?exemplarProjectId schema:dateCreated ?minProjectDate;
-        |                         renku:projectPath ?exemplarProjectPath.
-        |      OPTIONAL {
-        |        ?dsIdExample schema:image ?imageId .
-        |        ?imageId schema:position ?imagePosition ;
-        |                 schema:contentUrl ?imageUrl .
-        |        BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-        |      }
-        |      OPTIONAL { ?dsIdExample schema:keywords ?keyword }
-        |      OPTIONAL { ?dsIdExample schema:description ?maybeDescription }
-        |      OPTIONAL { ?dsIdExample schema:datePublished ?maybePublishedDate }
-        |      OPTIONAL { ?dsIdExample schema:dateCreated ?maybeDateCreated }
-        |      OPTIONAL { ?dsIdExample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
-        |      BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
-        |      FILTER NOT EXISTS {
-        |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample;
-        |                ^renku:hasDataset ?exemplarProjectId.
-        |      }
+        |      FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
+        |      FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
         |    }
+        |    GROUP BY ?sameAs 
         |  }
-        |  GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?keyword
+        |  ?dsIdSample renku:topmostSameAs ?sameAs;
+        |              schema:identifier ?identifier;
+        |              schema:name ?name;
+        |              renku:slug ?slug. 
+        |  ?projectIdSample renku:projectPath ?projectPath.
+        |  OPTIONAL {
+        |    ?dsIdSample schema:image ?imageId .
+        |    ?imageId schema:position ?imagePosition ;
+        |             schema:contentUrl ?imageUrl .
+        |    BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |  }
+        |  OPTIONAL { ?dsIdSample schema:keywords ?keyword }
+        |  OPTIONAL { ?dsIdSample schema:description ?maybeDescription }
+        |  OPTIONAL { ?dsIdSample schema:datePublished ?maybeDatePublished }
+        |  OPTIONAL { ?dsIdSample schema:dateCreated ?maybeDateCreated }
+        |  OPTIONAL { ?dsIdSample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
+        |  BIND (IF(BOUND(?maybeDatePublished), ?maybeDatePublished, ?maybeDateCreated) AS ?date)
         |}
-        |GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?someExemplarProjectPath ?projectsCount ?images
+        |GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybeDatePublished ?maybeDateCreated ?date
+        |  ?maybeDerivedFrom ?sameAs ?projectsCount
         |${`ORDER BY`(sort)}
         |""".stripMargin
   )
@@ -204,7 +197,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger](
   private def `ORDER BY`(sort: Sort.By): String = sort.property match {
     case Sort.TitleProperty         => s"ORDER BY ${sort.direction}(?name)"
     case Sort.DateProperty          => s"ORDER BY ${sort.direction}(?date)"
-    case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
+    case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybeDatePublished)"
     case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
   }
 }
@@ -219,7 +212,7 @@ private object DatasetsFinderImpl {
     def toListOfImageUrls(urlString: Option[String]): List[ImageUri] =
       urlString
         .map(
-          _.split(",")
+          _.split("\\|")
             .map(_.trim)
             .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUri(url) }
             .toSet[(Int, ImageUri)]
@@ -246,16 +239,16 @@ private object DatasetsFinderImpl {
       title               <- cursor.downField("name").downField("value").as[Title]
       name                <- cursor.downField("slug").downField("value").as[Name]
       maybeDateCreated    <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
-      maybePublishedDate  <- cursor.downField("maybePublishedDate").downField("value").as[Option[DatePublished]]
+      maybePublishedDate  <- cursor.downField("maybeDatePublished").downField("value").as[Option[DatePublished]]
       projectsCount       <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
-      exemplarProjectPath <- cursor.downField("someExemplarProjectPath").downField("value").as[projects.Path]
+      exemplarProjectPath <- cursor.downField("projectSamplePath").downField("value").as[projects.Path]
       keywords            <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
       images              <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
       maybeDescription    <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
       date <- maybeDateCreated
                 .orElse(maybePublishedDate)
                 .map(_.asRight)
-                .getOrElse(DecodingFailure("No dateCreated or publishedDate found", Nil).asLeft)
+                .getOrElse(DecodingFailure("No dateCreated or datePublished found", Nil).asLeft)
     } yield DatasetSearchResult(id,
                                 title,
                                 name,

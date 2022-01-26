@@ -65,6 +65,14 @@ class TinyTypeEncodersSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
+  "longEncoder" should {
+
+    "encode LongTinyType to Json" in {
+      val value = Arbitrary.arbLong.arbitrary.generateOne
+      LongTestType(value).asJson shouldBe Json.fromLong(value)
+    }
+  }
+
   "localDateEncoder" should {
 
     "encode LocalDateTinyType to Json" in {

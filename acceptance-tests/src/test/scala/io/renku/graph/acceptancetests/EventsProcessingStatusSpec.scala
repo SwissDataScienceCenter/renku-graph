@@ -59,7 +59,7 @@ class EventsProcessingStatusSpec
     Scenario("As a user I would like to see progress of events processing for my project") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      val project = dataProjects(projectEntities(visibilityPublic), CommitsCount(numberOfEvents.value)).generateOne
+      val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount(numberOfEvents.value)).generateOne
 
       When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")

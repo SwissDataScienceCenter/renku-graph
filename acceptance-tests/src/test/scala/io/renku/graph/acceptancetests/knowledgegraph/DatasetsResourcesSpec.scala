@@ -59,7 +59,7 @@ class DatasetsResourcesSpec
     val user = authUsers.generateOne
     implicit val accessToken: AccessToken = user.accessToken
 
-    val (dataset1 ::~ dataset2 ::~ dataset2Modified, testEntitiesProject) = projectEntities(visibilityPublic)
+    val (dataset1 ::~ dataset2 ::~ dataset2Modified, testEntitiesProject) = renkuProjectEntities(visibilityPublic)
       .addDataset(datasetEntities(provenanceInternal))
       .addDatasetAndModification(datasetEntities(provenanceInternal))
       .generateOne
@@ -143,7 +143,7 @@ class DatasetsResourcesSpec
 
     Scenario("As a user I should not to be able to see project's datasets if I don't have rights to the project") {
 
-      val (_, testEntitiesNonPublicProject) = projectEntities(visibilityNonPublic)
+      val (_, testEntitiesNonPublicProject) = renkuProjectEntities(visibilityNonPublic)
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
       val nonPublicProject = dataProjects(testEntitiesNonPublicProject).generateOne
@@ -173,23 +173,23 @@ class DatasetsResourcesSpec
 
       val text = nonBlankStrings(minLength = 10).generateOne
 
-      val (dataset1, project1) = projectEntities(visibilityPublic)
+      val (dataset1, project1) = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
         .generateOne
-      val (dataset2, project2) = projectEntities(visibilityPublic)
+      val (dataset2, project2) = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeDescContaining(text)))
         .generateOne
-      val (dataset3, project3) = projectEntities(visibilityPublic)
+      val (dataset3, project3) = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeCreatorNameContaining(text)))
         .generateOne
-      val (dataset4, project4 ::~ project4Fork) = projectEntities(visibilityPublic)
+      val (dataset4, project4 ::~ project4Fork) = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(text)))
         .forkOnce()
         .generateOne
-      val (dataset5WithoutText, project5) = projectEntities(visibilityPublic)
+      val (dataset5WithoutText, project5) = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
-      val (_, project6Private) = projectEntities(visibilityNonPublic)
+      val (_, project6Private) = renkuProjectEntities(visibilityNonPublic)
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
         .generateOne
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
@@ -290,15 +290,15 @@ class DatasetsResourcesSpec
 
       val text = nonBlankStrings(minLength = 10).generateOne
 
-      val (dataset1, project1) = projectEntities(visibilityPublic)
+      val (dataset1, project1) = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
         .generateOne
 
-      val (_, project2Private) = projectEntities(visibilityNonPublic)
+      val (_, project2Private) = renkuProjectEntities(visibilityNonPublic)
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
         .generateOne
 
-      val (dataset3PrivateWithAccess, project3PrivateWithAccess) = projectEntities(visibilityNonPublic)
+      val (dataset3PrivateWithAccess, project3PrivateWithAccess) = renkuProjectEntities(visibilityNonPublic)
         .map(_.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeTitleContaining(text)))
         .generateOne
@@ -322,7 +322,7 @@ class DatasetsResourcesSpec
       ).flatMap(sortCreators)
     }
 
-    def pushToStore(project: testentities.Project)(implicit accessToken: AccessToken): Unit = {
+    def pushToStore(project: testentities.RenkuProject)(implicit accessToken: AccessToken): Unit = {
       `data in the RDF store`(dataProjects(project).generateOne, project.asJsonLD)
       ()
     }
@@ -335,7 +335,7 @@ class DatasetsResourcesSpec
     ) {
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
-      val (dataset, testEntitiesProject) = projectEntities(visibilityPublic)
+      val (dataset, testEntitiesProject) = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
 
@@ -360,7 +360,7 @@ class DatasetsResourcesSpec
       val user = authUsers.generateOne
       implicit val accessToken: AccessToken = user.accessToken
 
-      val (dataset, testEntitiesProject) = projectEntities(visibilityNonPublic)
+      val (dataset, testEntitiesProject) = renkuProjectEntities(visibilityNonPublic)
         .map(_.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
