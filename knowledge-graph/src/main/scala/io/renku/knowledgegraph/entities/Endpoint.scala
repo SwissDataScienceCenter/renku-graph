@@ -1,10 +1,10 @@
 package io.renku.knowledgegraph.entities
 
 import io.renku.graph.model.{projects, users}
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
-import io.renku.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
+import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
 
-import java.time.Instant
+import java.time.LocalDate
 
 object Endpoint {
 
@@ -32,7 +32,7 @@ object Endpoint {
       }
     }
 
-    final class Date private (val value: Instant) extends AnyVal with InstantTinyType
-    object Date                                   extends TinyTypeFactory[Date](new Date(_)) with InstantNotInTheFuture
+    final class Date private (val value: LocalDate) extends AnyVal with LocalDateTinyType
+    object Date extends TinyTypeFactory[Date](new Date(_)) with LocalDateNotInTheFuture
   }
 }

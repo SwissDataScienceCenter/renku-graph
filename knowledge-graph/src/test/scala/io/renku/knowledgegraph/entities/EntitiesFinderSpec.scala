@@ -22,6 +22,7 @@ import Endpoint._
 import Filters._
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -34,7 +35,7 @@ import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.{LocalDateTime, ZoneOffset}
+import java.time.{Instant, ZoneOffset}
 
 class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryRdfStore with IOSpec {
 
@@ -57,7 +58,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
   "findEntities - with query filter" should {
 
     "return entities which name matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings().generateOne
+      val query = nonBlankStrings(minLength = 3).generateOne
 
       val matchingProject = renkuProjectEntities(visibilityPublic)
         .modify(_.copy(name = sentenceContaining(query).map(_.value).generateAs(projects.Name)))
@@ -84,7 +85,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     }
 
     "return entities which keywords matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings().generateOne
+      val query = nonBlankStrings(minLength = 3).generateOne
 
       val matchingProject = renkuProjectEntities(visibilityPublic)
         .modify(
@@ -117,7 +118,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     }
 
     "return entities which description matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings().generateOne
+      val query = nonBlankStrings(minLength = 3).generateOne
 
       val matchingProject = renkuProjectEntities(visibilityPublic)
         .modify(_.copy(maybeDescription = sentenceContaining(query).map(_.value).generateAs(projects.Description).some))
@@ -144,7 +145,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     }
 
     "return project entities which namespace matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings().generateOne
+      val query = nonBlankStrings(minLength = 3).generateOne
 
       val matchingProject = renkuProjectEntities(visibilityPublic)
         .modify(_.copy(path = projects.Path(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
@@ -160,7 +161,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     }
 
     "return entities which creator name matches the given query, sorted by name" in new TestCase {
-      val query = nonBlankStrings().generateOne
+      val query = nonBlankStrings(minLength = 3).generateOne
 
       val matchingProject = renkuProjectEntities(visibilityPublic)
         .modify(
@@ -300,12 +301,17 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
     "return entities with matching date only" in new TestCase {
       val date = dateParams.generateOne
+      val dateAsInstant = Instant
+        .from(date.value.atStartOfDay(ZoneOffset.UTC))
+        .plusSeconds(positiveInts(60 * 60 * 24 - 1).generateOne.value)
 
       val matchingDS ::~ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
-        .modify(_.copy(dateCreated = projects.DateCreated(date.value)))
+        .modify(_.copy(dateCreated = projects.DateCreated(dateAsInstant)))
         .addDataset(
           datasetEntities(provenanceInternal)
-            .modify(provenanceLens[Dataset.Provenance.Internal].modify(_.copy(date = datasets.DateCreated(date.value))))
+            .modify(
+              provenanceLens[Dataset.Provenance.Internal].modify(_.copy(date = datasets.DateCreated(dateAsInstant)))
+            )
         )
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
@@ -328,9 +334,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
           datasetEntities(provenanceImportedExternal)
             .modify(
               provenanceLens[Dataset.Provenance.ImportedExternal]
-                .modify(
-                  _.copy(date = datasets.DatePublished(LocalDateTime.ofInstant(date.value, ZoneOffset.UTC).toLocalDate))
-                )
+                .modify(_.copy(date = datasets.DatePublished(date.value)))
             )
         )
         .addDataset(datasetEntities(provenanceNonModified))

@@ -38,12 +38,12 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
-  import io.renku.graph.model.Schemas.{renku, schema, text, xsd}
+  import io.renku.graph.model.Schemas._
   import io.renku.graph.model.{datasets, projects}
   import io.renku.rdfstore.SparqlQuery
   import io.renku.rdfstore.SparqlQuery.Prefixes
 
-  import java.time.{LocalDateTime, ZoneOffset}
+  import java.time.{Instant, ZoneOffset}
 
   override def findEntities(filters: Filters): F[List[Entity]] =
     queryExpecting[List[Entity]](using = query(filters))
@@ -177,26 +177,34 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
 
     def maybeOnProjectDateCreated(variableName: String): String =
       filters.maybeDate
-        .map(date => s"FILTER ($variableName = xsd:dateTime('$date'))")
+        .map(date => s"""|BIND (${date.encodeAsXsdZonedDate} AS ?date)
+                         |FILTER (xsd:date($variableName) = ?date)""".stripMargin)
         .getOrElse("")
 
     def maybeOnDatasetDates(dateCreatedVariable: String, datePublishedVariable: String): String =
       filters.maybeDate
-        .map(date =>
-          "FILTER (" +
-            s"IF (" +
-            s"  BOUND($dateCreatedVariable), " +
-            s"    $dateCreatedVariable = xsd:dateTime('$date'), " +
-            s"    (IF (" +
-            s"      BOUND($datePublishedVariable), " +
-            s"        $datePublishedVariable = xsd:date('${LocalDateTime.ofInstant(date.value, ZoneOffset.UTC).toLocalDate}'), " +
-            s"        false" +
-            s"      )" +
-            s"    )" +
-            s"  )" +
-            s")"
-        )
+        .map(date => s"""|BIND (${date.encodeAsXsdZonedDate} AS ?dateZoned)
+                         |BIND (${date.encodeAsXsdNotZonedDate} AS ?dateNotZoned)
+                         |FILTER (
+                         |  IF (
+                         |    BOUND($dateCreatedVariable), 
+                         |      xsd:date($dateCreatedVariable) = ?dateZoned, 
+                         |      (IF (
+                         |        BOUND($datePublishedVariable), 
+                         |          xsd:date($datePublishedVariable) = ?dateNotZoned, 
+                         |          false
+                         |      ))
+                         |  )
+                         |)""".stripMargin)
         .getOrElse("")
+
+    private implicit class DateOps(date: Filters.Date) {
+
+      lazy val encodeAsXsdZonedDate: String =
+        s"xsd:date(xsd:dateTime('${Instant.from(date.value.atStartOfDay(ZoneOffset.UTC))}'))"
+
+      lazy val encodeAsXsdNotZonedDate: String = s"xsd:date('$date')"
+    }
   }
 
   private implicit lazy val recordsDecoder: Decoder[List[Entity]] = {

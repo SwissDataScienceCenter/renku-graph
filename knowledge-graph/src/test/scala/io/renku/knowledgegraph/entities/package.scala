@@ -21,7 +21,7 @@ package io.renku.knowledgegraph
 import entities.model._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{nonBlankStrings, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{localDatesNotInTheFuture, nonBlankStrings}
 import io.renku.graph.model.{RenkuBaseUrl, testentities}
 import org.scalacheck.Gen
 
@@ -30,7 +30,7 @@ package object entities {
 
   val queryParams: Gen[Filters.Query]      = nonBlankStrings(minLength = 5).map(v => Filters.Query(v.value))
   val typeParams:  Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
-  val dateParams:  Gen[Filters.Date]       = timestampsNotInTheFuture.toGeneratorOf(Filters.Date)
+  val dateParams:  Gen[Filters.Date]       = localDatesNotInTheFuture.toGeneratorOf(Filters.Date)
 
   private[entities] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
     Entity.Project(
