@@ -18,18 +18,23 @@
 
 package io.renku.knowledgegraph.entities
 
+import io.circe.{Decoder, Encoder}
 import io.renku.graph.model.{datasets, projects, users}
-import io.renku.tinytypes.StringTinyType
+import io.renku.tinytypes.constraints.FiniteFloat
+import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
+import io.renku.tinytypes.{FloatTinyType, StringTinyType, TinyTypeFactory}
 
 object model {
 
   sealed trait Entity extends Product with Serializable {
     type Name <: StringTinyType
-    def name: Name
+    val name:          Name
+    val matchingScore: MatchingScore
   }
 
   object Entity {
     final case class Project(
+        matchingScore:    MatchingScore,
         name:             projects.Name,
         path:             projects.Path,
         visibility:       projects.Visibility,
@@ -42,6 +47,7 @@ object model {
     }
 
     final case class Dataset(
+        matchingScore:    MatchingScore,
         name:             datasets.Name,
         visibility:       projects.Visibility,
         date:             datasets.Date,
@@ -51,5 +57,12 @@ object model {
     ) extends Entity {
       override type Name = datasets.Name
     }
+  }
+
+  final class MatchingScore private (val value: Float) extends AnyVal with FloatTinyType
+  object MatchingScore extends TinyTypeFactory[MatchingScore](new MatchingScore(_)) with FiniteFloat {
+    val min:                  MatchingScore          = MatchingScore(1.0f)
+    implicit val jsonEncoder: Encoder[MatchingScore] = TinyTypeEncoders.floatEncoder
+    implicit val jsonDecoder: Decoder[MatchingScore] = TinyTypeDecoders.floatDecoder(MatchingScore)
   }
 }

@@ -52,8 +52,9 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
     SparqlQuery.of(
       name = "cross-entity search",
       Prefixes.of(renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
-      s"""|SELECT ?entityType ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription ?keywords
-          |  ?visibilities ?maybeDateCreated ?maybeDatePublished ?creatorsNames
+      s"""|SELECT ?entityType ?matchingScore ?name ?path ?visibility ?dateCreated 
+          |  ?maybeCreatorName ?maybeDescription ?keywords ?visibilities 
+          |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames
           |WHERE {
           |  ${subqueries(filters).mkString(" UNION ")}
           |}
@@ -69,14 +70,14 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
 
   private def maybeProjectsQuery(filters: Filters) = (filters whenRequesting EntityType.Project) {
     s"""|{
-        |  SELECT ?entityType ?name ?path ?visibility ?dateCreated ?maybeCreatorName
+        |  SELECT ?entityType ?matchingScore ?name ?path ?visibility ?dateCreated ?maybeCreatorName
         |    ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
         |  WHERE { 
         |    {
-        |      SELECT DISTINCT ?projectId
+        |      SELECT ?projectId (MAX(?score) AS ?matchingScore)
         |      WHERE { 
         |        {
-        |          ?id text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query}')
+        |          (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query}')
         |        } {
         |          ?id a schema:Project
         |          BIND (?id AS ?projectId)
@@ -85,6 +86,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |                     a schema:Project.
         |        }
         |      }
+        |      GROUP BY ?projectId
         |    }
         |    BIND ('project' AS ?entityType)
         |    ?projectId schema:name ?name;
@@ -98,27 +100,27 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |    OPTIONAL { ?projectId schema:description ?maybeDescription }
         |    OPTIONAL { ?projectId schema:keywords ?keyword }
         |  }
-        |  GROUP BY ?entityType ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
+        |  GROUP BY ?entityType ?matchingScore ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
         |}
         |""".stripMargin
   }
 
   private def maybeDatasetsQuery(filters: Filters) = (filters whenRequesting EntityType.Dataset) {
     s"""|{
-        |  SELECT ?entityType ?name ?visibilities ?maybeDateCreated 
+        |  SELECT ?entityType ?matchingScore ?name ?visibilities ?maybeDateCreated 
         |    ?maybeDatePublished ?creatorsNames ?maybeDescription ?keywords
         |  WHERE {
         |    {
-        |      SELECT ?entityType ?name (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
+        |      SELECT ?entityType ?matchingScore ?name (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
         |        ?maybeDateCreated ?maybeDatePublished
         |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorsNames)
         |        ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
         |      WHERE {
         |         {
-        |          SELECT DISTINCT ?dsId
+        |          SELECT ?dsId (MAX(?score) AS ?matchingScore)
         |          WHERE {
         |            {
-        |              ?id text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
+        |              (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
         |            } {
         |              ?id a schema:Dataset
         |              BIND (?id AS ?dsId)
@@ -127,6 +129,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |                    a schema:Dataset.
         |            }
         |          }
+        |          GROUP BY ?dsId
         |        }
         |        BIND ('dataset' AS ?entityType)
         |        ?dsId renku:slug ?name.
@@ -140,7 +143,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
         |        OPTIONAL { ?dsId schema:description ?maybeDescription }
         |        OPTIONAL { ?dsId schema:keywords ?keyword }
         |      }
-        |      GROUP BY ?entityType ?name ?maybeDateCreated ?maybeDatePublished ?maybeDescription
+        |      GROUP BY ?entityType ?matchingScore ?name ?maybeDateCreated ?maybeDatePublished ?maybeDescription
         |    }
         |    ${filters.maybeOnCreatorsNames("?creatorsNames")}
         |  }
@@ -223,6 +226,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
 
     implicit val projectDecoder: Decoder[Entity.Project] = { cursor =>
       for {
+        matchingScore    <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
         name             <- cursor.downField("name").downField("value").as[projects.Name]
         path             <- cursor.downField("path").downField("value").as[projects.Path]
         visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
@@ -235,12 +239,21 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
             .as[Option[String]]
             .flatMap(toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword))
         maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[projects.Description]]
-      } yield Entity.Project(name, path, visibility, dateCreated, maybeCreatorName, keywords, maybeDescription)
+      } yield Entity.Project(matchingScore,
+                             name,
+                             path,
+                             visibility,
+                             dateCreated,
+                             maybeCreatorName,
+                             keywords,
+                             maybeDescription
+      )
     }
 
     implicit val datasetDecoder: Decoder[Entity.Dataset] = { cursor =>
       for {
-        name <- cursor.downField("name").downField("value").as[datasets.Name]
+        matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
+        name          <- cursor.downField("name").downField("value").as[datasets.Name]
         visibility <-
           cursor
             .downField("visibilities")
@@ -270,7 +283,7 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
                       .as[Option[String]]
                       .flatMap(toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword))
         maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[datasets.Description]]
-      } yield Entity.Dataset(name, visibility, date, creators, keywords, maybeDescription)
+      } yield Entity.Dataset(matchingScore, name, visibility, date, creators, keywords, maybeDescription)
     }
 
     val entity: Decoder[Entity] = { cursor =>

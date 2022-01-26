@@ -24,6 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{localDatesNotInTheFuture, nonBlankStrings}
 import io.renku.graph.model.{RenkuBaseUrl, testentities}
 import org.scalacheck.Gen
+import org.scalacheck.Gen.choose
 
 package object entities {
   import Endpoint._
@@ -32,8 +33,11 @@ package object entities {
   val typeParams:  Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
   val dateParams:  Gen[Filters.Date]       = localDatesNotInTheFuture.toGeneratorOf(Filters.Date)
 
+  val matchingScores: Gen[MatchingScore] = choose(MatchingScore.min.value, 10f).toGeneratorOf(MatchingScore)
+
   private[entities] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
     Entity.Project(
+      MatchingScore.min,
       project.name,
       project.path,
       project.visibility,
@@ -46,6 +50,7 @@ package object entities {
   private[entities] implicit def datasetConverter[P <: testentities.Project]
       : ((testentities.Dataset[testentities.Dataset.Provenance], P)) => Entity.Dataset = { case (dataset, project) =>
     Entity.Dataset(
+      MatchingScore.min,
       dataset.identification.name,
       project.visibility,
       dataset.provenance.date,

@@ -141,6 +141,8 @@ object Generators {
   def positiveLongs(max: Long = 1000): Gen[Long Refined Positive] =
     choose(1L, max) map Refined.unsafeApply
 
+  def nonNegativeFloats(max: Float = 1000): Gen[Float Refined NonNegative] = choose(0, max) map Refined.unsafeApply
+
   def nonNegativeDoubles(max: Double = 1000d): Gen[Double Refined NonNegative] = choose(0d, max) map Refined.unsafeApply
 
   def negativeDoubles(min: Double = -1000d): Gen[Double Refined Negative] = choose(min, 0d) map Refined.unsafeApply

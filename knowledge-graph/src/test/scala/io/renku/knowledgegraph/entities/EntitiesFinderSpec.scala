@@ -78,7 +78,8 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder
         .findEntities(Filters(maybeQuery = Query(query.value).some))
-        .unsafeRunSync() shouldBe List(
+        .unsafeRunSync()
+        .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
@@ -111,7 +112,8 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder
         .findEntities(Filters(maybeQuery = Query(query.value).some))
-        .unsafeRunSync() shouldBe List(
+        .unsafeRunSync()
+        .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
@@ -138,7 +140,8 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder
         .findEntities(Filters(maybeQuery = Query(query.value).some))
-        .unsafeRunSync() shouldBe List(
+        .unsafeRunSync()
+        .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
@@ -155,7 +158,8 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder
         .findEntities(Filters(maybeQuery = Query(query.value).some))
-        .unsafeRunSync() shouldBe List(
+        .unsafeRunSync()
+        .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project]
       ).sortBy(_.name.value)
     }
@@ -190,7 +194,8 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder
         .findEntities(Filters(maybeQuery = Query(query.value).some))
-        .unsafeRunSync() shouldBe List(
+        .unsafeRunSync()
+        .skipMatchingScore shouldBe List(
         matchingProject.to[model.Entity.Project],
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
@@ -366,5 +371,12 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
     val finder               = new EntitiesFinderImpl[IO](rdfStoreConfig, timeRecorder)
+  }
+
+  private implicit class ResultsOps(results: List[model.Entity]) {
+    lazy val skipMatchingScore: List[model.Entity] = results.map {
+      case proj: model.Entity.Project => proj.copy(matchingScore = model.MatchingScore.min)
+      case ds:   model.Entity.Dataset => ds.copy(matchingScore = model.MatchingScore.min)
+    }
   }
 }
