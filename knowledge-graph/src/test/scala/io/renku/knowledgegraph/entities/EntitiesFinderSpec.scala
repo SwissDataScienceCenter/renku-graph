@@ -387,6 +387,25 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         matchingDsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value).use(direction)
     }
+
+    "be sorting by date if requested" in new TestCase {
+      val externalDS ::~ internalDS ::~ project = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceImportedExternal))
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+
+      loadToStore(project)
+
+      val direction = sortingDirections.generateOne
+
+      finder
+        .findEntities(Filters(), Sorting.By(Sorting.ByDate, direction))
+        .unsafeRunSync() shouldBe List(
+        project.to[model.Entity.Project],
+        (externalDS -> project).to[model.Entity.Dataset],
+        (internalDS -> project).to[model.Entity.Dataset]
+      ).sortBy(_.dateAsInstant).use(direction)
+    }
   }
 
   private trait TestCase {
@@ -404,6 +423,13 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     lazy val use: SortBy.Direction => List[model.Entity] = {
       case SortBy.Direction.Asc  => results
       case SortBy.Direction.Desc => results.reverse
+    }
+  }
+
+  private implicit class EntityOps(entity: model.Entity) {
+    lazy val dateAsInstant: Instant = entity match {
+      case proj: model.Entity.Project => proj.date.value
+      case ds:   model.Entity.Dataset => ds.date.instant
     }
   }
 }

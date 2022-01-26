@@ -249,15 +249,15 @@ object datasets {
       sameAs => EntityId.of(sameAs.value).asJsonLD
   }
 
-  sealed trait Date extends Any {
-    def instant: Instant
-  }
-
   class PartResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object PartResourceId
       extends TinyTypeFactory[PartResourceId](new PartResourceId(_))
       with UrlConstraint
       with EntityIdJsonLdOps[PartResourceId]
+
+  sealed trait Date extends Any with TinyType {
+    def instant: Instant
+  }
 
   final class DateCreated private (val value: Instant) extends AnyVal with Date with InstantTinyType {
     override def instant: Instant = value

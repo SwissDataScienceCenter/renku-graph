@@ -20,15 +20,19 @@ package io.renku.knowledgegraph.entities
 
 import io.circe.{Decoder, Encoder}
 import io.renku.graph.model.{datasets, projects, users}
+import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
 import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
-import io.renku.tinytypes.{FloatTinyType, StringTinyType, TinyTypeFactory}
 
 object model {
 
   sealed trait Entity extends Product with Serializable {
     type Name <: StringTinyType
-    val name:          Name
+    val name: Name
+
+    type Date <: TinyType
+    val date: Date
+
     val matchingScore: MatchingScore
   }
 
@@ -38,12 +42,13 @@ object model {
         name:             projects.Name,
         path:             projects.Path,
         visibility:       projects.Visibility,
-        dateCreated:      projects.DateCreated,
+        date:             projects.DateCreated,
         maybeCreator:     Option[users.Name],
         keywords:         List[projects.Keyword],
         maybeDescription: Option[projects.Description]
     ) extends Entity {
       override type Name = projects.Name
+      override type Date = projects.DateCreated
     }
 
     final case class Dataset(
@@ -56,6 +61,7 @@ object model {
         maybeDescription: Option[datasets.Description]
     ) extends Entity {
       override type Name = datasets.Name
+      override type Date = datasets.Date
     }
   }
 
