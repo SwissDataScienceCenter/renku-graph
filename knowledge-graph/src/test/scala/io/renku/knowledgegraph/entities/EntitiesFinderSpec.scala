@@ -371,7 +371,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
   "findEntities - with sorting" should {
 
-    "be sorting by name if requested" in new TestCase {
+    "be sorting by Name if requested" in new TestCase {
       val matchingDsAndProject @ _ ::~ matchingDSProject = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
@@ -388,7 +388,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       ).sortBy(_.name.value).use(direction)
     }
 
-    "be sorting by date if requested" in new TestCase {
+    "be sorting by Date if requested" in new TestCase {
       val externalDS ::~ internalDS ::~ project = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceImportedExternal))
         .addDataset(datasetEntities(provenanceInternal))
@@ -405,6 +405,36 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         (externalDS -> project).to[model.Entity.Dataset],
         (internalDS -> project).to[model.Entity.Dataset]
       ).sortBy(_.dateAsInstant).use(direction)
+    }
+
+    "be sorting by Matching Score if requested" in new TestCase {
+
+      val query = nonBlankStrings(minLength = 3).generateOne
+
+      val ds ::~ project = renkuProjectEntities(visibilityPublic)
+        .modify(_.copy(name = projects.Name(query.value)))
+        .addDataset(
+          datasetEntities(provenanceNonModified).modify(
+            identificationLens.modify(
+              _.copy(name = sentenceContaining(query).map(_.value).generateAs(datasets.Name))
+            )
+          )
+        )
+        .generateOne
+
+      loadToStore(project)
+
+      val direction = sortingDirections.generateOne
+
+      finder
+        .findEntities(Filters(maybeQuery = Filters.Query(query.value).some),
+                      Sorting.By(Sorting.ByMatchingScore, direction)
+        )
+        .unsafeRunSync()
+        .skipMatchingScore shouldBe List(
+        project.to[model.Entity.Project], // should have higher score as its name is the query
+        (ds -> project).to[model.Entity.Dataset]
+      ).use(direction).reverse
     }
   }
 

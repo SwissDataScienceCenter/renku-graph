@@ -33,7 +33,7 @@ private trait EntitiesFinder[F[_]] {
 private class EntitiesFinderImpl[F[_]: Async: Logger](
     rdfStoreConfig: RdfStoreConfig,
     timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder, printQueries = true)
+) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
     with EntitiesFinder[F] {
 
   import eu.timepit.refined.auto._
