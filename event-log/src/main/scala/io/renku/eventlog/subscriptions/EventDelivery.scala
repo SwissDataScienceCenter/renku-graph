@@ -25,8 +25,8 @@ import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.graph.model.events.{CompoundEventId, EventId}
-import io.renku.graph.model.{events, projects}
+import io.renku.graph.model.events.{CompoundEventId, DeletingProjectDeliverId, EventDeliveryId, EventId, EventTypeId}
+import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import skunk._
@@ -39,7 +39,7 @@ private[subscriptions] trait EventDelivery[F[_], CategoryEvent] {
 
 private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
     sessionResource:          SessionResource[F, EventLogDB],
-    compoundEventIdExtractor: CategoryEvent => CompoundEventId,
+    compoundEventIdExtractor: CategoryEvent => EventDeliveryId,
     queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name],
     sourceUrl:                MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
@@ -47,39 +47,68 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
     with TypeSerializers {
 
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit] = sessionResource.useK {
-    val CompoundEventId(id, projectId) = compoundEventIdExtractor(event)
+    val eventDeliveryId = compoundEventIdExtractor(event)
     for {
-      _      <- deleteDelivery(id, projectId)
-      result <- insert(id, projectId, subscriberUrl)
+      _      <- deleteDelivery(eventDeliveryId)
+      result <- insert(eventDeliveryId, subscriberUrl)
     } yield result
   } flatMap toResult
 
-  private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
+  private def insert(eventDeliveryId: EventDeliveryId, subscriberUrl: SubscriberUrl) =
     measureExecutionTime {
-      SqlStatement(name = "event delivery info - insert")
-        .command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl](
-          sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
+      eventDeliveryId match {
+        case CompoundEventId(eventId, projectId) =>
+          SqlStatement(name = "event delivery info - insert")
+            .command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl](
+              sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
                 SELECT $eventIdEncoder, $projectIdEncoder, delivery_id
                 FROM subscriber
                 WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
                 ON CONFLICT (event_id, project_id)
                 DO NOTHING
             """.command
-        )
-        .arguments(eventId ~ projectId ~ subscriberUrl ~ sourceUrl)
-        .build
+            )
+            .arguments(eventId ~ projectId ~ subscriberUrl ~ sourceUrl)
+            .build
+        case eventId @ DeletingProjectDeliverId(projectId) =>
+          SqlStatement(name = "event delivery info - insert")
+            .command[projects.Id ~ EventTypeId ~ SubscriberUrl ~ MicroserviceBaseUrl](
+              sql"""INSERT INTO event_delivery (project_id, delivery_id, event_type_id)
+                SELECT  $projectIdEncoder, delivery_id, $eventTypeIdEncoder
+                FROM subscriber
+                WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
+                ON CONFLICT (event_id, project_id)
+                DO NOTHING
+            """.command
+            )
+            .arguments(projectId ~ eventId.eventTypeId ~ subscriberUrl ~ sourceUrl)
+            .build
+      }
     }
 
-  private def deleteDelivery(eventId: events.EventId, projectId: projects.Id) = measureExecutionTime {
-    SqlStatement(name = "event delivery info - remove")
-      .command[EventId ~ projects.Id](
-        sql"""DELETE FROM event_delivery
+  private def deleteDelivery(eventDeliveryId: EventDeliveryId) = measureExecutionTime {
+    eventDeliveryId match {
+      case CompoundEventId(eventId, projectId) =>
+        SqlStatement(name = "event delivery info - remove")
+          .command[EventId ~ projects.Id](
+            sql"""DELETE FROM event_delivery
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
           """.command
-      )
-      .arguments(eventId ~ projectId)
-      .build
-      .void
+          )
+          .arguments(eventId ~ projectId)
+          .build
+          .void
+      case eventId @ DeletingProjectDeliverId(projectId) =>
+        SqlStatement(name = "event delivery info - remove")
+          .command[projects.Id ~ EventTypeId](
+            sql"""DELETE FROM event_delivery
+              WHERE event_id = NULL AND project_id = $projectIdEncoder AND event_type_id = $eventTypeIdEncoder
+          """.command
+          )
+          .arguments(projectId ~ eventId.eventTypeId)
+          .build
+          .void
+    }
   }
 
   private lazy val toResult: Completion => F[Unit] = {
@@ -92,7 +121,7 @@ private[subscriptions] object EventDelivery {
 
   def apply[F[_]: MonadCancelThrow, CategoryEvent](
       sessionResource:          SessionResource[F, EventLogDB],
-      compoundEventIdExtractor: CategoryEvent => CompoundEventId,
+      compoundEventIdExtractor: CategoryEvent => EventDeliveryId,
       queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name]
   ): F[EventDelivery[F, CategoryEvent]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)

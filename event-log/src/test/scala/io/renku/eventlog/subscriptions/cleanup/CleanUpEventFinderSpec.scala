@@ -93,7 +93,7 @@ class CleanUpEventFinderSpec
         expectDeletingGaugeUpdate(projectPath, 2)
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          CleanUpEvent(event2Id, Project(projectId, projectPath))
+          CleanUpEvent(Project(projectId, projectPath))
         )
 
         findEvents(Deleting).noBatchDate shouldBe List((event1Id, executionDate), (event2Id, executionDate))
@@ -102,7 +102,7 @@ class CleanUpEventFinderSpec
         expectDeletingGaugeUpdate(project2Path, 1)
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          CleanUpEvent(event4id, Project(project2Id, project2Path))
+          CleanUpEvent(Project(project2Id, project2Path))
         )
 
         finder.popEvent().unsafeRunSync() shouldBe None
