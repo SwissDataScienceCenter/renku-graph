@@ -37,6 +37,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.concurrent.duration._
+
 class MicroserviceRunnerSpec
     extends AnyWordSpec
     with IOSpec
@@ -59,7 +61,7 @@ class MicroserviceRunnerSpec
         given(reProvisioning).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
-        runner.run().unsafeRunSync() shouldBe ExitCode.Success
+        Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync() shouldBe ExitCode.Success
       }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -136,7 +138,7 @@ class MicroserviceRunnerSpec
       given(httpServer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run().unsafeRunSync()
+        Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync()
       } shouldBe exception
 
       logger.loggedOnly(
@@ -155,7 +157,7 @@ class MicroserviceRunnerSpec
       given(reProvisioning).fails(becauseOf = exception)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync() shouldBe ExitCode.Success
     }
 
     "return Success ExitCode even when running eventConsumersRegistry fails" in new TestCase {
@@ -169,7 +171,7 @@ class MicroserviceRunnerSpec
       given(reProvisioning).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync() shouldBe ExitCode.Success
     }
   }
 

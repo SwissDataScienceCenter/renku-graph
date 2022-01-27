@@ -249,7 +249,6 @@ trait EventLogDataProvisioning {
   protected def findProjectCategorySyncTimes(projectId: projects.Id): List[(CategoryName, LastSyncedDate)] = execute {
     val lastSyncedDateDecoder: Decoder[LastSyncedDate] =
       timestamptz.map(timestamp => LastSyncedDate(timestamp.toInstant))
-
     Kleisli { session =>
       val query: Query[projects.Id, (CategoryName, LastSyncedDate)] =
         sql"""SELECT category_name, last_synced
