@@ -18,23 +18,28 @@
 
 package io.renku.knowledgegraph.entities
 
-import Endpoint.Filters._
-import Endpoint._
+import Endpoint.Criteria
+import Endpoint.Criteria.Filters
+import Endpoint.Criteria.Filters._
+import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.http.rest.paging.Paging.PagedResultsFinder
+import io.renku.http.rest.paging.{Paging, PagingResponse}
 import io.renku.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQueryTimeRecorder}
 import model._
 import org.typelevel.log4cats.Logger
 
 private trait EntitiesFinder[F[_]] {
-  def findEntities(filters: Filters, sorting: Sorting.By): F[List[Entity]]
+  def findEntities(criteria: Criteria): F[PagingResponse[Entity]]
 }
 
-private class EntitiesFinderImpl[F[_]: Async: Logger](
+private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     rdfStoreConfig: RdfStoreConfig,
     timeRecorder:   SparqlQueryTimeRecorder[F]
 ) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
-    with EntitiesFinder[F] {
+    with EntitiesFinder[F]
+    with Paging[Entity] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
@@ -45,22 +50,23 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
 
   import java.time.{Instant, ZoneOffset}
 
-  override def findEntities(filters: Filters, sorting: Sorting.By): F[List[Entity]] =
-    queryExpecting[List[Entity]](using = query(filters, sorting))
+  override def findEntities(criteria: Criteria): F[PagingResponse[Entity]] = {
+    implicit val resultsFinder: PagedResultsFinder[F, Entity] = pagedResultsFinder(query(criteria))
+    findPage[F](criteria.paging)
+  }
 
-  private def query(filters: Filters, sorting: Sorting.By) =
-    SparqlQuery.of(
-      name = "cross-entity search",
-      Prefixes.of(renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
-      s"""|SELECT ?entityType ?matchingScore ?name ?path ?visibility ?date 
-          |  ?maybeCreatorName ?maybeDescription ?keywords ?visibilities 
-          |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames
-          |WHERE {
-          |  ${subqueries(filters).mkString(" UNION ")}
-          |}
-          |${`ORDER BY`(sorting)}
-          |""".stripMargin
-    )
+  private def query(criteria: Criteria) = SparqlQuery.of(
+    name = "cross-entity search",
+    Prefixes.of(renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
+    s"""|SELECT ?entityType ?matchingScore ?name ?path ?visibility ?date 
+        |  ?maybeCreatorName ?maybeDescription ?keywords ?visibilities 
+        |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames
+        |WHERE {
+        |  ${subqueries(criteria.filters).mkString(" UNION ")}
+        |}
+        |${`ORDER BY`(criteria.sorting)}
+        |""".stripMargin
+  )
 
   private def subqueries(filters: Filters): List[String] =
     EntityType.all flatMap {
@@ -212,13 +218,13 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
     }
   }
 
-  private def `ORDER BY`(sorting: Sorting.By): String = sorting.property match {
-    case Sorting.ByName          => s"ORDER BY ${sorting.direction}(?name)"
-    case Sorting.ByDate          => s"ORDER BY ${sorting.direction}(?date)"
-    case Sorting.ByMatchingScore => s"ORDER BY ${sorting.direction}(?matchingScore)"
+  private def `ORDER BY`(sorting: Criteria.Sorting.By): String = sorting.property match {
+    case Criteria.Sorting.ByName          => s"ORDER BY ${sorting.direction}(?name)"
+    case Criteria.Sorting.ByDate          => s"ORDER BY ${sorting.direction}(?date)"
+    case Criteria.Sorting.ByMatchingScore => s"ORDER BY ${sorting.direction}(?matchingScore)"
   }
 
-  private implicit lazy val recordsDecoder: Decoder[List[Entity]] = {
+  private implicit lazy val recordDecoder: Decoder[Entity] = {
     import Decoder._
     import io.circe.DecodingFailure
     import io.renku.graph.model.users
@@ -294,13 +300,10 @@ private class EntitiesFinderImpl[F[_]: Async: Logger](
       } yield Entity.Dataset(matchingScore, name, visibility, date, creators, keywords, maybeDescription)
     }
 
-    val entity: Decoder[Entity] = { cursor =>
+    cursor =>
       cursor.downField("entityType").downField("value").as[String] >>= {
         case "project" => cursor.as[Entity.Project]
         case "dataset" => cursor.as[Entity.Dataset]
       }
-    }
-
-    _.downField("results").downField("bindings").as(decodeList(entity))
   }
 }

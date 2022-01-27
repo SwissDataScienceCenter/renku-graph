@@ -27,7 +27,7 @@ import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 
 package object entities {
-  import Endpoint._
+  import Endpoint.Criteria._
 
   val queryParams: Gen[Filters.Query]      = nonBlankStrings(minLength = 5).map(v => Filters.Query(v.value))
   val typeParams:  Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
