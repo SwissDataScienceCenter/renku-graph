@@ -50,12 +50,14 @@ object TestTinyTypes {
   implicit object FloatTestType extends TinyTypeFactory[FloatTestType](new FloatTestType(_)) with FiniteFloat
 
   class LocalDateTestType private (val value: LocalDate) extends AnyVal with LocalDateTinyType
+
   implicit object LocalDateTestType extends TinyTypeFactory[LocalDateTestType](new LocalDateTestType(_))
 
   class InstantTestType private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object InstantTestType                    extends TinyTypeFactory[InstantTestType](new InstantTestType(_))
 
   class DurationTestType private (val value: Duration) extends AnyVal with DurationTinyType
+
   implicit object DurationTestType extends TinyTypeFactory[DurationTestType](new DurationTestType(_))
 
   class ByteArrayTestType private (val value: Array[Byte]) extends AnyVal with ByteArrayTinyType with ZippedContent
