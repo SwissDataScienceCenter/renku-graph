@@ -51,7 +51,7 @@ private case class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logge
 
   private def checkColumnExists(): Kleisli[F, Session[F], Boolean] = {
     val query: Query[Void, String] =
-      sql"""SELECT column_name FROM information_schema.columns""".query(varchar)
+      sql"""SELECT column_name FROM information_schema.columns WHERE table_name = 'event_delivery'""".query(varchar)
 
     Kleisli {
       _.execute(query)
@@ -64,7 +64,7 @@ private case class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logge
     for {
       _ <-
         execute(
-          sql"ALTER TABLE event_delivery ADD COLUMN event_type_id varchar".command
+          sql"ALTER TABLE event_delivery ADD COLUMN IF NOT EXISTS event_type_id varchar".command
         )
       _ <-
         execute(
@@ -76,7 +76,15 @@ private case class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logge
         )
       _ <-
         execute(
+          sql"ALTER TABLE event_delivery DROP CONSTRAINT IF EXISTS event_project_id_unique".command
+        )
+      _ <-
+        execute(
           sql"ALTER TABLE event_delivery ADD CONSTRAINT event_project_id_unique UNIQUE (event_id, project_id)".command
+        )
+      _ <-
+        execute(
+          sql"ALTER TABLE event_delivery DROP CONSTRAINT IF EXISTS project_event_type_id_unique".command
         )
       _ <-
         execute(
