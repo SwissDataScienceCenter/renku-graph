@@ -517,6 +517,61 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     }
   }
 
+  "findEntities - in case of a shared dataset" should {
+
+    "de-duplicate datasets having equal sameAs - case of an Internal DS" in new TestCase {
+      val originalDSAndProject @ originalDS ::~ originalDSProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceInternal))
+        .generateOne
+
+      val _ ::~ importedDSProject = renkuProjectEntities(visibilityPublic)
+        .importDataset(originalDS)
+        .generateOne
+
+      loadToStore(originalDSProject, importedDSProject)
+
+      finder
+        .findEntities(Criteria(Filters()))
+        .unsafeRunSync()
+        .results shouldBe List(
+        originalDSProject.to[model.Entity.Project],
+        importedDSProject.to[model.Entity.Project],
+        originalDSAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "de-duplicate datasets having equal sameAs - case of an Exported DS" in new TestCase {
+      val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+
+      val importedDSAndProject1 @ importedDS1 ::~ project1WithImportedDS = renkuProjectEntities(visibilityPublic)
+        .importDataset(externalDS)
+        .generateOne
+
+      val importedDSAndProject2 @ _ ::~ project2WithImportedDS = renkuProjectEntities(visibilityPublic)
+        .importDataset(externalDS)
+        .generateOne
+
+      val importedDSAndProject3 @ _ ::~ projectWithDSImportedFromProject = renkuProjectEntities(visibilityPublic)
+        .importDataset(importedDS1)
+        .generateOne
+
+      loadToStore(project1WithImportedDS, project2WithImportedDS, projectWithDSImportedFromProject)
+
+      val results = finder.findEntities(Criteria(Filters())).unsafeRunSync().results
+
+      val expectedProjects = List(
+        project1WithImportedDS.to[model.Entity.Project],
+        project2WithImportedDS.to[model.Entity.Project],
+        projectWithDSImportedFromProject.to[model.Entity.Project]
+      )
+      results should {
+        be((importedDSAndProject1.to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value)) or
+          be((importedDSAndProject2.to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value)) or
+          be((importedDSAndProject3.to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value))
+      }
+    }
+  }
+
   private trait TestCase {
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())

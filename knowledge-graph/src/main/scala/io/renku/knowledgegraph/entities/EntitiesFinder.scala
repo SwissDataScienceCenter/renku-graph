@@ -57,8 +57,8 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   private def query(criteria: Criteria) = SparqlQuery.of(
     name = "cross-entity search",
-    Prefixes.of(renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
-    s"""|SELECT ?entityType ?matchingScore ?name ?path ?visibility ?date 
+    Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
+    s"""|SELECT ?entityType ?matchingScore ?path ?identifier ?name ?visibility ?date 
         |  ?maybeCreatorName ?maybeDescription ?keywords ?visibilities 
         |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames
         |WHERE {
@@ -113,33 +113,64 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   private def maybeDatasetsQuery(filters: Filters) = (filters whenRequesting EntityType.Dataset) {
     s"""|{
-        |  SELECT ?entityType ?matchingScore ?name ?visibilities 
+        |  SELECT ?entityType ?matchingScore ?identifier ?name ?visibilities 
         |    ?maybeDateCreated ?maybeDatePublished ?date 
         |    ?creatorsNames ?maybeDescription ?keywords
         |  WHERE {
         |    {
-        |      SELECT ?entityType ?matchingScore ?name (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
+        |      SELECT ?entityType ?matchingScore ?identifier ?name
+        |        (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
         |        ?maybeDateCreated ?maybeDatePublished ?date
         |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorsNames)
         |        ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
         |      WHERE {
-        |         {
-        |          SELECT ?dsId (MAX(?score) AS ?matchingScore)
+        |        {
+        |          SELECT ?sameAs (SAMPLE(?dsId) AS ?dsIdSample)
+        |            (GROUP_CONCAT(DISTINCT ?dsId; separator='|') AS ?dsIds)
+        |            (MAX(?dsScore) AS ?matchingScore)
         |          WHERE {
         |            {
-        |              (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
-        |            } {
-        |              ?id a schema:Dataset
-        |              BIND (?id AS ?dsId)
-        |            } UNION {
-        |              ?dsId schema:creator ?id;
-        |                    a schema:Dataset.
+        |              SELECT ?sameAs ?projectId ?dsId ?dsScore
+        |                (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds)
+        |                (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
+        |              WHERE {
+        |                {
+        |                  SELECT ?dsId (MAX(?score) AS ?dsScore)
+        |                  WHERE {
+        |                    {
+        |                      (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
+        |                    } {
+        |                      ?id a schema:Dataset
+        |                      BIND (?id AS ?dsId)
+        |                    } UNION {
+        |                      ?dsId schema:creator ?id;
+        |                            a schema:Dataset.
+        |                    }
+        |                  }
+        |                  GROUP BY ?dsId
+        |                }
+        |                ?dsId renku:topmostSameAs ?sameAs;
+        |                      ^renku:hasDataset ?projectId.
+        |                OPTIONAL {
+        |                ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
+        |                           ^renku:hasDataset ?childProjectId.
+        |                }
+        |                OPTIONAL {
+        |                  ?dsId prov:invalidatedAtTime ?invalidationTime;
+        |                        ^renku:hasDataset ?projectIdWhereInvalidated
+        |                }
+        |              }
+        |              GROUP BY ?sameAs ?dsId ?projectId ?dsScore
         |            }
+        |            FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
+        |            FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
         |          }
-        |          GROUP BY ?dsId
+        |          GROUP BY ?sameAs
         |        }
         |        BIND ('dataset' AS ?entityType)
-        |        ?dsId renku:slug ?name.
+        |        BIND (IF (CONTAINS(STR(?dsIds), STR(?sameAs)), ?sameAs, ?dsIdSample) AS ?dsId)
+        |        ?dsId schema:identifier ?identifier;
+        |              renku:slug ?name.
         |        ?projectId renku:hasDataset ?dsId;
         |                   renku:projectVisibility ?visibility.
         |        ${filters.maybeOnVisibility("?visibility")}
@@ -149,9 +180,9 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |        ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
         |        OPTIONAL { ?dsId schema:description ?maybeDescription }
         |        OPTIONAL { ?dsId schema:keywords ?keyword }
-        |        BIND(IF(BOUND(?maybeDateCreated), ?maybeDateCreated, ?maybeDatePublished) AS ?date)
+        |        BIND (IF (BOUND(?maybeDateCreated), ?maybeDateCreated, ?maybeDatePublished) AS ?date)
         |      }
-        |      GROUP BY ?entityType ?matchingScore ?name ?maybeDateCreated ?maybeDatePublished ?date ?maybeDescription
+        |      GROUP BY ?entityType ?matchingScore ?identifier ?name ?maybeDateCreated ?maybeDatePublished ?date ?maybeDescription
         |    }
         |    ${filters.maybeOnCreatorsNames("?creatorsNames")}
         |  }
@@ -241,8 +272,8 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     implicit val projectDecoder: Decoder[Entity.Project] = { cursor =>
       for {
         matchingScore    <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-        name             <- cursor.downField("name").downField("value").as[projects.Name]
         path             <- cursor.downField("path").downField("value").as[projects.Path]
+        name             <- cursor.downField("name").downField("value").as[projects.Name]
         visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
         dateCreated      <- cursor.downField("date").downField("value").as[projects.DateCreated]
         maybeCreatorName <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
@@ -254,8 +285,8 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
             .flatMap(toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword))
         maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[projects.Description]]
       } yield Entity.Project(matchingScore,
-                             name,
                              path,
+                             name,
                              visibility,
                              dateCreated,
                              maybeCreatorName,
@@ -267,6 +298,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     implicit val datasetDecoder: Decoder[Entity.Dataset] = { cursor =>
       for {
         matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
+        identifier    <- cursor.downField("identifier").downField("value").as[datasets.Identifier]
         name          <- cursor.downField("name").downField("value").as[datasets.Name]
         visibility <-
           cursor
@@ -297,7 +329,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
                       .as[Option[String]]
                       .flatMap(toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword))
         maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[datasets.Description]]
-      } yield Entity.Dataset(matchingScore, name, visibility, date, creators, keywords, maybeDescription)
+      } yield Entity.Dataset(matchingScore, identifier, name, visibility, date, creators, keywords, maybeDescription)
     }
 
     cursor =>

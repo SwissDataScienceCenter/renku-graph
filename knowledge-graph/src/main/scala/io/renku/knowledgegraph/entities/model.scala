@@ -39,8 +39,8 @@ object model {
   object Entity {
     final case class Project(
         matchingScore:    MatchingScore,
-        name:             projects.Name,
         path:             projects.Path,
+        name:             projects.Name,
         visibility:       projects.Visibility,
         date:             projects.DateCreated,
         maybeCreator:     Option[users.Name],
@@ -53,6 +53,7 @@ object model {
 
     final case class Dataset(
         matchingScore:    MatchingScore,
+        identifier:       datasets.Identifier,
         name:             datasets.Name,
         visibility:       projects.Visibility,
         date:             datasets.Date,

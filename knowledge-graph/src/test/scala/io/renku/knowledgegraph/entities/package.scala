@@ -38,8 +38,8 @@ package object entities {
   private[entities] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
     Entity.Project(
       MatchingScore.min,
-      project.name,
       project.path,
+      project.name,
       project.visibility,
       project.dateCreated,
       project.maybeCreator.map(_.name),
@@ -51,6 +51,7 @@ package object entities {
       : ((testentities.Dataset[testentities.Dataset.Provenance], P)) => Entity.Dataset = { case (dataset, project) =>
     Entity.Dataset(
       MatchingScore.min,
+      dataset.identification.identifier,
       dataset.identification.name,
       project.visibility,
       dataset.provenance.date,
@@ -63,7 +64,7 @@ package object entities {
   private[entities] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance,
                                                      +P <: testentities.Project
   ](datasetAndProject: (testentities.Dataset[PROV], P))(implicit renkuBaseUrl: RenkuBaseUrl) {
-    def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T =
-      convert(datasetAndProject)
+
+    def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T = convert(datasetAndProject)
   }
 }
