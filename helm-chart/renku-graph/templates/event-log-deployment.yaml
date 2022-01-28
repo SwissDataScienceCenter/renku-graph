@@ -88,7 +88,7 @@ spec:
           resources:
             {{- toYaml .Values.eventLog.resources | nindent 12 }}
           volumeMounts:
-            {{- include "certificates.volumeMounts.openjdk14" . | nindent 12 }}
+            {{- include "certificates.volumeMounts.openjdk15" . | nindent 12 }}
       volumes:
         {{- include "certificates.volumes" . | nindent 8 }}
   {{- with .Values.nodeSelector }}
