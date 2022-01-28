@@ -254,7 +254,7 @@ trait EventLogDataProvisioning {
       val query: Query[projects.Id, (CategoryName, LastSyncedDate)] =
         sql"""SELECT category_name, last_synced
               FROM subscription_category_sync_time
-               WHERE project_id = $projectIdEncoder"""
+              WHERE project_id = $projectIdEncoder"""
           .query(varchar ~ lastSyncedDateDecoder)
           .map { case (category: String) ~ lastSynced => (CategoryName(category), lastSynced) }
       session.prepare(query).use(_.stream(projectId, 32).compile.toList)
