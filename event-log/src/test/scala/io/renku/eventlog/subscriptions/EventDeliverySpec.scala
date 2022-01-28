@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,22 +19,28 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.IO
-import ch.datascience.db.SqlStatement
-import ch.datascience.events.consumers.subscriptions._
-import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.subscriptions.TestCompoundIdEvent.testCompoundIdEvent
+import io.renku.events.consumers.subscriptions._
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.events.CompoundEventId
+import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
+class EventDeliverySpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryEventLogDbSpec
+    with MockFactory
+    with should.Matchers {
 
   "registerSending" should {
 
@@ -77,7 +83,6 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
       findAllDeliveries shouldBe List(event.compoundEventId -> newSubscriberId)
-
     }
   }
 

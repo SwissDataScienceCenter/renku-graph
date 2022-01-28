@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,17 +18,15 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
 import org.scalacheck.Gen
 
 package object triplesgenerated {
 
   private[triplesgenerated] lazy val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
-    eventId       <- compoundEventIds
-    projectPath   <- projectPaths
-    payload       <- eventPayloads
-    schemaVersion <- projectSchemaVersions
-  } yield TriplesGeneratedEvent(eventId, projectPath, payload, schemaVersion)
+    eventId     <- compoundEventIds
+    projectPath <- projectPaths
+    payload     <- zippedEventPayloads
+  } yield TriplesGeneratedEvent(eventId, projectPath, payload)
 }

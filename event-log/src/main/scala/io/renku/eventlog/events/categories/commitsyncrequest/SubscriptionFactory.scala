@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,26 +18,20 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
-import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.EventHandler
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.metrics.LabeledHistogram
+import cats.effect.Concurrent
+import cats.syntax.all._
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
+import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
 
-  def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
-            logger:           Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
-    handler <- EventHandler(sessionResource, queriesExecTimes, logger)
+  def apply[F[_]: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+    handler <- EventHandler(sessionResource, queriesExecTimes)
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

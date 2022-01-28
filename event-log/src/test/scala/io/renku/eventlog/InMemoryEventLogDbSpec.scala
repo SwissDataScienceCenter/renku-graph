@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,12 +20,13 @@ package io.renku.eventlog
 
 import cats.data.Kleisli
 import cats.syntax.all._
-import ch.datascience.db.DbSpec
+import io.renku.db.DbSpec
 import io.renku.eventlog.init.EventLogDbMigrations
+import io.renku.testtools.IOSpec
 import org.scalatest.TestSuite
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
 import scala.language.reflectiveCalls
 
@@ -35,7 +36,7 @@ trait InMemoryEventLogDbSpec
     with InMemoryEventLogDb
     with EventLogDataProvisioning
     with EventDataFetching {
-  self: TestSuite =>
+  self: TestSuite with IOSpec =>
 
   protected def initDb(): Unit =
     allMigrations.map(_.run()).sequence.void.unsafeRunSync()
@@ -43,8 +44,8 @@ trait InMemoryEventLogDbSpec
   private def findAllTables(): List[String] = execute {
     Kleisli { session =>
       val query: Query[Void, String] = sql"""SELECT DISTINCT tablename FROM pg_tables
-                                WHERE schemaname != 'pg_catalog'
-                                AND schemaname != 'information_schema'"""
+                                             WHERE schemaname != 'pg_catalog'
+                                             AND schemaname != 'information_schema'"""
         .query(name)
       session.execute(query)
     }

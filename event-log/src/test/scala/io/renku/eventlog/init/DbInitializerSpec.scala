@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,51 +19,87 @@
 package io.renku.eventlog.init
 
 import cats.effect._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
-import ch.datascience.testtools.MockedRunnableCollaborators
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators with MockFactory with should.Matchers {
+import scala.concurrent.duration._
+
+class DbInitializerSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockedRunnableCollaborators
+    with MockFactory
+    with should.Matchers {
 
   "run" should {
 
-    "succeed if all the migration processes run fine" in new TestCase {
+    "succeed if all the migration processes run fine" +
+      "set and unset the value of isMigrating before/after migrating" in new TestCase {
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+          .returning(IO.unit)
 
-      given(migrator1).succeeds(returning = ())
-      given(migrator2).succeeds(returning = ())
+        given(migrator1).succeeds(returning = ())
+        given(migrator2).succeeds(returning = ())
 
-      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == false && f(false) == false))
+          .returning(IO.unit)
 
-      logger.loggedOnly(Info("Event Log database initialization success"))
-    }
+        dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
-    "fail if of the migrators fails" in new TestCase {
+        logger.loggedOnly(Info("Event Log database initialization success"))
+      }
 
-      given(migrator1).succeeds(returning = ())
+    "retry if one of the migrators fails" in new TestCase {
       val exception = exceptions.generateOne
-      given(migrator2).fails(becauseOf = exception)
+      inSequence {
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+          .returning(IO.unit)
 
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
+        given(migrator1).succeeds(returning = ())
+        given(migrator2).fails(becauseOf = exception)
+
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+          .returning(IO.unit)
+
+        given(migrator1).succeeds(returning = ())
+        given(migrator2).succeeds(returning = ())
+
+        (isMigrating.update _)
+          .expects(where((f: Boolean => Boolean) => f(true) == false && f(false) == false))
+          .returning(IO.unit)
+
+      }
+      dbInitializer.run().unsafeRunSync()
+
+      logger.loggedOnly(Error("Event Log database initialization failed: retrying 1 time(s)", exception),
+                        Info("Event Log database initialization success")
+      )
     }
   }
 
   private trait TestCase {
+
     import DbInitializer.Runnable
 
-    val migrator1 = mock[EventLogTableCreator[IO]]
-    val migrator2 = mock[EventPayloadTableCreator[IO]]
-    val logger    = TestLogger[IO]()
+    val migrator1   = mock[EventLogTableCreator[IO]]
+    val migrator2   = mock[EventPayloadTableCreator[IO]]
+    val isMigrating = mock[Ref[IO, Boolean]]
 
-    val dbInitializer = new DbInitializerImpl[IO](
-      List[Runnable[IO, Unit]](migrator1, migrator2),
-      logger
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+
+    val dbInitializer = new DbInitializerImpl[IO](List[Runnable[IO, Unit]](migrator1, migrator2),
+                                                  isMigrating,
+                                                  retrySleepDuration = 0.5.seconds
     )
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,45 +18,43 @@
 
 package io.renku.eventlog.eventdetails
 
-import cats.effect.{Effect, IO}
+import cats.effect.Concurrent
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CompoundEventId, EventDetails}
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.metrics.LabeledHistogram
 import io.circe.Encoder
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
+import io.renku.graph.model.events.{CompoundEventId, EventDetails}
+import io.renku.http.InfoMessage._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.metrics.LabeledHistogram
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait EventDetailsEndpoint[Interpretation[_]] {
-  def getDetails(eventId: CompoundEventId): Interpretation[Response[Interpretation]]
+trait EventDetailsEndpoint[F[_]] {
+  def getDetails(eventId: CompoundEventId): F[Response[F]]
 }
 
-class EventDetailsEndpointImpl[Interpretation[_]: Effect](eventDetailsFinder: EventDetailsFinder[Interpretation],
-                                                          logger: Logger[Interpretation]
-) extends Http4sDsl[Interpretation]
-    with EventDetailsEndpoint[Interpretation] {
+class EventDetailsEndpointImpl[F[_]: Concurrent: Logger](eventDetailsFinder: EventDetailsFinder[F])
+    extends Http4sDsl[F]
+    with EventDetailsEndpoint[F] {
 
   import org.http4s.circe._
 
-  override def getDetails(eventId: CompoundEventId): Interpretation[Response[Interpretation]] =
-    eventDetailsFinder.findDetails(eventId).flatMap {
+  override def getDetails(eventId: CompoundEventId): F[Response[F]] =
+    eventDetailsFinder.findDetails(eventId) flatMap {
       case Some(eventDetails) => Ok(eventDetails.asJson)
       case None               => NotFound(InfoMessage("Event not found"))
     } recoverWith internalServerError
 
-  private lazy val internalServerError: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage("Finding event details failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  private lazy val internalServerError: PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage("Finding event details failed")
+    Logger[F].error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 
   private implicit lazy val encoder: Encoder[EventDetails] = Encoder.instance[EventDetails] { eventDetails =>
@@ -71,10 +69,9 @@ class EventDetailsEndpointImpl[Interpretation[_]: Effect](eventDetailsFinder: Ev
 }
 
 object EventDetailsEndpoint {
-  def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
-            logger:           Logger[IO]
-  ): IO[EventDetailsEndpoint[IO]] = for {
+  def apply[F[_]: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventDetailsEndpoint[F]] = for {
     eventDetailFinder <- EventDetailsFinder(sessionResource, queriesExecTimes)
-  } yield new EventDetailsEndpointImpl[IO](eventDetailFinder, logger)
+  } yield new EventDetailsEndpointImpl[F](eventDetailFinder)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,13 +19,14 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.implicits._
 
-class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+class EventLogTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
   protected override val migrationsToRun: List[Migration] = Nil
 
@@ -37,7 +38,7 @@ class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.M
       tableExists("event")     shouldBe true
       tableExists("event_log") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run().unsafeRunSync() shouldBe ()
 
       tableExists("event_log") shouldBe false
 
@@ -48,7 +49,7 @@ class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.M
 
       tableExists("event_log") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run().unsafeRunSync() shouldBe ()
 
       tableExists("event_log") shouldBe true
 
@@ -59,7 +60,7 @@ class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.M
 
       tableExists("event_log") shouldBe false
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run().unsafeRunSync() shouldBe ()
 
       tableExists("event_log") shouldBe true
 
@@ -67,14 +68,14 @@ class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.M
 
       logger.reset()
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'event_log' table exists"))
     }
 
     "create indices for certain columns" in new TestCase {
 
-      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+      tableCreator.run().unsafeRunSync() shouldBe ()
 
       tableExists("event_log") shouldBe true
 
@@ -88,7 +89,7 @@ class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.M
   }
 
   private trait TestCase {
-    val logger       = TestLogger[IO]()
-    val tableCreator = new EventLogTableCreatorImpl[IO](sessionResource, logger)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tableCreator = new EventLogTableCreatorImpl[IO](sessionResource)
   }
 }

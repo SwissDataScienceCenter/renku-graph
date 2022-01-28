@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,13 +18,13 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
 import io.renku.eventlog.subscriptions.ProjectIds
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.graph.model.projects
+import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 
 import java.time.Duration
 
@@ -32,9 +32,8 @@ private class ProjectPrioritisation {
   import ProjectPrioritisation.Priority._
 
   def prioritise(projects: List[ProjectInfo]): List[(ProjectIds, Priority)] =
-    findPrioritiesBasedOnMostRecentActivity(projects).map { case (projectIds, priority, _) =>
-      (projectIds, priority)
-    }
+    findPrioritiesBasedOnMostRecentActivity(projects)
+      .map { case (projectIds, priority, _) => (projectIds, priority) }
 
   private lazy val findPrioritiesBasedOnMostRecentActivity
       : List[ProjectInfo] => List[(ProjectIds, Priority, Int Refined NonNegative)] = {

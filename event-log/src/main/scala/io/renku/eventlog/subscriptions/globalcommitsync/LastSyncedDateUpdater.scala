@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,39 +18,43 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
-import cats.effect.{BracketThrow, IO}
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
+import cats.MonadThrow
+import cats.effect.MonadCancelThrow
 import eu.timepit.refined.api.Refined
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.SubscriptionTypeSerializers
+import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits.{toIdOps, toStringOps}
 import skunk.~
 
-private trait LastSyncedDateUpdater[Interpretation[_]] {
-  def run(projectId: projects.Id, maybeLastSyncDate: Option[LastSyncedDate]): Interpretation[Completion]
+private trait LastSyncedDateUpdater[F[_]] {
+  def run(projectId: projects.Id, maybeLastSyncDate: Option[LastSyncedDate]): F[Completion]
 }
 
 private object LastSyncedDateUpdater {
-  def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[LastSyncedDateUpdater[IO]] = IO(
-    new LastSyncedDateUpdateImpl[IO](sessionResource, queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
+                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[LastSyncedDateUpdater[F]] = MonadThrow[F].catchNonFatal(
+    new LastSyncedDateUpdateImpl[F](sessionResource, queriesExecTimes)
   )
 }
 
-private class LastSyncedDateUpdateImpl[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
+private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
-    with LastSyncedDateUpdater[Interpretation]
+    with LastSyncedDateUpdater[F]
     with SubscriptionTypeSerializers {
 
-  override def run(projectId: projects.Id, maybeLastSyncDate: Option[LastSyncedDate]): Interpretation[Completion] =
-    sessionResource.useK(measureExecutionTime {
+  override def run(
+      projectId:         projects.Id,
+      maybeLastSyncDate: Option[LastSyncedDate]
+  ): F[Completion] = sessionResource.useK {
+    measureExecutionTime {
       maybeLastSyncDate match {
         case Some(lastSyncedDate) =>
           SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
@@ -73,5 +77,6 @@ private class LastSyncedDateUpdateImpl[Interpretation[_]: BracketThrow](
             .arguments(projectId ~ categoryName)
             .build
       }
-    })
+    }
+  }
 }

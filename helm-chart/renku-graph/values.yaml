@@ -25,13 +25,10 @@ webhookService:
     port: 80
   resources:
     requests:
-      memory: 150Mi
-    limits:
-      memory: 550Mi
-  jvmXmx: 200M
+      memory: 256Mi
+  jvmXmx: 128M
   gitlab:
     rateLimit: 100/sec
-  threadsNumber: 3
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
@@ -47,10 +44,8 @@ tokenRepository:
     port: 9003
   resources:
     requests:
-      memory: 150Mi
-    limits:
-      memory: 350Mi
-  jvmXmx: 100M
+      memory: 256Mi
+  jvmXmx: 128M
   gitlab:
     rateLimit: 50/sec
   connectionPool: 2
@@ -70,18 +65,15 @@ triplesGenerator:
     port: 9002
   resources:
     requests:
-      memory: 2000Mi
-    limits:
-      memory: 5000Mi
-  jvmXmx: 2g
-  renkuLogTimeout: 180 minutes
+      memory: 2048Mi
+      cpu: "1"
+  jvmXmx: 1g
   reProvisioningRemovalBatchSize: 1000
   gitlab:
     rateLimit: 30/sec
   ## a demanded number of concurrent triples generation processes
-  generationProcessesNumber: 4
+  generationProcessesNumber: 2
   transformationProcessesNumber: 2
-  threadsNumber: 6
   # set this to a pip-installable renku-python version which will be installed on startup
   renkuPythonDevVersion:
 
@@ -95,13 +87,10 @@ knowledgeGraph:
     port: 80
   resources:
     requests:
-      memory: 250Mi
-    limits:
-      memory: 800Mi
+      memory: 512Mi
   gitlab:
     rateLimit: 100/sec
-  jvmXmx: 512M
-  threadsNumber: 4
+  jvmXmx: 256M
   services:
     renku:
       ## Renku knowledge-graph resources path e.g. `knowledge-graph` would assume
@@ -118,11 +107,8 @@ eventLog:
     port: 9005
   resources:
     requests:
-      memory: 250Mi
-    limits:
-      memory: 2500Mi
-  jvmXmx: 1536M
-  threadsNumber: 6
+      memory: 512Mi
+  jvmXmx: 256M
   connectionPool: 10
 
 commitEventService:
@@ -135,13 +121,10 @@ commitEventService:
     port: 9006
   resources:
     requests:
-      memory: 250Mi
-    limits:
-      memory: 1024Mi
-  jvmXmx: 512M
+      memory: 384Mi
+  jvmXmx: 128M
   gitlab:
-    rateLimit: 100/sec
-  threadsNumber: 3
+    rateLimit: 10/sec
 
 sentry:
   enabled: false

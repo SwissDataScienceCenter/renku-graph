@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,10 +19,10 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.implicits.toShow
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import io.renku.eventlog.subscriptions.zombieevents.Generators.zombieEventProcessNames
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
+import io.renku.graph.model.GraphModelGenerators.projectPaths
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

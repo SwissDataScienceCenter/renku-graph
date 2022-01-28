@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,12 +18,9 @@
 
 package io.renku.eventlog
 
-import ch.datascience.data.ErrorMessage
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.data.ErrorMessage
+import io.renku.generators.Generators._
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -96,18 +93,6 @@ class EventMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     "be instantiatable from an exception and contain the stack trace" in {
       forAll(nestedExceptions) { exception =>
         EventMessage(exception).value shouldBe ErrorMessage.withStackTrace(exception).value
-      }
-    }
-  }
-}
-
-class EventSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
-
-  "compoundEventId" should {
-
-    "create a CompoundEventId from the event's id and project id" in {
-      forAll { event: Event =>
-        event.compoundEventId shouldBe CompoundEventId(event.id, event.project.id)
       }
     }
   }

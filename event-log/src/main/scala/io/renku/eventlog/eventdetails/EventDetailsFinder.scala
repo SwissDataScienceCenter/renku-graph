@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,33 +18,34 @@
 
 package io.renku.eventlog.eventdetails
 
-import cats.effect.{BracketThrow, IO}
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventDetails, EventId}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
+import cats.MonadThrow
+import cats.effect.MonadCancelThrow
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.graph.model.events.{CompoundEventId, EventBody, EventDetails, EventId}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.implicits._
 
-private trait EventDetailsFinder[Interpretation[_]] {
-  def findDetails(eventId: CompoundEventId): Interpretation[Option[EventDetails]]
+private trait EventDetailsFinder[F[_]] {
+  def findDetails(eventId: CompoundEventId): F[Option[EventDetails]]
 }
 
-private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
-) extends DbClient[Interpretation](Some(queriesExecTimes))
-    with EventDetailsFinder[Interpretation]
+private class EventDetailsFinderImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+) extends DbClient[F](Some(queriesExecTimes))
+    with EventDetailsFinder[F]
     with TypeSerializers {
 
   import eu.timepit.refined.auto._
 
-  override def findDetails(eventId: CompoundEventId): Interpretation[Option[EventDetails]] =
+  override def findDetails(eventId: CompoundEventId): F[Option[EventDetails]] =
     sessionResource.useK(measureExecutionTime(find(eventId)))
 
   private def find(eventId: CompoundEventId) =
-    SqlStatement[Interpretation](name = "find event details")
+    SqlStatement[F](name = "find event details")
       .select[EventId ~ projects.Id, EventDetails](
         sql"""SELECT evt.event_id, evt.project_id, evt.event_body
                 FROM event evt WHERE evt.event_id = $eventIdEncoder and evt.project_id = $projectIdEncoder
@@ -54,14 +55,13 @@ private class EventDetailsFinderImpl[Interpretation[_]: BracketThrow](
       )
       .arguments(eventId.id ~ eventId.projectId)
       .build(_.option)
-
 }
 
 private object EventDetailsFinder {
-  def apply(
-      sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventDetailsFinder[IO]] = IO {
+  def apply[F[_]: MonadCancelThrow](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventDetailsFinder[F]] = MonadThrow[F].catchNonFatal {
     new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
   }
 }

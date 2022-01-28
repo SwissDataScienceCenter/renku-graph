@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,33 +19,28 @@
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.Show
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.{SchemaVersion, projects}
 import cats.syntax.all._
-import io.renku.eventlog.EventPayload
-import io.renku.eventlog.subscriptions.EventEncoder
+import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
+import io.renku.graph.model.projects
 
-private final case class TriplesGeneratedEvent(id:            CompoundEventId,
-                                               projectPath:   projects.Path,
-                                               payload:       EventPayload,
-                                               schemaVersion: SchemaVersion
+private final case class TriplesGeneratedEvent(id:          CompoundEventId,
+                                               projectPath: projects.Path,
+                                               payload:     ZippedEventPayload
 ) {
-  override lazy val toString: String =
-    s"$TriplesGeneratedEvent $id, projectPath = $projectPath"
-
+  override lazy val toString: String = s"$TriplesGeneratedEvent $id, projectPath = $projectPath"
 }
 
 private object TriplesGeneratedEvent {
   implicit lazy val show: Show[TriplesGeneratedEvent] =
-    Show.show(event => show"TriplesGeneratedEvent ${event.id}, ${event.projectPath}")
+    Show.show(event => show"TriplesGeneratedEvent ${event.id}, projectPath = ${event.projectPath}")
 }
 
-private object TriplesGeneratedEventEncoder extends EventEncoder[TriplesGeneratedEvent] {
+private object TriplesGeneratedEventEncoder {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def encodeEvent(event: TriplesGeneratedEvent): Json = json"""{
+  lazy val encodeEvent: TriplesGeneratedEvent => Json = event => json"""{
     "categoryName": ${SubscriptionCategory.name.value},
     "id":           ${event.id.id.value},
     "project": {
@@ -54,6 +49,5 @@ private object TriplesGeneratedEventEncoder extends EventEncoder[TriplesGenerate
     }
   }"""
 
-  override def encodePayload(event: TriplesGeneratedEvent): Option[String] =
-    json"""{"payload":${event.payload.value}, "schemaVersion": ${event.schemaVersion.value} }""".noSpaces.some
+  lazy val encodePayload: TriplesGeneratedEvent => ZippedEventPayload = event => event.payload
 }

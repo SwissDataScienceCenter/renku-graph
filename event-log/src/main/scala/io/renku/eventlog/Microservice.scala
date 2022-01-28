@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,42 +19,35 @@
 package io.renku.eventlog
 
 import cats.effect._
-import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.db.{SessionPoolResource, SessionResource}
-import ch.datascience.events.consumers
-import ch.datascience.events.consumers.EventConsumersRegistry
-import ch.datascience.http.server.HttpServer
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.metrics._
-import ch.datascience.microservices.IOMicroservice
+import cats.effect.kernel.Ref
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.config.certificates.CertificateLoader
+import io.renku.config.sentry.SentryInitializer
+import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
-import io.renku.eventlog.events.EventEndpoint
-import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEventsQueue
+import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
-import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
-import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
+import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions._
+import io.renku.events.consumers
+import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.model.projects
+import io.renku.http.server.HttpServer
+import io.renku.logging.ApplicationLogger
+import io.renku.metrics._
+import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import natchez.Trace.Implicits.noop
-import pureconfig.ConfigSource
-
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-import scala.concurrent.ExecutionContext
+import org.typelevel.log4cats.Logger
 
 object Microservice extends IOMicroservice {
 
-  val ServicePort: Int Refined Positive = 9005
-
-  protected implicit override val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
-
-  protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-  protected implicit override def timer:        Timer[IO]        = IO.timer(executionContext)
+  val ServicePort:             Int Refined Positive = 9005
+  private implicit val logger: Logger[IO]           = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = for {
     sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
@@ -64,131 +57,122 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
     sessionPoolResource.use { sessionResource =>
       for {
-        certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
-        sentryInitializer           <- SentryInitializer[IO]()
-        dbInitializer               <- DbInitializer(sessionResource, ApplicationLogger)
-        metricsRegistry             <- MetricsRegistry()
+        certificateLoader           <- CertificateLoader[IO]
+        sentryInitializer           <- SentryInitializer[IO]
+        isMigrating                 <- Ref.of[IO, Boolean](true)
+        dbInitializer               <- DbInitializer(sessionResource, isMigrating)
+        metricsRegistry             <- MetricsRegistry[IO]()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
-        statsFinder                 <- IOStatsFinder(sessionResource, queriesExecTimes)
-        eventLogMetrics             <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
+        eventsQueue                 <- StatusChangeEventsQueue[IO](sessionResource, queriesExecTimes)
+        statsFinder                 <- StatsFinder(sessionResource, queriesExecTimes)
+        eventLogMetrics             <- EventLogMetrics(metricsRegistry, statsFinder)
         awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder)
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder)
         underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder)
         underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder)
-        metricsResetScheduler <- IOGaugeResetScheduler(
+        metricsResetScheduler <- GaugeResetScheduler[IO, projects.Path](
                                    List(awaitingGenerationGauge,
                                         underTriplesGenerationGauge,
                                         awaitingTransformationGauge,
                                         underTransformationGauge
                                    ),
-                                   MetricsConfigProvider(),
-                                   ApplicationLogger
+                                   MetricsConfigProvider()
                                  )
-        creationSubscription <- events.categories.creation.SubscriptionFactory(sessionResource,
-                                                                               awaitingGenerationGauge,
-                                                                               queriesExecTimes,
-                                                                               ApplicationLogger
-                                )
+        creationSubscription <-
+          events.categories.creation.SubscriptionFactory(sessionResource, awaitingGenerationGauge, queriesExecTimes)
         zombieEventsSubscription <- events.categories.zombieevents.SubscriptionFactory(
                                       sessionResource,
                                       awaitingGenerationGauge,
                                       underTriplesGenerationGauge,
                                       awaitingTransformationGauge,
                                       underTransformationGauge,
-                                      queriesExecTimes,
-                                      ApplicationLogger
+                                      queriesExecTimes
                                     )
         commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(
                                            sessionResource,
-                                           queriesExecTimes,
-                                           ApplicationLogger
+                                           queriesExecTimes
+                                         )
+        statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
+                                           sessionResource,
+                                           eventsQueue,
+                                           awaitingGenerationGauge,
+                                           underTriplesGenerationGauge,
+                                           awaitingTransformationGauge,
+                                           underTransformationGauge,
+                                           queriesExecTimes
                                          )
         eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                     creationSubscription,
                                     zombieEventsSubscription,
-                                    commitSyncRequestSubscription
+                                    commitSyncRequestSubscription,
+                                    statusChangeEventSubscription
                                   )
+        serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
-        processingStatusEndpoint <- IOProcessingStatusEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
-        eventsPatchingEndpoint <- IOEventsPatchingEndpoint(sessionResource,
-                                                           awaitingGenerationGauge,
-                                                           underTriplesGenerationGauge,
-                                                           queriesExecTimes,
-                                                           ApplicationLogger
-                                  )
-        statusChangeEndpoint <- IOStatusChangeEndpoint(
-                                  sessionResource,
-                                  awaitingGenerationGauge,
-                                  underTriplesGenerationGauge,
-                                  awaitingTransformationGauge,
-                                  underTransformationGauge,
-                                  queriesExecTimes,
-                                  ApplicationLogger
-                                )
+        processingStatusEndpoint <- ProcessingStatusEndpoint(sessionResource, queriesExecTimes)
         eventProducersRegistry <- EventProducersRegistry(
                                     sessionResource,
                                     awaitingGenerationGauge,
                                     underTriplesGenerationGauge,
                                     awaitingTransformationGauge,
                                     underTransformationGauge,
-                                    queriesExecTimes,
-                                    ApplicationLogger
+                                    queriesExecTimes
                                   )
-        subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
-        eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+        subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
+        eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes)
+        eventsEndpoint        <- EventsEndpoint(sessionResource, queriesExecTimes)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventEndpoint,
+                               eventsEndpoint,
                                processingStatusEndpoint,
-                               eventsPatchingEndpoint,
-                               statusChangeEndpoint,
                                subscriptionsEndpoint,
                                eventDetailsEndpoint,
-                               new RoutesMetrics[IO](metricsRegistry)
+                               new RoutesMetrics[IO](metricsRegistry),
+                               isMigrating
                              ).routes
         exitCode <- microserviceRoutes.use { routes =>
-                      val httpServer = new HttpServer[IO](serverPort = ServicePort.value, routes)
-
-                      new MicroserviceRunner(
-                        certificateLoader,
-                        sentryInitializer,
-                        dbInitializer,
-                        eventLogMetrics,
-                        eventProducersRegistry,
-                        eventConsumersRegistry,
-                        metricsResetScheduler,
-                        httpServer,
-                        subProcessesCancelTokens
+                      new MicroserviceRunner(serviceReadinessChecker,
+                                             certificateLoader,
+                                             sentryInitializer,
+                                             dbInitializer,
+                                             eventLogMetrics,
+                                             eventsQueue,
+                                             eventProducersRegistry,
+                                             eventConsumersRegistry,
+                                             metricsResetScheduler,
+                                             HttpServer[IO](serverPort = ServicePort.value, routes)
                       ).run()
                     }
       } yield exitCode
     }
 }
 
-private class MicroserviceRunner(
-    certificateLoader:        CertificateLoader[IO],
-    sentryInitializer:        SentryInitializer[IO],
-    dbInitializer:            DbInitializer[IO],
-    metrics:                  EventLogMetrics[IO],
-    eventProducersRegistry:   EventProducersRegistry[IO],
-    eventConsumersRegistry:   EventConsumersRegistry[IO],
-    metricsResetScheduler:    GaugeResetScheduler[IO],
-    httpServer:               HttpServer[IO],
-    subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
-)(implicit contextShift:      ContextShift[IO]) {
+private class MicroserviceRunner[F[_]: Spawn: Logger](
+    serviceReadinessChecker: ServiceReadinessChecker[F],
+    certificateLoader:       CertificateLoader[F],
+    sentryInitializer:       SentryInitializer[F],
+    dbInitializer:           DbInitializer[F],
+    metrics:                 EventLogMetrics[F],
+    eventsQueue:             StatusChangeEventsQueue[F],
+    eventProducersRegistry:  EventProducersRegistry[F],
+    eventConsumersRegistry:  EventConsumersRegistry[F],
+    gaugeScheduler:          GaugeResetScheduler[F],
+    httpServer:              HttpServer[F]
+) {
 
-  def run(): IO[ExitCode] = for {
+  def run(): F[ExitCode] = for {
     _      <- certificateLoader.run()
     _      <- sentryInitializer.run()
-    _      <- dbInitializer.run()
-    _      <- metrics.run().start map gatherCancelToken
-    _      <- metricsResetScheduler.run().start map gatherCancelToken
-    _      <- eventProducersRegistry.run().start map gatherCancelToken
-    _      <- eventConsumersRegistry.run().start map gatherCancelToken
+    _      <- Spawn[F].start(dbInitializer.run() >> startDBDependentProcesses())
     result <- httpServer.run()
   } yield result
 
-  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
-    subProcessesCancelTokens.put(fiber.cancel, ())
-    fiber
-  }
+  private def startDBDependentProcesses() = for {
+    _ <- Spawn[F].start(metrics.run())
+    _ <- serviceReadinessChecker.waitIfNotUp
+    _ <- Spawn[F].start(eventProducersRegistry.run())
+    _ <- Spawn[F].start(eventConsumersRegistry.run())
+    _ <- Spawn[F].start(eventsQueue.run())
+    _ <- gaugeScheduler.run()
+  } yield ()
 }

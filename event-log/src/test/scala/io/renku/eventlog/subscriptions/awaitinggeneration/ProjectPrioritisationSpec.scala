@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,15 +19,15 @@
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.EventDate
 import io.renku.eventlog.subscriptions.{Capacity, ProjectIds, Subscribers}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -35,7 +35,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant.now
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.Try
 
 private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers with MockFactory {
@@ -125,7 +124,7 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         val project2 = projectInfos.generateOne.copy(currentOccupancy = 1, latestEventDate = EventDate(now()))
         val project3 = projectInfos.generateOne.copy(currentOccupancy = 12)
 
-        val projectsAwaitingGeneration = projectInfos.generateList(4).map(_.copy(currentOccupancy = 0))
+        val projectsAwaitingGeneration = projectInfos.generateFixedSizeList(4).map(_.copy(currentOccupancy = 0))
 
         val projects = List(project0, project1, project2, project3) ++ projectsAwaitingGeneration
 

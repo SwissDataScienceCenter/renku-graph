@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,83 +18,62 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import cats.effect.{BracketThrow, IO, Timer}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, ToTransformationNonRecoverableFailure, TransformingToTriplesGenerated, UpdateResult}
-import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
+import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
-import io.renku.eventlog.{EventLogDB, EventMessage, subscriptions}
+import io.renku.eventlog.{EventMessage, subscriptions}
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.producers.EventSender
+import io.renku.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TriplesGenerated}
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: BracketThrow](
-    awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path],
-    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-    statusUpdatesRunner:             StatusUpdatesRunner[Interpretation],
-    logger:                          Logger[Interpretation],
-    onErrorSleep:                    FiniteDuration
-)(implicit timer:                    Timer[Interpretation])
-    extends subscriptions.DispatchRecovery[Interpretation, TriplesGeneratedEvent] {
+private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
+    eventSender: EventSender[F]
+) extends subscriptions.DispatchRecovery[F, TriplesGeneratedEvent]
+    with TinyTypeEncoders {
 
-  override def returnToQueue(event: TriplesGeneratedEvent): Interpretation[Unit] = {
-    val toTriplesGeneratedCommand = TransformingToTriplesGenerated[Interpretation](event.id,
-                                                                                   awaitingTransformationGauge,
-                                                                                   underTriplesTransformationGauge
-    )
-    statusUpdatesRunner run toTriplesGeneratedCommand void
-  }
+  override def returnToQueue(event: TriplesGeneratedEvent): F[Unit] = eventSender.sendEvent(
+    EventRequestContent.NoPayload(json"""{
+        "categoryName": "EVENTS_STATUS_CHANGE",
+        "id":           ${event.id.id},
+        "project": {
+          "id":   ${event.id.projectId},
+          "path": ${event.projectPath}
+        },
+        "newStatus": $TriplesGenerated
+      }"""),
+    errorMessage = s"${SubscriptionCategory.name}: Marking event as $TriplesGenerated failed"
+  )
 
   override def recover(
       url:   SubscriberUrl,
       event: TriplesGeneratedEvent
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    val markEventFailed = ToTransformationNonRecoverableFailure[Interpretation](
-      event.id,
-      EventMessage(exception),
-      underTriplesTransformationGauge,
-      maybeProcessingTime = None
+  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    eventSender.sendEvent(
+      EventRequestContent.NoPayload(json"""{
+        "categoryName": "EVENTS_STATUS_CHANGE",
+        "id":           ${event.id.id},
+        "project": {
+          "id":   ${event.id.projectId},
+          "path": ${event.projectPath}
+        },
+        "newStatus": $TransformationNonRecoverableFailure,
+        "message":   ${EventMessage(exception)} }"""),
+      errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
+    ) >> Logger[F].error(exception)(
+      s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
     )
-    for {
-      _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
-      _ <- logger.error(exception)(s"${SubscriptionCategory.name}: $event, url = $url -> ${markEventFailed.status}")
-    } yield ()
-  }
-
-  private def retry(
-      command: ChangeStatusCommand[Interpretation]
-  ): PartialFunction[Throwable, Interpretation[UpdateResult]] = { case NonFatal(exception) =>
-    {
-      for {
-        _      <- logger.error(exception)(s"${SubscriptionCategory.name}: Marking event as ${command.status} failed")
-        _      <- timer sleep onErrorSleep
-        result <- statusUpdatesRunner run command
-      } yield result
-    } recoverWith retry(command)
   }
 }
 
 private object DispatchRecovery {
 
-  private val OnErrorSleep: FiniteDuration = 1 seconds
-
-  def apply(sessionResource:                 SessionResource[IO, EventLogDB],
-            awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
-            underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:                LabeledHistogram[IO, SqlStatement.Name],
-            logger:                          Logger[IO]
-  )(implicit timer:                          Timer[IO]): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] = for {
-    updateCommandRunner <- IOUpdateCommandsRunner(sessionResource, queriesExecTimes, logger)
-  } yield new DispatchRecoveryImpl[IO](awaitingTransformationGauge,
-                                       underTriplesTransformationGauge,
-                                       updateCommandRunner,
-                                       logger,
-                                       OnErrorSleep
-  )
+  def apply[F[_]: Async: Logger]: F[DispatchRecovery[F, TriplesGeneratedEvent]] =
+    EventSender[F].map(new DispatchRecoveryImpl[F](_))
 }

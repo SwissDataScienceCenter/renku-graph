@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,32 +18,33 @@
 
 package io.renku.eventlog.subscriptions.commitsync
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, IO}
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventStatus, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import io.renku.eventlog.{EventDate, EventLogDB}
+import io.renku.graph.model.events.EventStatus.AwaitingDeletion
+import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant
-import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
 
-private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with EventFinder[Interpretation, CommitSyncEvent]
+    with EventFinder[F, CommitSyncEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): Interpretation[Option[CommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
+  override def popEvent(): F[Option[CommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
   private def findEventAndMarkTaken = findEvent >>= {
     case Some((event, maybeSyncDate, Some(eventStatus))) if eventStatus == AwaitingDeletion =>
@@ -160,14 +161,13 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: BracketThrow](
     case Completion.Update(1) | Completion.Insert(1) => Some(event)
     case _                                           => None
   }
-
 }
 
 private object CommitSyncEventFinder {
-  def apply(
-      sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, CommitSyncEvent]] = IO {
+  def apply[F[_]: MonadCancelThrow](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventFinder[F, CommitSyncEvent]] = MonadThrow[F].catchNonFatal {
     new CommitSyncEventFinderImpl(sessionResource, queriesExecTimes)
   }
 }

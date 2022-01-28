@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,44 +18,38 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
-import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.metrics.LabeledHistogram
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEventEncoder.encodeEvent
 import io.renku.eventlog.{EventLogDB, subscriptions}
+import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.ExecutionContext
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply(sessionResource:   SessionResource[IO, EventLogDB],
-            queriesExecTimes:  LabeledHistogram[IO, SqlStatement.Name],
-            subscriberTracker: SubscriberTracker[IO],
-            logger:            Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers           <- Subscribers(categoryName, subscriberTracker, logger)
+  def apply[F[_]: Async: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                 queriesExecTimes:  LabeledHistogram[F, SqlStatement.Name],
+                                 subscriberTracker: SubscriberTracker[F]
+  ): F[subscriptions.SubscriptionCategory[F]] = for {
+    subscribers           <- Subscribers(categoryName, subscriberTracker)
     lastSyncedDateUpdater <- LastSyncedDateUpdater(sessionResource, queriesExecTimes)
     eventsFinder          <- GlobalCommitSyncEventFinder(sessionResource, lastSyncedDateUpdater, queriesExecTimes)
-    dispatchRecovery      <- DispatchRecovery(lastSyncedDateUpdater, logger)
-    eventDelivery         <- EventDelivery.noOp[IO, GlobalCommitSyncEvent]
-    eventsDistributor <- IOEventsDistributor(categoryName,
-                                             subscribers,
-                                             eventsFinder,
-                                             eventDelivery,
-                                             GlobalCommitSyncEventEncoder,
-                                             dispatchRecovery,
-                                             logger
+    dispatchRecovery      <- DispatchRecovery(lastSyncedDateUpdater)
+    eventDelivery         <- EventDelivery.noOp[F, GlobalCommitSyncEvent]
+    eventsDistributor <- EventsDistributor(categoryName,
+                                           subscribers,
+                                           eventsFinder,
+                                           eventDelivery,
+                                           EventEncoder(encodeEvent),
+                                           dispatchRecovery
                          )
     deserializer <-
-      SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
-  } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](categoryName,
-                                                                        subscribers,
-                                                                        eventsDistributor,
-                                                                        deserializer
+      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
+  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](categoryName,
+                                                                       subscribers,
+                                                                       eventsDistributor,
+                                                                       deserializer
   )
 }

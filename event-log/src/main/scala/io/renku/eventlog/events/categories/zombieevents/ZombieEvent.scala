@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
-import ch.datascience.graph.model.projects
+import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
+import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.projects
 
 private sealed trait ZombieEvent {
   type Status <: EventStatus

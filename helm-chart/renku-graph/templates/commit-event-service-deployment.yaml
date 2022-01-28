@@ -49,8 +49,6 @@ spec:
             - name: SENTRY_ENVIRONMENT_NAME
               value: {{ .Values.sentry.environmentName }}
               {{- end }}
-            - name: THREADS_NUMBER
-              value: "{{ .Values.commitEventService.threadsNumber }}"
             - name: JAVA_OPTS
               value: -Xmx{{ .Values.commitEventService.jvmXmx }} -XX:+UseG1GC
           ports:

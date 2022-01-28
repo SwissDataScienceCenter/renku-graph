@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,19 +19,19 @@
 package io.renku.eventlog.metrics
 
 import cats.effect.IO
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.projects
+import io.renku.metrics._
 
 object AwaitingGenerationGauge {
 
   val NumberOfProjects: Int Refined Positive = 20
 
   def apply(
-      metricsRegistry: MetricsRegistry[IO],
+      metricsRegistry: MetricsRegistry,
       statsFinder:     StatsFinder[IO]
   ): IO[LabeledGauge[IO, projects.Path]] =
     Gauge[IO, projects.Path](

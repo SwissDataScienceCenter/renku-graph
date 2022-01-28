@@ -74,20 +74,7 @@ Accepts an event as multipart requests.
 }
 ```
 
-`payload` part as a string:
-
-```
-"JSON payload as string"
-```
-
-`payload` example:
-
-```json
-{
-  "payload": "json-ld payload as string",
-  "schemaVersion": "8"
-}
-```
+`payload` part: binary of `application/zip` content-type
 
 - **MEMBER_SYNC**
 
@@ -100,6 +87,22 @@ Accepts an event as multipart requests.
   "categoryName": "MEMBER_SYNC",
   "project": {
     "path": "namespace/project-name"
+  }
+}
+```
+
+- **CLEAN_UP**
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "CLEAN_UP",
+  "project": {
+    "id": 12,
+    "path": "project/path"
   }
 }
 ```

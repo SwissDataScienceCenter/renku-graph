@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,84 +18,65 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.effect.{BracketThrow, IO, Timer}
+import cats.MonadThrow
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.renku.eventlog.statuschange.commands._
-import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
+import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
-import io.renku.eventlog.{EventLogDB, EventMessage, subscriptions}
+import io.renku.eventlog.{EventMessage, subscriptions}
+import io.renku.events.EventRequestContent
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.events.producers.EventSender
+import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, New}
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]: BracketThrow](
-    awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
-    statusUpdatesRunner:            StatusUpdatesRunner[Interpretation],
-    logger:                         Logger[Interpretation],
-    onErrorSleep:                   FiniteDuration
-)(implicit timer:                   Timer[Interpretation])
-    extends subscriptions.DispatchRecovery[Interpretation, AwaitingGenerationEvent] {
+private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
+    eventSender: EventSender[F]
+) extends subscriptions.DispatchRecovery[F, AwaitingGenerationEvent]
+    with TinyTypeEncoders {
 
-  override def returnToQueue(event: AwaitingGenerationEvent): Interpretation[Unit] = {
-    val toNewCommand = ToNew[Interpretation](event.id,
-                                             awaitingTriplesGenerationGauge,
-                                             underTriplesGenerationGauge,
-                                             maybeProcessingTime = None
+  override def returnToQueue(event: AwaitingGenerationEvent): F[Unit] =
+    eventSender.sendEvent(
+      EventRequestContent.NoPayload(
+        json"""{
+          "categoryName": "EVENTS_STATUS_CHANGE",
+          "id":           ${event.id.id},
+          "project": {
+            "id":   ${event.id.projectId},
+            "path": ${event.projectPath}
+          },
+          "newStatus": $New
+        }"""
+      ),
+      errorMessage = s"${SubscriptionCategory.name}: Marking event as $New failed"
     )
-    statusUpdatesRunner run toNewCommand void
-  }
 
   override def recover(
       url:   SubscriberUrl,
       event: AwaitingGenerationEvent
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    val markEventFailed = ToGenerationNonRecoverableFailure[Interpretation](
-      event.id,
-      EventMessage(exception),
-      underTriplesGenerationGauge,
-      maybeProcessingTime = None
+  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    val requestContent = EventRequestContent.NoPayload(
+      json"""{
+        "categoryName": "EVENTS_STATUS_CHANGE",
+        "id":           ${event.id.id},
+        "project": {
+          "id":   ${event.id.projectId},
+          "path": ${event.projectPath}
+        },
+        "message" : ${EventMessage(exception)},
+        "newStatus": $GenerationNonRecoverableFailure
+      }"""
     )
-    for {
-      _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
-      _ <- logger.error(exception)(s"${SubscriptionCategory.name}: $event, url = $url -> ${markEventFailed.status}")
-    } yield ()
-  }
-
-  private def retry(
-      command: ChangeStatusCommand[Interpretation]
-  ): PartialFunction[Throwable, Interpretation[UpdateResult]] = { case NonFatal(exception) =>
-    {
-      for {
-        _      <- logger.error(exception)(s"${SubscriptionCategory.name}: Marking event as ${command.status} failed")
-        _      <- timer sleep onErrorSleep
-        result <- statusUpdatesRunner run command
-      } yield result
-    } recoverWith retry(command)
+    val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $GenerationNonRecoverableFailure"
+    eventSender.sendEvent(requestContent, errorMessage) >> Logger[F].error(exception)(errorMessage)
   }
 }
 
 private object DispatchRecovery {
-
-  private val OnErrorSleep: FiniteDuration = 1 seconds
-
-  def apply(sessionResource:                SessionResource[IO, EventLogDB],
-            awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-            underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
-            queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name],
-            logger:                         Logger[IO]
-  )(implicit timer:                         Timer[IO]): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] = for {
-    updateCommandRunner <- IOUpdateCommandsRunner(sessionResource, queriesExecTimes, logger)
-  } yield new DispatchRecoveryImpl[IO](awaitingTriplesGenerationGauge,
-                                       underTriplesGenerationGauge,
-                                       updateCommandRunner,
-                                       logger,
-                                       OnErrorSleep
-  )
+  def apply[F[_]: Async: Temporal: Logger]: F[DispatchRecovery[F, AwaitingGenerationEvent]] = for {
+    eventSender <- EventSender[F]
+  } yield new DispatchRecoveryImpl[F](eventSender)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,17 +18,18 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
+import cats.MonadThrow
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, IO}
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
+import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
@@ -37,15 +38,15 @@ import skunk.implicits._
 import java.time.Duration
 import java.time.Instant.now
 
-private class LostZombieEventFinder[Interpretation[_]: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name]
+private class LostZombieEventFinder[F[_]: MonadCancelThrow](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
-    with EventFinder[Interpretation, ZombieEvent]
+    with EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
 
-  override def popEvent(): Interpretation[Option[ZombieEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[ZombieEvent]] = sessionResource.useK {
     findEvent >>= markEventTaken
   }
   private val maxDurationForEvent = EventProcessingTime(Duration.ofMinutes(5))
@@ -71,8 +72,7 @@ private class LostZombieEventFinder[Interpretation[_]: BracketThrow](
       .build(_.option)
   }
 
-  private lazy val markEventTaken
-      : Option[ZombieEvent] => Kleisli[Interpretation, Session[Interpretation], Option[ZombieEvent]] = {
+  private lazy val markEventTaken: Option[ZombieEvent] => Kleisli[F, Session[F], Option[ZombieEvent]] = {
     case None        => Kleisli.pure(Option.empty[ZombieEvent])
     case Some(event) => updateExecutionDate(event.eventId) map toNoneIfEventAlreadyTaken(event)
   }
@@ -94,12 +94,12 @@ private class LostZombieEventFinder[Interpretation[_]: BracketThrow](
         .arguments(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage)
         .build
         .flatMapResult {
-          case Completion.Update(1) => true.pure[Interpretation]
-          case Completion.Update(0) => false.pure[Interpretation]
+          case Completion.Update(1) => true.pure[F]
+          case Completion.Update(0) => false.pure[F]
           case completion =>
             new Exception(
               s"${categoryName.value.toLowerCase} - lze - update execution date failed with status $completion"
-            ).raiseError[Interpretation, Boolean]
+            ).raiseError[F, Boolean]
         }
     }
 
@@ -107,10 +107,10 @@ private class LostZombieEventFinder[Interpretation[_]: BracketThrow](
 }
 
 private object LostZombieEventFinder {
-  def apply(
-      sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, ZombieEvent]] = IO {
+  def apply[F[_]: MonadCancelThrow](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
     new LostZombieEventFinder(sessionResource, queriesExecTimes)
   }
 }

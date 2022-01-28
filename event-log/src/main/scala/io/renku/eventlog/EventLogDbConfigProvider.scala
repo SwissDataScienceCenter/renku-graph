@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,13 +19,13 @@
 package io.renku.eventlog
 
 import cats.MonadThrow
-import ch.datascience.db.DBConfigProvider
 import eu.timepit.refined.auto._
+import io.renku.db.DBConfigProvider
 
 sealed trait EventLogDB
 
-class EventLogDbConfigProvider[Interpretation[_]: MonadThrow](
-) extends DBConfigProvider[Interpretation, EventLogDB](
+class EventLogDbConfigProvider[F[_]: MonadThrow](
+) extends DBConfigProvider[F, EventLogDB](
       namespace = "event-log",
       dbName = "event_log"
     )

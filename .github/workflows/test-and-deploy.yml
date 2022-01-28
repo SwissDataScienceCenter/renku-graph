@@ -2,6 +2,7 @@ name: Test, deploy and Renku test
 on:
   push:
     branches:
+      - development
       - master
       - 'hotfix-[0-9]+.[0-9]+**'
   pull_request:
@@ -114,7 +115,7 @@ jobs:
           RENKU_ANONYMOUS_SESSIONS: true
           RENKU_TESTS_ENABLED: true
           TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
-          renku_graph: "@master"
+          renku_graph: "@development"
           renku: "@master"
   renku-acceptance-tests:
     name: Renku Acceptance Tests

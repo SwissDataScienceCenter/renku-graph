@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,17 +21,18 @@ package io.renku.eventlog.processingstatus
 import cats.data.OptionT
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage.InfoMessage
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
 import eu.timepit.refined.api.Refined
 import io.circe.Decoder
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.http.ErrorMessage.ErrorMessage
+import io.renku.http.InfoMessage.InfoMessage
+import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
@@ -44,7 +45,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class ProcessingStatusEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "findProcessingStatus" should {
 
@@ -107,22 +108,22 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
   private trait TestCase {
     val projectId = projectIds.generateOne
 
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val statusFinder         = mock[ProcessingStatusFinder[IO]]
-    val logger               = TestLogger[IO]()
-    val findProcessingStatus = new ProcessingStatusEndpoint[IO](statusFinder, logger).findProcessingStatus _
+    val findProcessingStatus = new ProcessingStatusEndpointImpl[IO](statusFinder).findProcessingStatus _
   }
 
-  private implicit val processingStatusDecoder: Decoder[ProcessingStatus] = cursor =>
+  private implicit lazy val processingStatusDecoder: Decoder[ProcessingStatus] = cursor =>
     for {
       done     <- cursor.downField("done").as[Int]
       total    <- cursor.downField("total").as[Int]
       progress <- cursor.downField("progress").as[Double]
     } yield ProcessingStatus(Refined.unsafeApply(done), Refined.unsafeApply(total), Refined.unsafeApply(progress))
 
-  private implicit val entityDecoder: EntityDecoder[IO, ProcessingStatus] =
+  private implicit lazy val entityDecoder: EntityDecoder[IO, ProcessingStatus] =
     org.http4s.circe.jsonOf[IO, ProcessingStatus]
 
-  private implicit val processingStatuses: Gen[ProcessingStatus] = for {
+  private implicit lazy val processingStatuses: Gen[ProcessingStatus] = for {
     total <- positiveInts(max = Integer.MAX_VALUE)
     done  <- positiveInts(max = total.value)
   } yield ProcessingStatus.from[Try](done.value, total.value).fold(throw _, identity)

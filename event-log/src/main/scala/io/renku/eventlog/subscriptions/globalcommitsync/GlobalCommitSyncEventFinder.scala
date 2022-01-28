@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,43 +19,45 @@
 package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.data.Kleisli
-import cats.effect.{BracketThrow, IO, Sync}
+import cats.effect.Async
 import cats.syntax.all._
-import ch.datascience.db.implicits._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
-import ch.datascience.graph.model.events.{CategoryName, CommitId, EventStatus, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
+import cats.{Id, MonadThrow}
 import eu.timepit.refined.api.Refined
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEventFinder.syncInterval
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.EventStatus.AwaitingDeletion
+import io.renku.graph.model.events.{CategoryName, CommitId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: Sync](
-    sessionResource:       SessionResource[Interpretation, EventLogDB],
-    lastSyncedDateUpdater: LastSyncedDateUpdater[Interpretation],
-    queriesExecTimes:      LabeledHistogram[Interpretation, SqlStatement.Name],
+private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
+    sessionResource:       SessionResource[F, EventLogDB],
+    lastSyncedDateUpdater: LastSyncedDateUpdater[F],
+    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
     now:                   () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with EventFinder[Interpretation, GlobalCommitSyncEvent]
+    with EventFinder[F, GlobalCommitSyncEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): Interpretation[Option[GlobalCommitSyncEvent]] =
-    sessionResource.useK(findEventAndMarkTaken)
+  import skunk.codec.all.int8
+
+  override def popEvent(): F[Option[GlobalCommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
   private def findEventAndMarkTaken =
-    findProject >>= updateLastSyncDate >>= findCommits
+    findProject >>= updateLastSyncDate >>= findCommitsInfo
 
   private def updateLastSyncDate(
       maybeProject: Option[(Project, Option[LastSyncedDate])]
-  ): Kleisli[Interpretation, Session[Interpretation], Option[(Project, Option[LastSyncedDate])]] = maybeProject match {
+  ): Kleisli[F, Session[F], Option[(Project, Option[LastSyncedDate])]] = maybeProject match {
     case Some(projectAndMaybeLastSync @ (project, _)) =>
       Kleisli.liftF(
         lastSyncedDateUpdater
@@ -89,27 +91,32 @@ private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: S
       .build(_.option)
   }
 
-  private def findCommits(maybeProjectAndLastSyncedDate: Option[(Project, Option[LastSyncedDate])]) =
+  private def findCommitsInfo(maybeProjectAndLastSyncedDate: Option[(Project, Option[LastSyncedDate])]) =
     maybeProjectAndLastSyncedDate match {
       case Some((project, maybeLastSyncedDate)) =>
         measureExecutionTime {
           SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find commits"))
-            .select[projects.Id ~ EventStatus, CommitId](
+            .select[projects.Id ~ EventStatus ~ projects.Id ~ EventStatus, (Long, Option[CommitId])](
               sql"""
-                   SELECT evt.event_id
-                   FROM event evt
-                   WHERE evt.project_id = $projectIdEncoder AND evt.status <> $eventStatusEncoder
-                 """.query(commitIdDecoder)
+                   SELECT
+                     (SELECT COUNT(event_id) FROM event WHERE project_id = $projectIdEncoder AND status <> $eventStatusEncoder) AS count,
+                     (SELECT event_id FROM event WHERE project_id = $projectIdEncoder AND status <> $eventStatusEncoder ORDER BY event_date DESC LIMIT 1) AS latest
+                 """.query(int8 ~ commitIdDecoder.opt)
             )
-            .arguments(project.id ~ AwaitingDeletion)
-            .build(_.toList)
-            .mapResult {
-              case Nil     => Option.empty[GlobalCommitSyncEvent]
-              case commits => Some(GlobalCommitSyncEvent(project, commits, maybeLastSyncedDate))
-            }
+            .arguments(project.id ~ AwaitingDeletion ~ project.id ~ AwaitingDeletion)
+            .build[Id](_.unique)
+            .mapResult(toEvent(project, maybeLastSyncedDate))
         }
       case None => Kleisli.pure(Option.empty[GlobalCommitSyncEvent])
     }
+
+  private def toEvent(project:             Project,
+                      maybeLastSyncedDate: Option[LastSyncedDate]
+  ): Id[(Long, Option[CommitId])] => Option[GlobalCommitSyncEvent] = {
+    case (commitsCount, Some(latestCommitId)) =>
+      GlobalCommitSyncEvent(project, CommitsInfo(CommitsCount(commitsCount), latestCommitId), maybeLastSyncedDate).some
+    case _ => Option.empty[GlobalCommitSyncEvent]
+  }
 
   private def toNoneIfEventAlreadyTaken(
       projectAndMaybeLastSync: (Project, Option[LastSyncedDate])
@@ -117,18 +124,16 @@ private class GlobalCommitSyncEventFinderImpl[Interpretation[_]: BracketThrow: S
     case Completion.Update(1) | Completion.Insert(1) => Some(projectAndMaybeLastSync)
     case _                                           => None
   }
-
 }
 
 private object GlobalCommitSyncEventFinder {
   val syncInterval = Duration.ofDays(7)
 
-  def apply(
-      sessionResource:       SessionResource[IO, EventLogDB],
-      lastSyncedDateUpdater: LastSyncedDateUpdater[IO],
-      queriesExecTimes:      LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, GlobalCommitSyncEvent]] = IO(
+  def apply[F[_]: Async](
+      sessionResource:       SessionResource[F, EventLogDB],
+      lastSyncedDateUpdater: LastSyncedDateUpdater[F],
+      queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventFinder[F, GlobalCommitSyncEvent]] = MonadThrow[F].catchNonFatal(
     new GlobalCommitSyncEventFinderImpl(sessionResource, lastSyncedDateUpdater, queriesExecTimes)
   )
-
 }

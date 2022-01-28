@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,8 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
+import io.renku.graph.model.GraphModelGenerators.projectPaths
 import org.scalacheck.Gen
 
 package object awaitinggeneration {

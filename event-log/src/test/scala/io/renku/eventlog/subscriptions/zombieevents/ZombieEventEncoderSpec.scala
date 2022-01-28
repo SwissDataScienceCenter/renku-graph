@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,10 +18,9 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import ch.datascience.generators.Generators.Implicits._
 import io.circe.literal._
-import io.renku.eventlog.subscriptions.EventEncoder
 import io.renku.eventlog.subscriptions.zombieevents.Generators.zombieEvents
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -32,7 +31,8 @@ class ZombieEventEncoderSpec extends AnyWordSpec with should.Matchers {
     "serialize ZombieEvent to Json" in {
       val event = zombieEvents.generateOne
 
-      encoder.encodeEvent(event) shouldBe json"""{
+      ZombieEventEncoder.encodeEvent(event) shouldBe
+        json"""{
         "categoryName": "ZOMBIE_CHASING",
         "id":           ${event.eventId.id.value},
         "project": {
@@ -44,12 +44,4 @@ class ZombieEventEncoderSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  "encodePayload" should {
-
-    "return None" in {
-      encoder.encodePayload(zombieEvents.generateOne) shouldBe None
-    }
-  }
-
-  private lazy val encoder: EventEncoder[ZombieEvent] = ZombieEventEncoder
 }

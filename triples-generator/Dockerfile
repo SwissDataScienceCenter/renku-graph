@@ -26,15 +26,26 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
 # Installing Renku and other dependencies
-RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo && \
+RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc g++ make libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo tini && \
     python3 -m pip install --upgrade 'pip==21.3.1' && \
-    python3 -m pip install 'renku==0.16.2' 'sentry-sdk==0.18.0'  && \
-    chown -R daemon:daemon . && \
-    git config --global user.name 'renku'  && \
+    python3 -m pip install jinja2 && \
+    python3 -m pip install 'renku==1.0.3' 'sentry-sdk==0.18.0'  && \
+    chown -R daemon:daemon .
+
+COPY triples-generator/entrypoint.sh /entrypoint.sh
+
+ENV GID=90020
+RUN addgroup -g "$GID" -S tggroup && \
+    adduser --disabled-password -g "$GID" -D -u 9002 tguser && \
+    chmod 555 -R /opt/triples-generator && \
+    chmod 555 -R /entrypoint.sh
+
+USER tguser
+
+RUN git config --global user.name 'renku'  && \
     git config --global user.email 'renku@renkulab.io'  && \
     git config --global filter.lfs.smudge "git-lfs smudge --skip %f"  && \
     git config --global filter.lfs.process "git-lfs filter-process --skip"
 
-COPY triples-generator/entrypoint.sh /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
 CMD ["bin/triples-generator"]

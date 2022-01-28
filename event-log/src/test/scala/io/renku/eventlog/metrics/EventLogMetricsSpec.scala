@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,17 +18,18 @@
 
 package io.renku.eventlog.metrics
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CategoryName, EventStatus}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.metrics.{LabeledGauge, SingleValueGauge}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.events.{CategoryName, EventStatus}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.metrics.{LabeledGauge, SingleValueGauge}
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -36,13 +37,13 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
-import scala.language.{postfixOps, reflectiveCalls}
+import scala.language.reflectiveCalls
 
 class EventLogMetricsSpec
     extends AnyWordSpec
+    with IOSpec
     with MockFactory
     with Eventually
     with IntegrationPatience
@@ -58,7 +59,7 @@ class EventLogMetricsSpec
       val statusCount = statusCounts.generateOne
       givenStatusesMethodToReturn add statusCount.pure[IO]
 
-      metrics.run().unsafeRunAsyncAndForget()
+      metrics.run().unsafeRunAndForget()
 
       eventually {
         categoryNameEventsGauge.categoryNameValues.asScala shouldBe categoryNameCount
@@ -72,16 +73,16 @@ class EventLogMetricsSpec
     "log an eventual error and continue collecting the metrics" in new TestCase {
 
       val categoryNamesException = exceptions.generateOne
-      givenCountEventsByCategoryNameMethodToReturn.add(categoryNamesException.raiseError[IO, Map[CategoryName, Long]])
+      givenCountEventsByCategoryNameMethodToReturn add categoryNamesException.raiseError[IO, Map[CategoryName, Long]]
       val categoryNameCount = categoryNameCounts.generateOne
       givenCountEventsByCategoryNameMethodToReturn add categoryNameCount.pure[IO]
 
       val statusesFindException = exceptions.generateOne
-      givenStatusesMethodToReturn.add(statusesFindException.raiseError[IO, Map[EventStatus, Long]])
+      givenStatusesMethodToReturn add statusesFindException.raiseError[IO, Map[EventStatus, Long]]
       val statuses = statusCounts.generateOne
-      givenStatusesMethodToReturn.add(statuses.pure[IO])
+      givenStatusesMethodToReturn add statuses.pure[IO]
 
-      metrics.run().unsafeRunAsyncAndForget()
+      metrics.run().unsafeRunAndForget()
 
       eventually {
         categoryNameEventsGauge.categoryNameValues.asScala shouldBe categoryNameCount
@@ -94,10 +95,20 @@ class EventLogMetricsSpec
         )
       }
     }
-  }
 
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
+    "remove an entry from the categoryNameEventsGauge if it does not exist in the new set of values" in new TestCase {
+      val categoryNameCount1 = categoryNameCounts.generateOne
+      givenCountEventsByCategoryNameMethodToReturn add categoryNameCount1.pure[IO]
+      val categoryNameCount2 = categoryNameCounts.generateOne
+      givenCountEventsByCategoryNameMethodToReturn add categoryNameCount2.pure[IO]
+
+      metrics.run().unsafeRunAndForget()
+
+      eventually {
+        categoryNameEventsGauge.categoryNameValues.asScala shouldBe categoryNameCount2
+      }
+    }
+  }
 
   private trait TestGauges {
 
@@ -110,10 +121,12 @@ class EventLogMetricsSpec
         case (categoryName, value) => categoryNameValues.put(categoryName, value).pure[IO].void
       }
 
-      override def increment(labelValue: CategoryName) = fail("Spec shouldn't be calling that")
-      override def decrement(labelValue: CategoryName) = fail("Spec shouldn't be calling that")
-      override def reset()         = fail("Spec shouldn't be calling that")
-      protected override def gauge = fail("Spec shouldn't be calling that")
+      override def update(labelValue: (CategoryName, Double)) = fail("Spec shouldn't be calling that")
+      override def increment(labelValue: CategoryName)        = fail("Spec shouldn't be calling that")
+      override def decrement(labelValue: CategoryName)        = fail("Spec shouldn't be calling that")
+      override def reset()                                    = fail("Spec shouldn't be calling that")
+      override def clear()                                    = categoryNameValues.clear().pure[IO]
+      protected override def gauge                            = fail("Spec shouldn't be calling that")
     }
 
     lazy val statusesGauge = new LabeledGauge[IO, EventStatus] {
@@ -125,16 +138,18 @@ class EventLogMetricsSpec
         case (status, value) => statusValues.put(status, value).pure[IO].void
       }
 
-      override def increment(labelValue: EventStatus) = fail("Spec shouldn't be calling that")
-      override def decrement(labelValue: EventStatus) = fail("Spec shouldn't be calling that")
-      override def reset()         = fail("Spec shouldn't be calling that")
-      protected override def gauge = fail("Spec shouldn't be calling that")
+      override def update(labelValue: (EventStatus, Double)) = fail("Spec shouldn't be calling that")
+      override def increment(labelValue: EventStatus)        = fail("Spec shouldn't be calling that")
+      override def decrement(labelValue: EventStatus)        = fail("Spec shouldn't be calling that")
+      override def reset()                                   = fail("Spec shouldn't be calling that")
+      override def clear()                                   = statusValues.clear().pure[IO]
+      protected override def gauge                           = fail("Spec shouldn't be calling that")
     }
 
     lazy val totalGauge = new SingleValueGauge[IO] {
-      val values = new ConcurrentLinkedQueue[Double]()
+      val values                      = new ConcurrentLinkedQueue[Double]()
       override def set(value: Double) = values.add(value).pure[IO].void
-      protected override def gauge = fail("Spec shouldn't be calling that")
+      protected override def gauge    = fail("Spec shouldn't be calling that")
     }
   }
 
@@ -152,10 +167,9 @@ class EventLogMetricsSpec
       override def countEvents(statuses: Set[EventStatus], maybeLimit: Option[Refined[Int, Positive]]) =
         fail("Spec shouldn't be calling that")
     }
-    lazy val logger = TestLogger[IO]()
+    implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
     lazy val metrics = new EventLogMetricsImpl(
       statsFinder,
-      logger,
       categoryNameEventsGauge,
       statusesGauge,
       totalGauge,

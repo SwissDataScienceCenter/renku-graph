@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,27 +19,18 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TimestampZoneAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
-  protected override lazy val migrationsToRun: List[Migration] = List(
-    eventLogTableCreator,
-    projectPathAdder,
-    batchDateAdder,
-    projectTableCreator,
-    projectPathRemover,
-    eventLogTableRenamer,
-    eventStatusRenamer,
-    eventPayloadTableCreator,
-    eventPayloadSchemaVersionAdder,
-    subscriptionCategorySyncTimeTableCreator,
-    statusesProcessingTimeTableCreator,
-    subscriberTableCreator,
-    eventDeliveryTableCreator
-  )
+class TimestampZoneAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: TimestampZoneAdderImpl[_] => false
+    case _ => true
+  }
 
   private val timestampType   = "timestamp without time zone"
   private val timestamptzType = "timestamp with time zone"
@@ -50,21 +41,21 @@ class TimestampZoneAdderSpec extends AnyWordSpec with DbInitSpec with should.Mat
 
       tableExists("event") shouldBe true
 
-      verify("batch_date", timestampType)
-      verify("create_date", timestampType)
-      verify("event_date", timestampType)
-      verify("execution_date", timestampType)
-      verify("last_synced", timestampType)
-      verify("latest_event_date", timestampType)
+      verify("event", "batch_date", timestampType)
+      verify("event", "create_date", timestampType)
+      verify("event", "event_date", timestampType)
+      verify("event", "execution_date", timestampType)
+      verify("event", "last_synced", timestampType)
+      verify("event", "latest_event_date", timestampType)
 
       tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
 
-      verify("batch_date", timestamptzType)
-      verify("create_date", timestamptzType)
-      verify("event_date", timestamptzType)
-      verify("execution_date", timestamptzType)
-      verify("last_synced", timestamptzType)
-      verify("latest_event_date", timestamptzType)
+      verify("event", "batch_date", timestamptzType)
+      verify("event", "create_date", timestamptzType)
+      verify("event", "event_date", timestamptzType)
+      verify("event", "execution_date", timestamptzType)
+      verify("event", "last_synced", timestamptzType)
+      verify("event", "latest_event_date", timestamptzType)
 
     }
 
@@ -74,30 +65,28 @@ class TimestampZoneAdderSpec extends AnyWordSpec with DbInitSpec with should.Mat
 
       tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
 
-      verify("batch_date", timestamptzType)
-      verify("create_date", timestamptzType)
-      verify("event_date", timestamptzType)
-      verify("execution_date", timestamptzType)
-      verify("last_synced", timestamptzType)
-      verify("latest_event_date", timestamptzType)
+      verify("event", "batch_date", timestamptzType)
+      verify("event", "create_date", timestamptzType)
+      verify("event", "event_date", timestamptzType)
+      verify("event", "execution_date", timestamptzType)
+      verify("event", "last_synced", timestamptzType)
+      verify("event", "latest_event_date", timestamptzType)
 
       tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
 
-      verify("batch_date", timestamptzType)
-      verify("create_date", timestamptzType)
-      verify("event_date", timestamptzType)
-      verify("execution_date", timestamptzType)
-      verify("last_synced", timestamptzType)
-      verify("latest_event_date", timestamptzType)
+      verify("event", "batch_date", timestamptzType)
+      verify("event", "create_date", timestamptzType)
+      verify("event", "event_date", timestamptzType)
+      verify("event", "execution_date", timestamptzType)
+      verify("event", "last_synced", timestamptzType)
+      verify("event", "latest_event_date", timestamptzType)
 
       logger.loggedOnly(Info("Fields are already in timestamptz type"))
-
     }
-
   }
 
   private trait TestCase {
-    val logger        = TestLogger[IO]()
-    val tableRefactor = new TimestampZoneAdderImpl[IO](sessionResource, logger)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tableRefactor = new TimestampZoneAdderImpl[IO](sessionResource)
   }
 }

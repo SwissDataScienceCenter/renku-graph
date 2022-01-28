@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,15 +21,16 @@ package io.renku.eventlog.subscriptions
 import cats.effect.IO
 import cats.implicits.{catsSyntaxApplicativeErrorId, catsSyntaxApplicativeId}
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import io.renku.eventlog.subscriptions.Generators._
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "run" should {
 

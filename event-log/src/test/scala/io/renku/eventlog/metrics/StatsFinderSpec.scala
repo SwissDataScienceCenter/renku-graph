@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,21 +18,22 @@
 
 package io.renku.eventlog.metrics
 
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{nonEmptyList, timestamps}
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
-import ch.datascience.graph.model.projects.{Id, Path}
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, timestamps}
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.projects.{Id, Path}
+import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -40,6 +41,7 @@ import java.time.{Duration, Instant}
 
 class StatsFinderSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with SubscriptionDataProvisioning
     with should.Matchers {
@@ -143,6 +145,24 @@ class StatsFinderSpec
         globalcommitsync.categoryName -> 2L
       )
     }
+
+    "return info about number of events grouped by event_type in the status_change_events_queue" in {
+
+      val type1 = nonEmptyStrings().generateOne
+      insertEventIntoEventsQueue(type1, jsons.generateOne)
+      insertEventIntoEventsQueue(type1, jsons.generateOne)
+
+      val type2 = nonEmptyStrings().generateOne
+      insertEventIntoEventsQueue(type2, jsons.generateOne)
+
+      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
+        CategoryName(type1)           -> 2L,
+        CategoryName(type2)           -> 1L,
+        membersync.categoryName       -> 0L,
+        commitsync.categoryName       -> 0L,
+        globalcommitsync.categoryName -> 0L
+      )
+    }
   }
 
   "statuses" should {
@@ -163,6 +183,7 @@ class StatsFinderSpec
         GenerationNonRecoverableFailure     -> statuses.count(_ == GenerationNonRecoverableFailure),
         TransformationRecoverableFailure    -> statuses.count(_ == TransformationRecoverableFailure),
         TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure),
+        Deleting                            -> statuses.count(_ == Deleting),
         AwaitingDeletion                    -> statuses.count(_ == AwaitingDeletion)
       )
 

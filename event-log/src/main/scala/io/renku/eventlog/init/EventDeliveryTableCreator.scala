@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,48 +19,46 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
-import ch.datascience.db.SessionResource
+import cats.effect.MonadCancelThrow
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all.bool
 import skunk.implicits._
 
-private trait EventDeliveryTableCreator[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait EventDeliveryTableCreator[F[_]] {
+  def run(): F[Unit]
 }
 
-private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
-) extends EventDeliveryTableCreator[Interpretation] {
+private class EventDeliveryTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends EventDeliveryTableCreator[F] {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     checkTableExists >>= {
-      case true  => Kleisli.liftF(logger info "'event_delivery' table exists")
+      case true  => Kleisli.liftF(Logger[F] info "'event_delivery' table exists")
       case false => createTable()
     }
   }
 
-  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
     val query: Query[skunk.Void, Boolean] =
       sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_delivery')"
         .query(bool)
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id    ON event_delivery(event_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id  ON event_delivery(project_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON event_delivery(delivery_id)".command)
-      _ <- Kleisli.liftF(logger info "'event_delivery' table created")
-      _ <- execute(foreignKeySql)
-    } yield ()
+  private def createTable(): Kleisli[F, Session[F], Unit] = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id    ON event_delivery(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id  ON event_delivery(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON event_delivery(delivery_id)".command)
+    _ <- Kleisli.liftF(Logger[F] info "'event_delivery' table created")
+    _ <- execute(foreignKeySql)
+  } yield ()
 
   private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS event_delivery(
@@ -78,9 +76,7 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]: BracketThrow](
 }
 
 private object EventDeliveryTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
-  ): EventDeliveryTableCreator[Interpretation] =
-    new EventDeliveryTableCreatorImpl(sessionResource, logger)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): EventDeliveryTableCreator[F] = new EventDeliveryTableCreatorImpl(sessionResource)
 }

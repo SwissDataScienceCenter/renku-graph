@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,59 +18,73 @@
 
 package io.renku.eventlog.init
 
-import DbInitializer._
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.effect.kernel.Ref
+import cats.effect.{IO, Temporal}
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
-import org.typelevel.log4cats.Logger
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.init.DbInitializer._
+import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
-trait DbInitializer[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+trait DbInitializer[F[_]] {
+  def run(): F[Unit]
 }
 
-class DbInitializerImpl[Interpretation[_]](
-    migrators: List[Runnable[Interpretation, Unit]],
-    logger:    Logger[Interpretation]
-)(implicit ME: Bracket[Interpretation, Throwable])
-    extends DbInitializer[Interpretation] {
+class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[Runnable[F, Unit]],
+                                                isMigrating:        Ref[F, Boolean],
+                                                retrySleepDuration: FiniteDuration = 20.seconds
+) extends DbInitializer[F] {
 
-  override def run(): Interpretation[Unit] = {
-    migrators.map(_.run()).sequence >> logger.info("Event Log database initialization success")
-  } recoverWith logging
+  override def run(): F[Unit] = runMigrations()
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("Event Log database initialization failure")
-    exception.raiseError[Interpretation, Unit]
+  private def runMigrations(retryCount: Int = 0): F[Unit] = {
+    for {
+      _ <- isMigrating.update(_ => true)
+      _ <- migrators.map(_.run()).sequence
+      _ <- Logger[F].info("Event Log database initialization success")
+      _ <- isMigrating.update(_ => false)
+    } yield ()
+
+  } recoverWith logAndRetry(retryCount + 1)
+
+  private def logAndRetry(retryCount: Int): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    for {
+      _ <- Temporal[F] sleep retrySleepDuration
+      _ <- Logger[F].error(exception)(
+             s"Event Log database initialization failed: retrying $retryCount time(s)"
+           )
+      _ <- runMigrations(retryCount)
+    } yield ()
   }
 }
 
 object DbInitializer {
-  def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
+  def apply(sessionResource: SessionResource[IO, EventLogDB], isMigrating: Ref[IO, Boolean])(implicit
+      logger:                Logger[IO]
+  ): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
       migrators = List[Runnable[IO, Unit]](
-        EventLogTableCreator(sessionResource, logger),
-        ProjectPathAdder(sessionResource, logger),
-        BatchDateAdder(sessionResource, logger),
-        ProjectTableCreator(sessionResource, logger),
-        ProjectPathRemover(sessionResource, logger),
-        EventLogTableRenamer(sessionResource, logger),
-        EventStatusRenamer(sessionResource, logger),
-        EventPayloadTableCreator(sessionResource, logger),
-        EventPayloadSchemaVersionAdder(sessionResource, logger),
-        SubscriptionCategorySyncTimeTableCreator(sessionResource, logger),
-        StatusesProcessingTimeTableCreator(sessionResource, logger),
-        SubscriberTableCreator(sessionResource, logger),
-        EventDeliveryTableCreator(sessionResource, logger),
-        TimestampZoneAdder(sessionResource, logger)
+        EventLogTableCreator(sessionResource),
+        ProjectPathAdder(sessionResource),
+        BatchDateAdder(sessionResource),
+        ProjectTableCreator(sessionResource),
+        ProjectPathRemover(sessionResource),
+        EventLogTableRenamer(sessionResource),
+        EventStatusRenamer(sessionResource),
+        EventPayloadTableCreator(sessionResource),
+        SubscriptionCategorySyncTimeTableCreator(sessionResource),
+        StatusesProcessingTimeTableCreator(sessionResource),
+        SubscriberTableCreator(sessionResource),
+        EventDeliveryTableCreator(sessionResource),
+        TimestampZoneAdder(sessionResource),
+        PayloadTypeChanger(sessionResource),
+        StatusChangeEventsTableCreator(sessionResource)
       ),
-      logger
+      isMigrating
     )
   }
 

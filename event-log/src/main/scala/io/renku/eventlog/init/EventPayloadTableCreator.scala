@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,63 +19,58 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.{Bracket, BracketThrow}
-import ch.datascience.db.SessionResource
+import cats.effect.MonadCancelThrow
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait EventPayloadTableCreator[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait EventPayloadTableCreator[F[_]] {
+  def run(): F[Unit]
 }
 
 private object EventPayloadTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
-  ): EventPayloadTableCreator[Interpretation] =
-    new EventPayloadTableCreatorImpl(sessionResource, logger)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): EventPayloadTableCreator[F] = new EventPayloadTableCreatorImpl(sessionResource)
 }
 
-private class EventPayloadTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
-) extends EventPayloadTableCreator[Interpretation]
+private class EventPayloadTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends EventPayloadTableCreator[F]
     with EventTableCheck {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     whenEventTableExists(
       checkTableExists flatMap {
-        case true  => Kleisli.liftF(logger info "'event_payload' table exists")
+        case true  => Kleisli.liftF(Logger[F] info "'event_payload' table exists")
         case false => createTable()
       },
       otherwise = Kleisli.liftF(
-        Bracket[Interpretation, Throwable].raiseError(
+        MonadCancelThrow[F].raiseError(
           new Exception("Event table missing; creation of event_payload is not possible")
         )
       )
     )
   }
 
-  private def checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private def checkTableExists: Kleisli[F, Session[F], Boolean] = {
     val query: Query[Void, Boolean] =
-      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
-        .query(bool)
+      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')".query(bool)
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)".command)
-      _ <- Kleisli.liftF(logger info "'event_payload' table created")
-      _ <- execute(foreignKeySql)
-    } yield ()
+  private def createTable(): Kleisli[F, Session[F], Unit] = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)".command)
+    _ <- Kleisli.liftF(Logger[F] info "'event_payload' table created")
+    _ <- execute(foreignKeySql)
+  } yield ()
 
   private lazy val createTableSql: Command[Void] =
     sql"""

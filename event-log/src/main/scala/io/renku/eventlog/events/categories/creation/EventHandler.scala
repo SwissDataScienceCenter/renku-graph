@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,53 +18,47 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import cats.MonadThrow
 import cats.data.EitherT.fromEither
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.{Concurrent, MonadCancelThrow}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers._
-import ch.datascience.graph.model.events.{BatchDate, CategoryName, EventBody, EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.circe.{Decoder, DecodingFailure, HCursor}
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
+import cats.{MonadThrow, Show}
+import io.circe.{ACursor, Decoder, DecodingFailure}
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog._
+import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers._
+import io.renku.events.{EventRequestContent, consumers}
+import io.renku.graph.model.events.{BatchDate, CategoryName, EventBody, EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
+private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName: CategoryName,
-    eventPersister:            EventPersister[Interpretation],
-    logger:                    Logger[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
+    eventPersister:            EventPersister[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
-  import ch.datascience.graph.model.projects
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eventPersister._
+  import io.renku.graph.model.projects
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def createHandlingProcess(
-      request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess[Interpretation](storeEvent(request))
+  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
+    EventHandlingProcess[F](storeEvent(request))
 
   private def storeEvent(request: EventRequestContent) = for {
-    event <-
-      fromEither[Interpretation](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
+    event <- fromEither[F](request.event.as[Event].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
     result <- storeNewEvent(event).toRightT
                 .map(_ => Accepted)
-                .semiflatTap(logger.log(event))
-                .leftSemiflatTap(logger.log(event))
+                .semiflatTap(Logger[F].log(event))
+                .leftSemiflatTap(Logger[F].log(event))
   } yield result
 
-  private implicit lazy val eventInfoToString: Event => String = { event =>
+  private implicit lazy val eventInfoToString: Show[Event] = Show.show { event =>
     s"${event.compoundEventId}, projectPath = ${event.project.path}, status = ${event.status}"
   }
 
-  private implicit val eventDecoder: Decoder[Event] = (cursor: HCursor) =>
+  private implicit val eventDecoder: Decoder[Event] = cursor =>
     cursor.downField("status").as[Option[EventStatus]] flatMap {
       case None | Some(EventStatus.New) =>
         for {
@@ -81,22 +75,22 @@ private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
           date      <- cursor.downField("date").as[EventDate]
           batchDate <- cursor.downField("batchDate").as[BatchDate]
           body      <- cursor.downField("body").as[EventBody]
-          message   <- verifyMessage(cursor.downField("message").as[Option[String]])
+          message   <- extractMessage(cursor)
         } yield SkippedEvent(id, project, date, batchDate, body, message)
       case Some(invalidStatus) =>
         Left(DecodingFailure(s"Status $invalidStatus is not valid. Only NEW or SKIPPED are accepted", Nil))
     }
 
-  private def verifyMessage(result: Decoder.Result[Option[String]]) =
-    result
-      .map(blankToNone)
+  private lazy val extractMessage: ACursor => Decoder.Result[EventMessage] =
+    _.downField("message")
+      .as(blankStringToNoneDecoder(EventMessage))
       .flatMap {
-        case None          => Left(DecodingFailure(s"Skipped Status requires message", Nil))
-        case Some(message) => EventMessage.from(message.value)
+        case None          => DecodingFailure(s"Skipped Status requires message", Nil).asLeft
+        case Some(message) => message.asRight
       }
       .leftMap(_ => DecodingFailure("Invalid Skipped Event message", Nil))
 
-  implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) =>
+  implicit val projectDecoder: Decoder[Project] = cursor =>
     for {
       id   <- cursor.downField("id").as[projects.Id]
       path <- cursor.downField("path").as[projects.Path]
@@ -104,15 +98,10 @@ private class EventHandler[Interpretation[_]: MonadThrow: Concurrent](
 }
 
 private object EventHandler {
-  def apply(sessionResource:    SessionResource[IO, EventLogDB],
-            waitingEventsGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:   LabeledHistogram[IO, SqlStatement.Name],
-            logger:             Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[EventHandler[IO]] = for {
-    eventPersister <- IOEventPersister(sessionResource, waitingEventsGauge, queriesExecTimes)
-  } yield new EventHandler[IO](categoryName, eventPersister, logger)
+  def apply[F[_]: MonadCancelThrow: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                                        waitingEventsGauge: LabeledGauge[F, projects.Path],
+                                                        queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventHandler[F]] = for {
+    eventPersister <- EventPersister(sessionResource, waitingEventsGauge, queriesExecTimes)
+  } yield new EventHandler[F](categoryName, eventPersister)
 }

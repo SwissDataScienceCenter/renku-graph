@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,28 +18,22 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.EventHandler
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import org.typelevel.log4cats.Logger
+import cats.effect.{Concurrent, MonadCancelThrow}
+import cats.syntax.all._
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
-
-import scala.concurrent.ExecutionContext
+import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply(sessionResource:    SessionResource[IO, EventLogDB],
-            waitingEventsGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:   LabeledHistogram[IO, SqlStatement.Name],
-            logger:             Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
-    handler <- EventHandler(sessionResource, waitingEventsGauge, queriesExecTimes, logger)
+  def apply[F[_]: MonadCancelThrow: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                                        waitingEventsGauge: LabeledGauge[F, projects.Path],
+                                                        queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name]
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+    handler <- EventHandler(sessionResource, waitingEventsGauge, queriesExecTimes)
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

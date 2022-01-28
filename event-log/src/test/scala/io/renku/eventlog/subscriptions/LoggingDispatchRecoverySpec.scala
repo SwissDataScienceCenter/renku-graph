@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,20 +19,21 @@
 package io.renku.eventlog.subscriptions
 
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
 import io.renku.eventlog.subscriptions.Generators.categoryNames
 import io.renku.eventlog.subscriptions.TestCategoryEvent.testCategoryEvents
+import io.renku.events.consumers.subscriptions._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class LoggingDispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory {
+class LoggingDispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
   "recover" should {
 
@@ -57,8 +58,8 @@ class LoggingDispatchRecoverySpec extends AnyWordSpec with should.Matchers with 
   private trait TestCase {
     val event = testCategoryEvents.generateOne
 
-    val categoryName      = categoryNames.generateOne
-    val logger            = TestLogger[Try]()
-    val Success(recovery) = LoggingDispatchRecovery[Try, TestCategoryEvent](categoryName, logger)
+    val categoryName = categoryNames.generateOne
+    protected implicit val logger: TestLogger[Try] = TestLogger[Try]()
+    val Success(recovery) = LoggingDispatchRecovery[Try, TestCategoryEvent](categoryName)
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,13 +19,13 @@
 package io.renku.eventlog.metrics
 
 import cats.effect.IO
-import ch.datascience.db.SqlStatement
-import ch.datascience.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
+import io.renku.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
 
 object QueriesExecutionTimes {
 
-  def apply(metricsRegistry: MetricsRegistry[IO]): IO[LabeledHistogram[IO, SqlStatement.Name]] =
+  def apply(metricsRegistry: MetricsRegistry): IO[LabeledHistogram[IO, SqlStatement.Name]] =
     Histogram[IO, SqlStatement.Name](
       name = "event_log_queries_execution_times",
       help = "Event Log queries execution times",

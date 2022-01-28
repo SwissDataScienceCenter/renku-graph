@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,58 +19,55 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
-import ch.datascience.db.SessionResource
+import cats.effect.MonadCancelThrow
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait StatusesProcessingTimeTableCreator[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait StatusesProcessingTimeTableCreator[F[_]] {
+  def run(): F[Unit]
 }
 
 private object StatusesProcessingTimeTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
-  ): StatusesProcessingTimeTableCreator[Interpretation] =
-    new StatusesProcessingTimeTableCreatorImpl[Interpretation](sessionResource, logger)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): StatusesProcessingTimeTableCreator[F] =
+    new StatusesProcessingTimeTableCreatorImpl[F](sessionResource)
 }
 
-private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
-) extends StatusesProcessingTimeTableCreator[Interpretation] {
+private class StatusesProcessingTimeTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends StatusesProcessingTimeTableCreator[F] {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     checkTableExists >>= {
-      case true  => Kleisli.liftF(logger info "'status_processing_time' table exists")
+      case true  => Kleisli.liftF(Logger[F] info "'status_processing_time' table exists")
       case false => createTable()
     }
   }
 
-  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
     val query: Query[Void, Boolean] =
       sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'status_processing_time')".query(bool)
-    Kleisli[Interpretation, Session[Interpretation], Boolean] {
+    Kleisli[F, Session[F], Boolean] {
       _.unique(query)
         .recover { case _ => false }
     }
   }
 
-  private def createTable() =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)".command)
-      _ <- Kleisli.liftF(logger info "'status_processing_time' table created")
-      _ <- execute(foreignKeySql)
-    } yield ()
+  private def createTable() = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)".command)
+    _ <- Kleisli.liftF(Logger[F] info "'status_processing_time' table created")
+    _ <- execute(foreignKeySql)
+  } yield ()
 
   private lazy val createTableSql: Command[Void] =
     sql"""

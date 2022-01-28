@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,12 +20,12 @@ package io.renku.eventlog.subscriptions
 
 import cats.Show
 import cats.implicits.showInterpolator
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints.{NonNegativeInt, Url}
-import ch.datascience.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
 import io.circe.Decoder
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.graph.model.projects
+import io.renku.tinytypes._
+import io.renku.tinytypes.constraints.{NonNegativeInt, Url}
+import io.renku.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
 
 private final case class ProjectIds(id: projects.Id, path: projects.Path)
 
@@ -47,8 +47,10 @@ private trait SubscriptionInfo extends Product with Serializable {
 }
 
 private object SubscriptionInfo {
+
   implicit def showInfo[T <: SubscriptionInfo]: Show[T] =
-    Show.show(info => show"${info.subscriberUrl}, ${info.subscriberId}${info.maybeCapacity}")
+    Show.show(info => show"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId}${info.maybeCapacity}")
+
   private implicit lazy val showCapacity: Show[Option[Capacity]] =
     Show.show(maybeCapacity => maybeCapacity.map(capacity => show" with capacity ${capacity.value}").getOrElse(""))
 }

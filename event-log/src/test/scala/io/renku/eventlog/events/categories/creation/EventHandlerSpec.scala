@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,47 +16,57 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.creation
+package io.renku.eventlog.events.categories
+package creation
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
-import ch.datascience.events.consumers.{EventRequestContent, Project}
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level._
 import io.circe.literal.JsonStringContext
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import io.renku.eventlog.Event
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.categories.creation.EventPersister.Result.{Created, Existed}
+import io.renku.eventlog.events.categories.creation.Generators._
+import io.renku.events.Generators._
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.events.EventStatus
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level._
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.global
-
-class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventHandlerSpec
+    extends AnyWordSpec
+    with IOSpec
+    with MockFactory
+    with TableDrivenPropertyChecks
+    with should.Matchers {
 
   "createHandlingProcess" should {
 
-    List(Created, Existed).foreach { successfulResponse =>
-      s"return $Accepted if the creation of the event returns $successfulResponse" in new TestCase {
+    val scenarios = Table(
+      "status"  -> "resultFactory",
+      "Created" -> ((event: Event) => Created(event)),
+      "Existed" -> ((_: Event) => Existed)
+    )
+    forAll(scenarios) { case (status, resultFactory) =>
+      s"return $Accepted if the creation of the event returns $status" in new TestCase {
         val event = newOrSkippedEvents.generateOne
 
-        val requestContent = EventRequestContent(event = event.asJson, None)
+        (eventPersister.storeNewEvent _).expects(event).returning(resultFactory(event).pure[IO])
 
-        (eventPersister.storeNewEvent _).expects(event).returning(successfulResponse.pure[IO])
-
-        handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Right(
-          Accepted
-        )
+        handler
+          .createHandlingProcess(requestContent(event.asJson))
+          .unsafeRunSync()
+          .process
+          .value
+          .unsafeRunSync() shouldBe Right(Accepted)
 
         logger.loggedOnly(
           Info(
@@ -69,7 +79,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     s"return $BadRequest if the eventJson is malformed" in new TestCase {
       val event = jsons.generateOne deepMerge json""" {"categoryName":${categoryName.value} }"""
 
-      val requestContent = eventRequestContents.generateOne.copy(event)
+      val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
 
       handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
         BadRequest
@@ -81,7 +91,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     s"return $BadRequest if the skipped event does not contain a message" in new TestCase {
       val event = skippedEvents.generateOne.asJson.deepMerge(json""" {"message":${blankStrings().generateOne} }""")
 
-      val requestContent = eventRequestContents.generateOne.copy(event)
+      val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
 
       handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
         BadRequest
@@ -95,7 +105,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         val event =
           newOrSkippedEvents.generateOne.asJson deepMerge json"""{"status": ${unacceptableStatus.value}}"""
 
-        val requestContent = eventRequestContents.generateOne.copy(event)
+        val requestContent = eventRequestContentNoPayloads.generateOne.copy(event)
 
         handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
           BadRequest
@@ -109,13 +119,14 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       val event     = newOrSkippedEvents.generateOne
       val exception = exceptions.generateOne
 
-      val requestContent = EventRequestContent(event = event.asJson, None)
+      (eventPersister.storeNewEvent _).expects(event).returning(exception.raiseError[IO, EventPersister.Result])
 
-      (eventPersister.storeNewEvent _).expects(event).returning(context.raiseError(exception))
-
-      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
-        SchedulingError(exception)
-      )
+      handler
+        .createHandlingProcess(requestContent(event.asJson))
+        .unsafeRunSync()
+        .process
+        .value
+        .unsafeRunSync() shouldBe Left(SchedulingError(exception))
 
       logger.loggedOnly(
         Error(
@@ -126,18 +137,13 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
-
   private trait TestCase {
 
-    val context = MonadError[IO, Throwable]
-
-    val logger         = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventPersister = mock[EventPersister[IO]]
-
-    val handler = new EventHandler[IO](categoryName, eventPersister, logger)
-
+    val handler        = new EventHandler[IO](categoryName, eventPersister)
   }
+
   private def toJson(event: Event): Json =
     json"""{
       "categoryName": ${categoryName.value},
@@ -162,5 +168,4 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     case event: NewEvent     => toJson(event)
     case event: SkippedEvent => toJson(event) deepMerge json"""{ "message":    ${event.message.value} }"""
   }
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,11 +19,11 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
-import ch.datascience.graph.model.events.BatchDate
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
+import io.renku.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all.timestamp
@@ -32,37 +32,34 @@ import skunk.implicits._
 import java.time.{LocalDateTime, ZoneOffset}
 import scala.util.control.NonFatal
 
-private trait BatchDateAdder[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait BatchDateAdder[F[_]] {
+  def run(): F[Unit]
 }
 
 private object BatchDateAdder {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
-  ): BatchDateAdder[Interpretation] =
-    new BatchDateAdderImpl(sessionResource, logger)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): BatchDateAdder[F] = new BatchDateAdderImpl(sessionResource)
 }
 
-private class BatchDateAdderImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
-) extends BatchDateAdder[Interpretation]
+private class BatchDateAdderImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends BatchDateAdder[F]
     with EventTableCheck {
 
-  private implicit val transact: SessionResource[Interpretation, EventLogDB] = sessionResource
+  private implicit val transact: SessionResource[F, EventLogDB] = sessionResource
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     whenEventTableExists(
-      Kleisli.liftF(logger info "'batch_date' column adding skipped"),
+      Kleisli.liftF(Logger[F] info "'batch_date' column adding skipped"),
       otherwise = checkColumnExists >>= {
-        case true  => Kleisli.liftF(logger info "'batch_date' column exists")
+        case true  => Kleisli.liftF(Logger[F] info "'batch_date' column exists")
         case false => addColumn()
       }
     )
   }
 
-  private lazy val checkColumnExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private lazy val checkColumnExists: Kleisli[F, Session[F], Boolean] = {
     val query: Query[skunk.Void, BatchDate] = sql"SELECT batch_date FROM event_log limit 1"
       .query(timestamp)
       .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
@@ -73,19 +70,18 @@ private class BatchDateAdderImpl[Interpretation[_]: BracketThrow](
     )
   }
 
-  private def addColumn(): Kleisli[Interpretation, Session[Interpretation], Unit] = {
+  private def addColumn(): Kleisli[F, Session[F], Unit] = {
     for {
       _ <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS batch_date timestamp".command)
       _ <- execute(sql"update event_log set batch_date = created_date".command)
       _ <- execute(sql"ALTER TABLE event_log ALTER COLUMN batch_date SET NOT NULL".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_batch_date ON event_log(batch_date)".command)
-      _ <- Kleisli.liftF(logger.info("'batch_date' column added"))
+      _ <- Kleisli.liftF(Logger[F].info("'batch_date' column added"))
     } yield ()
   } recoverWith logging
 
-  private lazy val logging: PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("'batch_date' column adding failure")
-      Kleisli.liftF(exception.raiseError[Interpretation, Unit])
+  private lazy val logging: PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = { case NonFatal(exception) =>
+    Logger[F].error(exception)("'batch_date' column adding failure")
+    Kleisli.liftF(exception.raiseError[F, Unit])
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,130 +18,116 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.{MonadThrow, Show}
 import cats.data.OptionT
-import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.effect.{Async, Temporal}
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.graph.model.events.CategoryName
+import cats.{MonadThrow, Show}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-private trait EventsDistributor[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait EventsDistributor[F[_]] {
+  def run(): F[Unit]
 }
 
-private class EventsDistributorImpl[Interpretation[_]: Effect: MonadThrow: Timer, CategoryEvent](
+private class EventsDistributorImpl[F[_]: MonadThrow: Temporal: Logger, CategoryEvent](
     categoryName:                 CategoryName,
-    subscribers:                  Subscribers[Interpretation],
-    eventsFinder:                 EventFinder[Interpretation, CategoryEvent],
-    eventsSender:                 EventsSender[Interpretation, CategoryEvent],
-    eventDelivery:                EventDelivery[Interpretation, CategoryEvent],
-    dispatchRecovery:             DispatchRecovery[Interpretation, CategoryEvent],
-    logger:                       Logger[Interpretation],
+    subscribers:                  Subscribers[F],
+    eventsFinder:                 EventFinder[F, CategoryEvent],
+    eventsSender:                 EventsSender[F, CategoryEvent],
+    eventDelivery:                EventDelivery[F, CategoryEvent],
+    dispatchRecovery:             DispatchRecovery[F, CategoryEvent],
     noEventSleep:                 FiniteDuration,
     onErrorSleep:                 FiniteDuration
 )(implicit val showCategoryEvent: Show[CategoryEvent])
-    extends EventsDistributor[Interpretation] {
+    extends EventsDistributor[F] {
 
   import dispatchRecovery._
   import eventsSender._
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
   import subscribers._
 
-  def run(): Interpretation[Unit] = {
+  def run(): F[Unit] = {
     for {
-      _ <- ().pure[Interpretation]
+      _ <- ().pure[F]
       _ <- runOnSubscriber(popAndDispatch) recoverWith logAndWait
     } yield ()
   }.foreverM[Unit]
 
-  private lazy val popAndDispatch: SubscriberUrl => Interpretation[Unit] =
+  private lazy val popAndDispatch: SubscriberUrl => F[Unit] =
     subscriber => (popEvent semiflatMap dispatch(subscriber)).value.void
 
-  private def popEvent: OptionT[Interpretation, CategoryEvent] = OptionT {
+  private def popEvent: OptionT[F, CategoryEvent] = OptionT {
     eventsFinder.popEvent() recoverWith logError
-  }.flatTapNone(Timer[Interpretation] sleep noEventSleep)
+  }.flatTapNone(Temporal[F] sleep noEventSleep)
 
   private def dispatch(
       subscriber: SubscriberUrl
-  )(event:        CategoryEvent): Interpretation[Unit] = {
+  )(event:        CategoryEvent): F[Unit] = {
     sendEvent(subscriber, event) >>= handleResult(subscriber, event)
   } recoverWith recover(subscriber, event)
 
-  private lazy val logAndWait: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    for {
-      _ <- logger.error(exception)(show"$categoryName: executing event distribution on a subscriber failed")
-      _ <- Timer[Interpretation] sleep onErrorSleep
-    } yield ()
+  private lazy val logAndWait: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    Temporal[F].andWait(
+      Logger[F].error(exception)(show"$categoryName: executing event distribution on a subscriber failed"),
+      onErrorSleep
+    )
   }
 
-  private def handleResult(subscriber: SubscriberUrl, event: CategoryEvent): SendingResult => Interpretation[Unit] = {
+  private def handleResult(subscriber: SubscriberUrl, event: CategoryEvent): SendingResult => F[Unit] = {
     case result @ Delivered =>
-      logger.info(show"$categoryName: $event, $subscriber -> $result")
+      Logger[F].info(show"$categoryName: $event, subscriber = $subscriber -> $result")
       eventDelivery.registerSending(event, subscriber) recoverWith logError(event, subscriber)
     case TemporarilyUnavailable =>
       (markBusy(subscriber) recover withNothing) >> (returnToQueue(event) recoverWith logError(event))
     case result @ Misdelivered =>
-      logger.error(show"$categoryName: $event, $subscriber -> $result")
+      Logger[F].error(show"$categoryName: $event, subscriber = $subscriber -> $result")
       (delete(subscriber) recover withNothing) >> (returnToQueue(event) recoverWith logError(event))
   }
 
   private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }
 
-  private def logError(event:         CategoryEvent,
-                       subscriberUrl: SubscriberUrl
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"$categoryName: registering sending $event to $subscriberUrl failed")
+  private def logError(event: CategoryEvent, subscriberUrl: SubscriberUrl): PartialFunction[Throwable, F[Unit]] = {
+    case NonFatal(exception) =>
+      Logger[F].error(exception)(s"$categoryName: registering sending $event to $subscriberUrl failed")
   }
 
-  private def logError(event: CategoryEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"$categoryName: $event -> returning an event to the queue failed")
+  private def logError(event: CategoryEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    Logger[F].error(exception)(s"$categoryName: $event -> returning an event to the queue failed")
   }
 
-  private lazy val logError: PartialFunction[Throwable, Interpretation[Option[CategoryEvent]]] = {
-    case NonFatal(exception) =>
-      for {
-        _ <- logger.error(exception)(s"$categoryName: finding events to dispatch failed")
-        _ <- Timer[Interpretation] sleep onErrorSleep
-      } yield Option.empty[CategoryEvent]
+  private lazy val logError: PartialFunction[Throwable, F[Option[CategoryEvent]]] = { case NonFatal(exception) =>
+    for {
+      _ <- Logger[F].error(exception)(s"$categoryName: finding events to dispatch failed")
+      _ <- Temporal[F] sleep onErrorSleep
+    } yield Option.empty[CategoryEvent]
   }
 }
 
-private object IOEventsDistributor {
+private object EventsDistributor {
   private val NoEventSleep: FiniteDuration = 1 seconds
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
-  def apply[CategoryEvent](
-      categoryName:         CategoryName,
-      subscribers:          Subscribers[IO],
-      eventsFinder:         EventFinder[IO, CategoryEvent],
-      eventDelivery:        EventDelivery[IO, CategoryEvent],
-      categoryEventEncoder: EventEncoder[CategoryEvent],
-      dispatchRecovery:     DispatchRecovery[IO, CategoryEvent],
-      logger:               Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      show:             Show[CategoryEvent]
-  ): IO[EventsDistributor[IO]] =
-    for {
-      eventsSender <- IOEventsSender[CategoryEvent](categoryName, categoryEventEncoder, logger)
-    } yield new EventsDistributorImpl(categoryName,
-                                      subscribers,
-                                      eventsFinder,
-                                      eventsSender,
-                                      eventDelivery,
-                                      dispatchRecovery,
-                                      logger,
-                                      noEventSleep = NoEventSleep,
-                                      onErrorSleep = OnErrorSleep
-    )
+  def apply[F[_]: Async: Logger, CategoryEvent](
+      categoryName:             CategoryName,
+      subscribers:              Subscribers[F],
+      eventsFinder:             EventFinder[F, CategoryEvent],
+      eventDelivery:            EventDelivery[F, CategoryEvent],
+      categoryEventEncoder:     EventEncoder[CategoryEvent],
+      dispatchRecovery:         DispatchRecovery[F, CategoryEvent]
+  )(implicit showCategoryEvent: Show[CategoryEvent]): F[EventsDistributor[F]] = for {
+    eventsSender <- EventsSender[F, CategoryEvent](categoryName, categoryEventEncoder)
+  } yield new EventsDistributorImpl(categoryName,
+                                    subscribers,
+                                    eventsFinder,
+                                    eventsSender,
+                                    eventDelivery,
+                                    dispatchRecovery,
+                                    noEventSleep = NoEventSleep,
+                                    onErrorSleep = OnErrorSleep
+  )
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,10 +20,9 @@ package io.renku.eventlog.subscriptions.commitsync
 
 import cats.Show
 import cats.implicits.{showInterpolator, toShow}
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import io.renku.eventlog.subscriptions.EventEncoder
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{CompoundEventId, LastSyncedDate}
+import io.renku.graph.model.projects
 
 private sealed trait CommitSyncEvent
 
@@ -41,7 +40,9 @@ private final case class FullCommitSyncEvent(id:             CompoundEventId,
 
 private object FullCommitSyncEvent {
   implicit lazy val show: Show[FullCommitSyncEvent] =
-    Show.show(event => show"CommitSyncEvent ${event.id}, ${event.projectPath}, ${event.lastSyncedDate}")
+    Show.show(event =>
+      show"CommitSyncEvent ${event.id}, projectPath = ${event.projectPath}, lastSynced = ${event.lastSyncedDate}"
+    )
 }
 
 private final case class MinimalCommitSyncEvent(project: Project) extends CommitSyncEvent
@@ -50,12 +51,12 @@ private object MinimalCommitSyncEvent {
   implicit lazy val show: Show[MinimalCommitSyncEvent] = Show.show(event => show"CommitSyncEvent ${event.project}")
 }
 
-private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {
+private object CommitSyncEventEncoder {
 
   import io.circe.Json
   import io.circe.literal._
 
-  override def encodeEvent(event: CommitSyncEvent): Json = event match {
+  def encodeEvent(event: CommitSyncEvent): Json = event match {
     case FullCommitSyncEvent(eventId, projectPath, lastSyncedDate) => json"""{
         "categoryName": ${categoryName.value},
         "id":           ${eventId.id.value},
@@ -65,7 +66,7 @@ private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {
         },
         "lastSynced":   ${lastSyncedDate.value}
       }"""
-    case MinimalCommitSyncEvent(Project(projectId, projectPath))   => json"""{
+    case MinimalCommitSyncEvent(Project(projectId, projectPath)) => json"""{
         "categoryName": ${categoryName.value},
         "project": {
           "id":         ${projectId.value},
@@ -73,6 +74,4 @@ private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {
         }
       }"""
   }
-
-  override def encodePayload(event: CommitSyncEvent): Option[String] = None
 }

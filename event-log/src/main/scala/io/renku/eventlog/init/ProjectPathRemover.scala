@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,40 +19,37 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait ProjectPathRemover[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait ProjectPathRemover[F[_]] {
+  def run(): F[Unit]
 }
 
 private object ProjectPathRemover {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
-  ): ProjectPathRemover[Interpretation] =
-    new ProjectPathRemoverImpl(sessionResource, logger)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): ProjectPathRemover[F] = new ProjectPathRemoverImpl(sessionResource)
 }
 
-private class ProjectPathRemoverImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
-) extends ProjectPathRemover[Interpretation]
+private class ProjectPathRemoverImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends ProjectPathRemover[F]
     with EventTableCheck {
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     whenEventTableExists(
-      Kleisli.liftF(logger info "'project_path' column dropping skipped"),
+      Kleisli.liftF(Logger[F] info "'project_path' column dropping skipped"),
       otherwise = checkColumnExists >>= {
         case false =>
-          Kleisli.liftF[Interpretation, Session[Interpretation], Unit](
-            logger info "'project_path' column already removed"
+          Kleisli.liftF[F, Session[F], Unit](
+            Logger[F] info "'project_path' column already removed"
           )
         case true => removeColumn()
       }
@@ -61,17 +58,15 @@ private class ProjectPathRemoverImpl[Interpretation[_]: BracketThrow](
 
   private lazy val checkColumnExists = {
     val query: Query[Void, String] = sql"select project_path from event_log limit 1".query(varchar)
-    Kleisli[Interpretation, Session[Interpretation], Boolean] {
+    Kleisli[F, Session[F], Boolean] {
       _.option(query)
         .map(_ => true)
         .recover { case _ => false }
     }
   }
 
-  private def removeColumn(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(sql"ALTER TABLE event_log DROP COLUMN IF EXISTS project_path".command)
-      _ <- Kleisli.liftF(logger info "'project_path' column removed")
-    } yield ()
-
+  private def removeColumn(): Kleisli[F, Session[F], Unit] = for {
+    _ <- execute(sql"ALTER TABLE event_log DROP COLUMN IF EXISTS project_path".command)
+    _ <- Kleisli.liftF(Logger[F] info "'project_path' column removed")
+  } yield ()
 }

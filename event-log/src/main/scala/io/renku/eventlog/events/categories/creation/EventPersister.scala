@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,53 +18,56 @@
 
 package io.renku.eventlog.events.categories.creation
 
-import cats.Applicative
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{BracketThrow, IO}
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
+import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.eventlog._
+import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.categories.creation.EventPersister.Result
 import io.renku.eventlog.events.categories.creation.EventPersister.Result._
-import io.renku.eventlog._
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events._
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import skunk._
 import skunk.implicits._
 
 import java.time.Instant
 
-trait EventPersister[Interpretation[_]] {
-  def storeNewEvent(event: Event): Interpretation[Result]
+private trait EventPersister[F[_]] {
+  def storeNewEvent(event: Event): F[Result]
 }
 
-class EventPersisterImpl[Interpretation[_]: BracketThrow](
-    sessionResource:    SessionResource[Interpretation, EventLogDB],
-    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
-    queriesExecTimes:   LabeledHistogram[Interpretation, SqlStatement.Name],
+private class EventPersisterImpl[F[_]: MonadCancelThrow](
+    sessionResource:    SessionResource[F, EventLogDB],
+    waitingEventsGauge: LabeledGauge[F, projects.Path],
+    queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name],
     now:                () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with EventPersister[Interpretation] {
+    with EventPersister[F] {
 
+  private val applicative = Applicative[F]
+  import applicative._
   import io.renku.eventlog.TypeSerializers._
 
-  override def storeNewEvent(event: Event): Interpretation[Result] = sessionResource.useWithTransactionK[Result] {
+  override def storeNewEvent(event: Event): F[Result] = sessionResource.useWithTransactionK[Result] {
     Kleisli { case (transaction, session) =>
       for {
         sp <- transaction.savepoint
         result <- insertIfNotDuplicate(event)(session) recoverWith { case error =>
-                    transaction.rollback(sp) >> error.raiseError[Interpretation, Result]
+                    transaction.rollback(sp) >> error.raiseError[F, Result]
                   }
-        _ <-
-          Applicative[Interpretation].whenA(result == Created && event.status == New)(
-            waitingEventsGauge.increment(event.project.path)
-          )
-
+        _ <- whenA(aNewEventIsCreated(result))(waitingEventsGauge.increment(event.project.path))
       } yield result
     }
+  }
+
+  private lazy val aNewEventIsCreated: Result => Boolean = {
+    case Created(event) if event.status == New => true
+    case _                                     => false
   }
 
   private def insertIfNotDuplicate(event: Event) =
@@ -73,16 +76,38 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
       case false => persist(event)
     }
 
-  private def persist(event: Event): Kleisli[Interpretation, Session[Interpretation], Result] =
-    for {
-      updatedCommitEvent <- eventuallyAddToExistingBatch(event)
-      _                  <- upsertProject(updatedCommitEvent)
-      _                  <- insert(updatedCommitEvent)
-    } yield Created
+  private def persist(event: Event): Kleisli[F, Session[F], Result] = for {
+    updatedCommitEvent <- eventuallyAddToExistingBatch(event) >>= eventuallyUpdateStatus
+    _                  <- upsertProject(updatedCommitEvent)
+    _                  <- insert(updatedCommitEvent)
+  } yield Created(updatedCommitEvent)
 
   private def eventuallyAddToExistingBatch(event: Event) =
     findBatchInQueue(event)
       .map(_.map(event.withBatchDate).getOrElse(event))
+
+  private lazy val eventuallyUpdateStatus: Event => Kleisli[F, Session[F], Event] = {
+    case event: NewEvent =>
+      findNewerEventStatus(event).map {
+        case Some(newerStatus) => event.copy(status = newerStatus)
+        case None              => event
+      }
+    case event => Kleisli.pure(event)
+  }
+
+  private def findNewerEventStatus(event: Event) = measureExecutionTime(
+    SqlStatement(name = "new - find newer event status")
+      .select[projects.Id ~ EventStatus ~ EventDate, EventStatus](
+        sql"""SELECT status
+              FROM event
+              WHERE project_id = $projectIdEncoder AND status = $eventStatusEncoder
+                    AND event_date >= $eventDateEncoder
+              LIMIT 1
+          """.query(eventStatusDecoder)
+      )
+      .arguments(event.project.id ~ TriplesStore ~ event.date)
+      .build(_.option)
+  )
 
   private def checkIfPersisted(event: Event) = measureExecutionTime(
     SqlStatement(name = "new - check existence")
@@ -114,9 +139,9 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
       .build(_.option)
   )
 
-  private lazy val insert: Event => Kleisli[Interpretation, Session[Interpretation], Unit] = {
-    case NewEvent(id, project, date, batchDate, body) =>
-      val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply _)(now())
+  private lazy val insert: Event => Kleisli[F, Session[F], Unit] = {
+    case NewEvent(id, project, date, batchDate, body, status) =>
+      val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply)(now())
       measureExecutionTime(
         SqlStatement(name = "new - create (NEW)")
           .command[
@@ -126,12 +151,12 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
                 VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
               """.command
           )
-          .arguments(id ~ project.id ~ New ~ createdDate ~ executionDate ~ date ~ batchDate ~ body)
+          .arguments(id ~ project.id ~ status ~ createdDate ~ executionDate ~ date ~ batchDate ~ body)
           .build
           .void
       )
     case SkippedEvent(id, project, date, batchDate, body, message) =>
-      val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply _)(now())
+      val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply)(now())
       measureExecutionTime(
         SqlStatement(name = "new - create (SKIPPED)")
           .command[
@@ -170,23 +195,18 @@ class EventPersisterImpl[Interpretation[_]: BracketThrow](
     s"status IN (${NonEmptyList.of(status, otherStatuses: _*).map(el => s"'$el'").toList.mkString(",")})"
 }
 
-object EventPersister {
+private object EventPersister {
+  def apply[F[_]: MonadCancelThrow](
+      sessionResource:    SessionResource[F, EventLogDB],
+      waitingEventsGauge: LabeledGauge[F, projects.Path],
+      queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventPersisterImpl[F]] = MonadThrow[F].catchNonFatal {
+    new EventPersisterImpl[F](sessionResource, waitingEventsGauge, queriesExecTimes)
+  }
 
   sealed trait Result extends Product with Serializable
-
   object Result {
-    case object Created extends Result
-
-    case object Existed extends Result
-  }
-}
-
-object IOEventPersister {
-  def apply(
-      sessionResource:    SessionResource[IO, EventLogDB],
-      waitingEventsGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:   LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventPersisterImpl[IO]] = IO {
-    new EventPersisterImpl[IO](sessionResource, waitingEventsGauge, queriesExecTimes)
+    case class Created(event: Event) extends Result
+    case object Existed              extends Result
   }
 }

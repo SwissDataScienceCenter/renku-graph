@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
-import ch.datascience.generators.Generators.Implicits._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.globalcommitsync.Generators.globalCommitSyncEvents
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -37,15 +37,11 @@ class GlobalCommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers 
           "id":         ${event.project.id.value},
           "path":       ${event.project.path.value}
         },
-        "commits":      ${event.commits.map(_.value)}
+        "commits": {
+          "count":  ${event.commits.count.value},
+          "latest": ${event.commits.latest.value}
+        }
       }"""
-    }
-
-  }
-
-  "encodePayload" should {
-    "return None" in {
-      GlobalCommitSyncEventEncoder.encodePayload(globalCommitSyncEvents.generateOne) shouldBe None
     }
   }
 }

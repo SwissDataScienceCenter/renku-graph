@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,10 +18,10 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
-import ch.datascience.generators.Generators.Implicits._
+import cats.implicits.toShow
+import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import cats.implicits.toShow
 
 class TriplesGeneratedEventSpec extends AnyWordSpec with should.Matchers {
 

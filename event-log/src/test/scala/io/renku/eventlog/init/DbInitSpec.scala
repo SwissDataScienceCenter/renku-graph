@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,15 +21,16 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.syntax.all._
 import io.renku.eventlog.InMemoryEventLogDb
+import io.renku.testtools.IOSpec
 import org.scalatest.{BeforeAndAfter, Suite}
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
 import scala.language.reflectiveCalls
 
 trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with BeforeAndAfter {
-  self: Suite =>
+  self: Suite with IOSpec =>
 
   protected val migrationsToRun: List[Migration]
 

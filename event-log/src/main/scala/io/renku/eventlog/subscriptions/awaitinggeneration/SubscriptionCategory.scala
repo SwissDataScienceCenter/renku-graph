@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,63 +18,54 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import org.typelevel.log4cats.Logger
+import cats.Parallel
+import cats.effect._
+import cats.syntax.all._
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.awaitinggeneration.AwaitingGenerationEventEncoder.{encodeEvent, encodePayload}
 import io.renku.eventlog.{EventLogDB, subscriptions}
-
-import scala.concurrent.ExecutionContext
+import io.renku.graph.model.events.CategoryName
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
   val name: CategoryName = CategoryName("AWAITING_GENERATION")
 
-  def apply(
-      sessionResource:                SessionResource[IO, EventLogDB],
-      awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:               LabeledHistogram[IO, SqlStatement.Name],
-      subscriberTracker:              SubscriberTracker[IO],
-      logger:                         Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers <- Subscribers(name, subscriberTracker, logger)
-    eventFetcher <- IOAwaitingGenerationEventFinder(sessionResource,
-                                                    subscribers,
-                                                    awaitingTriplesGenerationGauge,
-                                                    underTriplesGenerationGauge,
-                                                    queriesExecTimes
+  def apply[F[_]: Async: Parallel: Logger](
+      sessionResource:                SessionResource[F, EventLogDB],
+      awaitingTriplesGenerationGauge: LabeledGauge[F, projects.Path],
+      underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],
+      queriesExecTimes:               LabeledHistogram[F, SqlStatement.Name],
+      subscriberTracker:              SubscriberTracker[F]
+  ): F[subscriptions.SubscriptionCategory[F]] = for {
+    subscribers <- Subscribers(name, subscriberTracker)
+    eventFetcher <- AwaitingGenerationEventFinder(sessionResource,
+                                                  subscribers,
+                                                  awaitingTriplesGenerationGauge,
+                                                  underTriplesGenerationGauge,
+                                                  queriesExecTimes
                     )
-    dispatchRecovery <- DispatchRecovery(sessionResource,
-                                         awaitingTriplesGenerationGauge,
-                                         underTriplesGenerationGauge,
-                                         queriesExecTimes,
-                                         logger
-                        )
-    eventDelivery <- EventDelivery[AwaitingGenerationEvent](sessionResource,
-                                                            compoundEventIdExtractor = (_: AwaitingGenerationEvent).id,
-                                                            queriesExecTimes
+    dispatchRecovery <- DispatchRecovery[F]
+    eventDelivery <- EventDelivery[F, AwaitingGenerationEvent](sessionResource,
+                                                               compoundEventIdExtractor =
+                                                                 (_: AwaitingGenerationEvent).id,
+                                                               queriesExecTimes
                      )
-    eventsDistributor <- IOEventsDistributor(name,
-                                             subscribers,
-                                             eventFetcher,
-                                             eventDelivery,
-                                             AwaitingGenerationEventEncoder,
-                                             dispatchRecovery,
-                                             logger
+    eventsDistributor <- EventsDistributor(name,
+                                           subscribers,
+                                           eventFetcher,
+                                           eventDelivery,
+                                           EventEncoder(encodeEvent, encodePayload),
+                                           dispatchRecovery
                          )
     deserializer <-
-      SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
-  } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](name,
-                                                                        subscribers,
-                                                                        eventsDistributor,
-                                                                        deserializer
+      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
+  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](name,
+                                                                       subscribers,
+                                                                       eventsDistributor,
+                                                                       deserializer
   )
 }

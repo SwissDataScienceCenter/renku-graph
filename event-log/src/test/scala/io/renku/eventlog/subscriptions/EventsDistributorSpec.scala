@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,17 +18,18 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.{IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
 import io.renku.eventlog.subscriptions.Generators._
 import io.renku.eventlog.subscriptions.TestCategoryEvent._
+import io.renku.events.consumers.subscriptions._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
@@ -36,11 +37,9 @@ import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.lang.Thread.sleep
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
-class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
+class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory with Eventually with should.Matchers {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(5, Seconds)),
@@ -73,12 +72,12 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      distributor.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered"),
-          Info(s"$categoryName: $otherEvent, url = $otherSubscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered"),
+          Info(s"$categoryName: $otherEvent, subscriber = $otherSubscriber -> $Delivered")
         )
       }
     }
@@ -107,11 +106,11 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
           givenNoMoreEvents()
         }
 
-        distributor.run().unsafeRunAsyncAndForget()
+        distributor.run().unsafeRunAndForget()
 
         eventually {
           logger.loggedOnly(
-            Info(s"$categoryName: $event, url = $otherSubscriber -> $Delivered")
+            Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
           )
         }
       }
@@ -150,13 +149,13 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
         sleep(500)
 
-        distributor.run().unsafeRunAsyncAndForget()
+        distributor.run().unsafeRunAndForget()
 
         eventually {
           logger.loggedOnly(
-            Error(s"$categoryName: $event, url = $subscriber -> $Misdelivered"),
-            Error(s"$categoryName: $event, url = $otherSubscriber -> $Misdelivered"),
-            Info(s"$categoryName: $event, url = $yetAnotherSubscriber -> $Delivered")
+            Error(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+            Error(s"$categoryName: $event, subscriber = $otherSubscriber -> $Misdelivered"),
+            Info(s"$categoryName: $event, subscriber = $yetAnotherSubscriber -> $Delivered")
           )
         }
       }
@@ -191,11 +190,11 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
           givenNoMoreEvents()
         }
 
-        distributor.run().unsafeRunAsyncAndForget()
+        distributor.run().unsafeRunAndForget()
 
         eventually {
           logger.loggedOnly(
-            Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
+            Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered")
           )
         }
       }
@@ -220,12 +219,12 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      distributor.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
           Error(s"$categoryName: executing event distribution on a subscriber failed", exception),
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered")
         )
       }
     }
@@ -252,12 +251,12 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      distributor.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
           Error(s"$categoryName: finding events to dispatch failed", exception),
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered")
         )
       }
     }
@@ -287,13 +286,13 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      distributor.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered"),
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered"),
           Error(s"$categoryName: registering sending $event to $subscriber failed", exception),
-          Info(s"$categoryName: $otherEvent, url = $subscriber -> $Delivered")
+          Info(s"$categoryName: $otherEvent, subscriber = $subscriber -> $Delivered")
         )
       }
     }
@@ -323,11 +322,11 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      distributor.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
-          Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Delivered")
         )
       }
     }
@@ -358,12 +357,12 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      distributor.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
-          Error(s"$categoryName: $event, url = $subscriber -> $Misdelivered"),
-          Info(s"$categoryName: $event, url = $otherSubscriber -> $Delivered")
+          Error(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+          Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
         )
       }
     }
@@ -392,19 +391,17 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      distributor.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAndForget()
 
       eventually {
         logger.loggedOnly(
-          Error(s"$categoryName: $event, url = $subscriber -> $Misdelivered"),
+          Error(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
           Error(s"$categoryName: $event -> returning an event to the queue failed", backToTheQueueException),
-          Info(s"$categoryName: $event, url = $otherSubscriber -> $Delivered")
+          Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
         )
       }
     }
   }
-
-  private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
 
@@ -414,7 +411,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
     val eventsSender             = mock[EventsSender[IO, TestCategoryEvent]]
     val eventDelivery            = mock[EventDelivery[IO, TestCategoryEvent]]
     private val dispatchRecovery = mock[DispatchRecovery[IO, TestCategoryEvent]]
-    val logger                   = TestLogger[IO]()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val distributor = new EventsDistributorImpl[IO, TestCategoryEvent](
       categoryName,
       subscribers,
@@ -422,7 +419,6 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       eventsSender,
       eventDelivery,
       dispatchRecovery,
-      logger,
       noEventSleep = 250 millis,
       onErrorSleep = 250 millis
     )
@@ -433,7 +429,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
                                     event:      TestCategoryEvent,
                                     returning: PartialFunction[Throwable, IO[Unit]] =
                                       new PartialFunction[Throwable, IO[Unit]] {
-                                        override def isDefinedAt(x:   Throwable) = true
+                                        override def isDefinedAt(x: Throwable)   = true
                                         override def apply(throwable: Throwable) = dispatchRecoveryStrategy(throwable)
                                       }
     ) = (dispatchRecovery.recover _)

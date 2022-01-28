@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,43 +18,37 @@
 
 package io.renku.eventlog.subscriptions.commitsync
 
-import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.metrics.LabeledHistogram
-import org.typelevel.log4cats.Logger
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.commitsync.CommitSyncEventEncoder.encodeEvent
 import io.renku.eventlog.{EventLogDB, subscriptions}
-
-import scala.concurrent.ExecutionContext
+import io.renku.metrics.LabeledHistogram
+import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply(sessionResource:   SessionResource[IO, EventLogDB],
-            queriesExecTimes:  LabeledHistogram[IO, SqlStatement.Name],
-            subscriberTracker: SubscriberTracker[IO],
-            logger:            Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers      <- Subscribers(categoryName, subscriberTracker, logger)
+  def apply[F[_]: Async: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                 queriesExecTimes:  LabeledHistogram[F, SqlStatement.Name],
+                                 subscriberTracker: SubscriberTracker[F]
+  ): F[subscriptions.SubscriptionCategory[F]] = for {
+    subscribers      <- Subscribers(categoryName, subscriberTracker)
     eventsFinder     <- CommitSyncEventFinder(sessionResource, queriesExecTimes)
-    dispatchRecovery <- LoggingDispatchRecovery[IO, CommitSyncEvent](categoryName, logger)
-    eventDelivery    <- EventDelivery.noOp[IO, CommitSyncEvent]
-    eventsDistributor <- IOEventsDistributor(categoryName,
-                                             subscribers,
-                                             eventsFinder,
-                                             eventDelivery,
-                                             CommitSyncEventEncoder,
-                                             dispatchRecovery,
-                                             logger
+    dispatchRecovery <- LoggingDispatchRecovery[F, CommitSyncEvent](categoryName)
+    eventDelivery    <- EventDelivery.noOp[F, CommitSyncEvent]
+    eventsDistributor <- EventsDistributor(categoryName,
+                                           subscribers,
+                                           eventsFinder,
+                                           eventDelivery,
+                                           EventEncoder(encodeEvent),
+                                           dispatchRecovery
                          )
     deserializer <-
-      SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
-  } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](categoryName,
-                                                                        subscribers,
-                                                                        eventsDistributor,
-                                                                        deserializer
+      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
+  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](categoryName,
+                                                                       subscribers,
+                                                                       eventsDistributor,
+                                                                       deserializer
   )
 }

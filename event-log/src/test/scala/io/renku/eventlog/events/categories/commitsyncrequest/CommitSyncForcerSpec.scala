@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,15 +18,16 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,6 +36,7 @@ import java.time.Instant
 
 class CommitSyncForcerSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with SubscriptionDataProvisioning
     with MockFactory
@@ -78,7 +80,7 @@ class CommitSyncForcerSpec
         forcer.forceCommitSync(projectId, projectPath).unsafeRunSync() shouldBe ()
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findProjects                                     shouldBe List((projectId, projectPath, EventDate(Instant.EPOCH)))
+        findProjects shouldBe List((projectId, projectPath, EventDate(Instant.EPOCH)))
 
         queriesExecTimes.verifyExecutionTimeMeasured("commit_sync_request - delete last_synced")
         queriesExecTimes.verifyExecutionTimeMeasured("commit_sync_request - insert project")
@@ -99,7 +101,7 @@ class CommitSyncForcerSpec
         forcer.forceCommitSync(projectId, projectPath).unsafeRunSync() shouldBe ()
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe None
-        findProjects.map(proj => proj._1 -> proj._2) shouldBe List(projectId -> projectPath)
+        findProjects.map(proj => proj._1 -> proj._2)     shouldBe List(projectId -> projectPath)
 
         queriesExecTimes.verifyExecutionTimeMeasured("commit_sync_request - delete last_synced")
       }

@@ -1,7 +1,7 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
 
-FROM openjdk:14-jdk-alpine as builder
+FROM openjdk:15-jdk-alpine as builder
 
 WORKDIR /work
 
@@ -15,7 +15,7 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositor
     sbt "project webhook-service" stage  && \
     apk del .build-dependencies
 
-FROM openjdk:14-jdk-alpine
+FROM openjdk:15-jdk-alpine
 
 WORKDIR /opt/webhook-service
 
@@ -25,8 +25,15 @@ COPY --from=builder /work/webhook-service/target/universal/stage .
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
-RUN apk add --no-cache tzdata curl bash && \
+RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
-ENTRYPOINT ["bin/webhook-service"]
-CMD []
+ENV GID=90010
+RUN addgroup -g "$GID" -S wsgroup && \
+    adduser --disabled-password -g "$GID" -D -u 9001 wsuser && \
+    chmod 555 -R /opt/webhook-service
+
+USER wsuser
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["bin/webhook-service"]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,23 +20,23 @@ package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.Show
 import cats.syntax.all._
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
-import ch.datascience.graph.model.projects
-import io.renku.eventlog.subscriptions.EventEncoder
+import io.renku.graph.model.events.{CompoundEventId, EventBody}
+import io.renku.graph.model.projects
 
 private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody)
 
 private object AwaitingGenerationEvent {
   implicit lazy val show: Show[AwaitingGenerationEvent] =
-    Show.show(event => show"AwaitingGenerationEvent ${event.id}, ${event.projectPath}")
+    Show.show(event => show"AwaitingGenerationEvent ${event.id}, projectPath = ${event.projectPath}")
 }
 
-private object AwaitingGenerationEventEncoder extends EventEncoder[AwaitingGenerationEvent] {
+private object AwaitingGenerationEventEncoder {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def encodeEvent(event: AwaitingGenerationEvent): Json = json"""{
+  def encodeEvent(event: AwaitingGenerationEvent): Json =
+    json"""{
     "categoryName": ${SubscriptionCategory.name.value},
     "id":           ${event.id.id.value},
     "project": {
@@ -44,6 +44,6 @@ private object AwaitingGenerationEventEncoder extends EventEncoder[AwaitingGener
     }
   }"""
 
-  override def encodePayload(event: AwaitingGenerationEvent): Option[String] =
-    event.body.value.some
+  def encodePayload(event: AwaitingGenerationEvent): String =
+    event.body.value
 }

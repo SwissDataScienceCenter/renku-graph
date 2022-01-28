@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,43 +19,43 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
-import ch.datascience.db.SessionResource
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
+import cats.effect.MonadCancelThrow
+import io.renku.db.SessionResource
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus.GenerationRecoverableFailure
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait EventLogTableCreator[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait EventLogTableCreator[F[_]] {
+  def run(): F[Unit]
 }
 
 private object EventLogTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
-  ): EventLogTableCreator[Interpretation] =
-    new EventLogTableCreatorImpl(sessionResource, logger)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): EventLogTableCreator[F] =
+    new EventLogTableCreatorImpl(sessionResource)
 }
 
-private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
-) extends EventLogTableCreator[Interpretation]
+private class EventLogTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends EventLogTableCreator[F]
     with EventTableCheck
     with TypeSerializers {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     whenEventTableExists(
-      Kleisli.liftF(logger info "'event_log' table creation skipped"),
+      Kleisli.liftF(Logger[F] info "'event_log' table creation skipped"),
       otherwise = checkTableExists flatMap {
         case true =>
-          Kleisli.liftF[Interpretation, Session[Interpretation], Unit](logger info "'event_log' table exists")
+          Kleisli.liftF[F, Session[F], Unit](
+            Logger[F] info "'event_log' table exists"
+          )
         case false => createTable
       }
     )
@@ -64,10 +64,10 @@ private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow](
   private lazy val checkTableExists = {
     val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
       .query(bool)
-    Kleisli[Interpretation, Session[Interpretation], Boolean](_.unique(query).recover { case _ => false })
+    Kleisli[F, Session[F], Boolean](_.unique(query).recover { case _ => false })
   }
 
-  private lazy val createTable: Kleisli[Interpretation, Session[Interpretation], Unit] =
+  private lazy val createTable: Kleisli[F, Session[F], Unit] =
     for {
       _ <- execute(createTableSql)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)".command)
@@ -77,7 +77,7 @@ private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow](
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)".command)
       _ <- revertStatusToGenerationRecoverableFailure
-      _ <- Kleisli.liftF(logger info "'event_log' table created")
+      _ <- Kleisli.liftF(Logger[F] info "'event_log' table created")
     } yield ()
 
   private lazy val createTableSql: Command[Void] =
@@ -98,9 +98,8 @@ private class EventLogTableCreatorImpl[Interpretation[_]: BracketThrow](
   private lazy val revertStatusToGenerationRecoverableFailure = {
     val query: Command[EventStatus] =
       sql"UPDATE event_log set status=$eventStatusEncoder where status='TRIPLES_STORE_FAILURE'".command
-    Kleisli[Interpretation, Session[Interpretation], Unit] {
+    Kleisli[F, Session[F], Unit] {
       _.prepare(query).use(_.execute(GenerationRecoverableFailure).void)
     }
   }
-
 }

@@ -63,8 +63,6 @@ spec:
                 secretKeyRef:
                   name: {{ template "jena.fullname" . }}
                   key: jena-renku-password
-            - name: RENKU_LOG_TIMEOUT
-              value: "{{ .Values.triplesGenerator.renkuLogTimeout }}"
             - name: RENKU_DISABLE_VERSION_CHECK
               value: "true"
             - name: RE_PROVISIONING_REMOVAL_BATCH_SIZE
@@ -83,8 +81,6 @@ spec:
               value: "{{ .Values.triplesGenerator.generationProcessesNumber }}"
             - name: TRANSFORMATION_PROCESSES_NUMBER
               value: "{{ .Values.triplesGenerator.transformationProcessesNumber }}"
-            - name: THREADS_NUMBER
-              value: "{{ .Values.triplesGenerator.threadsNumber }}"
             - name: JAVA_OPTS
               value: -Xmx{{ .Values.triplesGenerator.jvmXmx }} -XX:+UseG1GC
             - name: RENKU_PYTHON_DEV_VERSION
@@ -97,7 +93,8 @@ spec:
             httpGet:
               path: /ping
               port: http-triples-gn
-            periodSeconds: 10
+            timeoutSeconds: 60
+            periodSeconds: 60
             successThreshold: 1
             failureThreshold: 10
             {{- if .Values.triplesGenerator.renkuPythonDevVersion }}

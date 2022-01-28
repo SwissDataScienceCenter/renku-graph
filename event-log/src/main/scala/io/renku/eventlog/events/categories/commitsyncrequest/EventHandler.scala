@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,50 +18,45 @@
 
 package io.renku.eventlog.events.categories.commitsyncrequest
 
-import cats.MonadThrow
+import cats.Show
 import cats.data.EitherT.fromEither
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.Concurrent
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers
-import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventRequestContent, EventSchedulingResult}
-import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.metrics.LabeledHistogram
 import io.circe.Decoder
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers._
+import io.renku.events.{EventRequestContent, consumers}
+import io.renku.graph.model.events.CategoryName
+import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
-import scala.concurrent.ExecutionContext
-
-private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurrent](
+private class EventHandler[F[_]: Concurrent: Logger](
     override val categoryName: CategoryName,
-    commitSyncForcer:          CommitSyncForcer[Interpretation],
-    logger:                    Logger[Interpretation]
-) extends consumers.EventHandlerWithProcessLimiter[Interpretation](ConcurrentProcessesLimiter.withoutLimit) {
+    commitSyncForcer:          CommitSyncForcer[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
-  import ch.datascience.graph.model.projects
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import commitSyncForcer._
+  import io.renku.graph.model.projects
+  import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  override def createHandlingProcess(
-      request: EventRequestContent
-  ): Interpretation[EventHandlingProcess[Interpretation]] =
-    EventHandlingProcess[Interpretation](startForceCommitSync(request))
+  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
+    EventHandlingProcess[F](startForceCommitSync(request))
 
   private def startForceCommitSync(request: EventRequestContent) = for {
     event <-
-      fromEither[Interpretation](
+      fromEither[F](
         request.event.as[(projects.Id, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
       )
     result <- forceCommitSync(event._1, event._2).toRightT
                 .map(_ => Accepted)
-                .semiflatTap(logger.log(event))
-                .leftSemiflatTap(logger.log(event))
+                .semiflatTap(Logger[F].log(event))
+                .leftSemiflatTap(Logger[F].log(event))
   } yield result
 
-  private implicit lazy val eventInfoToString: ((projects.Id, projects.Path)) => String = {
-    case (projectId, projectPath) => s"projectId = $projectId, projectPath = $projectPath"
+  private implicit lazy val eventInfoToString: Show[(projects.Id, projects.Path)] = Show.show {
+    case (projectId, projectPath) => show"projectId = $projectId, projectPath = $projectPath"
   }
 
   private implicit val eventDecoder: Decoder[(projects.Id, projects.Path)] = { cursor =>
@@ -73,14 +68,9 @@ private class EventHandler[Interpretation[_]: MonadThrow: ContextShift: Concurre
 }
 
 private object EventHandler {
-  def apply(sessionResource:  SessionResource[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name],
-            logger:           Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[EventHandler[IO]] = for {
+  def apply[F[_]: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventHandler[F]] = for {
     commitSyncForcer <- CommitSyncForcer(sessionResource, queriesExecTimes)
-  } yield new EventHandler[IO](categoryName, commitSyncForcer, logger)
+  } yield new EventHandler[F](categoryName, commitSyncForcer)
 }

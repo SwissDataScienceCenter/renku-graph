@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,33 +21,38 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{CreatedDate, Event, EventDate, ExecutionDate}
+import io.renku.eventlog.init.Generators.events
+import io.renku.eventlog.init.model.Event
+import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.graph.model.projects.Path
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
 class ProjectPathAdderSpec
     extends AnyWordSpec
+    with IOSpec
     with DbInitSpec
     with should.Matchers
     with Eventually
     with IntegrationPatience {
 
-  protected override lazy val migrationsToRun: List[Migration] = List(
-    eventLogTableCreator
-  )
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: ProjectPathAdderImpl[_] => false
+    case _ => true
+  }
 
   "run" should {
 
@@ -81,9 +86,9 @@ class ProjectPathAdderSpec
 
       checkColumnExists shouldBe false
 
-      val event1 = newOrSkippedEvents.generateOne
+      val event1 = events.generateOne
       storeEvent(event1)
-      val event2 = newOrSkippedEvents.generateOne
+      val event2 = events.generateOne
       storeEvent(event2)
 
       projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
@@ -99,8 +104,8 @@ class ProjectPathAdderSpec
   }
 
   private trait TestCase {
-    val logger           = TestLogger[IO]()
-    val projectPathAdder = new ProjectPathAdderImpl[IO](sessionResource, logger)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val projectPathAdder = new ProjectPathAdderImpl[IO](sessionResource)
   }
 
   private def checkColumnExists: Boolean = sessionResource
@@ -140,7 +145,7 @@ class ProjectPathAdderSpec
             )
           )
         )
-        .map(_ => ())
+        .void
     }
   }
 

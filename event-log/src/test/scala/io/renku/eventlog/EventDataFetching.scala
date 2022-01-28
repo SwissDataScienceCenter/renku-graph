@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,8 +19,8 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
+import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.projects
 import skunk._
 import skunk.implicits._
 
@@ -45,20 +45,19 @@ trait EventDataFetching {
       }
     }
 
-  protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, EventPayload)] =
-    execute {
-      Kleisli { session =>
-        val query: Query[EventId ~ projects.Id, (CompoundEventId, EventPayload)] =
-          sql"""SELECT event_id, project_id, payload
-                FROM event_payload
-                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;"""
-            .query(eventIdDecoder ~ projectIdDecoder ~ eventPayloadDecoder)
-            .map { case eventId ~ projectId ~ eventPayload =>
-              (CompoundEventId(eventId, projectId), eventPayload)
-            }
-        session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
-      }
+  protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, ZippedEventPayload)] = execute {
+    Kleisli { session =>
+      val query: Query[EventId ~ projects.Id, (CompoundEventId, ZippedEventPayload)] =
+        sql"""SELECT event_id, project_id, payload
+              FROM event_payload
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;"""
+          .query(eventIdDecoder ~ projectIdDecoder ~ zippedPayloadDecoder)
+          .map { case eventId ~ projectId ~ eventPayload =>
+            (CompoundEventId(eventId, projectId), eventPayload)
+          }
+      session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
     }
+  }
 
   protected def findProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
     Kleisli { session =>

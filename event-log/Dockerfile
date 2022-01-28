@@ -1,7 +1,7 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
 
-FROM openjdk:14-jdk-alpine as builder
+FROM openjdk:15-jdk-alpine as builder
 
 WORKDIR /work
 
@@ -15,7 +15,7 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositor
     sbt "project event-log" stage && \
     apk del .build-dependencies
 
-FROM openjdk:14-jdk-alpine
+FROM openjdk:15-jdk-alpine
 
 WORKDIR /opt/event-log
 
@@ -25,8 +25,15 @@ COPY --from=builder /work/event-log/target/universal/stage .
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
-RUN apk add --no-cache tzdata curl bash && \
+RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
-ENTRYPOINT ["bin/event-log"]
-CMD []
+ENV GID=90050
+RUN addgroup -g "$GID" -S elgroup && \
+    adduser --disabled-password -g "$GID" -D -u 9005 eluser && \
+    chmod 555 -R /opt/event-log
+
+USER eluser
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["bin/event-log"]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,13 +19,13 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
-import cats.effect.Bracket
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import skunk._
 
 package object init {
 
-  def execute[Interpretation[_]: Bracket[*[_], Throwable]](
+  def execute[F[_]: MonadCancelThrow](
       sql: Command[Void]
-  ): Kleisli[Interpretation, Session[Interpretation], Unit] = Kleisli(session => session.execute(sql).void)
+  ): Kleisli[F, Session[F], Unit] = Kleisli(session => session.execute(sql).void)
 }

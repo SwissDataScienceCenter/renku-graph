@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,33 +18,41 @@
 
 package io.renku.eventlog.processingstatus
 
-import cats.MonadError
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.http.ErrorMessage
-import ch.datascience.metrics.LabeledHistogram
+import cats.MonadThrow
+import cats.effect.MonadCancelThrow
+import cats.effect.kernel.Async
+import cats.syntax.all._
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.graph.model.projects
+import io.renku.http.ErrorMessage
+import io.renku.metrics.LabeledHistogram
+import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-class ProcessingStatusEndpoint[Interpretation[_]](
-    processingStatusFinder: ProcessingStatusFinder[Interpretation],
-    logger:                 Logger[Interpretation]
-)(implicit ME:              MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+trait ProcessingStatusEndpoint[F[_]] {
+  def findProcessingStatus(projectId: projects.Id): F[Response[F]]
+}
+
+class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
+    processingStatusFinder: ProcessingStatusFinder[F]
+) extends Http4sDsl[F]
+    with ProcessingStatusEndpoint[F] {
 
   import cats.syntax.all._
-  import ch.datascience.graph.model.projects
-  import ch.datascience.http.ErrorMessage._
-  import ch.datascience.http.InfoMessage
   import io.circe.Encoder
   import io.circe.literal._
   import io.circe.syntax._
+  import io.renku.graph.model.projects
+  import io.renku.http.ErrorMessage._
+  import io.renku.http.InfoMessage
   import org.http4s.Response
   import org.http4s.circe._
   import processingStatusFinder._
 
-  def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]] = {
+  override def findProcessingStatus(projectId: projects.Id): F[Response[F]] = {
     for {
       maybeProcessingStatus <- fetchStatus(projectId).value
       response              <- maybeProcessingStatus.toResponse
@@ -60,7 +68,7 @@ class ProcessingStatusEndpoint[Interpretation[_]](
   }
 
   private implicit class StatusOps(maybeProcessingStatus: Option[ProcessingStatus]) {
-    lazy val toResponse: Interpretation[Response[Interpretation]] =
+    lazy val toResponse: F[Response[F]] =
       maybeProcessingStatus.fold {
         NotFound(InfoMessage("No processing status found").asJson)
       } { status =>
@@ -70,24 +78,21 @@ class ProcessingStatusEndpoint[Interpretation[_]](
 
   private def internalServerError(
       projectId: projects.Id
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
     val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
-    logger.error(exception)(errorMessage.value)
+    Logger[F].error(exception)(errorMessage.value)
     InternalServerError(errorMessage)
   }
 }
 
-object IOProcessingStatusEndpoint {
+object ProcessingStatusEndpoint {
 
-  import cats.effect.{ContextShift, IO}
   import io.renku.eventlog.EventLogDB
 
-  def apply(
-      sessionResource:     SessionResource[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlStatement.Name],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] =
-    for {
-      statusFinder <- IOProcessingStatusFinder(sessionResource, queriesExecTimes)
-    } yield new ProcessingStatusEndpoint[IO](statusFinder, logger)
+  def apply[F[_]: MonadCancelThrow: Async: Logger](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[ProcessingStatusEndpoint[F]] = for {
+    statusFinder <- ProcessingStatusFinder(sessionResource, queriesExecTimes)
+  } yield new ProcessingStatusEndpointImpl[F](statusFinder)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,33 +20,41 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.Show
 import cats.implicits.showInterpolator
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{CommitId, LastSyncedDate}
-import io.renku.eventlog.subscriptions.EventEncoder
+import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.{CommitId, LastSyncedDate}
+import io.renku.tinytypes.constraints.NonNegativeLong
+import io.renku.tinytypes.{LongTinyType, TinyTypeFactory}
 
 private final case class GlobalCommitSyncEvent(project:             Project,
-                                               commits:             List[CommitId],
+                                               commits:             CommitsInfo,
                                                maybeLastSyncedDate: Option[LastSyncedDate]
 )
-
 private object GlobalCommitSyncEvent {
-  implicit lazy val show: Show[GlobalCommitSyncEvent] =
-    Show.show(event => show"GlobalCommitSyncEvent ${event.project}, numberOfCommits = ${event.commits.length}")
+  final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
+  implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong
+
+  final case class CommitsInfo(count: CommitsCount, latest: CommitId)
+
+  implicit lazy val show: Show[GlobalCommitSyncEvent] = Show.show(event =>
+    show"GlobalCommitSyncEvent ${event.project}, numberOfCommits = ${event.commits.count}, latestCommit = ${event.commits.latest}"
+  )
 }
 
-private object GlobalCommitSyncEventEncoder extends EventEncoder[GlobalCommitSyncEvent] {
+private object GlobalCommitSyncEventEncoder {
 
   import io.circe.Json
   import io.circe.literal._
 
-  override def encodeEvent(event: GlobalCommitSyncEvent): Json = json"""{
-        "categoryName": ${categoryName.value},
-        "project": {
-          "id":         ${event.project.id.value},
-          "path":       ${event.project.path.value}
-        },
-        "commits":      ${event.commits.map(_.value)}
-      }"""
-
-  override def encodePayload(event: GlobalCommitSyncEvent): Option[String] = None
+  def encodeEvent(event: GlobalCommitSyncEvent): Json = json"""{
+    "categoryName": ${categoryName.value},
+    "project": {
+      "id":         ${event.project.id.value},
+      "path":       ${event.project.path.value}
+    },
+    "commits": {
+      "count":  ${event.commits.count.value},
+      "latest": ${event.commits.latest.value}
+    }
+  }"""
 }

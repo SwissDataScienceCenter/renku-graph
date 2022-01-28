@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,36 +18,31 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
-import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{SessionResource, SqlStatement}
-import ch.datascience.events.consumers.EventHandler
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import org.typelevel.log4cats.Logger
+import cats.effect.Concurrent
+import cats.effect.kernel.{Async, Spawn, Temporal}
+import cats.syntax.all._
+import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice}
-
-import scala.concurrent.ExecutionContext
+import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply(sessionResource:                    SessionResource[IO, EventLogDB],
-            awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-            underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
-            awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-            underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
-            queriesExecTimes:                   LabeledHistogram[IO, SqlStatement.Name],
-            logger:                             Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
+  def apply[F[_]: Async: Spawn: Concurrent: Temporal: Logger](
+      sessionResource:                    SessionResource[F, EventLogDB],
+      awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
+      underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
+      awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
+      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path],
+      queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name]
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier),
-                               logger
+                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
     handler <- EventHandler(
                  sessionResource,
@@ -55,8 +50,7 @@ object SubscriptionFactory {
                  awaitingTriplesGenerationGauge,
                  underTriplesGenerationGauge,
                  awaitingTriplesTransformationGauge,
-                 underTriplesTransformationGauge,
-                 logger
+                 underTriplesTransformationGauge
                )
   } yield handler -> subscriptionMechanism
 }

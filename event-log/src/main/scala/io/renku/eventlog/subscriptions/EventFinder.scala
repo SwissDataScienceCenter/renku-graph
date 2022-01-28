@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,6 +18,6 @@
 
 package io.renku.eventlog.subscriptions
 
-private trait EventFinder[Interpretation[_], CategoryEvent] {
-  def popEvent(): Interpretation[Option[CategoryEvent]]
+private trait EventFinder[F[_], CategoryEvent] {
+  def popEvent(): F[Option[CategoryEvent]]
 }

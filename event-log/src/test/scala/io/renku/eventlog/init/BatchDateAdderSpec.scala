@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -21,15 +21,18 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{BatchDate, EventId}
-import ch.datascience.graph.model.{events, projects}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{CreatedDate, Event, EventDate, ExecutionDate}
+import io.renku.eventlog.init.Generators._
+import io.renku.eventlog.init.model.Event
+import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.events.{BatchDate, EventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
@@ -38,7 +41,7 @@ import skunk.implicits._
 
 import java.time.{LocalDateTime, ZoneOffset}
 
-class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
   protected override lazy val migrationsToRun: List[Migration] = List(
     eventLogTableCreator,
@@ -51,7 +54,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
       createEventTable()
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'batch_date' column adding skipped"))
     }
@@ -60,7 +63,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
       checkColumnExists shouldBe false
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ()
 
       checkColumnExists shouldBe true
 
@@ -68,7 +71,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
       logger.reset()
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'batch_date' column exists"))
     }
@@ -77,14 +80,14 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
       checkColumnExists shouldBe false
 
-      val event1            = newOrSkippedEvents.generateOne
+      val event1            = events.generateOne
       val event1CreatedDate = createdDates.generateOne
       storeEvent(event1, event1CreatedDate)
-      val event2            = newOrSkippedEvents.generateOne
+      val event2            = events.generateOne
       val event2CreatedDate = createdDates.generateOne
       storeEvent(event2, event2CreatedDate)
 
-      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ()
 
       findBatchDates shouldBe Set(BatchDate(event1CreatedDate.value), BatchDate(event2CreatedDate.value))
 
@@ -95,8 +98,8 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
   }
 
   private trait TestCase {
-    val logger         = TestLogger[IO]()
-    val batchDateAdder = new BatchDateAdderImpl[IO](sessionResource, logger)
+    implicit val logger = TestLogger[IO]()
+    val batchDateAdder  = new BatchDateAdderImpl[IO](sessionResource)
   }
 
   private def checkColumnExists: Boolean =
@@ -117,7 +120,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
   private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[
-        EventId ~ projects.Id ~ projects.Path ~ events.EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String
+        EventId ~ projects.Id ~ projects.Path ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String
       ] =
         sql"""insert into
               event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 

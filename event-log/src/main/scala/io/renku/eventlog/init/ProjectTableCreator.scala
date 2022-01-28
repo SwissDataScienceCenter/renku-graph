@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,59 +19,56 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
-import ch.datascience.db.SessionResource
+import cats.effect.MonadCancelThrow
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait ProjectTableCreator[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait ProjectTableCreator[F[_]] {
+  def run(): F[Unit]
 }
 
 private object ProjectTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
-  ): ProjectTableCreator[Interpretation] =
-    new ProjectTableCreatorImpl(sessionResource, logger)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): ProjectTableCreator[F] = new ProjectTableCreatorImpl(sessionResource)
 }
 
-private class ProjectTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
-) extends ProjectTableCreator[Interpretation]
+private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends ProjectTableCreator[F]
     with EventTableCheck {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     whenEventTableExists(
-      Kleisli.liftF(logger info "'project' table creation skipped"),
+      Kleisli.liftF(Logger[F] info "'project' table creation skipped"),
       otherwise = checkTableExists >>= {
-        case true  => Kleisli.liftF(logger info "'project' table exists")
+        case true  => Kleisli.liftF(Logger[F] info "'project' table exists")
         case false => createTable()
       }
     )
   }
 
-  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
     val query: Query[Void, Boolean] =
       sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'project')".query(bool)
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+  private def createTable(): Kleisli[F, Session[F], Unit] =
     for {
       _ <- execute(createTableSql)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id        ON project(project_id)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path      ON project(project_path)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_latest_event_date ON project(latest_event_date)".command)
-      _ <- Kleisli.liftF(logger info "'project' table created")
+      _ <- Kleisli.liftF(Logger[F] info "'project' table created")
       _ <- execute(fillInTableSql)
-      _ <- Kleisli.liftF(logger info "'project' table filled in")
+      _ <- Kleisli.liftF(Logger[F] info "'project' table filled in")
       _ <- execute(foreignKeySql)
     } yield ()
 

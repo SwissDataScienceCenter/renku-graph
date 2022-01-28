@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,26 +20,25 @@ package io.renku.eventlog.subscriptions.membersync
 
 import cats.Show
 import cats.implicits.showInterpolator
-import ch.datascience.graph.model.projects
-import io.renku.eventlog.subscriptions.EventEncoder
+import io.renku.graph.model.projects
 
 private final case class MemberSyncEvent(projectPath: projects.Path)
 
 private object MemberSyncEvent {
-  implicit lazy val show: Show[MemberSyncEvent] = Show.show(event => show"MemberSyncEvent ${event.projectPath}")
+  implicit lazy val show: Show[MemberSyncEvent] =
+    Show.show(event => show"MemberSyncEvent projectPath = ${event.projectPath}")
 }
 
-private object MemberSyncEventEncoder extends EventEncoder[MemberSyncEvent] {
+private object MemberSyncEventEncoder {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def encodeEvent(event: MemberSyncEvent): Json = json"""{
+  def encodeEvent(event: MemberSyncEvent): Json =
+    json"""{
     "categoryName": ${categoryName.value},
     "project": {
       "path":       ${event.projectPath.value}
     }
   }"""
-
-  override def encodePayload(categoryEvent: MemberSyncEvent): Option[String] = None
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,16 +19,16 @@
 package io.renku.eventlog.metrics
 
 import cats.effect.IO
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.GeneratingTriples
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 import eu.timepit.refined.auto._
+import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus.GeneratingTriples
+import io.renku.graph.model.projects
+import io.renku.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 
 object UnderTriplesGenerationGauge {
 
   def apply(
-      metricsRegistry: MetricsRegistry[IO],
+      metricsRegistry: MetricsRegistry,
       statsFinder:     StatsFinder[IO]
   ): IO[LabeledGauge[IO, projects.Path]] =
     Gauge[IO, projects.Path](

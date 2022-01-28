@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,16 +20,12 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.Show
 import cats.implicits.showInterpolator
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.renku.eventlog.subscriptions.EventEncoder
+import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
 private final class ZombieEventProcess private (val value: String) extends AnyVal with StringTinyType
-
-private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](new ZombieEventProcess(_)) {
-  implicit lazy val show: Show[ZombieEventProcess] = Show.show(_.value)
-}
+private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](new ZombieEventProcess(_))
 
 private case class ZombieEvent(generatedBy: ZombieEventProcess,
                                eventId:     CompoundEventId,
@@ -41,16 +37,18 @@ private case class ZombieEvent(generatedBy: ZombieEventProcess,
 }
 
 private object ZombieEvent {
-  implicit lazy val show: Show[ZombieEvent] =
-    Show.show(event => show"ZombieEvent ${event.generatedBy} ${event.eventId}, ${event.projectPath}, ${event.status}")
+  implicit lazy val show: Show[ZombieEvent] = Show.show(event =>
+    show"ZombieEvent ${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+  )
 }
 
-private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {
+private object ZombieEventEncoder {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def encodeEvent(event: ZombieEvent): Json = json"""{
+  def encodeEvent(event: ZombieEvent): Json =
+    json"""{
     "categoryName": ${categoryName.value},
     "id":           ${event.eventId.id.value},
     "project": {
@@ -59,6 +57,4 @@ private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {
     },
     "status":       ${event.status.value}
   }"""
-
-  override def encodePayload(categoryEvent: ZombieEvent): Option[String] = None
 }

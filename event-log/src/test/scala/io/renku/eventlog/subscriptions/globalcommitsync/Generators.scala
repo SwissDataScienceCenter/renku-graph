@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,16 +18,19 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
-import ch.datascience.events.consumers.ConsumersModelGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
+import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
+import io.renku.events.consumers.ConsumersModelGenerators._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.positiveLongs
+import io.renku.graph.model.EventsGenerators.{commitIds, lastSyncedDates}
 import org.scalacheck.Gen
 
 private object Generators {
 
   val globalCommitSyncEvents: Gen[GlobalCommitSyncEvent] = for {
-    project             <- projectsGen
-    commits             <- commitIds.toGeneratorOfNonEmptyList().map(_.toList)
+    project             <- consumerProjects
+    commitsCount        <- positiveLongs().map(_.value).toGeneratorOf(CommitsCount)
+    latestCommit        <- commitIds
     currentLastSyncDate <- lastSyncedDates.toGeneratorOfOptions
-  } yield GlobalCommitSyncEvent(project, commits, currentLastSyncDate)
+  } yield GlobalCommitSyncEvent(project, CommitsInfo(commitsCount, latestCommit), currentLastSyncDate)
 }

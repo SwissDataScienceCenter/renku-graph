@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,14 +18,15 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.generators.Generators.Implicits.GenOps
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Debug, Info}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.generators.Generators.Implicits.GenOps
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Debug, Info}
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
@@ -35,11 +36,9 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.lang.Thread.sleep
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
-class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers with Eventually {
+class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers with Eventually {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(30, Seconds)),
@@ -80,7 +79,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
       registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
-      registry.markBusy(subscriberUrl).unsafeRunSync()                  shouldBe ((): Unit)
+      registry.markBusy(subscriberUrl).unsafeRunSync()                  shouldBe ()
       registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
     }
@@ -152,7 +151,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
         .map(callerId => IO(callFindSubscriber(callerId, collectedCallerIds)))
         .sequence
         .start
-        .unsafeRunAsyncAndForget()
+        .unsafeRunAndForget()
 
       Thread sleep 500
 
@@ -206,7 +205,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
         logger.loggedOnly(
           Info(s"$categoryName: all 1 subscriber(s) are busy; waiting for one to become available"),
           Debug(
-            s"$categoryName: url = ${subscriptionInfo.subscriberUrl}, id = ${subscriptionInfo.subscriberId}$withCapacity taken from busy state"
+            s"$categoryName: subscriber = ${subscriptionInfo.subscriberUrl}, id = ${subscriptionInfo.subscriberId}$withCapacity taken from busy state"
           )
         )
       }
@@ -255,9 +254,6 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
     }
   }
 
-  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO]        = IO.timer(global)
-
   private trait TestCase {
 
     val subscriptionInfo = subscriptionInfos.generateOne
@@ -266,8 +262,8 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
     val busySleep       = 500 milliseconds
     val checkupInterval = 500 milliseconds
-    val logger          = TestLogger[IO]()
-    lazy val registry   = SubscribersRegistry(categoryName, logger, checkupInterval, busySleep).unsafeRunSync()
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    lazy val registry = SubscribersRegistry[IO](categoryName, checkupInterval, busySleep).unsafeRunSync()
 
     def callFindSubscriber(callerId: Int, collectedCallers: ConcurrentHashMap[Unit, List[Int]]) = {
 

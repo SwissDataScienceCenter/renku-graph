@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -20,18 +20,19 @@ package io.renku.eventlog.eventdetails
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
-import ch.datascience.graph.model.events.EventDetails
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.server.EndpointTester._
-import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
 import io.circe.literal.JsonStringContext
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
+import io.renku.graph.model.events.EventDetails
+import io.renku.http.ErrorMessage.ErrorMessage
+import io.renku.http.InfoMessage._
+import io.renku.http.server.EndpointTester._
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
+import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
@@ -40,7 +41,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventDetailsEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventDetailsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "getDetails" should {
 
@@ -95,9 +96,8 @@ class EventDetailsEndpointSpec extends AnyWordSpec with MockFactory with should.
       eventBody <- eventBodies
     } yield EventDetails(eventId, eventBody)
 
-    val logger = TestLogger[IO]()
-
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventDetailsFinder  = mock[EventDetailsFinder[IO]]
-    val eventDetailEndpoint = new EventDetailsEndpointImpl[IO](eventDetailsFinder, logger)
+    val eventDetailEndpoint = new EventDetailsEndpointImpl[IO](eventDetailsFinder)
   }
 }

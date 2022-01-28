@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,19 +19,20 @@
 package io.renku.eventlog.subscriptions
 package commitsync
 
-import ch.datascience.db.SqlStatement
-import ch.datascience.events.consumers.Project
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus.AwaitingDeletion
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.graph.model.EventsGenerators._
+import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventStatus.AwaitingDeletion
+import io.renku.graph.model.events.{CompoundEventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.projects
+import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -42,6 +43,7 @@ import java.time.temporal.ChronoUnit
 
 class CommitSyncEventFinderSpec
     extends AnyWordSpec
+    with IOSpec
     with InMemoryEventLogDbSpec
     with SubscriptionDataProvisioning
     with MockFactory
@@ -222,14 +224,13 @@ class CommitSyncEventFinderSpec
                        createdDate: CreatedDate = createdDates.generateOne,
                        eventStatus: EventStatus =
                          Gen.oneOf(EventStatus.all.filterNot(_ == AwaitingDeletion)).generateOne
-  ): Unit =
-    storeEvent(
-      eventId,
-      eventStatus,
-      executionDates.generateOne,
-      eventDate,
-      eventBodies.generateOne,
-      createdDate,
-      projectPath = projectPath
-    )
+  ): Unit = storeEvent(
+    eventId,
+    eventStatus,
+    executionDates.generateOne,
+    eventDate,
+    eventBodies.generateOne,
+    createdDate,
+    projectPath = projectPath
+  )
 }

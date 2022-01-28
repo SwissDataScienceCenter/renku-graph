@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,22 +19,28 @@
 package io.renku.eventlog.subscriptions
 
 import cats.data.Kleisli
-import ch.datascience.db.SqlStatement
-import ch.datascience.events.consumers.subscriptions._
-import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.metrics.TestLabeledHistogram
-import ch.datascience.microservices.MicroserviceBaseUrl
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.events.consumers.subscriptions._
+import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.metrics.TestLabeledHistogram
+import io.renku.microservices.MicroserviceBaseUrl
+import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
 
-class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
+class SubscriberTrackerSpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryEventLogDbSpec
+    with MockFactory
+    with should.Matchers {
 
   "add" should {
 
@@ -138,7 +144,6 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
   }
 
   private trait TestCase {
-
     val subscriptionInfo = subscriptionInfos.generateOne
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val sourceUrl        = microserviceBaseUrls.generateOne

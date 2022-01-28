@@ -8,6 +8,12 @@
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
@@ -16,7 +22,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 9,
-  "iteration": 1616519722652,
+  "iteration": 1638268856220,
   "links": [],
   "panels": [
     {
@@ -27,7 +33,6 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -61,7 +66,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.3.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -71,8 +76,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(sum by (status) (rate(server_request_count{kubernetes_name=\"[[kube_env_name]]-knowledge-graph\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(sum by (status) (rate(server_request_count_total{kubernetes_name=\"${kube_env_name}-knowledge-graph\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
           "instant": false,
+          "interval": "",
           "legendFormat": "{{status}}/sec",
           "refId": "B"
         }
@@ -127,7 +134,6 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -161,7 +167,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.3.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -171,7 +177,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(sum by (status) (rate(server_request_count{kubernetes_name=\"[[kube_env_name]]-webhook-service\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(sum by (status) (rate(server_request_count_total{kubernetes_name=\"${kube_env_name}-webhook-service\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "{{status}}/sec",
           "refId": "B"
         }
@@ -225,7 +233,6 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -259,7 +266,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.3.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -269,7 +276,8 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(sum by (status) (rate(server_request_count{kubernetes_name=\"[[kube_env_name]]-commit-event-service\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(sum by (status) (rate(server_request_count_total{kubernetes_name=\"${kube_env_name}-commit-event-service\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
           "interval": "",
           "legendFormat": "{{status}}/sec",
           "refId": "B"
@@ -295,6 +303,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:103",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -303,6 +312,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:104",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -324,7 +334,6 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -358,7 +367,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.3.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -368,7 +377,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(sum by (status) (rate(server_request_count{kubernetes_name=\"[[kube_env_name]]-event-log\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(sum by (status) (rate(server_request_count_total{kubernetes_name=\"${kube_env_name}-event-log\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "{{status}}/sec",
           "refId": "B"
         }
@@ -422,7 +433,6 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -456,7 +466,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.3.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -466,7 +476,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(sum by (status) (rate(server_request_count{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(sum by (status) (rate(server_request_count_total{kubernetes_name=\"${kube_env_name}-triples-generator\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "{{status}}/sec",
           "refId": "B"
         }
@@ -521,7 +533,6 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -555,7 +566,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.3.5",
+      "pluginVersion": "8.1.6",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -565,7 +576,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(sum by (status) (rate(server_request_count{kubernetes_name=\"[[kube_env_name]]-token-repository\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "exemplar": true,
+          "expr": "label_replace(sum by (status) (rate(server_request_count_total{kubernetes_name=\"${kube_env_name}-token-repository\"}[5m])), \"status\", \"$1\", \"status\", \"(.*)\")",
+          "interval": "",
           "legendFormat": "{{status}}/sec",
           "refId": "B"
         }
@@ -612,8 +625,8 @@
       }
     }
   ],
-  "refresh": "1m",
-  "schemaVersion": 26,
+  "refresh": "",
+  "schemaVersion": 30,
   "style": "dark",
   "tags": [
     "renku"
@@ -624,11 +637,12 @@
         "allValue": null,
         "current": {
           "selected": false,
-          "text": "renku",
-          "value": "renku"
+          "text": "david-renku",
+          "value": "david-renku"
         },
         "datasource": "Prometheus",
-        "definition": "server_request_count",
+        "definition": "server_request_count_total",
+        "description": null,
         "error": null,
         "hide": 0,
         "includeAll": false,
@@ -636,16 +650,45 @@
         "multi": false,
         "name": "kube_env_name",
         "options": [],
-        "query": "server_request_count",
+        "query": {
+          "query": "server_request_count_total",
+          "refId": "StandardVariableQuery"
+        },
         "refresh": 1,
-        "regex": "/.*kubernetes_name=\"([\\w-]*)-knowledge-graph\".*/",
+        "regex": "/.*release=\"([\\w-]*)\".*/",
         "skipUrlSync": false,
         "sort": 2,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
+      },
+      {
+        "allValue": null,
+        "current": {
+          "selected": false,
+          "text": "david",
+          "value": "david"
+        },
+        "datasource": null,
+        "definition": "server_request_count_total",
+        "description": null,
+        "error": null,
+        "hide": 0,
+        "includeAll": true,
+        "label": "Env namespace",
+        "multi": false,
+        "name": "env_namespace",
+        "options": [],
+        "query": {
+          "query": "server_request_count_total",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "/.*namespace=\"([\\w-]*)\".*/",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -669,5 +712,5 @@
   "timezone": "",
   "title": "Graph Services response statuses",
   "uid": "uRmFXAqZz",
-  "version": 3
+  "version": 15
 }

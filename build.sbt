@@ -1,4 +1,4 @@
-organization := "ch.datascience"
+organization := "io.renku"
 name := "renku-graph"
 scalaVersion := "2.13.6"
 
@@ -16,7 +16,9 @@ lazy val root = Project(
   publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
-  jsonLd,
+  generators,
+  tinyTypes,
+  renkuModel,
   graphCommons,
   eventLog,
   tokenRepository,
@@ -26,11 +28,34 @@ lazy val root = Project(
   knowledgeGraph
 )
 
-lazy val jsonLd = Project(
-  id = "json-ld",
-  base = file("json-ld")
+lazy val generators = Project(
+  id = "generators",
+  base = file("generators")
 ).settings(
   commonSettings
+).enablePlugins(
+  AutomateHeaderPlugin
+)
+
+lazy val tinyTypes = Project(
+  id = "tiny-types",
+  base = file("tiny-types")
+).settings(
+  commonSettings
+).dependsOn(
+  generators % "test->test"
+).enablePlugins(
+  AutomateHeaderPlugin
+)
+
+lazy val renkuModel = Project(
+  id = "renku-model",
+  base = file("renku-model")
+).settings(
+  commonSettings
+).dependsOn(
+  tinyTypes % "compile->compile",
+  tinyTypes % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -41,8 +66,8 @@ lazy val graphCommons = Project(
 ).settings(
   commonSettings
 ).dependsOn(
-  jsonLd % "compile->compile",
-  jsonLd % "test->test"
+  renkuModel % "compile->compile",
+  renkuModel % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -92,8 +117,6 @@ lazy val triplesGenerator = Project(
 ).settings(
   commonSettings
 ).dependsOn(
-  jsonLd       % "compile->compile",
-  jsonLd       % "test->test",
   graphCommons % "compile->compile",
   graphCommons % "test->test"
 ).enablePlugins(
@@ -145,15 +168,16 @@ lazy val acceptanceTests = Project(
 )
 
 lazy val commonSettings = Seq(
-  organization := "ch.datascience",
+  organization := "io.renku",
   scalaVersion := "2.13.6",
   publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
   Compile / packageDoc / publishArtifact := false,
   Compile / packageSrc / publishArtifact := false,
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full),
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full),
   // format: off
   scalacOptions ++= Seq(
+    "-language:postfixOps", // enabling postfixes
     "-deprecation", // Emit warning and location for usages of deprecated APIs.
     "-encoding", "utf-8", // Specify character encoding used by source files.
     "-explaintypes", // Explain type errors in more detail.

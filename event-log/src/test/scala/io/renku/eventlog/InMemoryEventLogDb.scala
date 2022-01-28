@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,10 +19,11 @@
 package io.renku.eventlog
 
 import cats.data.Kleisli
-import cats.effect.{ContextShift, IO}
+import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
 import com.dimafeng.testcontainers._
+import io.renku.db.SessionResource
+import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import org.testcontainers.utility.DockerImageName
@@ -30,12 +31,8 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
 trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
-  self: Suite =>
-
-  implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+  self: Suite with IOSpec =>
 
   private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
@@ -61,12 +58,39 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   def verifyTrue(sql: Command[Void]): Unit = execute[Unit](Kleisli(session => session.execute(sql).void))
 
-  def verify(column: String, hasType: String) = execute[Boolean] {
+  def verifyIndexExists(tableName: String, indexName: String): Boolean = execute[Boolean](Kleisli { session =>
+    val query: Query[String ~ String, Boolean] =
+      sql"""SELECT EXISTS(SELECT indexname FROM pg_indexes WHERE tablename = $varchar AND indexname = $varchar)"""
+        .query(bool)
+
+    session.prepare(query).use(_.unique(tableName ~ indexName)).recover(_ => false)
+  })
+
+  def verify(table: String, column: String, hasType: String): Boolean = execute[Boolean] {
     Kleisli { session =>
-      val query: Query[String, String] =
+      val query: Query[String ~ String, String] =
         sql"""SELECT data_type FROM information_schema.columns WHERE
-         table_name = event AND column_name = $varchar;""".query(varchar)
-      session.prepare(query).use(_.unique(column)).map(dataType => dataType == hasType).recover { case _ => false }
+         table_name = $varchar AND column_name = $varchar;""".query(varchar)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ column))
+        .map(dataType => dataType == hasType)
+        .recover { case _ => false }
+    }
+  }
+
+  def verifyColumnExists(table: String, column: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] =
+        sql"""SELECT EXISTS (
+                SELECT *
+                FROM information_schema.columns 
+                WHERE table_name = $varchar AND column_name = $varchar
+              )""".query(bool)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ column))
+        .recover { case _ => false }
     }
   }
 

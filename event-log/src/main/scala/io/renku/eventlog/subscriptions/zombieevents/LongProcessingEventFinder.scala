@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,18 +18,19 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
+import cats.MonadThrow
 import cats.data.{Kleisli, Nested}
-import cats.effect.{BracketThrow, IO, Sync}
+import cats.effect.Async
 import cats.syntax.all._
-import ch.datascience.db.implicits._
-import ch.datascience.db.{DbClient, SessionResource, SqlStatement}
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
+import io.renku.db.implicits._
+import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
+import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.projects
+import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
@@ -37,16 +38,16 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class LongProcessingEventFinder[Interpretation[_]: Sync: BracketThrow](
-    sessionResource:  SessionResource[Interpretation, EventLogDB],
-    queriesExecTimes: LabeledHistogram[Interpretation, SqlStatement.Name],
+private class LongProcessingEventFinder[F[_]: Async](
+    sessionResource:  SessionResource[F, EventLogDB],
+    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with EventFinder[Interpretation, ZombieEvent]
+    with EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
 
-  override def popEvent(): Interpretation[Option[ZombieEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[ZombieEvent]] = sessionResource.useK {
     findPotentialZombies >>= lookForZombie >>= markEventTaken
   }
 
@@ -69,8 +70,7 @@ private class LongProcessingEventFinder[Interpretation[_]: Sync: BracketThrow](
 
   }
 
-  private lazy val lookForZombie
-      : List[(projects.Id, EventStatus)] => Kleisli[Interpretation, Session[Interpretation], Option[ZombieEvent]] = {
+  private lazy val lookForZombie: List[(projects.Id, EventStatus)] => Kleisli[F, Session[F], Option[ZombieEvent]] = {
     case Nil => Kleisli.pure(Option.empty[ZombieEvent])
     case (projectId, status) :: rest =>
       queryZombieEvent(projectId, status) flatMap {
@@ -104,8 +104,7 @@ private class LongProcessingEventFinder[Interpretation[_]: Sync: BracketThrow](
         .build(_.option)
     }
 
-  private lazy val markEventTaken
-      : Option[ZombieEvent] => Kleisli[Interpretation, Session[Interpretation], Option[ZombieEvent]] = {
+  private lazy val markEventTaken: Option[ZombieEvent] => Kleisli[F, Session[F], Option[ZombieEvent]] = {
     case None        => Kleisli.pure(Option.empty[ZombieEvent])
     case Some(event) => updateMessage(event.eventId) map toNoneIfEventAlreadyTaken(event)
   }
@@ -166,10 +165,10 @@ private class LongProcessingEventFinder[Interpretation[_]: Sync: BracketThrow](
 
 private object LongProcessingEventFinder {
 
-  def apply(
-      sessionResource:  SessionResource[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name]
-  ): IO[EventFinder[IO, ZombieEvent]] = IO {
+  def apply[F[_]: Async](
+      sessionResource:  SessionResource[F, EventLogDB],
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  ): F[EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
     new LongProcessingEventFinder(sessionResource, queriesExecTimes)
   }
 }

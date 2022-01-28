@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,18 +19,19 @@
 package io.renku.eventlog.eventdetails
 
 import cats.syntax.all._
-import ch.datascience.db.SqlStatement
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
-import ch.datascience.graph.model.events.{CompoundEventId, EventDetails}
-import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
+import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
+import io.renku.graph.model.events.{CompoundEventId, EventDetails}
+import io.renku.metrics.TestLabeledHistogram
+import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventDetailsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
+class EventDetailsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSpec with should.Matchers {
 
   "findDetails" should {
 

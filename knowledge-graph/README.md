@@ -63,14 +63,14 @@ Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&
 Response body example:
 
 ```
-[  
+[
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
       "title":"rmDaYfpehl",
       "name": "mniouUnmal",
       "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
       "published": {
-        "datePublished": "2012-10-14T03:02:25.639Z", // optional property
+        "datePublished": "2012-10-14", // optional property
         "creator": [
           {
             "name": "e wmtnxmcguz"
@@ -84,7 +84,17 @@ Response body example:
       "date": "2012-10-14T03:02:25.639Z",            // either datePublished or dateCreated
       "projectsCount": 2,
       "keywords": ["grüezi", "안녕", "잘 지내?"],
-      "images": ["image.png"],
+      "images": [
+        {
+          "location": "image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+             }
+          ]
+        }
+      ],
       "_links":[  
          {  
             "rel":"details",
@@ -105,7 +115,17 @@ Response body example:
       "date": "2012-11-15T10:00:00.000Z",            // either datePublished or dateCreated
       "projectsCount": 1,
       "keywords": [],
-      "images": ["https://blah.com/image.png"],
+      "images": [
+        {
+          "location": "https://blah.com/image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "https://blah.com/image.png"
+             }
+          ]
+        }
+      ],
       "_links":[  
          {  
             "rel":"details",
@@ -122,11 +142,12 @@ Finds details of the dataset with the given `id`.
 
 **Response**
 
-| Status                     | Description                   |
-|----------------------------|-------------------------------|
-| OK (200)                   | If dataset details are found  |
-| NOT_FOUND (404)            | If dataset is not found       |
-| INTERNAL SERVER ERROR (500)| Otherwise                     |
+| Status                     | Description                                                                                       |
+|----------------------------|---------------------------------------------------------------------------------------------------|
+| OK (200)                   | If dataset details are found                                                                      |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                      |
+| NOT_FOUND (404)            | If dataset is not found or user is not authorised to access project where this dataset belongs to |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                                                         |
 
 Response body example:
 
@@ -148,12 +169,12 @@ Response body example:
   },
   "title" : "dataset title",
   "name" : "dataset alternate name",
-  "url" : "http://host/url1",  // optional property
+  "url" : "http://host/url1",                     // optional property
   "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
   "derivedFrom" : "http://host/url1",             // optional property when no "sameAs" exists
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
   "published" : {
-    "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
+    "datePublished" : "2012-10-14",               // optional property
     "creator" : [
       {
         "name" : "e wmtnxmcguz"
@@ -168,11 +189,9 @@ Response body example:
   "created" : "2012-10-15T03:02:25.639Z",         // optional property
   "hasPart" : [
     {
-      "name" : "o",
       "atLocation" : "data/dataset-name/file1"
     },
     {
-      "name" : "rldzpwo",
       "atLocation" : "data/dataset-name/file2"
     }
   ],
@@ -184,14 +203,7 @@ Response body example:
       }
     ],
     "path" : "namespace1/project1-name",
-    "name" : "project1 name",
-    "created" : {
-      "dateCreated" : "1970-05-12T06:06:41.448Z",
-      "agent" : {
-        "email" : "n@ulQdsXl",                  // optional property
-        "name" : "v imzn"
-      }
-    }
+    "name" : "project1 name"
   },
   "usedIn" : [
     {
@@ -202,14 +214,7 @@ Response body example:
         }
       ],
       "path" : "namespace1/project1-name",
-      "name" : "project1 name",
-      "created" : {
-        "dateCreated" : "1970-05-12T06:06:41.448Z",
-        "agent" : {
-          "email" : "n@ulQdsXl",                  // optional property
-          "name" : "v imzn"
-        }
-      }
+      "name" : "project1 name"
     },
     {
       "_links" : [
@@ -219,24 +224,30 @@ Response body example:
         }
       ],
       "path" : "namespace2/project2-name",
-      "name" : "project2 name",
-      "created" : {
-        "dateCreated" : "1970-06-12T06:06:41.448Z",
-        "agent" : {
-          "email" : "name@ulQdsXl",               // optional property
-          "name" : "v imzn"
-        }
-      }
+      "name" : "project2 name"
     }
   ],
-  "keywords": [
-    "rldzpwo",
-    "gfioui"
-  ],
+  "keywords": [ "rldzpwo", "gfioui" ],
   "images": [
-    "https://renku.io/dataset1/23423423.jpg",
-    "image.png"
-  ]
+    {
+      "location": "image.png",
+      "_links":[  
+         {  
+            "rel":  "view",
+            "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+         }
+      ]
+    },
+    {
+      "location": "http://host/external-image.png",
+      "_links":[  
+         {  
+            "rel":  "view",
+            "href": "http://host/external-image.png"
+         }
+      ]
+    }
+  ],
 }
 ```
 
@@ -257,10 +268,11 @@ Endpoint to perform GraphQL queries on the Knowledge Graph data.
 
 **Response**
 
-| Status                     | Description                    |
-|----------------------------|--------------------------------|
-| OK (200)                   | Body containing queried data   |
-| INTERNAL SERVER ERROR (500)| Otherwise                      |
+| Status                     | Description                                  |
+|----------------------------|----------------------------------------------|
+| OK (200)                   | Body containing queried data                 |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated |
+| INTERNAL SERVER ERROR (500)| Otherwise                                    |
 
 **Available queries**
 
@@ -376,7 +388,7 @@ Response body example:
       }
     }
   },
-  "tags": ["tag1", "tag2"],
+  "keywords": ["keyword1", "keyword2"],
   "starsCount": 0,
   "permissions": {
     "projectAccess": { // optional
@@ -393,7 +405,7 @@ Response body example:
     "lfsObjectsSize":   0,
     "jobArtifactsSize": 0
   },
-  "version": "1", 
+  "version": "9",  // optional
   "_links":[  
     {  
       "rel":"self",
@@ -416,6 +428,8 @@ Finds list of datasets of the project with the given `namespace/name`.
 | Status                     | Description                                                       |
 |----------------------------|-------------------------------------------------------------------|
 | OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                      |
+| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access this project |
 | INTERNAL SERVER ERROR (500)| Otherwise                                                         |
 
 Response body example:
@@ -449,9 +463,28 @@ Response body example:
         "initial": "22222222-2222-2222-2222-222222222222"
       },
       "name": "a",
-      "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
-      "derivedFrom" : "http://host/url2",             // optional property when no "sameAs" exists
-      "images": ["image.png"],
+      "sameAs" : "http://host/url2",        // optional property when no "derivedFrom" exists
+      "derivedFrom" : "http://host/url2",   // optional property when no "sameAs" exists
+      "images": [
+        {
+          "location": "image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+             }
+          ]
+        },
+        {
+          "location": "http://host/external-image.png",
+          "_links":[  
+             {  
+                "rel":  "view",
+                "href": "http://host/external-image.png"
+             }
+          ]
+        }
+      ],
       "_links": [  
          {  
             "rel": "details",

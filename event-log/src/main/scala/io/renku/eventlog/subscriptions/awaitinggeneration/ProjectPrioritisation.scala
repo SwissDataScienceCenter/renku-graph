@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -18,25 +18,24 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.MonadError
+import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.subscriptions.{Capacity, ProjectIds, Subscribers}
+import io.renku.graph.model.projects
+import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 
 import java.time.Duration
 
-private trait ProjectPrioritisation[Interpretation[_]] {
+private trait ProjectPrioritisation[F[_]] {
   def prioritise(projects: List[ProjectInfo], totalOccupancy: Long): List[(ProjectIds, Priority)]
 }
 
-private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscribers[Interpretation])
-    extends ProjectPrioritisation[Interpretation] {
+private class ProjectPrioritisationImpl[F[_]](subscribers: Subscribers[F]) extends ProjectPrioritisation[F] {
   import ProjectPrioritisation.Priority._
 
   private val FreeSpotsRatio = .15
@@ -145,10 +144,10 @@ private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscrib
 
 private object ProjectPrioritisation {
 
-  def apply[Interpretation[_]](subscribers: Subscribers[Interpretation])(implicit
-      ME:                                   MonadError[Interpretation, Throwable]
-  ): Interpretation[ProjectPrioritisation[Interpretation]] =
-    ME.catchNonFatal(new ProjectPrioritisationImpl[Interpretation](subscribers))
+  def apply[F[_]: MonadThrow](
+      subscribers: Subscribers[F]
+  ): F[ProjectPrioritisation[F]] =
+    MonadThrow[F].catchNonFatal(new ProjectPrioritisationImpl[F](subscribers))
 
   final case class ProjectInfo(id:               projects.Id,
                                path:             projects.Path,

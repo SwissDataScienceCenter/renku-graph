@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -19,47 +19,45 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
-import cats.effect.BracketThrow
-import ch.datascience.db.SessionResource
+import cats.effect.MonadCancelThrow
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait SubscriberTableCreator[Interpretation[_]] {
-  def run(): Interpretation[Unit]
+private trait SubscriberTableCreator[F[_]] {
+  def run(): F[Unit]
 }
 
-private class SubscriberTableCreatorImpl[Interpretation[_]: BracketThrow](
-    sessionResource: SessionResource[Interpretation, EventLogDB],
-    logger:          Logger[Interpretation]
-) extends SubscriberTableCreator[Interpretation] {
+private class SubscriberTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
+    sessionResource: SessionResource[F, EventLogDB]
+) extends SubscriberTableCreator[F] {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = sessionResource.useK {
     checkTableExists >>= {
-      case true  => Kleisli.liftF(logger info "'subscriber' table exists")
+      case true  => Kleisli.liftF(Logger[F] info "'subscriber' table exists")
       case false => createTable()
 
     }
   }
 
-  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
     val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'subscriber')"
       .query(bool)
     Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON subscriber(delivery_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON subscriber(delivery_url)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_source_url ON subscriber(source_url)".command)
-      _ <- Kleisli.liftF(logger info "'subscriber' table created")
-    } yield ()
+  private def createTable(): Kleisli[F, Session[F], Unit] = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON subscriber(delivery_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON subscriber(delivery_url)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_source_url ON subscriber(source_url)".command)
+    _ <- Kleisli.liftF(Logger[F] info "'subscriber' table created")
+  } yield ()
 
   private lazy val createTableSql: Command[Void] =
     sql"""
@@ -74,9 +72,7 @@ private class SubscriberTableCreatorImpl[Interpretation[_]: BracketThrow](
 }
 
 private object SubscriberTableCreator {
-  def apply[Interpretation[_]: BracketThrow](
-      sessionResource: SessionResource[Interpretation, EventLogDB],
-      logger:          Logger[Interpretation]
-  ): SubscriberTableCreator[Interpretation] =
-    new SubscriberTableCreatorImpl(sessionResource, logger)
+  def apply[F[_]: MonadCancelThrow: Logger](
+      sessionResource: SessionResource[F, EventLogDB]
+  ): SubscriberTableCreator[F] = new SubscriberTableCreatorImpl(sessionResource)
 }

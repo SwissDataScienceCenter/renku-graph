@@ -25,8 +25,15 @@ COPY --from=builder /work/commit-event-service/target/universal/stage .
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
-RUN apk add --no-cache tzdata curl bash && \
+RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
-ENTRYPOINT ["bin/commit-event-service"]
-CMD []
+ENV GID=90060
+RUN addgroup -g "$GID" -S cesgroup && \
+    adduser --disabled-password -g "$GID" -D -u 9006 cesuser && \
+    chmod 555 -R /opt/commit-event-service
+
+USER cesuser
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["bin/commit-event-service"]

@@ -1,7 +1,7 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
 
-FROM openjdk:14-jdk-alpine as builder
+FROM openjdk:15-jdk-alpine as builder
 
 WORKDIR /work
 
@@ -15,7 +15,7 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositor
     sbt "project token-repository" stage && \
     apk del .build-dependencies
 
-FROM openjdk:14-jdk-alpine
+FROM openjdk:15-jdk-alpine
 
 WORKDIR /opt/token-repository
 
@@ -25,8 +25,15 @@ COPY --from=builder /work/token-repository/target/universal/stage .
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
-RUN apk add --no-cache tzdata curl bash && \
+RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
-ENTRYPOINT ["bin/token-repository"]
-CMD []
+ENV GID=90030
+RUN addgroup -g "$GID" -S trgroup && \
+    adduser --disabled-password -g "$GID" -D -u 9003 truser && \
+    chmod 555 -R /opt/token-repository
+
+USER truser
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["bin/token-repository"]
