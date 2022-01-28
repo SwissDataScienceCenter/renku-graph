@@ -19,6 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
+import cats.data.Kleisli._
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.SessionResource
@@ -28,74 +29,61 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
+import scala.util.control.NonFatal
+
 private trait TimestampZoneAdder[F[_]] {
   def run(): F[Unit]
 }
 
 private object TimestampZoneAdder {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): TimestampZoneAdder[F] = TimestampZoneAdderImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger](sessionResource: SessionResource[F, EventLogDB]): TimestampZoneAdder[F] =
+    TimestampZoneAdderImpl(sessionResource)
 }
 
 private case class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[F, EventLogDB]
 ) extends TimestampZoneAdder[F]
     with EventTableCheck {
+
   override def run(): F[Unit] = sessionResource.useK {
-    checkIfAlreadyTimestamptz >>= {
-      case true =>
-        Kleisli.liftF(Logger[F].info("Fields are already in timestamptz type"))
-      case false => migrateTimestampToCEST()
-    }
+    columnsToMigrate.map { case (table, column) => migrateIfNeeded(table, column) }.sequence.void
   }
 
-  private val columnsToMigrate =
-    List("batch_date", "created_date", "execution_date", "event_date", "last_synced", "latest_event_date")
+  private val columnsToMigrate = List(
+    "event"                           -> "batch_date",
+    "event"                           -> "created_date",
+    "event"                           -> "execution_date",
+    "event"                           -> "event_date",
+    "subscription_category_sync_time" -> "last_synced",
+    "project"                         -> "latest_event_date"
+  )
 
-  private lazy val checkIfAlreadyTimestamptz: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[Void, String ~ String] =
+  private def migrateIfNeeded(table: String, column: String): Kleisli[F, Session[F], Unit] = {
+    findCurrentType(table, column) >>= {
+      case "timestamp with time zone" =>
+        liftF(Logger[F].info(s"$table.$column already migrated to 'timestamp with time zone'"))
+      case columnType =>
+        liftF[F, Session[F], Unit](Logger[F].info(s"$table.$column in '$columnType', migrating")) >>=
+          (_ => migrate(table, column))
+    }
+  } recoverWith { case NonFatal(e) =>
+    liftF(Logger[F].error(e)(s"$table.$column migration failed")) >> liftF(e.raiseError[F, Unit])
+  }
+
+  private def findCurrentType(table: String, column: String): Kleisli[F, Session[F], String] = {
+    val query: Query[(String, String), String] =
       sql"""
-         SELECT column_name, data_type FROM information_schema.columns""".query(varchar ~ varchar)
-
+           SELECT data_type
+           FROM information_schema.columns
+           WHERE table_name = $varchar AND column_name = $varchar"""
+        .query(varchar)
     Kleisli {
-      _.execute(query)
-        .map {
-          _.filter { case columnName ~ _ =>
-            columnsToMigrate.contains(columnName)
-          }.forall { case _ ~ columnType =>
-            columnType == "timestamp with time zone"
-          }
-        }
-        .recover(_ => false)
+      _.prepare(query)
+        .use(_.unique(table -> column))
     }
   }
 
-  private def migrateTimestampToCEST(): Kleisli[F, Session[F], Unit] =
-    for {
-      _ <-
-        execute(
-          sql"ALTER table event ALTER batch_date TYPE timestamptz USING batch_date AT TIME ZONE 'CEST' ".command
-        )
-      _ <-
-        execute(
-          sql"ALTER table event ALTER created_date TYPE timestamptz USING created_date AT TIME ZONE 'CEST' ".command
-        )
-      _ <-
-        execute(
-          sql"ALTER table event ALTER execution_date TYPE timestamptz USING execution_date AT TIME ZONE 'CEST' ".command
-        )
-      _ <-
-        execute(
-          sql"ALTER table event ALTER event_date TYPE timestamptz USING event_date AT TIME ZONE 'CEST' ".command
-        )
-      _ <-
-        execute(
-          sql"ALTER table subscription_category_sync_time ALTER last_synced TYPE timestamptz USING last_synced AT TIME ZONE 'CEST' ".command
-        )
-      _ <-
-        execute(
-          sql"ALTER table project ALTER latest_event_date TYPE timestamptz USING latest_event_date AT TIME ZONE 'CEST' ".command
-        )
-    } yield ()
+  private def migrate(table: String, column: String) = execute(
+    sql"ALTER table #$table ALTER #$column TYPE timestamptz USING #$column AT TIME ZONE 'CEST'".command
+  )
 }
