@@ -103,6 +103,8 @@ object Microservice extends IOMicroservice {
                                            underTriplesGenerationGauge,
                                            awaitingTransformationGauge,
                                            underTransformationGauge,
+                                           awaitingDeletionGauge,
+                                           deletingGauge,
                                            queriesExecTimes
                                          )
         eventConsumersRegistry <- consumers.EventConsumersRegistry(

@@ -112,14 +112,18 @@ private object EventHandler {
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
-      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
+      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path],
+      awaitingDeletionGauge:              LabeledGauge[F, projects.Path],
+      deletingGauge:                      LabeledGauge[F, projects.Path]
   ): F[EventHandler[F]] = for {
     deliveryInfoRemover <- DeliveryInfoRemover(queriesExecTimes)
     gaugesUpdater <- MonadThrow[F].catchNonFatal(
                        new GaugesUpdaterImpl[F](awaitingTriplesGenerationGauge,
                                                 awaitingTriplesTransformationGauge,
                                                 underTriplesTransformationGauge,
-                                                underTriplesGenerationGauge
+                                                underTriplesGenerationGauge,
+                                                awaitingDeletionGauge,
+                                                deletingGauge
                        )
                      )
     statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](sessionResource, gaugesUpdater))

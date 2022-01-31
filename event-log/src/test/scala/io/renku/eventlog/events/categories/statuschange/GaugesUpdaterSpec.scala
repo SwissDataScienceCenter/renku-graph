@@ -67,6 +67,15 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
         (underTransformationGauge.update _)
           .expects(projectPath -> underTransformationGaugeChange)
           .returning(().pure[Try])
+        val awaitingDeletionGaugeChange = List(updateResults.getCount(projectPath, AwaitingDeletion)).sum.toDouble
+        (awaitingDeletionGauge.update _)
+          .expects(projectPath -> awaitingDeletionGaugeChange)
+          .returning(().pure[Try])
+
+        val deletingGaugeChange = List(updateResults.getCount(projectPath, Deleting)).sum.toDouble
+        (deletingGauge.update _)
+          .expects(projectPath -> deletingGaugeChange)
+          .returning(().pure[Try])
       }
 
       gaugesUpdater.updateGauges(updateResults) shouldBe ().pure[Try]
@@ -80,6 +89,8 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
       (awaitingTransformationGauge.reset _).expects().returning(().pure[Try])
       (underTriplesGenerationGauge.reset _).expects().returning(().pure[Try])
       (underTransformationGauge.reset _).expects().returning(().pure[Try])
+      (awaitingDeletionGauge.reset _).expects().returning(().pure[Try])
+      (deletingGauge.reset _).expects().returning(().pure[Try])
 
       gaugesUpdater.updateGauges(updateResults) shouldBe ().pure[Try]
     }
@@ -91,10 +102,14 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
     val awaitingTransformationGauge = mock[LabeledGauge[Try, projects.Path]]
     val underTransformationGauge    = mock[LabeledGauge[Try, projects.Path]]
     val underTriplesGenerationGauge = mock[LabeledGauge[Try, projects.Path]]
+    val awaitingDeletionGauge       = mock[LabeledGauge[Try, projects.Path]]
+    val deletingGauge               = mock[LabeledGauge[Try, projects.Path]]
     val gaugesUpdater = new GaugesUpdaterImpl[Try](awaitingGenerationGauge,
                                                    awaitingTransformationGauge,
                                                    underTransformationGauge,
-                                                   underTriplesGenerationGauge
+                                                   underTriplesGenerationGauge,
+                                                   awaitingDeletionGauge,
+                                                   deletingGauge
     )
   }
 
@@ -110,6 +125,7 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
     transformationRecoverableFailure    <- nonNegativeInts()
     transformationNonRecoverableFailure <- nonNegativeInts()
     awaitingDeletion                    <- nonNegativeInts()
+    deleting                            <- nonNegativeInts()
   } yield Map(
     New                                 -> statusNew.value,
     GeneratingTriples                   -> generatingTriples.value,
@@ -121,7 +137,8 @@ class GaugesUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactor
     GenerationNonRecoverableFailure     -> generationNonRecoverableFailure.value,
     TransformationRecoverableFailure    -> transformationRecoverableFailure.value,
     TransformationNonRecoverableFailure -> transformationNonRecoverableFailure.value,
-    AwaitingDeletion                    -> awaitingDeletion.value
+    AwaitingDeletion                    -> awaitingDeletion.value,
+    Deleting                            -> deleting.value
   )
 
   private implicit class DBUpdateResultsOps(dbUpdateResults: DBUpdateResults.ForProjects) {

@@ -39,7 +39,7 @@ private[subscriptions] trait EventDelivery[F[_], CategoryEvent] {
 
 private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
     sessionResource:          SessionResource[F, EventLogDB],
-    compoundEventIdExtractor: CategoryEvent => EventDeliveryId,
+    eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId,
     queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name],
     sourceUrl:                MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
@@ -47,7 +47,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
     with TypeSerializers {
 
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit] = sessionResource.useK {
-    val eventDeliveryId = compoundEventIdExtractor(event)
+    val eventDeliveryId = eventDeliveryIdExtractor(event)
     for {
       _      <- deleteDelivery(eventDeliveryId)
       result <- insert(eventDeliveryId, subscriberUrl)

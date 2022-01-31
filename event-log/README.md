@@ -286,7 +286,7 @@ the new status.
 }
 ```
 
-#### Changing status of the all events of a specific project to `AWAITING_DELETION` from "DELETING"
+#### Changing status of the all events of a specific project to `AWAITING_DELETION` from `DELETING`
 
 **Multipart Request**
 
