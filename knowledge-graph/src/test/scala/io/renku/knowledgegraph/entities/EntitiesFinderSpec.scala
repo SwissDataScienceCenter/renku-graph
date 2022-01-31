@@ -517,7 +517,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     }
   }
 
-  "findEntities - in case of a shared dataset" should {
+  "findEntities - in case of a shared datasets" should {
 
     "de-duplicate datasets having equal sameAs - case of an Internal DS" in new TestCase {
       val originalDSAndProject @ originalDS ::~ originalDSProject = renkuProjectEntities(visibilityPublic)
@@ -569,6 +569,55 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
           be((importedDSAndProject2.to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value)) or
           be((importedDSAndProject3.to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value))
       }
+    }
+  }
+
+  "findEntities - in case of a modified datasets" should {
+
+    "de-duplicate datasets having equal sameAs - case of an Internal DS" in new TestCase {
+      val originalDS ::~ modifiedDS ::~ originalDSProject = renkuProjectEntities(visibilityPublic)
+        .addDatasetAndModification(datasetEntities(provenanceInternal))
+        .generateOne
+
+      val importedDSAndProject @ _ ::~ importedDSProject = renkuProjectEntities(visibilityPublic)
+        .importDataset(originalDS)
+        .generateOne
+
+      loadToStore(originalDSProject, importedDSProject)
+
+      finder
+        .findEntities(Criteria(Filters()))
+        .unsafeRunSync()
+        .results shouldBe List(
+        originalDSProject.to[model.Entity.Project],
+        importedDSProject.to[model.Entity.Project],
+        (modifiedDS -> originalDSProject).to[model.Entity.Dataset],
+        importedDSAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+  }
+
+  "findEntities - in case of a invalidated datasets" should {
+
+    "not return invalidated DS" in new TestCase {
+      val originalDS ::~ _ ::~ originalDSProject = renkuProjectEntities(visibilityPublic)
+        .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
+        .generateOne
+
+      val importedDSAndProject @ _ ::~ importedDSProject = renkuProjectEntities(visibilityPublic)
+        .importDataset(originalDS)
+        .generateOne
+
+      loadToStore(originalDSProject, importedDSProject)
+
+      finder
+        .findEntities(Criteria(Filters()))
+        .unsafeRunSync()
+        .results shouldBe List(
+        originalDSProject.to[model.Entity.Project],
+        importedDSProject.to[model.Entity.Project],
+        importedDSAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
     }
   }
 
