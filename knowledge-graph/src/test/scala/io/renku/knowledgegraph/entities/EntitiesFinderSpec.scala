@@ -559,11 +559,9 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       val results = finder.findEntities(Criteria(Filters())).unsafeRunSync().results
 
-      val expectedProjects = List(
-        project1WithImportedDS.to[model.Entity.Project],
-        project2WithImportedDS.to[model.Entity.Project],
-        projectWithDSImportedFromProject.to[model.Entity.Project]
-      )
+      val expectedProjects = List(project1WithImportedDS, project2WithImportedDS, projectWithDSImportedFromProject)
+        .map(_.to[model.Entity.Project])
+
       results should {
         be((importedDSAndProject1.to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value)) or
           be((importedDSAndProject2.to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value)) or
@@ -618,6 +616,27 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         importedDSProject.to[model.Entity.Project],
         importedDSAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
+    }
+  }
+
+  "findEntities - in case of a forks with datasets" should {
+
+    "de-duplicate datasets when on forked projects" in new TestCase {
+      val _ ::~ modifiedDS ::~ originalDSProject = renkuProjectEntities(visibilityPublic)
+        .addDatasetAndModification(datasetEntities(provenanceInternal))
+        .generateOne
+
+      val original ::~ fork = originalDSProject.forkOnce()
+
+      loadToStore(original, fork)
+
+      val results = finder.findEntities(Criteria(Filters())).unsafeRunSync().results
+
+      val expectedProjects = List(original, fork).map(_.to[model.Entity.Project])
+      results should {
+        be(((modifiedDS -> original).to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value)) or
+          be(((modifiedDS -> fork).to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value))
+      }
     }
   }
 
