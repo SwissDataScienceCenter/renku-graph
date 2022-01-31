@@ -32,56 +32,51 @@ class TimestampZoneAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec wit
     case _ => true
   }
 
-  private val timestampType   = "timestamp without time zone"
-  private val timestamptzType = "timestamp with time zone"
-
   "run" should {
 
     "modify the type of the timestamp columns" in new TestCase {
 
       tableExists("event") shouldBe true
 
-      verify("event", "batch_date", timestampType)
-      verify("event", "create_date", timestampType)
-      verify("event", "event_date", timestampType)
-      verify("event", "execution_date", timestampType)
-      verify("event", "last_synced", timestampType)
-      verify("event", "latest_event_date", timestampType)
+      columnsToMigrate foreach { case (table, column) =>
+        verify(table, column, timestampType)
+      }
 
       tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
 
-      verify("event", "batch_date", timestamptzType)
-      verify("event", "create_date", timestamptzType)
-      verify("event", "event_date", timestamptzType)
-      verify("event", "execution_date", timestamptzType)
-      verify("event", "last_synced", timestamptzType)
-      verify("event", "latest_event_date", timestamptzType)
+      columnsToMigrate foreach { case (table, column) =>
+        verify(table, column, timestamptzType)
+      }
 
+      val expectedLogs = columnsToMigrate map { case (table, column) =>
+        Info(s"$table.$column in 'timestamp without time zone', migrating")
+      }
+      logger.loggedOnly(expectedLogs: _*)
     }
 
-    "do nothing if the timestamp are already timestampz" in new TestCase {
+    "do nothing if the timestamps are already timestampz" in new TestCase {
 
       tableExists("event") shouldBe true
 
-      tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
+      tableRefactor.run().unsafeRunSync() shouldBe ()
 
-      verify("event", "batch_date", timestamptzType)
-      verify("event", "create_date", timestamptzType)
-      verify("event", "event_date", timestamptzType)
-      verify("event", "execution_date", timestamptzType)
-      verify("event", "last_synced", timestamptzType)
-      verify("event", "latest_event_date", timestamptzType)
+      columnsToMigrate foreach { case (table, column) =>
+        verify(table, column, timestamptzType)
+      }
 
-      tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
+      tableRefactor.run().unsafeRunSync() shouldBe ()
 
-      verify("event", "batch_date", timestamptzType)
-      verify("event", "create_date", timestamptzType)
-      verify("event", "event_date", timestamptzType)
-      verify("event", "execution_date", timestamptzType)
-      verify("event", "last_synced", timestamptzType)
-      verify("event", "latest_event_date", timestamptzType)
+      columnsToMigrate foreach { case (table, column) =>
+        verify(table, column, timestamptzType)
+      }
 
-      logger.loggedOnly(Info("Fields are already in timestamptz type"))
+      val migrationLogs = columnsToMigrate map { case (table, column) =>
+        Info(s"$table.$column in 'timestamp without time zone', migrating")
+      }
+      val secondMigrationLogs = columnsToMigrate map { case (table, column) =>
+        Info(s"$table.$column already migrated to 'timestamp with time zone'")
+      }
+      logger.loggedOnly(migrationLogs ::: secondMigrationLogs: _*)
     }
   }
 
@@ -89,4 +84,16 @@ class TimestampZoneAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec wit
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val tableRefactor = new TimestampZoneAdderImpl[IO](sessionResource)
   }
+
+  private lazy val timestampType   = "timestamp without time zone"
+  private lazy val timestamptzType = "timestamp with time zone"
+
+  private lazy val columnsToMigrate = List(
+    "event"                           -> "batch_date",
+    "event"                           -> "created_date",
+    "event"                           -> "execution_date",
+    "event"                           -> "event_date",
+    "subscription_category_sync_time" -> "last_synced",
+    "project"                         -> "latest_event_date"
+  )
 }
