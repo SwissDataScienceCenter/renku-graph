@@ -24,7 +24,7 @@ import Criteria.{Filters, Sorting}
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.generators.CommonGraphGenerators.sortingDirections
+import io.renku.generators.CommonGraphGenerators.{accessTokens, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -33,6 +33,7 @@ import io.renku.graph.model.{datasets, projects, users}
 import io.renku.http.rest.SortBy
 import io.renku.http.rest.paging.model._
 import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
+import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.entities.model.Entity
 import io.renku.logging.TestExecutionTimeRecorder
@@ -531,7 +532,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(originalDSProject, importedDSProject)
 
       finder
-        .findEntities(Criteria(Filters()))
+        .findEntities(Criteria())
         .unsafeRunSync()
         .results shouldBe List(
         originalDSProject.to[model.Entity.Project],
@@ -557,7 +558,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(project1WithImportedDS, project2WithImportedDS, projectWithDSImportedFromProject)
 
-      val results = finder.findEntities(Criteria(Filters())).unsafeRunSync().results
+      val results = finder.findEntities(Criteria()).unsafeRunSync().results
 
       val expectedProjects = List(project1WithImportedDS, project2WithImportedDS, projectWithDSImportedFromProject)
         .map(_.to[model.Entity.Project])
@@ -609,7 +610,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(originalDSProject, importedDSProject)
 
       finder
-        .findEntities(Criteria(Filters()))
+        .findEntities(Criteria())
         .unsafeRunSync()
         .results shouldBe List(
         originalDSProject.to[model.Entity.Project],
@@ -630,7 +631,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       loadToStore(original, fork)
 
-      val results = finder.findEntities(Criteria(Filters())).unsafeRunSync().results
+      val results = finder.findEntities(Criteria()).unsafeRunSync().results
 
       val expectedProjects = List(original, fork).map(_.to[model.Entity.Project])
       results should {
@@ -649,14 +650,15 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .importDataset(externalDS)
         .generateOne
 
+      val member = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
       val original ::~ fork = {
         val original ::~ fork = publicProject.forkOnce()
-        original -> fork.copy(visibility = visibilityNonPublic.generateOne)
+        original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
       }
 
       loadToStore(original, fork)
 
-      finder.findEntities(Criteria(Filters())).unsafeRunSync().results shouldBe List(
+      finder.findEntities(Criteria(maybeUser = member.toAuthUser.some)).unsafeRunSync().results shouldBe List(
         original.to[model.Entity.Project],
         fork.to[model.Entity.Project],
         dsAndPublicProject.to[model.Entity.Dataset]
@@ -666,18 +668,20 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     "favour dataset on internal project projects if exists" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
+      val member = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
       val dsAndInternalProject @ _ ::~ internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
+        .modify(_.copy(members = Set(member)))
         .importDataset(externalDS)
         .generateOne
 
       val original ::~ fork = {
         val original ::~ fork = internalProject.forkOnce()
-        original -> fork.copy(visibility = projects.Visibility.Private)
+        original -> fork.copy(visibility = projects.Visibility.Private, members = Set(member))
       }
 
       loadToStore(original, fork)
 
-      finder.findEntities(Criteria(Filters())).unsafeRunSync().results shouldBe List(
+      finder.findEntities(Criteria(maybeUser = member.toAuthUser.some)).unsafeRunSync().results shouldBe List(
         original.to[model.Entity.Project],
         fork.to[model.Entity.Project],
         dsAndInternalProject.to[model.Entity.Dataset]
@@ -687,14 +691,76 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     "select dataset on private project if there's no project with broader visibility" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
+      val member = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
       val dsAndProject @ _ ::~ privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
+        .modify(_.copy(members = Set(member)))
         .importDataset(externalDS)
         .generateOne
 
       loadToStore(privateProject)
 
-      finder.findEntities(Criteria(Filters())).unsafeRunSync().results shouldBe List(
+      finder.findEntities(Criteria(maybeUser = member.toAuthUser.some)).unsafeRunSync().results shouldBe List(
         privateProject.to[model.Entity.Project],
+        dsAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+  }
+
+  "findEntities - security" should {
+
+    "not return non-public entities if no user who is a member is given" in new TestCase {
+
+      val _ ::~ nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      val dsAndProject @ _ ::~ publicProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(nonPublicProject, publicProject)
+
+      finder.findEntities(Criteria()).unsafeRunSync().results shouldBe List(
+        publicProject.to[model.Entity.Project],
+        dsAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "not return non-public entities if the given user has no access to them" in new TestCase {
+
+      val _ ::~ nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      val dsAndProject @ _ ::~ publicProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(nonPublicProject, publicProject)
+
+      finder
+        .findEntities(
+          Criteria(maybeUser = personEntities(userGitLabIds.toGeneratorOfSomes).generateSome.map(_.toAuthUser))
+        )
+        .unsafeRunSync()
+        .results shouldBe List(
+        publicProject.to[model.Entity.Project],
+        dsAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "return non-public entities if the given user has access to them" in new TestCase {
+      val member = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
+
+      val dsAndProject @ _ ::~ project = renkuProjectEntities(visibilityNonPublic)
+        .modify(_.copy(members = Set(member)))
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(project)
+
+      finder.findEntities(Criteria(maybeUser = member.toAuthUser.some)).unsafeRunSync().results shouldBe List(
+        project.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset]
       ).sortBy(_.name.value)
     }
@@ -727,5 +793,9 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       case proj: model.Entity.Project => proj.date.value
       case ds:   model.Entity.Dataset => ds.date.instant
     }
+  }
+
+  implicit class PersonOps(person: Person) {
+    lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, accessTokens.generateOne)
   }
 }

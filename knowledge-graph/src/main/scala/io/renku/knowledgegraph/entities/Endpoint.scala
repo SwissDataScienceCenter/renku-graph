@@ -3,6 +3,7 @@ package io.renku.knowledgegraph.entities
 import io.renku.graph.model.{projects, users}
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
+import io.renku.http.server.security.model.AuthUser
 import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
 import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
 
@@ -12,9 +13,10 @@ object Endpoint {
 
   import Criteria._
 
-  final case class Criteria(filters: Filters = Filters(),
-                            sorting: Sorting.By = Sorting.default,
-                            paging:  PagingRequest = PagingRequest.default
+  final case class Criteria(filters:   Filters = Filters(),
+                            sorting:   Sorting.By = Sorting.default,
+                            paging:    PagingRequest = PagingRequest.default,
+                            maybeUser: Option[AuthUser] = None
   )
 
   object Criteria {

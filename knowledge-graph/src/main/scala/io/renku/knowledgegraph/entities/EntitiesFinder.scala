@@ -62,19 +62,20 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |  ?maybeCreatorName ?maybeDescription ?keywords ?visibilities 
         |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames
         |WHERE {
-        |  ${subqueries(criteria.filters).mkString(" UNION ")}
+        |  ${subqueries(criteria).mkString(" UNION ")}
         |}
         |${`ORDER BY`(criteria.sorting)}
         |""".stripMargin
   )
 
-  private def subqueries(filters: Filters): List[String] =
+  private def subqueries(criteria: Criteria): List[String] =
     EntityType.all flatMap {
-      case EntityType.Project => maybeProjectsQuery(filters)
-      case EntityType.Dataset => maybeDatasetsQuery(filters)
+      case EntityType.Project => maybeProjectsQuery(criteria)
+      case EntityType.Dataset => maybeDatasetsQuery(criteria)
     }
 
-  private def maybeProjectsQuery(filters: Filters) = (filters whenRequesting EntityType.Project) {
+  private def maybeProjectsQuery(criteria: Criteria) = (criteria.filters whenRequesting EntityType.Project) {
+    import criteria._
     s"""|{
         |  SELECT ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName
         |    ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
@@ -99,6 +100,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |               renku:projectPath ?path;
         |               renku:projectVisibility ?visibility;
         |               schema:dateCreated ?date.
+        |    ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
         |    ${filters.maybeOnVisibility("?visibility")}
         |    ${filters.maybeOnProjectDateCreated("?date")}
         |    OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
@@ -111,7 +113,8 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |""".stripMargin
   }
 
-  private def maybeDatasetsQuery(filters: Filters) = (filters whenRequesting EntityType.Dataset) {
+  private def maybeDatasetsQuery(criteria: Criteria) = (criteria.filters whenRequesting EntityType.Dataset) {
+    import criteria._
     s"""|{
         |  SELECT ?entityType ?matchingScore ?identifier ?name ?visibilities
         |    ?maybeDateCreated ?maybeDatePublished ?date
@@ -160,6 +163,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |        FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
         |        FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
         |        ?projectId renku:projectVisibility ?visibility.
+        |        ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
         |        ${filters.maybeOnVisibility("?visibility")}
         |        OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
         |        OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
@@ -236,6 +240,24 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         s"xsd:date(xsd:dateTime('${Instant.from(date.value.atStartOfDay(ZoneOffset.UTC))}'))"
 
       lazy val encodeAsXsdNotZonedDate: String = s"xsd:date('$date')"
+    }
+  }
+
+  private implicit class CriteriaOps(criteria: Criteria) {
+
+    def maybeOnAccessRights(projectIdVariable: String, visibilityVariable: String): String = criteria.maybeUser match {
+      case Some(user) =>
+        s"""|OPTIONAL {
+            |    $projectIdVariable schema:member/schema:sameAs ?memberId.
+            |    ?memberId schema:additionalType 'GitLab';
+            |              schema:identifier ?userGitlabId .
+            |}
+            |FILTER (
+            |  $visibilityVariable = '${projects.Visibility.Public.value}' || ?userGitlabId = ${user.id.value}
+            |)
+            |""".stripMargin
+      case _ =>
+        s"""FILTER ($visibilityVariable = '${projects.Visibility.Public.value}')"""
     }
   }
 
