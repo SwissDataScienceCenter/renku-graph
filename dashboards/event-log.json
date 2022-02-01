@@ -22,7 +22,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 20,
-  "iteration": 1638267369276,
+  "iteration": 1643700322048,
   "links": [],
   "panels": [
     {
@@ -68,7 +68,7 @@
       "links": [],
       "nullPointMode": "null",
       "options": {
-        "alertThreshold": true
+        "alertThreshold": false
       },
       "paceLength": 10,
       "percentage": false,
@@ -597,6 +597,224 @@
       }
     },
     {
+      "aliasColors": {},
+      "bars": true,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "decimals": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "hiddenSeries": false,
+      "id": 24,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "hideZero": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 430,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": false,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "paceLength": 10,
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "label_replace(ceil(max by(project) (events_awaiting_deletion_count{kubernetes_name=\"${kube_env_name}-event-log\", kubernetes_namespace=\"${env_namespace}\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{project}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Events awaiting deletion",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:282",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:283",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": true,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "decimals": null,
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "hiddenSeries": false,
+      "id": 25,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "hideZero": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 430,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": false,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
+      "paceLength": 10,
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "label_replace(ceil(max by(project) (events_deleting_count{kubernetes_name=\"${kube_env_name}-event-log\", kubernetes_namespace=\"${env_namespace}\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{project}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Events deleting",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:282",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:283",
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
       "aliasColors": {
         "Generation Failure Rate": "dark-red"
       },
@@ -617,7 +835,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 37
       },
       "hiddenSeries": false,
       "id": 19,
@@ -725,7 +943,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 42
       },
       "hiddenSeries": false,
       "id": 6,
@@ -874,7 +1092,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 48
       },
       "hiddenSeries": false,
       "id": 9,
@@ -983,7 +1201,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 53
       },
       "hiddenSeries": false,
       "id": 10,
@@ -1091,7 +1309,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 58
       },
       "hiddenSeries": false,
       "id": 4,
@@ -1213,7 +1431,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 64
       },
       "hiddenSeries": false,
       "id": 23,
@@ -1314,7 +1532,7 @@
       }
     }
   ],
-  "refresh": "1m",
+  "refresh": "30s",
   "schemaVersion": 30,
   "style": "dark",
   "tags": [
@@ -1325,9 +1543,9 @@
       {
         "allValue": null,
         "current": {
-          "selected": true,
-          "text": "david-renku",
-          "value": "david-renku"
+          "selected": false,
+          "text": "tasko-renku",
+          "value": "tasko-renku"
         },
         "datasource": "Prometheus",
         "definition": "server_request_count_total",
@@ -1355,9 +1573,9 @@
       {
         "allValue": null,
         "current": {
-          "selected": true,
-          "text": "david",
-          "value": "david"
+          "selected": false,
+          "text": "andrea",
+          "value": "andrea"
         },
         "datasource": null,
         "definition": "server_request_count_total",
@@ -1412,5 +1630,5 @@
   "timezone": "",
   "title": "Renku Event Log",
   "uid": "cb9J1WBZz",
-  "version": 42
+  "version": 48
 }
