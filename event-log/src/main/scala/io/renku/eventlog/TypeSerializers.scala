@@ -20,7 +20,8 @@ package io.renku.eventlog
 
 import io.renku.events.consumers.Project
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import io.renku.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, EventTypeId, ZippedEventPayload}
+import io.renku.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
@@ -90,7 +91,9 @@ trait TypeSerializers {
   val eventFailureStatusEncoder: Encoder[EventStatus.FailureStatus] =
     eventStatusEncoder.contramap((s: EventStatus.FailureStatus) => s: EventStatus)
 
-  val eventTypeIdDecoder: Decoder[EventTypeId] = varchar.map(EventTypeId.apply)
+  val eventTypeIdDecoder: Decoder[EventTypeId] = varchar.map { case "DELETING" =>
+    DeletingProjectTypeId
+  }
   val eventTypeIdEncoder: Encoder[EventTypeId] = varchar.values.contramap(_.value)
 
   val compoundEventIdDecoder: Decoder[CompoundEventId] = (eventIdDecoder ~ projectIdDecoder).gmap[CompoundEventId]

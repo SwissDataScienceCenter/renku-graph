@@ -22,6 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
+import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.subscriptions.Generators._
 import io.renku.eventlog.subscriptions.TestCategoryEvent._
 import io.renku.events.consumers.subscriptions._

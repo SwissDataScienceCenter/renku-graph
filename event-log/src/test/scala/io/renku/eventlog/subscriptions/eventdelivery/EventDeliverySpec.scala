@@ -16,13 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.eventdelivery
 
 import cats.effect.IO
 import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.subscriptions.TestCompoundIdEvent
 import io.renku.eventlog.subscriptions.TestCompoundIdEvent.testCompoundIdEvent
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
@@ -34,7 +35,6 @@ import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.graph.model.events._
 
 class EventDeliverySpec
     extends AnyWordSpec
@@ -91,7 +91,7 @@ class EventDeliverySpec
 
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
-      findAllProjectDeliveries shouldBe List((event.compoundEventId.projectId, subscriberId, EventTypeId("DELETING")))
+      findAllProjectDeliveries shouldBe List((event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId))
     }
   }
 
@@ -105,7 +105,8 @@ class EventDeliverySpec
 
   private trait TestCase extends CommonTestCase {
 
-    val compoundIdExtractor: TestCompoundIdEvent => CompoundEventId = _.compoundEventId
+    val compoundIdExtractor: TestCompoundIdEvent => CompoundEventDeliveryId = e =>
+      CompoundEventDeliveryId(e.compoundEventId)
     val delivery =
       new EventDeliveryImpl[IO, TestCompoundIdEvent](sessionResource, compoundIdExtractor, queriesExecTimes, sourceUrl)
   }

@@ -22,6 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.subscriptions.triplesgenerated.TriplesGeneratedEventEncoder.{encodeEvent, encodePayload}
 import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.graph.model.events.CategoryName
@@ -46,9 +47,10 @@ private[subscriptions] object SubscriptionCategory {
                                                 queriesExecTimes
                     )
     dispatchRecovery <- DispatchRecovery[F]
-    eventDelivery <- EventDelivery[F, TriplesGeneratedEvent](sessionResource,
-                                                             compoundEventIdExtractor = (_: TriplesGeneratedEvent).id,
-                                                             queriesExecTimes
+    eventDelivery <- EventDelivery[F, TriplesGeneratedEvent](
+                       sessionResource,
+                       eventDeliveryIdExtractor = (event: TriplesGeneratedEvent) => CompoundEventDeliveryId(event.id),
+                       queriesExecTimes
                      )
     eventsDistributor <- EventsDistributor(name,
                                            subscribers,

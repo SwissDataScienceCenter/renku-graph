@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.eventdelivery
 
 import cats.MonadThrow
 import cats.effect.MonadCancelThrow
@@ -25,7 +25,8 @@ import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.graph.model.events.{CompoundEventId, DeletingProjectDeliverId, EventDeliveryId, EventId, EventTypeId}
+import io.renku.eventlog.subscriptions.eventdelivery._
+import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -57,7 +58,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
   private def insert(eventDeliveryId: EventDeliveryId, subscriberUrl: SubscriberUrl) =
     measureExecutionTime {
       eventDeliveryId match {
-        case CompoundEventId(eventId, projectId) =>
+        case CompoundEventDeliveryId(CompoundEventId(eventId, projectId)) =>
           SqlStatement(name = "event delivery info - insert")
             .command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl](
               sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
@@ -88,7 +89,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
 
   private def deleteDelivery(eventDeliveryId: EventDeliveryId) = measureExecutionTime {
     eventDeliveryId match {
-      case CompoundEventId(eventId, projectId) =>
+      case CompoundEventDeliveryId(CompoundEventId(eventId, projectId)) =>
         SqlStatement(name = "event delivery info - remove")
           .command[EventId ~ projects.Id](
             sql"""DELETE FROM event_delivery
@@ -121,13 +122,13 @@ private[subscriptions] object EventDelivery {
 
   def apply[F[_]: MonadCancelThrow, CategoryEvent](
       sessionResource:          SessionResource[F, EventLogDB],
-      compoundEventIdExtractor: CategoryEvent => EventDeliveryId,
+      eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId,
       queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name]
   ): F[EventDelivery[F, CategoryEvent]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     microserviceUrl       <- microserviceUrlFinder.findBaseUrl()
   } yield new EventDeliveryImpl[F, CategoryEvent](sessionResource,
-                                                  compoundEventIdExtractor,
+                                                  eventDeliveryIdExtractor,
                                                   queriesExecTimes,
                                                   microserviceUrl
   )
@@ -138,6 +139,7 @@ private[subscriptions] object EventDelivery {
       .widen[EventDelivery[F, CategoryEvent]]
 }
 
-private class NoOpEventDelivery[F[_]: MonadThrow, CategoryEvent] extends EventDelivery[F, CategoryEvent] {
+private[subscriptions] class NoOpEventDelivery[F[_]: MonadThrow, CategoryEvent]
+    extends EventDelivery[F, CategoryEvent] {
   override def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit] = ().pure[F]
 }
