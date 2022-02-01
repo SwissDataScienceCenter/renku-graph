@@ -584,14 +584,14 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(originalDSProject, importedDSProject)
 
       finder
-        .findEntities(Criteria(Filters()))
+        .findEntities(Criteria(sorting = Sorting.By(Sorting.ByDate, SortBy.Direction.Asc)))
         .unsafeRunSync()
         .results shouldBe List(
         originalDSProject.to[model.Entity.Project],
         importedDSProject.to[model.Entity.Project],
         (modifiedDS -> originalDSProject).to[model.Entity.Dataset],
         importedDSAndProject.to[model.Entity.Dataset]
-      ).sortBy(_.name.value)
+      ).sortBy(_.dateAsInstant)
     }
   }
 
@@ -637,6 +637,66 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         be(((modifiedDS -> original).to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value)) or
           be(((modifiedDS -> fork).to[model.Entity.Dataset] :: expectedProjects).sortBy(_.name.value))
       }
+    }
+  }
+
+  "findEntities - in case of a dataset on forks with different visibility" should {
+
+    "favour dataset on public project projects if exists" in new TestCase {
+      val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+
+      val dsAndPublicProject @ _ ::~ publicProject = renkuProjectEntities(visibilityPublic)
+        .importDataset(externalDS)
+        .generateOne
+
+      val original ::~ fork = {
+        val original ::~ fork = publicProject.forkOnce()
+        original -> fork.copy(visibility = visibilityNonPublic.generateOne)
+      }
+
+      loadToStore(original, fork)
+
+      finder.findEntities(Criteria(Filters())).unsafeRunSync().results shouldBe List(
+        original.to[model.Entity.Project],
+        fork.to[model.Entity.Project],
+        dsAndPublicProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "favour dataset on internal project projects if exists" in new TestCase {
+      val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+
+      val dsAndInternalProject @ _ ::~ internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
+        .importDataset(externalDS)
+        .generateOne
+
+      val original ::~ fork = {
+        val original ::~ fork = internalProject.forkOnce()
+        original -> fork.copy(visibility = projects.Visibility.Private)
+      }
+
+      loadToStore(original, fork)
+
+      finder.findEntities(Criteria(Filters())).unsafeRunSync().results shouldBe List(
+        original.to[model.Entity.Project],
+        fork.to[model.Entity.Project],
+        dsAndInternalProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+
+    "select dataset on private project if there's no project with broader visibility" in new TestCase {
+      val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+
+      val dsAndProject @ _ ::~ privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
+        .importDataset(externalDS)
+        .generateOne
+
+      loadToStore(privateProject)
+
+      finder.findEntities(Criteria(Filters())).unsafeRunSync().results shouldBe List(
+        privateProject.to[model.Entity.Project],
+        dsAndProject.to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
     }
   }
 

@@ -113,81 +113,71 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   private def maybeDatasetsQuery(filters: Filters) = (filters whenRequesting EntityType.Dataset) {
     s"""|{
-        |  SELECT ?entityType ?matchingScore ?identifier ?name ?visibilities 
-        |    ?maybeDateCreated ?maybeDatePublished ?date 
+        |  SELECT ?entityType ?matchingScore ?identifier ?name ?visibilities
+        |    ?maybeDateCreated ?maybeDatePublished ?date
         |    ?creatorsNames ?maybeDescription ?keywords
         |  WHERE {
         |    {
-        |      SELECT ?entityType ?matchingScore ?identifier ?name
-        |        (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
-        |        ?maybeDateCreated ?maybeDatePublished ?date
+        |      SELECT ?sameAs ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date
         |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorsNames)
-        |        ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+        |        (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
+        |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+        |        (SAMPLE(?dsId) AS ?dsIdSample) (GROUP_CONCAT(DISTINCT ?dsId; separator='|') AS ?dsIds)
         |      WHERE {
         |        {
-        |          SELECT ?sameAs (SAMPLE(?dsId) AS ?dsIdSample)
-        |            (GROUP_CONCAT(DISTINCT ?dsId; separator='|') AS ?dsIds)
-        |            (MAX(?dsScore) AS ?matchingScore)
+        |          SELECT ?sameAs ?dsId ?projectId ?matchingScore
+        |            (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds)
+        |            (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
         |          WHERE {
         |            {
-        |              SELECT ?sameAs ?projectId ?dsId ?dsScore
-        |                (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds)
-        |                (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
+        |              SELECT ?dsId (MAX(?score) AS ?matchingScore)
         |              WHERE {
         |                {
-        |                  SELECT ?dsId (MAX(?score) AS ?dsScore)
-        |                  WHERE {
-        |                    {
-        |                      (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
-        |                    } {
-        |                      ?id a schema:Dataset
-        |                      BIND (?id AS ?dsId)
-        |                    } UNION {
-        |                      ?dsId schema:creator ?id;
-        |                            a schema:Dataset.
-        |                    }
-        |                  }
-        |                  GROUP BY ?dsId
-        |                }
-        |                ?dsId renku:topmostSameAs ?sameAs;
-        |                      ^renku:hasDataset ?projectId.
-        |                OPTIONAL {
-        |                ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
-        |                           ^renku:hasDataset ?childProjectId.
-        |                }
-        |                OPTIONAL {
-        |                  ?dsId prov:invalidatedAtTime ?invalidationTime;
-        |                        ^renku:hasDataset ?projectIdWhereInvalidated
+        |                  (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
+        |                } {
+        |                  ?id a schema:Dataset
+        |                  BIND (?id AS ?dsId)
+        |                } UNION {
+        |                  ?dsId schema:creator ?id;
+        |                        a schema:Dataset.
         |                }
         |              }
-        |              GROUP BY ?sameAs ?dsId ?projectId ?dsScore
+        |              GROUP BY ?dsId
         |            }
-        |            FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
-        |            FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
+        |            ?dsId renku:topmostSameAs ?sameAs;
+        |                  ^renku:hasDataset ?projectId.
+        |            OPTIONAL {
+        |            ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
+        |                       ^renku:hasDataset ?childProjectId.
+        |            }
+        |            OPTIONAL {
+        |              ?dsId prov:invalidatedAtTime ?invalidationTime;
+        |                    ^renku:hasDataset ?projectIdWhereInvalidated
+        |            }
         |          }
-        |          GROUP BY ?sameAs
+        |          GROUP BY ?sameAs ?dsId ?projectId ?matchingScore
         |        }
-        |        BIND ('dataset' AS ?entityType)
-        |        BIND (IF (CONTAINS(STR(?dsIds), STR(?sameAs)), ?sameAs, ?dsIdSample) AS ?dsId)
-        |        ?dsId schema:identifier ?identifier;
-        |              renku:slug ?name.
-        |        ?projectId renku:hasDataset ?dsId;
-        |                   renku:projectVisibility ?visibility.
+        |        FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
+        |        FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
+        |        ?projectId renku:projectVisibility ?visibility.
         |        ${filters.maybeOnVisibility("?visibility")}
         |        OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
         |        OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
         |        OPTIONAL { ?dsId schema:datePublished ?maybeDatePublished }.
-        |        ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
-        |        OPTIONAL { ?dsId schema:description ?maybeDescription }
-        |        OPTIONAL { ?dsId schema:keywords ?keyword }
         |        BIND (IF (BOUND(?maybeDateCreated), ?maybeDateCreated, ?maybeDatePublished) AS ?date)
+        |        ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
+        |        OPTIONAL { ?dsId schema:keywords ?keyword }
         |      }
-        |      GROUP BY ?entityType ?matchingScore ?identifier ?name ?maybeDateCreated ?maybeDatePublished ?date ?maybeDescription
+        |      GROUP BY ?sameAs ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date
         |    }
         |    ${filters.maybeOnCreatorsNames("?creatorsNames")}
+        |    BIND ('dataset' AS ?entityType)
+        |    BIND (IF (CONTAINS(STR(?dsIds), STR(?sameAs)), ?sameAs, ?dsIdSample) AS ?dsId)
+        |    ?dsId schema:identifier ?identifier;
+        |          renku:slug ?name.
+        |    OPTIONAL { ?dsId schema:description ?maybeDescription }
         |  }
-        |}
-        |""".stripMargin
+        |}""".stripMargin
   }
 
   private implicit class FiltersOps(filters: Filters) {
