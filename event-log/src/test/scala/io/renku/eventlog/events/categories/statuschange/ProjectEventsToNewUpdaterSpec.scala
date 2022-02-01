@@ -48,6 +48,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 import scala.util.Random
+import io.renku.metrics.LabeledGauge
 
 class ProjectEventsToNewUpdaterSpec
     extends AnyWordSpec
@@ -101,6 +102,8 @@ class ProjectEventsToNewUpdaterSpec
           .updatedWith(EventStatus.New) { maybeNewEvents =>
             maybeNewEvents.map(_ + events.size).orElse(Some(events.size))
           }
+          .updated(EventStatus.Deleting, -1)
+      (deletingGauge.update _).expects((projectPath, -1.toDouble)).returning(().pure[IO])
 
       sessionResource
         .useK(dbUpdater.updateDB(ProjectEventsToNew(Project(projectId, projectPath))))
@@ -137,7 +140,7 @@ class ProjectEventsToNewUpdaterSpec
 
         sessionResource
           .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, Map.empty)
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, Map(EventStatus.Deleting -> -2))
 
         findEvent(CompoundEventId(event1, projectId)) shouldBe None
         findEvent(CompoundEventId(event2, projectId)) shouldBe None
@@ -159,7 +162,7 @@ class ProjectEventsToNewUpdaterSpec
 
         sessionResource
           .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, Map.empty)
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, Map(EventStatus.Deleting -> -2))
 
         findEvent(CompoundEventId(event1, projectId)) shouldBe None
         findEvent(CompoundEventId(event2, projectId)) shouldBe None
@@ -225,9 +228,10 @@ class ProjectEventsToNewUpdaterSpec
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val deletingGauge    = mock[LabeledGauge[IO, projects.Path]]
     val projectCleaner   = mock[ProjectCleaner[IO]]
-    val dbUpdater        = new ProjectEventsToNewUpdaterImpl[IO](projectCleaner, queriesExecTimes, currentTime)
-    val now              = Instant.now()
+    val dbUpdater = new ProjectEventsToNewUpdaterImpl[IO](projectCleaner, queriesExecTimes, deletingGauge, currentTime)
+    val now       = Instant.now()
 
     currentTime.expects().returning(now)
   }
