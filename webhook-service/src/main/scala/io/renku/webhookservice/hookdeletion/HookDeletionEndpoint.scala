@@ -62,8 +62,8 @@ class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
 
   def deleteHook(projectId: Id, authUser: AuthUser): F[Response[F]] = {
     for {
-      creationResult <- hookDeletor.deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken)
-      response       <- toHttpResponse(creationResult)
+      deletionResult <- hookDeletor.deleteHook(HookIdentifier(projectId, projectHookUrl), authUser.accessToken)
+      response       <- toHttpResponse(deletionResult)
     } yield response
   } recoverWith httpResponse
 }

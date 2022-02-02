@@ -60,6 +60,7 @@ class ProjectHookFetcherSpec
 
       fetcher.fetchProjectHooks(projectId, personalAccessToken).unsafeRunSync() shouldBe idAndUrls.toList
     }
+
     "return the list of hooks of the project - oauth token case" in new TestCase {
 
       val oauthAccessToken = oauthAccessTokens.generateOne
@@ -73,6 +74,21 @@ class ProjectHookFetcherSpec
 
       fetcher.fetchProjectHooks(projectId, oauthAccessToken).unsafeRunSync() shouldBe idAndUrls.toList
     }
+
+    "return an empty list of hooks if the project does not exists" in new TestCase {
+
+      val oauthAccessToken = oauthAccessTokens.generateOne
+      val idAndUrls        = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId/hooks")
+          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
+          .willReturn(notFound())
+      }
+
+      fetcher.fetchProjectHooks(projectId, oauthAccessToken).unsafeRunSync() shouldBe List.empty[HookIdAndUrl]
+    }
+
     "decode the list of hooks if the id is sent as a number" in new TestCase {
 
       val oauthAccessToken = oauthAccessTokens.generateOne
@@ -103,7 +119,7 @@ class ProjectHookFetcherSpec
       } shouldBe UnauthorizedException
     }
 
-    "return a RuntimeException if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
+    "return a RuntimeException if remote client responds with status neither OK , NOT_FOUND nor UNAUTHORIZED" in new TestCase {
 
       val personalAccessToken = personalAccessTokens.generateOne
 
