@@ -60,6 +60,7 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: Logger](
   import org.http4s.dsl.io._
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[List[HookIdAndUrl]]] = {
     case (Ok, _, response)    => response.as[List[HookIdAndUrl]]
+    case (NotFound, _, _)     => List.empty[HookIdAndUrl].pure[F]
     case (Unauthorized, _, _) => MonadCancelThrow[F].raiseError(UnauthorizedException)
   }
 
