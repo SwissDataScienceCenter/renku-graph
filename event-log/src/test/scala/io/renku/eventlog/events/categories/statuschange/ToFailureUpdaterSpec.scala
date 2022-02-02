@@ -37,6 +37,7 @@ import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.data.Completion
 
 import java.time.{Duration, Instant}
 
@@ -144,7 +145,8 @@ class ToFailureUpdaterSpec
 
           intercept[Exception] {
             sessionResource.useK(dbUpdater.updateDB(statusChangeEvent)).unsafeRunSync()
-          }.getMessage shouldBe s"Could not update event $eventId to status ${statusChangeEvent.newStatus}"
+          }.getMessage shouldBe s"Could not update event $eventId to status ${statusChangeEvent.newStatus}: ${Completion
+            .Update(0)}"
 
           findEvent(eventId).map(_._2) shouldBe Some(invalidStatus)
         }

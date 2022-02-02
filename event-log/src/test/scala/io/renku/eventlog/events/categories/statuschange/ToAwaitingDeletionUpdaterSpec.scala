@@ -70,7 +70,7 @@ class ToAwaitingDeletionUpdaterSpec
         sessionResource
           .useK(dbUpdater updateDB ToAwaitingDeletion(eventId, projectPaths.generateOne))
           .unsafeRunSync()
-      }.getMessage shouldBe s"Could not update event $eventId to status $AwaitingDeletion"
+      }.getMessage shouldBe s"Could not update event $eventId to status $AwaitingDeletion: event not found"
     }
   }
 

@@ -66,7 +66,7 @@ private class ToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
             .pure[F]
             .widen[DBUpdateResults]
         case _ =>
-          new Exception(s"Could not update event ${event.eventId} to status $AwaitingDeletion")
+          new Exception(s"Could not update event ${event.eventId} to status $AwaitingDeletion: event not found")
             .raiseError[F, DBUpdateResults]
       }
   }

@@ -79,8 +79,8 @@ private class ToTriplesStoreUpdater[F[_]: MonadCancelThrow: Async](
           DBUpdateResults
             .ForProjects(event.projectPath, Map(TransformingTriples -> -1, TriplesStore -> 1))
             .pure[F]
-        case _ =>
-          new Exception(s"Could not update event ${event.eventId} to status ${EventStatus.TriplesStore}")
+        case completion =>
+          new Exception(s"Could not update event ${event.eventId} to status ${EventStatus.TriplesStore}: $completion")
             .raiseError[F, DBUpdateResults.ForProjects]
       }
   }
