@@ -19,11 +19,11 @@
 package io.renku.eventlog.subscriptions.cleanup
 
 import cats.MonadThrow
-import cats.effect.{Async, Temporal}
+import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
-import io.renku.eventlog.{EventMessage, subscriptions}
+import io.renku.eventlog.subscriptions
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
@@ -40,41 +40,35 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
 
   override def returnToQueue(event: CleanUpEvent): F[Unit] =
     eventSender.sendEvent(
-      EventRequestContent.NoPayload(
-        json"""{
-        "categoryName": "EVENTS_STATUS_CHANGE",
-        "project": {
-          "id":   ${event.project.id},
-          "path": ${event.project.path}
-        },
-          "newStatus": $AwaitingDeletion
-        }"""
-      ),
-      errorMessage = s"${SubscriptionCategory.name}: Marking event as $AwaitingDeletion failed"
+      sendEventPayload(event),
+      errorMessage =
+        s"${SubscriptionCategory.name}: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
     )
 
   override def recover(
       url:   SubscriberUrl,
       event: CleanUpEvent
   ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    val requestContent = EventRequestContent.NoPayload(
+    val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $AwaitingDeletion"
+    eventSender.sendEvent(sendEventPayload(event), errorMessage) >> Logger[F].error(exception)(errorMessage)
+  }
+
+  private def sendEventPayload(event: CleanUpEvent) =
+    EventRequestContent.NoPayload(
       json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "project": {
           "id":   ${event.project.id},
           "path": ${event.project.path}
         },
-        "message" : ${EventMessage(exception)},
         "newStatus": $AwaitingDeletion
-      }"""
+     }"""
     )
-    val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $AwaitingDeletion"
-    eventSender.sendEvent(requestContent, errorMessage) >> Logger[F].error(exception)(errorMessage)
-  }
+
 }
 
 private object DispatchRecovery {
-  def apply[F[_]: Async: Temporal: Logger]: F[DispatchRecovery[F, CleanUpEvent]] = for {
+  def apply[F[_]: Async: Logger]: F[DispatchRecovery[F, CleanUpEvent]] = for {
     eventSender <- EventSender[F]
   } yield new DispatchRecoveryImpl[F](eventSender)
 }

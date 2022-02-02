@@ -91,7 +91,7 @@ trait TypeSerializers {
   val eventFailureStatusEncoder: Encoder[EventStatus.FailureStatus] =
     eventStatusEncoder.contramap((s: EventStatus.FailureStatus) => s: EventStatus)
 
-  val eventTypeIdDecoder: Decoder[EventTypeId] = varchar.map { case "DELETING" =>
+  val eventTypeIdDecoder: Decoder[EventTypeId] = varchar.map { case DeletingProjectTypeId.value =>
     DeletingProjectTypeId
   }
   val eventTypeIdEncoder: Encoder[EventTypeId] = varchar.values.contramap(_.value)

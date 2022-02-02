@@ -51,7 +51,7 @@ private[subscriptions] object SubscriptionCategory {
                        eventDeliveryIdExtractor = (event: CleanUpEvent) => DeletingProjectDeliverId(event.project.id),
                        queriesExecTimes
                      )
-    dispatchRecovery <- LoggingDispatchRecovery[F, CleanUpEvent](name)
+    dispatchRecovery <- DispatchRecovery[F]
     eventFinder      <- CleanUpEventFinder(sessionResource, awaitingDeletionGauge, deletingGauge, queriesExecTimes)
     eventsDistributor <-
       EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)

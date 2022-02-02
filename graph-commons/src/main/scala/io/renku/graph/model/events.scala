@@ -67,9 +67,6 @@ object events {
     protected[this] override def maybeMax: Option[Instant] = instantNow.plus(24, HOURS).some
   }
 
-  final class ProjectDeliveryId private (val value: String) extends AnyVal with StringTinyType
-  implicit object ProjectDeliveryId extends TinyTypeFactory[ProjectDeliveryId](new ProjectDeliveryId(_)) with NonBlank
-
   final class EventId private (val value: String) extends AnyVal with StringTinyType
   implicit object EventId                         extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
 

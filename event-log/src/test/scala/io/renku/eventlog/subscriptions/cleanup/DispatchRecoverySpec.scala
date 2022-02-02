@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.subscriptions.cleanup
 
-import io.renku.eventlog.EventMessage
 import io.renku.events.EventRequestContent
 import io.renku.generators.Generators._
 import io.renku.generators.Generators.Implicits._
@@ -53,7 +52,10 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
 
       (eventSender
         .sendEvent(_: EventRequestContent.NoPayload, _: String))
-        .expects(eventRequestContent, s"${SubscriptionCategory.name}: Marking event as $AwaitingDeletion failed")
+        .expects(
+          eventRequestContent,
+          s"${SubscriptionCategory.name}: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
+        )
         .returning(().pure[Try])
 
       dispatchRecovery.returnToQueue(event) shouldBe ().pure[Try]
@@ -73,7 +75,6 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
           "id":   ${event.project.id},
           "path": ${event.project.path}
         },
-        "message": ${EventMessage(exception)},
         "newStatus": $AwaitingDeletion
       }""")
 
