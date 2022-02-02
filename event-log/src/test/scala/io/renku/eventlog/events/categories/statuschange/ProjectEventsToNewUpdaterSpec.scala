@@ -34,12 +34,12 @@ import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventsGenerators.{categoryNames, compoundEventIds, eventBodies, eventProcessingTimes, lastSyncedDates, zippedEventPayloads}
-import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, Skipped}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -48,7 +48,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 import scala.util.Random
-import io.renku.metrics.LabeledGauge
 
 class ProjectEventsToNewUpdaterSpec
     extends AnyWordSpec
@@ -61,39 +60,36 @@ class ProjectEventsToNewUpdaterSpec
   "updateDB" should {
     "change the status of all events of a specific project to NEW except SKIPPED events" in new TestCase {
 
-      val Project(projectId, projectPath) = consumerProjects.generateOne
+      val project = consumerProjects.generateOne
       val eventsStatuses = Gen
-        .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion, EventStatus.Deleting)))
+        .oneOf(EventStatus.all.diff(Set(Skipped, AwaitingDeletion, Deleting)))
         .generateNonEmptyList(2)
 
       val eventsAndDates = eventsStatuses
         .map { status =>
           val eventDate = timestampsNotInTheFuture.generateAs(EventDate)
-          addEvent(status, projectId, projectPath, eventDate) -> eventDate
+          addEvent(status, project, eventDate) -> eventDate
         }
-        .map { case (id, eventDate) => CompoundEventId(id, projectId) -> eventDate }
+        .map { case (id, eventDate) => CompoundEventId(id, project.id) -> eventDate }
         .toList
 
       val events = eventsAndDates.map(_._1)
 
       val skippedEventDate          = timestampsNotInTheFuture.generateAs(EventDate)
       val awaitingDeletionEventDate = timestampsNotInTheFuture.generateAs(EventDate)
-      val skippedEvent              = addEvent(EventStatus.Skipped, projectId, projectPath, skippedEventDate)
-      val awaitingDeletionEvent =
-        addEvent(EventStatus.AwaitingDeletion, projectId, projectPath, awaitingDeletionEventDate)
-      val deletingEvent = addEvent(EventStatus.Deleting, projectId, projectPath)
+      val skippedEvent              = addEvent(Skipped, project, skippedEventDate)
+      val awaitingDeletionEvent     = addEvent(AwaitingDeletion, project, awaitingDeletionEventDate)
+      val deletingEvent             = addEvent(Deleting, project)
 
-      val Project(otherProjectId, otherProjectPath) = consumerProjects.generateOne
-      val eventStatus = Gen
-        .oneOf(EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion)))
-        .generateOne
+      val otherProject = consumerProjects.generateOne
+      val eventStatus  = Gen.oneOf(EventStatus.all.diff(Set(Skipped, AwaitingDeletion))).generateOne
 
-      val otherProjectEventId = CompoundEventId(addEvent(eventStatus, otherProjectId, otherProjectPath), otherProjectId)
+      val otherProjectEventId = CompoundEventId(addEvent(eventStatus, otherProject), otherProject.id)
 
       events.foreach(upsertEventDelivery(_, subscriberId))
       upsertEventDelivery(otherProjectEventId, subscriberId)
 
-      upsertCategorySyncTime(projectId, categoryNames.generateOne, lastSyncedDates.generateOne)
+      upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
 
       val counts: Map[EventStatus, Int] =
         eventsStatuses.toList
@@ -102,26 +98,27 @@ class ProjectEventsToNewUpdaterSpec
           .updatedWith(EventStatus.New) { maybeNewEvents =>
             maybeNewEvents.map(_ + events.size).orElse(Some(events.size))
           }
-          .updated(EventStatus.Deleting, -1)
-      (deletingGauge.update _).expects((projectPath, -1.toDouble)).returning(().pure[IO])
+          .updated(AwaitingDeletion, -1)
+          .updated(Deleting, -1)
+      (deletingGauge.update _).expects((project.path, -1.toDouble)).returning(().pure[IO])
 
       sessionResource
-        .useK(dbUpdater.updateDB(ProjectEventsToNew(Project(projectId, projectPath))))
-        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, counts)
+        .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path, counts)
 
       events.flatMap(findFullEvent) shouldBe events.map { eventId =>
         (eventId.id, EventStatus.New, None, None, List())
       }
 
-      findEvent(CompoundEventId(skippedEvent, projectId)).map(_._2)          shouldBe Some(EventStatus.Skipped)
-      findEvent(CompoundEventId(awaitingDeletionEvent, projectId)).map(_._2) shouldBe Some(EventStatus.AwaitingDeletion)
-      findEvent(CompoundEventId(deletingEvent, projectId)).map(_._2)         shouldBe None
+      findEvent(CompoundEventId(skippedEvent, project.id)).map(_._2)          shouldBe Some(Skipped)
+      findEvent(CompoundEventId(awaitingDeletionEvent, project.id)).map(_._2) shouldBe None
+      findEvent(CompoundEventId(deletingEvent, project.id)).map(_._2)         shouldBe None
       findAllEventDeliveries shouldBe List(otherProjectEventId -> subscriberId)
 
       val latestEventDate: EventDate =
         (List(skippedEventDate, awaitingDeletionEventDate) ::: eventsAndDates.map(_._2)).max
 
-      findProjects.find { case (id, _, _) => id == projectId }.map(_._3) shouldBe Some(latestEventDate)
+      findProjects.find { case (id, _, _) => id == project.id }.map(_._3) shouldBe Some(latestEventDate)
 
       findEvent(otherProjectEventId).map(_._2) shouldBe Some(eventStatus)
     }
@@ -129,32 +126,33 @@ class ProjectEventsToNewUpdaterSpec
     "change the status of all events of a specific project to NEW except SKIPPED events " +
       "- case when there are no events left in the project" in new TestCase {
 
-        val project @ Project(projectId, projectPath) = consumerProjects.generateOne
+        val project = consumerProjects.generateOne
 
-        val event1 = addEvent(EventStatus.Deleting, projectId, projectPath)
-        val event2 = addEvent(EventStatus.Deleting, projectId, projectPath)
+        val event1 = addEvent(Deleting, project)
+        val event2 = addEvent(Deleting, project)
 
-        upsertCategorySyncTime(projectId, categoryNames.generateOne, lastSyncedDates.generateOne)
+        upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
 
         (projectCleaner.cleanUp _).expects(project).returns(Kleisli.pure(()))
 
         sessionResource
           .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, Map(EventStatus.Deleting -> -2))
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path,
+                                                                Map(AwaitingDeletion -> 0, Deleting -> -2)
+        )
 
-        findEvent(CompoundEventId(event1, projectId)) shouldBe None
-        findEvent(CompoundEventId(event2, projectId)) shouldBe None
-
+        findEvent(CompoundEventId(event1, project.id)) shouldBe None
+        findEvent(CompoundEventId(event2, project.id)) shouldBe None
       }
 
     "change the status of all events of a specific project to NEW except SKIPPED events " +
       "- case when there are no events left in the project and cleaning the project fails" in new TestCase {
 
-        val exception                                 = exceptions.generateOne
-        val project @ Project(projectId, projectPath) = consumerProjects.generateOne
+        val exception = exceptions.generateOne
+        val project   = consumerProjects.generateOne
 
-        val event1 = addEvent(EventStatus.Deleting, projectId, projectPath)
-        val event2 = addEvent(EventStatus.Deleting, projectId, projectPath)
+        val event1 = addEvent(Deleting, project)
+        val event2 = addEvent(Deleting, project)
 
         (projectCleaner.cleanUp _)
           .expects(project)
@@ -162,22 +160,22 @@ class ProjectEventsToNewUpdaterSpec
 
         sessionResource
           .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
-          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(projectPath, Map(EventStatus.Deleting -> -2))
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path,
+                                                                Map(AwaitingDeletion -> 0, Deleting -> -2)
+        )
 
-        findEvent(CompoundEventId(event1, projectId)) shouldBe None
-        findEvent(CompoundEventId(event2, projectId)) shouldBe None
+        findEvent(CompoundEventId(event1, project.id)) shouldBe None
+        findEvent(CompoundEventId(event2, project.id)) shouldBe None
 
         logger.loggedOnly(Error(s"Clean up project failed: ${project.show}", exception))
-
       }
   }
 
-  private def addEvent(status:      EventStatus,
-                       projectId:   projects.Id = projectIds.generateOne,
-                       projectPath: projects.Path = projectPaths.generateOne,
-                       eventDate:   EventDate = timestampsNotInTheFuture.generateAs(EventDate)
+  private def addEvent(status:    EventStatus,
+                       project:   Project = consumerProjects.generateOne,
+                       eventDate: EventDate = timestampsNotInTheFuture.generateAs(EventDate)
   ): EventId = {
-    val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
+    val eventId = compoundEventIds.generateOne.copy(projectId = project.id)
     storeEvent(
       eventId,
       status,
@@ -190,16 +188,16 @@ class ProjectEventsToNewUpdaterSpec
       },
       maybeEventPayload = status match {
         case EventStatus.TriplesStore | EventStatus.TriplesGenerated => zippedEventPayloads.generateSome
-        case EventStatus.AwaitingDeletion                            => zippedEventPayloads.generateOption
+        case AwaitingDeletion                                        => zippedEventPayloads.generateOption
         case _                                                       => zippedEventPayloads.generateNone
       },
-      projectPath = projectPath
+      projectPath = project.path
     )
 
     status match {
       case EventStatus.TriplesGenerated | EventStatus.TriplesStore =>
         upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-      case EventStatus.AwaitingDeletion =>
+      case AwaitingDeletion =>
         if (Random.nextBoolean()) {
           upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
         } else ()
