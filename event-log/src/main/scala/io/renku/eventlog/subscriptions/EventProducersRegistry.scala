@@ -67,6 +67,8 @@ object EventProducersRegistry {
       underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],
       awaitingTransformationGauge:    LabeledGauge[F, projects.Path],
       underTransformationGauge:       LabeledGauge[F, projects.Path],
+      awaitingDeletionGauge:          LabeledGauge[F, projects.Path],
+      deletingGauge:                  LabeledGauge[F, projects.Path],
       queriesExecTimes:               LabeledHistogram[F, SqlStatement.Name]
   ): F[EventProducersRegistry[F]] = for {
     subscriberTracker <- SubscriberTracker(sessionResource, queriesExecTimes)
@@ -86,7 +88,13 @@ object EventProducersRegistry {
                                                                       queriesExecTimes,
                                                                       subscriberTracker
                                 )
-    cleanUpEventCategory <- cleanup.SubscriptionCategory(subscriberTracker, queriesExecTimes)
+    cleanUpEventCategory <-
+      cleanup.SubscriptionCategory(subscriberTracker,
+                                   sessionResource,
+                                   awaitingDeletionGauge,
+                                   deletingGauge,
+                                   queriesExecTimes
+      )
     zombieEventsCategory <- zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
   } yield new EventProducersRegistryImpl(
     Set[SubscriptionCategory[F]](

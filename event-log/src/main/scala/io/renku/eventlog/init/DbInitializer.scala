@@ -82,7 +82,8 @@ object DbInitializer {
         EventDeliveryTableCreator(sessionResource),
         TimestampZoneAdder(sessionResource),
         PayloadTypeChanger(sessionResource),
-        StatusChangeEventsTableCreator(sessionResource)
+        StatusChangeEventsTableCreator(sessionResource),
+        EventDeliveryEventTypeAdder(sessionResource)
       ),
       isMigrating
     )

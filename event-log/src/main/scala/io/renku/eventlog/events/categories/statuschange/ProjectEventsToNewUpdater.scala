@@ -38,20 +38,24 @@ import skunk.{Session, ~}
 
 import java.time.Instant
 import scala.util.control.NonFatal
+import skunk.data.Completion
+import io.renku.metrics.LabeledGauge
 
 private trait ProjectEventsToNewUpdater[F[_]] extends DBUpdater[F, ProjectEventsToNew]
 
 private object ProjectEventsToNewUpdater {
   def apply[F[_]: Async: Logger](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name],
+      deletingEventGauge: LabeledGauge[F, projects.Path]
   ): F[DBUpdater[F, ProjectEventsToNew]] =
-    ProjectCleaner[F](queriesExecTimes).map(new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes))
+    ProjectCleaner[F](queriesExecTimes).map(new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes, deletingEventGauge))
 }
 
 private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
-    projectCleaner:   ProjectCleaner[F],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
-    now:              () => Instant = () => Instant.now
+    projectCleaner:     ProjectCleaner[F],
+    queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name],
+    deletingEventGauge: LabeledGauge[F, projects.Path],
+    now:                () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with ProjectEventsToNewUpdater[F] {
 
@@ -60,15 +64,17 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
     _                    <- removeProjectProcessingTimes(event.project)
     _                    <- removeProjectPayloads(event.project)
     _                    <- removeProjectDeliveryInfo(event.project)
-    _                    <- removeProjectDeletingEvents(event.project)
+    removedDeletingEvent <- removeProjectDeletingEvents(event.project)
     maybeLatestEventDate <- getLatestEventDate(event.project)
     _ <- maybeLatestEventDate match {
-           case Some(latestEventDate) => updateLatestEventDate(event.project, latestEventDate)
-           case None                  => projectCleaner.cleanUp(event.project) recoverWith logError(event.project)
+           case Some(latestEventDate) =>
+             updateLatestEventDate(event.project, latestEventDate)
+               .map(_ => cleanUpDeletingMetrics(event.project, removedDeletingEvent))
+           case None => projectCleaner.cleanUp(event.project) recoverWith logError(event.project)
          }
-  } yield DBUpdateResults.ForProjects(event.project.path, eventCountsByStatus(statuses))
+  } yield DBUpdateResults.ForProjects(event.project.path, eventCountsByStatus(statuses, removedDeletingEvent))
 
-  private def eventCountsByStatus(statuses: List[EventStatus]) =
+  private def eventCountsByStatus(statuses: List[EventStatus], removedDeletingEvent: Int) =
     statuses
       .groupBy(identity)
       .map { case (eventStatus, eventStatuses) => (eventStatus, -1 * eventStatuses.length) }
@@ -77,6 +83,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
           .map(_ + statuses.length)
           .orElse(if (statuses.nonEmpty) Some(statuses.length) else None)
       }
+      .updated(EventStatus.Deleting, -removedDeletingEvent)
 
   private def updateStatuses(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
@@ -133,8 +140,14 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
       )
       .arguments(EventStatus.Deleting ~ project.id)
       .build
-      .void
+      .mapResult {
+        case Completion.Delete(count) => count
+        case _                        => 0
+      }
   }
+
+  private def cleanUpDeletingMetrics(project: Project, removeProjectDeletingEvents: Int) =
+    Kleisli.liftF(deletingEventGauge.update((project.path, -removeProjectDeletingEvents.toDouble)))
 
   private def removeProjectDeliveryInfo(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - delivery removal")

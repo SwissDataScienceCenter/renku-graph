@@ -194,13 +194,21 @@ class DatasetsResourcesSpec
         .generateOne
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
 
-      pushToStore(project1)
-      pushToStore(project2)
-      pushToStore(project3)
-      pushToStore(project4)
-      pushToStore(project4Fork)
-      pushToStore(project5)
-      pushToStore(project6Private)
+      val dataProject1     = pushToStore(project1)
+      val dataProject2     = pushToStore(project2)
+      val dataProject3     = pushToStore(project3)
+      val dataProject4     = pushToStore(project4)
+      val dataProject4Fork = pushToStore(project4Fork)
+      val dataProject5     = pushToStore(project5)
+      val dataProject6     = pushToStore(project6Private)
+
+      `wait for events to be processed`(dataProject1.id)
+      `wait for events to be processed`(dataProject2.id)
+      `wait for events to be processed`(dataProject3.id)
+      `wait for events to be processed`(dataProject4.id)
+      `wait for events to be processed`(dataProject4Fork.id)
+      `wait for events to be processed`(dataProject5.id)
+      `wait for events to be processed`(dataProject6.id)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
@@ -353,11 +361,13 @@ class DatasetsResourcesSpec
       ).flatMap(sortCreators)
     }
 
-    def pushToStore(project: testentities.RenkuProject)(implicit accessToken: AccessToken): Unit = {
-      `data in the RDF store`(dataProjects(project).generateOne, project.asJsonLD)
-      ()
+    def pushToStore(project: testentities.RenkuProject)(implicit accessToken: AccessToken): Project = {
+      val dataProject = dataProjects(project).generateOne
+      `data in the RDF store`(dataProject, project.asJsonLD)
+      dataProject
     }
   }
+
 
   Feature("GET knowledge-graph/datasets/:id to find dataset details") {
 

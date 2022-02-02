@@ -43,7 +43,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import io.renku.events.consumers.Project
 import io.renku.json.JsonOps._
+
 
 class EventHandlerSpec
     extends AnyWordSpec
@@ -79,6 +81,9 @@ class EventHandlerSpec
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
         toAwaitingDeletionEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
+        rollbackToAwaitingDeletionEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
         projectEventToNewEvents
@@ -214,6 +219,14 @@ class EventHandlerSpec
       "id":           ${eventId.id.value},
       "project": {
         "id":         ${eventId.projectId.value},
+        "path":       ${path.value}
+      },
+      "newStatus":    "AWAITING_DELETION"
+    }"""
+    case StatusChangeEvent.RollbackToAwaitingDeletion(Project(id, path)) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "project": {
+        "id":         ${id.value},
         "path":       ${path.value}
       },
       "newStatus":    "AWAITING_DELETION"

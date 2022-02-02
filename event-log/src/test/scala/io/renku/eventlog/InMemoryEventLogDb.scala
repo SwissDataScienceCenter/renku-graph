@@ -94,6 +94,21 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
     }
   }
 
+  def verifyConstraintExists(table: String, constraintName: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] =
+        sql"""SELECT EXISTS (
+                 SELECT * 
+                 FROM information_schema.constraint_column_usage 
+                 WHERE table_name = $varchar AND constraint_name = $varchar                            
+               )""".query(bool)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ constraintName))
+        .recover { case _ => false }
+    }
+  }
+
   def tableExists(tableName: String): Boolean = execute[Boolean] {
     Kleisli { session =>
       val query: Query[String, Boolean] =

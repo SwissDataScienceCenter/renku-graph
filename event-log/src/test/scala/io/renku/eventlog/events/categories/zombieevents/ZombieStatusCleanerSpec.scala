@@ -80,12 +80,12 @@ class ZombieStatusCleanerSpec
         upsertEventDeliveryInfo(eventId)
 
         findEvent(eventId)          shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
-        findAllDeliveries.map(_._1) shouldBe List(eventId)
+        findAllEventDeliveries.map(_._1) shouldBe List(eventId)
 
         updater.cleanZombieStatus(GeneratingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
         findEvent(eventId)          shouldBe (ExecutionDate(now), New, None).some
-        findAllDeliveries.map(_._1) shouldBe Nil
+        findAllEventDeliveries.map(_._1) shouldBe Nil
 
         queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
       }
@@ -97,12 +97,12 @@ class ZombieStatusCleanerSpec
         upsertEventDeliveryInfo(eventId)
 
         findEvent(eventId)          shouldBe (executionDate, TransformingTriples, Some(zombieMessage)).some
-        findAllDeliveries.map(_._1) shouldBe List(eventId)
+        findAllEventDeliveries.map(_._1) shouldBe List(eventId)
 
         updater.cleanZombieStatus(TransformingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
         findEvent(eventId)          shouldBe (ExecutionDate(now), TriplesGenerated, None).some
-        findAllDeliveries.map(_._1) shouldBe Nil
+        findAllEventDeliveries.map(_._1) shouldBe Nil
 
         queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
       }
