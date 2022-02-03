@@ -30,7 +30,6 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.{GitLabApiUrl, projects}
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import org.http4s.Method.GET
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
@@ -62,9 +61,9 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
 
   import gitLabCommitFetcher._
 
-  override def fetchCommitStats(projectId: projects.Id)(implicit
-      maybeAccessToken:                    Option[AccessToken]
-  ): F[Option[ProjectCommitStats]] = {
+  override def fetchCommitStats(
+      projectId:               projects.Id
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Option[ProjectCommitStats]] = {
     for {
       maybeLatestCommitId <- OptionT.liftF(fetchLatestGitLabCommit(projectId))
       commitCount         <- OptionT(fetchCommitCount(projectId))
@@ -73,15 +72,12 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
 
   private def fetchCommitCount(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]) = for {
     uri         <- validateUri(s"$gitLabApiUrl/projects/$projectId?statistics=true")
-    commitCount <- send(request(GET, uri, maybeAccessToken))(mapCountResponse)
+    commitCount <- send(request(GET, uri, maybeAccessToken))(mapResponse)
   } yield commitCount
 
-  private implicit lazy val mapCountResponse: PartialFunction[(Status, Request[F], Response[F]), F[
-    Option[CommitsCount]
-  ]] = {
-    case (Ok, _, response)    => response.as[CommitsCount].map(_.some)
-    case (NotFound, _, _)     => Option.empty[CommitsCount].pure[F]
-    case (Unauthorized, _, _) => UnauthorizedException.raiseError
+  private implicit lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitsCount]]] = {
+    case (Ok, _, response)               => response.as[CommitsCount].map(_.some)
+    case (NotFound | Unauthorized, _, _) => Option.empty[CommitsCount].pure[F]
   }
 
   private implicit val commitCountDecoder: EntityDecoder[F, CommitsCount] = {
