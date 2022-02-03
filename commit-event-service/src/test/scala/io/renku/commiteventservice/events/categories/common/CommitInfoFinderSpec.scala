@@ -20,25 +20,31 @@ package io.renku.commiteventservice.events.categories.common
 
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
-import io.renku.commiteventservice.events.categories.common
 import io.renku.commiteventservice.events.categories.common.Generators._
-import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.CommittedDate
+import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Status
+import org.http4s.Method.GET
+import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.{Header, Method, Request, Response, Status, Uri}
+import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.ci.CIStringSyntax
 
 import java.time.{LocalDateTime, ZoneOffset}
 
@@ -53,100 +59,80 @@ class CommitInfoFinderSpec
 
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with Personal Access Token" in new TestCase {
-
-        val maybeAccessToken @ Some(token) = personalAccessTokens.generateSome
-
-        stubFor {
-          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .withHeader("PRIVATE-TOKEN", equalTo(token.value))
-            .willReturn(okJson(responseJson.toString()))
-        }
-
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe CommitInfo(
+        val commitInfoExpectation = CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
           author = author,
           committer = committer,
           parents = parents
-        )
+        ).some
+        val maybeAccessToken @ Some(token) = personalAccessTokens.generateSome
+
+        setGitLabClientExpectation(maybeAccessToken, returning = commitInfoExpectation)
+
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe commitInfoExpectation
       }
 
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with OAuth Access Token" in new TestCase {
 
-        val maybeAccessToken @ Some(token) = oauthAccessTokens.generateSome
-
-        stubFor {
-          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .withHeader("Authorization", equalTo(s"Bearer ${token.value}"))
-            .willReturn(okJson(responseJson.toString()))
-        }
-
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common.CommitInfo(
+        val commitInfoExpectation = CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
           author = author,
           committer = committer,
           parents = parents
-        )
+        ).some
+
+        val maybeAccessToken @ Some(token) = oauthAccessTokens.generateSome
+
+        setGitLabClientExpectation(maybeAccessToken, returning = commitInfoExpectation)
+
+        finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe commitInfoExpectation
       }
 
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with no access token" in new TestCase {
 
-        stubFor {
-          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .willReturn(okJson(responseJson.toString()))
-        }
-
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe common.CommitInfo(
+        val commitInfoExpectation = CommitInfo(
           id = commitId,
           message = commitMessage,
           committedDate = committedDate,
           author = author,
           committer = committer,
           parents = parents
-        )
+        ).some
+
+        setGitLabClientExpectation(maybeAccessToken = None, returning = commitInfoExpectation)
+
+        finder
+          .findCommitInfo(projectId, commitId)(maybeAccessToken = None)
+          .unsafeRunSync() shouldBe commitInfoExpectation
       }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(unauthorized())
-      }
-
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
+        mapToCommitOrThrow((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
     "return an Error if remote client responds with invalid json" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(okJson("{}"))
-      }
-
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
-      }.getMessage should startWith(
-        s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
-      )
+        mapToCommitOrThrow(
+          (Status.Ok, Request[IO](), Response[IO]().withEntity("{}").withHeaders(Header.Raw(ci"X-Next-Page", "")))
+        ).unsafeRunSync()
+      }
     }
 
     "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(notFound().withBody("some message"))
-      }
-
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.NotFound}; body: some message"
+        mapToCommitOrThrow((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync()
+      }
     }
   }
 
@@ -157,22 +143,20 @@ class CommitInfoFinderSpec
 
         val maybeAccessToken @ Some(token) = personalAccessTokens.generateSome
 
-        stubFor {
-          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .withHeader("PRIVATE-TOKEN", equalTo(token.value))
-            .willReturn(okJson(responseJson.toString()))
-        }
+        val someCommitInfoExpectation = CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        ).some
 
-        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common
-          .CommitInfo(
-            id = commitId,
-            message = commitMessage,
-            committedDate = committedDate,
-            author = author,
-            committer = committer,
-            parents = parents
-          )
-          .some
+        setGitLabClientExpectation(maybeAccessToken, returning = someCommitInfoExpectation)
+
+        finder
+          .getMaybeCommitInfo(projectId, commitId)(maybeAccessToken)
+          .unsafeRunSync() shouldBe someCommitInfoExpectation
       }
 
     "get commit info from the configured url " +
@@ -180,90 +164,66 @@ class CommitInfoFinderSpec
 
         val maybeAccessToken @ Some(token) = oauthAccessTokens.generateSome
 
-        stubFor {
-          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .withHeader("Authorization", equalTo(s"Bearer ${token.value}"))
-            .willReturn(okJson(responseJson.toString()))
-        }
+        val someCommitInfoExpectation = CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        ).some
 
-        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe common
-          .CommitInfo(
-            id = commitId,
-            message = commitMessage,
-            committedDate = committedDate,
-            author = author,
-            committer = committer,
-            parents = parents
-          )
-          .some
+        setGitLabClientExpectation(maybeAccessToken, returning = someCommitInfoExpectation)
+
+        finder
+          .getMaybeCommitInfo(projectId, commitId)(maybeAccessToken)
+          .unsafeRunSync() shouldBe someCommitInfoExpectation
       }
 
     "get commit info from the configured url " +
       "and return some CommitInfo if OK returned with valid body - case with no access token" in new TestCase {
 
-        stubFor {
-          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-            .willReturn(okJson(responseJson.toString()))
-        }
+        val someCommitInfoExpectation = CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        ).some
 
-        finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe common
-          .CommitInfo(
-            id = commitId,
-            message = commitMessage,
-            committedDate = committedDate,
-            author = author,
-            committer = committer,
-            parents = parents
-          )
-          .some
+        setGitLabClientExpectation(maybeAccessToken = None, returning = someCommitInfoExpectation)
+
+        finder
+          .getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None)
+          .unsafeRunSync() shouldBe someCommitInfoExpectation
       }
 
     "return None if remote client responds with Not found" in new TestCase {
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(notFound())
-      }
-      finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync() shouldBe None
-
+      mapToMaybeCommit((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(unauthorized())
-      }
-
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
+        mapToMaybeCommit((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
     "return an Error if remote client responds with invalid json" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(okJson("{}"))
-      }
-
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
-      }.getMessage should startWith(
-        s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
-      )
+        mapToMaybeCommit(
+          (Status.Ok, Request[IO](), Response[IO]().withEntity("{}").withHeaders(Header.Raw(ci"X-Next-Page", "")))
+        ).unsafeRunSync()
+      }
     }
 
     "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(notFound().withBody("some message"))
-      }
-
       intercept[Exception] {
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.NotFound}; body: some message"
+        mapToMaybeCommit((Status.BadRequest, Request[IO](), Response[IO]())).unsafeRunSync()
+      }
     }
   }
 
@@ -277,9 +237,11 @@ class CommitInfoFinderSpec
     val committer     = committers.generateOne
     val parents       = parentsIdsLists().generateOne
     private implicit val logger: TestLogger[IO] = TestLogger()
-    val finder = new CommitInfoFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
+    val gitLabClient = mock[GitLabClient[IO]]
+    val finder       = new CommitInfoFinderImpl[IO](gitLabClient)
 
-    lazy val responseJson = json"""{
+    lazy val responseJson =
+      json"""{
       "id":              ${commitId.value},
       "author_name":     ${author.name.value},
       "author_email":    ${author.emailToJson},
@@ -289,5 +251,52 @@ class CommitInfoFinderSpec
       "committed_date":  "2012-09-20T09:06:12+03:00",
       "parent_ids":      ${parents.map(_.value)}
     }"""
+
+    val endpointName: String Refined NonEmpty = "commits"
+
+    def setGitLabClientExpectation(maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome,
+                                   returning:        Option[CommitInfo] = commitInfos.generateOne.some
+    ) =
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET,
+                 uri"projects" / projectId.show / "repository" / "commits" / commitId.show,
+                 endpointName,
+                 *,
+                 maybeAccessToken
+        )
+        .returning(returning.pure[IO])
+
+    lazy val mapToCommitOrThrow = {
+      val responseMapping = CaptureOne[ResponseMappingF[IO, CommitInfo]]()
+
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, CommitInfo])(
+          _: Option[AccessToken]
+        ))
+        .expects(*, *, *, capture(responseMapping), *)
+        .returning(commitInfos.generateOne.pure[IO])
+
+      finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None)
+
+      responseMapping.value
+    }
+
+    lazy val mapToMaybeCommit = {
+      val responseMapping = CaptureOne[ResponseMappingF[IO, Option[CommitInfo]]]()
+
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+          _: Option[AccessToken]
+        ))
+        .expects(*, *, *, capture(responseMapping), *)
+        .returning(commitInfos.generateSome.pure[IO])
+
+      finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None)
+
+      responseMapping.value
+    }
   }
 }

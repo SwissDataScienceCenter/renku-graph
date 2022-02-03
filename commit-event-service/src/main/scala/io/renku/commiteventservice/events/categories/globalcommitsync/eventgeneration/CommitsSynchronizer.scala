@@ -180,7 +180,7 @@ private[globalcommitsync] object CommitsSynchronizer {
     gitLabCommitFetcher       <- GitLabCommitFetcher[F](gitLabClient)
     elCommitFetcher           <- ELCommitFetcher[F]
     commitEventDeleter        <- CommitEventDeleter[F]
-    missingCommitEventCreator <- MissingCommitEventCreator(gitLabThrottler)
+    missingCommitEventCreator <- MissingCommitEventCreator(gitLabClient)
   } yield new CommitsSynchronizerImpl(
     accessTokenFinder,
     gitLabCommitStatFetcher,
