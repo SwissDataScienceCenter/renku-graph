@@ -93,7 +93,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
       case None => EitherT.rightT[F, ProcessingRecoverableError](member)
       case Some(nextPage) =>
         for {
-          eventsAndNextPage <- fetchUserEvents(member, nextPage).map(filterEventsFor(member, project))
+          eventsAndNextPage <- fetchProjectEvents(project, nextPage).map(filterEventsFor(member))
           maybeEmail        <- matchEmailFromCommits(eventsAndNextPage, project)
           updatedMember     <- addEmailOrCheckNextPage(member, maybeEmail, project, eventsAndNextPage._2)
         } yield updatedMember
@@ -108,20 +108,20 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
     case Some(email) => EitherT.rightT[F, ProcessingRecoverableError](member add email)
   }
 
-  private def fetchUserEvents(member: ProjectMember, nextPage: Int)(implicit maybeAccessToken: Option[AccessToken]) =
+  private def fetchProjectEvents(project: Project, nextPage: Int)(implicit maybeAccessToken: Option[AccessToken]) =
     EitherT {
       {
         for {
-          uri <- validateUri(s"$gitLabApiUrl/users/${member.gitLabId}/events/?action=pushed&page=$nextPage")
+          uri               <- validateUri(s"$gitLabApiUrl/projects/${project.id}/events/?action=pushed&page=$nextPage")
           eventsAndNextPage <- send(secureRequest(GET, uri))(mapResponse)
         } yield eventsAndNextPage
       }.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)
     }
 
-  private def filterEventsFor(member:  ProjectMember,
-                              project: Project
+  private def filterEventsFor(
+      member: ProjectMember
   ): ((List[PushEvent], Option[Int])) => (List[PushEvent], Option[Int]) = { case (events, maybeNextPage) =>
-    events.filter(ev => ev.projectId == project.id && ev.authorId == member.gitLabId) -> maybeNextPage
+    events.filter(ev => ev.authorId == member.gitLabId) -> maybeNextPage
   }
 
   private def matchEmailFromCommits(eventsAndNextPage: (List[PushEvent], Option[Int]),
