@@ -34,7 +34,7 @@ import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventsGenerators.{categoryNames, compoundEventIds, eventBodies, eventProcessingTimes, lastSyncedDates, zippedEventPayloads}
-import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, Skipped}
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, FailureStatus, Skipped, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
@@ -58,6 +58,7 @@ class ProjectEventsToNewUpdaterSpec
     with MockFactory {
 
   "updateDB" should {
+
     "change the status of all events of a specific project to NEW except SKIPPED events" in new TestCase {
 
       val project = consumerProjects.generateOne
@@ -100,7 +101,8 @@ class ProjectEventsToNewUpdaterSpec
           }
           .updated(AwaitingDeletion, -1)
           .updated(Deleting, -1)
-      (deletingGauge.update _).expects((project.path, -1.toDouble)).returning(().pure[IO])
+      (awaitingDeletionGauge.update _).expects((project.path, -1d)).returning(().pure[IO])
+      (deletingGauge.update _).expects((project.path, -1d)).returning(().pure[IO])
 
       sessionResource
         .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
@@ -115,8 +117,7 @@ class ProjectEventsToNewUpdaterSpec
       findEvent(CompoundEventId(deletingEvent, project.id)).map(_._2)         shouldBe None
       findAllEventDeliveries shouldBe List(otherProjectEventId -> subscriberId)
 
-      val latestEventDate: EventDate =
-        (List(skippedEventDate, awaitingDeletionEventDate) ::: eventsAndDates.map(_._2)).max
+      val latestEventDate: EventDate = (skippedEventDate :: eventsAndDates.map(_._2)).max
 
       findProjects.find { case (id, _, _) => id == project.id }.map(_._3) shouldBe Some(latestEventDate)
 
@@ -134,6 +135,9 @@ class ProjectEventsToNewUpdaterSpec
         upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
 
         (projectCleaner.cleanUp _).expects(project).returns(Kleisli.pure(()))
+
+        (awaitingDeletionGauge.update _).expects((project.path, 0d)).returning(().pure[IO])
+        (deletingGauge.update _).expects((project.path, -2d)).returning(().pure[IO])
 
         sessionResource
           .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
@@ -157,6 +161,9 @@ class ProjectEventsToNewUpdaterSpec
         (projectCleaner.cleanUp _)
           .expects(project)
           .returning(Kleisli.liftF(exception.raiseError[IO, Unit]))
+
+        (awaitingDeletionGauge.update _).expects((project.path, 0d)).returning(().pure[IO])
+        (deletingGauge.update _).expects((project.path, -2d)).returning(().pure[IO])
 
         sessionResource
           .useK(dbUpdater.updateDB(ProjectEventsToNew(project)))
@@ -183,24 +190,24 @@ class ProjectEventsToNewUpdaterSpec
       eventDate,
       eventBodies.generateOne,
       maybeMessage = status match {
-        case _: EventStatus.FailureStatus => eventMessages.generateSome
+        case _: FailureStatus => eventMessages.generateSome
         case _ => eventMessages.generateOption
       },
       maybeEventPayload = status match {
-        case EventStatus.TriplesStore | EventStatus.TriplesGenerated => zippedEventPayloads.generateSome
-        case AwaitingDeletion                                        => zippedEventPayloads.generateOption
-        case _                                                       => zippedEventPayloads.generateNone
+        case TriplesStore | TriplesGenerated => zippedEventPayloads.generateSome
+        case AwaitingDeletion                => zippedEventPayloads.generateOption
+        case _                               => zippedEventPayloads.generateNone
       },
       projectPath = project.path
     )
 
     status match {
-      case EventStatus.TriplesGenerated | EventStatus.TriplesStore =>
+      case TriplesGenerated | TriplesStore =>
         upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
       case AwaitingDeletion =>
-        if (Random.nextBoolean()) {
+        if (Random.nextBoolean())
           upsertProcessingTime(eventId, status, eventProcessingTimes.generateOne)
-        } else ()
+        else ()
       case _ => ()
     }
 
@@ -225,11 +232,17 @@ class ProjectEventsToNewUpdaterSpec
     upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val deletingGauge    = mock[LabeledGauge[IO, projects.Path]]
-    val projectCleaner   = mock[ProjectCleaner[IO]]
-    val dbUpdater = new ProjectEventsToNewUpdaterImpl[IO](projectCleaner, queriesExecTimes, deletingGauge, currentTime)
-    val now       = Instant.now()
+    val queriesExecTimes      = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val awaitingDeletionGauge = mock[LabeledGauge[IO, projects.Path]]
+    val deletingGauge         = mock[LabeledGauge[IO, projects.Path]]
+    val projectCleaner        = mock[ProjectCleaner[IO]]
+    val dbUpdater = new ProjectEventsToNewUpdaterImpl[IO](projectCleaner,
+                                                          queriesExecTimes,
+                                                          awaitingDeletionGauge,
+                                                          deletingGauge,
+                                                          currentTime
+    )
+    val now = Instant.now()
 
     currentTime.expects().returning(now)
   }
