@@ -26,12 +26,11 @@ import cats.effect.{Async, Concurrent, Spawn}
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitsSynchronizer
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
 import io.renku.events.{EventRequestContent, consumers}
 import io.renku.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
+import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -87,9 +86,9 @@ private[events] class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
 
 private[events] object EventHandler {
   def apply[F[_]: Async: Spawn: Concurrent: Temporal: Logger](
-      gitLabThrottler:       Throttler[F, GitLab],
+      gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[EventHandler[F]] = for {
-    commitEventSynchronizer <- CommitsSynchronizer(gitLabThrottler, executionTimeRecorder)
+    commitEventSynchronizer <- CommitsSynchronizer(gitLabClient, executionTimeRecorder)
   } yield new EventHandler[F](categoryName, commitEventSynchronizer)
 }

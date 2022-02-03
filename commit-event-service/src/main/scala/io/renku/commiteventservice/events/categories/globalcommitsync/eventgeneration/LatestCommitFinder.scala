@@ -18,35 +18,26 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration
 
-import cats.data.OptionT
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.commiteventservice.events.categories.common.CommitInfo
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.Id
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient}
 import org.http4s.circe.jsonOf
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{EntityDecoder, Status}
 import org.typelevel.log4cats.Logger
 
 private trait LatestCommitFinder[F[_]] {
-  def findLatestCommitId(
-      projectId:        Id,
-      maybeAccessToken: Option[AccessToken]
-  ): OptionT[F, CommitId]
+  def findLatestCommitId(projectId: Id)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitId]]
 }
 
-private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](
-    gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[F, GitLab]
-) extends RestClient(gitLabThrottler)
-    with LatestCommitFinder[F] {
+private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F])
+    extends LatestCommitFinder[F] {
 
   import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
@@ -54,15 +45,9 @@ private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](
   import org.http4s.{Request, Response}
 
   override def findLatestCommitId(
-      projectId:        Id,
-      maybeAccessToken: Option[AccessToken]
-  ): OptionT[F, CommitId] = OptionT {
-    for {
-      stringUri     <- s"$gitLabUrl/api/v4/projects/$projectId/repository/commits".pure[F]
-      uri           <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
-      maybeCommitId <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-    } yield maybeCommitId
-  }
+      projectId:               Id
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitId]] =
+    gitLabClient.send(GET, uri"projects" / projectId.show / "repository" / "commits", "commits")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitId]]] = {
     case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption.map(_.id))
@@ -77,9 +62,6 @@ private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](
 }
 
 private object LatestCommitFinder {
-  def apply[F[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
-  ): F[LatestCommitFinder[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new LatestCommitFinderImpl(gitLabUrl, gitLabThrottler)
+  def apply[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F]): F[LatestCommitFinder[F]] =
+    new LatestCommitFinderImpl(gitLabClient).pure[F].widen
 }
