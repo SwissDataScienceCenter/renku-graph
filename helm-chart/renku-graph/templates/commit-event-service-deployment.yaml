@@ -21,6 +21,8 @@ spec:
         app: {{ include "commitEventService.name" . }}
         release: {{ .Release.Name }}
     spec:
+      initContainers:
+        {{- include "certificates.initContainer" . | nindent 8 }}
       containers:
         - name: commit-event-service
           image: "{{ .Values.commitEventService.image.repository }}:{{ .Values.commitEventService.image.tag }}"
@@ -62,7 +64,11 @@ spec:
               path: /ping
               port: http-commit-sv
           resources:
-  {{- toYaml .Values.commitEventService.resources | nindent 12 }}
+            {{- toYaml .Values.commitEventService.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "certificates.volumeMounts.openjdk15" . | nindent 12 }}
+      volumes:
+        {{- include "certificates.volumes" . | nindent 8 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}

@@ -21,6 +21,8 @@ spec:
         app: {{ include "tokenRepository.name" . }}
         release: {{ .Release.Name }}
     spec:
+      initContainers:
+        {{- include "certificates.initContainer" . | nindent 8 }}
       containers:
         - name: token-repository
           image: "{{ .Values.tokenRepository.image.repository }}:{{ .Values.tokenRepository.image.tag }}"
@@ -86,7 +88,11 @@ spec:
             successThreshold: 1
             failureThreshold: 3
           resources:
-  {{- toYaml .Values.tokenRepository.resources | nindent 12 }}
+            {{- toYaml .Values.tokenRepository.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "certificates.volumeMounts.openjdk15" . | nindent 12 }}
+      volumes:
+        {{- include "certificates.volumes" . | nindent 8 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}
