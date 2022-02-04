@@ -34,7 +34,6 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.AccessToken
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -52,6 +51,7 @@ class GitLabCommitStatFetcherSpec
     with ScalaCheckPropertyChecks {
 
   "fetchCommitStats" should {
+
     "return a ProjectCommitStats with count of commits " in new TestCase {
       forAll(commitIds.toGeneratorOfOptions, commitsCounts) { (maybeLatestCommit, commitCount) =>
         (gitLabCommitFetcher
@@ -86,7 +86,22 @@ class GitLabCommitStatFetcherSpec
       gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
     }
 
-    "throw an UnauthorizedException if the gitlab API returns an UnauthorizedException" in new TestCase {
+    "return None if the gitlab API returns no statistics" in new TestCase {
+      val maybeLatestCommit = commitIds.generateOption
+      (gitLabCommitFetcher
+        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
+        .expects(projectId, maybeAccessToken)
+        .returning(maybeLatestCommit.pure[IO])
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId?statistics=true")
+          .willReturn(okJson("{}"))
+      }
+
+      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
+    }
+
+    "return None if the gitlab API returns a Unauthorized" in new TestCase {
       val maybeLatestCommit = commitIds.generateOption
       (gitLabCommitFetcher
         .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
@@ -95,9 +110,7 @@ class GitLabCommitStatFetcherSpec
 
       stubFor(get(s"/api/v4/projects/$projectId?statistics=true").willReturn(unauthorized()))
 
-      intercept[Exception] {
-        gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync()
-      } shouldBe a[UnauthorizedException]
+      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
     }
   }
 
