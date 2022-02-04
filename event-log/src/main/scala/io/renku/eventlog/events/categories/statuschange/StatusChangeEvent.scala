@@ -105,6 +105,14 @@ private object StatusChangeEvent {
     }
   }
 
+  final case class RollbackToAwaitingDeletion(project: Project) extends StatusChangeEvent
+  object RollbackToAwaitingDeletion {
+    implicit lazy val show: Show[RollbackToAwaitingDeletion] = Show.show {
+      case RollbackToAwaitingDeletion(Project(id, path)) =>
+        s"project_id = $id, projectPath = $path, status = $AwaitingDeletion - rollback"
+    }
+  }
+
   type AllEventsToNew = AllEventsToNew.type
   final case object AllEventsToNew extends StatusChangeEvent {
     implicit lazy val show: Show[AllEventsToNew] = Show.show(_ => s"status = $New")

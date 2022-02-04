@@ -121,9 +121,7 @@ class ToTriplesStoreUpdaterSpec
 
       (deliveryInfoRemover.deleteDelivery _).expects(event.eventId).returning(Kleisli.pure(()))
 
-      sessionResource
-        .useK(dbUpdater onRollback event)
-        .unsafeRunSync() shouldBe ()
+      sessionResource.useK(dbUpdater onRollback event).unsafeRunSync() shouldBe ()
     }
   }
 

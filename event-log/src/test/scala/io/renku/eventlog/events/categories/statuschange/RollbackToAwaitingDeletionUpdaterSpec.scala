@@ -22,13 +22,13 @@ import cats.effect.IO
 import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds, eventStatuses}
+import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventStatuses}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import EventStatus._
 import eu.timepit.refined.auto._
 import io.renku.eventlog._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToAwaitingDeletion
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
@@ -36,8 +36,9 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
+import io.renku.events.consumers.Project
 
-class ToAwaitingDeletionUpdaterSpec
+class RollbackToAwaitingDeletionUpdaterSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -47,31 +48,23 @@ class ToAwaitingDeletionUpdaterSpec
 
   "updateDB" should {
 
-    s"change status of the given event to $AwaitingDeletion" in new TestCase {
-
-      val eventOldStatus = eventStatuses.generateOne
-      val eventId        = addEvent(eventOldStatus)
-
+    s"change status of all the event in the $Deleting status of a given project to $AwaitingDeletion" in new TestCase {
+      val otherStatus = eventStatuses.filter(_ != Deleting).generateOne
+      val event1Id    = addEvent(Deleting)
+      val event2Id    = addEvent(otherStatus)
+      val event3Id    = addEvent(Deleting)
       sessionResource
-        .useK(dbUpdater updateDB ToAwaitingDeletion(CompoundEventId(eventId, projectId), projectPath))
+        .useK(dbUpdater updateDB RollbackToAwaitingDeletion(Project(projectId, projectPath)))
         .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
         projectPath,
-        Map(eventOldStatus -> -1, AwaitingDeletion -> 1)
+        Map(Deleting -> -2, AwaitingDeletion -> 2)
       )
 
-      findEvent(CompoundEventId(eventId, projectId)).map(_._2) shouldBe Some(AwaitingDeletion)
+      findEvent(CompoundEventId(event1Id, projectId)).map(_._2) shouldBe Some(AwaitingDeletion)
+      findEvent(CompoundEventId(event2Id, projectId)).map(_._2) shouldBe Some(otherStatus)
+      findEvent(CompoundEventId(event3Id, projectId)).map(_._2) shouldBe Some(AwaitingDeletion)
     }
 
-    "fail if there's no event specified in the event" in new TestCase {
-
-      val eventId = compoundEventIds.generateOne
-
-      intercept[Exception] {
-        sessionResource
-          .useK(dbUpdater updateDB ToAwaitingDeletion(eventId, projectPaths.generateOne))
-          .unsafeRunSync()
-      }.getMessage shouldBe s"Could not update event $eventId to status $AwaitingDeletion: event not found"
-    }
   }
 
   private trait TestCase {
@@ -81,7 +74,7 @@ class ToAwaitingDeletionUpdaterSpec
 
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater        = new ToAwaitingDeletionUpdater[IO](queriesExecTimes, currentTime)
+    val dbUpdater        = new RollbackToAwaitingDeletionUpdater[IO](queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

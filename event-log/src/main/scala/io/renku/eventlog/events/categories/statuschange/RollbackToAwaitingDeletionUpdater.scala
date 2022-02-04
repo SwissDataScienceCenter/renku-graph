@@ -25,51 +25,47 @@ import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToAwaitingDeletion
-import io.renku.graph.model.events.EventStatus.AwaitingDeletion
-import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
+import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk.implicits._
 import skunk.~
 
 import java.time.Instant
+import skunk.data.Completion
 
-private class ToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
+private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
     queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with DBUpdater[F, ToAwaitingDeletion] {
+    with DBUpdater[F, RollbackToAwaitingDeletion] {
 
-  override def updateDB(event: ToAwaitingDeletion): UpdateResult[F] = measureExecutionTime {
-    SqlStatement[F](name = "to_awaiting_deletion - status update")
-      .select[ExecutionDate ~ projects.Id ~ EventId, EventStatus](
+  override def updateDB(event: RollbackToAwaitingDeletion): UpdateResult[F] = measureExecutionTime {
+    SqlStatement[F](name = "rollback_to_awaiting_deletion - status update")
+      .command[EventStatus ~ ExecutionDate ~ projects.Id ~ EventStatus](
         sql"""UPDATE event evt
-              SET status = '#${AwaitingDeletion.value}', execution_date = $executionDateEncoder
-              FROM (
-                SELECT event_id, project_id, status 
-                FROM event
-                WHERE project_id = $projectIdEncoder
-                  AND event_id = $eventIdEncoder
-                FOR UPDATE
-              ) old_evt
-              WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
-              RETURNING old_evt.status
-              """.query(eventStatusDecoder)
+              SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+              WHERE project_id = $projectIdEncoder
+                  AND status = $eventStatusEncoder
+              """.command
       )
-      .arguments(ExecutionDate(now()) ~ event.eventId.projectId ~ event.eventId.id)
-      .build(_.option)
+      .arguments(AwaitingDeletion ~ ExecutionDate(now()) ~ event.project.id ~ Deleting)
+      .build
       .flatMapResult {
-        case Some(oldEventStatus) =>
+        case Completion.Update(count) =>
           DBUpdateResults
-            .ForProjects(event.projectPath, Map(oldEventStatus -> -1, AwaitingDeletion -> 1))
+            .ForProjects(event.project.path, Map(Deleting -> -count, AwaitingDeletion -> count))
             .pure[F]
             .widen[DBUpdateResults]
         case _ =>
-          new Exception(s"Could not update event ${event.eventId} to status $AwaitingDeletion: event not found")
+          new Exception(
+            s"Could not update $Deleting events for project ${event.project.path} to status $AwaitingDeletion"
+          )
             .raiseError[F, DBUpdateResults]
       }
   }
 
-  override def onRollback(event: ToAwaitingDeletion) = Kleisli.pure(())
+  override def onRollback(event: RollbackToAwaitingDeletion) = Kleisli.pure(())
 }

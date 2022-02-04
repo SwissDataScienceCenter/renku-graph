@@ -19,17 +19,18 @@
 package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.IO
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.common.CommitInfo
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -47,32 +48,15 @@ class LatestCommitFinderSpec
 
   "findLatestCommit" should {
 
-    "return latest Commit info if remote responds with OK and valid body - personal access token case" in new TestCase {
-      val personalAccessToken = personalAccessTokens.generateOne
+    "return latest Commit info if remote responds with OK and valid body" in new TestCase {
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
+          .withAccessToken(maybeAccessToken)
           .willReturn(okJson(commitsJson(from = commitInfo)))
       }
 
-      latestCommitFinder.findLatestCommit(projectId, Some(personalAccessToken)).value.unsafeRunSync() shouldBe Some(
-        commitInfo
-      )
-    }
-
-    "return latest Commit info if remote responds with OK and valid body - oauth token case" in new TestCase {
-      val oauthAccessToken = oauthAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
-          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(okJson(commitsJson(from = commitInfo)))
-      }
-
-      latestCommitFinder.findLatestCommit(projectId, Some(oauthAccessToken)).value.unsafeRunSync() shouldBe Some(
-        commitInfo
-      )
+      latestCommitFinder.findLatestCommit(projectId).unsafeRunSync() shouldBe commitInfo.some
     }
 
     "return latest Commit info if remote responds with OK and valid body - no token case" in new TestCase {
@@ -82,9 +66,7 @@ class LatestCommitFinderSpec
           .willReturn(okJson(commitsJson(from = commitInfo)))
       }
 
-      latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync() shouldBe Some(
-        commitInfo
-      )
+      latestCommitFinder.findLatestCommit(projectId).unsafeRunSync() shouldBe commitInfo.some
     }
 
     "return None if remote responds with OK and no commits" in new TestCase {
@@ -94,7 +76,7 @@ class LatestCommitFinderSpec
           .willReturn(okJson("[]"))
       }
 
-      latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync() shouldBe None
+      latestCommitFinder.findLatestCommit(projectId).unsafeRunSync() shouldBe None
     }
 
     "return None if remote responds with NOT_FOUND" in new TestCase {
@@ -104,19 +86,22 @@ class LatestCommitFinderSpec
           .willReturn(notFound())
       }
 
-      latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync() shouldBe None
+      latestCommitFinder.findLatestCommit(projectId).unsafeRunSync() shouldBe None
     }
 
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+    "fallback to fetching the latest commit without an access token for UNAUTHORIZED" in new TestCase {
 
       stubFor {
         get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
+          .withAccessToken(maybeAccessToken)
           .willReturn(unauthorized())
       }
+      stubFor {
+        get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
+          .willReturn(okJson("[]"))
+      }
 
-      intercept[Exception] {
-        latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync()
-      } shouldBe UnauthorizedException
+      latestCommitFinder.findLatestCommit(projectId).unsafeRunSync() shouldBe None
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
@@ -127,7 +112,7 @@ class LatestCommitFinderSpec
       }
 
       intercept[Exception] {
-        latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync()
+        latestCommitFinder.findLatestCommit(projectId).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits?per_page=1 returned ${Status.BadRequest}; body: some error"
     }
 
@@ -139,7 +124,7 @@ class LatestCommitFinderSpec
       }
 
       intercept[Exception] {
-        latestCommitFinder.findLatestCommit(projectId, maybeAccessToken = None).value.unsafeRunSync()
+        latestCommitFinder.findLatestCommit(projectId).unsafeRunSync()
       }.getMessage should startWith(
         s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits?per_page=1 returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
       )
@@ -147,6 +132,8 @@ class LatestCommitFinderSpec
   }
 
   private trait TestCase {
+    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
+
     val gitLabUrl  = GitLabUrl(externalServiceBaseUrl)
     val projectId  = projectIds.generateOne
     val commitInfo = commitInfos.generateOne
