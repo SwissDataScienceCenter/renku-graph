@@ -82,7 +82,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning OK`(
+  def `GET <gitlabApi>/projects/:id/events/?action=pushed&page=1 returning OK`(
       maybeAuthor:        Option[Person],
       project:            data.Project,
       commitId:           CommitId
@@ -91,7 +91,7 @@ trait GitLab {
       val (authorId, authorName) = maybeAuthor
         .flatMap(p => p.maybeGitLabId.map(_ -> p.name))
         .getOrElse(userGitLabIds.generateOne -> userNames.generateOne)
-      get(s"/api/v4/users/$authorId/events/?action=pushed&page=1").withAccessTokenInHeader
+      get(s"/api/v4/projects/${project.id}/events/?action=pushed&page=1").withAccessTokenInHeader
         .willReturn {
           okJson {
             json"""[{
@@ -107,16 +107,6 @@ trait GitLab {
             }]""".noSpaces
           }
         }
-    }
-    ()
-  }
-
-  def `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning NOT_FOUND`(
-      userId:             users.GitLabId
-  )(implicit accessToken: AccessToken): Unit = {
-    stubFor {
-      get(s"/api/v4/users/$userId/events/?action=pushed&page=1").withAccessTokenInHeader
-        .willReturn(notFound())
     }
     ()
   }
@@ -241,11 +231,7 @@ trait GitLab {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}/users").withAccessTokenInHeader
         .willReturn(okJson(project.entitiesProject.members.toList.asJson.noSpaces))
     }
-    project.entitiesProject.members.foreach { member =>
-      `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning NOT_FOUND`(
-        member.maybeGitLabId.getOrElse(throw new Exception("Project member should have GitLabId"))
-      )
-    }
+    ()
   }
 
   def `GET <gitlabApi>/projects/:path AND :id returning OK with`(
