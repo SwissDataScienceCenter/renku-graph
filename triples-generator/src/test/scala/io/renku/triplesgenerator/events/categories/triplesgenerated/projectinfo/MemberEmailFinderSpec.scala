@@ -73,7 +73,7 @@ class MemberEmailFinderSpec
         val event  = pushEvents.generateOne.forMember(member).forProject(project)
         val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
-        `/api/v4/users/:id/events?action=pushed`(member.gitLabId) returning okJson(events.asJson.noSpaces)
+        `/api/v4/projects/:id/events?action=pushed`(project.id) returning okJson(events.asJson.noSpaces)
 
         val authorEmail = userEmails.generateOne
         (commitAuthorFinder
@@ -102,7 +102,7 @@ class MemberEmailFinderSpec
         .copy(maybeCommitFrom = Some(commitFrom), maybeCommitTo = Some(commitTo))
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId) returning okJson(events.asJson.noSpaces)
+      `/api/v4/projects/:id/events?action=pushed`(project.id) returning okJson(events.asJson.noSpaces)
 
       val authorEmail = userEmails.generateOne
       (commitAuthorFinder
@@ -121,7 +121,7 @@ class MemberEmailFinderSpec
         .copy(maybeCommitFrom = Some(commitFrom), maybeCommitTo = None)
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId) returning okJson(events.asJson.noSpaces)
+      `/api/v4/projects/:id/events?action=pushed`(project.id) returning okJson(events.asJson.noSpaces)
 
       val authorEmail = userEmails.generateOne
       (commitAuthorFinder
@@ -136,10 +136,12 @@ class MemberEmailFinderSpec
       val event       = pushEvents.generateOne.forMember(member).forProject(project)
       val eventsPage2 = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId, maybeNextPage = 2.some) returning okJson(
+      `/api/v4/projects/:id/events?action=pushed`(project.id, maybeNextPage = 2.some) returning okJson(
         pushEvents.generateNonEmptyList().toList.asJson.noSpaces
       )
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId, page = 2) returning okJson(eventsPage2.asJson.noSpaces)
+      `/api/v4/projects/:id/events?action=pushed`(project.id, page = 2) returning okJson(
+        eventsPage2.asJson.noSpaces
+      )
 
       val authorEmail = userEmails.generateOne
       (commitAuthorFinder
@@ -167,10 +169,10 @@ class MemberEmailFinderSpec
           .copy(maybeCommitFrom = commitIds.generateSome, maybeCommitTo = None)
         val eventsPage2 = Random.shuffle(eventPage2 :: pushEvents.generateNonEmptyList().toList)
 
-        `/api/v4/users/:id/events?action=pushed`(member.gitLabId, maybeNextPage = 2.some) returning okJson(
+        `/api/v4/projects/:id/events?action=pushed`(project.id, maybeNextPage = 2.some) returning okJson(
           eventsPage1.asJson.noSpaces
         )
-        `/api/v4/users/:id/events?action=pushed`(member.gitLabId, page = 2) returning okJson(
+        `/api/v4/projects/:id/events?action=pushed`(project.id, page = 2) returning okJson(
           eventsPage2.asJson.noSpaces
         )
 
@@ -209,10 +211,12 @@ class MemberEmailFinderSpec
         .copy(maybeCommitFrom = commitIds.generateSome, maybeCommitTo = None)
       val eventsPage2 = Random.shuffle(eventPage2 :: pushEvents.generateNonEmptyList().toList)
 
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId, maybeNextPage = 2.some) returning okJson(
+      `/api/v4/projects/:id/events?action=pushed`(project.id, maybeNextPage = 2.some) returning okJson(
         eventsPage1.asJson.noSpaces
       )
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId, page = 2) returning okJson(eventsPage2.asJson.noSpaces)
+      `/api/v4/projects/:id/events?action=pushed`(project.id, page = 2) returning okJson(
+        eventsPage2.asJson.noSpaces
+      )
 
       (commitAuthorFinder
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
@@ -240,10 +244,10 @@ class MemberEmailFinderSpec
 
     "return the given member back if no user events for the project are found" in new TestCase {
 
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId, maybeNextPage = 2.some) returning okJson(
+      `/api/v4/projects/:id/events?action=pushed`(project.id, maybeNextPage = 2.some) returning okJson(
         pushEvents.generateNonEmptyList().toList.asJson.noSpaces
       )
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId, page = 2) returning okJson(
+      `/api/v4/projects/:id/events?action=pushed`(project.id, page = 2) returning okJson(
         pushEvents.generateNonEmptyList().toList.asJson.noSpaces
       )
 
@@ -251,7 +255,7 @@ class MemberEmailFinderSpec
     }
 
     "return the given member back if no user events are found" in new TestCase {
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId, maybeNextPage = 2.some) returning notFound()
+      `/api/v4/projects/:id/events?action=pushed`(project.id, maybeNextPage = 2.some) returning notFound()
 
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member.asRight
     }
@@ -265,7 +269,7 @@ class MemberEmailFinderSpec
       "Unauthorized"       -> aResponse().withStatus(Unauthorized.code)
     ) foreach { case (problemName, response) =>
       s"return a Recoverable Failure for $problemName when fetching member's events" in new TestCase {
-        `/api/v4/users/:id/events?action=pushed`(member.gitLabId, maybeNextPage = 2.some) returning response
+        `/api/v4/projects/:id/events?action=pushed`(project.id, maybeNextPage = 2.some) returning response
 
         val Left(failure) = finder.findMemberEmail(member, project).value.unsafeRunSync()
         failure shouldBe a[ProcessingRecoverableError]
@@ -276,7 +280,7 @@ class MemberEmailFinderSpec
       val event  = pushEvents.generateOne.forMember(member).forProject(project)
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
-      `/api/v4/users/:id/events?action=pushed`(member.gitLabId) returning okJson(events.asJson.noSpaces)
+      `/api/v4/projects/:id/events?action=pushed`(project.id) returning okJson(events.asJson.noSpaces)
 
       val error = processingRecoverableErrors.generateOne
       (commitAuthorFinder
@@ -326,12 +330,12 @@ class MemberEmailFinderSpec
     }"""
   }
 
-  private def `/api/v4/users/:id/events?action=pushed`(userId:        users.GitLabId,
-                                                       page:          Int = 1,
-                                                       maybeNextPage: Option[Int] = None
-  )(implicit maybeAccessToken:                                        Option[AccessToken]) = new {
+  private def `/api/v4/projects/:id/events?action=pushed`(projectId:     projects.Id,
+                                                          page:          Int = 1,
+                                                          maybeNextPage: Option[Int] = None
+  )(implicit maybeAccessToken:                                           Option[AccessToken]) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get(s"/api/v4/users/$userId/events/?action=pushed&page=$page")
+      get(s"/api/v4/projects/$projectId/events/?action=pushed&page=$page")
         .withAccessToken(maybeAccessToken)
         .willReturn(response.withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
     }

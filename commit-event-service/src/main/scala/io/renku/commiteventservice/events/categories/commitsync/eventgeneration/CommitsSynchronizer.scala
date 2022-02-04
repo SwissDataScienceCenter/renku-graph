@@ -67,6 +67,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
     maybeAccessToken  <- findAccessToken(event.project.id)
     maybeLatestCommit <- findLatestCommit(event.project.id, maybeAccessToken).value
     _                 <- checkForSkippedEvent(maybeLatestCommit, event)(maybeAccessToken)
+    _                 <- triggerGlobalCommitSync(event)
   } yield ()) recoverWith loggingError(event)
 
   private def checkForSkippedEvent(maybeLatestCommit: Option[CommitInfo], event: CommitSyncEvent)(implicit
@@ -89,6 +90,9 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
   ) flatMap { case (elapsedTime: ElapsedTime, summary) =>
     logSummary(commitId, project)(elapsedTime, summary._2)
   }
+
+  private def triggerGlobalCommitSync(event: CommitSyncEvent): F[Unit] =
+    println(event).pure[F]
 
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
