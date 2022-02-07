@@ -136,10 +136,10 @@ Updating links happens in order to not create island in our graph. An example wo
 
 `project1 <-- project2 <-- project3`
 
-If we wanted to remove project2 we would to re-link project3 to project1.
+If we wanted to remove project2 we would have to re-link project3 to project1.
 
 `project1 <-- project3`
 
 The update of the links would also be applied to the Dataset entities which could be imported from other Datasets(similar to a fork for a project).
 
-After the re-linking we have a clean state and remove the project and all its dependant entities, if they are linked only to this project (they are not used/imported in another project).
+After the re-linking, the project and all its dependant entities can be removed. These entities will be removed only if they are not used in another project.
