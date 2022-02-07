@@ -30,22 +30,21 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{EntityDecoder, Status}
 import org.typelevel.log4cats.Logger
 
-private[categories] trait
-CommitInfoFinder[F[_]] {
+private[categories] trait CommitInfoFinder[F[_]] {
   def findCommitInfo(
-                      projectId: Id,
-                      commitId: CommitId
-                    )(implicit
-                      maybeAccessToken: Option[AccessToken]
-                    ): F[CommitInfo]
+      projectId: Id,
+      commitId:  CommitId
+  )(implicit
+      maybeAccessToken: Option[AccessToken]
+  ): F[CommitInfo]
 
   def getMaybeCommitInfo(projectId: Id, commitId: CommitId)(implicit
-                                                            maybeAccessToken: Option[AccessToken]
+      maybeAccessToken:             Option[AccessToken]
   ): F[Option[CommitInfo]]
 }
 
-private[categories] class CommitInfoFinderImpl[F[_] : Async : Temporal : Logger](gitLabClient: GitLabClient[F])
-  extends CommitInfoFinder[F] {
+private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F])
+    extends CommitInfoFinder[F] {
 
   import CommitInfo._
   import io.renku.http.client.RestClientError.UnauthorizedException
@@ -54,32 +53,32 @@ private[categories] class CommitInfoFinderImpl[F[_] : Async : Temporal : Logger]
   import org.http4s.{Request, Response}
 
   def findCommitInfo(projectId: Id, commitId: CommitId)(implicit
-                                                        maybeAccessToken: Option[AccessToken]
+      maybeAccessToken:         Option[AccessToken]
   ): F[CommitInfo] =
     fetchCommitInfo(projectId, commitId)(mapToCommitOrThrow)
 
   def getMaybeCommitInfo(projectId: Id, commitId: CommitId)(implicit
-                                                            maybeAccessToken: Option[AccessToken]
+      maybeAccessToken:             Option[AccessToken]
   ): F[Option[CommitInfo]] =
     fetchCommitInfo(projectId, commitId)(mapToMaybeCommit)
 
   private def fetchCommitInfo[ResultType](projectId: Id, commitId: CommitId)(
-    mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
-      ResultType
-    ]]
+      mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
+        ResultType
+      ]]
   )(implicit maybeAccessToken: Option[AccessToken]) =
     gitLabClient.send(GET, uri"projects" / projectId.show / "repository" / "commits" / commitId.show, "commits")(
       mapResponse
     )
 
   private lazy val mapToCommitOrThrow: PartialFunction[(Status, Request[F], Response[F]), F[CommitInfo]] = {
-    case (Ok, _, response) => response.as[CommitInfo]
+    case (Ok, _, response)    => response.as[CommitInfo]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
   private lazy val mapToMaybeCommit: PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
-    case (Ok, _, response) => response.as[CommitInfo].map(Some(_))
-    case (NotFound, _, _) => Option.empty[CommitInfo].pure[F]
+    case (Ok, _, response)    => response.as[CommitInfo].map(Some(_))
+    case (NotFound, _, _)     => Option.empty[CommitInfo].pure[F]
     case (Unauthorized, _, _) => UnauthorizedException.raiseError
   }
 
@@ -88,6 +87,6 @@ private[categories] class CommitInfoFinderImpl[F[_] : Async : Temporal : Logger]
 }
 
 private[categories] object CommitInfoFinder {
-  def apply[F[_] : Async : Temporal : Logger](gitLabClient: GitLabClient[F]): F[CommitInfoFinderImpl[F]] =
+  def apply[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F]): F[CommitInfoFinderImpl[F]] =
     new CommitInfoFinderImpl[F](gitLabClient).pure[F]
 }

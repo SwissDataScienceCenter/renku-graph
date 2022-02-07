@@ -21,29 +21,25 @@ package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 import cats.effect.Async
 import cats.effect.kernel.Temporal
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.commiteventservice.events.categories.common
 import io.renku.commiteventservice.events.categories.common.ProjectInfo
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.projects.Visibility.Public
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient}
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private trait ProjectInfoFinder[F[_]] {
-  def findProjectInfo(
-      projectId:        projects.Id,
-      maybeAccessToken: Option[AccessToken]
+  def findProjectInfo(projectId: projects.Id)(implicit
+      maybeAccessToken:          Option[AccessToken]
   ): F[ProjectInfo]
 }
 
 private class ProjectInfoFinderImpl[F[_]: Async: Temporal: Logger](
-    gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[F, GitLab]
-) extends RestClient(gitLabThrottler)
-    with ProjectInfoFinder[F] {
+    gitLabClient: GitLabClient[F]
+) extends ProjectInfoFinder[F] {
 
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
@@ -54,11 +50,8 @@ private class ProjectInfoFinderImpl[F[_]: Async: Temporal: Logger](
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
-    for {
-      uri         <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
-      projectInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-    } yield projectInfo
+  def findProjectInfo(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
+    gitLabClient.send(GET, uri"projects" / projectId.show, "projects")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProjectInfo]] = {
     case (Ok, _, response)    => response.as[ProjectInfo]
@@ -81,9 +74,6 @@ private class ProjectInfoFinderImpl[F[_]: Async: Temporal: Logger](
 }
 
 private object ProjectInfoFinder {
-  def apply[F[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
-  ): F[ProjectInfoFinder[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler)
+  def apply[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F]): F[ProjectInfoFinder[F]] =
+    new ProjectInfoFinderImpl(gitLabClient).pure[F].widen
 }
