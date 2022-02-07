@@ -121,5 +121,25 @@ sequenceDiagram
     TriplesGenerator -->>TriplesStore: JsonLD
     TriplesGenerator ->>EventLog: TriplesStoreEvent
 ```
+##### The removal (re-provisioning) of a project
 
+Once an event is marked as AwaitingDeletion it is automatically picked up by our process and a CleanUp event is created. 
+This event triggers the removal of the project in the Triple Store. The clean up of a project can be either the removal of the projects with all its events and entities (if the project was removed from GitLab) or the re-provisioning of the project (if there are events which are not AwaitingDeletion).
 
+###### Removing Project Triples
+
+The removal of project triples happens in two steps:
+ - Updating links
+ - Removing all entities
+
+Updating links happens in order to not create island in our graph. An example would be with a hierarchy of forked projects:
+
+`project1 <-- project2 <-- project3`
+
+If we wanted to remove project2 we would to re-link project3 to project1.
+
+`project1 <-- project3`
+
+The update of the links would also be applied to the Dataset entities which could be imported from other Datasets(similar to a fork for a project).
+
+After the re-linking we have a clean state and remove the project and all its dependant entities, if they are linked only to this project (they are not used/imported in another project).
