@@ -32,9 +32,8 @@ import org.typelevel.log4cats.Logger
 object DatasetIdRecordsFinder {
   def apply[F[_]: Async: Logger](
       timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[SecurityRecordFinder[F, datasets.Identifier]] = for {
-    config <- RdfStoreConfig[F]()
-  } yield new DatasetIdRecordsFinderImpl(config, timeRecorder)
+  ): F[SecurityRecordFinder[F, datasets.Identifier]] =
+    RdfStoreConfig[F]().map(new DatasetIdRecordsFinderImpl(_, timeRecorder))
 }
 
 private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger](
