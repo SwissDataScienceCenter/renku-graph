@@ -27,7 +27,10 @@ private sealed trait DBUpdateResults
 
 private object DBUpdateResults {
 
-  final case class ForProjects(statusCounts: Set[(projects.Path, Map[EventStatus, Int])]) extends DBUpdateResults
+  final case class ForProjects(statusCounts: Set[(projects.Path, Map[EventStatus, Int])]) extends DBUpdateResults {
+    def apply(project: projects.Path): Map[EventStatus, Int] =
+      statusCounts.find(_._1 == project).map(_._2).getOrElse(Map.empty)
+  }
 
   object ForProjects {
 

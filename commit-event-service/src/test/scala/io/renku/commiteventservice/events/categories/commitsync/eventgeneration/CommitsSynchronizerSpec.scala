@@ -203,7 +203,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       (latestCommitFinder
         .findLatestCommit(_: projects.Id)(_: Option[AccessToken]))
         .expects(event.project.id, maybeAccessToken)
-        .returning(Success(None))
+        .returning(Option.empty[CommitInfo].pure[Try])
 
       givenEventIsInEL(event.id, event.project.id)(returning =
         CommitWithParents(event.id, event.project.id, List(parentCommit.id))
@@ -544,7 +544,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       (latestCommitFinder
         .findLatestCommit(_: projects.Id)(_: Option[AccessToken]))
         .expects(projectId, maybeAccessToken)
-        .returning(Success(commitInfo.some))
+        .returning(commitInfo.some.pure[Try])
 
     def givenCommitIsInGL(commitInfo: CommitInfo, projectId: Id) = (commitInfoFinder
       .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))

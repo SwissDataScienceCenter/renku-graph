@@ -49,10 +49,10 @@ private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](
   override def findLatestCommit(projectId: Id)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitInfo]] =
     gitLabClient.send(GET, uri"projects" / projectId.show / "repository" / "commits", "commits")(mapResponse)
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
+  private def mapResponse(projectId: Id): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
     case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption)
     case (NotFound, _, _)     => Option.empty[CommitInfo].pure[F]
-    case (Unauthorized, _, _) => UnauthorizedException.raiseError
+    case (Unauthorized, _, _) => findLatestCommit(projectId)(maybeAccessToken = None)
   }
 
   private implicit val commitInfosEntityDecoder: EntityDecoder[F, List[CommitInfo]] = {

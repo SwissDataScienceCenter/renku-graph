@@ -61,6 +61,11 @@ private object DBUpdater {
   implicit def factoryToAwaitingDeletionUpdater[F[_]: MonadCancelThrow]: EventUpdaterFactory[F, ToAwaitingDeletion] =
     (_, _, execTimes) => new ToAwaitingDeletionUpdater(execTimes).pure[F].widen[DBUpdater[F, ToAwaitingDeletion]]
 
+  implicit def factoryRollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow]
+      : EventUpdaterFactory[F, RollbackToAwaitingDeletion] =
+    (_, _, execTimes) =>
+      new RollbackToAwaitingDeletionUpdater(execTimes).pure[F].widen[DBUpdater[F, RollbackToAwaitingDeletion]]
+
   implicit def factoryToProjectEventsNewHandler[F[_]: Async: Logger]: EventUpdaterFactory[F, ProjectEventsToNew] =
     (eventsQueue, _, _) => new ProjectEventsToNewHandler[F](eventsQueue).pure[F].widen[DBUpdater[F, ProjectEventsToNew]]
 

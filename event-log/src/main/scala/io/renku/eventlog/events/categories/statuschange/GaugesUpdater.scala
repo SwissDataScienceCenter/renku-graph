@@ -33,7 +33,9 @@ private class GaugesUpdaterImpl[F[_]: Applicative](
     awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
     awaitingTransformationGauge: LabeledGauge[F, projects.Path],
     underTransformationGauge:    LabeledGauge[F, projects.Path],
-    underTriplesGenerationGauge: LabeledGauge[F, projects.Path]
+    underTriplesGenerationGauge: LabeledGauge[F, projects.Path],
+    awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
+    deletingGauge:               LabeledGauge[F, projects.Path]
 ) extends GaugesUpdater[F] {
 
   override def updateGauges(dbUpdateResults: DBUpdateResults): F[Unit] = dbUpdateResults match {
@@ -47,7 +49,9 @@ private class GaugesUpdaterImpl[F[_]: Applicative](
             awaitingGenerationGauge.update(projectPath     -> sum(New, GenerationRecoverableFailure)),
             underTriplesGenerationGauge.update(projectPath -> sum(GeneratingTriples)),
             awaitingTransformationGauge.update(projectPath -> sum(TriplesGenerated, TransformationRecoverableFailure)),
-            underTransformationGauge.update(projectPath    -> sum(TransformingTriples))
+            underTransformationGauge.update(projectPath    -> sum(TransformingTriples)),
+            awaitingDeletionGauge.update(projectPath       -> sum(AwaitingDeletion)),
+            deletingGauge.update(projectPath               -> sum(Deleting))
           ).sequence
         }
         .toList
@@ -55,7 +59,13 @@ private class GaugesUpdaterImpl[F[_]: Applicative](
         .void
 
     case DBUpdateResults.ForAllProjects =>
-      List(awaitingGenerationGauge, underTriplesGenerationGauge, awaitingTransformationGauge, underTransformationGauge)
+      List(awaitingGenerationGauge,
+           underTriplesGenerationGauge,
+           awaitingTransformationGauge,
+           underTransformationGauge,
+           awaitingDeletionGauge,
+           deletingGauge
+      )
         .map(_.reset())
         .sequence
         .void

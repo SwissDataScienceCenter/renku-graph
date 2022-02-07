@@ -33,6 +33,7 @@ import io.renku.graph.model.events.CommittedDate
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -92,8 +93,7 @@ class CommitInfoFinderSpec
         finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe commitInfoExpectation
       }
 
-    "fetch commit info from the configured url " +
-      "and return CommitInfo if OK returned with valid body - case with no access token" in new TestCase {
+    "fallback to fetch commit info without an access token for UNAUTHORIZED" in new TestCase {
 
         val commitInfoExpectation = CommitInfo(
           id = commitId,
@@ -138,30 +138,7 @@ class CommitInfoFinderSpec
   "getMaybeCommitInfo" should {
 
     "get commit info from the configured url " +
-      "and return some CommitInfo if OK returned with valid body - case with Personal Access Token" in new TestCase {
-
-        val maybeAccessToken @ Some(token) = personalAccessTokens.generateSome
-
-        val someCommitInfoExpectation = CommitInfo(
-          id = commitId,
-          message = commitMessage,
-          committedDate = committedDate,
-          author = author,
-          committer = committer,
-          parents = parents
-        ).some
-
-        setGitLabClientExpectation(maybeAccessToken, returning = someCommitInfoExpectation)
-
-        finder
-          .getMaybeCommitInfo(projectId, commitId)(maybeAccessToken)
-          .unsafeRunSync() shouldBe someCommitInfoExpectation
-      }
-
-    "get commit info from the configured url " +
-      "and return some CommitInfo if OK returned with valid body - case with OAuth Access Token" in new TestCase {
-
-        val maybeAccessToken @ Some(token) = oauthAccessTokens.generateSome
+      "and return some CommitInfo if OK returned with valid body" in new TestCase {
 
         val someCommitInfoExpectation = CommitInfo(
           id = commitId,
@@ -181,6 +158,33 @@ class CommitInfoFinderSpec
 
     "get commit info from the configured url " +
       "and return some CommitInfo if OK returned with valid body - case with no access token" in new TestCase {
+
+        val someCommitInfoExpectation = CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        ).some
+
+        setGitLabClientExpectation(maybeAccessToken, returning = someCommitInfoExpectation)
+
+        finder
+          .getMaybeCommitInfo(projectId, commitId)(maybeAccessToken)
+          .unsafeRunSync() shouldBe someCommitInfoExpectation
+      }
+
+    "return None if remote client responds with Not found" in new TestCase {
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+          .willReturn(notFound())
+      }
+
+      finder.getMaybeCommitInfo(projectId, commitId).unsafeRunSync() shouldBe None
+
+    }
 
         val someCommitInfoExpectation = CommitInfo(
           id = commitId,

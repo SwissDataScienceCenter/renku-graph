@@ -81,8 +81,8 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
           DBUpdateResults
             .ForProjects(event.projectPath, Map(event.currentStatus -> -1, event.newStatus -> 1))
             .pure[F]
-        case _ =>
-          new Exception(s"Could not update event ${event.eventId} to status ${event.newStatus}")
+        case completion =>
+          new Exception(s"Could not update event ${event.eventId} to status ${event.newStatus}: $completion")
             .raiseError[F, DBUpdateResults.ForProjects]
       }
   }

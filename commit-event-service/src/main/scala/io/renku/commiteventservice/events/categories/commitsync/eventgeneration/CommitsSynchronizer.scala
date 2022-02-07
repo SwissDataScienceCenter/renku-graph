@@ -61,15 +61,15 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
   import executionTimeRecorder._
   import latestCommitFinder._
 
-  override def synchronizeEvents(event: CommitSyncEvent): F[Unit] = (for {
-    maybeAccessToken  <- findAccessToken(event.project.id)
-    maybeLatestCommit <- findLatestCommit(event.project.id)(maybeAccessToken)
-    _                 <- checkForSkippedEvent(maybeLatestCommit, event)(maybeAccessToken)
-  } yield ()) recoverWith loggingError(event)
+  override def synchronizeEvents(event: CommitSyncEvent): F[Unit] = {
+    findAccessToken(event.project.id) >>= { implicit maybeAccessToken =>
+      findLatestCommit(event.project.id) >>= (checkForSkippedEvent(_, event))
+    }
+  } recoverWith loggingError(event)
 
   private def checkForSkippedEvent(maybeLatestCommit: Option[CommitInfo], event: CommitSyncEvent)(implicit
       maybeAccessToken:                               Option[AccessToken]
-  ) = (maybeLatestCommit, event) match {
+  ): F[Unit] = (maybeLatestCommit, event) match {
     case (Some(commitInfo), FullCommitSyncEvent(id, _, _)) if commitInfo.id == id =>
       measureExecutionTime(Skipped.pure[F].widen[UpdateResult]) >>= logResult(event)
     case (Some(commitInfo), event) =>

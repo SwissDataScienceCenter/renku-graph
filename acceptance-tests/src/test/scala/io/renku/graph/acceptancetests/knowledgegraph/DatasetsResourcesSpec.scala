@@ -194,13 +194,21 @@ class DatasetsResourcesSpec
         .generateOne
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
 
-      pushToStore(project1)
-      pushToStore(project2)
-      pushToStore(project3)
-      pushToStore(project4)
-      pushToStore(project4Fork)
-      pushToStore(project5)
-      pushToStore(project6Private)
+      val dataProject1     = pushToStore(project1)
+      val dataProject2     = pushToStore(project2)
+      val dataProject3     = pushToStore(project3)
+      val dataProject4     = pushToStore(project4)
+      val dataProject4Fork = pushToStore(project4Fork)
+      val dataProject5     = pushToStore(project5)
+      val dataProject6     = pushToStore(project6Private)
+
+      `wait for events to be processed`(dataProject1.id)
+      `wait for events to be processed`(dataProject2.id)
+      `wait for events to be processed`(dataProject3.id)
+      `wait for events to be processed`(dataProject4.id)
+      `wait for events to be processed`(dataProject4Fork.id)
+      `wait for events to be processed`(dataProject5.id)
+      `wait for events to be processed`(dataProject6.id)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
@@ -209,12 +217,19 @@ class DatasetsResourcesSpec
       datasetsSearchResponse.status shouldBe Ok
 
       val Right(foundDatasets) = datasetsSearchResponse.jsonBody.as[List[Json]]
-      foundDatasets.flatMap(sortCreators) should contain theSameElementsAs List(
-        searchResultJson(dataset1, 1, project1.path, foundDatasets),
-        searchResultJson(dataset2, 1, project2.path, foundDatasets),
-        searchResultJson(dataset3, 1, project3.path, foundDatasets),
-        searchResultJson(dataset4, 2, project4.path, foundDatasets)
-      ).flatMap(sortCreators)
+      foundDatasets.flatMap(sortCreators) should {
+        contain theSameElementsAs List(
+          searchResultJson(dataset1, 1, project1.path, foundDatasets),
+          searchResultJson(dataset2, 1, project2.path, foundDatasets),
+          searchResultJson(dataset3, 1, project3.path, foundDatasets),
+          searchResultJson(dataset4, 2, project4.path, foundDatasets)
+        ).flatMap(sortCreators) or contain theSameElementsAs List(
+          searchResultJson(dataset1, 1, project1.path, foundDatasets),
+          searchResultJson(dataset2, 1, project2.path, foundDatasets),
+          searchResultJson(dataset3, 1, project3.path, foundDatasets),
+          searchResultJson(dataset4, 2, project4Fork.path, foundDatasets)
+        ).flatMap(sortCreators)
+      }
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc")
       val searchSortedByName =
@@ -224,14 +239,24 @@ class DatasetsResourcesSpec
       searchSortedByName.status shouldBe Ok
 
       val Right(foundDatasetsSortedByName) = searchSortedByName.jsonBody.as[List[Json]]
-      val datasetsSortedByName = List(
+      val datasetsSortedByNameProj4Path = List(
         searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
         searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
         searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
         searchResultJson(dataset4, 2, project4.path, foundDatasetsSortedByName)
       ).flatMap(sortCreators)
         .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
-      foundDatasetsSortedByName.flatMap(sortCreators) shouldBe datasetsSortedByName
+      val datasetsSortedByNameProj4ForkPath = List(
+        searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
+        searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
+        searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
+        searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsSortedByName)
+      ).flatMap(sortCreators)
+        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+
+      foundDatasetsSortedByName.flatMap(sortCreators) should {
+        be(datasetsSortedByNameProj4Path) or be(datasetsSortedByNameProj4ForkPath)
+      }
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc&page=2&per_page=1")
       val searchForPage =
@@ -239,22 +264,34 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with the dataset from the requested page")
       val Right(foundDatasetsPage) = searchForPage.jsonBody.as[List[Json]]
-      foundDatasetsPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByName(1))
-        .flatMap(sortCreators)
+      foundDatasetsPage.flatMap(sortCreators) should {
+        contain theSameElementsAs List(datasetsSortedByNameProj4Path(1)).flatMap(sortCreators) or
+          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath(1)).flatMap(sortCreators)
+      }
 
       When("user calls the GET knowledge-graph/datasets?sort=name:asc")
       val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=title:asc"
 
       Then("he should get OK response with all the datasets")
       val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.jsonBody.as[List[Json]]
-      foundDatasetsWithoutPhrase.flatMap(sortCreators) should contain allElementsOf List(
-        searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
-        searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
-        searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
-        searchResultJson(dataset4, 2, project4.path, foundDatasetsWithoutPhrase),
-        searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
-      ).flatMap(sortCreators)
-        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+      foundDatasetsWithoutPhrase.flatMap(sortCreators) should {
+        contain allElementsOf List(
+          searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset4, 2, project4.path, foundDatasetsWithoutPhrase),
+          searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
+        ).flatMap(sortCreators)
+          .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found"))) or
+          contain allElementsOf List(
+            searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsWithoutPhrase),
+            searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
+          ).flatMap(sortCreators)
+            .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+      }
 
       When("user uses the response header link with the rel='first'")
       val firstPageLink     = searchForPage.headerLink(rel = "first")
@@ -262,8 +299,10 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with the datasets from the first page")
       val foundFirstPage = firstPageResponse.flatMap(_.as[List[Json]]).unsafeRunSync()
-      foundFirstPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByName.head)
-        .flatMap(sortCreators)
+      foundFirstPage.flatMap(sortCreators) should {
+        contain theSameElementsAs List(datasetsSortedByNameProj4Path.head).flatMap(sortCreators) or
+          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath.head).flatMap(sortCreators)
+      }
 
       When("user uses 'details' link of one of the found datasets")
       val someDatasetJson = Random.shuffle(foundDatasets).head
@@ -322,11 +361,13 @@ class DatasetsResourcesSpec
       ).flatMap(sortCreators)
     }
 
-    def pushToStore(project: testentities.RenkuProject)(implicit accessToken: AccessToken): Unit = {
-      `data in the RDF store`(dataProjects(project).generateOne, project.asJsonLD)
-      ()
+    def pushToStore(project: testentities.RenkuProject)(implicit accessToken: AccessToken): Project = {
+      val dataProject = dataProjects(project).generateOne
+      `data in the RDF store`(dataProject, project.asJsonLD)
+      dataProject
     }
   }
+
 
   Feature("GET knowledge-graph/datasets/:id to find dataset details") {
 
@@ -460,8 +501,8 @@ trait DatasetsResources {
       "published": ${dataset.provenance.creators -> dataset.provenance.date},
       "date": ${dataset.provenance.date.instant},
       "projectsCount": $projectsCount,
-      "images": ${dataset.additionalInfo.images -> projectPath},
-      "keywords": ${dataset.additionalInfo.keywords.sorted.map(_.value)}
+      "keywords": ${dataset.additionalInfo.keywords.sorted.map(_.value)},
+      "images": ${dataset.additionalInfo.images -> projectPath}
     }"""
       .addIfDefined("description" -> dataset.additionalInfo.maybeDescription)
       .deepMerge {
@@ -492,18 +533,18 @@ trait DatasetsResources {
     Encoder.instance[(List[ImageUri], projects.Path)] { case (images, exemplarProjectPath) =>
       Json.arr(images.map {
         case uri: ImageUri.Relative => json"""{
-            "location": $uri,
             "_links": [{
               "rel": "view",
               "href": ${s"$gitLabUrl/$exemplarProjectPath/raw/master/$uri"}
-            }]
+            }],
+            "location": $uri
           }"""
         case uri: ImageUri.Absolute => json"""{
-            "location": $uri,
             "_links": [{
               "rel": "view",
               "href": $uri
-            }]
+            }],
+            "location": $uri
           }"""
       }: _*)
     }

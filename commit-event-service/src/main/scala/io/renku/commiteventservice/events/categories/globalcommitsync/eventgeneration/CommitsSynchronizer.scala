@@ -65,7 +65,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
   override def synchronizeEvents(event: GlobalCommitSyncEvent): F[Unit] = {
     findAccessToken(event.project.id) >>= { implicit maybeAccessToken =>
       fetchCommitStats(event.project.id) >>= {
-        case maybeStats if outOfSync(event, maybeStats) => createOrDeleteEvents(event)
+        case maybeStats if outOfSync(event)(maybeStats) => createOrDeleteEvents(event)
         case _ =>
           logSummary(event.project,
                      SynchronizationSummary().updated(UpdateResult.Skipped, event.commits.count.value.toInt)
@@ -77,13 +77,12 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
       error.raiseError[F, Unit]
   }
 
-  private def outOfSync(event: GlobalCommitSyncEvent, maybeCommitStats: Option[ProjectCommitStats]) =
-    maybeCommitStats match {
-      case Some(commitStats) =>
-        event.commits.count != commitStats.commitsCount ||
-          !commitStats.maybeLatestCommit.contains(event.commits.latest)
-      case _ => true
-    }
+  private def outOfSync(event: GlobalCommitSyncEvent): Option[ProjectCommitStats] => Boolean = {
+    case Some(commitStats) =>
+      event.commits.count != commitStats.commitsCount ||
+        !(commitStats.maybeLatestCommit contains event.commits.latest)
+    case _ => true
+  }
 
   private def createOrDeleteEvents(
       event:                   GlobalCommitSyncEvent

@@ -57,6 +57,7 @@ class GitLabCommitStatFetcherSpec
     with ScalaCheckPropertyChecks {
 
   "fetchCommitStats" should {
+
     "return a ProjectCommitStats with count of commits " in new TestCase {
       forAll(commitIds.toGeneratorOfOptions, commitsCounts) { (maybeLatestCommit, commitCount) =>
         (gitLabCommitFetcher
@@ -89,7 +90,22 @@ class GitLabCommitStatFetcherSpec
 
     }
 
-    "throw an UnauthorizedException if the gitlab API returns an UnauthorizedException" in new TestCase {
+    "return None if the gitlab API returns no statistics" in new TestCase {
+      val maybeLatestCommit = commitIds.generateOption
+      (gitLabCommitFetcher
+        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
+        .expects(projectId, maybeAccessToken)
+        .returning(maybeLatestCommit.pure[IO])
+
+      stubFor {
+        get(s"/api/v4/projects/$projectId?statistics=true")
+          .willReturn(okJson("{}"))
+      }
+
+      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
+    }
+
+    "return None if the gitlab API returns a Unauthorized" in new TestCase {
       val maybeLatestCommit = commitIds.generateOption
       (gitLabCommitFetcher
         .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))

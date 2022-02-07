@@ -286,6 +286,23 @@ the new status.
 }
 ```
 
+#### Changing status of the all events of a specific project to `AWAITING_DELETION` from `DELETING`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "newStatus": "AWAITING_DELETION"
+}
+```
+
 #### Changing status of all events to `NEW`
 
 **Multipart Request**
@@ -692,11 +709,19 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | delivery_url VARCHAR     PK NOT NULL |
 | delivery_id  VARCHAR(19)    NOT NULL |
 
-| event_delivery                          |
-|-----------------------------------------|
-| event_id     VARCHAR     PK FK NOT NULL |
-| project_id   INT4        PK FK NOT NULL |
-| delivery_id  VARCHAR(19)       NOT NULL |
+| event_delivery                            |
+|-------------------------------------------|
+| event_id      VARCHAR      FK UK NULL     |
+| project_id    INT4         FK UK NOT NULL |
+| delivery_id   VARCHAR(19)        NOT NULL |
+| event_type_id VARCHAR         UK NULL     | 
+
+| status_change_events_queue       |
+|----------------------------------|
+| id         SERIAL    PRIMARY KEY |
+| date       TIMESTAMP NOT NULL    |
+| event_type VARCHAR   NOT NULL    |
+| payload    TEXT      NOT NULL    |
 
 | status_change_events_queue       |
 |----------------------------------|

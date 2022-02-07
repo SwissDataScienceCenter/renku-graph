@@ -23,6 +23,7 @@ import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import io.renku.eventlog.subscriptions.eventdelivery.EventDelivery
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger

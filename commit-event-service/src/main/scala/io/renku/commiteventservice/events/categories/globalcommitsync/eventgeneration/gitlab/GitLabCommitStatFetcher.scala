@@ -48,9 +48,9 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
 
   import gitLabCommitFetcher._
 
-  override def fetchCommitStats(projectId: projects.Id)(implicit
-      maybeAccessToken:                    Option[AccessToken]
-  ): F[Option[ProjectCommitStats]] = {
+  override def fetchCommitStats(
+      projectId:               projects.Id
+  )(implicit maybeAccessToken: Option[AccessToken]): F[Option[ProjectCommitStats]] = {
     for {
       maybeLatestCommitId <- OptionT.liftF(fetchLatestGitLabCommit(projectId))
       commitCount         <- OptionT(fetchCommitCount(projectId))
@@ -59,21 +59,20 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
 
   private def fetchCommitCount(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]) =
     gitLabClient.send(GET, uri"projects" / projectId.show withQueryParams Map("statistics" -> "true"), "projects")(
-      mapCountResponse
+      mapResponse
     )
 
-  private implicit lazy val mapCountResponse: PartialFunction[(Status, Request[F], Response[F]), F[
-    Option[CommitsCount]
-  ]] = {
-    case (Ok, _, response)    => response.as[CommitsCount].map(_.some)
-    case (NotFound, _, _)     => Option.empty[CommitsCount].pure[F]
-    case (Unauthorized, _, _) => UnauthorizedException.raiseError
+  private implicit lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitsCount]]] = {
+    case (Ok, _, response)               => response.as[Option[CommitsCount]]
+    case (NotFound | Unauthorized, _, _) => Option.empty[CommitsCount].pure[F]
   }
 
-  private implicit val commitCountDecoder: EntityDecoder[F, CommitsCount] = {
-    implicit val commitDecoder: Decoder[CommitsCount] =
-      _.downField("statistics").downField("commit_count").as(CommitsCount.decoder)
-    jsonOf[F, CommitsCount]
+  private implicit val commitCountDecoder: EntityDecoder[F, Option[CommitsCount]] = {
+    import io.circe.Decoder.decodeOption
+
+    implicit val commitDecoder: Decoder[Option[CommitsCount]] =
+      _.downField("statistics").downField("commit_count").as(decodeOption(CommitsCount.decoder))
+    jsonOf[F, Option[CommitsCount]]
   }
 }
 

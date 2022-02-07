@@ -70,8 +70,9 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
       } yield (maybeKGPerson, maybeMergedPerson)
         .mapN { (kgPerson, mergedPerson) =>
           val updatedProject = update(person, mergedPerson)(previousResults._1)
-          val queries        = preparePreDataUpdates(kgPerson, mergedPerson)
-          (updatedProject, previousResults._2 |+| Queries.preDataQueriesOnly(queries))
+          val preQueries     = preparePreDataUpdates(kgPerson, mergedPerson)
+          val postQueries    = preparePostDataUpdates(mergedPerson)
+          (updatedProject, previousResults._2 |+| Queries(preQueries, postQueries))
         }
         .getOrElse(previousResults)
   }
