@@ -32,6 +32,7 @@ import io.circe.{Encoder, Json}
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.ints
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths, userEmails, userGitLabIds, userNames}
 import io.renku.graph.model.entities.Project.ProjectMember
@@ -67,9 +68,8 @@ class MemberEmailFinderSpec
 
   "findEmail" should {
 
-    "iterate over member's push events for the project " +
-      "until commit info for the commit found on the push event " +
-      "lists an author with the same name" in new TestCase {
+    "iterate over project's push events " +
+      "until commit info for the commit found on the push event lists an author with the same name" in new TestCase {
         val event  = pushEvents.generateOne.forMember(member).forProject(project)
         val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
 
@@ -156,6 +156,62 @@ class MemberEmailFinderSpec
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
     }
 
+    "select first, middle and last 20 pages " +
+      "if total number of events pages for the project is more than 3 * 20 * 20" in new TestCase {
+        val maybeTotalPages @ Some(totalPages) = ints(min = 3 * 20 * 20 + 1).generateSome
+
+        (1 to 20) foreach { page =>
+          `/api/v4/projects/:id/events?action=pushed`(project.id,
+                                                      page,
+                                                      maybeNextPage = (page + 1).some,
+                                                      maybeTotalPages = maybeTotalPages
+          ) returning okJson(
+            pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList.asJson.noSpaces
+          )
+        }
+
+        ((totalPages / 2 - 10) to (totalPages / 2 + 10)) foreach { page =>
+          `/api/v4/projects/:id/events?action=pushed`(project.id,
+                                                      page,
+                                                      maybeNextPage = (page + 1).some,
+                                                      maybeTotalPages = maybeTotalPages
+          ) returning okJson(
+            pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList.asJson.noSpaces
+          )
+        }
+
+        ((totalPages - 20) until totalPages) foreach { page =>
+          `/api/v4/projects/:id/events?action=pushed`(project.id,
+                                                      page,
+                                                      maybeNextPage = (page + 1).some,
+                                                      maybeTotalPages = maybeTotalPages
+          ) returning okJson(
+            pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList.asJson.noSpaces
+          )
+        }
+
+        val event = pushEvents.generateOne.forMember(member).forProject(project)
+        `/api/v4/projects/:id/events?action=pushed`(project.id,
+                                                    totalPages,
+                                                    maybeNextPage = None,
+                                                    maybeTotalPages = maybeTotalPages
+        ) returning okJson(
+          (event :: pushEvents.generateNonEmptyList(maxElements = 19).toList.reverse).asJson.noSpaces
+        )
+
+        val authorEmail = userEmails.generateOne
+        (commitAuthorFinder
+          .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
+          .expects(
+            project.path,
+            (event.maybeCommitTo orElse event.maybeCommitFrom).getOrElse(fail("At least one commit expected on Event")),
+            maybeAccessToken
+          )
+          .returning(EitherT.rightT[IO, ProcessingRecoverableError]((member.name -> authorEmail).some))
+
+        finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
+      }
+
     "find the email if a matching commits exist on both pages, " +
       "however, the first matching commit has author with a different name" in new TestCase {
         val eventPage1 = pushEvents.generateOne
@@ -199,7 +255,7 @@ class MemberEmailFinderSpec
         finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
       }
 
-    "return the given member back if a matching commit author cannot be found on any events page" in new TestCase {
+    "return the given member back if a matching commit author cannot be found on any events" in new TestCase {
       val eventPage1 = pushEvents.generateOne
         .forMember(member)
         .forProject(project)
@@ -242,7 +298,7 @@ class MemberEmailFinderSpec
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member.asRight
     }
 
-    "return the given member back if no user events for the project are found" in new TestCase {
+    "return the given member back if no project events with the member as an author are found for the project" in new TestCase {
 
       `/api/v4/projects/:id/events?action=pushed`(project.id, maybeNextPage = 2.some) returning okJson(
         pushEvents.generateNonEmptyList().toList.asJson.noSpaces
@@ -254,7 +310,7 @@ class MemberEmailFinderSpec
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member.asRight
     }
 
-    "return the given member back if no user events are found" in new TestCase {
+    "return the given member back if no project events are found" in new TestCase {
       `/api/v4/projects/:id/events?action=pushed`(project.id, maybeNextPage = 2.some) returning notFound()
 
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member.asRight
@@ -330,14 +386,19 @@ class MemberEmailFinderSpec
     }"""
   }
 
-  private def `/api/v4/projects/:id/events?action=pushed`(projectId:     projects.Id,
-                                                          page:          Int = 1,
-                                                          maybeNextPage: Option[Int] = None
-  )(implicit maybeAccessToken:                                           Option[AccessToken]) = new {
+  private def `/api/v4/projects/:id/events?action=pushed`(projectId:       projects.Id,
+                                                          page:            Int = 1,
+                                                          maybeNextPage:   Option[Int] = None,
+                                                          maybeTotalPages: Option[Int] = None
+  )(implicit maybeAccessToken:                                             Option[AccessToken]) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get(s"/api/v4/projects/$projectId/events/?action=pushed&page=$page")
+      get(s"/api/v4/projects/$projectId/events?action=pushed&page=$page")
         .withAccessToken(maybeAccessToken)
-        .willReturn(response.withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse("")))
+        .willReturn(
+          response
+            .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
+            .withHeader("X-Total-Pages", maybeTotalPages.map(_.show).getOrElse(maybeNextPage.map(_.show).getOrElse("")))
+        )
     }
   }
 
