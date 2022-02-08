@@ -156,31 +156,20 @@ class MemberEmailFinderSpec
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe (member add authorEmail).asRight
     }
 
-    "select first, middle and last 20 pages " +
-      "if total number of events pages for the project is more than 3 * 20 * 20" in new TestCase {
-        val maybeTotalPages @ Some(totalPages) = ints(min = 3 * 20 * 20 + 1).generateSome
+    "select 30 pages from the total number of pages (including the first and the last one) " +
+      "if the total number of pages for the project is more than 30" in new TestCase {
+        val maybeTotalPages @ Some(totalPages) = ints(min = 30 * 20 + 1, max = 1000000).generateSome
 
-        (1 to 20) foreach { page =>
-          `/api/v4/projects/:id/events?action=pushed`(project.id,
-                                                      page,
-                                                      maybeNextPage = (page + 1).some,
-                                                      maybeTotalPages = maybeTotalPages
-          ) returning okJson(
-            pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList.asJson.noSpaces
-          )
-        }
+        val step = totalPages / 30
 
-        ((totalPages / 2 - 10) to (totalPages / 2 + 10)) foreach { page =>
-          `/api/v4/projects/:id/events?action=pushed`(project.id,
-                                                      page,
-                                                      maybeNextPage = (page + 1).some,
-                                                      maybeTotalPages = maybeTotalPages
-          ) returning okJson(
-            pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList.asJson.noSpaces
-          )
-        }
+        `/api/v4/projects/:id/events?action=pushed`(project.id,
+                                                    maybeNextPage = 2.some,
+                                                    maybeTotalPages = maybeTotalPages
+        ) returning okJson(
+          pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList.asJson.noSpaces
+        )
 
-        ((totalPages - 20) until totalPages) foreach { page =>
+        step to (totalPages - 1, step) foreach { page =>
           `/api/v4/projects/:id/events?action=pushed`(project.id,
                                                       page,
                                                       maybeNextPage = (page + 1).some,
