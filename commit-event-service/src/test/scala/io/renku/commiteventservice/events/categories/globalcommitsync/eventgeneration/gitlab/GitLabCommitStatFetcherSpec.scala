@@ -34,7 +34,6 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
@@ -97,10 +96,12 @@ class GitLabCommitStatFetcherSpec
         .expects(projectId, maybeAccessToken)
         .returning(maybeLatestCommit.pure[IO])
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId?statistics=true")
-          .willReturn(okJson("{}"))
-      }
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET, uri"projects" / projectId.show withQueryParam ("statistics", "true"), endpointName, *, *)
+        .returning(None.pure[IO])
 
       gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
     }
@@ -112,9 +113,7 @@ class GitLabCommitStatFetcherSpec
         .expects(projectId, maybeAccessToken)
         .returning(maybeLatestCommit.pure[IO])
 
-      intercept[Exception] {
-        mapResponse(Status.Unauthorized, Request[IO](), Response[IO]()).unsafeRunSync()
-      } shouldBe a[UnauthorizedException]
+      mapResponse(Status.Unauthorized, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe None
     }
   }
 

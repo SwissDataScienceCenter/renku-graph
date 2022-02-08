@@ -24,6 +24,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
+import io.renku.commiteventservice.events.categories.common
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -31,9 +32,7 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.CommittedDate
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -67,7 +66,6 @@ class CommitInfoFinderSpec
           committer = committer,
           parents = parents
         ).some
-        val maybeAccessToken @ Some(token) = personalAccessTokens.generateSome
 
         setGitLabClientExpectation(maybeAccessToken, returning = commitInfoExpectation)
 
@@ -86,8 +84,6 @@ class CommitInfoFinderSpec
           parents = parents
         ).some
 
-        val maybeAccessToken @ Some(token) = oauthAccessTokens.generateSome
-
         setGitLabClientExpectation(maybeAccessToken, returning = commitInfoExpectation)
 
         finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe commitInfoExpectation
@@ -95,27 +91,20 @@ class CommitInfoFinderSpec
 
     "fallback to fetch commit info without an access token for UNAUTHORIZED" in new TestCase {
 
-        val commitInfoExpectation = CommitInfo(
-          id = commitId,
-          message = commitMessage,
-          committedDate = committedDate,
-          author = author,
-          committer = committer,
-          parents = parents
-        ).some
+      val commitInfoExpectation = CommitInfo(
+        id = commitId,
+        message = commitMessage,
+        committedDate = committedDate,
+        author = author,
+        committer = committer,
+        parents = parents
+      ).some
 
-        setGitLabClientExpectation(maybeAccessToken = None, returning = commitInfoExpectation)
+      setGitLabClientExpectation(maybeAccessToken = None, returning = commitInfoExpectation)
 
-        finder
-          .findCommitInfo(projectId, commitId)(maybeAccessToken = None)
-          .unsafeRunSync() shouldBe commitInfoExpectation
-      }
-
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-
-      intercept[Exception] {
-        mapToCommitOrThrow((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync()
-      } shouldBe UnauthorizedException
+      finder
+        .findCommitInfo(projectId, commitId)(maybeAccessToken = None)
+        .unsafeRunSync() shouldBe commitInfoExpectation
     }
 
     "return an Error if remote client responds with invalid json" in new TestCase {
@@ -174,63 +163,56 @@ class CommitInfoFinderSpec
           .getMaybeCommitInfo(projectId, commitId)(maybeAccessToken)
           .unsafeRunSync() shouldBe someCommitInfoExpectation
       }
+  }
 
-    "return None if remote client responds with Not found" in new TestCase {
+  "return None if remote client responds with Not found" in new TestCase {
+    mapToMaybeCommit((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
+  }
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(notFound())
-      }
+  // TODO: figure out how to check that it's called twice
+  "fallback to fetch commit info without an access token for UNAUTHORIZED" in new TestCase {
+    val invalidAccessToken = accessTokens.generateSome
 
-      finder.getMaybeCommitInfo(projectId, commitId).unsafeRunSync() shouldBe None
+    val mapResponse = CaptureOne[ResponseMappingF[IO, Option[CommitInfo]]]()
 
+    (gitLabClient
+      .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+        _: Option[AccessToken]
+      ))
+      .expects(*, *, *, capture(mapResponse), *)
+      .returning(commitInfos.generateSome.pure[IO])
+
+    finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = invalidAccessToken)
+
+    (gitLabClient
+      .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+        _: Option[AccessToken]
+      ))
+      .expects(*, *, *, *, *)
+      .returning(Option.empty[common.CommitInfo].pure[IO])
+
+    mapResponse.value((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
+  }
+
+  "return an Error if remote client responds with invalid json" in new TestCase {
+
+    intercept[Exception] {
+      mapToMaybeCommit(
+        (Status.Ok, Request[IO](), Response[IO]().withEntity("{}").withHeaders(Header.Raw(ci"X-Next-Page", "")))
+      ).unsafeRunSync()
     }
+  }
 
-        val someCommitInfoExpectation = CommitInfo(
-          id = commitId,
-          message = commitMessage,
-          committedDate = committedDate,
-          author = author,
-          committer = committer,
-          parents = parents
-        ).some
+  "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
 
-        setGitLabClientExpectation(maybeAccessToken = None, returning = someCommitInfoExpectation)
-
-        finder
-          .getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None)
-          .unsafeRunSync() shouldBe someCommitInfoExpectation
-      }
-
-    "return None if remote client responds with Not found" in new TestCase {
-      mapToMaybeCommit((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
-    }
-
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-
-      intercept[Exception] {
-        mapToMaybeCommit((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync()
-      } shouldBe UnauthorizedException
-    }
-
-    "return an Error if remote client responds with invalid json" in new TestCase {
-
-      intercept[Exception] {
-        mapToMaybeCommit(
-          (Status.Ok, Request[IO](), Response[IO]().withEntity("{}").withHeaders(Header.Raw(ci"X-Next-Page", "")))
-        ).unsafeRunSync()
-      }
-    }
-
-    "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
-
-      intercept[Exception] {
-        mapToMaybeCommit((Status.BadRequest, Request[IO](), Response[IO]())).unsafeRunSync()
-      }
+    intercept[Exception] {
+      mapToMaybeCommit((Status.BadRequest, Request[IO](), Response[IO]())).unsafeRunSync()
     }
   }
 
   private trait TestCase {
+    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
+
     val projectId     = projectIds.generateOne
     val commitId      = commitIds.generateOne
     val commitMessage = commitMessages.generateOne

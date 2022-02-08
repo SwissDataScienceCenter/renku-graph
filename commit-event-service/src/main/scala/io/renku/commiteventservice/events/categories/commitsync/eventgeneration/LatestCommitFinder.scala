@@ -41,13 +41,15 @@ private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](
 ) extends LatestCommitFinder[F] {
 
   import CommitInfo._
-  import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status._
   import org.http4s.{Request, Response}
 
   override def findLatestCommit(projectId: Id)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitInfo]] =
-    gitLabClient.send(GET, uri"projects" / projectId.show / "repository" / "commits", "commits")(mapResponse)
+    gitLabClient.send(GET,
+                      uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
+                      "commits"
+    )(mapResponse(projectId))
 
   private def mapResponse(projectId: Id): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
     case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption)
@@ -62,6 +64,6 @@ private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](
 }
 
 private object LatestCommitFinder {
-  def apply[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F]): F[LatestCommitFinder[F]] =
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[LatestCommitFinder[F]] =
     new LatestCommitFinderImpl[F](gitLabClient).pure[F].widen
 }

@@ -26,7 +26,6 @@ import io.circe.Decoder
 import io.renku.commiteventservice.events.categories.globalcommitsync.CommitsCount
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
 import io.renku.graph.model.projects
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
 import org.http4s.Method.GET
 import org.http4s.Status.{NotFound, Ok, Unauthorized}

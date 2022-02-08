@@ -32,7 +32,6 @@ import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, personalAcc
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
@@ -101,10 +100,15 @@ class LatestCommitFinderSpec
       mapResponse((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
     }
 
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-      intercept[Exception] {
-        mapResponse((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync()
-      } shouldBe UnauthorizedException
+    "fallback to fetching the latest commit without an access token for UNAUTHORIZED" in new TestCase {
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+          _: Option[AccessToken]
+        ))
+        .expects(*, *, *, *, *)
+        .returning(None.pure[IO])
+
+      mapResponse((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
@@ -145,7 +149,7 @@ class LatestCommitFinderSpec
           _: Option[AccessToken]
         ))
         .expects(GET,
-                 uri"projects" / projectId.show / "repository" / "commits",
+                 uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
                  endpointName,
                  *,
                  maybePersonalAccessToken

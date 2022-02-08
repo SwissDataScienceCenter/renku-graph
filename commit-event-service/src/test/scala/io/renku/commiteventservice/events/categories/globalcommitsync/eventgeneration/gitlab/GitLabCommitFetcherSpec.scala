@@ -31,6 +31,7 @@ import io.renku.commiteventservice.events.categories.globalcommitsync.Generators
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.PageResult
 import io.renku.generators.CommonGraphGenerators.{accessTokens, pages, pagingRequests}
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
