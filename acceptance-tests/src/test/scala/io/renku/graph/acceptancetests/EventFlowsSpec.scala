@@ -47,7 +47,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
       `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
 
-      `GET <gitlabApi>/users/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+      `GET <gitlabApi>/projects/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
                                                                             project,
                                                                             commitId
       )

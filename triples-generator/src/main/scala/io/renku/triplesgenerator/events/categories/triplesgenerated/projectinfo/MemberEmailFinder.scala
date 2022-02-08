@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 
 import cats.data.EitherT
+import cats.data.EitherT.rightT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -85,74 +86,72 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
     }
   }
 
-  private def findInCommitsAndEvents(member:        ProjectMemberNoEmail,
-                                     project:       Project,
-                                     maybeNextPage: Option[Int] = Some(1)
+  private def findInCommitsAndEvents(member:  ProjectMemberNoEmail,
+                                     project: Project,
+                                     paging:  PagingInfo = PagingInfo(maybeNextPage = Some(1), maybeTotalPages = None)
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, ProjectMember] =
-    maybeNextPage match {
-      case None => EitherT.rightT[F, ProcessingRecoverableError](member)
+    paging.findNextPage match {
+      case None => rightT[F, ProcessingRecoverableError](member)
       case Some(nextPage) =>
         for {
           eventsAndNextPage <- fetchProjectEvents(project, nextPage).map(filterEventsFor(member))
-          maybeEmail        <- matchEmailFromCommits(eventsAndNextPage, project)
+          maybeEmail        <- matchEmailFromCommits(eventsAndNextPage._1, project)
           updatedMember     <- addEmailOrCheckNextPage(member, maybeEmail, project, eventsAndNextPage._2)
         } yield updatedMember
     }
 
-  private def addEmailOrCheckNextPage(member:        ProjectMemberNoEmail,
-                                      maybeEmail:    Option[users.Email],
-                                      project:       Project,
-                                      maybeNextPage: Option[Int]
-  )(implicit maybeAccessToken:                       Option[AccessToken]) = maybeEmail match {
-    case None        => findInCommitsAndEvents(member, project, maybeNextPage)
-    case Some(email) => EitherT.rightT[F, ProcessingRecoverableError](member add email)
+  private def addEmailOrCheckNextPage(member:     ProjectMemberNoEmail,
+                                      maybeEmail: Option[users.Email],
+                                      project:    Project,
+                                      paging:     PagingInfo
+  )(implicit maybeAccessToken:                    Option[AccessToken]) = maybeEmail match {
+    case None        => findInCommitsAndEvents(member, project, paging)
+    case Some(email) => rightT[F, ProcessingRecoverableError](member add email)
   }
 
   private def fetchProjectEvents(project: Project, nextPage: Int)(implicit maybeAccessToken: Option[AccessToken]) =
     EitherT {
       {
         for {
-          uri               <- validateUri(s"$gitLabApiUrl/projects/${project.id}/events/?action=pushed&page=$nextPage")
-          eventsAndNextPage <- send(secureRequest(GET, uri))(mapResponse)
-        } yield eventsAndNextPage
+          uri             <- validateUri(s"$gitLabApiUrl/projects/${project.id}/events?action=pushed&page=$nextPage")
+          eventsAndPaging <- send(secureRequest(GET, uri))(mapResponse)
+        } yield eventsAndPaging
       }.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)
     }
 
   private def filterEventsFor(
       member: ProjectMember
-  ): ((List[PushEvent], Option[Int])) => (List[PushEvent], Option[Int]) = { case (events, maybeNextPage) =>
-    events.filter(ev => ev.authorId == member.gitLabId) -> maybeNextPage
+  ): ((List[PushEvent], PagingInfo)) => (List[PushEvent], PagingInfo) = { case (events, paging) =>
+    events.filter(ev => ev.authorId == member.gitLabId) -> paging
   }
 
-  private def matchEmailFromCommits(eventsAndNextPage: (List[PushEvent], Option[Int]),
-                                    project:           Project,
+  private def matchEmailFromCommits(events:  List[PushEvent],
+                                    project: Project,
                                     maybeEmail: EitherT[F, ProcessingRecoverableError, Option[users.Email]] =
-                                      EitherT.rightT[F, ProcessingRecoverableError](Option.empty[users.Email])
+                                      rightT[F, ProcessingRecoverableError](Option.empty[users.Email])
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[users.Email]] =
     maybeEmail >>= {
-      case someEmail @ Some(_) => EitherT.rightT[F, ProcessingRecoverableError](someEmail)
+      case someEmail @ Some(_) => rightT[F, ProcessingRecoverableError](someEmail)
       case none =>
-        eventsAndNextPage match {
-          case (Nil, _)                           => EitherT.rightT[F, ProcessingRecoverableError](none)
-          case (event :: eventsToCheck, nextPage) => matchEmailOnSingleCommit(event, project, eventsToCheck -> nextPage)
+        events match {
+          case Nil                    => rightT[F, ProcessingRecoverableError](none)
+          case event :: eventsToCheck => matchEmailOnSingleCommit(event, project, eventsToCheck)
         }
     }
 
-  private def matchEmailOnSingleCommit(event:         PushEvent,
-                                       project:       Project,
-                                       eventsToCheck: (List[PushEvent], Option[Int])
-  )(implicit maybeAccessToken:                        Option[AccessToken]) =
-    findCommitAuthor(project.path, event.commitId) >>= {
-      case Some((event.authorName, email)) => EitherT.rightT[F, ProcessingRecoverableError](email.some)
-      case _ => matchEmailFromCommits(eventsToCheck, project, EitherT.rightT[F, ProcessingRecoverableError](none))
-    }
+  private def matchEmailOnSingleCommit(event: PushEvent, project: Project, eventsToCheck: List[PushEvent])(implicit
+      maybeAccessToken:                       Option[AccessToken]
+  ) = findCommitAuthor(project.path, event.commitId) >>= {
+    case Some((event.authorName, email)) => rightT[F, ProcessingRecoverableError](email.some)
+    case _ => matchEmailFromCommits(eventsToCheck, project, rightT[F, ProcessingRecoverableError](none))
+  }
 
-  private lazy val mapResponse
-      : PartialFunction[(Status, Request[F], Response[F]), F[(List[PushEvent], Option[Int])]] = {
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[(List[PushEvent], PagingInfo)]] = {
     case (Ok, _, response) =>
-      lazy val maybeNextPage = response.headers.get(ci"X-Next-Page") >>= (_.head.value.toIntOption)
-      response.as[List[PushEvent]].map(_ -> maybeNextPage)
-    case (NotFound, _, _) => (List.empty[PushEvent] -> Option.empty[Int]).pure[F]
+      lazy val maybeNextPage   = response.headers.get(ci"X-Next-Page") >>= (_.head.value.toIntOption)
+      lazy val maybeTotalPages = response.headers.get(ci"X-Total-Pages") >>= (_.head.value.toIntOption)
+      response.as[List[PushEvent]].map(_ -> PagingInfo(maybeNextPage, maybeTotalPages))
+    case (NotFound, _, _) => (List.empty[PushEvent] -> PagingInfo(maybeNextPage = None, maybeTotalPages = None)).pure[F]
   }
 
   private implicit lazy val eventsDecoder: EntityDecoder[F, List[PushEvent]] = {
@@ -176,6 +175,25 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
                                authorId:   users.GitLabId,
                                authorName: users.Name
   )
+
+  private case class PagingInfo(maybeNextPage: Option[Int], maybeTotalPages: Option[Int]) {
+
+    private val windowSize      = 20
+    private val maxPagesToCheck = 3 * windowSize
+
+    lazy val findNextPage: Option[Int] =
+      if (maybeTotalPages.isEmpty) maybeNextPage
+      else
+        (maybeNextPage -> maybeTotalPages).mapN {
+          case next -> total if total <= maxPagesToCheck            => next.some
+          case next -> total if next > total                        => None
+          case next -> total if next > total - windowSize           => next.some
+          case next -> total if next > (total / 2 + windowSize / 2) => (total - windowSize).some
+          case next -> total if next > (total / 2 - windowSize / 2) => next.some
+          case next -> total if next > windowSize                   => (total / 2 - windowSize / 2).some
+          case next -> _                                            => next.some
+        }.flatten
+  }
 }
 
 private final case class Project(id: projects.Id, path: projects.Path)

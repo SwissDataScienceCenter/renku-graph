@@ -27,7 +27,6 @@ import io.renku.commiteventservice.events.categories.common.CommitInfo
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.Page
 import org.http4s.Method.GET
@@ -57,35 +56,38 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
 
   override def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
       maybeAccessToken:                           Option[AccessToken]
-  ): F[Option[CommitId]] =
-    send(GET, uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"), "commits")(
-      mapSingleCommitResponse
-    )
+  ): F[Option[CommitId]] = send(
+    GET,
+    uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
+    "latest commit"
+  )(mapLatestCommit(projectId))
 
   override def fetchGitLabCommits(
       projectId:               projects.Id,
       pageRequest:             PagingRequest
-  )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] =
-    send(
-      GET,
-      uri"projects" / projectId.show / "repository" / "commits" withQueryParams (Map(
-        "page"     -> pageRequest.page.show,
-        "per_page" -> pageRequest.perPage.show
-      )),
-      "commits"
-    )(mapCommitResponse)
+  )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = send(
+    GET,
+    uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
+      "page"     -> pageRequest.page.show,
+      "per_page" -> pageRequest.perPage.show
+    ),
+    "commits"
+  )(mapCommitsPage(projectId, pageRequest))
 
-  private implicit lazy val mapCommitResponse: PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {
+  private def mapCommitsPage(projectId:   projects.Id,
+                             pageRequest: PagingRequest
+  ): PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {
     case (Ok, _, response)    => (response.as[List[CommitId]] -> maybeNextPage(response)).mapN(PageResult(_, _))
     case (NotFound, _, _)     => PageResult.empty.pure[F]
-    case (Unauthorized, _, _) => UnauthorizedException.raiseError
+    case (Unauthorized, _, _) => fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
   }
 
-  private implicit lazy val mapSingleCommitResponse
-      : PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitId]]] = {
+  private def mapLatestCommit(
+      projectId: projects.Id
+  ): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitId]]] = {
     case (Ok, _, response)    => response.as[List[CommitId]].map(_.headOption)
     case (NotFound, _, _)     => Option.empty[CommitId].pure[F]
-    case (Unauthorized, _, _) => UnauthorizedException.raiseError
+    case (Unauthorized, _, _) => fetchLatestGitLabCommit(projectId)(maybeAccessToken = None)
   }
 
   private implicit val commitIdDecoder: EntityDecoder[F, List[CommitId]] =

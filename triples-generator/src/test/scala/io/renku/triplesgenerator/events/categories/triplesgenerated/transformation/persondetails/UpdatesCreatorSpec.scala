@@ -104,6 +104,79 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
     }
   }
 
+  "preparePostDataUpdates" should {
+
+    "generate queries which delete person's duplicate name, email and/or affiliation" in {
+
+      val Some(person) = personEntities(withGitLabId, withEmail)
+        .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+        .generateOne
+        .toMaybe[entities.Person.WithGitLabId]
+      val duplicatePerson = person.copy(name = userNames.generateOne,
+                                        maybeEmail = userEmails.generateSome,
+                                        maybeAffiliation = userAffiliations.generateSome
+      )
+
+      loadToStore(person, duplicatePerson)
+
+      findPersons.toIdAndPropertyPairs shouldBe Set(
+        (person.resourceId.value -> person.name.value).some,
+        person.maybeEmail.map(person.resourceId.value       -> _.value),
+        person.maybeAffiliation.map(person.resourceId.value -> _.value),
+        (person.resourceId.value          -> person.gitLabId.value.toString).some,
+        (duplicatePerson.resourceId.value -> duplicatePerson.name.value).some,
+        duplicatePerson.maybeEmail.map(duplicatePerson.resourceId.value       -> _.value),
+        duplicatePerson.maybeAffiliation.map(duplicatePerson.resourceId.value -> _.value),
+        (duplicatePerson.resourceId.value -> duplicatePerson.gitLabId.value.toString).some
+      ).flatten
+
+      val queries = preparePostDataUpdates(person)
+
+      queries.runAll.unsafeRunSync()
+
+      findPersons shouldBe Set(
+        (person.resourceId.value,
+         person.name.value.some,
+         person.maybeEmail.map(_.value),
+         person.maybeAffiliation.map(_.value),
+         person.gitLabId.value.some
+        )
+      )
+    }
+
+    "generate queries which do nothing if there are no duplicates" in {
+
+      val Some(person) = personEntities(withGitLabId, withEmail)
+        .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+        .generateOne
+        .toMaybe[entities.Person.WithGitLabId]
+
+      loadToStore(person)
+
+      findPersons shouldBe Set(
+        (person.resourceId.value,
+         person.name.value.some,
+         person.maybeEmail.map(_.value),
+         person.maybeAffiliation.map(_.value),
+         person.gitLabId.value.some
+        )
+      )
+
+      val queries = preparePostDataUpdates(person)
+
+      queries.runAll.unsafeRunSync()
+
+      findPersons shouldBe Set(
+        (person.resourceId.value,
+         person.name.value.some,
+         person.maybeEmail.map(_.value),
+         person.maybeAffiliation.map(_.value),
+         person.gitLabId.value.some
+        )
+      )
+    }
+  }
+
   private def findPersons: Set[(String, Option[String], Option[String], Option[String], Option[Int])] =
     runQuery(s"""|SELECT ?id ?name ?email ?affiliation ?sameAsId ?gitlabId
                  |WHERE {
@@ -123,4 +196,14 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         (row("id"), row.get("name"), row.get("email"), row.get("affiliation"), row.get("gitlabId").map(_.toInt))
       )
       .toSet
+
+  private implicit class QueryResultsOps(
+      records: Set[(String, Option[String], Option[String], Option[String], Option[Int])]
+  ) {
+    lazy val toIdAndPropertyPairs: Set[(String, String)] =
+      records.foldLeft(Set.empty[(String, String)]) {
+        case (pairs, (id, maybeName, maybeEmail, maybeAffiliation, maybeGitLabId)) =>
+          pairs ++ Set(maybeName, maybeEmail, maybeAffiliation, maybeGitLabId.map(_.toString)).flatten.map(id -> _)
+      }
+  }
 }

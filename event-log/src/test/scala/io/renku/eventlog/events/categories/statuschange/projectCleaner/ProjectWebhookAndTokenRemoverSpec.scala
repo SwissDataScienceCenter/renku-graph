@@ -65,14 +65,13 @@ class ProjectWebhookAndTokenRemoverSpec
       webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync() shouldBe ()
     }
 
-    "fail when the tokenFinder returns no token for the project" in new TestCase {
+    "do nothing when the tokenFinder returns no token for the project" in new TestCase {
       (accesTokenFinder
         .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
         .expects(project.id, AccessTokenFinder.projectIdToPath)
         .returns(None.pure[IO])
-      intercept[Exception] {
-        webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync()
-      }.getMessage shouldBe s"No token found for project: ${project.show}"
+
+      webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync() shouldBe ()
     }
 
     "fail when the tokenFinder fails" in new TestCase {
