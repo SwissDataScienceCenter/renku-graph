@@ -36,7 +36,7 @@ import io.renku.graph.model.entities.Project.GitLabProjectInfo
 import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.{GitLabUrl, users}
+import io.renku.graph.model.{GitLabUrl, projects, users}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder._
 import io.renku.interpreters.TestLogger
@@ -85,6 +85,22 @@ class ProjectFinderSpec
         finder.findProject(projectInfo.path).value.unsafeRunSync() shouldBe
           projectInfo.copy(maybeCreator = None, members = Set.empty).some.asRight
       }
+    }
+
+    "default to visibility Public if not returned (quite likely due to invalid token)" in new TestCase {
+      // It should be safe as for non-public repos and invalid/no token we'd not get any response
+      val projectInfo = gitLabProjectInfos.generateOne
+        .copy(maybeCreator = None, visibility = projects.Visibility.Public)
+
+      val json = projectInfo.asJson.hcursor
+        .downField("visibility")
+        .delete
+        .top
+        .getOrElse(fail("Deleting visibility failed"))
+      `/api/v4/projects`(projectInfo.path) returning okJson(json.noSpaces)
+
+      finder.findProject(projectInfo.path).value.unsafeRunSync() shouldBe
+        projectInfo.copy(maybeCreator = None, members = Set.empty).some.asRight
     }
 
     "return info without creator if it's not returned from the GET projects/:id" in new TestCase {

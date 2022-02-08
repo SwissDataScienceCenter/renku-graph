@@ -22,25 +22,37 @@ import cats.Parallel
 import cats.effect._
 import cats.syntax.all._
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.cleanup.CleanUpEventEncoder.encodeEvent
-import io.renku.graph.model.events.CategoryName
+import io.renku.graph.model.events._
 import org.typelevel.log4cats.Logger
 import io.renku.metrics.LabeledHistogram
 import io.renku.db.SqlStatement
+import io.renku.db.SessionResource
+import io.renku.metrics.LabeledGauge
+import io.renku.eventlog.EventLogDB
+import io.renku.graph.model.projects
 
 private[subscriptions] object SubscriptionCategory {
 
   val name: CategoryName = CategoryName("CLEAN_UP")
 
   def apply[F[_]: Async: Parallel: Logger](
-      subscriberTracker: SubscriberTracker[F],
-      queriesExecTimes:  LabeledHistogram[F, SqlStatement.Name]
+      subscriberTracker:     SubscriberTracker[F],
+      sessionResource:       SessionResource[F, EventLogDB],
+      awaitingDeletionGauge: LabeledGauge[F, projects.Path],
+      deletingGauge:         LabeledGauge[F, projects.Path],
+      queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers      <- Subscribers(name, subscriberTracker)
-    eventDelivery    <- EventDelivery.noOp[F, CleanUpEvent]
-    dispatchRecovery <- LoggingDispatchRecovery[F, CleanUpEvent](name)
-    eventFinder      <- CleanUpEventFinder(queriesExecTimes)
+    subscribers <- Subscribers(name, subscriberTracker)
+    eventDelivery <- eventdelivery.EventDelivery[F, CleanUpEvent](
+                       sessionResource,
+                       eventDeliveryIdExtractor = (event: CleanUpEvent) => DeletingProjectDeliverId(event.project.id),
+                       queriesExecTimes
+                     )
+    dispatchRecovery <- DispatchRecovery[F]
+    eventFinder      <- CleanUpEventFinder(sessionResource, awaitingDeletionGauge, deletingGauge, queriesExecTimes)
     eventsDistributor <-
       EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)
     deserializer <-

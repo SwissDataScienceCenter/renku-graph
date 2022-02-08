@@ -18,7 +18,6 @@
 
 package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
-import cats.data.OptionT
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.commitsync.Generators._
 import io.renku.commiteventservice.events.categories.commitsync.{categoryName, logMessageCommon}
@@ -31,6 +30,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{batchDates, commitIds}
 import io.renku.graph.model.events.CommitId
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder._
@@ -200,9 +200,10 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
       givenAccessTokenIsFound(event.project.id)
 
-      (latestCommitFinder.findLatestCommit _)
+      (latestCommitFinder
+        .findLatestCommit(_: projects.Id)(_: Option[AccessToken]))
         .expects(event.project.id, maybeAccessToken)
-        .returning(OptionT.none)
+        .returning(Option.empty[CommitInfo].pure[Try])
 
       givenEventIsInEL(event.id, event.project.id)(returning =
         CommitWithParents(event.id, event.project.id, List(parentCommit.id))
@@ -539,9 +540,11 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       .expects(projectId, projectIdToPath)
       .returning(Success(maybeAccessToken))
 
-    def givenLatestCommitIsFound(commitInfo: CommitInfo, projectId: Id) = (latestCommitFinder.findLatestCommit _)
-      .expects(projectId, maybeAccessToken)
-      .returning(OptionT.some[Try](commitInfo))
+    def givenLatestCommitIsFound(commitInfo: CommitInfo, projectId: Id) =
+      (latestCommitFinder
+        .findLatestCommit(_: projects.Id)(_: Option[AccessToken]))
+        .expects(projectId, maybeAccessToken)
+        .returning(commitInfo.some.pure[Try])
 
     def givenCommitIsInGL(commitInfo: CommitInfo, projectId: Id) = (commitInfoFinder
       .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))

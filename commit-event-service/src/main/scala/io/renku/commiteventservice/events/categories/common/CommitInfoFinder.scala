@@ -52,7 +52,6 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](
     with CommitInfoFinder[F] {
 
   import CommitInfo._
-  import io.renku.http.client.RestClientError.UnauthorizedException
   import org.http4s.Method.GET
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.{Request, Response}
@@ -60,12 +59,12 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](
   def findCommitInfo(projectId: Id, commitId: CommitId)(implicit
       maybeAccessToken:         Option[AccessToken]
   ): F[CommitInfo] =
-    fetchCommitInfo(projectId, commitId)(mapToCommitOrThrow)
+    fetchCommitInfo(projectId, commitId)(mapToCommitOrThrow(projectId, commitId))
 
   def getMaybeCommitInfo(projectId: Id, commitId: CommitId)(implicit
       maybeAccessToken:             Option[AccessToken]
   ): F[Option[CommitInfo]] =
-    fetchCommitInfo(projectId, commitId)(mapToMaybeCommit)
+    fetchCommitInfo(projectId, commitId)(mapToMaybeCommit(projectId, commitId))
 
   private def fetchCommitInfo[ResultType](projectId: Id, commitId: CommitId)(
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
@@ -73,22 +72,25 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](
       ]]
   )(implicit maybeAccessToken: Option[AccessToken]) = for {
     uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId")
-    result <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+    result <- send(secureRequest(GET, uri))(mapResponse)
   } yield result
 
-  private lazy val mapToCommitOrThrow: PartialFunction[(Status, Request[F], Response[F]), F[CommitInfo]] = {
+  private def mapToCommitOrThrow(projectId: Id,
+                                 commitId:  CommitId
+  ): PartialFunction[(Status, Request[F], Response[F]), F[CommitInfo]] = {
     case (Ok, _, response)    => response.as[CommitInfo]
-    case (Unauthorized, _, _) => UnauthorizedException.raiseError
+    case (Unauthorized, _, _) => findCommitInfo(projectId, commitId)(maybeAccessToken = None)
   }
 
-  private lazy val mapToMaybeCommit: PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
+  private def mapToMaybeCommit(projectId: Id,
+                               commitId:  CommitId
+  ): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
     case (Ok, _, response)    => response.as[CommitInfo].map(Some(_))
     case (NotFound, _, _)     => Option.empty[CommitInfo].pure[F]
-    case (Unauthorized, _, _) => UnauthorizedException.raiseError
+    case (Unauthorized, _, _) => getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None)
   }
 
-  private implicit val commitInfoEntityDecoder: EntityDecoder[F, CommitInfo] =
-    jsonOf[F, CommitInfo]
+  private implicit val commitInfoEntityDecoder: EntityDecoder[F, CommitInfo] = jsonOf[F, CommitInfo]
 }
 
 private[categories] object CommitInfoFinder {

@@ -22,6 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.subscriptions.commitsync.CommitSyncEventEncoder.encodeEvent
 import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.metrics.LabeledHistogram

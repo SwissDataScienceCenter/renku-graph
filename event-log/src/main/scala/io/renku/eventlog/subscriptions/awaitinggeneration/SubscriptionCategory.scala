@@ -24,6 +24,7 @@ import cats.syntax.all._
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.awaitinggeneration.AwaitingGenerationEventEncoder.{encodeEvent, encodePayload}
+import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.graph.model.events.CategoryName
 import io.renku.graph.model.projects
@@ -49,10 +50,10 @@ private[subscriptions] object SubscriptionCategory {
                                                   queriesExecTimes
                     )
     dispatchRecovery <- DispatchRecovery[F]
-    eventDelivery <- EventDelivery[F, AwaitingGenerationEvent](sessionResource,
-                                                               compoundEventIdExtractor =
-                                                                 (_: AwaitingGenerationEvent).id,
-                                                               queriesExecTimes
+    eventDelivery <- eventdelivery.EventDelivery[F, AwaitingGenerationEvent](
+                       sessionResource,
+                       eventDeliveryIdExtractor = (event: AwaitingGenerationEvent) => CompoundEventDeliveryId(event.id),
+                       queriesExecTimes
                      )
     eventsDistributor <- EventsDistributor(name,
                                            subscribers,

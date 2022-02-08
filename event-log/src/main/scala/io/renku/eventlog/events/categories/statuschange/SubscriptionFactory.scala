@@ -37,6 +37,8 @@ object SubscriptionFactory {
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
       underTriplesTransformationGauge:    LabeledGauge[F, projects.Path],
+      awaitingDeletionGauge:              LabeledGauge[F, projects.Path],
+      deletingGauge:                      LabeledGauge[F, projects.Path],
       queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     handler <- EventHandler(
@@ -46,7 +48,9 @@ object SubscriptionFactory {
                  awaitingTriplesGenerationGauge,
                  underTriplesGenerationGauge,
                  awaitingTriplesTransformationGauge,
-                 underTriplesTransformationGauge
+                 underTriplesTransformationGauge,
+                 awaitingDeletionGauge,
+                 deletingGauge
                )
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

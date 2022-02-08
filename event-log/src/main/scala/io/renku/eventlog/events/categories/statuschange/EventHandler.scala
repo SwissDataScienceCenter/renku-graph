@@ -59,6 +59,7 @@ private class EventHandler[F[_]: Async: Logger](
       requestAs[RollbackToNew],
       requestAs[RollbackToTriplesGenerated],
       requestAs[ToAwaitingDeletion],
+      requestAs[RollbackToAwaitingDeletion],
       requestAs[ProjectEventsToNew],
       requestAs[AllEventsToNew]
     )(request)
@@ -111,25 +112,31 @@ private object EventHandler {
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
-      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
+      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path],
+      awaitingDeletionGauge:              LabeledGauge[F, projects.Path],
+      deletingGauge:                      LabeledGauge[F, projects.Path]
   ): F[EventHandler[F]] = for {
     deliveryInfoRemover <- DeliveryInfoRemover(queriesExecTimes)
     gaugesUpdater <- MonadThrow[F].catchNonFatal(
                        new GaugesUpdaterImpl[F](awaitingTriplesGenerationGauge,
                                                 awaitingTriplesTransformationGauge,
                                                 underTriplesTransformationGauge,
-                                                underTriplesGenerationGauge
+                                                underTriplesGenerationGauge,
+                                                awaitingDeletionGauge,
+                                                deletingGauge
                        )
                      )
     statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](sessionResource, gaugesUpdater))
-    _             <- registerHandlers(eventsQueue, statusChanger, queriesExecTimes)
+    _ <- registerHandlers(eventsQueue, statusChanger, queriesExecTimes, awaitingDeletionGauge, deletingGauge)
   } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queriesExecTimes)
 
   private def registerHandlers[F[_]: Async: Logger](eventsQueue: StatusChangeEventsQueue[F],
-                                                    statusChanger:    StatusChanger[F],
-                                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+                                                    statusChanger:         StatusChanger[F],
+                                                    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
+                                                    awaitingDeletionGauge: LabeledGauge[F, projects.Path],
+                                                    deletingGauge:         LabeledGauge[F, projects.Path]
   ) = for {
-    projectsToNewUpdater <- ProjectEventsToNewUpdater(queriesExecTimes)
+    projectsToNewUpdater <- ProjectEventsToNewUpdater(queriesExecTimes, awaitingDeletionGauge, deletingGauge)
     _ <- eventsQueue.register[ProjectEventsToNew](statusChanger.updateStatuses(_)(projectsToNewUpdater))
   } yield ()
 
@@ -256,6 +263,18 @@ private object EventHandler {
              case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
            }
     } yield ToAwaitingDeletion(CompoundEventId(id, projectId), projectPath)
+  }
+
+  private implicit lazy val eventRollbackToAwaitingDeletionDecoder
+      : EventRequestContent => Either[DecodingFailure, RollbackToAwaitingDeletion] = { request =>
+    for {
+      projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
+      _ <- request.event.hcursor.downField("newStatus").as[EventStatus].flatMap {
+             case AwaitingDeletion => Right(())
+             case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+           }
+    } yield RollbackToAwaitingDeletion(Project(projectId, projectPath))
   }
 
   private implicit lazy val eventToProjectEventToNewDecoder

@@ -16,13 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.eventdelivery
 
 import cats.effect.IO
 import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.subscriptions.TestCompoundIdEvent
 import io.renku.eventlog.subscriptions.TestCompoundIdEvent.testCompoundIdEvent
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
@@ -51,18 +52,18 @@ class EventDeliverySpec
         upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
         upsertSubscriber(subscriberId, subscriberUrl, sourceUrl = microserviceBaseUrls.generateOne)
 
-        findAllDeliveries shouldBe Nil
+        findAllEventDeliveries shouldBe Nil
 
         delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
-        findAllDeliveries shouldBe List(event.compoundEventId -> subscriberId)
+        findAllEventDeliveries shouldBe List(event.compoundEventId -> subscriberId)
 
         val otherEvent = testCompoundIdEvent.generateOne
         addEvent(otherEvent.compoundEventId)
 
         delivery.registerSending(otherEvent, subscriberUrl).unsafeRunSync() shouldBe ()
 
-        findAllDeliveries.toSet shouldBe Set(
+        findAllEventDeliveries.toSet shouldBe Set(
           event.compoundEventId      -> subscriberId,
           otherEvent.compoundEventId -> subscriberId
         )
@@ -75,26 +76,44 @@ class EventDeliverySpec
 
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
-      findAllDeliveries shouldBe List(event.compoundEventId -> subscriberId)
+      findAllEventDeliveries shouldBe List(event.compoundEventId -> subscriberId)
 
       val newSubscriberId = subscriberIds.generateOne
       upsertSubscriber(newSubscriberId, subscriberUrl, sourceUrl)
 
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
+      findAllEventDeliveries shouldBe List(event.compoundEventId -> newSubscriberId)
+    }
 
-      findAllDeliveries shouldBe List(event.compoundEventId -> newSubscriberId)
+    "update the delivery_id if the id is a DeletingProjectDeliverId" in new DeletingProjectTestCase {
+      addEvent(event.compoundEventId)
+      upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+
+      delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
+
+      findAllProjectDeliveries shouldBe List((event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId))
     }
   }
 
-  private trait TestCase {
-
-    val event         = testCompoundIdEvent.generateOne
-    val subscriberId  = subscriberIds.generateOne
-    val subscriberUrl = subscriberUrls.generateOne
-    val sourceUrl     = microserviceBaseUrls.generateOne
-
-    val compoundIdExtractor: TestCompoundIdEvent => CompoundEventId = _.compoundEventId
+  private trait CommonTestCase {
+    val event            = testCompoundIdEvent.generateOne
+    val subscriberId     = subscriberIds.generateOne
+    val subscriberUrl    = subscriberUrls.generateOne
+    val sourceUrl        = microserviceBaseUrls.generateOne
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
+  }
+
+  private trait TestCase extends CommonTestCase {
+
+    val compoundIdExtractor: TestCompoundIdEvent => CompoundEventDeliveryId = e =>
+      CompoundEventDeliveryId(e.compoundEventId)
+    val delivery =
+      new EventDeliveryImpl[IO, TestCompoundIdEvent](sessionResource, compoundIdExtractor, queriesExecTimes, sourceUrl)
+  }
+
+  private trait DeletingProjectTestCase extends CommonTestCase {
+
+    val compoundIdExtractor: TestCompoundIdEvent => EventDeliveryId = event => DeletingProjectDeliverId(event.projectId)
     val delivery =
       new EventDeliveryImpl[IO, TestCompoundIdEvent](sessionResource, compoundIdExtractor, queriesExecTimes, sourceUrl)
   }

@@ -21,6 +21,8 @@ spec:
         app: {{ include "eventLog.name" . }}
         release: {{ .Release.Name }}
     spec:
+      initContainers:
+        {{- include "certificates.initContainer" . | nindent 8 }}
       containers:
         - name: event-log
           image: "{{ .Values.eventLog.image.repository }}:{{ .Values.eventLog.image.tag }}"
@@ -84,7 +86,11 @@ spec:
             successThreshold: 1
             failureThreshold: 3
           resources:
-  {{- toYaml .Values.eventLog.resources | nindent 12 }}
+            {{- toYaml .Values.eventLog.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "certificates.volumeMounts.openjdk15" . | nindent 12 }}
+      volumes:
+        {{- include "certificates.volumes" . | nindent 8 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}

@@ -27,6 +27,7 @@ import io.renku.graph.model.events.EventStatus._
 import org.scalacheck.Gen
 import io.renku.generators.Generators.Implicits._
 import java.time.Duration
+import io.renku.events.consumers.Project
 
 private object Generators {
 
@@ -96,6 +97,11 @@ private object Generators {
     eventId     <- compoundEventIds
     projectPath <- projectPaths
   } yield ToAwaitingDeletion(eventId, projectPath)
+
+  lazy val rollbackToAwaitingDeletionEvents = for {
+    projectId   <- projectIds
+    projectPath <- projectPaths
+  } yield RollbackToAwaitingDeletion(Project(projectId, projectPath))
 
   lazy val projectEventToNewEvents = for {
     project <- consumerProjects
