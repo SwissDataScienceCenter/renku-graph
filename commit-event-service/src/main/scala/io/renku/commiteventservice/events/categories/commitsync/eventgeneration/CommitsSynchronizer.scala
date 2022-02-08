@@ -37,8 +37,10 @@ import io.renku.http.client.AccessToken
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
-
+import io.circe.literal._
 import scala.util.control.NonFatal
+import io.renku.events.producers.EventSender
+import io.renku.events.EventRequestContent
 
 private[commitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: CommitSyncEvent): F[Unit]
@@ -51,6 +53,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
     commitInfoFinder:      CommitInfoFinder[F],
     commitToEventLog:      CommitToEventLog[F],
     commitEventsRemover:   CommitEventsRemover[F],
+    eventSender:           EventSender[F],
     executionTimeRecorder: ExecutionTimeRecorder[F],
     clock:                 java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitsSynchronizer[F] {
@@ -65,9 +68,16 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
 
   override def synchronizeEvents(event: CommitSyncEvent): F[Unit] = {
     findAccessToken(event.project.id) >>= { implicit maybeAccessToken =>
-      findLatestCommit(event.project.id) >>= (checkForSkippedEvent(_, event))
+      for {
+        maybeLatestCommit <- findLatestCommit(event.project.id)
+        _                 <- checkForSkippedEvent(maybeLatestCommit, event)
+        _ <-
+          triggerGlobalCommitSync(event) recoverWith loggingErrorAndIgnoreError(event,
+                                                                                "Triggering Global Commit Sync Failed"
+          )
+      } yield ()
     }
-  } recoverWith loggingError(event)
+  } recoverWith loggingError(event, "Synchronization failed")
 
   private def checkForSkippedEvent(maybeLatestCommit: Option[CommitInfo], event: CommitSyncEvent)(implicit
       maybeAccessToken:                               Option[AccessToken]
@@ -91,7 +101,12 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
   }
 
   private def triggerGlobalCommitSync(event: CommitSyncEvent): F[Unit] =
-    println(event).pure[F]
+    eventSender.sendEvent(
+      EventRequestContent.NoPayload(
+        json"""{ "category_name": "GLOBAL_COMMIT_SYNC_REQUEST", "project":{ "id": ${event.project.id.value}, "path": ${event.project.path.value} }}"""
+      ),
+      s"$categoryName - Triggering Global Commit Sync Failed"
+    )
 
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
@@ -150,10 +165,18 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
     maybeInfoFromGL         <- getMaybeCommitInfo(project.id, commitId)
   } yield (maybeEventDetailsFromEL, maybeInfoFromGL)
 
-  private def loggingError(event: CommitSyncEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+  private def loggingErrorAndIgnoreError(event:        CommitSyncEvent,
+                                         errorMessage: String
+  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     Logger[F]
-      .error(exception)(s"${logMessageCommon(event)} -> Synchronization failed")
-      .flatMap(_ => exception.raiseError[F, Unit])
+      .error(exception)(s"${logMessageCommon(event)} -> $errorMessage")
+  }
+
+  private def loggingError(event: CommitSyncEvent, errorMessage: String): PartialFunction[Throwable, F[Unit]] = {
+    case NonFatal(exception) =>
+      Logger[F]
+        .error(exception)(s"${logMessageCommon(event)} -> $errorMessage")
+        .flatMap(_ => exception.raiseError[F, Unit])
   }
 
   private def logResult(event: CommitSyncEvent): ((ElapsedTime, UpdateResult)) => F[Unit] = {
@@ -209,12 +232,14 @@ private[commitsync] object CommitsSynchronizer {
     commitInfoFinder    <- CommitInfoFinder(gitLabThrottler)
     commitToEventLog    <- CommitToEventLog[F]
     commitEventsRemover <- CommitEventsRemover[F]
+    eventSender         <- EventSender[F]
   } yield new CommitsSynchronizerImpl[F](accessTokenFinder,
                                          latestCommitFinder,
                                          eventDetailsFinder,
                                          commitInfoFinder,
                                          commitToEventLog,
                                          commitEventsRemover,
+                                         eventSender,
                                          executionTimeRecorder
   )
 }
