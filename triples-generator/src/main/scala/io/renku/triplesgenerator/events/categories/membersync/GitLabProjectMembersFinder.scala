@@ -33,7 +33,7 @@ import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
-import org.http4s.dsl.io.{NotFound, Ok}
+import org.http4s.dsl.io.{Forbidden, NotFound, Ok, Unauthorized}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
@@ -64,7 +64,7 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](
       allUsers:                Set[GitLabProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] = for {
     uri                     <- addPageToUrl(url, maybePage)
-    fetchedUsersAndNextPage <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+    fetchedUsersAndNextPage <- send(request(GET, uri, maybeAccessToken))(mapResponse(url))
     allUsers                <- addNextPage(url, allUsers, fetchedUsersAndNextPage)
   } yield allUsers
 
@@ -73,15 +73,20 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](
     case None       => validateUri(url)
   }
 
-  private lazy val mapResponse
-      : PartialFunction[(Status, Request[F], Response[F]), F[(Set[GitLabProjectMember], Option[Int])]] = {
+  private def mapResponse(url: String)(implicit
+      maybeAccessToken:        Option[AccessToken]
+  ): PartialFunction[(Status, Request[F], Response[F]), F[(Set[GitLabProjectMember], Option[Int])]] = {
     case (Ok, _, response) =>
       response
         .as[List[GitLabProjectMember]]
         .map(members => members.toSet -> maybeNextPage(response))
     case (NotFound, _, _) =>
       (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
-
+    case (Unauthorized | Forbidden, _, _) =>
+      maybeAccessToken match {
+        case Some(_) => fetch(url)(maybeAccessToken = None).map(_ -> None)
+        case None    => (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[F]
+      }
   }
 
   private def addNextPage(

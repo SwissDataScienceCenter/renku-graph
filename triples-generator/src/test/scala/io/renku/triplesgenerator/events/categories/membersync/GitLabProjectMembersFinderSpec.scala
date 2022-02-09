@@ -39,6 +39,7 @@ package io.renku.triplesgenerator.events.categories.membersync
 import Generators._
 import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.stubbing.Scenario
 import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
@@ -72,10 +73,12 @@ class GitLabProjectMembersFinderSpec
       forAll { (gitLabProjectUsers: List[GitLabProjectMember], gitLabProjectMembers: List[GitLabProjectMember]) =>
         stubFor {
           get(s"/api/v4/projects/${urlEncode(path.toString)}/users")
+            .withAccessToken(maybeAccessToken)
             .willReturn(okJson(gitLabProjectUsers.asJson.noSpaces))
         }
         stubFor {
           get(s"/api/v4/projects/${urlEncode(path.toString)}/members")
+            .withAccessToken(maybeAccessToken)
             .willReturn(okJson(gitLabProjectMembers.asJson.noSpaces))
         }
 
@@ -111,7 +114,7 @@ class GitLabProjectMembersFinderSpec
         .unsafeRunSync() shouldBe (projectUsers.toSet ++ projectMembers.toSet)
     }
 
-    "return an empty list when service responds with NOT_FOUND" in new TestCase {
+    "return an empty set when service responds with NOT_FOUND" in new TestCase {
 
       stubFor {
         get(s"/api/v4/projects/${urlEncode(path.toString)}/users")
@@ -126,15 +129,53 @@ class GitLabProjectMembersFinderSpec
     }
 
     Forbidden +: Unauthorized +: Nil foreach { status =>
-      s"fail when service responds with $status" in new TestCase {
+      s"try without an access token when service responds with $status" in new TestCase {
+        val members = gitLabProjectMembers.generateNonEmptyList().toList
+
+        val getMembersRequest = get(s"/api/v4/projects/${urlEncode(path.toString)}/members").inScenario("Retry")
+        stubFor {
+          getMembersRequest
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("Error")
+            .withAccessToken(maybeAccessToken)
+            .willReturn(aResponse.withStatus(status.code))
+        }
+        stubFor {
+          getMembersRequest
+            .whenScenarioStateIs("Error")
+            .willSetStateTo("Successful")
+            .willReturn(okJson(members.asJson.noSpaces))
+        }
+
+        val getUsersRequest = get(s"/api/v4/projects/${urlEncode(path.toString)}/users").inScenario("Retry")
+        stubFor {
+          getUsersRequest
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("Error")
+            .withAccessToken(maybeAccessToken)
+            .willReturn(aResponse.withStatus(status.code))
+        }
+        stubFor {
+          getUsersRequest
+            .whenScenarioStateIs("Error")
+            .willSetStateTo("Successful")
+            .willReturn(okJson(members.asJson.noSpaces))
+        }
+
+        finder.findProjectMembers(path).unsafeRunSync() shouldBe members.toSet
+      }
+
+      s"return an empty set when service responds with $status" in new TestCase {
         stubFor {
           get(s"/api/v4/projects/${urlEncode(path.toString)}/members")
             .willReturn(aResponse.withStatus(status.code))
         }
-
-        intercept[Exception] {
-          finder.findProjectMembers(path).unsafeRunSync()
+        stubFor {
+          get(s"/api/v4/projects/${urlEncode(path.toString)}/users")
+            .willReturn(aResponse.withStatus(status.code))
         }
+
+        finder.findProjectMembers(path).unsafeRunSync() shouldBe Set.empty
       }
     }
   }
