@@ -24,7 +24,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
-import io.renku.commiteventservice.events.categories.common
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -35,11 +34,10 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
+import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Method.GET
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Header, Method, Request, Response, Status, Uri}
-import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -52,29 +50,13 @@ class CommitInfoFinderSpec
     with IOSpec
     with MockFactory
     with ExternalServiceStubbing
-    with should.Matchers {
+    with should.Matchers
+    with GitLabClientTools[IO] {
 
   "findCommitInfo" should {
 
     "fetch commit info from the configured url " +
-      "and return CommitInfo if OK returned with valid body - case with Personal Access Token" in new TestCase {
-        val commitInfoExpectation = CommitInfo(
-          id = commitId,
-          message = commitMessage,
-          committedDate = committedDate,
-          author = author,
-          committer = committer,
-          parents = parents
-        ).some
-
-        setGitLabClientExpectation(maybeAccessToken, returning = commitInfoExpectation)
-
-        finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe commitInfoExpectation
-      }
-
-    "fetch commit info from the configured url " +
-      "and return CommitInfo if OK returned with valid body - case with OAuth Access Token" in new TestCase {
-
+      "and return CommitInfo if OK returned with valid body - case with Access Token" in new TestCase {
         val commitInfoExpectation = CommitInfo(
           id = commitId,
           message = commitMessage,
@@ -91,20 +73,15 @@ class CommitInfoFinderSpec
 
     "fallback to fetch commit info without an access token for UNAUTHORIZED" in new TestCase {
 
-      val commitInfoExpectation = CommitInfo(
-        id = commitId,
-        message = commitMessage,
-        committedDate = committedDate,
-        author = author,
-        committer = committer,
-        parents = parents
-      ).some
+      val result = commitInfos.generateOne
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, CommitInfo])(
+          _: Option[AccessToken]
+        ))
+        .expects(*, *, *, *, Option.empty[AccessToken])
+        .returning(result.pure[IO])
 
-      setGitLabClientExpectation(maybeAccessToken = None, returning = commitInfoExpectation)
-
-      finder
-        .findCommitInfo(projectId, commitId)(maybeAccessToken = None)
-        .unsafeRunSync() shouldBe commitInfoExpectation
+      mapToCommitOrThrow((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe result
     }
 
     "return an Error if remote client responds with invalid json" in new TestCase {
@@ -169,29 +146,18 @@ class CommitInfoFinderSpec
     mapToMaybeCommit((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
   }
 
-  // TODO: figure out how to check that it's called twice
   "fallback to fetch commit info without an access token for UNAUTHORIZED" in new TestCase {
-    val invalidAccessToken = accessTokens.generateSome
 
-    val mapResponse = CaptureOne[ResponseMappingF[IO, Option[CommitInfo]]]()
-
-    (gitLabClient
-      .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
-        _: Option[AccessToken]
-      ))
-      .expects(*, *, *, capture(mapResponse), *)
-      .returning(commitInfos.generateSome.pure[IO])
-
-    finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = invalidAccessToken)
+    val result = commitInfos.generateOption
 
     (gitLabClient
       .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
         _: Option[AccessToken]
       ))
-      .expects(*, *, *, *, *)
-      .returning(Option.empty[common.CommitInfo].pure[IO])
+      .expects(*, *, *, *, Option.empty[AccessToken])
+      .returning(result.pure[IO])
 
-    mapResponse.value((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
+    mapToMaybeCommit((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe result
   }
 
   "return an Error if remote client responds with invalid json" in new TestCase {
@@ -236,9 +202,9 @@ class CommitInfoFinderSpec
       "parent_ids":      ${parents.map(_.value)}
     }"""
 
-    val endpointName: String Refined NonEmpty = "commits"
+    val endpointName: String Refined NonEmpty = "commit-details"
 
-    def setGitLabClientExpectation(maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome,
+    def setGitLabClientExpectation(maybeAccessToken: Option[AccessToken] = accessTokens.generateSome,
                                    returning:        Option[CommitInfo] = commitInfos.generateOne.some
     ) =
       (gitLabClient
@@ -253,34 +219,14 @@ class CommitInfoFinderSpec
         )
         .returning(returning.pure[IO])
 
-    lazy val mapToCommitOrThrow = {
-      val responseMapping = CaptureOne[ResponseMappingF[IO, CommitInfo]]()
+    val mapToCommitOrThrow = captureMapping(finder, gitLabClient)(
+      findingMethod = _.findCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync(),
+      resultGenerator = commitInfos.generateOne
+    )
 
-      (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, CommitInfo])(
-          _: Option[AccessToken]
-        ))
-        .expects(*, *, *, capture(responseMapping), *)
-        .returning(commitInfos.generateOne.pure[IO])
-
-      finder.findCommitInfo(projectId, commitId)(maybeAccessToken = None)
-
-      responseMapping.value
-    }
-
-    lazy val mapToMaybeCommit = {
-      val responseMapping = CaptureOne[ResponseMappingF[IO, Option[CommitInfo]]]()
-
-      (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
-          _: Option[AccessToken]
-        ))
-        .expects(*, *, *, capture(responseMapping), *)
-        .returning(commitInfos.generateSome.pure[IO])
-
-      finder.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None)
-
-      responseMapping.value
-    }
+    val mapToMaybeCommit = captureMapping(finder, gitLabClient)(
+      findingMethod = _.getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None).unsafeRunSync(),
+      resultGenerator = commitInfos.generateSome
+    )
   }
 }

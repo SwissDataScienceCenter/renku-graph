@@ -24,38 +24,37 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.Json
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.common.CommitInfo
 import io.renku.commiteventservice.events.categories.common.Generators._
-import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
+import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Method.GET
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Header, Method, Request, Response, Status, Uri}
-import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.ci.CIStringSyntax
 
 class LatestCommitFinderSpec
-    extends AnyWordSpec
+  extends AnyWordSpec
     with IOSpec
     with MockFactory
     with ExternalServiceStubbing
-    with should.Matchers {
+    with should.Matchers
+    with GitLabClientTools[IO] {
 
   "findLatestCommit" should {
 
-    "return latest Commit info if remote responds with OK and valid body - personal access token case" in new TestCase {
-      val maybePersonalAccessToken = personalAccessTokens.generateOption
+    "return latest Commit info if remote responds with OK and valid body - access token case" in new TestCase {
+      val maybePersonalAccessToken = accessTokens.generateOption
 
       setGitLabClientExpectation(maybePersonalAccessToken, returning = Some(commitInfo))
 
@@ -64,19 +63,9 @@ class LatestCommitFinderSpec
       )
     }
 
-    "return latest Commit info if remote responds with OK and valid body - oauth token case" in new TestCase {
-      val oauthAccessToken = oauthAccessTokens.generateSome
-
-      setGitLabClientExpectation(oauthAccessToken, returning = Some(commitInfo))
-
-      latestCommitFinder.findLatestCommit(projectId)(oauthAccessToken).unsafeRunSync() shouldBe Some(
-        commitInfo
-      )
-    }
-
     "return latest Commit info if remote responds with OK and valid body - no token case" in new TestCase {
 
-      setGitLabClientExpectation(maybePersonalAccessToken = None)
+      setGitLabClientExpectation(maybeAccessToken = None)
 
       latestCommitFinder.findLatestCommit(projectId)(maybeAccessToken = None).unsafeRunSync() shouldBe Some(
         commitInfo
@@ -87,10 +76,10 @@ class LatestCommitFinderSpec
 
       mapResponse(
         (Status.Ok,
-         Request[IO](),
-         Response[IO]()
-           .withEntity("[]")
-           .withHeaders(Header.Raw(ci"X-Next-Page", ""))
+          Request[IO](),
+          Response[IO]()
+            .withEntity("[]")
+            .withHeaders(Header.Raw(ci"X-Next-Page", ""))
         )
       )
         .unsafeRunSync() shouldBe None
@@ -121,10 +110,10 @@ class LatestCommitFinderSpec
       intercept[Exception] {
         mapResponse(
           (Status.Ok,
-           Request[IO](),
-           Response[IO]()
-             .withEntity("{}")
-             .withHeaders(Header.Raw(ci"X-Next-Page", ""))
+            Request[IO](),
+            Response[IO]()
+              .withEntity("{}")
+              .withHeaders(Header.Raw(ci"X-Next-Page", ""))
           )
         )
           .unsafeRunSync()
@@ -133,54 +122,35 @@ class LatestCommitFinderSpec
   }
 
   private trait TestCase {
-    val projectId  = projectIds.generateOne
+    val projectId = projectIds.generateOne
     val commitInfo = commitInfos.generateOne
     private implicit val logger: TestLogger[IO] = TestLogger()
-    val gitLabClient       = mock[GitLabClient[IO]]
+    val gitLabClient = mock[GitLabClient[IO]]
     val latestCommitFinder = new LatestCommitFinderImpl[IO](gitLabClient)
 
     val endpointName: String Refined NonEmpty = "commits"
 
-    def setGitLabClientExpectation(maybePersonalAccessToken: Option[AccessToken] = personalAccessTokens.generateSome,
-                                   returning:                Option[CommitInfo] = Some(commitInfo)
-    ) =
+    def setGitLabClientExpectation(maybeAccessToken: Option[AccessToken] = accessTokens.generateSome,
+                                   returning: Option[CommitInfo] = Some(commitInfo)
+                                  ) =
       (gitLabClient
         .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
           _: Option[AccessToken]
         ))
         .expects(GET,
-                 uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
-                 endpointName,
-                 *,
-                 maybePersonalAccessToken
+          uri"projects" / projectId.show / "repository" / "commits" withQueryParam("per_page", "1"),
+          endpointName,
+          *,
+          maybeAccessToken
         )
         .returning(returning.pure[IO])
 
-    val mapResponse = {
-      val responseMapping = CaptureOne[ResponseMappingF[IO, Option[CommitInfo]]]()
+    val mapResponse: ResponseMappingF[IO, Option[CommitInfo]] = captureMapping(latestCommitFinder, gitLabClient)(
+      _.findLatestCommit(projectId)(accessTokens.generateOption).unsafeRunSync(),
+      commitInfos.toGeneratorOfOptions
+    )
 
-      def setUnusedExpectationToCaptureResponseMapping = {
-        val unusedCommitInfo = commitInfos.generateOne
-        (gitLabClient
-          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
-            _: Option[AccessToken]
-          ))
-          .expects(*, *, *, capture(responseMapping), *)
-          .returning(unusedCommitInfo.some.pure[IO])
-      }
-
-      def executeMethodToCaptureResponseMapping = latestCommitFinder
-        .findLatestCommit(projectId)(None)
-        .unsafeRunSync()
-
-      setUnusedExpectationToCaptureResponseMapping
-      executeMethodToCaptureResponseMapping
-      responseMapping.value
-    }
   }
-
-  private def commitsJson(from: CommitInfo) =
-    Json.arr(commitJson(from)).noSpaces
 
   private def commitJson(commitInfo: CommitInfo) =
     json"""{
