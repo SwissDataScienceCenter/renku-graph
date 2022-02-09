@@ -403,25 +403,25 @@ object Project {
   )
 
   sealed trait ProjectMember {
-    val name:     users.Name
-    val username: users.Username
-    val gitLabId: users.GitLabId
+    val name:     persons.Name
+    val username: persons.Username
+    val gitLabId: persons.GitLabId
   }
   object ProjectMember {
 
-    def apply(name: users.Name, username: users.Username, gitLabId: users.GitLabId): ProjectMemberNoEmail =
+    def apply(name: persons.Name, username: persons.Username, gitLabId: persons.GitLabId): ProjectMemberNoEmail =
       ProjectMemberNoEmail(name, username, gitLabId)
 
-    final case class ProjectMemberNoEmail(name: users.Name, username: users.Username, gitLabId: users.GitLabId)
+    final case class ProjectMemberNoEmail(name: persons.Name, username: persons.Username, gitLabId: persons.GitLabId)
         extends ProjectMember {
 
-      def add(email: users.Email): ProjectMemberWithEmail = ProjectMemberWithEmail(name, username, gitLabId, email)
+      def add(email: persons.Email): ProjectMemberWithEmail = ProjectMemberWithEmail(name, username, gitLabId, email)
     }
 
-    final case class ProjectMemberWithEmail(name:     users.Name,
-                                            username: users.Username,
-                                            gitLabId: users.GitLabId,
-                                            email:    users.Email
+    final case class ProjectMemberWithEmail(name:     persons.Name,
+                                            username: persons.Username,
+                                            gitLabId: persons.GitLabId,
+                                            email:    persons.Email
     ) extends ProjectMember
   }
 }

@@ -30,7 +30,7 @@ import io.renku.crypto.AesCrypto
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GraphModelGenerators.{projectPaths, userGitLabIds}
+import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, projectPaths}
 import io.renku.graph.model.Schemas
 import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.http.client.RestClientError._
@@ -256,7 +256,7 @@ object CommonGraphGenerators {
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
 
   implicit val authUsers: Gen[AuthUser] = for {
-    gitLabId    <- userGitLabIds
+    gitLabId    <- personGitLabIds
     accessToken <- accessTokens
   } yield AuthUser(gitLabId, accessToken)
 

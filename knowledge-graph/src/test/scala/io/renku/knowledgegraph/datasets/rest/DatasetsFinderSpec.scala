@@ -783,7 +783,7 @@ class DatasetsFinderSpec
       val (publicDataset, publicProject) =
         publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
-      val userWithGitlabId = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
+      val userWithGitlabId = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val (privateDatasetWithAccess, privateProjectWithAccess) =
         renkuProjectEntities(visibilityNonPublic)
           .modify(_.copy(members = Set(userWithGitlabId)))
@@ -820,7 +820,7 @@ class DatasetsFinderSpec
         val (privateDatasetWithoutAccess, privateProjectWithoutAccess) =
           renkuProjectEntities(visibilityNonPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        val userWithGitlabId = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
+        val userWithGitlabId = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
         val (privateDatasetWithAccess, privateProjectWithAccess) =
           renkuProjectEntities(visibilityNonPublic)
             .modify(_.copy(members = Set(userWithGitlabId)))

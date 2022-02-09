@@ -295,7 +295,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
   private implicit lazy val recordDecoder: Decoder[Entity] = {
     import Decoder._
     import io.circe.DecodingFailure
-    import io.renku.graph.model.users
+    import io.renku.graph.model.persons
     import io.renku.tinytypes.json.TinyTypeDecoders._
     import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -313,7 +313,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         name             <- cursor.downField("name").downField("value").as[projects.Name]
         visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
         dateCreated      <- cursor.downField("date").downField("value").as[projects.DateCreated]
-        maybeCreatorName <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
+        maybeCreatorName <- cursor.downField("maybeCreatorName").downField("value").as[Option[persons.Name]]
         keywords <-
           cursor
             .downField("keywords")
@@ -359,7 +359,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
                       .downField("creatorsNames")
                       .downField("value")
                       .as[Option[String]]
-                      .flatMap(toListOf[users.Name, users.Name.type](users.Name))
+                      .flatMap(toListOf[persons.Name, persons.Name.type](persons.Name))
         keywords <- cursor
                       .downField("keywords")
                       .downField("value")
@@ -372,7 +372,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     implicit val personDecoder: Decoder[Entity.Person] = { cursor =>
       for {
         matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-        name          <- cursor.downField("name").downField("value").as[users.Name]
+        name          <- cursor.downField("name").downField("value").as[persons.Name]
       } yield Entity.Person(matchingScore, name)
     }
 

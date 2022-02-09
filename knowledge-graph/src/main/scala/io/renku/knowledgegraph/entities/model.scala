@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph.entities
 
 import io.circe.{Decoder, Encoder}
-import io.renku.graph.model.{datasets, projects, users}
+import io.renku.graph.model.{datasets, persons, projects}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
 import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
@@ -46,7 +46,7 @@ object model {
         name:             projects.Name,
         visibility:       projects.Visibility,
         date:             projects.DateCreated,
-        maybeCreator:     Option[users.Name],
+        maybeCreator:     Option[persons.Name],
         keywords:         List[projects.Keyword],
         maybeDescription: Option[projects.Description]
     ) extends Entity {
@@ -60,7 +60,7 @@ object model {
         name:             datasets.Name,
         visibility:       projects.Visibility,
         date:             datasets.Date,
-        creators:         List[users.Name],
+        creators:         List[persons.Name],
         keywords:         List[datasets.Keyword],
         maybeDescription: Option[datasets.Description]
     ) extends Entity {
@@ -70,9 +70,9 @@ object model {
 
     final case class Person(
         matchingScore: MatchingScore,
-        name:          users.Name
+        name:          persons.Name
     ) extends Entity {
-      override type Name = users.Name
+      override type Name = persons.Name
       override type Date = Person.DateCreationFiller
       override val date: Person.DateCreationFiller = Person.DateCreationFiller
     }

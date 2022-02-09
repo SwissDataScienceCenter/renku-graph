@@ -26,7 +26,7 @@ import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabApiUrl
 import io.renku.graph.model.projects.Path
-import io.renku.graph.model.users.{GitLabId, Name}
+import io.renku.graph.model.persons.{GitLabId, Name}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -103,12 +103,12 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](
     response.headers.get(ci"X-Next-Page").flatMap(_.head.value.toIntOption)
 
   private implicit lazy val projectDecoder: EntityDecoder[F, List[GitLabProjectMember]] = {
-    import io.renku.graph.model.users
+    import io.renku.graph.model.persons
 
     implicit val decoder: Decoder[GitLabProjectMember] = { cursor =>
       for {
         id   <- cursor.downField("id").as[GitLabId]
-        name <- cursor.downField("name").as[users.Name]
+        name <- cursor.downField("name").as[persons.Name]
       } yield GitLabProjectMember(id, name)
     }
 

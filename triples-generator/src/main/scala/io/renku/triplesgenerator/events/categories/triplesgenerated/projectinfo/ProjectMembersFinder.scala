@@ -29,7 +29,7 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.{GitLabApiUrl, projects, users}
+import io.renku.graph.model.{GitLabApiUrl, persons, projects}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
@@ -70,7 +70,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  private type ProjectAndCreator = (GitLabProjectInfo, Option[users.GitLabId])
+  private type ProjectAndCreator = (GitLabProjectInfo, Option[persons.GitLabId])
 
   override def findProjectMembers(path: projects.Path)(implicit
       maybeAccessToken:                 Option[AccessToken]
@@ -85,9 +85,9 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   private implicit val memberDecoder: Decoder[ProjectMember] = cursor =>
     for {
-      gitLabId <- cursor.downField("id").as[users.GitLabId]
-      name     <- cursor.downField("name").as[users.Name]
-      username <- cursor.downField("username").as[users.Username]
+      gitLabId <- cursor.downField("id").as[persons.GitLabId]
+      name     <- cursor.downField("name").as[persons.Name]
+      username <- cursor.downField("username").as[persons.Username]
     } yield ProjectMember(name, username, gitLabId)
 
   private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]

@@ -23,8 +23,8 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person
-import io.renku.graph.model.users
-import io.renku.graph.model.users.{Email, GitLabId, ResourceId}
+import io.renku.graph.model.persons
+import io.renku.graph.model.persons.{Email, GitLabId, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -76,11 +76,11 @@ private class KGPersonFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreCo
 
     val personEntities: Decoder[Person] = { cursor =>
       for {
-        resourceId       <- cursor.downField("resourceId").downField("value").as[users.ResourceId]
-        name             <- cursor.downField("name").downField("value").as[users.Name]
-        maybeEmail       <- cursor.downField("maybeEmail").downField("value").as[Option[users.Email]]
-        maybeGitLabId    <- cursor.downField("maybeGitLabId").downField("value").as[Option[users.GitLabId]]
-        maybeAffiliation <- cursor.downField("maybeAffiliation").downField("value").as[Option[users.Affiliation]]
+        resourceId       <- cursor.downField("resourceId").downField("value").as[persons.ResourceId]
+        name             <- cursor.downField("name").downField("value").as[persons.Name]
+        maybeEmail       <- cursor.downField("maybeEmail").downField("value").as[Option[persons.Email]]
+        maybeGitLabId    <- cursor.downField("maybeGitLabId").downField("value").as[Option[persons.GitLabId]]
+        maybeAffiliation <- cursor.downField("maybeAffiliation").downField("value").as[Option[persons.Affiliation]]
         person <- Person
                     .from(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId)
                     .toEither

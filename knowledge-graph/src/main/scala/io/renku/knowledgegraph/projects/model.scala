@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.model.projects.{DateCreated, Description, Id, Keyword, Name, Path, Visibility}
-import io.renku.graph.model.{SchemaVersion, users}
+import io.renku.graph.model.{SchemaVersion, persons}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 import model.Statistics._
@@ -65,7 +65,7 @@ private object model {
 
   final case class Creation(date: DateCreated, maybeCreator: Option[Creator])
 
-  final case class Creator(maybeEmail: Option[users.Email], name: users.Name)
+  final case class Creator(maybeEmail: Option[persons.Email], name: persons.Name)
 
   final case class Forking(forksCount: ForksCount, maybeParent: Option[ParentProject])
 

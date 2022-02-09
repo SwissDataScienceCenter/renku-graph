@@ -25,7 +25,7 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, TopmostSameAs}
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, users}
+import io.renku.graph.model.{entities, persons}
 import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
@@ -198,7 +198,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     val transformer         = new DatasetTransformerImpl[Try](kgDatasetInfoFinder, updatesCreator, ProjectFunctions)
 
     def givenRelevantCreatorsUnlinking(ds: entities.Dataset[entities.Dataset.Provenance]): List[SparqlQuery] = {
-      val creatorsInKG = userResourceIds.generateSet()
+      val creatorsInKG = personResourceIds.generateSet()
       findingDatasetCreatorsFor(ds.identification.resourceId, returning = creatorsInKG.pure[Try])
 
       val unlinkingQueries = sparqlQueries.generateList()
@@ -220,7 +220,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       .expects(resourceId, *)
       .returning(returning)
 
-    def findingDatasetCreatorsFor(resourceId: ResourceId, returning: Try[Set[users.ResourceId]]) =
+    def findingDatasetCreatorsFor(resourceId: ResourceId, returning: Try[Set[persons.ResourceId]]) =
       (kgDatasetInfoFinder
         .findDatasetCreators(_: ResourceId))
         .expects(resourceId)
@@ -238,10 +238,10 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     def prepareQueriesUnlinkingRelevantCreators(
         dataset:    entities.Dataset[entities.Dataset.Provenance],
-        kgCreators: Set[users.ResourceId],
+        kgCreators: Set[persons.ResourceId],
         returning:  List[SparqlQuery]
     ) = (updatesCreator
-      .queriesUnlinkingCreators(_: entities.Dataset[entities.Dataset.Provenance], _: Set[users.ResourceId]))
+      .queriesUnlinkingCreators(_: entities.Dataset[entities.Dataset.Provenance], _: Set[persons.ResourceId]))
       .expects(dataset, kgCreators)
       .returning(returning)
 

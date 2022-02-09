@@ -26,7 +26,7 @@ import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityReco
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.projects.Visibility.Public
-import io.renku.graph.model.users.GitLabId
+import io.renku.graph.model.persons.GitLabId
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import io.renku.http.server.security.model.AuthUser

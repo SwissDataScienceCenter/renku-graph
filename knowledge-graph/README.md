@@ -139,12 +139,12 @@ Response body example:
 
 #### GET /knowledge-graph/entities
 
-Allows finding `projects`, `datasets`, `workflows`, and `users`.
+Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 
 Filtering:
 * `query` - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
 * `type` - to filter by entity type; allowed values: `project`, `dataset`, `workflow`, and `user`
-* `user` - to filter by user (creator for projects and datasets); the filter would require user's name
+* `person` - to filter by person (creator for projects and datasets); the filter would require person's name
 * `visibility` - to filter by visibility (restricted vs. public); allowed values: `public`, `internal`, `private`
 * `date` - to filter by entity's creation date
 * `projectTemplate` no info in KG yet
@@ -255,7 +255,7 @@ Response body example:
     "_links": []
   },
   {
-    "type": "user",
+    "type": "person",
     "name": "name",
     "_links": []
   }

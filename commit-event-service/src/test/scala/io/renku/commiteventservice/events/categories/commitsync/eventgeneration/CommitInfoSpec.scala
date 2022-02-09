@@ -49,8 +49,8 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
     "decode valid JSON with blank emails to a CommitInfo object" in {
       val commitInfo        = commitInfos.generateOne
-      val authorUsername    = userNames.generateOne
-      val committerUsername = userNames.generateOne
+      val authorUsername    = personNames.generateOne
+      val committerUsername = personNames.generateOne
       json"""{
         "id":              ${commitInfo.id.value},
         "author_name":     ${authorUsername.value},
@@ -70,8 +70,8 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
     "decode valid JSON with blank usernames to a CommitInfo object" in {
       val commitInfo     = commitInfos.generateOne
-      val authorEmail    = userEmails.generateOne
-      val committerEmail = userEmails.generateOne
+      val authorEmail    = personEmails.generateOne
+      val committerEmail = personEmails.generateOne
       json"""{
         "id":              ${commitInfo.id.value},
         "author_name":     ${blankStrings().generateOne},
@@ -91,8 +91,8 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
     "decode invalid emails to Nones" in {
       val commitInfo        = commitInfos.generateOne
-      val authorUsername    = userNames.generateOne
-      val committerUsername = userNames.generateOne
+      val authorUsername    = personNames.generateOne
+      val committerUsername = personNames.generateOne
       json"""{
         "id":              ${commitInfo.id.value},
         "author_name":     ${authorUsername.value},
@@ -117,8 +117,8 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
         "id":              ${commitInfo.id.value},
         "author_name":     ${blankStrings().generateOne},
         "author_email":    ${blankStrings().generateOne},
-        "committer_name":  ${userNames.generateOne.value},
-        "committer_email": ${userEmails.generateOne.value},
+        "committer_name":  ${personNames.generateOne.value},
+        "committer_email": ${personEmails.generateOne.value},
         "message":         ${commitInfo.message.value},
         "committed_date":  ${commitInfo.committedDate.value},
         "parent_ids":      ${commitInfo.parents.map(_.value)}
@@ -133,7 +133,7 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
       val Left(exception) = json"""{
         "id":              ${commitInfo.id.value},
         "author_name":     ${usernames.generateOne.value},
-        "author_email":    ${userEmails.generateOne.value},
+        "author_email":    ${personEmails.generateOne.value},
         "committer_name":  ${blankStrings().generateOne},
         "committer_email": ${blankStrings().generateOne},
         "message":         ${commitInfo.message.value},

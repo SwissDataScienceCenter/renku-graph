@@ -21,7 +21,7 @@ package generators
 
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.users
+import io.renku.graph.model.persons
 import monocle.Lens
 import org.scalacheck.Gen
 
@@ -41,8 +41,8 @@ trait ProjectEntitiesGenerators {
     def modify(f: Project => Project): Gen[Project] = projectGen.map(f)
   }
 
-  lazy val memberGitLabIdLens: Lens[ProjectMember, users.GitLabId] =
-    Lens[ProjectMember, users.GitLabId](_.gitLabId) { gitLabId =>
+  lazy val memberGitLabIdLens: Lens[ProjectMember, persons.GitLabId] =
+    Lens[ProjectMember, persons.GitLabId](_.gitLabId) { gitLabId =>
       {
         case member: ProjectMember.ProjectMemberNoEmail   => member.copy(gitLabId = gitLabId)
         case member: ProjectMember.ProjectMemberWithEmail => member.copy(gitLabId = gitLabId)

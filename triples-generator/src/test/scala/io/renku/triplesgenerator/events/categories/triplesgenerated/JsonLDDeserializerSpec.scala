@@ -266,7 +266,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     private implicit lazy val toProjectMember: Person => ProjectMember = person => {
       val member = ProjectMember(person.name,
-                                 users.Username(person.name.value),
+                                 persons.Username(person.name.value),
                                  person.maybeGitLabId.getOrElse(fail("Project person without GitLabId"))
       )
       person.maybeEmail match {

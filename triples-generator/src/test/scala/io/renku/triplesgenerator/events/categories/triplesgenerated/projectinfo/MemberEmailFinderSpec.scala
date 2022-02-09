@@ -34,11 +34,11 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.ints
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths, userEmails, userGitLabIds, userNames}
+import io.renku.graph.model.GraphModelGenerators.{personEmails, personGitLabIds, personNames, projectIds, projectPaths}
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.{GitLabUrl, projects, users}
+import io.renku.graph.model.{GitLabUrl, persons, projects}
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
@@ -75,7 +75,7 @@ class MemberEmailFinderSpec
 
         `/api/v4/projects/:id/events?action=pushed`(project.id) returning okJson(events.asJson.noSpaces)
 
-        val authorEmail = userEmails.generateOne
+        val authorEmail = personEmails.generateOne
         (commitAuthorFinder
           .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
           .expects(
@@ -89,7 +89,7 @@ class MemberEmailFinderSpec
       }
 
     "do nothing if email is already set on the given member" in new TestCase {
-      val memberWithEmail = member add userEmails.generateOne
+      val memberWithEmail = member add personEmails.generateOne
       finder.findMemberEmail(memberWithEmail, project).value.unsafeRunSync() shouldBe memberWithEmail.asRight
     }
 
@@ -104,7 +104,7 @@ class MemberEmailFinderSpec
 
       `/api/v4/projects/:id/events?action=pushed`(project.id) returning okJson(events.asJson.noSpaces)
 
-      val authorEmail = userEmails.generateOne
+      val authorEmail = personEmails.generateOne
       (commitAuthorFinder
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
         .expects(project.path, commitTo, maybeAccessToken)
@@ -123,7 +123,7 @@ class MemberEmailFinderSpec
 
       `/api/v4/projects/:id/events?action=pushed`(project.id) returning okJson(events.asJson.noSpaces)
 
-      val authorEmail = userEmails.generateOne
+      val authorEmail = personEmails.generateOne
       (commitAuthorFinder
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
         .expects(project.path, commitFrom, maybeAccessToken)
@@ -143,7 +143,7 @@ class MemberEmailFinderSpec
         eventsPage2.asJson.noSpaces
       )
 
-      val authorEmail = userEmails.generateOne
+      val authorEmail = personEmails.generateOne
       (commitAuthorFinder
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
         .expects(
@@ -188,7 +188,7 @@ class MemberEmailFinderSpec
           (event :: pushEvents.generateNonEmptyList(maxElements = 19).toList.reverse).asJson.noSpaces
         )
 
-        val authorEmail = userEmails.generateOne
+        val authorEmail = personEmails.generateOne
         (commitAuthorFinder
           .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
           .expects(
@@ -229,9 +229,9 @@ class MemberEmailFinderSpec
             maybeAccessToken
           )
           .returning(
-            EitherT.rightT[IO, ProcessingRecoverableError]((userNames.generateOne -> userEmails.generateOne).some)
+            EitherT.rightT[IO, ProcessingRecoverableError]((personNames.generateOne -> personEmails.generateOne).some)
           )
-        val authorEmail = userEmails.generateOne
+        val authorEmail = personEmails.generateOne
         (commitAuthorFinder
           .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
           .expects(
@@ -271,7 +271,7 @@ class MemberEmailFinderSpec
           maybeAccessToken
         )
         .returning(
-          EitherT.rightT[IO, ProcessingRecoverableError]((userNames.generateOne -> userEmails.generateOne).some)
+          EitherT.rightT[IO, ProcessingRecoverableError]((personNames.generateOne -> personEmails.generateOne).some)
         )
       (commitAuthorFinder
         .findCommitAuthor(_: projects.Path, _: CommitId)(_: Option[AccessToken]))
@@ -281,7 +281,7 @@ class MemberEmailFinderSpec
           maybeAccessToken
         )
         .returning(
-          EitherT.rightT[IO, ProcessingRecoverableError]((userNames.generateOne -> userEmails.generateOne).some)
+          EitherT.rightT[IO, ProcessingRecoverableError]((personNames.generateOne -> personEmails.generateOne).some)
         )
 
       finder.findMemberEmail(member, project).value.unsafeRunSync() shouldBe member.asRight
@@ -335,7 +335,7 @@ class MemberEmailFinderSpec
           (event.maybeCommitTo orElse event.maybeCommitFrom).getOrElse(fail("At least one commit expected on Event")),
           maybeAccessToken
         )
-        .returning(EitherT.leftT[IO, Option[(users.Name, users.Email)]](error))
+        .returning(EitherT.leftT[IO, Option[(persons.Name, persons.Email)]](error))
 
       val Left(failure) = finder.findMemberEmail(member, project).value.unsafeRunSync()
       failure shouldBe a[ProcessingRecoverableError]
@@ -394,8 +394,8 @@ class MemberEmailFinderSpec
   private case class PushEvent(projectId:       projects.Id,
                                maybeCommitFrom: Option[CommitId],
                                maybeCommitTo:   Option[CommitId],
-                               authorId:        users.GitLabId,
-                               authorName:      users.Name
+                               authorId:        persons.GitLabId,
+                               authorName:      persons.Name
   ) {
     def forMember(member: ProjectMember): PushEvent =
       copy(authorId = member.gitLabId, authorName = member.name)
@@ -406,7 +406,7 @@ class MemberEmailFinderSpec
   private lazy val pushEvents: Gen[PushEvent] = for {
     projectId <- projectIds
     commitIds <- commitIds.toGeneratorOfSet(minElements = 2, maxElements = 2)
-    userId    <- userGitLabIds
-    userName  <- userNames
+    userId    <- personGitLabIds
+    userName  <- personNames
   } yield PushEvent(projectId, commitIds.headOption, commitIds.tail.headOption, userId, userName)
 }

@@ -26,7 +26,7 @@ import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityReco
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.users.GitLabId
+import io.renku.graph.model.persons.GitLabId
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import org.scalacheck.Arbitrary
@@ -57,7 +57,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       securityRecordsFinder
         .expects(key)
-        .returning(List((Visibility.Public, projectPath, userGitLabIds.generateSet() + authUser.id)).pure[Try])
+        .returning(List((Visibility.Public, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try])
 
       authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
         AuthContext[Key](Some(authUser), key, Set(projectPath))
@@ -70,7 +70,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       securityRecordsFinder
         .expects(key)
-        .returning(List((Visibility.Public, projectPath, userGitLabIds.generateSet())).pure[Try])
+        .returning(List((Visibility.Public, projectPath, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
         AuthContext[Key](Some(authUser), key, Set(projectPath))
@@ -84,7 +84,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
       securityRecordsFinder
         .expects(key)
         .returning(
-          List((visibilityNonPublic.generateOne, projectPath, userGitLabIds.generateSet() + authUser.id)).pure[Try]
+          List((visibilityNonPublic.generateOne, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try]
         )
 
       authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
@@ -107,7 +107,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
       securityRecordsFinder
         .expects(key)
         .returning(
-          List((visibilityNonPublic.generateOne, projectPaths.generateOne, userGitLabIds.generateSet())).pure[Try]
+          List((visibilityNonPublic.generateOne, projectPaths.generateOne, personGitLabIds.generateSet())).pure[Try]
         )
 
       authorizer.authorize(key, authUsers.generateSome) shouldBe EitherT.leftT[Try, Unit](AuthorizationFailure)
@@ -117,7 +117,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
       securityRecordsFinder
         .expects(key)
         .returning(
-          List((visibilityNonPublic.generateOne, projectPaths.generateOne, userGitLabIds.generateSet())).pure[Try]
+          List((visibilityNonPublic.generateOne, projectPaths.generateOne, personGitLabIds.generateSet())).pure[Try]
         )
 
       authorizer.authorize(key, maybeAuthUser = None) shouldBe EitherT.leftT[Try, Unit](AuthorizationFailure)

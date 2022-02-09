@@ -29,7 +29,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{datasets, projects, users}
+import io.renku.graph.model.{datasets, persons, projects}
 import io.renku.http.rest.SortBy
 import io.renku.http.rest.paging.model._
 import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
@@ -69,7 +69,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val person = personEntities
-        .map(_.copy(name = sentenceContaining(query).map(_.value).generateAs(users.Name)))
+        .map(_.copy(name = sentenceContaining(query).map(_.value).generateAs(persons.Name)))
         .generateOne
 
       val loneProject = renkuProjectEntities(visibilityPublic)
@@ -182,13 +182,13 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val projectCreator =
-        personEntities.generateOne.copy(name = sentenceContaining(query).map(_.value).generateAs(users.Name))
+        personEntities.generateOne.copy(name = sentenceContaining(query).map(_.value).generateAs(persons.Name))
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(creatorLens.modify(_ => projectCreator.some))
         .generateOne
 
       val dsCreator =
-        personEntities.generateOne.copy(name = sentenceContaining(query).map(_.value).generateAs(users.Name))
+        personEntities.generateOne.copy(name = sentenceContaining(query).map(_.value).generateAs(persons.Name))
       val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
@@ -294,7 +294,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeCreator = userNames.generateSome)))
+        .findEntities(Criteria(Filters(maybeCreator = personNames.generateSome)))
         .unsafeRunSync()
         .results shouldBe Nil
     }
@@ -680,7 +680,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .importDataset(externalDS)
         .generateOne
 
-      val member = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
+      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val original ::~ fork = {
         val original ::~ fork = publicProject.forkOnce()
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
@@ -701,7 +701,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     "favour dataset on internal project projects if exists" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
-      val member = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
+      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val dsAndInternalProject @ _ ::~ internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .modify(_.copy(members = Set(member)))
         .importDataset(externalDS)
@@ -727,7 +727,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     "select dataset on private project if there's no project with broader visibility" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
-      val member = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
+      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val dsAndProject @ _ ::~ privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(_.copy(members = Set(member)))
         .importDataset(externalDS)
@@ -784,7 +784,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       finder
         .findEntities(
-          Criteria(maybeUser = personEntities(userGitLabIds.toGeneratorOfSomes).generateSome.map(_.toAuthUser))
+          Criteria(maybeUser = personEntities(personGitLabIds.toGeneratorOfSomes).generateSome.map(_.toAuthUser))
         )
         .unsafeRunSync()
         .results shouldBe List(
@@ -798,7 +798,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     }
 
     "return non-public entities if the given user has access to them" in new TestCase {
-      val member = personEntities(userGitLabIds.toGeneratorOfSomes).generateOne
+      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
 
       val dsAndProject @ ds ::~ project = renkuProjectEntities(visibilityNonPublic)
         .modify(_.copy(members = Set(member)))
@@ -821,11 +821,11 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       val query = nonBlankStrings(minLength = 3).generateOne
 
-      val sharedName      = sentenceContaining(query).map(_.value).generateAs(users.Name)
+      val sharedName      = sentenceContaining(query).map(_.value).generateAs(persons.Name)
       val person1SameName = personEntities.map(_.copy(name = sharedName)).generateOne
       val person2SameName = personEntities.map(_.copy(name = sharedName)).generateOne
       val person3 = personEntities
-        .map(_.copy(name = sentenceContaining(query).map(_.value).generateAs(users.Name)))
+        .map(_.copy(name = sentenceContaining(query).map(_.value).generateAs(persons.Name)))
         .generateOne
 
       loadToStore(person1SameName, person2SameName, person3, personEntities.generateOne)

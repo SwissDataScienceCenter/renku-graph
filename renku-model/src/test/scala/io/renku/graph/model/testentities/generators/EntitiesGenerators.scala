@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
-import io.renku.graph.model.users.{Email, GitLabId}
+import io.renku.graph.model.persons.{Email, GitLabId}
 import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
 
@@ -56,20 +56,20 @@ trait EntitiesGenerators
   def invalidationTimes(min: Instant*): Gen[InvalidationTime] =
     timestamps(min = min.max, max = Instant.now()).toGeneratorOf(InvalidationTime)
 
-  lazy val withGitLabId:    Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfSomes
+  lazy val withGitLabId:    Gen[Option[GitLabId]] = personGitLabIds.toGeneratorOfSomes
   lazy val withoutGitLabId: Gen[Option[GitLabId]] = fixed(Option.empty[GitLabId])
-  lazy val withEmail:       Gen[Option[Email]]    = userEmails.toGeneratorOfSomes
-  lazy val withoutEmail:    Gen[Option[Email]]    = userEmails.toGeneratorOfNones
+  lazy val withEmail:       Gen[Option[Email]]    = personEmails.toGeneratorOfSomes
+  lazy val withoutEmail:    Gen[Option[Email]]    = personEmails.toGeneratorOfNones
 
   implicit lazy val personEntities: Gen[Person] = personEntities()
 
   def personEntities(
-      maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfOptions,
-      maybeEmails:    Gen[Option[Email]] = userEmails.toGeneratorOfOptions
+      maybeGitLabIds: Gen[Option[GitLabId]] = personGitLabIds.toGeneratorOfOptions,
+      maybeEmails:    Gen[Option[Email]] = personEmails.toGeneratorOfOptions
   ): Gen[Person] = for {
-    name             <- userNames
+    name             <- personNames
     maybeEmail       <- maybeEmails
-    maybeAffiliation <- userAffiliations.toGeneratorOfOptions
+    maybeAffiliation <- personAffiliations.toGeneratorOfOptions
     maybeGitLabId    <- maybeGitLabIds
   } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
 }
