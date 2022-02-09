@@ -103,7 +103,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
   private def triggerGlobalCommitSync(event: CommitSyncEvent): F[Unit] =
     eventSender.sendEvent(
       EventRequestContent.NoPayload(
-        json"""{ "category_name": "GLOBAL_COMMIT_SYNC_REQUEST", "project":{ "id": ${event.project.id.value}, "path": ${event.project.path.value} }}"""
+        json"""{ "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST", "project":{ "id": ${event.project.id.value}, "path": ${event.project.path.value} }}"""
       ),
       s"$categoryName - Triggering Global Commit Sync Failed"
     )

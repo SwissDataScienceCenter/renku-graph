@@ -612,7 +612,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
     def withRequestContent(project: Project) =
       EventRequestContent.NoPayload(
-        json"""{ "category_name": "GLOBAL_COMMIT_SYNC_REQUEST" ,"project":{ "id": ${project.id.value}, "path":${project.path.value} }}"""
+        json"""{ "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST" ,"project":{ "id": ${project.id.value}, "path":${project.path.value} }}"""
       )
   }
 
