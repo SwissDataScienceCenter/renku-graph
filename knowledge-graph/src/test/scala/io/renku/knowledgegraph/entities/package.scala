@@ -67,4 +67,7 @@ package object entities {
 
     def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T = convert(datasetAndProject)
   }
+
+  private[entities] implicit def personConverter[P <: testentities.Person]: P => Entity.Person = person =>
+    Entity.Person(MatchingScore.min, person.name)
 }

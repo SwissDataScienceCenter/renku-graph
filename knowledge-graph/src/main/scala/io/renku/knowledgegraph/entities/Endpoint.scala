@@ -35,10 +35,14 @@ object Endpoint {
 
       sealed trait EntityType extends StringTinyType with Product with Serializable
       object EntityType extends TinyTypeFactory[EntityType](EntityTypeApply) {
+
         final case object Project extends EntityType { override val value: String = "project" }
         final case object Dataset extends EntityType { override val value: String = "dataset" }
-        val all: List[EntityType] = Project :: Dataset :: Nil
+        final case object Person  extends EntityType { override val value: String = "person" }
+
+        val all: List[EntityType] = Project :: Dataset :: Person :: Nil
       }
+
       private object EntityTypeApply extends (String => EntityType) {
         override def apply(value: String): EntityType = EntityType.all.find(_.value == value).getOrElse {
           throw new IllegalArgumentException(s"'$value' unknown EntityType")

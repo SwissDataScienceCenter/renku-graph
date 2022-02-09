@@ -280,6 +280,8 @@ trait DatasetEntitiesGenerators {
       }
     }
 
+  def removeCreators[P <: Dataset.Provenance]: P => P = creatorsLens.modify(_ => Set.empty)
+
   implicit lazy val internalProvenanceDateLens: Lens[Dataset.Provenance.Internal, InstantTinyType] =
     Lens[Dataset.Provenance.Internal, InstantTinyType](_.date) { max =>
       _.copy(date = timestamps(max = max.value).generateAs[datasets.DateCreated])

@@ -24,6 +24,8 @@ import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
 import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
 
+import java.time.Instant
+
 object model {
 
   sealed trait Entity extends Product with Serializable {
@@ -37,6 +39,7 @@ object model {
   }
 
   object Entity {
+
     final case class Project(
         matchingScore:    MatchingScore,
         path:             projects.Path,
@@ -63,6 +66,22 @@ object model {
     ) extends Entity {
       override type Name = datasets.Name
       override type Date = datasets.Date
+    }
+
+    final case class Person(
+        matchingScore: MatchingScore,
+        name:          users.Name
+    ) extends Entity {
+      override type Name = users.Name
+      override type Date = Person.DateCreationFiller
+      override val date: Person.DateCreationFiller = Person.DateCreationFiller
+    }
+
+    object Person {
+      final case object DateCreationFiller extends InstantTinyType {
+        override val value: Instant = Instant.EPOCH
+      }
+      type DateCreationFiller = DateCreationFiller.type
     }
   }
 

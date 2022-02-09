@@ -72,6 +72,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     EntityType.all flatMap {
       case EntityType.Project => maybeProjectsQuery(criteria)
       case EntityType.Dataset => maybeDatasetsQuery(criteria)
+      case EntityType.Person  => maybePersonsQuery(criteria)
     }
 
   private def maybeProjectsQuery(criteria: Criteria) = (criteria.filters whenRequesting EntityType.Project) {
@@ -184,13 +185,37 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |}""".stripMargin
   }
 
+  private def maybePersonsQuery(criteria: Criteria) =
+    (criteria.filters whenRequesting (EntityType.Person, criteria.filters.withNoOrPublicVisibility, criteria.filters.maybeDate.isEmpty)) {
+      import criteria._
+      s"""|{
+          |  SELECT DISTINCT ?entityType ?matchingScore ?name
+          |  WHERE {
+          |    {
+          |      SELECT (SAMPLE(?id) AS ?personId) ?name (MAX(?score) AS ?matchingScore)
+          |      WHERE { 
+          |        (?id ?score) text:query (schema:name '${filters.query}').
+          |        ?id a schema:Person;
+          |            schema:name ?name.
+          |        ${filters.maybeOnCreatorName("?name")}    
+          |      }
+          |      GROUP BY ?name
+          |    }
+          |    BIND ('person' AS ?entityType)
+          |  }
+          |}
+          |""".stripMargin
+    }
+
   private implicit class FiltersOps(filters: Filters) {
     import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 
     lazy val query: String = filters.maybeQuery.map(_.value).getOrElse("*")
 
-    def whenRequesting(entityType: Filters.EntityType)(query: => String): Option[String] =
-      Option.when(filters.maybeEntityType.forall(_ == entityType))(query)
+    def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] =
+      Option.when(filters.maybeEntityType.forall(_ == entityType) && predicates.forall(_ == true))(query)
+
+    lazy val withNoOrPublicVisibility: Boolean = filters.maybeVisibility forall (_ == projects.Visibility.Public)
 
     def maybeOnCreatorName(variableName: String): String =
       filters.maybeCreator
@@ -344,10 +369,18 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       } yield Entity.Dataset(matchingScore, identifier, name, visibility, date, creators, keywords, maybeDescription)
     }
 
+    implicit val personDecoder: Decoder[Entity.Person] = { cursor =>
+      for {
+        matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
+        name          <- cursor.downField("name").downField("value").as[users.Name]
+      } yield Entity.Person(matchingScore, name)
+    }
+
     cursor =>
       cursor.downField("entityType").downField("value").as[String] >>= {
         case "project" => cursor.as[Entity.Project]
         case "dataset" => cursor.as[Entity.Dataset]
+        case "person"  => cursor.as[Entity.Person]
       }
   }
 }

@@ -68,4 +68,8 @@ trait ProjectEntitiesGenerators {
         case project: NonRenkuProject.WithParent    => project.copy(maybeCreator = maybeCreator).asInstanceOf[P]
       }
     }
+
+  def removeCreator[P <: Project]: P => P = creatorLens.modify(_ => None)
+
+  def removeMembers[P <: Project]: P => P = membersLens.modify(_ => Set.empty)
 }
