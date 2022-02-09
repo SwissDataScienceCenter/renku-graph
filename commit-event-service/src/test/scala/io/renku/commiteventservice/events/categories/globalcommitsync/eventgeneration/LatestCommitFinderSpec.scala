@@ -23,7 +23,7 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
@@ -48,8 +48,8 @@ class LatestCommitFinderSpec
     with should.Matchers {
 
   "findLatestCommitId" should {
-    "return the latest CommitID if remote responds with OK and valid body - personal access token case" in new TestCase {
-      implicit val personalAccessToken = personalAccessTokens.generateSome
+    "return the latest CommitID if remote responds with OK and valid body - access token case" in new TestCase {
+      implicit val someAccessToken = accessTokens.generateSome
 
       val endpointName: String Refined NonEmpty = "commits"
 
@@ -57,7 +57,7 @@ class LatestCommitFinderSpec
         .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitId]])(
           _: Option[AccessToken]
         ))
-        .expects(GET, uri"projects" / projectId.show / "repository" / "commits", endpointName, *, personalAccessToken)
+        .expects(GET, uri"projects" / projectId.show / "repository" / "commits", endpointName, *, someAccessToken)
         .returning(Some(commitId).pure[IO])
 
       latestCommitFinder.findLatestCommitId(projectId).unsafeRunSync() shouldBe commitId.some
