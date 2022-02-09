@@ -96,6 +96,10 @@ object Microservice extends IOMicroservice {
                                            sessionResource,
                                            queriesExecTimes
                                          )
+        globalCommitSyncRequestSubscription <- events.categories.globalcommitsyncrequest.SubscriptionFactory(
+                                                 sessionResource,
+                                                 queriesExecTimes
+                                               )
         statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
                                            sessionResource,
                                            eventsQueue,
@@ -111,7 +115,8 @@ object Microservice extends IOMicroservice {
                                     creationSubscription,
                                     zombieEventsSubscription,
                                     commitSyncRequestSubscription,
-                                    statusChangeEventSubscription
+                                    statusChangeEventSubscription,
+                                    globalCommitSyncRequestSubscription
                                   )
         serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
