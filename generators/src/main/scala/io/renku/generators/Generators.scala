@@ -73,11 +73,10 @@ object Generators {
   def sentences(minWords: Int Refined Positive = 1, maxWords: Int Refined Positive = 10): Gen[NonBlank] =
     nonEmptyStringsList(minWords, maxWords) map (_.mkString(" ")) map Refined.unsafeApply
 
-  def sentenceContaining(phrase: NonBlank): Gen[NonBlank] =
-    for {
-      prefix <- nonEmptyStrings()
-      suffix <- nonEmptyStrings()
-    } yield Refined.unsafeApply(s"$prefix $phrase $suffix")
+  def sentenceContaining(phrase: NonBlank): Gen[String] = for {
+    prefix <- nonEmptyStrings()
+    suffix <- nonEmptyStrings()
+  } yield s"$prefix $phrase $suffix"
 
   def blankStrings(maxLength: Int Refined NonNegative = 10): Gen[String] =
     for {

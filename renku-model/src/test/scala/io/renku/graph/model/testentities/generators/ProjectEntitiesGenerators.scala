@@ -21,7 +21,7 @@ package generators
 
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.persons
+import io.renku.graph.model.{persons, projects}
 import monocle.Lens
 import org.scalacheck.Gen
 
@@ -69,7 +69,49 @@ trait ProjectEntitiesGenerators {
       }
     }
 
-  def removeCreator[P <: Project]: P => P = creatorLens.modify(_ => None)
+  def removeCreator[P <: Project](): P => P = creatorLens.modify(_ => None)
 
-  def removeMembers[P <: Project]: P => P = membersLens.modify(_ => Set.empty)
+  def replaceProjectCreator[P <: Project](to: Option[Person]): P => P = {
+    case project: RenkuProject.WithoutParent    => project.copy(maybeCreator = to).asInstanceOf[P]
+    case project: RenkuProject.WithParent       => project.copy(maybeCreator = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithoutParent => project.copy(maybeCreator = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithParent    => project.copy(maybeCreator = to).asInstanceOf[P]
+  }
+
+  def removeMembers[P <: Project](): P => P = membersLens.modify(_ => Set.empty)
+
+  def replaceMembers[P <: Project](to: Set[Person]): P => P = {
+    case project: RenkuProject.WithoutParent    => project.copy(members = to).asInstanceOf[P]
+    case project: RenkuProject.WithParent       => project.copy(members = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithoutParent => project.copy(members = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithParent    => project.copy(members = to).asInstanceOf[P]
+  }
+
+  def replaceProjectName[P <: Project](to: projects.Name): P => P = {
+    case project: RenkuProject.WithoutParent    => project.copy(name = to).asInstanceOf[P]
+    case project: RenkuProject.WithParent       => project.copy(name = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithoutParent => project.copy(name = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithParent    => project.copy(name = to).asInstanceOf[P]
+  }
+
+  def replaceProjectKeywords[P <: Project](to: Set[projects.Keyword]): P => P = {
+    case project: RenkuProject.WithoutParent    => project.copy(keywords = to).asInstanceOf[P]
+    case project: RenkuProject.WithParent       => project.copy(keywords = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithoutParent => project.copy(keywords = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithParent    => project.copy(keywords = to).asInstanceOf[P]
+  }
+
+  def replaceProjectDesc[P <: Project](to: Option[projects.Description]): P => P = {
+    case project: RenkuProject.WithoutParent    => project.copy(maybeDescription = to).asInstanceOf[P]
+    case project: RenkuProject.WithParent       => project.copy(maybeDescription = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithoutParent => project.copy(maybeDescription = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithParent    => project.copy(maybeDescription = to).asInstanceOf[P]
+  }
+
+  def replaceProjectDateCreated[P <: Project](to: projects.DateCreated): P => P = {
+    case project: RenkuProject.WithoutParent    => project.copy(dateCreated = to).asInstanceOf[P]
+    case project: RenkuProject.WithParent       => project.copy(dateCreated = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithoutParent => project.copy(dateCreated = to).asInstanceOf[P]
+    case project: NonRenkuProject.WithParent    => project.copy(dateCreated = to).asInstanceOf[P]
+  }
 }

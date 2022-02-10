@@ -32,6 +32,7 @@ import java.time.Instant
 object EntitiesGenerators extends EntitiesGenerators {
   type DatasetGenFactory[+P <: Dataset.Provenance] = projects.DateCreated => Gen[Dataset[P]]
   type ActivityGenFactory                          = projects.DateCreated => Gen[Activity]
+  type PlanGenFactory                              = projects.DateCreated => Gen[Plan]
 }
 
 private object Instances {
@@ -72,4 +73,6 @@ trait EntitiesGenerators
     maybeAffiliation <- personAffiliations.toGeneratorOfOptions
     maybeGitLabId    <- maybeGitLabIds
   } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
+
+  def replacePersonName(to: persons.Name): Person => Person = _.copy(name = to)
 }

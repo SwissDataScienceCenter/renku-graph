@@ -280,7 +280,16 @@ trait DatasetEntitiesGenerators {
       }
     }
 
-  def removeCreators[P <: Dataset.Provenance]: P => P = creatorsLens.modify(_ => Set.empty)
+  def removeCreators[P <: Dataset.Provenance](): P => P = creatorsLens.modify(_ => Set.empty)
+
+  def replaceDSName[P <: Dataset.Provenance](to: datasets.Name): Dataset[P] => Dataset[P] =
+    identificationLens[P].modify(_.copy(name = to))
+
+  def replaceDSKeywords[P <: Dataset.Provenance](to: List[datasets.Keyword]): Dataset[P] => Dataset[P] =
+    additionalInfoLens[P].modify(_.copy(keywords = to))
+
+  def replaceDSDesc[P <: Dataset.Provenance](to: Option[datasets.Description]): Dataset[P] => Dataset[P] =
+    additionalInfoLens[P].modify(_.copy(maybeDescription = to))
 
   implicit lazy val internalProvenanceDateLens: Lens[Dataset.Provenance.Internal, InstantTinyType] =
     Lens[Dataset.Provenance.Internal, InstantTinyType](_.date) { max =>

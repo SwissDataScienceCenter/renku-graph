@@ -64,8 +64,24 @@ package object entities {
   private[entities] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance,
                                                      +P <: testentities.Project
   ](datasetAndProject: (testentities.Dataset[PROV], P))(implicit renkuBaseUrl: RenkuBaseUrl) {
-
     def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T = convert(datasetAndProject)
+  }
+
+  private[entities] implicit def planConverter[P <: testentities.Project]
+      : ((testentities.Plan, P)) => Entity.Workflow = { case (plan, project) =>
+    Entity.Workflow(
+      MatchingScore.min,
+      plan.id,
+      plan.name,
+      project.visibility,
+      plan.dateCreated,
+      plan.keywords.sorted,
+      plan.maybeDescription
+    )
+  }
+
+  private[entities] implicit class ProjectPlanOps[+P <: testentities.Project](planAndProject: (testentities.Plan, P)) {
+    def to[T](implicit convert: ((testentities.Plan, P)) => T): T = convert(planAndProject)
   }
 
   private[entities] implicit def personConverter[P <: testentities.Person]: P => Entity.Person = person =>

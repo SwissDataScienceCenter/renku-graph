@@ -278,19 +278,14 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def makeNameContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
-      dataset.copy(
-        identification = dataset.identification.copy(name =
-          sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
-        )
-      )
+      replaceDSName(to = sentenceContaining(nonEmptyPhrase).map(Name.apply).generateOne)(dataset)
     }
 
     def makeTitleContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
       dataset.copy(
-        identification = dataset.identification.copy(title =
-          sentenceContaining(nonEmptyPhrase).map(_.value).map(Title.apply).generateOne
-        )
+        identification =
+          dataset.identification.copy(title = sentenceContaining(nonEmptyPhrase).map(Title.apply).generateOne)
       )
     }
 
@@ -298,9 +293,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
       dataset.copy(
         provenance =
-          provenanceUpdater(sentenceContaining(nonEmptyPhrase).map(_.value).map(persons.Name.apply).generateOne,
-                            dataset.provenance
-          )
+          provenanceUpdater(sentenceContaining(nonEmptyPhrase).map(persons.Name.apply).generateOne, dataset.provenance)
       )
     }
 
@@ -310,11 +303,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
 
     def makeDescContaining(phrase: String): Dataset[P] =
-      dataset.copy(additionalInfo =
-        dataset.additionalInfo.copy(maybeDescription =
-          sentenceContaining(Refined.unsafeApply(phrase)).map(_.value).map(Description.apply).generateSome
-        )
-      )
+      replaceDSDesc(to = sentenceContaining(Refined.unsafeApply(phrase)).map(Description.apply).generateSome)(dataset)
   }
 
   type ProvenanceImportFactory[OldProvenance <: Dataset.Provenance, NewProvenance <: Dataset.Provenance] =

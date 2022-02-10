@@ -31,7 +31,7 @@ import io.renku.graph.model.plans.Command
 import io.renku.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import io.renku.graph.model.testentities.Plan.CommandParameters
 import io.renku.graph.model.testentities.Plan.CommandParameters.CommandParameterFactory
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{ActivityGenFactory, PlanGenFactory}
 import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
 
@@ -50,10 +50,11 @@ trait ActivityGenerators {
   val entityLocations:       Gen[Location]        = Gen.oneOf(entityFileLocations, entityFolderLocations)
   val entityChecksums:       Gen[Checksum]        = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)
 
-  implicit val planNames: Gen[plans.Name] = nonBlankStrings().map(_.value).toGeneratorOf[plans.Name]
-  implicit val planDescriptions: Gen[plans.Description] =
-    sentences().map(_.value).toGeneratorOf[plans.Description]
-  implicit val planCommands: Gen[plans.Command] = nonBlankStrings().map(_.value).toGeneratorOf[plans.Command]
+  implicit val planIdentifiers: Gen[plans.Identifier] = Gen.uuid.map(uuid => plans.Identifier(uuid.toString))
+  implicit val planNames:       Gen[plans.Name]       = nonBlankStrings().map(_.value).toGeneratorOf[plans.Name]
+  implicit val planKeywords: Gen[plans.Keyword] = nonBlankStrings(minLength = 5) map (_.value) map plans.Keyword.apply
+  implicit val planDescriptions: Gen[plans.Description] = sentences().map(_.value).toGeneratorOf[plans.Description]
+  implicit val planCommands:     Gen[plans.Command]     = nonBlankStrings().map(_.value).toGeneratorOf[plans.Command]
   implicit val planProgrammingLanguages: Gen[plans.ProgrammingLanguage] =
     nonBlankStrings().map(_.value).toGeneratorOf[plans.ProgrammingLanguage]
   implicit val planSuccessCodes: Gen[plans.SuccessCode] =
@@ -95,13 +96,12 @@ trait ActivityGenerators {
 
   def planEntities(
       parameterFactories:     CommandParameterFactory*
-  )(implicit planCommandsGen: Gen[Command]): projects.DateCreated => Gen[Plan] =
-    projectDateCreated =>
-      for {
-        name         <- planNames
-        maybeCommand <- planCommandsGen.toGeneratorOfOptions
-        dateCreated  <- planDatesCreated(after = projectDateCreated)
-      } yield Plan.of(name, maybeCommand, dateCreated, CommandParameters.of(parameterFactories: _*))
+  )(implicit planCommandsGen: Gen[Command]): PlanGenFactory = projectDateCreated =>
+    for {
+      name         <- planNames
+      maybeCommand <- planCommandsGen.toGeneratorOfOptions
+      dateCreated  <- planDatesCreated(after = projectDateCreated)
+    } yield Plan.of(name, maybeCommand, dateCreated, CommandParameters.of(parameterFactories: _*))
 
   def executionPlanners(planGen: projects.DateCreated => Gen[Plan], project: RenkuProject): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)
@@ -148,4 +148,18 @@ trait ActivityGenerators {
           case assoc: Association.WithPersonAgent => assoc
         }
     )
+
+  implicit class PlanGenFactoryOps(factory: PlanGenFactory) {
+
+    def modify(f: Plan => Plan): PlanGenFactory =
+      projectCreationDate => factory(projectCreationDate).map(f)
+  }
+
+  def replacePlanName(to: plans.Name): Plan => Plan = _.copy(name = to)
+
+  def replacePlanKeywords(to: List[plans.Keyword]): Plan => Plan = _.copy(keywords = to)
+
+  def replacePlanDesc(to: Option[plans.Description]): Plan => Plan = _.copy(maybeDescription = to)
+
+  def replacePlanDateCreated(to: plans.DateCreated): Plan => Plan = _.copy(dateCreated = to)
 }

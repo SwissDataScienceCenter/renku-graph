@@ -28,8 +28,8 @@ import io.renku.generators.CommonGraphGenerators.{accessTokens, sortingDirection
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{datasets, persons, projects}
 import io.renku.http.rest.SortBy
 import io.renku.http.rest.paging.model._
 import io.renku.http.rest.paging.{PagingRequest, PagingResponse}
@@ -51,15 +51,18 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
     "return all entities sorted by name if no query is given" in new TestCase {
       val dsAndProject @ ds ::~ project = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
+      val plan :: Nil = project.plans.toList
 
       loadToStore(project)
 
       finder.findEntities(Criteria()).unsafeRunSync().results shouldBe List(
         project.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset]
-      ).addPersonsFrom(project).addPersonsFrom(ds).sortBy(_.name.value)
+        dsAndProject.to[model.Entity.Dataset],
+        (plan -> project).to[model.Entity.Workflow]
+      ).addPersonsFrom(project).addPersonsFrom(ds).addPersonsFrom(project.activities).sortBy(_.name.value)
     }
   }
 
@@ -69,25 +72,37 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val person = personEntities
-        .map(_.copy(name = sentenceContaining(query).map(_.value).generateAs(persons.Name)))
+        .map(replacePersonName(to = sentenceContaining(query).generateAs(persons.Name)))
         .generateOne
 
       val loneProject = renkuProjectEntities(visibilityPublic)
-        .modify(_.copy(name = sentenceContaining(query).map(_.value).generateAs(projects.Name)))
+        .modify(replaceProjectName(sentenceContaining(query).generateAs(projects.Name)))
         .modify(creatorLens.modify(_ => person.some))
         .generateOne
 
       val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
-            identificationLens.modify(
-              _.copy(name = sentenceContaining(query).map(_.value).generateAs(datasets.Name))
-            )
+            replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name))
           )
         )
         .generateOne
 
-      loadToStore(loneProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      val planProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(
+          activityEntities(
+            planEntities().modify(replacePlanName(to = sentenceContaining(query).generateAs(plans.Name)))
+          )
+        )
+        .generateOne
+      val plan :: Nil = planProject.plans.toList
+
+      val notMatchingProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
+        .withDatasets(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(loneProject, dsProject, planProject, notMatchingProject)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -95,6 +110,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .resultsWithSkippedMatchingScore shouldBe List(
         loneProject.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset],
+        (plan -> planProject).to[model.Entity.Workflow],
         person.to[model.Entity.Person]
       ).sortBy(_.name.value)
     }
@@ -104,8 +120,8 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(
-          _.copy(keywords =
-            Set(sentenceContaining(query).map(_.value).generateAs(projects.Keyword), projectKeywords.generateOne)
+          replaceProjectKeywords(to =
+            Set(sentenceContaining(query).generateAs(projects.Keyword), projectKeywords.generateOne)
           )
         )
         .generateOne
@@ -113,23 +129,35 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
-            additionalInfoLens.modify(
-              _.copy(keywords =
-                List(sentenceContaining(query).map(_.value).generateAs(datasets.Keyword), datasetKeywords.generateOne)
-              )
+            replaceDSKeywords(to =
+              List(sentenceContaining(query).generateAs(datasets.Keyword), datasetKeywords.generateOne)
             )
           )
         )
         .generateOne
 
-      loadToStore(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      val planProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(
+          activityEntities(
+            planEntities().modify(
+              replacePlanKeywords(to =
+                List(sentenceContaining(query).generateAs(plans.Keyword), planKeywords.generateOne)
+              )
+            )
+          )
+        )
+        .generateOne
+      val plan :: Nil = planProject.plans.toList
+
+      loadToStore(soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
         .unsafeRunSync()
         .resultsWithSkippedMatchingScore shouldBe List(
         soleProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset]
+        dsAndProject.to[model.Entity.Dataset],
+        (plan -> planProject).to[model.Entity.Workflow]
       ).sortBy(_.name.value)
     }
 
@@ -137,27 +165,36 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val soleProject = renkuProjectEntities(visibilityPublic)
-        .modify(_.copy(maybeDescription = sentenceContaining(query).map(_.value).generateAs(projects.Description).some))
+        .modify(
+          replaceProjectDesc(to = sentenceContaining(query).generateAs(projects.Description).some)
+        )
         .generateOne
 
       val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
-          datasetEntities(provenanceNonModified).modify(
-            additionalInfoLens.modify(
-              _.copy(maybeDescription = sentenceContaining(query).map(_.value).generateAs(datasets.Description).some)
-            )
-          )
+          datasetEntities(provenanceNonModified)
+            .modify(replaceDSDesc(to = sentenceContaining(query).generateAs(datasets.Description).some))
         )
         .generateOne
 
-      loadToStore(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      val planProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(
+          activityEntities(
+            planEntities().modify(replacePlanDesc(to = sentenceContaining(query).generateAs(plans.Description).some))
+          )
+        )
+        .generateOne
+      val plan :: Nil = planProject.plans.toList
+
+      loadToStore(soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
         .unsafeRunSync()
         .resultsWithSkippedMatchingScore shouldBe List(
         soleProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset]
+        dsAndProject.to[model.Entity.Dataset],
+        (plan -> planProject).to[model.Entity.Workflow]
       ).sortBy(_.name.value)
     }
 
@@ -181,14 +218,12 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     "return entities which creator name matches the given query, sorted by name" in new TestCase {
       val query = nonBlankStrings(minLength = 3).generateOne
 
-      val projectCreator =
-        personEntities.generateOne.copy(name = sentenceContaining(query).map(_.value).generateAs(persons.Name))
+      val projectCreator = personEntities.generateOne.copy(name = sentenceContaining(query).generateAs(persons.Name))
       val soleProject = renkuProjectEntities(visibilityPublic)
         .modify(creatorLens.modify(_ => projectCreator.some))
         .generateOne
 
-      val dsCreator =
-        personEntities.generateOne.copy(name = sentenceContaining(query).map(_.value).generateAs(persons.Name))
+      val dsCreator = personEntities.generateOne.copy(name = sentenceContaining(query).generateAs(persons.Name))
       val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
@@ -214,8 +249,9 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
   "findEntities - with entity type filter" should {
 
     "return only projects when 'project' type given" in new TestCase {
-      val _ ::~ project = renkuProjectEntities(visibilityPublic)
-        .addDataset(datasetEntities(provenanceNonModified))
+      val project = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
+        .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
       loadToStore(project)
@@ -228,6 +264,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
     "return only datasets when 'dataset' type given" in new TestCase {
       val dsAndProject @ _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -239,11 +276,25 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .results shouldBe List(dsAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
     }
 
+    "return only workflows when 'workflow' type given" in new TestCase {
+      val project = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
+        .withDatasets(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Criteria(Filters(maybeEntityType = EntityType.Workflow.some)))
+        .unsafeRunSync()
+        .results shouldBe project.plans.map(_ -> project).map(_.to[model.Entity.Workflow]).toList.sortBy(_.name.value)
+    }
+
     "return only datasets when 'person' type given" in new TestCase {
       val person = personEntities.generateOne
       val project = renkuProjectEntities(visibilityPublic)
         .modify(creatorLens.modify(_ => person.some))
-        .modify(removeMembers)
+        .modify(removeMembers())
         .generateOne
 
       loadToStore(project)
@@ -286,7 +337,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       ).sortBy(_.name.value)
     }
 
-    "return no entities when no match on visibility" in new TestCase {
+    "return no entities when no match on creator" in new TestCase {
       val _ ::~ project = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
@@ -304,25 +355,34 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
     "return entities with matching visibility only" in new TestCase {
 
-      val dsAndProject @ ds ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ ::~ publicProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
+      val plan :: Nil = publicProject.plans.toList
 
-      val nonPublicProject = projectEntities(visibilityNonPublic).generateOne
+      val nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+        .withActivities(activityEntities(planEntities()))
+        .withDatasets(datasetEntities(provenanceNonModified))
+        .generateOne
 
-      loadToStore(dsProject, nonPublicProject)
+      loadToStore(publicProject, nonPublicProject)
 
       finder
         .findEntities(Criteria(Filters(maybeVisibility = projects.Visibility.Public.some)))
         .unsafeRunSync()
         .results shouldBe List(
-        dsProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset]
-      ).addPersonsFrom(dsProject).addPersonsFrom(ds).addPersonsFrom(nonPublicProject).sortBy(_.name.value)
+        publicProject.to[model.Entity.Project],
+        dsAndProject.to[model.Entity.Dataset],
+        (plan -> publicProject).to[model.Entity.Workflow]
+      ).addAllPersonsFrom(publicProject)
+        .addAllPersonsFrom(nonPublicProject)
+        .sortBy(_.name.value)
     }
 
     "return no entities when no match on visibility" in new TestCase {
       val _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -343,8 +403,12 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .from(date.value.atStartOfDay(ZoneOffset.UTC))
         .plusSeconds(positiveInts(60 * 60 * 24 - 1).generateOne.value)
 
-      val matchingDS ::~ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
-        .modify(_.copy(dateCreated = projects.DateCreated(dateAsInstant)))
+      val matchingDS ::~ _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .modify(replaceProjectDateCreated(to = projects.DateCreated(dateAsInstant)))
+        .withActivities(
+          activityEntities(planEntities().modify(replacePlanDateCreated(to = plans.DateCreated(dateAsInstant)))),
+          activityEntities(planEntities())
+        )
         .addDataset(
           datasetEntities(provenanceInternal)
             .modify(
@@ -353,15 +417,17 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         )
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
+      val plan :: _ = project.plans.toList
 
-      loadToStore(dsProject, projectEntities(visibilityPublic).generateOne)
+      loadToStore(project, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeDate = date.some)))
         .unsafeRunSync()
         .results shouldBe List(
-        dsProject.to[model.Entity.Project],
-        (matchingDS -> dsProject).to[model.Entity.Dataset]
+        project.to[model.Entity.Project],
+        (matchingDS -> project).to[model.Entity.Dataset],
+        (plan       -> project).to[model.Entity.Workflow]
       ).sortBy(_.name.value)
     }
 
@@ -391,6 +457,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
     "return no entities when no match on date" in new TestCase {
       val _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -406,11 +473,12 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
   "findEntities - with sorting" should {
 
     "be sorting by Name if requested" in new TestCase {
-      val dsAndProject @ ds ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val dsAndProject @ _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(dsProject)
+      loadToStore(project)
 
       val direction = sortingDirections.generateOne
 
@@ -418,13 +486,14 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .findEntities(Criteria(sorting = Sorting.By(Sorting.ByName, direction)))
         .unsafeRunSync()
         .results shouldBe List(
-        dsProject.to[model.Entity.Project],
+        project.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset]
-      ).addPersonsFrom(dsProject).addPersonsFrom(ds).sortBy(_.name.value).use(direction)
+      ).addAllPlans(project).addAllPersonsFrom(project).sortBy(_.name.value).use(direction)
     }
 
     "be sorting by Date if requested" in new TestCase {
       val externalDS ::~ internalDS ::~ project = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()), activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceImportedExternal))
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
@@ -438,14 +507,13 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .unsafeRunSync()
         .results
 
-      val expectedPersons =
-        List.empty[model.Entity].addPersonsFrom(project).addPersonsFrom(internalDS).addPersonsFrom(externalDS).toSet
+      val expectedPersons = List.empty[model.Entity].addAllPersonsFrom(project).toSet
 
       val expectedSorted = List(
         project.to[model.Entity.Project],
         (externalDS -> project).to[model.Entity.Dataset],
         (internalDS -> project).to[model.Entity.Dataset]
-      ).sortBy(_.dateAsInstant).use(direction)
+      ).addAllPlans(project).sortBy(_.dateAsInstant).use(direction)
 
       val (sorted, persons) = if (direction == SortBy.Direction.Asc) {
         val (persons, sorted) = results splitAt expectedPersons.size
@@ -461,15 +529,14 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       val query = nonBlankStrings(minLength = 3).generateOne
 
       val ds ::~ project = renkuProjectEntities(visibilityPublic)
-        .modify(_.copy(name = projects.Name(query.value)))
+        .modify(replaceProjectName(to = projects.Name(query.value)))
+        .withActivities(activityEntities(planEntities().modify(replacePlanName(to = plans.Name(s"smth $query")))))
         .addDataset(
-          datasetEntities(provenanceNonModified).modify(
-            identificationLens.modify(
-              _.copy(name = sentenceContaining(query).map(_.value).generateAs(datasets.Name))
-            )
-          )
+          datasetEntities(provenanceNonModified)
+            .modify(replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name)))
         )
         .generateOne
+      val plan :: Nil = project.plans.toList
 
       loadToStore(project)
 
@@ -483,8 +550,9 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         )
         .unsafeRunSync()
         .resultsWithSkippedMatchingScore shouldBe List(
-        project.to[model.Entity.Project], // should have higher score as its name is the query
-        (ds -> project).to[model.Entity.Dataset]
+        project.to[model.Entity.Project], // should have the highest score as its name is the query
+        (plan -> project).to[model.Entity.Workflow], // should have higher score as its name is the query with a prefix
+        (ds   -> project).to[model.Entity.Dataset]
       ).use(direction).reverse
     }
   }
@@ -492,10 +560,10 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
   "findEntities - with paging" should {
 
     val ds1 ::~ ds2 ::~ project = renkuProjectEntities(visibilityPublic)
-      .modify(removeCreator)
-      .modify(removeMembers)
-      .addDataset(datasetEntities(provenanceNonModified).modify(provenanceLens.modify(removeCreators)))
-      .addDataset(datasetEntities(provenanceNonModified).modify(provenanceLens.modify(removeCreators)))
+      .modify(removeCreator())
+      .modify(removeMembers())
+      .addDataset(datasetEntities(provenanceNonModified).modify(provenanceLens.modify(removeCreators())))
+      .addDataset(datasetEntities(provenanceNonModified).modify(provenanceLens.modify(removeCreators())))
       .generateOne
 
     "return the only page" in new TestCase {
@@ -673,7 +741,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
   "findEntities - in case of a dataset on forks with different visibility" should {
 
-    "favour dataset on public project projects if exists" in new TestCase {
+    "favour dataset on public projects if exist" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
       val dsAndPublicProject @ _ ::~ publicProject = renkuProjectEntities(visibilityPublic)
@@ -698,12 +766,12 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .results shouldBe List(dsAndPublicProject.to[model.Entity.Dataset])
     }
 
-    "favour dataset on internal project projects if exists" in new TestCase {
+    "favour dataset on internal projects over projects if exist" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val dsAndInternalProject @ _ ::~ internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
-        .modify(_.copy(members = Set(member)))
+        .modify(replaceMembers(to = Set(member)))
         .importDataset(externalDS)
         .generateOne
 
@@ -729,7 +797,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val dsAndProject @ _ ::~ privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
-        .modify(_.copy(members = Set(member)))
+        .modify(replaceMembers(to = Set(member)))
         .importDataset(externalDS)
         .generateOne
 
@@ -746,39 +814,142 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
     }
   }
 
+  "findEntities - in case of a forks with workflows" should {
+
+    "de-duplicate workflows when on forked projects" in new TestCase {
+      val original ::~ fork = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
+        .generateOne
+        .forkOnce()
+      val plan :: Nil = fork.plans.toList
+
+      loadToStore(original, fork)
+
+      val results = finder
+        .findEntities(Criteria(Filters(maybeEntityType = Filters.EntityType.Workflow.some)))
+        .unsafeRunSync()
+        .results
+
+      results should {
+        be(List((plan -> original).to[model.Entity.Workflow])) or
+          be(List((plan -> fork).to[model.Entity.Workflow]))
+      }
+    }
+  }
+
+  "findEntities - in case of a workflows on forks with different visibility" should {
+
+    "favour workflows on public projects if exist" in new TestCase {
+
+      val publicProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
+        .generateOne
+
+      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val original ::~ fork = {
+        val original ::~ fork = publicProject.forkOnce()
+        original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
+      }
+      val plan :: Nil = publicProject.plans.toList
+
+      loadToStore(original, fork)
+
+      finder
+        .findEntities(
+          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Workflow.some),
+                   maybeUser = member.toAuthUser.some
+          )
+        )
+        .unsafeRunSync()
+        .results shouldBe List((plan -> publicProject).to[model.Entity.Workflow])
+    }
+
+    "favour workflows on internal projects over private projects if exist" in new TestCase {
+
+      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
+        .modify(replaceMembers(to = Set(member)))
+        .withActivities(activityEntities(planEntities()))
+        .generateOne
+
+      val original ::~ fork = {
+        val original ::~ fork = internalProject.forkOnce()
+        original -> fork.copy(visibility = projects.Visibility.Private, members = Set(member))
+      }
+      val plan :: Nil = internalProject.plans.toList
+
+      loadToStore(original, fork)
+
+      finder
+        .findEntities(
+          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Workflow.some),
+                   maybeUser = member.toAuthUser.some
+          )
+        )
+        .unsafeRunSync()
+        .results shouldBe List((plan -> internalProject).to[model.Entity.Workflow])
+    }
+
+    "select workflows on private projects if there are no projects with broader visibility" in new TestCase {
+
+      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
+        .modify(replaceMembers(to = Set(member)))
+        .withActivities(activityEntities(planEntities()))
+        .generateOne
+      val plan :: Nil = privateProject.plans.toList
+
+      loadToStore(privateProject)
+
+      finder
+        .findEntities(
+          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Workflow.some),
+                   maybeUser = member.toAuthUser.some
+          )
+        )
+        .unsafeRunSync()
+        .results shouldBe List((plan -> privateProject).to[model.Entity.Workflow])
+    }
+  }
+
   "findEntities - security" should {
 
     "not return non-public entities if no user who is a member of the project is given" in new TestCase {
 
-      val nonPublicDS ::~ nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+      val _ ::~ nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val dsAndProject @ publicDS ::~ publicProject = renkuProjectEntities(visibilityPublic)
+      val dsAndPublicProject @ _ ::~ publicProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
+      val publicPlan :: Nil = publicProject.plans.toList
 
       loadToStore(nonPublicProject, publicProject)
 
       finder.findEntities(Criteria()).unsafeRunSync().results shouldBe List(
         publicProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset]
-      ).addPersonsFrom(nonPublicProject)
-        .addPersonsFrom(publicProject)
-        .addPersonsFrom(nonPublicDS)
-        .addPersonsFrom(publicDS)
+        dsAndPublicProject.to[model.Entity.Dataset],
+        (publicPlan -> publicProject).to[model.Entity.Workflow]
+      ).addAllPersonsFrom(nonPublicProject)
+        .addAllPersonsFrom(publicProject)
         .sortBy(_.name.value)
     }
 
     "not return non-public entities if the given user has no access to them" in new TestCase {
 
-      val nonPublicDS ::~ nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+      val _ ::~ nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val dsAndProject @ publicDS ::~ publicProject = renkuProjectEntities(visibilityPublic)
+      val dsAndPublicProject @ _ ::~ publicProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
+      val publicPlan :: Nil = publicProject.plans.toList
 
       loadToStore(nonPublicProject, publicProject)
 
@@ -789,28 +960,30 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .unsafeRunSync()
         .results shouldBe List(
         publicProject.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset]
-      ).addPersonsFrom(nonPublicProject)
-        .addPersonsFrom(publicProject)
-        .addPersonsFrom(nonPublicDS)
-        .addPersonsFrom(publicDS)
+        dsAndPublicProject.to[model.Entity.Dataset],
+        (publicPlan -> publicProject).to[model.Entity.Workflow]
+      ).addAllPersonsFrom(nonPublicProject)
+        .addAllPersonsFrom(publicProject)
         .sortBy(_.name.value)
     }
 
     "return non-public entities if the given user has access to them" in new TestCase {
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
 
-      val dsAndProject @ ds ::~ project = renkuProjectEntities(visibilityNonPublic)
-        .modify(_.copy(members = Set(member)))
+      val dsAndProject @ _ ::~ project = renkuProjectEntities(visibilityNonPublic)
+        .modify(replaceMembers(to = Set(member)))
+        .withActivities(activityEntities(planEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
+      val plan :: Nil = project.plans.toList
 
       loadToStore(project)
 
       finder.findEntities(Criteria(maybeUser = member.toAuthUser.some)).unsafeRunSync().results shouldBe List(
         project.to[model.Entity.Project],
-        dsAndProject.to[model.Entity.Dataset]
-      ).addPersonsFrom(project).addPersonsFrom(ds).sortBy(_.name.value)
+        dsAndProject.to[model.Entity.Dataset],
+        (plan -> project).to[model.Entity.Workflow]
+      ).addAllPersonsFrom(project).sortBy(_.name.value)
     }
   }
 
@@ -821,11 +994,11 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
       val query = nonBlankStrings(minLength = 3).generateOne
 
-      val sharedName      = sentenceContaining(query).map(_.value).generateAs(persons.Name)
+      val sharedName      = sentenceContaining(query).generateAs(persons.Name)
       val person1SameName = personEntities.map(_.copy(name = sharedName)).generateOne
       val person2SameName = personEntities.map(_.copy(name = sharedName)).generateOne
       val person3 = personEntities
-        .map(_.copy(name = sentenceContaining(query).map(_.value).generateAs(persons.Name)))
+        .map(_.copy(name = sentenceContaining(query).generateAs(persons.Name)))
         .generateOne
 
       loadToStore(person1SameName, person2SameName, person3, personEntities.generateOne)
@@ -842,8 +1015,8 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
   private trait TestCase {
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
-    val finder               = new EntitiesFinderImpl[IO](rdfStoreConfig, timeRecorder)
+    val finder =
+      new EntitiesFinderImpl[IO](rdfStoreConfig, new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]()))
   }
 
   private implicit class PagingResponseOps(response: PagingResponse[model.Entity]) {
@@ -852,9 +1025,10 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
   private implicit class ResultsOps(results: List[model.Entity]) {
     lazy val skipMatchingScore: List[model.Entity] = results.map {
-      case proj:   model.Entity.Project => proj.copy(matchingScore = model.MatchingScore.min)
-      case ds:     model.Entity.Dataset => ds.copy(matchingScore = model.MatchingScore.min)
-      case person: model.Entity.Person  => person.copy(matchingScore = model.MatchingScore.min)
+      case proj:     model.Entity.Project  => proj.copy(matchingScore = model.MatchingScore.min)
+      case ds:       model.Entity.Dataset  => ds.copy(matchingScore = model.MatchingScore.min)
+      case workflow: model.Entity.Workflow => workflow.copy(matchingScore = model.MatchingScore.min)
+      case person:   model.Entity.Person   => person.copy(matchingScore = model.MatchingScore.min)
     }
 
     lazy val use: SortBy.Direction => List[model.Entity] = {
@@ -865,19 +1039,34 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
 
   private implicit class EntityOps(entity: model.Entity) {
     lazy val dateAsInstant: Instant = entity match {
-      case proj:   model.Entity.Project => proj.date.value
-      case ds:     model.Entity.Dataset => ds.date.instant
-      case person: model.Entity.Person  => person.date.value
+      case proj:     model.Entity.Project  => proj.date.value
+      case ds:       model.Entity.Dataset  => ds.date.instant
+      case workflow: model.Entity.Workflow => workflow.date.value
+      case person:   model.Entity.Person   => person.date.value
     }
   }
 
   private implicit class EntitiesOps(entities: List[model.Entity]) {
 
     def addPersonsFrom(project: Project): List[model.Entity] =
-      (project.members ++ project.maybeCreator).map(_.to[model.Entity.Person]).toList ::: entities
+      (project.members ++ project.maybeCreator).map(_.to[model.Entity.Person]).toList ::: entities.distinct
 
     def addPersonsFrom[P <: Dataset.Provenance](ds: Dataset[P]): List[model.Entity] =
-      ds.provenance.creators.map(_.to[model.Entity.Person]).toList ::: entities
+      ds.provenance.creators.map(_.to[model.Entity.Person]).toList ::: entities.distinct
+
+    def addPersonsFrom(activities: List[Activity]): List[model.Entity] =
+      activities.map(_.author).map(_.to[model.Entity.Person]) ::: entities.distinct
+
+    def addAllPersonsFrom(project: RenkuProject): List[model.Entity] =
+      addPersonsFrom(project)
+        .addPersons(project.datasets.flatMap(_.provenance.creators.toList))
+        .addPersonsFrom(project.activities)
+
+    def addAllPlans(project: RenkuProject): List[model.Entity] =
+      project.plans.toList.map(_ -> project).map(_.to[model.Entity.Workflow]) ::: entities.distinct
+
+    def addPersons(persons: List[Person]): List[model.Entity] =
+      persons.map(_.to[model.Entity.Person]) ::: entities.distinct
   }
 
   implicit class PersonOps(person: Person) {

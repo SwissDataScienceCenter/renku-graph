@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph.entities
 
 import io.circe.{Decoder, Encoder}
-import io.renku.graph.model.{datasets, persons, projects}
+import io.renku.graph.model.{datasets, persons, plans, projects}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
 import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
@@ -66,6 +66,19 @@ object model {
     ) extends Entity {
       override type Name = datasets.Name
       override type Date = datasets.Date
+    }
+
+    final case class Workflow(
+        matchingScore:    MatchingScore,
+        identifier:       plans.Identifier,
+        name:             plans.Name,
+        visibility:       projects.Visibility,
+        date:             plans.DateCreated,
+        keywords:         List[plans.Keyword],
+        maybeDescription: Option[plans.Description]
+    ) extends Entity {
+      override type Name = plans.Name
+      override type Date = plans.DateCreated
     }
 
     final case class Person(

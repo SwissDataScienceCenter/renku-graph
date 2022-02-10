@@ -64,7 +64,7 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
     recoverableFailureMessagesToCheck foreach { recoverableError =>
       s"return $LogWorthyRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
 
-        val errorMessage = sentenceContaining(recoverableError).generateOne.value
+        val errorMessage = sentenceContaining(recoverableError).generateOne
         val commandResultException = ShelloutException {
           CommandResult(
             exitCode = 1,

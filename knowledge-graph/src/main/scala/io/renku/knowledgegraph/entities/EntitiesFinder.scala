@@ -24,9 +24,11 @@ import Endpoint.Criteria.Filters._
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.plans
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingResponse}
 import io.renku.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.tinytypes.TinyTypeConverter
 import model._
 import org.typelevel.log4cats.Logger
 
@@ -60,7 +62,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
     s"""|SELECT ?entityType ?matchingScore ?path ?identifier ?name ?visibility ?date 
         |  ?maybeCreatorName ?maybeDescription ?keywords ?visibilities 
-        |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames
+        |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames ?wkId
         |WHERE {
         |  ${subqueries(criteria).mkString(" UNION ")}
         |}
@@ -70,9 +72,10 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   private def subqueries(criteria: Criteria): List[String] =
     EntityType.all flatMap {
-      case EntityType.Project => maybeProjectsQuery(criteria)
-      case EntityType.Dataset => maybeDatasetsQuery(criteria)
-      case EntityType.Person  => maybePersonsQuery(criteria)
+      case EntityType.Project  => maybeProjectsQuery(criteria)
+      case EntityType.Dataset  => maybeDatasetsQuery(criteria)
+      case EntityType.Workflow => maybeWorkflowQuery(criteria)
+      case EntityType.Person   => maybePersonsQuery(criteria)
     }
 
   private def maybeProjectsQuery(criteria: Criteria) = (criteria.filters whenRequesting EntityType.Project) {
@@ -103,7 +106,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |               schema:dateCreated ?date.
         |    ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
         |    ${filters.maybeOnVisibility("?visibility")}
-        |    ${filters.maybeOnProjectDateCreated("?date")}
+        |    ${filters.maybeOnDateCreated("?date")}
         |    OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
         |    ${filters.maybeOnCreatorName("?maybeCreatorName")}
         |    OPTIONAL { ?projectId schema:description ?maybeDescription }
@@ -185,6 +188,43 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |}""".stripMargin
   }
 
+  private def maybeWorkflowQuery(criteria: Criteria) = (criteria.filters whenRequesting EntityType.Workflow) {
+    import criteria._
+    s"""|{
+        |  SELECT ?entityType ?matchingScore ?wkId ?name ?visibilities ?date ?maybeDescription
+        |    (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+        |  WHERE {
+        |    {
+        |      SELECT ?wkId ?matchingScore ?date (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
+        |      WHERE {
+        |        {
+        |          SELECT ?wkId (MAX(?score) AS ?matchingScore)
+        |          WHERE {
+        |            (?wkId ?score) text:query (schema:name schema:keywords schema:description '${filters.query}').
+        |            ?wkId a prov:Plan
+        |          }
+        |          GROUP BY ?wkId
+        |        }
+        |        ?wkId schema:name ?name;
+        |              schema:dateCreated ?date;
+        |              ^renku:hasPlan ?projectId.
+        |        ?projectId renku:projectVisibility ?visibility
+        |        ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
+        |        ${filters.maybeOnVisibility("?visibility")}
+        |        ${filters.maybeOnDateCreated("?date")}
+        |      }
+        |      GROUP BY ?wkId ?matchingScore ?date
+        |    }
+        |    BIND ('workflow' AS ?entityType)
+        |    ?wkId schema:name ?name.
+        |    OPTIONAL { ?wkId schema:description ?maybeDescription }
+        |    OPTIONAL { ?wkId schema:keywords ?keyword }
+        |  }
+        |  GROUP BY ?entityType ?matchingScore ?wkId ?name ?visibilities ?date ?maybeDescription
+        |}
+        |""".stripMargin
+  }
+
   private def maybePersonsQuery(criteria: Criteria) =
     (criteria.filters whenRequesting (EntityType.Person, criteria.filters.withNoOrPublicVisibility, criteria.filters.maybeDate.isEmpty)) {
       import criteria._
@@ -236,7 +276,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         .map(visibility => s"FILTER ($variableName = '$visibility')")
         .getOrElse("")
 
-    def maybeOnProjectDateCreated(variableName: String): String =
+    def maybeOnDateCreated(variableName: String): String =
       filters.maybeDate
         .map(date => s"""|BIND (${date.encodeAsXsdZonedDate} AS ?dateZoned)
                          |FILTER (xsd:date($variableName) = ?dateZoned)""".stripMargin)
@@ -306,6 +346,12 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
         .map(_.getOrElse(List.empty))
 
+    lazy val selectBroaderVisibility: List[projects.Visibility] => projects.Visibility = list =>
+      list
+        .find(_ == projects.Visibility.Public)
+        .orElse(list.find(_ == projects.Visibility.Internal))
+        .getOrElse(projects.Visibility.Private)
+
     implicit val projectDecoder: Decoder[Entity.Project] = { cursor =>
       for {
         matchingScore    <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
@@ -314,12 +360,11 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
         dateCreated      <- cursor.downField("date").downField("value").as[projects.DateCreated]
         maybeCreatorName <- cursor.downField("maybeCreatorName").downField("value").as[Option[persons.Name]]
-        keywords <-
-          cursor
-            .downField("keywords")
-            .downField("value")
-            .as[Option[String]]
-            .flatMap(toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword))
+        keywords <- cursor
+                      .downField("keywords")
+                      .downField("value")
+                      .as[Option[String]]
+                      .flatMap(toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword))
         maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[projects.Description]]
       } yield Entity.Project(matchingScore,
                              path,
@@ -337,18 +382,12 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
         identifier    <- cursor.downField("identifier").downField("value").as[datasets.Identifier]
         name          <- cursor.downField("name").downField("value").as[datasets.Name]
-        visibility <-
-          cursor
-            .downField("visibilities")
-            .downField("value")
-            .as[Option[String]]
-            .flatMap(toListOf[projects.Visibility, projects.Visibility.type](projects.Visibility))
-            .map(list =>
-              list
-                .find(_ == projects.Visibility.Public)
-                .orElse(list.find(_ == projects.Visibility.Internal))
-                .getOrElse(projects.Visibility.Private)
-            )
+        visibility <- cursor
+                        .downField("visibilities")
+                        .downField("value")
+                        .as[Option[String]]
+                        .flatMap(toListOf[projects.Visibility, projects.Visibility.type](projects.Visibility))
+                        .map(selectBroaderVisibility)
         maybeDateCreated <- cursor.downField("maybeDateCreated").downField("value").as[Option[datasets.DateCreated]]
         maybeDatePublished <-
           cursor.downField("maybeDatePublished").downField("value").as[Option[datasets.DatePublished]]
@@ -369,6 +408,30 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       } yield Entity.Dataset(matchingScore, identifier, name, visibility, date, creators, keywords, maybeDescription)
     }
 
+    implicit val workflowDecoder: Decoder[Entity.Workflow] = { cursor =>
+      for {
+        matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
+        resourceId    <- cursor.downField("wkId").downField("value").as[plans.ResourceId]
+        name          <- cursor.downField("name").downField("value").as[plans.Name]
+        dateCreated   <- cursor.downField("date").downField("value").as[plans.DateCreated]
+        identifier <- implicitly[TinyTypeConverter[plans.ResourceId, plans.Identifier]]
+                        .apply(resourceId)
+                        .leftMap(e => DecodingFailure(e.getMessage, Nil))
+        visibility <- cursor
+                        .downField("visibilities")
+                        .downField("value")
+                        .as[Option[String]]
+                        .flatMap(toListOf[projects.Visibility, projects.Visibility.type](projects.Visibility))
+                        .map(selectBroaderVisibility)
+        keywords <- cursor
+                      .downField("keywords")
+                      .downField("value")
+                      .as[Option[String]]
+                      .flatMap(toListOf[plans.Keyword, plans.Keyword.type](plans.Keyword))
+        maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[plans.Description]]
+      } yield Entity.Workflow(matchingScore, identifier, name, visibility, dateCreated, keywords, maybeDescription)
+    }
+
     implicit val personDecoder: Decoder[Entity.Person] = { cursor =>
       for {
         matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
@@ -377,10 +440,11 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     }
 
     cursor =>
-      cursor.downField("entityType").downField("value").as[String] >>= {
-        case "project" => cursor.as[Entity.Project]
-        case "dataset" => cursor.as[Entity.Dataset]
-        case "person"  => cursor.as[Entity.Person]
+      cursor.downField("entityType").downField("value").as[EntityType] >>= {
+        case EntityType.Project  => cursor.as[Entity.Project]
+        case EntityType.Dataset  => cursor.as[Entity.Dataset]
+        case EntityType.Workflow => cursor.as[Entity.Workflow]
+        case EntityType.Person   => cursor.as[Entity.Person]
       }
   }
 }

@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.entities
 
+import io.circe.Decoder
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
@@ -54,11 +55,16 @@ object Endpoint {
       sealed trait EntityType extends StringTinyType with Product with Serializable
       object EntityType extends TinyTypeFactory[EntityType](EntityTypeApply) {
 
-        final case object Project extends EntityType { override val value: String = "project" }
-        final case object Dataset extends EntityType { override val value: String = "dataset" }
-        final case object Person  extends EntityType { override val value: String = "person" }
+        final case object Project  extends EntityType { override val value: String = "project" }
+        final case object Dataset  extends EntityType { override val value: String = "dataset" }
+        final case object Workflow extends EntityType { override val value: String = "workflow" }
+        final case object Person   extends EntityType { override val value: String = "person" }
 
-        val all: List[EntityType] = Project :: Dataset :: Person :: Nil
+        val all: List[EntityType] = Project :: Dataset :: Workflow :: Person :: Nil
+
+        import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
+
+        implicit val decoder: Decoder[EntityType] = stringDecoder(EntityType)
       }
 
       private object EntityTypeApply extends (String => EntityType) {
