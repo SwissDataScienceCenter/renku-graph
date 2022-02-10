@@ -23,7 +23,6 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.circe.literal._
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -189,18 +188,6 @@ class CommitInfoFinderSpec
     private implicit val logger: TestLogger[IO] = TestLogger()
     val gitLabClient = mock[GitLabClient[IO]]
     val finder       = new CommitInfoFinderImpl[IO](gitLabClient)
-
-    lazy val responseJson =
-      json"""{
-      "id":              ${commitId.value},
-      "author_name":     ${author.name.value},
-      "author_email":    ${author.emailToJson},
-      "committer_name":  ${committer.name.value},
-      "committer_email": ${committer.emailToJson},
-      "message":         ${commitMessage.value},
-      "committed_date":  "2012-09-20T09:06:12+03:00",
-      "parent_ids":      ${parents.map(_.value)}
-    }"""
 
     val endpointName: String Refined NonEmpty = "commit-details"
 

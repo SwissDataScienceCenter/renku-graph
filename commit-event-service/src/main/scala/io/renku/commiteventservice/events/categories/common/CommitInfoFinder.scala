@@ -66,7 +66,7 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](gi
         ResultType
       ]]
   )(implicit maybeAccessToken: Option[AccessToken]) =
-    gitLabClient.send(GET, uri"projects" / projectId.show / "repository" / "commits" / commitId.show, "commits")(
+    gitLabClient.send(GET, uri"projects" / projectId.show / "repository" / "commits" / commitId.show, "commit-details")(
       mapResponse
     )
 

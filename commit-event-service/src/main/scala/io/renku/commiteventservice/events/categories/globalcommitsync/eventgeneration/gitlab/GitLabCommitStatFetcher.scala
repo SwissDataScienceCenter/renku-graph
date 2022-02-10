@@ -57,7 +57,10 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
   }.value
 
   private def fetchCommitCount(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]) =
-    gitLabClient.send(GET, uri"projects" / projectId.show withQueryParams Map("statistics" -> "true"), "projects")(
+    gitLabClient.send(GET,
+                      uri"projects" / projectId.show withQueryParams Map("statistics" -> "true"),
+                      "project-details"
+    )(
       mapResponse
     )
 
