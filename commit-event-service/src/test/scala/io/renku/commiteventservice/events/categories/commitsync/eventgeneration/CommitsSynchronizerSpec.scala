@@ -62,7 +62,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         givenAccessTokenIsFound(event.project.id)
 
         givenLatestCommitIsFound(latestCommitInfo, event.project.id)
-        givenGlobalCommitSyncRequestIsSent(event.project)
         commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
         logger.loggedOnly(
@@ -84,7 +83,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       )
 
       givenCommitIsInGL(latestCommitInfo, event.project.id)
-      givenGlobalCommitSyncRequestIsSent(event.project)
 
       commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
@@ -113,7 +111,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
         givenEventIsNotInEL(latestCommitInfo, event.project.id)
         givenCommitIsInGL(latestCommitInfo, event.project.id)
-        givenGlobalCommitSyncRequestIsSent(event.project)
 
         commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
@@ -164,361 +161,382 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
     }
 
-    "succeed if there is a new commit and the creation succeeds for the commit and its parents" in new TestCase {
-      val event            = fullCommitSyncEvents.generateOne
-      val parentCommit     = commitInfos.generateOne.copy(parents = List.empty[CommitId])
-      val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parentCommit.id))
+    "succeed if there is a new commit and the creation succeeds for the commit and its parents " +
+      "and trigger the global commit sync process" in new TestCase {
+        val event            = fullCommitSyncEvents.generateOne
+        val parentCommit     = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+        val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parentCommit.id))
 
-      givenAccessTokenIsFound(event.project.id)
+        givenAccessTokenIsFound(event.project.id)
 
-      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+        givenLatestCommitIsFound(latestCommitInfo, event.project.id)
 
-      givenEventIsNotInEL(latestCommitInfo, event.project.id)
-      givenCommitIsInGL(latestCommitInfo, event.project.id)
+        givenEventIsNotInEL(latestCommitInfo, event.project.id)
+        givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate)
-        .returning(Success(Created))
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, latestCommitInfo, batchDate)
+          .returning(Success(Created))
 
-      givenEventIsNotInEL(parentCommit, event.project.id)
-      givenCommitIsInGL(parentCommit, event.project.id)
+        givenEventIsNotInEL(parentCommit, event.project.id)
+        givenCommitIsInGL(parentCommit, event.project.id)
 
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, parentCommit, batchDate)
-        .returning(Success(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, parentCommit, batchDate)
+          .returning(Success(Created))
+        givenGlobalCommitSyncRequestIsSent(event.project)
 
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
-      logger.loggedOnly(
-        logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
-        logNewEventFound(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
-        logSummary(latestCommitInfo.id,
-                   event.project,
-                   executionTimeRecorder.elapsedTime,
-                   SynchronizationSummary(Created.name -> 2)
+        logger.loggedOnly(
+          logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
+          logNewEventFound(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
+          logSummary(latestCommitInfo.id,
+                     event.project,
+                     executionTimeRecorder.elapsedTime,
+                     SynchronizationSummary(Created.name -> 2)
+          )
         )
-      )
-    }
+      }
 
-    "succeed if there are no latest commit (project removed) and start the deletion process" in new TestCase {
-      val event        = fullCommitSyncEvents.generateOne
-      val parentCommit = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+    "succeed if there are no latest commit (project removed) and start the deletion process " +
+      "and trigger the global commit sync process" in new TestCase {
+        val event        = fullCommitSyncEvents.generateOne
+        val parentCommit = commitInfos.generateOne.copy(parents = List.empty[CommitId])
 
-      givenAccessTokenIsFound(event.project.id)
+        givenAccessTokenIsFound(event.project.id)
 
-      (latestCommitFinder
-        .findLatestCommit(_: projects.Id)(_: Option[AccessToken]))
-        .expects(event.project.id, maybeAccessToken)
-        .returning(Option.empty[CommitInfo].pure[Try])
+        (latestCommitFinder
+          .findLatestCommit(_: projects.Id)(_: Option[AccessToken]))
+          .expects(event.project.id, maybeAccessToken)
+          .returning(Option.empty[CommitInfo].pure[Try])
 
-      givenEventIsInEL(event.id, event.project.id)(returning =
-        CommitWithParents(event.id, event.project.id, List(parentCommit.id))
-      )
-      givenCommitIsNotInGL(event.id, event.project.id)
-
-      (commitEventsRemover.removeDeletedEvent _)
-        .expects(event.project, event.id)
-        .returning(UpdateResult.Deleted.pure[Try])
-
-      givenEventIsInEL(parentCommit.id, event.project.id)(returning =
-        CommitWithParents(parentCommit.id, event.project.id, List.empty[CommitId])
-      )
-      givenCommitIsNotInGL(parentCommit.id, event.project.id)
-
-      (commitEventsRemover.removeDeletedEvent _)
-        .expects(event.project, parentCommit.id)
-        .returning(UpdateResult.Deleted.pure[Try])
-      givenGlobalCommitSyncRequestIsSent(event.project)
-
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
-
-      logger.loggedOnly(
-        logEventFoundForDeletion(event.id, event.project, executionTimeRecorder.elapsedTime),
-        logEventFoundForDeletion(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
-        logSummary(event.id,
-                   event.project,
-                   executionTimeRecorder.elapsedTime,
-                   SynchronizationSummary(Deleted.name -> 2)
+        givenEventIsInEL(event.id, event.project.id)(returning =
+          CommitWithParents(event.id, event.project.id, List(parentCommit.id))
         )
-      )
-    }
+        givenCommitIsNotInGL(event.id, event.project.id)
 
-    "succeed if there is a latest commit to create and a parent to delete" in new TestCase {
-      val event            = fullCommitSyncEvents.generateOne
-      val parentCommit     = commitInfos.generateOne.copy(parents = List.empty[CommitId])
-      val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parentCommit.id))
+        (commitEventsRemover.removeDeletedEvent _)
+          .expects(event.project, event.id)
+          .returning(UpdateResult.Deleted.pure[Try])
 
-      givenAccessTokenIsFound(event.project.id)
-
-      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
-
-      givenEventIsNotInEL(latestCommitInfo, event.project.id)
-      givenCommitIsInGL(latestCommitInfo, event.project.id)
-
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate)
-        .returning(Success(Created))
-
-      givenEventIsInEL(parentCommit.id, event.project.id)(returning =
-        CommitWithParents(parentCommit.id, event.project.id, List.empty[CommitId])
-      )
-      givenCommitIsNotInGL(parentCommit.id, event.project.id)
-
-      (commitEventsRemover.removeDeletedEvent _)
-        .expects(event.project, parentCommit.id)
-        .returning(UpdateResult.Deleted.pure[Try])
-      givenGlobalCommitSyncRequestIsSent(event.project)
-
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
-
-      logger.loggedOnly(
-        logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
-        logEventFoundForDeletion(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
-        logSummary(latestCommitInfo.id,
-                   event.project,
-                   executionTimeRecorder.elapsedTime,
-                   SynchronizationSummary(Deleted.name -> 1, Created.name -> 1)
+        givenEventIsInEL(parentCommit.id, event.project.id)(returning =
+          CommitWithParents(parentCommit.id, event.project.id, List.empty[CommitId])
         )
-      )
-    }
+        givenCommitIsNotInGL(parentCommit.id, event.project.id)
 
-    "succeed and continue the process if fetching event details fails" in new TestCase {
-      val event            = fullCommitSyncEvents.generateOne
-      val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
-      val parent2Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
-      val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parent1Commit.id, parent2Commit.id))
+        (commitEventsRemover.removeDeletedEvent _)
+          .expects(event.project, parentCommit.id)
+          .returning(UpdateResult.Deleted.pure[Try])
+        givenGlobalCommitSyncRequestIsSent(event.project)
 
-      givenAccessTokenIsFound(event.project.id)
+        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
-      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
-
-      givenEventIsNotInEL(latestCommitInfo, event.project.id)
-      givenCommitIsInGL(latestCommitInfo, event.project.id)
-
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate)
-        .returning(Success(Created))
-
-      val exception = exceptions.generateOne
-      (eventDetailsFinder.getEventDetails _)
-        .expects(event.project.id, parent1Commit.id)
-        .returning(Failure(exception))
-
-      givenEventIsNotInEL(parent2Commit, event.project.id)
-      givenCommitIsInGL(parent2Commit, event.project.id)
-
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, parent2Commit, batchDate)
-        .returning(Success(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
-
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
-
-      logger.loggedOnly(
-        logNewEventFound(parent2Commit.id, event.project, executionTimeRecorder.elapsedTime),
-        logErrorSynchronization(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime, exception),
-        logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
-        logSummary(latestCommitInfo.id,
-                   event.project,
-                   executionTimeRecorder.elapsedTime,
-                   SynchronizationSummary(Failed.name -> 1, Created.name -> 2)
+        logger.loggedOnly(
+          logEventFoundForDeletion(event.id, event.project, executionTimeRecorder.elapsedTime),
+          logEventFoundForDeletion(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
+          logSummary(event.id,
+                     event.project,
+                     executionTimeRecorder.elapsedTime,
+                     SynchronizationSummary(Deleted.name -> 2)
+          )
         )
-      )
-    }
+      }
 
-    "succeed and continue the process if fetching commit info fails" in new TestCase {
-      val event            = fullCommitSyncEvents.generateOne
-      val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
-      val parent2Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
-      val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parent1Commit.id, parent2Commit.id))
+    "succeed if there is a latest commit to create and a parent to delete " +
+      "and trigger the global commit sync process" in new TestCase {
+        val event            = fullCommitSyncEvents.generateOne
+        val parentCommit     = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+        val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parentCommit.id))
 
-      givenAccessTokenIsFound(event.project.id)
+        givenAccessTokenIsFound(event.project.id)
 
-      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+        givenLatestCommitIsFound(latestCommitInfo, event.project.id)
 
-      givenEventIsNotInEL(latestCommitInfo, event.project.id)
-      givenCommitIsInGL(latestCommitInfo, event.project.id)
+        givenEventIsNotInEL(latestCommitInfo, event.project.id)
+        givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate)
-        .returning(Success(Created))
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, latestCommitInfo, batchDate)
+          .returning(Success(Created))
 
-      givenEventIsNotInEL(parent1Commit, event.project.id)
-
-      val exception = exceptions.generateOne
-      (commitInfoFinder
-        .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))
-        .expects(event.project.id, parent1Commit.id, maybeAccessToken)
-        .returning(Failure(exception))
-
-      givenEventIsNotInEL(parent2Commit, event.project.id)
-      givenCommitIsInGL(parent2Commit, event.project.id)
-
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, parent2Commit, batchDate)
-        .returning(Success(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
-
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
-
-      logger.loggedOnly(
-        logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
-        logErrorSynchronization(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime, exception),
-        logNewEventFound(parent2Commit.id, event.project, executionTimeRecorder.elapsedTime),
-        logSummary(latestCommitInfo.id,
-                   event.project,
-                   executionTimeRecorder.elapsedTime,
-                   SynchronizationSummary(Failed.name -> 1, Created.name -> 2)
+        givenEventIsInEL(parentCommit.id, event.project.id)(returning =
+          CommitWithParents(parentCommit.id, event.project.id, List.empty[CommitId])
         )
-      )
-    }
+        givenCommitIsNotInGL(parentCommit.id, event.project.id)
 
-    "succeed and continue the process if the commit creation is needed and fails" in new TestCase {
-      val event            = fullCommitSyncEvents.generateOne
-      val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
-      val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parent1Commit.id))
+        (commitEventsRemover.removeDeletedEvent _)
+          .expects(event.project, parentCommit.id)
+          .returning(UpdateResult.Deleted.pure[Try])
+        givenGlobalCommitSyncRequestIsSent(event.project)
 
-      givenAccessTokenIsFound(event.project.id)
+        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
-      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
-
-      givenEventIsNotInEL(latestCommitInfo, event.project.id)
-      givenCommitIsInGL(latestCommitInfo, event.project.id)
-
-      val exception = exceptions.generateOne
-
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, latestCommitInfo, batchDate)
-        .returning(Success(Failed(exception.getMessage, exception)))
-
-      givenEventIsNotInEL(parent1Commit, event.project.id)
-      givenCommitIsInGL(parent1Commit, event.project.id)
-
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, parent1Commit, batchDate)
-        .returning(Success(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
-
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
-
-      logger.loggedOnly(
-        logErrorSynchronization(latestCommitInfo.id,
-                                event.project,
-                                executionTimeRecorder.elapsedTime,
-                                exception,
-                                exception.getMessage
-        ),
-        logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
-        logSummary(latestCommitInfo.id,
-                   event.project,
-                   executionTimeRecorder.elapsedTime,
-                   SynchronizationSummary(Failed.name -> 1, Created.name -> 1)
+        logger.loggedOnly(
+          logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
+          logEventFoundForDeletion(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
+          logSummary(latestCommitInfo.id,
+                     event.project,
+                     executionTimeRecorder.elapsedTime,
+                     SynchronizationSummary(Deleted.name -> 1, Created.name -> 1)
+          )
         )
-      )
-    }
+      }
 
-    "succeed and continue the process if the commit deletion is needed and return a failure" in new TestCase {
-      val event            = fullCommitSyncEvents.generateOne
-      val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
-      val latestCommitInfo = commitInfos.generateOne
+    "succeed and continue the process if fetching event details fails " +
+      "and trigger the global commit sync process" in new TestCase {
+        val event            = fullCommitSyncEvents.generateOne
+        val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+        val parent2Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+        val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parent1Commit.id, parent2Commit.id))
 
-      givenAccessTokenIsFound(event.project.id)
+        givenAccessTokenIsFound(event.project.id)
 
-      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+        givenLatestCommitIsFound(latestCommitInfo, event.project.id)
 
-      givenEventIsInEL(latestCommitInfo.id, event.project.id)(
-        CommitWithParents(latestCommitInfo.id, event.project.id, List(parent1Commit.id))
-      )
-      givenCommitIsNotInGL(latestCommitInfo.id, event.project.id)
+        givenEventIsNotInEL(latestCommitInfo, event.project.id)
+        givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-      val exception       = exceptions.generateOne
-      val deletionFailure = UpdateResult.Failed(nonEmptyStrings().generateOne, exception)
-      (commitEventsRemover.removeDeletedEvent _)
-        .expects(event.project, latestCommitInfo.id)
-        .returning(deletionFailure.pure[Try])
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, latestCommitInfo, batchDate)
+          .returning(Success(Created))
 
-      givenEventIsNotInEL(parent1Commit, event.project.id)
-      givenCommitIsInGL(parent1Commit, event.project.id)
+        val exception = exceptions.generateOne
+        (eventDetailsFinder.getEventDetails _)
+          .expects(event.project.id, parent1Commit.id)
+          .returning(Failure(exception))
 
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, parent1Commit, batchDate)
-        .returning(Success(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
+        givenEventIsNotInEL(parent2Commit, event.project.id)
+        givenCommitIsInGL(parent2Commit, event.project.id)
 
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, parent2Commit, batchDate)
+          .returning(Success(Created))
+        givenGlobalCommitSyncRequestIsSent(event.project)
 
-      logger.loggedOnly(
-        logErrorSynchronization(latestCommitInfo.id,
-                                event.project,
-                                executionTimeRecorder.elapsedTime,
-                                exception,
-                                deletionFailure.message
-        ),
-        logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
-        logSummary(latestCommitInfo.id,
-                   event.project,
-                   executionTimeRecorder.elapsedTime,
-                   SynchronizationSummary(Failed.name -> 1, Created.name -> 1)
+        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+
+        logger.loggedOnly(
+          logNewEventFound(parent2Commit.id, event.project, executionTimeRecorder.elapsedTime),
+          logErrorSynchronization(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime, exception),
+          logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
+          logSummary(latestCommitInfo.id,
+                     event.project,
+                     executionTimeRecorder.elapsedTime,
+                     SynchronizationSummary(Failed.name -> 1, Created.name -> 2)
+          )
         )
-      )
-    }
+      }
 
-    "succeed and continue the process if the commit deletion is needed and fails" in new TestCase {
-      val event            = fullCommitSyncEvents.generateOne
-      val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
-      val latestCommitInfo = commitInfos.generateOne
+    "succeed and continue the process if fetching commit info fails " +
+      "and trigger the global commit sync process" in new TestCase {
+        val event            = fullCommitSyncEvents.generateOne
+        val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+        val parent2Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+        val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parent1Commit.id, parent2Commit.id))
 
-      givenAccessTokenIsFound(event.project.id)
+        givenAccessTokenIsFound(event.project.id)
 
-      givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+        givenLatestCommitIsFound(latestCommitInfo, event.project.id)
 
-      givenEventIsInEL(latestCommitInfo.id, event.project.id)(
-        CommitWithParents(latestCommitInfo.id, event.project.id, List(parent1Commit.id))
-      )
-      givenCommitIsNotInGL(latestCommitInfo.id, event.project.id)
+        givenEventIsNotInEL(latestCommitInfo, event.project.id)
+        givenCommitIsInGL(latestCommitInfo, event.project.id)
 
-      val exception = exceptions.generateOne
-      (commitEventsRemover.removeDeletedEvent _)
-        .expects(event.project, latestCommitInfo.id)
-        .returning(exception.raiseError[Try, UpdateResult])
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, latestCommitInfo, batchDate)
+          .returning(Success(Created))
 
-      givenEventIsNotInEL(parent1Commit, event.project.id)
-      givenCommitIsInGL(parent1Commit, event.project.id)
+        givenEventIsNotInEL(parent1Commit, event.project.id)
 
-      (commitToEventLog.storeCommitInEventLog _)
-        .expects(event.project, parent1Commit, batchDate)
-        .returning(Success(Created))
-      givenGlobalCommitSyncRequestIsSent(event.project)
+        val exception = exceptions.generateOne
+        (commitInfoFinder
+          .getMaybeCommitInfo(_: Id, _: CommitId)(_: Option[AccessToken]))
+          .expects(event.project.id, parent1Commit.id, maybeAccessToken)
+          .returning(Failure(exception))
 
-      commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+        givenEventIsNotInEL(parent2Commit, event.project.id)
+        givenCommitIsInGL(parent2Commit, event.project.id)
 
-      logger.loggedOnly(
-        logErrorSynchronization(latestCommitInfo.id,
-                                event.project,
-                                executionTimeRecorder.elapsedTime,
-                                exception,
-                                "COMMIT_SYNC - Commit Remover failed to send commit deletion status"
-        ),
-        logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
-        logSummary(latestCommitInfo.id,
-                   event.project,
-                   executionTimeRecorder.elapsedTime,
-                   SynchronizationSummary(Failed.name -> 1, Created.name -> 1)
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, parent2Commit, batchDate)
+          .returning(Success(Created))
+        givenGlobalCommitSyncRequestIsSent(event.project)
+
+        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+
+        logger.loggedOnly(
+          logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
+          logErrorSynchronization(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime, exception),
+          logNewEventFound(parent2Commit.id, event.project, executionTimeRecorder.elapsedTime),
+          logSummary(latestCommitInfo.id,
+                     event.project,
+                     executionTimeRecorder.elapsedTime,
+                     SynchronizationSummary(Failed.name -> 1, Created.name -> 2)
+          )
         )
-      )
-    }
+      }
+
+    "succeed and continue the process if the commit creation is needed and fails " +
+      "and trigger the global commit sync process" in new TestCase {
+        val event            = fullCommitSyncEvents.generateOne
+        val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+        val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parent1Commit.id))
+
+        givenAccessTokenIsFound(event.project.id)
+
+        givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+
+        givenEventIsNotInEL(latestCommitInfo, event.project.id)
+        givenCommitIsInGL(latestCommitInfo, event.project.id)
+
+        val exception = exceptions.generateOne
+
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, latestCommitInfo, batchDate)
+          .returning(Success(Failed(exception.getMessage, exception)))
+
+        givenEventIsNotInEL(parent1Commit, event.project.id)
+        givenCommitIsInGL(parent1Commit, event.project.id)
+
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, parent1Commit, batchDate)
+          .returning(Success(Created))
+        givenGlobalCommitSyncRequestIsSent(event.project)
+
+        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+
+        logger.loggedOnly(
+          logErrorSynchronization(latestCommitInfo.id,
+                                  event.project,
+                                  executionTimeRecorder.elapsedTime,
+                                  exception,
+                                  exception.getMessage
+          ),
+          logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
+          logSummary(latestCommitInfo.id,
+                     event.project,
+                     executionTimeRecorder.elapsedTime,
+                     SynchronizationSummary(Failed.name -> 1, Created.name -> 1)
+          )
+        )
+      }
+
+    "succeed and continue the process if the commit deletion is needed and return a failure " +
+      "and trigger the global commit sync process" in new TestCase {
+        val event            = fullCommitSyncEvents.generateOne
+        val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+        val latestCommitInfo = commitInfos.generateOne
+
+        givenAccessTokenIsFound(event.project.id)
+
+        givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+
+        givenEventIsInEL(latestCommitInfo.id, event.project.id)(
+          CommitWithParents(latestCommitInfo.id, event.project.id, List(parent1Commit.id))
+        )
+        givenCommitIsNotInGL(latestCommitInfo.id, event.project.id)
+
+        val exception       = exceptions.generateOne
+        val deletionFailure = UpdateResult.Failed(nonEmptyStrings().generateOne, exception)
+        (commitEventsRemover.removeDeletedEvent _)
+          .expects(event.project, latestCommitInfo.id)
+          .returning(deletionFailure.pure[Try])
+
+        givenEventIsNotInEL(parent1Commit, event.project.id)
+        givenCommitIsInGL(parent1Commit, event.project.id)
+
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, parent1Commit, batchDate)
+          .returning(Success(Created))
+        givenGlobalCommitSyncRequestIsSent(event.project)
+
+        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+
+        logger.loggedOnly(
+          logErrorSynchronization(latestCommitInfo.id,
+                                  event.project,
+                                  executionTimeRecorder.elapsedTime,
+                                  exception,
+                                  deletionFailure.message
+          ),
+          logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
+          logSummary(latestCommitInfo.id,
+                     event.project,
+                     executionTimeRecorder.elapsedTime,
+                     SynchronizationSummary(Failed.name -> 1, Created.name -> 1)
+          )
+        )
+      }
+
+    "succeed and continue the process if the commit deletion is needed and fails " +
+      "and trigger the global commit sync process" in new TestCase {
+        val event            = fullCommitSyncEvents.generateOne
+        val parent1Commit    = commitInfos.generateOne.copy(parents = List.empty[CommitId])
+        val latestCommitInfo = commitInfos.generateOne
+
+        givenAccessTokenIsFound(event.project.id)
+
+        givenLatestCommitIsFound(latestCommitInfo, event.project.id)
+
+        givenEventIsInEL(latestCommitInfo.id, event.project.id)(
+          CommitWithParents(latestCommitInfo.id, event.project.id, List(parent1Commit.id))
+        )
+        givenCommitIsNotInGL(latestCommitInfo.id, event.project.id)
+
+        val exception = exceptions.generateOne
+        (commitEventsRemover.removeDeletedEvent _)
+          .expects(event.project, latestCommitInfo.id)
+          .returning(exception.raiseError[Try, UpdateResult])
+
+        givenEventIsNotInEL(parent1Commit, event.project.id)
+        givenCommitIsInGL(parent1Commit, event.project.id)
+
+        (commitToEventLog.storeCommitInEventLog _)
+          .expects(event.project, parent1Commit, batchDate)
+          .returning(Success(Created))
+        givenGlobalCommitSyncRequestIsSent(event.project)
+
+        commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
+
+        logger.loggedOnly(
+          logErrorSynchronization(latestCommitInfo.id,
+                                  event.project,
+                                  executionTimeRecorder.elapsedTime,
+                                  exception,
+                                  "COMMIT_SYNC - Commit Remover failed to send commit deletion status"
+          ),
+          logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
+          logSummary(latestCommitInfo.id,
+                     event.project,
+                     executionTimeRecorder.elapsedTime,
+                     SynchronizationSummary(Failed.name -> 1, Created.name -> 1)
+          )
+        )
+      }
 
     "succeed if the process is successful but the triggering of the global commit sync fails" in new TestCase {
 
       val event            = fullCommitSyncEvents.generateOne
-      val exception        = exceptions.generateOne
-      val latestCommitInfo = commitInfos.generateOne.copy(event.id)
+      val parentCommit     = commitInfos.generateOne
+      val latestCommitInfo = commitInfos.generateOne.copy(parents = List(parentCommit.id, commitIds.generateOne))
 
       givenAccessTokenIsFound(event.project.id)
 
       givenLatestCommitIsFound(latestCommitInfo, event.project.id)
 
+      givenEventIsNotInEL(latestCommitInfo, event.project.id)
+      givenCommitIsInGL(latestCommitInfo, event.project.id)
+
+      (commitToEventLog.storeCommitInEventLog _)
+        .expects(event.project, latestCommitInfo, batchDate)
+        .returning(Success(Created))
+
+      givenEventIsInEL(parentCommit.id, event.project.id)(
+        CommitWithParents(parentCommit.id, event.project.id, parentCommit.parents)
+      )
+      givenCommitIsInGL(parentCommit, event.project.id)
+
+      val exception = exceptions.generateOne
       (eventSender
         .sendEvent(_: EventRequestContent.NoPayload, _: String))
         .expects(withRequestContent(event.project), s"$categoryName - Triggering Global Commit Sync Failed")
@@ -527,7 +545,13 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
       logger.loggedOnly(
-        Info(s"${logMessageCommon(event)} -> event skipped in ${executionTimeRecorder.elapsedTime}ms"),
+        logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
+        logNoNewEvents(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
+        logSummary(latestCommitInfo.id,
+                   event.project,
+                   executionTimeRecorder.elapsedTime,
+                   SynchronizationSummary(Existed.name -> 1, Created.name -> 1)
+        ),
         Error(s"${logMessageCommon(event)} -> Triggering Global Commit Sync Failed", exception)
       )
 

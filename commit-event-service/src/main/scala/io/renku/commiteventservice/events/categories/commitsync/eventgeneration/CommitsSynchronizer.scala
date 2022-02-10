@@ -71,10 +71,6 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
       for {
         maybeLatestCommit <- findLatestCommit(event.project.id)
         _                 <- checkForSkippedEvent(maybeLatestCommit, event)
-        _ <-
-          triggerGlobalCommitSync(event) recoverWith loggingErrorAndIgnoreError(event,
-                                                                                "Triggering Global Commit Sync Failed"
-          )
       } yield ()
     }
   } recoverWith loggingError(event, "Synchronization failed")
@@ -85,19 +81,25 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
     case (Some(commitInfo), FullCommitSyncEvent(id, _, _)) if commitInfo.id == id =>
       measureExecutionTime(Skipped.pure[F].widen[UpdateResult]) >>= logResult(event)
     case (Some(commitInfo), event) =>
-      processCommitsAndLogSummary(commitInfo.id, event.project)
+      processCommitsAndLogSummary(commitInfo.id, event)
     case (None, FullCommitSyncEvent(id, _, _)) =>
-      processCommitsAndLogSummary(id, event.project)
+      processCommitsAndLogSummary(id, event)
     case (None, MinimalCommitSyncEvent(_)) =>
       measureExecutionTime(Skipped.pure[F].widen[UpdateResult]) >>= logResult(event)
   }
 
-  private def processCommitsAndLogSummary(commitId: CommitId, project: Project)(implicit
+  private def processCommitsAndLogSummary(commitId: CommitId, event: CommitSyncEvent)(implicit
       maybeAccessToken:                             Option[AccessToken]
   ) = measureExecutionTime(
-    processCommits(List(commitId), project, BatchDate(clock)).run(SynchronizationSummary())
-  ) flatMap { case (elapsedTime: ElapsedTime, summary) =>
-    logSummary(commitId, project)(elapsedTime, summary._2)
+    processCommits(List(commitId), event.project, BatchDate(clock)).run(SynchronizationSummary())
+  ) flatTap { case (_, summary) =>
+    if (summary._2.get(Created) > 0 || summary._2.get(Deleted) > 0) {
+      triggerGlobalCommitSync(event) recoverWith loggingErrorAndIgnoreError(event,
+                                                                            "Triggering Global Commit Sync Failed"
+      )
+    } else ().pure[F]
+  } flatMap { case (elapsedTime: ElapsedTime, summary) =>
+    logSummary(commitId, event.project)(elapsedTime, summary._2)
   }
 
   private def triggerGlobalCommitSync(event: CommitSyncEvent): F[Unit] =
