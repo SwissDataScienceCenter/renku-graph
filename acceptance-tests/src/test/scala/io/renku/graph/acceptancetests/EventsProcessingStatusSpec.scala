@@ -61,7 +61,9 @@ class EventsProcessingStatusSpec
       implicit val accessToken: AccessToken = accessTokens.generateOne
       val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount(numberOfEvents.value)).generateOne
 
-      When("there's no webhook for a given project in GitLab")
+      When("there is a project in GitLab")
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+      And("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")
       webhookServiceClient.GET(s"projects/${project.id}/events/status").status shouldBe NotFound
 
@@ -98,7 +100,6 @@ class EventsProcessingStatusSpec
 
     `data in the RDF store`(project, project.entitiesProject.asJsonLD, allCommitIds.head)
 
-    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
     `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
                                                                             project,
                                                                             allCommitIds
