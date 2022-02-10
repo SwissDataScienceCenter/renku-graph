@@ -82,7 +82,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id/events/?action=pushed&page=1 returning OK`(
+  def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(
       maybeAuthor:        Option[Person],
       project:            data.Project,
       commitId:           CommitId
@@ -91,7 +91,7 @@ trait GitLab {
       val (authorId, authorName) = maybeAuthor
         .flatMap(p => p.maybeGitLabId.map(_ -> p.name))
         .getOrElse(userGitLabIds.generateOne -> userNames.generateOne)
-      get(s"/api/v4/projects/${project.id}/events/?action=pushed&page=1").withAccessTokenInHeader
+      get(s"/api/v4/projects/${project.id}/events?action=pushed&page=1").withAccessTokenInHeader
         .willReturn {
           okJson {
             json"""[{

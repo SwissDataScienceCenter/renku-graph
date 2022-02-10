@@ -57,9 +57,9 @@ trait RdfStoreProvisioning
 
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
-    `GET <gitlabApi>/projects/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
-                                                                             project,
-                                                                             commitId
+    `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                            project,
+                                                                            commitId
     )
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)

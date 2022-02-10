@@ -107,7 +107,7 @@ class EventsProcessingStatusSpec
                                                                                           theMostRecentEventDate
       )
 
-      `GET <gitlabApi>/projects/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+      `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
                                                                             project,
                                                                             commitId
       )
