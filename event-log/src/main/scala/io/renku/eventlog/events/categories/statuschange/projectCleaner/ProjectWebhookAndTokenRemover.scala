@@ -49,13 +49,12 @@ private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](accessToken
 ) extends RestClient[F, ProjectWebhookAndTokenRemover[F]](Throttler.noThrottling[F])
     with ProjectWebhookAndTokenRemover[F] {
 
-  override def removeWebhookAndToken(project: Project): F[Unit] = for {
-    accessToken <- accessTokenFinder
-                     .findAccessToken(project.id)(AccessTokenFinder.projectIdToPath)
-                     .flatMap(mapResponseToAccessToken(project))
-    _ <- removeProjectWebhook(project, accessToken)
-    _ <- removeProjectTokens(project)
-  } yield ()
+  override def removeWebhookAndToken(project: Project): F[Unit] =
+    accessTokenFinder
+      .findAccessToken(project.id)(AccessTokenFinder.projectIdToPath) flatMap {
+      case Some(token) => removeProjectWebhook(project, token) >> removeProjectTokens(project)
+      case None        => ().pure[F]
+    }
 
   private def removeProjectWebhook(project: Project, accessToken: AccessToken): F[Unit] = for {
     validatedUrl <- validateUri(s"$webhookUrl/projects/${project.id}/webhooks")
@@ -66,13 +65,6 @@ private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](accessToken
     validatedUrl <- validateUri(s"$tokenRepositoryUrl/projects/${project.id}/tokens")
     _            <- send(request(DELETE, validatedUrl))(mapTokenRepoResponse(project))
   } yield ()
-
-  private def mapResponseToAccessToken(project: Project): Option[AccessToken] => F[AccessToken] = {
-    case Some(token) => token.pure[F]
-    case None =>
-      new Exception(s"No token found for project: ${project.show}")
-        .raiseError[F, AccessToken]
-  }
 
   private implicit val tokenEntityDecoder: EntityDecoder[F, AccessToken] = jsonOf[F, AccessToken]
 

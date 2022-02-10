@@ -19,16 +19,17 @@
 package io.renku.knowledgegraph.projects.rest
 
 import cats.effect.IO
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.projects.model.Permissions
@@ -51,31 +52,20 @@ class GitLabProjectFinderSpec
 
   "findProject" should {
 
-    "return fetched project info if service responds with OK and a valid body - personal access token case" in new TestCase {
-      forAll { (path: model.projects.Path, accessToken: PersonalAccessToken, project: GitLabProject) =>
+    "return fetched project info if service responds with OK and a valid body" in new TestCase {
+      forAll { (path: model.projects.Path, accessToken: AccessToken, project: GitLabProject) =>
         stubFor {
           get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
-            .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
+            .withAccessToken(accessToken.some)
             .willReturn(okJson(projectJson(project).noSpaces))
         }
 
-        projectFinder.findProject(path, Some(accessToken)).value.unsafeRunSync() shouldBe Some(project)
-      }
-    }
-
-    "return fetched project info if service responds with OK and a valid body - oauth access token case" in new TestCase {
-      forAll { (path: model.projects.Path, accessToken: OAuthAccessToken, project: GitLabProject) =>
-        stubFor {
-          get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
-            .withHeader("Authorization", equalTo(s"Bearer ${accessToken.value}"))
-            .willReturn(okJson(projectJson(project).noSpaces))
-        }
-
-        projectFinder.findProject(path, Some(accessToken)).value.unsafeRunSync() shouldBe Some(project)
+        projectFinder.findProject(path)(accessToken).value.unsafeRunSync() shouldBe Some(project)
       }
     }
 
     "return fetched project info with no readme if readme_url in remote is blank" in new TestCase {
+      implicit val accessToken: AccessToken = accessTokens.generateOne
       val path          = projectPaths.generateOne
       val gitLabProject = gitLabProjects.generateOne
       val project       = gitLabProject.copy(urls = gitLabProject.urls.copy(maybeReadme = None))
@@ -83,16 +73,15 @@ class GitLabProjectFinderSpec
       stubFor {
         get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
           .willReturn(
-            okJson(
-              projectJson(project).noSpaces
-            )
+            okJson(projectJson(project).noSpaces)
           )
       }
 
-      projectFinder.findProject(path, maybeAccessToken = None).value.unsafeRunSync() shouldBe Some(project)
+      projectFinder.findProject(path).value.unsafeRunSync() shouldBe Some(project)
     }
 
     "return None if service responds with NOT_FOUND" in new TestCase {
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       val path = projectPaths.generateOne
       stubFor {
@@ -100,10 +89,11 @@ class GitLabProjectFinderSpec
           .willReturn(notFound())
       }
 
-      projectFinder.findProject(path, None).value.unsafeRunSync() shouldBe None
+      projectFinder.findProject(path).value.unsafeRunSync() shouldBe None
     }
 
     "return a RuntimeException if remote client responds with status different than OK or NOT_FOUND" in new TestCase {
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       val path = projectPaths.generateOne
       stubFor {
@@ -112,11 +102,12 @@ class GitLabProjectFinderSpec
       }
 
       intercept[Exception] {
-        projectFinder.findProject(path, None).value.unsafeRunSync()
+        projectFinder.findProject(path).value.unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)}?statistics=true returned ${Status.Unauthorized}; body: some error"
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
+      implicit val accessToken: AccessToken = accessTokens.generateOne
 
       val path = projectPaths.generateOne
       stubFor {
@@ -125,7 +116,7 @@ class GitLabProjectFinderSpec
       }
 
       intercept[Exception] {
-        projectFinder.findProject(path, None).value.unsafeRunSync()
+        projectFinder.findProject(path).value.unsafeRunSync()
       }.getMessage should startWith(
         s"GET $gitLabUrl/api/v4/projects/${urlEncode(path.toString)}?statistics=true returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
       )

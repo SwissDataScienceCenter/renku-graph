@@ -28,7 +28,7 @@ object ErrorGenerators {
   lazy val logWorthyRecoverableErrors: Gen[LogWorthyRecoverableError] = for {
     message    <- nonEmptyStrings()
     maybeCause <- exceptions.toGeneratorOfOptions
-  } yield LogWorthyRecoverableError(message, maybeCause.getOrElse(null))
+  } yield LogWorthyRecoverableError(message, maybeCause.orNull)
 
   lazy val authRecoverableErrors: Gen[AuthRecoverableError] = for {
     message <- nonEmptyStrings()
