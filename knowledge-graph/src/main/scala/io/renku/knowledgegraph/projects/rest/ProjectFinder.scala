@@ -50,12 +50,10 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel](
   import kgProjectFinder.{findProject => findInKG}
 
   def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[Project]] =
-    ((OptionT(findInKG(path, maybeAuthUser)), findInGitLab(path, maybeAuthUser)) parMapN (merge(path, _, _))).value
+    ((OptionT(findInKG(path, maybeAuthUser)), findInGitLab(path)) parMapN (merge(path, _, _))).value
 
-  private def findInGitLab(path: Path, maybeAuthUser: Option[AuthUser]) = for {
-    accessToken   <- OptionT.fromOption[F](maybeAuthUser.map(_.accessToken)) orElseF findAccessToken(path)
-    gitLabProject <- findProjectInGitLab(path, Some(accessToken))
-  } yield gitLabProject
+  private def findInGitLab(path: Path) =
+    OptionT(findAccessToken(path)) >>= { implicit accessToken => findProjectInGitLab(path) }
 
   private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) = Project(
     id = gitLabProject.id,

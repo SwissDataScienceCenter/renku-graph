@@ -64,6 +64,19 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
       )
     }
 
+    "succeed if found SecurityRecord is for a public project and the user has no explicit rights to the project" in new TestCase {
+      val projectPath = projectPaths.generateOne
+      val authUser    = authUsers.generateOne
+
+      securityRecordsFinder
+        .expects(key)
+        .returning(List((Visibility.Public, projectPath, userGitLabIds.generateSet())).pure[Try])
+
+      authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
+        AuthContext[Key](Some(authUser), key, Set(projectPath))
+      )
+    }
+
     "succeed if found SecurityRecord is for a non-public project but the user has rights to the project" in new TestCase {
       val projectPath = projectPaths.generateOne
       val authUser    = authUsers.generateOne

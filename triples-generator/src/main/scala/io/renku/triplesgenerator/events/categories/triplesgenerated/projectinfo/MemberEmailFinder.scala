@@ -178,21 +178,21 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
 
   private case class PagingInfo(maybeNextPage: Option[Int], maybeTotalPages: Option[Int]) {
 
-    private val windowSize      = 20
-    private val maxPagesToCheck = 3 * windowSize
+    private val pagesToCheck = 30
+    private val step         = maybeTotalPages.map(_ / pagesToCheck).getOrElse(1)
 
     lazy val findNextPage: Option[Int] =
       if (maybeTotalPages.isEmpty) maybeNextPage
       else
-        (maybeNextPage -> maybeTotalPages).mapN {
-          case next -> total if total <= maxPagesToCheck            => next.some
-          case next -> total if next > total                        => None
-          case next -> total if next > total - windowSize           => next.some
-          case next -> total if next > (total / 2 + windowSize / 2) => (total - windowSize).some
-          case next -> total if next > (total / 2 - windowSize / 2) => next.some
-          case next -> total if next > windowSize                   => (total / 2 - windowSize / 2).some
-          case next -> _                                            => next.some
-        }.flatten
+        (maybeNextPage -> maybeTotalPages) mapN {
+          case nextPage -> total if total < pagesToCheck => nextPage
+          case nextPage -> total if nextPage == total    => nextPage
+          case nextPage -> _ if nextPage     % step == 0 => nextPage
+          case nextPage -> total if nextPage % step > 0 =>
+            val next = nextPage - (nextPage % step) + step
+            if (next >= total) total
+            else next
+        }
   }
 }
 

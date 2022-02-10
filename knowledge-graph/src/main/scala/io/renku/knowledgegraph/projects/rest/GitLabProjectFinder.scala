@@ -34,10 +34,7 @@ import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import org.typelevel.log4cats.Logger
 
 private trait GitLabProjectFinder[F[_]] {
-  def findProject(
-      projectPath:      projects.Path,
-      maybeAccessToken: Option[AccessToken]
-  ): OptionT[F, GitLabProject]
+  def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): OptionT[F, GitLabProject]
 }
 
 private class GitLabProjectFinderImpl[F[_]: Async: Logger](
@@ -55,13 +52,12 @@ private class GitLabProjectFinderImpl[F[_]: Async: Logger](
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  def findProject(projectPath: projects.Path, maybeAccessToken: Option[AccessToken]): OptionT[F, GitLabProject] =
-    OptionT {
-      for {
-        uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}?statistics=true")
-        project <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-      } yield project
-    }
+  def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): OptionT[F, GitLabProject] = OptionT {
+    for {
+      uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}?statistics=true")
+      project <- send(secureRequest(GET, uri)(accessToken.some))(mapResponse)
+    } yield project
+  }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[GitLabProject]]] = {
     case (Ok, _, response) => response.as[GitLabProject].map(Option.apply)
