@@ -52,17 +52,16 @@ class EventsResourceSpec
       implicit val accessToken: AccessToken           = accessTokens.generateOne
       val project = dataProjects(renkuProjectEntities(anyVisibility), CommitsCount(commits.size)).generateOne
 
-      When("there are no events for the given project in EL")
-      Then("the resource should return OK with an empty array")
+      When("there is a project in GitLab")
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+      And("there are no events for the given project in EL")
       val noEventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
+      Then("the resource should return OK with an empty array")
       noEventsResponse.status                  shouldBe Ok
       noEventsResponse.jsonBody.as[List[Json]] shouldBe Nil.asRight
 
-      commits foreach { commitId => `data in the RDF store`(project, project.entitiesProject.asJsonLD, commitId) }
-      `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
-                                                                              project,
-                                                                              commits
-      )
+      `data in the RDF store`(project, project.entitiesProject.asJsonLD, commits)
+
       eventually {
         val eventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
         eventsResponse.status shouldBe Ok

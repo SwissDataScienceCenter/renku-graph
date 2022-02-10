@@ -32,14 +32,11 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
-import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
-
-import java.time.Instant
 
 class EventsProcessingStatusSpec
     extends AnyFeatureSpec
@@ -61,9 +58,7 @@ class EventsProcessingStatusSpec
       implicit val accessToken: AccessToken = accessTokens.generateOne
       val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount(numberOfEvents.value)).generateOne
 
-      When("there is a project in GitLab")
-      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
-      And("there's no webhook for a given project in GitLab")
+      When("there's no webhook for a given project in GitLab")
       Then("the status endpoint should return NOT_FOUND")
       webhookServiceClient.GET(s"projects/${project.id}/events/status").status shouldBe NotFound
 
@@ -98,29 +93,6 @@ class EventsProcessingStatusSpec
 
     `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds: _*)
 
-    `data in the RDF store`(project, project.entitiesProject.asJsonLD, allCommitIds.head)
-
-    `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
-                                                                            project,
-                                                                            allCommitIds
-    )
-    val theMostRecentEventDate = Instant.now()
-    allCommitIds.tail.foldLeft(allCommitIds.head) { (previousCommitId, commitId) =>
-      // GitLab to return commit info about all the parent commits
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project,
-                                                                                          commitId,
-                                                                                          Set(previousCommitId),
-                                                                                          theMostRecentEventDate
-      )
-
-      // making the triples generation process happy and not throwing exceptions to the logs
-      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
-
-      commitId
-    }
-
-    webhookServiceClient
-      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, allCommitIds.last))
-      .status shouldBe Accepted
+    `data in the RDF store`(project, project.entitiesProject.asJsonLD, allCommitIds)
   }
 }
