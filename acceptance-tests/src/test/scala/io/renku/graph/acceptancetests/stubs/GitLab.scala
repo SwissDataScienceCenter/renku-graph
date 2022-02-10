@@ -86,15 +86,20 @@ trait GitLab {
       maybeAuthor:        Option[Person],
       project:            data.Project,
       commitId:           CommitId
+  )(implicit accessToken: AccessToken): Unit =
+    `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(maybeAuthor, project, List(commitId))
+
+  def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(
+      maybeAuthor:        Option[Person],
+      project:            data.Project,
+      commitIds:          List[CommitId]
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       val (authorId, authorName) = maybeAuthor
         .flatMap(p => p.maybeGitLabId.map(_ -> p.name))
         .getOrElse(userGitLabIds.generateOne -> userNames.generateOne)
-      get(s"/api/v4/projects/${project.id}/events?action=pushed&page=1").withAccessTokenInHeader
-        .willReturn {
-          okJson {
-            json"""[{
+      val jsonContent = Json.fromValues(commitIds.map { commitId =>
+        json"""{
               "project_id": ${project.id.value},
               "push_data": {
                 "commit_from": ${Json.Null},
@@ -104,13 +109,13 @@ trait GitLab {
                 "id":   ${authorId.value},
                 "name": ${authorName.value}
               }
-            }]""".noSpaces
-          }
-        }
+            }"""
+      })
+      get(s"/api/v4/projects/${project.id}/events?action=pushed&page=1").withAccessTokenInHeader
+        .willReturn(okJson(jsonContent.noSpaces))
     }
     ()
   }
-
   def `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {

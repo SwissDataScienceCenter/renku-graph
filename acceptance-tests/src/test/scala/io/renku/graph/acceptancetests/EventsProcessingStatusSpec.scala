@@ -69,7 +69,6 @@ class EventsProcessingStatusSpec
       givenAccessTokenPresentFor(project)
 
       When("there is a webhook created")
-      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
       `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
 
       And("there are events under processing")
@@ -99,6 +98,11 @@ class EventsProcessingStatusSpec
 
     `data in the RDF store`(project, project.entitiesProject.asJsonLD, allCommitIds.head)
 
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+    `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                            project,
+                                                                            allCommitIds
+    )
     val theMostRecentEventDate = Instant.now()
     allCommitIds.tail.foldLeft(allCommitIds.head) { (previousCommitId, commitId) =>
       // GitLab to return commit info about all the parent commits
@@ -106,11 +110,6 @@ class EventsProcessingStatusSpec
                                                                                           commitId,
                                                                                           Set(previousCommitId),
                                                                                           theMostRecentEventDate
-      )
-
-      `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
-                                                                              project,
-                                                                              commitId
       )
 
       // making the triples generation process happy and not throwing exceptions to the logs
