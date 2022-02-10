@@ -71,6 +71,11 @@ class CommitSyncFlowsSpec
       And("project exists in GitLab")
       `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
+      `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                              project,
+                                                                              missedCommitId
+      )
+
       And("access token is present")
       givenAccessTokenPresentFor(project)
 

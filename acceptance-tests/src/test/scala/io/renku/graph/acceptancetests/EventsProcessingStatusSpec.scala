@@ -69,6 +69,7 @@ class EventsProcessingStatusSpec
       givenAccessTokenPresentFor(project)
 
       When("there is a webhook created")
+      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
       `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
 
       And("there are events under processing")
@@ -108,8 +109,8 @@ class EventsProcessingStatusSpec
       )
 
       `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
-                                                                            project,
-                                                                            commitId
+                                                                              project,
+                                                                              commitId
       )
 
       // making the triples generation process happy and not throwing exceptions to the logs
