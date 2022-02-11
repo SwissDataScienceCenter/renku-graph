@@ -22,23 +22,22 @@ import cats.effect.Async
 import cats.effect.kernel.{Concurrent, Temporal}
 import cats.syntax.all._
 import io.renku.commiteventservice.Microservice
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
   def apply[F[_]: Async: Concurrent: Temporal: Logger](
-      gitLabThrottler:       Throttler[F, GitLab],
+      gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
-    handler <- EventHandler(gitLabThrottler, executionTimeRecorder)
+    handler <- EventHandler(gitLabClient, executionTimeRecorder)
   } yield handler -> subscriptionMechanism
 }

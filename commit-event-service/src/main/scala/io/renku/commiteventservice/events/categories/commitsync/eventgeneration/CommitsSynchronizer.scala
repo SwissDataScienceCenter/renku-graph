@@ -27,13 +27,11 @@ import io.renku.commiteventservice.events.categories.commitsync._
 import io.renku.commiteventservice.events.categories.common.SynchronizationSummary._
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
 import io.renku.commiteventservice.events.categories.common._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.{BatchDate, CommitId}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder._
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
@@ -197,13 +195,14 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
 }
 
 private[commitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: Temporal: Logger](gitLabThrottler: Throttler[F, GitLab],
-                                           executionTimeRecorder: ExecutionTimeRecorder[F]
+  def apply[F[_]: Async: Temporal: Logger](
+      gitLabClient:          GitLabClient[F],
+      executionTimeRecorder: ExecutionTimeRecorder[F]
   ) = for {
     accessTokenFinder   <- AccessTokenFinder[F]
-    latestCommitFinder  <- LatestCommitFinder(gitLabThrottler)
+    latestCommitFinder  <- LatestCommitFinder(gitLabClient)
     eventDetailsFinder  <- EventDetailsFinder[F]
-    commitInfoFinder    <- CommitInfoFinder(gitLabThrottler)
+    commitInfoFinder    <- CommitInfoFinder(gitLabClient)
     commitToEventLog    <- CommitToEventLog[F]
     commitEventsRemover <- CommitEventsRemover[F]
   } yield new CommitsSynchronizerImpl[F](accessTokenFinder,

@@ -23,15 +23,14 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.common.CommitInfo
 import io.renku.commiteventservice.events.categories.common.Generators.commitInfos
+import io.renku.commiteventservice.events.categories.globalcommitsync.Generators._
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.PageResult
 import io.renku.generators.CommonGraphGenerators.{accessTokens, pages, pagingRequests}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
@@ -277,11 +276,6 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       responseMapping
     }
   }
-
-  private def pageResults(maxCommitCount: Int Refined Positive = positiveInts().generateOne) = for {
-    commits       <- commitIds.toGeneratorOfList(0, maxCommitCount)
-    maybeNextPage <- pages.toGeneratorOfOptions
-  } yield PageResult(commits, maybeNextPage)
 
   private def commitsJson(from: List[CommitInfo]) =
     Json.arr(from.map(commitJson): _*).noSpaces

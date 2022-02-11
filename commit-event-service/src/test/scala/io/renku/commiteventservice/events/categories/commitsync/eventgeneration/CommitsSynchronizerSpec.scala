@@ -512,8 +512,8 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
   private trait TestCase {
 
-    val maybeAccessToken = personalAccessTokens.generateOption
-    val batchDate        = batchDates.generateOne
+    implicit val maybeAccessToken = personalAccessTokens.generateOption
+    val batchDate                 = batchDates.generateOne
 
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]

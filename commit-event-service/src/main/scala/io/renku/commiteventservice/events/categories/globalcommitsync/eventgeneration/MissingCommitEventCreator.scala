@@ -22,11 +22,9 @@ import cats.MonadThrow
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import io.renku.commiteventservice.events.categories.common._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.{BatchDate, CommitId}
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import org.typelevel.log4cats.Logger
 
 private[eventgeneration] trait MissingCommitEventCreator[F[_]] {
@@ -56,9 +54,9 @@ private[eventgeneration] class MissingCommitEventCreatorImpl[F[_]: MonadThrow](
 
 private[eventgeneration] object MissingCommitEventCreator {
   def apply[F[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
+      gitLabClient: GitLabClient[F]
   ): F[MissingCommitEventCreator[F]] = for {
-    commitInfoFinder <- CommitInfoFinder(gitLabThrottler)
+    commitInfoFinder <- CommitInfoFinder(gitLabClient)
     commitToEventLog <- CommitToEventLog[F]
   } yield new MissingCommitEventCreatorImpl[F](commitInfoFinder, commitToEventLog)
 }

@@ -22,8 +22,6 @@ import cats.NonEmptyParallel
 import cats.effect._
 import cats.syntax.all._
 import io.renku.commiteventservice.Microservice
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
 import io.renku.http.client.GitLabClient
@@ -34,13 +32,12 @@ object SubscriptionFactory {
 
   def apply[F[_]: Async: NonEmptyParallel: Logger](
       gitLabClient:          GitLabClient[F],
-      gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
-    handler <- EventHandler(subscriptionMechanism, gitLabClient, gitLabThrottler, executionTimeRecorder)
+    handler <- EventHandler(subscriptionMechanism, gitLabClient, executionTimeRecorder)
   } yield handler -> subscriptionMechanism
 }
