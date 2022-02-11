@@ -48,6 +48,8 @@ import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.server.security.model.AuthUser
 
 import java.time.Instant
+import io.renku.jsonld.JsonLD
+import cats.data.NonEmptyList
 
 trait GitLab {
   self: GraphServices =>
@@ -87,18 +89,21 @@ trait GitLab {
       project:            data.Project,
       commitId:           CommitId
   )(implicit accessToken: AccessToken): Unit =
-    `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(maybeAuthor, project, List(commitId))
+    `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(maybeAuthor,
+                                                                            project,
+                                                                            NonEmptyList(commitId, Nil)
+    )
 
   def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(
       maybeAuthor:        Option[Person],
       project:            data.Project,
-      commitIds:          List[CommitId]
+      commitIds:          NonEmptyList[CommitId]
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       val (authorId, authorName) = maybeAuthor
         .flatMap(p => p.maybeGitLabId.map(_ -> p.name))
         .getOrElse(userGitLabIds.generateOne -> userNames.generateOne)
-      val jsonContent = Json.fromValues(commitIds.map { commitId =>
+      val jsonContent = Json.fromValues(commitIds.toList.map { commitId =>
         json"""{
               "project_id": ${project.id.value},
               "push_data": {
@@ -148,7 +153,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(
+  def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(
       projectId:          Id,
       commitIds:          CommitId*
   )(implicit accessToken: AccessToken): Unit = {
@@ -344,6 +349,34 @@ trait GitLab {
       .willReturn(aResponse() withFault CONNECTION_RESET_BY_PEER)
   }
 
+  def mockDataOnGitLabAPIs(
+      project:            data.Project,
+      triples:            JsonLD,
+      commitId:           CommitId
+  )(implicit accessToken: AccessToken): Unit = mockDataOnGitLabAPIs(project, triples, NonEmptyList(commitId, Nil))
+
+  def mockDataOnGitLabAPIs(
+      project:            data.Project,
+      triples:            JsonLD,
+      commitIds:          NonEmptyList[CommitId]
+  )(implicit accessToken: AccessToken): Unit = {
+
+    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id,
+                                                                                         commitIds.toList: _*
+    )
+    `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                            project,
+                                                                            commitIds
+    )
+    commitIds.toList.foreach { commitId =>
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
+
+      `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+
+    }
+  }
   private implicit class MappingBuilderOps(builder: MappingBuilder) {
     def withAccessTokenInHeader(implicit accessToken: AccessToken): MappingBuilder = accessToken match {
       case PersonalAccessToken(token) => builder.withHeader("PRIVATE-TOKEN", equalTo(token))

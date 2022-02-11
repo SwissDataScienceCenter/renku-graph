@@ -62,9 +62,6 @@ class EventsProcessingStatusSpec
       Then("the status endpoint should return NOT_FOUND")
       webhookServiceClient.GET(s"projects/${project.id}/events/status").status shouldBe NotFound
 
-      Given("there's an access token for the user")
-      givenAccessTokenPresentFor(project)
-
       When("there is a webhook created")
       `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
 
@@ -89,10 +86,9 @@ class EventsProcessingStatusSpec
 
   private def sendEventsForProcessing(project: data.Project)(implicit accessToken: AccessToken) = {
 
-    val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
+    val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents)
 
-    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, allCommitIds: _*)
-
-    `data in the RDF store`(project, project.entitiesProject.asJsonLD, allCommitIds)
+    mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, allCommitIds)
+    `data in the RDF store`(project, allCommitIds)
   }
 }

@@ -84,7 +84,7 @@ class WebhookCreationSpec
       Given("some Commit exists for the project in GitLab")
       givenAccessTokenPresentFor(project)
       val commitId = commitIds.generateOne
-      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id, commitId)
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
 
       `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,

@@ -58,8 +58,9 @@ class ReProvisioningSpec
       val commitId = commitIds.generateOne
 
       `GET <gitlabApi>/user returning OK`(user)
+      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
 
-      `data in the RDF store`(project, project.entitiesProject.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
 
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 

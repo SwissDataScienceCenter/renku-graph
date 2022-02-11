@@ -45,7 +45,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
-      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id, commitId)
 
       `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
                                                                               project,
@@ -81,7 +81,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
-      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id, commitId)
 
       `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
                                                                               project,
@@ -119,7 +119,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
-      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id, commitId)
 
       `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
                                                                               project,
@@ -157,7 +157,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
-      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id, commitId)
 
       `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
                                                                               project,

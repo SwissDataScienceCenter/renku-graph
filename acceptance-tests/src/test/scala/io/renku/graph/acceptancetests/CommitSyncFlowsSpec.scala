@@ -60,7 +60,7 @@ class CommitSyncFlowsSpec
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, missedCommitId)
 
       And("fetch latest commit endpoint returns the non missed commit")
-      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id,
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id,
                                                                                             nonMissedCommitId
       )
 
@@ -93,7 +93,7 @@ class CommitSyncFlowsSpec
       }
 
       And("fetch latest commit endpoint returns the missed and the non missed commit")
-      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id,
+      `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id,
                                                                                             nonMissedCommitId,
                                                                                             missedCommitId
       )
