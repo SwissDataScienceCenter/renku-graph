@@ -22,6 +22,7 @@ import entities.model._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{localDatesNotInTheFuture, nonBlankStrings}
+import io.renku.graph.model.testentities.{Entity => _, _}
 import io.renku.graph.model.{RenkuBaseUrl, testentities}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
@@ -34,6 +35,17 @@ package object entities {
   val dateParams:  Gen[Filters.Date]       = localDatesNotInTheFuture.toGeneratorOf(Filters.Date)
 
   val matchingScores: Gen[MatchingScore] = choose(MatchingScore.min.value, 10f).toGeneratorOf(MatchingScore)
+
+  val modelProjects: Gen[model.Entity.Project] = anyProjectEntities.map(_.to[model.Entity.Project])
+  val modelDatasets: Gen[model.Entity.Dataset] =
+    anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).map(_.to[model.Entity.Dataset])
+  val modelWorkflows: Gen[model.Entity.Workflow] =
+    anyRenkuProjectEntities.withActivities(activityEntities(planEntities())) map { project =>
+      val plan :: Nil = project.plans.toList
+      (plan -> project).to[model.Entity.Workflow]
+    }
+  val modelPersons:  Gen[model.Entity.Person] = personEntities.map(_.to[model.Entity.Person])
+  val modelEntities: Gen[model.Entity]        = Gen.oneOf(modelProjects, modelDatasets, modelWorkflows, modelPersons)
 
   private[entities] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
     Entity.Project(
@@ -69,14 +81,12 @@ package object entities {
 
   private[entities] implicit def planConverter[P <: testentities.Project]
       : ((testentities.Plan, P)) => Entity.Workflow = { case (plan, project) =>
-    Entity.Workflow(
-      MatchingScore.min,
-      plan.id,
-      plan.name,
-      project.visibility,
-      plan.dateCreated,
-      plan.keywords.sorted,
-      plan.maybeDescription
+    Entity.Workflow(MatchingScore.min,
+                    plan.name,
+                    project.visibility,
+                    plan.dateCreated,
+                    plan.keywords.sorted,
+                    plan.maybeDescription
     )
   }
 

@@ -180,15 +180,14 @@ object CommonGraphGenerators {
   } yield PagingRequest(page, perPage)
   implicit val totals: Gen[paging.model.Total] = nonNegativeInts() map (_.value) map paging.model.Total.apply
 
-  def pagingResponses[Result](resultsGen: Gen[Result]): Gen[PagingResponse[Result]] =
-    for {
-      page    <- pages
-      perPage <- perPages
-      results <- listOf(resultsGen, maxElements = Refined.unsafeApply(perPage.value))
-      total = Total((page.value - 1) * perPage.value + results.size)
-    } yield PagingResponse
-      .from[Try, Result](results, PagingRequest(page, perPage), total)
-      .fold(throw _, identity)
+  def pagingResponses[Result](resultsGen: Gen[Result]): Gen[PagingResponse[Result]] = for {
+    page    <- pages
+    perPage <- perPages
+    results <- listOf(resultsGen, maxElements = Refined.unsafeApply(perPage.value))
+    total = Total((page.value - 1) * perPage.value + results.size)
+  } yield PagingResponse
+    .from[Try, Result](results, PagingRequest(page, perPage), total)
+    .fold(throw _, identity)
 
   implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls() map FusekiBaseUrl.apply
 

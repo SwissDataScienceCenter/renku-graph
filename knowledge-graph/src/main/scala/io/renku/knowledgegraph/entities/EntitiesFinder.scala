@@ -28,7 +28,6 @@ import io.renku.graph.model.plans
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingResponse}
 import io.renku.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQueryTimeRecorder}
-import io.renku.tinytypes.TinyTypeConverter
 import model._
 import org.typelevel.log4cats.Logger
 
@@ -411,12 +410,8 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     implicit val workflowDecoder: Decoder[Entity.Workflow] = { cursor =>
       for {
         matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-        resourceId    <- cursor.downField("wkId").downField("value").as[plans.ResourceId]
         name          <- cursor.downField("name").downField("value").as[plans.Name]
         dateCreated   <- cursor.downField("date").downField("value").as[plans.DateCreated]
-        identifier <- implicitly[TinyTypeConverter[plans.ResourceId, plans.Identifier]]
-                        .apply(resourceId)
-                        .leftMap(e => DecodingFailure(e.getMessage, Nil))
         visibility <- cursor
                         .downField("visibilities")
                         .downField("value")
@@ -429,7 +424,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
                       .as[Option[String]]
                       .flatMap(toListOf[plans.Keyword, plans.Keyword.type](plans.Keyword))
         maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[plans.Description]]
-      } yield Entity.Workflow(matchingScore, identifier, name, visibility, dateCreated, keywords, maybeDescription)
+      } yield Entity.Workflow(matchingScore, name, visibility, dateCreated, keywords, maybeDescription)
     }
 
     implicit val personDecoder: Decoder[Entity.Person] = { cursor =>

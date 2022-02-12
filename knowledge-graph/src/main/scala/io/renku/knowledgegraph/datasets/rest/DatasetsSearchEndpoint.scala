@@ -126,7 +126,7 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
         "images": ${images -> exemplarProjectPath}
       }"""
         .addIfDefined("description" -> maybeDescription)
-        .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))
+        .deepMerge(_links(Link(Rel("details") -> DatasetEndpoint.href(renkuResourcesUrl, id))))
   }
 
   private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =

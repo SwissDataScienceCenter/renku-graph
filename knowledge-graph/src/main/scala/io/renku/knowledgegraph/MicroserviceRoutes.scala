@@ -74,7 +74,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   // format: off
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
     AuthedRoutes.of {
-      case GET            -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) as maybeUser => searchForDatasets(maybePhrase, maybeSortBy,page, perPage, maybeUser)
+      case GET            -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) as maybeUser => searchForDatasets(maybePhrase, maybeSortBy, page, perPage, maybeUser)
       case GET            -> Root / "knowledge-graph" /  "datasets" / DatasetId(id)                                                              as maybeUser => fetchDataset(id, maybeUser)
       case authReq @ POST -> Root / "knowledge-graph" /  "graphql"                                                                               as maybeUser => handleQuery(authReq.req, maybeUser)
       case GET ->                   "knowledge-graph" /: "projects" /: path                                                                      as maybeUser => routeToProjectsEndpoints(path, maybeUser)

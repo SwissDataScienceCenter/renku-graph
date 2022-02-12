@@ -259,6 +259,14 @@ object datasets {
     def instant: Instant
   }
 
+  object Date {
+    import io.renku.tinytypes.json.TinyTypeEncoders._
+    implicit val encoder: Encoder[Date] = Encoder.instance {
+      case d: DateCreated   => d.asJson
+      case d: DatePublished => d.asJson
+    }
+  }
+
   final class DateCreated private (val value: Instant) extends AnyVal with Date with InstantTinyType {
     override def instant: Instant = value
   }

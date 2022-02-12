@@ -136,4 +136,7 @@ object ProjectDatasetsEndpoint {
     gitLabUrl,
     executionTimeRecorder
   )
+
+  def href(renkuResourcesUrl: renku.ResourcesUrl, projectPath: projects.Path): Href =
+    Href(renkuResourcesUrl / "projects" / projectPath / "datasets")
 }

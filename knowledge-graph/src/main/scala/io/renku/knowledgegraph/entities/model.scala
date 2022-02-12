@@ -70,7 +70,6 @@ object model {
 
     final case class Workflow(
         matchingScore:    MatchingScore,
-        identifier:       plans.Identifier,
         name:             plans.Name,
         visibility:       projects.Visibility,
         date:             plans.DateCreated,
