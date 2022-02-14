@@ -28,15 +28,15 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ToFailure
 import io.renku.eventlog.{EventMessage, ExecutionDate}
-import io.renku.graph.model.events.EventId
-import io.renku.graph.model.events.EventStatus.{FailureStatus, New, ProcessingStatus, TransformationNonRecoverableFailure, TriplesGenerated}
+import io.renku.graph.model.events.EventStatus.{FailureStatus, New, ProcessingStatus, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
+import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.~
-import java.time.Duration
-import java.time.Instant
+
+import java.time.{Duration, Instant}
 
 private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
     deliveryInfoRemover: DeliveryInfoRemover[F],
@@ -88,15 +88,17 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
   }
 
   private def maybeUpdateAncestors(event: ToFailure[ProcessingStatus, FailureStatus]) = event.newStatus match {
-    case TransformationNonRecoverableFailure => updateAncestorsStatus(event)
-    case _                                   => Kleisli.pure(DBUpdateResults.ForProjects(event.projectPath, Map.empty))
+    case TransformationNonRecoverableFailure => updateAncestorsStatus(event, newStatus = New)
+    case TransformationRecoverableFailure => updateAncestorsStatus(event, newStatus = TransformationRecoverableFailure)
+    case _                                => Kleisli.pure(DBUpdateResults.ForProjects(event.projectPath, Map.empty))
   }
 
-  private def updateAncestorsStatus(event: ToFailure[ProcessingStatus, FailureStatus]) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"to_${event.newStatus.value.toLowerCase} - ancestors update"))
-      .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventId](
-        sql"""UPDATE event evt
-              SET status = '#${New.value}', 
+  private def updateAncestorsStatus(event: ToFailure[ProcessingStatus, FailureStatus], newStatus: EventStatus) =
+    measureExecutionTime {
+      SqlStatement(name = Refined.unsafeApply(s"to_${event.newStatus.value.toLowerCase} - ancestors update"))
+        .select[EventStatus ~ ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventId](
+          sql"""UPDATE event evt
+              SET status = $eventStatusEncoder, 
                   execution_date = $executionDateEncoder, 
                   message = NULL
               FROM (
@@ -104,7 +106,7 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
                 FROM event
                 WHERE project_id = $projectIdEncoder
                   AND status = '#${TriplesGenerated.value}'
-                  AND event_date <= (
+                  AND event_date < (
                     SELECT event_date
                     FROM event
                     WHERE project_id = $projectIdEncoder
@@ -116,15 +118,16 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
               WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
               RETURNING evt.event_id
            """.query(eventIdDecoder)
-      )
-      .arguments(
-        ExecutionDate(
-          now().plusMillis(event.maybeExecutionDelay.getOrElse(Duration.ofMillis(0)).toMillis)
-        ) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
-      )
-      .build(_.toList)
-      .mapResult { ids =>
-        DBUpdateResults.ForProjects(event.projectPath, Map(New -> ids.size, TriplesGenerated -> -ids.size))
-      }
-  }
+        )
+        .arguments(
+          newStatus ~
+            ExecutionDate(
+              now().plusMillis(event.maybeExecutionDelay.getOrElse(Duration.ofMillis(0)).toMillis)
+            ) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
+        )
+        .build(_.toList)
+        .mapResult { ids =>
+          DBUpdateResults.ForProjects(event.projectPath, Map(newStatus -> ids.size, TriplesGenerated -> -ids.size))
+        }
+    }
 }

@@ -130,7 +130,7 @@ private class ToTriplesGeneratedUpdater[F[_]: Async](
                 FROM event
                 WHERE project_id = $projectIdEncoder
                   AND #${`status IN`(Set(New, GeneratingTriples, GenerationRecoverableFailure, AwaitingDeletion))}
-                  AND event_date <= (
+                  AND event_date < (
                     SELECT event_date
                     FROM event
                     WHERE project_id = $projectIdEncoder
