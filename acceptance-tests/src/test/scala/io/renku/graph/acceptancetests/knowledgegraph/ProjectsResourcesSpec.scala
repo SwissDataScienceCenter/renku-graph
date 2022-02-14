@@ -28,7 +28,7 @@ import io.renku.graph.acceptancetests.data.Project.{Urls, _}
 import io.renku.graph.acceptancetests.data.{Project, _}
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
-import io.renku.graph.model.projects.{DateCreated, ForksCount}
+import io.renku.graph.model.projects.{DateCreated, ForksCount, Visibility}
 import io.renku.graph.model.testentities
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.RenkuProject._
@@ -64,7 +64,7 @@ class ProjectsResourcesSpec
 
     (dataProjects(parent).generateOne,
      dataProjects(
-       child.copy(visibility = visibilityNonPublic.generateOne,
+       child.copy(visibility = Visibility.Private,
                   members = child.members + personEntities.generateOne.copy(maybeGitLabId = user.id.some)
        )
      ).generateOne
