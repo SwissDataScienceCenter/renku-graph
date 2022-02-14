@@ -35,8 +35,10 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
-
+import io.circe.literal._
 import scala.util.control.NonFatal
+import io.renku.events.producers.EventSender
+import io.renku.events.EventRequestContent
 
 private[commitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: CommitSyncEvent): F[Unit]
@@ -49,6 +51,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
     commitInfoFinder:      CommitInfoFinder[F],
     commitToEventLog:      CommitToEventLog[F],
     commitEventsRemover:   CommitEventsRemover[F],
+    eventSender:           EventSender[F],
     executionTimeRecorder: ExecutionTimeRecorder[F],
     clock:                 java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitsSynchronizer[F] {
@@ -63,9 +66,12 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
 
   override def synchronizeEvents(event: CommitSyncEvent): F[Unit] = {
     findAccessToken(event.project.id) >>= { implicit maybeAccessToken =>
-      findLatestCommit(event.project.id) >>= (checkForSkippedEvent(_, event))
+      for {
+        maybeLatestCommit <- findLatestCommit(event.project.id)
+        _                 <- checkForSkippedEvent(maybeLatestCommit, event)
+      } yield ()
     }
-  } recoverWith loggingError(event)
+  } recoverWith loggingError(event, "Synchronization failed")
 
   private def checkForSkippedEvent(maybeLatestCommit: Option[CommitInfo], event: CommitSyncEvent)(implicit
       maybeAccessToken:                               Option[AccessToken]
@@ -73,20 +79,34 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
     case (Some(commitInfo), FullCommitSyncEvent(id, _, _)) if commitInfo.id == id =>
       measureExecutionTime(Skipped.pure[F].widen[UpdateResult]) >>= logResult(event)
     case (Some(commitInfo), event) =>
-      processCommitsAndLogSummary(commitInfo.id, event.project)
+      processCommitsAndLogSummary(commitInfo.id, event)
     case (None, FullCommitSyncEvent(id, _, _)) =>
-      processCommitsAndLogSummary(id, event.project)
+      processCommitsAndLogSummary(id, event)
     case (None, MinimalCommitSyncEvent(_)) =>
       measureExecutionTime(Skipped.pure[F].widen[UpdateResult]) >>= logResult(event)
   }
 
-  private def processCommitsAndLogSummary(commitId: CommitId, project: Project)(implicit
+  private def processCommitsAndLogSummary(commitId: CommitId, event: CommitSyncEvent)(implicit
       maybeAccessToken:                             Option[AccessToken]
   ) = measureExecutionTime(
-    processCommits(List(commitId), project, BatchDate(clock)).run(SynchronizationSummary())
-  ) flatMap { case (elapsedTime: ElapsedTime, summary) =>
-    logSummary(commitId, project)(elapsedTime, summary._2)
+    processCommits(List(commitId), event.project, BatchDate(clock)).run(SynchronizationSummary())
+  ) flatTap { case (_, summary) =>
+    if (summary._2.get(Created) > 0 || summary._2.get(Deleted) > 0) {
+      triggerGlobalCommitSync(event) recoverWith loggingErrorAndIgnoreError(event,
+                                                                            "Triggering Global Commit Sync Failed"
+      )
+    } else ().pure[F]
+  } flatMap { case (elapsedTime: ElapsedTime, summary) =>
+    logSummary(commitId, event.project)(elapsedTime, summary._2)
   }
+
+  private def triggerGlobalCommitSync(event: CommitSyncEvent): F[Unit] =
+    eventSender.sendEvent(
+      EventRequestContent.NoPayload(
+        json"""{ "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST", "project":{ "id": ${event.project.id.value}, "path": ${event.project.path.value} }}"""
+      ),
+      s"$categoryName - Triggering Global Commit Sync Failed"
+    )
 
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
 
@@ -145,10 +165,18 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
     maybeInfoFromGL         <- getMaybeCommitInfo(project.id, commitId)
   } yield (maybeEventDetailsFromEL, maybeInfoFromGL)
 
-  private def loggingError(event: CommitSyncEvent): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+  private def loggingErrorAndIgnoreError(event:        CommitSyncEvent,
+                                         errorMessage: String
+  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     Logger[F]
-      .error(exception)(s"${logMessageCommon(event)} -> Synchronization failed")
-      .flatMap(_ => exception.raiseError[F, Unit])
+      .error(exception)(s"${logMessageCommon(event)} -> $errorMessage")
+  }
+
+  private def loggingError(event: CommitSyncEvent, errorMessage: String): PartialFunction[Throwable, F[Unit]] = {
+    case NonFatal(exception) =>
+      Logger[F]
+        .error(exception)(s"${logMessageCommon(event)} -> $errorMessage")
+        .flatMap(_ => exception.raiseError[F, Unit])
   }
 
   private def logResult(event: CommitSyncEvent): ((ElapsedTime, UpdateResult)) => F[Unit] = {
@@ -205,12 +233,14 @@ private[commitsync] object CommitsSynchronizer {
     commitInfoFinder    <- CommitInfoFinder(gitLabClient)
     commitToEventLog    <- CommitToEventLog[F]
     commitEventsRemover <- CommitEventsRemover[F]
+    eventSender         <- EventSender[F]
   } yield new CommitsSynchronizerImpl[F](accessTokenFinder,
                                          latestCommitFinder,
                                          eventDetailsFinder,
                                          commitInfoFinder,
                                          commitToEventLog,
                                          commitEventsRemover,
+                                         eventSender,
                                          executionTimeRecorder
   )
 }

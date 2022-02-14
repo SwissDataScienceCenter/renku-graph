@@ -29,7 +29,7 @@ import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{C
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEventFinder.syncInterval
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import io.renku.events.consumers.Project
-import io.renku.graph.model.events.EventStatus.AwaitingDeletion
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.{CategoryName, CommitId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
@@ -90,25 +90,30 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
       .arguments(categoryName ~ lastSyncDate)
       .build(_.option)
   }
-
+  private val deletionStatus = Set(AwaitingDeletion, Deleting)
   private def findCommitsInfo(maybeProjectAndLastSyncedDate: Option[(Project, Option[LastSyncedDate])]) =
     maybeProjectAndLastSyncedDate match {
       case Some((project, maybeLastSyncedDate)) =>
         measureExecutionTime {
           SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find commits"))
-            .select[projects.Id ~ EventStatus ~ projects.Id ~ EventStatus, (Long, Option[CommitId])](
+            .select[projects.Id ~ projects.Id, (Long, Option[CommitId])](
               sql"""
                    SELECT
-                     (SELECT COUNT(event_id) FROM event WHERE project_id = $projectIdEncoder AND status <> $eventStatusEncoder) AS count,
-                     (SELECT event_id FROM event WHERE project_id = $projectIdEncoder AND status <> $eventStatusEncoder ORDER BY event_date DESC LIMIT 1) AS latest
+                     (SELECT COUNT(event_id) FROM event 
+                       WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)}) AS count,
+                     (SELECT event_id FROM event 
+                       WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)} ORDER BY event_date DESC LIMIT 1) AS latest
                  """.query(int8 ~ commitIdDecoder.opt)
             )
-            .arguments(project.id ~ AwaitingDeletion ~ project.id ~ AwaitingDeletion)
+            .arguments(project.id ~ project.id)
             .build[Id](_.unique)
             .mapResult(toEvent(project, maybeLastSyncedDate))
         }
       case None => Kleisli.pure(Option.empty[GlobalCommitSyncEvent])
     }
+
+  private def `status NOT IN`(statuses: Set[EventStatus]) =
+    s"status NOT IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"
 
   private def toEvent(project:             Project,
                       maybeLastSyncedDate: Option[LastSyncedDate]

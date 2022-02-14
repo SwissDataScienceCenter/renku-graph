@@ -27,6 +27,7 @@ import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model
+import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
@@ -68,7 +69,9 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
     Scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, exemplarData.project.asJsonLD)
+      val commitId = commitIds.generateOne
+      mockDataOnGitLabAPIs(project, exemplarData.project.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery
@@ -117,9 +120,10 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       )
 
       Given("some data in the RDF Store with a project I am a member of")
-      `data in the RDF store`(dataProjects(accessibleExemplarData.project).generateOne,
-                              accessibleExemplarData.project.asJsonLD
-      )
+      val commitId = commitIds.generateOne
+      val project  = dataProjects(accessibleExemplarData.project).generateOne
+      mockDataOnGitLabAPIs(project, accessibleExemplarData.project.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
 
       And("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
@@ -156,9 +160,10 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
           members = Set.empty
         )
       )
-      `data in the RDF store`(dataProjects(privateExemplarData.project).generateOne,
-                              privateExemplarData.project.asJsonLD
-      )
+      val commitId = commitIds.generateOne
+      val project  = dataProjects(privateExemplarData.project).generateOne
+      mockDataOnGitLabAPIs(project, privateExemplarData.project.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
 
       Given("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
@@ -188,7 +193,10 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
           path = model.projects.Path("unauthenticated/private-project")
         )
       )
-      `data in the RDF store`(dataProjects(exemplarData.project).generateOne, exemplarData.project.asJsonLD)
+      val commitId = commitIds.generateOne
+      val project  = dataProjects(exemplarData.project).generateOne
+      mockDataOnGitLabAPIs(project, exemplarData.project.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient.POST(namedLineageQuery,

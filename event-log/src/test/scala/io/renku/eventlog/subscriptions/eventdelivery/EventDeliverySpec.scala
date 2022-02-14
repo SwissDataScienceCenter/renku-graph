@@ -93,6 +93,19 @@ class EventDeliverySpec
 
       findAllProjectDeliveries shouldBe List((event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId))
     }
+
+    "do nothing if the same event is delivered twice with a DeletingProjectTypeId" in new DeletingProjectTestCase {
+      addEvent(event.compoundEventId)
+      upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+
+      delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
+
+      findAllProjectDeliveries shouldBe List((event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId))
+
+      delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
+
+      findAllProjectDeliveries shouldBe List((event.compoundEventId.projectId, subscriberId, DeletingProjectTypeId))
+    }
   }
 
   private trait CommonTestCase {

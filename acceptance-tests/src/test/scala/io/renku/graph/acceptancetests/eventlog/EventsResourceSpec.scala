@@ -37,6 +37,7 @@ import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
+import cats.data.NonEmptyList
 
 class EventsResourceSpec
     extends AnyFeatureSpec
@@ -48,24 +49,26 @@ class EventsResourceSpec
   Feature("GET /events?project-path=<path> to return info about all the project events") {
 
     Scenario("As a user I would like to see all events from the project with the given path") {
-      val commits:              List[events.CommitId] = commitIds.generateNonEmptyList(maxElements = 6).toList
-      implicit val accessToken: AccessToken           = accessTokens.generateOne
+      val commits:              NonEmptyList[events.CommitId] = commitIds.generateNonEmptyList(maxElements = 6)
+      implicit val accessToken: AccessToken                   = accessTokens.generateOne
       val project = dataProjects(renkuProjectEntities(anyVisibility), CommitsCount(commits.size)).generateOne
 
-      When("there are no events for the given project in EL")
-      Then("the resource should return OK with an empty array")
+      Given("there are no events for the given project in EL")
       val noEventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
+      And("the resource returns OK with an empty array")
+      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commits)
       noEventsResponse.status                  shouldBe Ok
       noEventsResponse.jsonBody.as[List[Json]] shouldBe Nil.asRight
-
-      commits foreach { commitId => `data in the RDF store`(project, project.entitiesProject.asJsonLD, commitId) }
+      When("new events are added to the store")
+      `data in the RDF store`(project, commits)
 
       eventually {
+        Then("the user can see the events on the endpoint")
         val eventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
         eventsResponse.status shouldBe Ok
         val Right(events) = eventsResponse.jsonBody.as[List[EventInfo]]
         events.size               shouldBe commits.size
-        events.map(_.eventId.value) should contain theSameElementsAs commits.map(_.value)
+        events.map(_.eventId.value) should contain theSameElementsAs commits.toList.map(_.value)
       }
     }
   }
