@@ -111,7 +111,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger](
           |               schema:identifier ?userGitlabId .
           |}
           |FILTER (
-          |  ?visibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value}
+          |  ?visibility != '${Visibility.Private.value}' || ?userGitlabId = ${user.id.value}
           |)
           |""".stripMargin
     case _ =>
