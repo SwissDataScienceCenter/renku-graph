@@ -37,7 +37,7 @@ private object GlobalCommitSyncEvent {
   final case class CommitsInfo(count: CommitsCount, latest: CommitId)
 
   implicit lazy val show: Show[GlobalCommitSyncEvent] = Show.show(event =>
-    show"GlobalCommitSyncEvent ${event.project}, numberOfCommits = ${event.commits.count}, latestCommit = ${event.commits.latest}"
+    show"${event.project}, numberOfCommits = ${event.commits.count}, latestCommit = ${event.commits.latest}"
   )
 }
 

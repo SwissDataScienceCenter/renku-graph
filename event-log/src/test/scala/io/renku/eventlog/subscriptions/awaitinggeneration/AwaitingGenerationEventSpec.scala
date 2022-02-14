@@ -29,7 +29,7 @@ class AwaitingGenerationEventSpec extends AnyWordSpec with should.Matchers {
 
     "print out the id and projectPath" in {
       val event = awaitingGenerationEvents.generateOne
-      event.show shouldBe s"AwaitingGenerationEvent ${event.id}, projectPath = ${event.projectPath}"
+      event.show shouldBe s"${event.id}, projectPath = ${event.projectPath}"
     }
   }
 }

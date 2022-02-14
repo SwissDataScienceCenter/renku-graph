@@ -36,7 +36,7 @@ class ZombieEventSpec extends AnyWordSpec with should.Matchers {
                               projectPaths.generateOne,
                               eventStatuses.generateOne
       )
-      event.show shouldBe s"ZombieEvent ${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+      event.show shouldBe s"${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
     }
   }
 }

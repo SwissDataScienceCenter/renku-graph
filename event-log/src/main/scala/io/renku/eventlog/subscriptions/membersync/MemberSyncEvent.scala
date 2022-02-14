@@ -26,7 +26,7 @@ private final case class MemberSyncEvent(projectPath: projects.Path)
 
 private object MemberSyncEvent {
   implicit lazy val show: Show[MemberSyncEvent] =
-    Show.show(event => show"MemberSyncEvent projectPath = ${event.projectPath}")
+    Show.show(event => show"projectPath = ${event.projectPath}")
 }
 
 private object MemberSyncEventEncoder {
