@@ -70,9 +70,9 @@ spec:
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
               {{- if .Values.sentry.enabled }}
-            - name: SENTRY_BASE_URL
+            - name: SENTRY_DSN
               value: {{ .Values.sentry.dsn }}
-            - name: SENTRY_ENVIRONMENT_NAME
+            - name: SENTRY_ENVIRONMENT
               value: {{ .Values.sentry.environment }}
               {{- end }}
             - name: GENERATION_PROCESSES_NUMBER
