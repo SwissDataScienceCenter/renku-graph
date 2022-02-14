@@ -119,10 +119,13 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
   private def toUploadingError(
       triplesGeneratedEvent: TriplesGeneratedEvent
-  ): PartialFunction[Throwable, F[UploadingResult]] = { case error: ProcessingRecoverableError =>
-    Logger[F]
-      .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} ${error.getMessage}")
-      .map(_ => RecoverableError(triplesGeneratedEvent, error))
+  ): PartialFunction[Throwable, F[UploadingResult]] = {
+    case error: LogWorthyRecoverableError =>
+      Logger[F]
+        .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} ${error.getMessage}")
+        .map(_ => RecoverableError(triplesGeneratedEvent, error))
+    case error: AuthRecoverableError =>
+      RecoverableError(triplesGeneratedEvent, error).pure[F].widen[UploadingResult]
   }
 
   private lazy val updateEventLog: ((ElapsedTime, UploadingResult)) => F[Unit] = {

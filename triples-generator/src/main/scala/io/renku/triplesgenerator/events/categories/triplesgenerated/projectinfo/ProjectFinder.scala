@@ -106,7 +106,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
         id               <- cursor.downField("id").as[projects.Id]
         path             <- cursor.downField("path_with_namespace").as[projects.Path]
         name             <- cursor.downField("name").as[projects.Name]
-        visibility       <- cursor.downField("visibility").as[projects.Visibility]
+        maybeVisibility  <- cursor.downField("visibility").as[Option[projects.Visibility]]
         dateCreated      <- cursor.downField("created_at").as[projects.DateCreated]
         maybeDescription <- cursor.downField("description").as[Option[projects.Description]]
         keywords         <- cursor.downField("tag_list").as[Set[Option[projects.Keyword]]].map(_.flatten)
@@ -114,16 +114,17 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
         maybeParentPath <- cursor
                              .downField("forked_from_project")
                              .as[Option[projects.Path]](decodeOption(parentPathDecoder))
-      } yield GitLabProjectInfo(id,
-                                name,
-                                path,
-                                dateCreated,
-                                maybeDescription,
-                                maybeCreator = None,
-                                keywords,
-                                members = Set.empty,
-                                visibility,
-                                maybeParentPath
+      } yield GitLabProjectInfo(
+        id,
+        name,
+        path,
+        dateCreated,
+        maybeDescription,
+        maybeCreator = None,
+        keywords,
+        members = Set.empty,
+        maybeVisibility getOrElse projects.Visibility.Public,
+        maybeParentPath
       ) -> maybeCreatorId
 
     jsonOf[F, ProjectAndCreator]

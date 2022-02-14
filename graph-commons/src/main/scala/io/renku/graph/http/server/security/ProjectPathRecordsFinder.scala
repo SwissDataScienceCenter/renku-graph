@@ -32,9 +32,7 @@ import org.typelevel.log4cats.Logger
 
 object ProjectPathRecordsFinder {
   def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[SecurityRecordFinder[F, projects.Path]] =
-    for {
-      config <- RdfStoreConfig[F]()
-    } yield new ProjectPathRecordsFinderImpl(config, timeRecorder)
+    RdfStoreConfig[F]().map(new ProjectPathRecordsFinderImpl[F](_, timeRecorder))
 }
 
 private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger](
@@ -51,7 +49,7 @@ private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger](
 
   private def query(path: projects.Path) = SparqlQuery.of(
     name = "authorise - project path",
-    Prefixes.of(schema -> "schema", renku -> "renku"),
+    Prefixes of (schema -> "schema", renku -> "renku"),
     s"""|SELECT DISTINCT ?projectId ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
         |WHERE {
         |  ?projectId a schema:Project;
