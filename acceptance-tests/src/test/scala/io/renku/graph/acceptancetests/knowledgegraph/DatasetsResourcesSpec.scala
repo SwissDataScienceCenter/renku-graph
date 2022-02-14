@@ -32,6 +32,7 @@ import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.testentities.{::~, Dataset, Person}
+import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.{projects, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -68,8 +69,9 @@ class DatasetsResourcesSpec
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, testEntitiesProject.asJsonLD)
-      `wait for events to be processed`(project.id)
+      val commitId = commitIds.generateOne
+      mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
@@ -149,8 +151,9 @@ class DatasetsResourcesSpec
       val nonPublicProject = dataProjects(testEntitiesNonPublicProject).generateOne
 
       Given("there's a non-public project in KG")
-      `data in the RDF store`(nonPublicProject, testEntitiesNonPublicProject.asJsonLD)
-      `wait for events to be processed`(nonPublicProject.id)
+      val commitId = commitIds.generateOne
+      mockDataOnGitLabAPIs(nonPublicProject, testEntitiesProject.asJsonLD, commitId)
+      `data in the RDF store`(nonPublicProject, commitId)
 
       When("there's an authenticated user who is not a member of the project")
       val nonMemberAccessToken = accessTokens.generateOne
@@ -363,11 +366,12 @@ class DatasetsResourcesSpec
 
     def pushToStore(project: testentities.RenkuProject)(implicit accessToken: AccessToken): Project = {
       val dataProject = dataProjects(project).generateOne
-      `data in the RDF store`(dataProject, project.asJsonLD)
+      val commitId    = commitIds.generateOne
+      mockDataOnGitLabAPIs(dataProject, project.asJsonLD, commitId)
+      `data in the RDF store`(dataProject, commitId)
       dataProject
     }
   }
-
 
   Feature("GET knowledge-graph/datasets/:id to find dataset details") {
 
@@ -383,8 +387,9 @@ class DatasetsResourcesSpec
       val project = dataProjects(testEntitiesProject).generateOne
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, testEntitiesProject.asJsonLD)
-      `wait for events to be processed`(project.id)
+      val commitId = commitIds.generateOne
+      mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
 
       When("user fetches dataset details with GET knowledge-graph/datasets/:id")
       val detailsResponse = knowledgeGraphClient GET s"knowledge-graph/datasets/${dataset.identifier}"
@@ -412,7 +417,9 @@ class DatasetsResourcesSpec
       `GET <gitlabApi>/user returning OK`(user)
 
       Given("some data in the RDF Store")
-      `data in the RDF store`(project, testEntitiesProject.asJsonLD)
+      val commitId = commitIds.generateOne
+      mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
       `wait for events to be processed`(project.id)
 
       When("an authenticated and authorised user fetches dataset details through GET knowledge-graph/datasets/:id")
