@@ -129,6 +129,7 @@ commitEventService:
 sentry:
   enabled: false
   dsn: '' # Sentry dsn
+  sentryDsnRenkuPython: '' # Sentry dsn for renku CLI
   environment: '' # Environment name e.g. renkulabio
 
 nameOverride: ''
