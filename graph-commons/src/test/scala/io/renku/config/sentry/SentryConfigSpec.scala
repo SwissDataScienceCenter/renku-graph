@@ -20,7 +20,6 @@ package io.renku.config.sentry
 
 import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.ConfigLoadingException
-import io.renku.config.sentry.SentryConfig.SentryStackTracePackage
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should
@@ -49,17 +48,16 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     }
 
     "return a SentryConfig if 'services.sentry.enabled' is 'true' and all " +
-      "'services.sentry.url', 'services.sentry.service-name', 'services.sentry.environment-name' and 'services.sentry.stacktrace-package' are set" in {
+      "'services.sentry.url', 'services.sentry.service' and 'services.sentry.environment' are set" in {
         forAll { sentryConfig: SentryConfig =>
           val config = ConfigFactory.parseMap(
             Map(
               "services" -> Map(
                 "sentry" -> Map(
-                  "enabled"            -> "true",
-                  "url"                -> sentryConfig.baseUrl.value,
-                  "service-name"       -> sentryConfig.serviceName.value,
-                  "environment-name"   -> sentryConfig.environmentName.value,
-                  "stacktrace-package" -> sentryConfig.stackTracePackage.value
+                  "enabled"     -> "true",
+                  "dsn"         -> sentryConfig.baseUrl.value,
+                  "service"     -> sentryConfig.serviceName.value,
+                  "environment" -> sentryConfig.environmentName.value
                 ).asJava
               ).asJava
             ).asJava
@@ -69,38 +67,16 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
         }
       }
 
-    "return a SentryConfig if 'services.sentry.enabled' is 'true' but 'services.sentry.stacktrace-package' is invalid and replace it with an empty string" in {
-
+    "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.dsn' is invalid" in {
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "sentry" -> Map(
-              "enabled"          -> "true",
-              "url"              -> sentryConfig.baseUrl.value,
-              "service-name"     -> sentryConfig.serviceName.value,
-              "environment-name" -> sentryConfig.environmentName.value
-            ).asJava
-          ).asJava
-        ).asJava
-      )
-
-      SentryConfig[Try](config) shouldBe Success(
-        Some(sentryConfig.copy(stackTracePackage = SentryStackTracePackage.empty))
-      )
-    }
-
-    "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.url' is invalid" in {
-      val sentryConfig = sentryConfigs.generateOne
-      val config = ConfigFactory.parseMap(
-        Map(
-          "services" -> Map(
-            "sentry" -> Map(
-              "enabled"            -> "true",
-              "url"                -> "",
-              "service-name"       -> sentryConfig.serviceName.value,
-              "environment-name"   -> sentryConfig.environmentName.value,
-              "stacktrace-package" -> sentryConfig.stackTracePackage.value
+              "enabled"     -> "true",
+              "dsn"         -> "",
+              "service"     -> sentryConfig.serviceName.value,
+              "environment" -> sentryConfig.environmentName.value
             ).asJava
           ).asJava
         ).asJava
@@ -111,17 +87,16 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
       exception shouldBe a[ConfigLoadingException]
     }
 
-    "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.service-name' is invalid" in {
+    "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.service' is invalid" in {
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "sentry" -> Map(
-              "enabled"            -> "true",
-              "url"                -> sentryConfig.baseUrl.value,
-              "service-name"       -> "",
-              "environment-name"   -> sentryConfig.environmentName.value,
-              "stacktrace-package" -> sentryConfig.stackTracePackage.value
+              "enabled"     -> "true",
+              "dsn"         -> sentryConfig.baseUrl.value,
+              "service"     -> "",
+              "environment" -> sentryConfig.environmentName.value
             ).asJava
           ).asJava
         ).asJava
@@ -132,17 +107,16 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
       exception shouldBe a[ConfigLoadingException]
     }
 
-    "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.environment-name' is invalid" in {
+    "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.environment' is invalid" in {
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "sentry" -> Map(
-              "enabled"            -> "true",
-              "url"                -> sentryConfig.baseUrl.value,
-              "service-name"       -> sentryConfig.serviceName.value,
-              "environment-name"   -> "",
-              "stacktrace-package" -> sentryConfig.stackTracePackage.value
+              "enabled"     -> "true",
+              "dsn"         -> sentryConfig.baseUrl.value,
+              "service"     -> sentryConfig.serviceName.value,
+              "environment" -> ""
             ).asJava
           ).asJava
         ).asJava

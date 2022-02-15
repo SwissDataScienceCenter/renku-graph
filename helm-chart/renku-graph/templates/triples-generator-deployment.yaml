@@ -67,15 +67,13 @@ spec:
               value: "true"
             - name: RE_PROVISIONING_REMOVAL_BATCH_SIZE
               value: "{{ .Values.triplesGenerator.reProvisioningRemovalBatchSize }}"
-            - name: SENTRY_DSN
-              value: {{ .Values.sentry.sentryDsnRenkuPython }}
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
               {{- if .Values.sentry.enabled }}
-            - name: SENTRY_BASE_URL
-              value: {{ .Values.sentry.url }}
-            - name: SENTRY_ENVIRONMENT_NAME
-              value: {{ .Values.sentry.environmentName }}
+            - name: SENTRY_DSN
+              value: {{ .Values.sentry.dsn }}
+            - name: SENTRY_ENVIRONMENT
+              value: {{ .Values.sentry.environment }}
               {{- end }}
             - name: GENERATION_PROCESSES_NUMBER
               value: "{{ .Values.triplesGenerator.generationProcessesNumber }}"
