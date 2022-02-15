@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.cleanup
+package io.renku.eventlog.subscriptions
 
 import io.renku.graph.model.events.CategoryName
 

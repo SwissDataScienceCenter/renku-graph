@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.config.certificates.Certificate
 import io.renku.config.sentry.SentryConfig
-import io.renku.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, SentryStackTracePackage, ServiceName}
+import io.renku.config.sentry.SentryConfig.{Dsn, Environment, Service}
 import io.renku.config.{ServiceUrl, renku}
 import io.renku.control.{RateLimit, RateLimitUnit}
 import io.renku.crypto.AesCrypto
@@ -126,21 +126,18 @@ object CommonGraphGenerators {
     path <- relativePaths(maxSegments = 1)
   } yield renkuResourcesUrl / path
 
-  private implicit val sentryBaseUrls: Gen[SentryBaseUrl] = for {
+  private implicit val sentryDsns: Gen[Dsn] = for {
     url         <- httpUrls()
     projectName <- nonEmptyList(nonEmptyStrings()).map(_.toList.mkString("."))
     projectId   <- positiveInts(max = 100)
-  } yield SentryBaseUrl(s"$url@$projectName/$projectId")
-  private implicit val serviceNames:     Gen[ServiceName]     = nonEmptyStrings() map ServiceName.apply
-  private implicit val environmentNames: Gen[EnvironmentName] = nonEmptyStrings() map EnvironmentName.apply
-  private implicit val stackTracePackages: Gen[SentryStackTracePackage] =
-    nonEmptyStrings() map SentryStackTracePackage.apply
+  } yield Dsn(s"$url@$projectName/$projectId")
+  private implicit val sentryServices:     Gen[Service]     = nonEmptyStrings() map Service.apply
+  private implicit val sentryEnvironments: Gen[Environment] = nonEmptyStrings() map Environment.apply
   implicit val sentryConfigs: Gen[SentryConfig] = for {
-    url               <- sentryBaseUrls
-    serviceName       <- serviceNames
-    environmentName   <- environmentNames
-    stackTracePackage <- stackTracePackages
-  } yield SentryConfig(url, environmentName, serviceName, stackTracePackage)
+    dsn         <- sentryDsns
+    service     <- sentryServices
+    environment <- sentryEnvironments
+  } yield SentryConfig(dsn, environment, service)
 
   implicit val rels: Gen[Rel] = nonEmptyStrings() map Rel.apply
   implicit val hrefs: Gen[Href] = for {

@@ -27,7 +27,7 @@ sealed trait EventTypeId {
   def value: String
 }
 
-final case object DeletingProjectTypeId extends EventTypeId {
+case object DeletingProjectTypeId extends EventTypeId {
   override val value: String = "DELETING"
 }
 

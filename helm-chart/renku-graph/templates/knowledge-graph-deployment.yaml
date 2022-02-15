@@ -59,10 +59,10 @@ spec:
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
               {{- if .Values.sentry.enabled }}
-            - name: SENTRY_BASE_URL
-              value: {{ .Values.sentry.url }}
-            - name: SENTRY_ENVIRONMENT_NAME
-              value: {{ .Values.sentry.environmentName }}
+            - name: SENTRY_DSN
+              value: {{ .Values.sentry.dsn }}
+            - name: SENTRY_ENVIRONMENT
+              value: {{ .Values.sentry.environment }}
               {{- end }}
             - name: JAVA_OPTS
               value: -Xmx{{ .Values.knowledgeGraph.jvmXmx }} -XX:+UseG1GC

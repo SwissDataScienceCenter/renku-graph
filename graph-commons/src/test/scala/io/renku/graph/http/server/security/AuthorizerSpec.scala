@@ -25,7 +25,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityRecord}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.testentities._
 import io.renku.graph.model.persons.GitLabId
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
@@ -77,19 +76,54 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
       )
     }
 
-    "succeed if found SecurityRecord is for a non-public project but the user has rights to the project" in new TestCase {
+    Visibility.Internal :: Visibility.Private :: Nil foreach { visibility =>
+      s"fail if found SecurityRecord is for a $visibility project and there's no auth user" in new TestCase {
+        val projectPath = projectPaths.generateOne
+        securityRecordsFinder
+          .expects(key)
+          .returning(List((visibility, projectPath, Set.empty[GitLabId])).pure[Try])
+
+        authorizer.authorize(key, maybeAuthUser = None) shouldBe EitherT.leftT[Try, Unit](AuthorizationFailure)
+      }
+    }
+
+    Visibility.Internal :: Visibility.Private :: Nil foreach { visibility =>
+      s"succeed if found SecurityRecord is for a $visibility project but the user has rights to the project" in new TestCase {
+        val projectPath = projectPaths.generateOne
+        val authUser    = authUsers.generateOne
+
+        securityRecordsFinder
+          .expects(key)
+          .returning(List((visibility, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try])
+
+        authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
+          AuthContext[Key](Some(authUser), key, Set(projectPath))
+        )
+      }
+    }
+
+    "succeed if found SecurityRecord is for an internal project even if the user has no explicit rights for the project" in new TestCase {
       val projectPath = projectPaths.generateOne
       val authUser    = authUsers.generateOne
 
       securityRecordsFinder
         .expects(key)
-        .returning(
-          List((visibilityNonPublic.generateOne, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try]
-        )
+        .returning(List((Visibility.Internal, projectPath, personGitLabIds.generateSet())).pure[Try])
 
       authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
         AuthContext[Key](Some(authUser), key, Set(projectPath))
       )
+    }
+
+    "fail if found SecurityRecord is for a private project and the user has no explicit rights for the project" in new TestCase {
+      val projectPath = projectPaths.generateOne
+      val authUser    = authUsers.generateOne
+
+      securityRecordsFinder
+        .expects(key)
+        .returning(List((Visibility.Private, projectPath, personGitLabIds.generateSet())).pure[Try])
+
+      authorizer.authorize(key, authUser.some) shouldBe EitherT.leftT[Try, Unit](AuthorizationFailure)
     }
 
     "succeed with no allowed projects if there's no project with the given id" in new TestCase {
@@ -100,27 +134,6 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
       authorizer.authorize(key, Some(authUser)) shouldBe EitherT.rightT[Try, EndpointSecurityException](
         AuthContext[Key](Some(authUser), key, Set.empty)
       )
-    }
-
-    "fail if the given project is non-public and the user does not have rights for it" in new TestCase {
-
-      securityRecordsFinder
-        .expects(key)
-        .returning(
-          List((visibilityNonPublic.generateOne, projectPaths.generateOne, personGitLabIds.generateSet())).pure[Try]
-        )
-
-      authorizer.authorize(key, authUsers.generateSome) shouldBe EitherT.leftT[Try, Unit](AuthorizationFailure)
-    }
-
-    "fail if the given project is non-public and there's no authorized user" in new TestCase {
-      securityRecordsFinder
-        .expects(key)
-        .returning(
-          List((visibilityNonPublic.generateOne, projectPaths.generateOne, personGitLabIds.generateSet())).pure[Try]
-        )
-
-      authorizer.authorize(key, maybeAuthUser = None) shouldBe EitherT.leftT[Try, Unit](AuthorizationFailure)
     }
   }
 

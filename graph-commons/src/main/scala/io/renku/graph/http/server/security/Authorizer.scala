@@ -25,7 +25,7 @@ import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityRecord, SecurityRecordFinder}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.projects.Visibility.Public
+import io.renku.graph.model.projects.Visibility.{Internal, Public}
 import io.renku.graph.model.persons.GitLabId
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
@@ -63,8 +63,9 @@ private class AuthorizerImpl[F[_]: MonadThrow, Key](securityRecordsFinder: Secur
                        records:     List[SecurityRecord]
   ): EitherT[F, EndpointSecurityException, AuthContext[Key]] = EitherT.fromEither[F] {
     records.foldLeft(authContext.asRight[EndpointSecurityException]) {
-      case (left @ Left(_), _)             => left
-      case (Right(ctx), (Public, path, _)) => (ctx addAllowedProject path).asRight
+      case (left @ Left(_), _)                                              => left
+      case (Right(ctx), (Public, path, _))                                  => (ctx addAllowedProject path).asRight
+      case (Right(ctx), (Internal, path, _)) if ctx.maybeAuthUser.isDefined => (ctx addAllowedProject path).asRight
       case (Right(ctx), (_, path, projectMembers))
           if (projectMembers intersect authContext.maybeAuthUser.map(_.id).toSet).nonEmpty =>
         (ctx addAllowedProject path).asRight

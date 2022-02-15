@@ -58,10 +58,10 @@ class ReProvisioningSpec
       val commitId = commitIds.generateOne
 
       `GET <gitlabApi>/user returning OK`(user)
+      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
 
-      `data in the RDF store`(project, project.entitiesProject.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
 
-      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 
       projectDetailsResponseIsValid(projectDetailsResponse, initialProjectSchemaVersion)
@@ -82,8 +82,6 @@ class ReProvisioningSpec
 
       Then("Re-provisioning is triggered")
       And("The new data can be queried in Jena")
-
-      `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       eventually {
         val updatedProjectDetailsResponse =

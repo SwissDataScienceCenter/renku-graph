@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions.cleanup
 
+import Generators._
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import org.scalatest.matchers.should

@@ -19,24 +19,28 @@
 package io.renku.commiteventservice.events.categories.globalcommitsync
 package eventgeneration.gitlab
 
-import Generators.commitsCounts
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.circe.Encoder
 import io.circe.literal.JsonStringContext
-import io.circe.syntax._
+import io.renku.commiteventservice.events.categories.globalcommitsync.Generators.commitsCounts
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
-import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators.personalAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.client.AccessToken
+import io.renku.graph.model.projects
+import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
+import io.renku.testtools.{GitLabClientTools, IOSpec}
+import org.http4s.Method.GET
+import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.{Method, Request, Response, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,7 +52,8 @@ class GitLabCommitStatFetcherSpec
     with MockFactory
     with ExternalServiceStubbing
     with should.Matchers
-    with ScalaCheckPropertyChecks {
+    with ScalaCheckPropertyChecks
+    with GitLabClientTools[IO] {
 
   "fetchCommitStats" should {
 
@@ -59,10 +64,12 @@ class GitLabCommitStatFetcherSpec
           .expects(projectId, maybeAccessToken)
           .returning(maybeLatestCommit.pure[IO])
 
-        stubFor {
-          get(s"/api/v4/projects/$projectId?statistics=true")
-            .willReturn(okJson(commitCount.asJson.noSpaces))
-        }
+        (gitLabClient
+          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
+            _: Option[AccessToken]
+          ))
+          .expects(GET, uri, endpointName, *, maybeAccessToken)
+          .returning(commitCount.some.pure[IO])
 
         gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe ProjectCommitStats(
           maybeLatestCommit,
@@ -78,12 +85,8 @@ class GitLabCommitStatFetcherSpec
         .expects(projectId, maybeAccessToken)
         .returning(maybeLatestCommit.pure[IO])
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId?statistics=true")
-          .willReturn(notFound())
-      }
+      mapResponse(Status.NotFound, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe None
 
-      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
     }
 
     "return None if the gitlab API returns no statistics" in new TestCase {
@@ -93,10 +96,12 @@ class GitLabCommitStatFetcherSpec
         .expects(projectId, maybeAccessToken)
         .returning(maybeLatestCommit.pure[IO])
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId?statistics=true")
-          .willReturn(okJson("{}"))
-      }
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET, uri"projects" / projectId.show withQueryParam ("statistics", "true"), endpointName, *, *)
+        .returning(None.pure[IO])
 
       gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
     }
@@ -108,9 +113,7 @@ class GitLabCommitStatFetcherSpec
         .expects(projectId, maybeAccessToken)
         .returning(maybeLatestCommit.pure[IO])
 
-      stubFor(get(s"/api/v4/projects/$projectId?statistics=true").willReturn(unauthorized()))
-
-      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
+      mapResponse(Status.Unauthorized, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe None
     }
   }
 
@@ -119,11 +122,19 @@ class GitLabCommitStatFetcherSpec
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
     val projectId = projectIds.generateOne
 
-    val gitLabUrl           = GitLabUrl(externalServiceBaseUrl)
     val gitLabCommitFetcher = mock[GitLabCommitFetcher[IO]]
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val gitLabClient = mock[GitLabClient[IO]]
     val gitLabCommitStatFetcher =
-      new GitLabCommitStatFetcherImpl[IO](gitLabCommitFetcher, gitLabUrl.apiV4, Throttler.noThrottling)
+      new GitLabCommitStatFetcherImpl[IO](gitLabCommitFetcher, gitLabClient)
+
+    val uri = uri"projects" / projectId.show withQueryParams Map("statistics" -> true)
+    val endpointName: String Refined NonEmpty = "project-details"
+
+    lazy val mapResponse = captureMapping(gitLabCommitStatFetcher, gitLabClient)(
+      _.fetchCommitStats(projectId).unsafeRunSync(),
+      commitsCounts.generateOption
+    )
   }
 
   private implicit lazy val commitsCountEncoder: Encoder[CommitsCount] = Encoder.instance { count =>

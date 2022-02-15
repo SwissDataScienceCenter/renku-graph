@@ -18,9 +18,13 @@
 
 package io.renku.commiteventservice.events.categories.globalcommitsync
 
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.auto._
 import io.renku.commiteventservice.events.categories.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
-import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
+import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.{PageResult, ProjectCommitStats}
 import io.renku.events.consumers.Project
+import io.renku.generators.CommonGraphGenerators.pages
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -43,6 +47,11 @@ private object Generators {
     commitsCount   <- commitsCounts
     latestCommitId <- commitIds
   } yield CommitsInfo(commitsCount, latestCommitId)
+
+  def pageResults(maxCommitCount: Int Refined Positive = positiveInts().generateOne) = for {
+    commits       <- commitIds.toGeneratorOfList(0, maxCommitCount)
+    maybeNextPage <- pages.toGeneratorOfOptions
+  } yield PageResult(commits, maybeNextPage)
 
   def projectCommitStats(commitId: CommitId): Gen[ProjectCommitStats] = projectCommitStats(Gen.const(Some(commitId)))
 

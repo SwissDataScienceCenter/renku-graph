@@ -114,6 +114,38 @@ class ToTriplesGeneratedUpdaterSpec
       }
     }
 
+    "change statuses to TRIPLES_GENERATED of all events older than the current event but not the events with the same date" in new TestCase {
+      val eventDate = eventDates.generateOne
+      val event1    = addEvent(GeneratingTriples, eventDate)
+      val event2    = addEvent(TriplesGenerated, eventDate)
+      val event1Id  = CompoundEventId(event1._1, projectId)
+      val event2Id  = CompoundEventId(event2._1, projectId)
+
+      val statusChangeEvent =
+        ToTriplesGenerated(event1Id, projectPath, eventProcessingTimes.generateOne, zippedEventPayloads.generateOne)
+
+      (deliveryInfoRemover.deleteDelivery _).expects(event1Id).returning(Kleisli.pure(()))
+
+      sessionResource
+        .useK(dbUpdater updateDB statusChangeEvent)
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
+        projectPath,
+        statusCount = Map(GeneratingTriples -> -1, TriplesGenerated -> 1)
+      )
+
+      findFullEvent(event1Id)
+        .map {
+          case (_, status, _, Some(payload), processingTimes) =>
+            status        shouldBe TriplesGenerated
+            payload.value   should contain theSameElementsAs statusChangeEvent.payload.value
+            processingTimes should contain(statusChangeEvent.processingTime)
+          case _ => fail("No payload found for the main event")
+        }
+        .getOrElse(fail("No event found for the main event"))
+
+      findFullEvent(event2Id).map(_._2) shouldBe TriplesGenerated.some
+    }
+
     "just clean the delivery info if the event is already in the TRIPLES_GENERATED" in new TestCase {
       val eventDate = eventDates.generateOne
       val (olderEventId, olderEventStatus, _, _, _) =

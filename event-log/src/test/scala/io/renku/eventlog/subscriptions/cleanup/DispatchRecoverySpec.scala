@@ -18,22 +18,23 @@
 
 package io.renku.eventlog.subscriptions.cleanup
 
+import Generators._
+import cats.syntax.all._
+import io.circe.literal._
 import io.renku.events.EventRequestContent
-import io.renku.generators.Generators._
-import io.renku.generators.Generators.Implicits._
-import io.renku.events.producers.EventSender
 import io.renku.events.consumers.subscriptions._
-import io.renku.eventlog.subscriptions.cleanup.DispatchRecoveryImpl
+import io.renku.events.producers.EventSender
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.interpreters.TestLogger
-import io.renku.tinytypes.json.TinyTypeEncoders
-import cats.syntax.all._
-import org.scalatest.wordspec.AnyWordSpec
-import scala.util.Try
 import io.renku.interpreters.TestLogger.Level.Error
-import io.circe.literal._
-import org.scalatest.matchers.should
+import io.renku.tinytypes.json.TinyTypeEncoders
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+
+import scala.util.Try
 
 class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory with TinyTypeEncoders {
 
@@ -97,8 +98,8 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
   private trait TestCase {
     val event = cleanupEvents.generateOne
 
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val eventSender      = mock[EventSender[Try]]
-    implicit val logger  = TestLogger[Try]()
     val dispatchRecovery = new DispatchRecoveryImpl[Try](eventSender)
   }
 }

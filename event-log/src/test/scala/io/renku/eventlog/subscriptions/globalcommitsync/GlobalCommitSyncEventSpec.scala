@@ -30,7 +30,7 @@ class GlobalCommitSyncEventSpec extends AnyWordSpec with should.Matchers {
 
     "print out the eventId, projectPath, and lastSynced" in {
       val event = globalCommitSyncEvents.generateOne
-      event.show shouldBe s"GlobalCommitSyncEvent projectId = ${event.project.id}, projectPath = ${event.project.path}, numberOfCommits = ${event.commits.count}, latestCommit = ${event.commits.latest}"
+      event.show shouldBe s"projectId = ${event.project.id}, projectPath = ${event.project.path}, numberOfCommits = ${event.commits.count}, latestCommit = ${event.commits.latest}"
     }
   }
 }

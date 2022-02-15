@@ -128,9 +128,8 @@ commitEventService:
 
 sentry:
   enabled: false
-  url: '' # Sentry url
-  environmentName: '' # Environment name e.g. renkulabio
-  sentryDsnRenkuPython: ''
+  dsn: '' # Sentry dsn
+  environment: '' # Environment name e.g. renkulabio
 
 nameOverride: ''
 fullnameOverride: ''

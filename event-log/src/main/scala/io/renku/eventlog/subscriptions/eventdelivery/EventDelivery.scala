@@ -78,7 +78,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
                 SELECT  $projectIdEncoder, delivery_id, $eventTypeIdEncoder
                 FROM subscriber
                 WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
-                ON CONFLICT (event_id, project_id)
+                ON CONFLICT (project_id, event_type_id)
                 DO NOTHING
             """.command
             )

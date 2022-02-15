@@ -40,15 +40,13 @@ private final case class FullCommitSyncEvent(id:             CompoundEventId,
 
 private object FullCommitSyncEvent {
   implicit lazy val show: Show[FullCommitSyncEvent] =
-    Show.show(event =>
-      show"CommitSyncEvent ${event.id}, projectPath = ${event.projectPath}, lastSynced = ${event.lastSyncedDate}"
-    )
+    Show.show(event => show"${event.id}, projectPath = ${event.projectPath}, lastSynced = ${event.lastSyncedDate}")
 }
 
 private final case class MinimalCommitSyncEvent(project: Project) extends CommitSyncEvent
 
 private object MinimalCommitSyncEvent {
-  implicit lazy val show: Show[MinimalCommitSyncEvent] = Show.show(event => show"CommitSyncEvent ${event.project}")
+  implicit lazy val show: Show[MinimalCommitSyncEvent] = Show.show(_.project.show)
 }
 
 private object CommitSyncEventEncoder {

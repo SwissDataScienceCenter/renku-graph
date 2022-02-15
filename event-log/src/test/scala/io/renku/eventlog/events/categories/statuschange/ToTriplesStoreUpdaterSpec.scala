@@ -113,6 +113,33 @@ class ToTriplesStoreUpdaterSpec
           .getOrElse(fail(s"No event found with old $originalStatus status"))
       }
     }
+
+    "change the status of all events older than the current event but not the events with the same date" in new TestCase {
+      val eventDate = eventDates.generateOne
+      val event1    = addEvent(TransformingTriples, eventDate)
+      val event2    = addEvent(TriplesGenerated, eventDate)
+
+      val statusChangeEvent =
+        ToTriplesStore(CompoundEventId(event1._1, projectId), projectPath, eventProcessingTimes.generateOne)
+
+      (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+
+      sessionResource.useK(dbUpdater updateDB statusChangeEvent).unsafeRunSync() shouldBe DBUpdateResults
+        .ForProjects(
+          projectPath,
+          statusCount = Map(TransformingTriples -> -1, TriplesStore -> 1)
+        )
+
+      findFullEvent(CompoundEventId(event1._1, projectId))
+        .map { case (_, status, _, maybePayload, processingTimes) =>
+          status        shouldBe TriplesStore
+          maybePayload  shouldBe a[Some[_]]
+          processingTimes should contain(statusChangeEvent.processingTime)
+        }
+        .getOrElse(fail("No event found for main event"))
+
+      findFullEvent(CompoundEventId(event2._1, projectId)).map(_._2) shouldBe TriplesGenerated.some
+    }
   }
 
   "onRollback" should {

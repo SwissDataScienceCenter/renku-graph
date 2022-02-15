@@ -27,7 +27,7 @@ private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPat
 
 private object AwaitingGenerationEvent {
   implicit lazy val show: Show[AwaitingGenerationEvent] =
-    Show.show(event => show"AwaitingGenerationEvent ${event.id}, projectPath = ${event.projectPath}")
+    Show.show(event => show"${event.id}, projectPath = ${event.projectPath}")
 }
 
 private object AwaitingGenerationEventEncoder {

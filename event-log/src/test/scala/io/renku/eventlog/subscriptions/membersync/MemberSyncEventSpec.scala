@@ -30,7 +30,7 @@ class MemberSyncEventSpec extends AnyWordSpec with should.Matchers {
 
     "print out the projectPath" in {
       val event = MemberSyncEvent(projectPaths.generateOne)
-      event.show shouldBe s"MemberSyncEvent projectPath = ${event.projectPath}"
+      event.show shouldBe s"projectPath = ${event.projectPath}"
     }
   }
 }

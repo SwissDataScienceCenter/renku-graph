@@ -750,7 +750,7 @@ class DatasetsFinderSpec
         loadToStore(publicProject, privateProject)
 
         val result = datasetsFinder
-          .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
+          .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, maybeUser = None)
           .unsafeRunSync()
 
         result.results          shouldBe List((publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1))
@@ -778,22 +778,25 @@ class DatasetsFinderSpec
 
   "findDatasets with authorized user" should {
 
-    "return public datasets and private datasets from project the user is a member of" in new TestCase {
+    "return datasets from public, internal and private project where the user is a member" in new TestCase {
 
       val (publicDataset, publicProject) =
         publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
       val userWithGitlabId = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
-      val (privateDatasetWithAccess, privateProjectWithAccess) =
-        renkuProjectEntities(visibilityNonPublic)
+      val (internalDatasetWithAccess, internalProjectWithAccess) =
+        renkuProjectEntities(fixed(Visibility.Internal))
           .modify(_.copy(members = Set(userWithGitlabId)))
           .addDataset(datasetEntities(provenanceInternal))
           .generateOne
 
-      val (_, privateProjectWithoutAccess) =
-        renkuProjectEntities(visibilityNonPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+      val (privateDatasetWithAccess, privateProjectWithAccess) =
+        renkuProjectEntities(fixed(Visibility.Private))
+          .modify(_.copy(members = Set(userWithGitlabId)))
+          .addDataset(datasetEntities(provenanceInternal))
+          .generateOne
 
-      loadToStore(publicProject, privateProjectWithAccess, privateProjectWithoutAccess)
+      loadToStore(publicProject, internalProjectWithAccess, privateProjectWithAccess)
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = None,
@@ -805,29 +808,76 @@ class DatasetsFinderSpec
 
       val datasetsList = List(
         (publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1),
+        (internalDatasetWithAccess, internalProjectWithAccess).toDatasetSearchResult(projectsCount = 1),
         (privateDatasetWithAccess, privateProjectWithAccess).toDatasetSearchResult(projectsCount = 1)
       ).sortBy(_.title)
 
       result.results          shouldBe datasetsList
-      result.pagingInfo.total shouldBe Total(2)
+      result.pagingInfo.total shouldBe Total(3)
     }
 
-    "return public datasets and private datasets from project the user is a member of " +
-      "but not count project the user is not a member of" in new TestCase {
+    "return datasets from internal projects where the user is not a member" in new TestCase {
+
+      val (internalDatasetWithoutAccess, internalProjectWithoutAccess) =
+        renkuProjectEntities(fixed(Visibility.Internal)).addDataset(datasetEntities(provenanceInternal)).generateOne
+
+      loadToStore(internalProjectWithoutAccess)
+
+      datasetsFinder
+        .findDatasets(maybePhrase = None,
+                      Sort.By(TitleProperty, Direction.Asc),
+                      PagingRequest.default,
+                      authUsers.generateSome
+        )
+        .unsafeRunSync()
+        .results shouldBe List(
+        (internalDatasetWithoutAccess, internalProjectWithoutAccess).toDatasetSearchResult(projectsCount = 1)
+      )
+    }
+
+    "not return datasets from private projects where the user is not a member" in new TestCase {
+
+      val privateProjectWithoutAccess =
+        renkuProjectEntities(fixed(Visibility.Private)).withDatasets(datasetEntities(provenanceInternal)).generateOne
+
+      loadToStore(privateProjectWithoutAccess)
+
+      datasetsFinder
+        .findDatasets(maybePhrase = None,
+                      Sort.By(TitleProperty, Direction.Asc),
+                      PagingRequest.default,
+                      authUsers.generateSome
+        )
+        .unsafeRunSync()
+        .results shouldBe Nil
+    }
+
+    "return datasets from public, internal and private projects where the user is a member " +
+      "but not count private projects the user is not a member" in new TestCase {
 
         val (publicDataset, publicProject) =
           publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
+        val (internalDatasetWithoutAccess, internalProjectWithoutAccess) =
+          renkuProjectEntities(fixed(Visibility.Internal)).addDataset(datasetEntities(provenanceInternal)).generateOne
         val (privateDatasetWithoutAccess, privateProjectWithoutAccess) =
-          renkuProjectEntities(visibilityNonPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
+          renkuProjectEntities(fixed(Visibility.Private)).addDataset(datasetEntities(provenanceInternal)).generateOne
 
         val userWithGitlabId = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
-        val (privateDatasetWithAccess, privateProjectWithAccess) =
-          renkuProjectEntities(visibilityNonPublic)
-            .modify(_.copy(members = Set(userWithGitlabId)))
-            .importDataset(privateDatasetWithoutAccess)
-            .generateOne
+        val (internalDatasetWithAccess, internalProjectWithAccess) = renkuProjectEntities(fixed(Visibility.Internal))
+          .modify(_.copy(members = Set(userWithGitlabId)))
+          .importDataset(internalDatasetWithoutAccess)
+          .generateOne
+        val (privateDatasetWithAccess, privateProjectWithAccess) = renkuProjectEntities(fixed(Visibility.Private))
+          .modify(_.copy(members = Set(userWithGitlabId)))
+          .importDataset(privateDatasetWithoutAccess)
+          .generateOne
 
-        loadToStore(publicProject, privateProjectWithoutAccess, privateProjectWithAccess)
+        loadToStore(publicProject,
+                    internalProjectWithoutAccess,
+                    internalProjectWithAccess,
+                    privateProjectWithoutAccess,
+                    privateProjectWithAccess
+        )
 
         val result = datasetsFinder
           .findDatasets(maybePhrase = None,
@@ -837,13 +887,17 @@ class DatasetsFinderSpec
           )
           .unsafeRunSync()
 
-        val datasetsList = List(
-          (publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1),
-          (privateDatasetWithAccess, privateProjectWithAccess).toDatasetSearchResult(projectsCount = 1)
-        ).sortBy(_.title)
+        result.results shouldBe {
+          List(
+            (publicDataset, publicProject).toDatasetSearchResult(projectsCount = 1),
+            (privateDatasetWithAccess, privateProjectWithAccess).toDatasetSearchResult(projectsCount = 1)
+          ) ::: List(
+            (internalDatasetWithoutAccess, internalProjectWithoutAccess),
+            (internalDatasetWithAccess, internalProjectWithAccess)
+          ).toDatasetSearchResult(matchIdFrom = result.results, projectsCount = 2).toList
+        }.sortBy(_.title)
 
-        result.results          shouldBe datasetsList
-        result.pagingInfo.total shouldBe Total(2)
+        result.pagingInfo.total shouldBe Total(3)
       }
   }
 

@@ -25,19 +25,16 @@ import io.renku.commiteventservice.events.categories.common.SynchronizationSumma
 import io.renku.commiteventservice.events.categories.common.{SynchronizationSummary, UpdateResult}
 import io.renku.commiteventservice.events.categories.globalcommitsync._
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.gitlab.{GitLabCommitFetcher, GitLabCommitStatFetcher}
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder._
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
-import io.renku.http.client.GitLabClient
 
 import scala.util.control.NonFatal
 
@@ -171,15 +168,14 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
 
 private[globalcommitsync] object CommitsSynchronizer {
   def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabClient: GitLabClient[F],
-                                                   gitLabThrottler:       Throttler[F, GitLab],
                                                    executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[CommitsSynchronizer[F]] = for {
     accessTokenFinder         <- AccessTokenFinder[F]
-    gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabClient, gitLabThrottler)
+    gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabClient)
     gitLabCommitFetcher       <- GitLabCommitFetcher[F](gitLabClient)
     elCommitFetcher           <- ELCommitFetcher[F]
     commitEventDeleter        <- CommitEventDeleter[F]
-    missingCommitEventCreator <- MissingCommitEventCreator(gitLabThrottler)
+    missingCommitEventCreator <- MissingCommitEventCreator(gitLabClient)
   } yield new CommitsSynchronizerImpl(
     accessTokenFinder,
     gitLabCommitStatFetcher,
