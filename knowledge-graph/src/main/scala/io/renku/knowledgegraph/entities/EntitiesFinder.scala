@@ -317,7 +317,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
             |              schema:identifier ?userGitlabId .
             |}
             |FILTER (
-            |  $visibilityVariable = '${projects.Visibility.Public.value}' || ?userGitlabId = ${user.id.value}
+            |  $visibilityVariable != '${projects.Visibility.Private.value}' || ?userGitlabId = ${user.id.value}
             |)
             |""".stripMargin
       case _ =>
