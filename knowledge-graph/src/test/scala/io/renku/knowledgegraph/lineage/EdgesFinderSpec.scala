@@ -24,6 +24,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
@@ -82,11 +83,11 @@ class EdgesFinderSpec
       }
 
     /** in1 in2 in3 in2 
-      *   \ /     \ / 
+     *    \ /     \ / 
      *    plan   plan
-      *     |     |
-     *     out1  out2
-      */
+     *     |     |
+     *    out1  out2
+     */
     "return all the edges including executions with overridden inputs/outputs" in new TestCase {
 
       val project = renkuProjectEntities(visibilityPublic).generateOne
@@ -134,30 +135,78 @@ class EdgesFinderSpec
           .unsafeRunSync() shouldBe empty
       }
 
-    "return None if the project is not public " +
-      "case when the user is not a member of the project or not authenticated" in new TestCase {
-        val exemplarData = LineageExemplarData(renkuProjectEntities(visibilityNonPublic).generateOne)
+    Visibility.Internal :: Visibility.Private :: Nil foreach { visibility =>
+      s"return None if the project is $visibility " +
+        "case when the user is not authenticated" in new TestCase {
+          val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(visibility)).generateOne)
+
+          loadToStore(exemplarData.project)
+
+          edgesFinder
+            .findEdges(projectPaths.generateOne, authUsers.generateOption)
+            .unsafeRunSync() shouldBe empty
+
+          logger.logged(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
+        }
+    }
+
+    "return None if the project is private " +
+      "case when the user is authenticated but he's not the project member" in new TestCase {
+        val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Private)).generateOne)
 
         loadToStore(exemplarData.project)
 
         edgesFinder
-          .findEdges(projectPaths.generateOne, authUsers.generateOption)
+          .findEdges(projectPaths.generateOne, authUsers.generateSome)
           .unsafeRunSync() shouldBe empty
 
-        logger.logged(
-          Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}")
-        )
+        logger.logged(Warn(s"lineage - edges finished${executionTimeRecorder.executionTimeInfo}"))
       }
 
-    "return all the edges of the given project " +
-      "case when the user is authenticated and is a member of the project" in new TestCase {
+    Visibility.Internal :: Visibility.Private :: Nil foreach { visibility =>
+      s"return all the edges of the $visibility project " +
+        "case when the user is authenticated and he's a member of the project" in new TestCase {
+          val authUser = authUsers.generateOne
+
+          val exemplarData = LineageExemplarData(
+            renkuProjectEntities(fixed(visibility)).generateOne.copy(
+              members = Set(personEntities.generateOne.copy(maybeGitLabId = Some(authUser.id)))
+            )
+          )
+
+          import exemplarData._
+
+          loadToStore(project)
+
+          edgesFinder
+            .findEdges(project.path, Some(authUser))
+            .unsafeRunSync() shouldBe Map(
+            ExecutionInfo(activity1.asEntityId.show, RunDate(activity1.startTime.value)) -> (
+              Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+              Set(`bikesparquet entity`.toNodeLocation)
+            ),
+            ExecutionInfo(activity2.asEntityId.show, RunDate(activity2.startTime.value)) -> (
+              Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+              Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+            ),
+            ExecutionInfo(activity3.asEntityId.show, RunDate(activity3.startTime.value)) -> (
+              Set(`zhbikes folder`.toNodeLocation, `clean_data entity`.toNodeLocation),
+              Set(`bikesparquet entity`.toNodeLocation)
+            ),
+            ExecutionInfo(activity4.asEntityId.show, RunDate(activity4.startTime.value)) -> (
+              Set(`plot_data entity`.toNodeLocation, `bikesparquet entity`.toNodeLocation),
+              Set(`grid_plot entity`.toNodeLocation, `cumulative entity`.toNodeLocation)
+            )
+          )
+        }
+    }
+
+    "return all the edges of the internal project " +
+      "case when the user is authenticated and he's not a member of the project" in new TestCase {
         val authUser = authUsers.generateOne
 
-        val exemplarData = LineageExemplarData(
-          renkuProjectEntities(visibilityNonPublic).generateOne.copy(
-            members = Set(personEntities.generateOne.copy(maybeGitLabId = Some(authUser.id)))
-          )
-        )
+        val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Internal)).generateOne)
+
         import exemplarData._
 
         loadToStore(project)

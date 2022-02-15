@@ -23,7 +23,8 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.client.UrlEncoder._
+import io.sentry.SentryOptions
+import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,16 +36,18 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
   "run" should {
 
     "initialise Sentry with the url built from the given config if config given" in new TestCase {
+
+      val optionsCapture = CaptureOne[SentryOptions]()
+      initSentry.expects(capture(optionsCapture)).returning(())
+
       val sentryConfig = sentryConfigs.generateOne
 
-      initSentry.expects {
-        s"${sentryConfig.baseUrl}?" +
-          s"stacktrace.app.packages=${urlEncode(sentryConfig.stackTracePackage.toString)}&" +
-          s"servername=${urlEncode(sentryConfig.serviceName.toString)}&" +
-          s"environment=${urlEncode(sentryConfig.environmentName.toString)}"
-      }
+      sentryInitializer(Some(sentryConfig)).run() shouldBe ().pure[Try]
 
-      sentryInitializer(Some(sentryConfig)).run() shouldBe MonadThrow[Try].unit
+      val options = optionsCapture.value
+      options.getDsn         shouldBe sentryConfig.baseUrl.value
+      options.getServerName  shouldBe sentryConfig.serviceName.value
+      options.getEnvironment shouldBe sentryConfig.environmentName.value
     }
 
     "do nothing if no config given" in new TestCase {
@@ -63,7 +66,7 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
   }
 
   private trait TestCase {
-    val initSentry        = mockFunction[String, Unit]
+    val initSentry        = mockFunction[SentryOptions, Unit]
     val sentryInitializer = new SentryInitializerImpl[Try](_, initSentry)
   }
 }

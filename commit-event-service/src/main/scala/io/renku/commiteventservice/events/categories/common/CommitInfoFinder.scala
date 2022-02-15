@@ -20,15 +20,13 @@ package io.renku.commiteventservice.events.categories.common
 
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.GitLabUrl
+import eu.timepit.refined.auto._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects.Id
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient}
 import org.http4s.Status.NotFound
 import org.http4s.circe.jsonOf
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{EntityDecoder, Status}
 import org.typelevel.log4cats.Logger
 
@@ -45,11 +43,8 @@ private[categories] trait CommitInfoFinder[F[_]] {
   ): F[Option[CommitInfo]]
 }
 
-private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](
-    gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[F, GitLab]
-) extends RestClient(gitLabThrottler)
-    with CommitInfoFinder[F] {
+private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F])
+    extends CommitInfoFinder[F] {
 
   import CommitInfo._
   import org.http4s.Method.GET
@@ -70,10 +65,10 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
         ResultType
       ]]
-  )(implicit maybeAccessToken: Option[AccessToken]) = for {
-    uri    <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId")
-    result <- send(secureRequest(GET, uri))(mapResponse)
-  } yield result
+  )(implicit maybeAccessToken: Option[AccessToken]) =
+    gitLabClient.send(GET, uri"projects" / projectId.show / "repository" / "commits" / commitId.show, "commit-details")(
+      mapResponse
+    )
 
   private def mapToCommitOrThrow(projectId: Id,
                                  commitId:  CommitId
@@ -94,9 +89,6 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](
 }
 
 private[categories] object CommitInfoFinder {
-  def apply[F[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
-  ): F[CommitInfoFinderImpl[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new CommitInfoFinderImpl[F](gitLabUrl, gitLabThrottler)
+  def apply[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F]): F[CommitInfoFinderImpl[F]] =
+    new CommitInfoFinderImpl[F](gitLabClient).pure[F]
 }

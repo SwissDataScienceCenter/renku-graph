@@ -147,7 +147,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger](
           |  ?memberId  schema:additionalType 'GitLab';
           |             schema:identifier ?userGitlabId .
           |}
-          |FILTER ( ?visibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value} )
+          |FILTER ( ?visibility != '${Visibility.Private.value}' || ?userGitlabId = ${user.id.value} )
           |""".stripMargin
     case _ =>
       s"""|$projectResourceId renku:projectVisibility ?visibility .

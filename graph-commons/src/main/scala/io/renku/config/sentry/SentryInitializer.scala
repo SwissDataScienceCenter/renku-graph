@@ -20,7 +20,6 @@ package io.renku.config.sentry
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.config.sentry.SentryConfig.SentryBaseUrl
 import io.sentry.SentryOptions
 
 import scala.util.Try
@@ -31,17 +30,21 @@ trait SentryInitializer[F[_]] {
 
 class SentryInitializerImpl[F[_]: MonadThrow](
     maybeSentryConfig: Option[SentryConfig],
-    initSentry:        String => Unit
+    initSentry:        SentryOptions => Unit
 ) extends SentryInitializer[F] {
 
-  override def run(): F[Unit] = maybeSentryConfig.map(toDsn) match {
-    case Some(dsn) => MonadThrow[F].fromTry(Try(initSentry(dsn.toString)))
-    case _         => MonadThrow[F].unit
+  override def run(): F[Unit] = maybeSentryConfig.map(toSentryOptions) match {
+    case Some(options) => MonadThrow[F].fromTry(Try(initSentry(options)))
+    case _             => MonadThrow[F].unit
   }
 
-  private lazy val toDsn: SentryConfig => SentryBaseUrl = {
-    case SentryConfig(baseUrl, environmentName, serviceName, stackTracePackage) =>
-      baseUrl ? ("stacktrace.app.packages" -> stackTracePackage) & ("servername" -> serviceName) & ("environment" -> environmentName)
+  private lazy val toSentryOptions: SentryConfig => SentryOptions = {
+    case SentryConfig(baseUrl, environment, service) =>
+      val options = new SentryOptions()
+      options.setDsn(baseUrl.value)
+      options.setServerName(service.value)
+      options.setEnvironment(environment.value)
+      options
   }
 }
 
@@ -52,6 +55,6 @@ object SentryInitializer {
     maybeSentryConfig <- SentryConfig[F]()
   } yield new SentryInitializerImpl(
     maybeSentryConfig,
-    dsn => { Sentry.init((options: SentryOptions) => options.setDsn(dsn)); () }
+    sentryOptions => Sentry.init(sentryOptions)
   )
 }

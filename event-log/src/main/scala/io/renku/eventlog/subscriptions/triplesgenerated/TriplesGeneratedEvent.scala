@@ -32,7 +32,7 @@ private final case class TriplesGeneratedEvent(id:          CompoundEventId,
 
 private object TriplesGeneratedEvent {
   implicit lazy val show: Show[TriplesGeneratedEvent] =
-    Show.show(event => show"TriplesGeneratedEvent ${event.id}, projectPath = ${event.projectPath}")
+    Show.show(event => show"${event.id}, projectPath = ${event.projectPath}")
 }
 
 private object TriplesGeneratedEventEncoder {

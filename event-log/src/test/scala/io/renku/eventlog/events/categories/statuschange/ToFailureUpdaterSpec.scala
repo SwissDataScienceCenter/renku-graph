@@ -54,8 +54,7 @@ class ToFailureUpdaterSpec
     "change status of the given event from ProcessingStatus to FailureStatus" in new TestCase {
       Set(
         createFailureEvent(GeneratingTriples, GenerationNonRecoverableFailure, None),
-        createFailureEvent(GeneratingTriples, GenerationRecoverableFailure, Duration.ofHours(100).some),
-        createFailureEvent(TransformingTriples, TransformationRecoverableFailure, Duration.ofHours(100).some)
+        createFailureEvent(GeneratingTriples, GenerationRecoverableFailure, Duration.ofHours(100).some)
       ) foreach { statusChangeEvent =>
         (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
@@ -78,6 +77,64 @@ class ToFailureUpdaterSpec
         message         shouldBe statusChangeEvent.message
       }
     }
+
+    "change status of the given event from TRANSFORMING_TRIPLES to TRANSFORMATION_RECOVERABLE_FAILURE " +
+      "as well as all the older events which are TRIPLES_GENERATED status to TRANSFORMATION_RECOVERABLE_FAILURE" in new TestCase {
+        val latestEventDate = eventDates.generateOne
+        val statusChangeEvent = ToFailure(
+          addEvent(compoundEventIds.generateOne.copy(projectId = projectId), TransformingTriples, latestEventDate),
+          projectPath,
+          eventMessages.generateOne,
+          TransformingTriples,
+          TransformationRecoverableFailure,
+          None
+        )
+
+        val eventToUpdate = addEvent(
+          compoundEventIds.generateOne.copy(projectId = projectId),
+          TriplesGenerated,
+          timestamps(max = latestEventDate.value).generateAs(EventDate)
+        )
+
+        val eventsNotToUpdate = (EventStatus.all - TriplesGenerated).map { status =>
+          addEvent(
+            compoundEventIds.generateOne.copy(projectId = projectId),
+            status,
+            timestamps(max = latestEventDate.value).generateAs(EventDate)
+          ) -> status
+        } + {
+          addEvent(
+            compoundEventIds.generateOne.copy(projectId = projectId),
+            TriplesGenerated,
+            timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now()).generateAs(EventDate)
+          ) -> TriplesGenerated
+        } + {
+          addEvent(
+            compoundEventIds.generateOne.copy(projectId = projectId),
+            TriplesGenerated,
+            latestEventDate
+          ) -> TriplesGenerated
+        }
+
+        (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+
+        sessionResource
+          .useK(dbUpdater updateDB statusChangeEvent)
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(
+          projectPath,
+          Map(TriplesGenerated -> -1, statusChangeEvent.currentStatus -> -1, statusChangeEvent.newStatus -> 2)
+        )
+
+        val updatedEvent = findEvent(statusChangeEvent.eventId)
+        updatedEvent.map(_._2)     shouldBe Some(statusChangeEvent.newStatus)
+        updatedEvent.flatMap(_._3) shouldBe Some(statusChangeEvent.message)
+
+        findEvent(eventToUpdate).map(_._2) shouldBe Some(TransformationRecoverableFailure)
+
+        eventsNotToUpdate foreach { case (eventId, status) =>
+          findEvent(eventId).map(_._2) shouldBe Some(status)
+        }
+      }
 
     "change status of the given event from TRANSFORMING_TRIPLES to TRANSFORMATION_NON_RECOVERABLE_FAILURE " +
       "as well as all the older events which are TRIPLES_GENERATED status to NEW" in new TestCase {
@@ -103,11 +160,19 @@ class ToFailureUpdaterSpec
             status,
             timestamps(max = latestEventDate.value).generateAs(EventDate)
           ) -> status
-        } + (addEvent(
-          compoundEventIds.generateOne.copy(projectId = projectId),
-          TriplesGenerated,
-          timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now()).generateAs(EventDate)
-        ) -> TriplesGenerated)
+        } + {
+          addEvent(
+            compoundEventIds.generateOne.copy(projectId = projectId),
+            TriplesGenerated,
+            timestamps(min = latestEventDate.value.plusSeconds(2), max = Instant.now()).generateAs(EventDate)
+          ) -> TriplesGenerated
+        } + {
+          addEvent(
+            compoundEventIds.generateOne.copy(projectId = projectId),
+            TriplesGenerated,
+            latestEventDate
+          ) -> TriplesGenerated
+        }
 
         (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 

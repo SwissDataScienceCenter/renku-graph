@@ -28,8 +28,6 @@ import eu.timepit.refined.numeric.Positive
 import io.circe.Decoder
 import io.renku.commiteventservice.events.categories.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.CommitsSynchronizer
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -102,11 +100,10 @@ private[events] object EventHandler {
   def apply[F[_]: Async: NonEmptyParallel: Logger](
       subscriptionMechanism: SubscriptionMechanism[F],
       gitLabClient:          GitLabClient[F],
-      gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[EventHandler[F]] = for {
     concurrentProcessesLimiter    <- ConcurrentProcessesLimiter(processesLimit)
-    globalCommitEventSynchronizer <- CommitsSynchronizer(gitLabClient, gitLabThrottler, executionTimeRecorder)
+    globalCommitEventSynchronizer <- CommitsSynchronizer(gitLabClient, executionTimeRecorder)
   } yield new EventHandler[F](categoryName,
                               globalCommitEventSynchronizer,
                               subscriptionMechanism,

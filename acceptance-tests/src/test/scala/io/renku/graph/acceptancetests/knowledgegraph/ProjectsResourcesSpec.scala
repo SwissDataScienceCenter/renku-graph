@@ -28,8 +28,9 @@ import io.renku.graph.acceptancetests.data.Project.{Urls, _}
 import io.renku.graph.acceptancetests.data.{Project, _}
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
-import io.renku.graph.model.projects.{DateCreated, ForksCount}
+import io.renku.graph.model.projects.{DateCreated, ForksCount, Visibility}
 import io.renku.graph.model.testentities
+import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.RenkuProject._
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
@@ -63,7 +64,7 @@ class ProjectsResourcesSpec
 
     (dataProjects(parent).generateOne,
      dataProjects(
-       child.copy(visibility = visibilityNonPublic.generateOne,
+       child.copy(visibility = Visibility.Private,
                   members = child.members + personEntities.generateOne.copy(maybeGitLabId = user.id.some)
        )
      ).generateOne
@@ -74,18 +75,19 @@ class ProjectsResourcesSpec
 
     Scenario("As a user I would like to find project's details by calling a REST endpoint") {
 
-      Given("I am authenticated")
+      Given("the user is authenticated")
       `GET <gitlabApi>/user returning OK`(user)
 
-      Given("some data in the RDF Store")
+      And("there are some data in the RDF Store")
+      val parentCommitId = commitIds.generateOne
+      mockDataOnGitLabAPIs(parentProject, parentProject.entitiesProject.asJsonLD, parentCommitId)
+      `data in the RDF store`(parentProject, parentCommitId)
 
-      `data in the RDF store`(parentProject, parentProject.entitiesProject.asJsonLD)
-      `wait for events to be processed`(parentProject.id)
+      val commitId = commitIds.generateOne
+      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
+      `data in the RDF store`(project, commitId)
 
-      `data in the RDF store`(project, project.entitiesProject.asJsonLD)
-      `wait for events to be processed`(project.id)
-
-      When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
+      When("the user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 
       Then("he should get OK response with project's details")

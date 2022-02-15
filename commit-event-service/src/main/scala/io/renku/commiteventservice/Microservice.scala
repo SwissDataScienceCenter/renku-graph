@@ -49,9 +49,9 @@ object Microservice extends IOMicroservice {
     gitLabClient          <- GitLabClient[IO](gitLabThrottler)
     executionTimeRecorder <- ExecutionTimeRecorder[IO]()
     commitSyncCategory <-
-      events.categories.commitsync.SubscriptionFactory(gitLabThrottler, executionTimeRecorder)
+      events.categories.commitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
     globalCommitSyncCategory <-
-      events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, gitLabThrottler, executionTimeRecorder)
+      events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
     eventConsumersRegistry  <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
     metricsRegistry         <- MetricsRegistry[IO]()
     serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)

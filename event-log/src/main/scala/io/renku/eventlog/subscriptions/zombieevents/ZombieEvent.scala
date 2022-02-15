@@ -38,7 +38,7 @@ private case class ZombieEvent(generatedBy: ZombieEventProcess,
 
 private object ZombieEvent {
   implicit lazy val show: Show[ZombieEvent] = Show.show(event =>
-    show"ZombieEvent ${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
+    show"${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
   )
 }
 

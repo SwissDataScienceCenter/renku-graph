@@ -86,7 +86,7 @@ class ProjectMembersFinderSpec
       finder.findProjectMembers(projectPath).value.unsafeRunSync() shouldBe allMembers.toSet.asRight
     }
 
-    "return an empty list if one of the endpoints responds with NOT_FOUND" in new TestCase {
+    "return members even if one of the endpoints responds with NOT_FOUND" in new TestCase {
       val members = projectMembersNoEmail.generateSet()
       if (Random.nextBoolean()) {
         `/api/v4/project/users`(projectPath) returning notFound()
@@ -99,7 +99,7 @@ class ProjectMembersFinderSpec
       finder.findProjectMembers(projectPath).value.unsafeRunSync() shouldBe members.asRight
     }
 
-    "return an empty list if one of the endpoints returns an empty list" in new TestCase {
+    "return an empty set if one of the endpoints returns an empty list" in new TestCase {
       val members = projectMembersNoEmail.generateSet()
       if (Random.nextBoolean()) {
         `/api/v4/project/users`(projectPath) returning okJson(Json.arr().noSpaces)

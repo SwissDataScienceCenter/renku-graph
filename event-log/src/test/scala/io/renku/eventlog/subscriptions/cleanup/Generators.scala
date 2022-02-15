@@ -16,15 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.cleanup
 
+import io.renku.events.consumers.Project
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import org.scalacheck.Gen
-import io.renku.events.consumers.Project
 
-package object cleanup {
-
-  private[cleanup] lazy val cleanupEvents: Gen[CleanUpEvent] = for {
+private object Generators {
+  lazy val cleanupEvents: Gen[CleanUpEvent] = for {
     projectId   <- projectIds
     projectPath <- projectPaths
   } yield CleanUpEvent(Project(projectId, projectPath))

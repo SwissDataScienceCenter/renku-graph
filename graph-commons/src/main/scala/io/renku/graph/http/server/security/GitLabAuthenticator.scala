@@ -44,17 +44,14 @@ class GitLabAuthenticatorImpl[F[_]: Async: Temporal: Logger](
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def authenticate(accessToken: AccessToken): F[Either[EndpointSecurityException, AuthUser]] =
-    for {
-      uri      <- validateUri(s"$gitLabApiUrl/user")
-      authUser <- send(request(GET, uri, accessToken))(mapResponse(accessToken))
-    } yield authUser
+  override def authenticate(accessToken: AccessToken): F[Either[EndpointSecurityException, AuthUser]] = for {
+    uri      <- validateUri(s"$gitLabApiUrl/user")
+    authUser <- send(request(GET, uri, accessToken))(mapResponse(accessToken))
+  } yield authUser
 
   private def mapResponse(
       accessToken: AccessToken
-  ): PartialFunction[(Status, Request[F], Response[F]), F[
-    Either[EndpointSecurityException, AuthUser]
-  ]] = {
+  ): PartialFunction[(Status, Request[F], Response[F]), F[Either[EndpointSecurityException, AuthUser]]] = {
     case (Ok, _, response) =>
       implicit val entityDecoder: EntityDecoder[F, AuthUser] = decoder(accessToken)
       response.as[AuthUser] map (_.asRight[EndpointSecurityException])

@@ -24,6 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import org.http4s.Status._
@@ -84,6 +85,10 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
       Given("project is present in GitLab")
       `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
+      `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
+                                                                              project,
+                                                                              commitIds.generateOne
+      )
       Given("project has Graph Services hook in GitLab")
       `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(project.id)
 

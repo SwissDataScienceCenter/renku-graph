@@ -16,29 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.membersync
+package io.renku.eventlog.events.categories
 
-import cats.Show
-import cats.implicits.showInterpolator
-import io.renku.graph.model.projects
+import io.renku.graph.model.events.CategoryName
 
-private final case class MemberSyncEvent(projectPath: projects.Path)
-
-private object MemberSyncEvent {
-  implicit lazy val show: Show[MemberSyncEvent] =
-    Show.show(event => show"projectPath = ${event.projectPath}")
-}
-
-private object MemberSyncEventEncoder {
-
-  import io.circe.Json
-  import io.circe.literal.JsonStringContext
-
-  def encodeEvent(event: MemberSyncEvent): Json =
-    json"""{
-    "categoryName": ${categoryName.value},
-    "project": {
-      "path":       ${event.projectPath.value}
-    }
-  }"""
+package object globalcommitsyncrequest {
+  val categoryName: CategoryName = CategoryName("GLOBAL_COMMIT_SYNC_REQUEST")
 }

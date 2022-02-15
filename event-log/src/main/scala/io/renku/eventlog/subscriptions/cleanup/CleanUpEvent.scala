@@ -25,8 +25,7 @@ import io.renku.events.consumers.Project
 private final case class CleanUpEvent(project: Project)
 
 private object CleanUpEvent {
-  implicit lazy val show: Show[CleanUpEvent] =
-    Show.show(event => show"CleanUpEvent ${event.project}")
+  implicit lazy val show: Show[CleanUpEvent] = Show.show(_.project.show)
 }
 
 private object CleanUpEventEncoder {

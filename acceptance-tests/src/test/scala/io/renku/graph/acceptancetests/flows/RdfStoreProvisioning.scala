@@ -28,7 +28,6 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
-import io.renku.jsonld.JsonLD
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.Assertion
@@ -37,6 +36,7 @@ import org.scalatest.matchers.should
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
+import cats.data.NonEmptyList
 
 trait RdfStoreProvisioning
     extends ModelImplicits
@@ -45,33 +45,26 @@ trait RdfStoreProvisioning
     with AcceptanceTestPatience
     with should.Matchers {
   self: GraphServices =>
+  def `data in the RDF store`(
+      project:            data.Project,
+      commitId:           CommitId = commitIds.generateOne
+  )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion =
+    `data in the RDF store`(project, NonEmptyList(commitId, Nil))
 
   def `data in the RDF store`(
       project:            data.Project,
-      triples:            JsonLD,
-      commitId:           CommitId = commitIds.generateOne
+      commitIds:          NonEmptyList[CommitId]
   )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion = {
-    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with a commit`(project.id, commitId)
-
-    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
-
-    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
-
-    `GET <gitlabApi>/projects/:id/events/?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
-                                                                             project,
-                                                                             commitId
-    )
-
-    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 
     givenAccessTokenPresentFor(project)
 
-    webhookServiceClient
-      .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, commitId))
-      .status shouldBe Accepted
+    commitIds.toList.foreach { commitId =>
+      webhookServiceClient
+        .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, commitId))
+        .status shouldBe Accepted
 
-    sleep((3 second).toMillis)
-
+      sleep((3 second).toMillis)
+    }
     `wait for events to be processed`(project.id)
   }
 

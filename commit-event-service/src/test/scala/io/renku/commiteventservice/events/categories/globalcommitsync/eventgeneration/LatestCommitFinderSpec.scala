@@ -20,21 +20,22 @@ package io.renku.commiteventservice.events.categories.globalcommitsync.eventgene
 
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.WireMock._
-import io.circe.Json
-import io.circe.literal._
-import io.renku.commiteventservice.events.categories.common.CommitInfo
-import io.renku.commiteventservice.events.categories.common.Generators.commitInfos
-import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.graph.model.events.CommitId
+import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
+import org.http4s.Method.GET
+import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.{Method, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,18 +48,19 @@ class LatestCommitFinderSpec
     with should.Matchers {
 
   "findLatestCommitId" should {
-    "return the latest CommitID if remote responds with OK and valid body - personal access token case" in new TestCase {
-      val personalAccessToken = personalAccessTokens.generateOne
+    "return the latest CommitID if remote responds with OK and valid body - access token case" in new TestCase {
+      implicit val someAccessToken = accessTokens.generateSome
 
-      stubFor {
-        get(urlPathEqualTo(s"/api/v4/projects/$projectId/repository/commits"))
-          .withQueryParam("per_page", equalTo("1"))
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(okJson(commitsJson(from = commitId)))
-      }
+      val endpointName: String Refined NonEmpty = "commits"
 
-      latestCommitFinder.findLatestCommitId(projectId, Some(personalAccessToken)).value.unsafeRunSync() shouldBe
-        commitId.some
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitId]])(
+          _: Option[AccessToken]
+        ))
+        .expects(GET, uri"projects" / projectId.show / "repository" / "commits", endpointName, *, someAccessToken)
+        .returning(Some(commitId).pure[IO])
+
+      latestCommitFinder.findLatestCommitId(projectId).unsafeRunSync() shouldBe commitId.some
     }
   }
 
@@ -66,22 +68,8 @@ class LatestCommitFinderSpec
     val projectId = projectIds.generateOne
     val commitId  = commitIds.generateOne
 
-    val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val latestCommitFinder = new LatestCommitFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
+    val gitLabClient       = mock[GitLabClient[IO]]
+    val latestCommitFinder = new LatestCommitFinderImpl[IO](gitLabClient)
   }
-
-  private def commitsJson(from: CommitId) =
-    Json.arr(commitJson(commitInfos.generateOne.copy(id = from))).noSpaces
-
-  private def commitJson(commitInfo: CommitInfo) = json"""{
-    "id":              ${commitInfo.id.value},
-    "author_name":     ${commitInfo.author.name.value},
-    "author_email":    ${commitInfo.author.emailToJson},
-    "committer_name":  ${commitInfo.committer.name.value},
-    "committer_email": ${commitInfo.committer.emailToJson},
-    "message":         ${commitInfo.message.value},
-    "committed_date":  ${commitInfo.committedDate.value},
-    "parent_ids":      ${commitInfo.parents.map(_.value)}
-  }"""
 }

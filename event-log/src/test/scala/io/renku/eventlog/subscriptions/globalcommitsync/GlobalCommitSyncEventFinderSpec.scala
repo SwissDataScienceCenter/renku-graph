@@ -32,7 +32,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.EventStatus.AwaitingDeletion
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.{CommitId, CompoundEventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
@@ -169,7 +169,7 @@ class GlobalCommitSyncEventFinderSpec
         )
       }
 
-    "return an event with all commit ids for the project which are *NOT* AWAITING_DELETION" +
+    "return an event with all commit ids for the project which are *NOT* AWAITING_DELETION or DELETING" +
       s"where the project hasn't been synced in the past week" +
       s"and the project's latest event is the most recent of all ready-to-sync projects" in new TestCase {
 
@@ -181,8 +181,10 @@ class GlobalCommitSyncEventFinderSpec
 
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(olderThanAWeek = true, projectId = project0.id)
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(olderThanAWeek = false, projectId = project0.id)
+        val (project0Event2Id, project0Event2Date) = genCommitIdAndDate(olderThanAWeek = false, projectId = project0.id)
         addEvent(project0Event0Id, project0Event0Date, project0.path)
         addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
+        addEvent(project0Event2Id, project0Event2Date, project0.path, eventStatus = Deleting)
         upsertLastSynced(project0.id, categoryName, project0LastSynced)
 
         givenTheLastSyncedDateIsUpdated(project0)
@@ -197,7 +199,7 @@ class GlobalCommitSyncEventFinderSpec
       }
 
     "return None " +
-      "when all events are AWAITING_DELETION but still update the last sync date of the project" in new TestCase {
+      "when all events are AWAITING_DELETION or DELETING but still update the last sync date of the project" in new TestCase {
         currentTime.expects().returning(now)
         finder.popEvent().unsafeRunSync() shouldBe None
 
@@ -206,8 +208,10 @@ class GlobalCommitSyncEventFinderSpec
 
         val (project0Event0Id, project0Event0Date) = genCommitIdAndDate(projectId = project0.id)
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
+        val (project0Event2Id, project0Event2Date) = genCommitIdAndDate(projectId = project0.id)
         addEvent(project0Event0Id, project0Event0Date, project0.path, eventStatus = AwaitingDeletion)
         addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
+        addEvent(project0Event2Id, project0Event2Date, project0.path, eventStatus = Deleting)
         upsertLastSynced(project0.id, categoryName, project0LastSynced)
 
         givenTheLastSyncedDateIsUpdated(project0)
@@ -255,7 +259,8 @@ class GlobalCommitSyncEventFinderSpec
       eventDate:   EventDate,
       projectPath: projects.Path,
       createdDate: CreatedDate = createdDates.generateOne,
-      eventStatus: EventStatus = Gen.oneOf(EventStatus.all.filterNot(_ == AwaitingDeletion)).generateOne
+      eventStatus: EventStatus =
+        Gen.oneOf(EventStatus.all.filterNot(status => status == AwaitingDeletion || status == Deleting)).generateOne
   ): Unit = storeEvent(
     eventId,
     eventStatus,

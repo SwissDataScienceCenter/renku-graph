@@ -16,28 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.commiteventservice.events.categories.globalcommitsync
+package io.renku.eventlog.events.categories.globalcommitsyncrequest
 
-import cats.NonEmptyParallel
-import cats.effect._
+import cats.effect.Concurrent
 import cats.syntax.all._
-import io.renku.commiteventservice.Microservice
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.eventlog.EventLogDB
+import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
-import io.renku.http.client.GitLabClient
-import io.renku.logging.ExecutionTimeRecorder
+import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: NonEmptyParallel: Logger](
-      gitLabClient:          GitLabClient[F],
-      executionTimeRecorder: ExecutionTimeRecorder[F]
+  def apply[F[_]: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
+                                      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriptionMechanism <- SubscriptionMechanism(
-                               categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
-                             )
-    handler <- EventHandler(subscriptionMechanism, gitLabClient, executionTimeRecorder)
-  } yield handler -> subscriptionMechanism
+    handler <- EventHandler(sessionResource, queriesExecTimes)
+  } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }
