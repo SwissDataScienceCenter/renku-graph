@@ -50,9 +50,9 @@ spec:
               path: /$/ping
               port: jena
             initialDelaySeconds: 30
-            periodSeconds: 60
+            periodSeconds: 120
             successThreshold: 1
-            failureThreshold: 6
+            failureThreshold: 10
           volumeMounts:
             - name: lucene-config
               mountPath: /fuseki/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
