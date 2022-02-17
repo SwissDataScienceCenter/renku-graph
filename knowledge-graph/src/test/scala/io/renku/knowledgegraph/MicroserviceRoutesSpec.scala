@@ -22,6 +22,7 @@ import cats.data.EitherT.{leftT, rightT}
 import cats.data.{Kleisli, OptionT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
+import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -29,7 +30,6 @@ import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.SortBy
@@ -49,6 +49,7 @@ import io.renku.knowledgegraph.datasets.rest._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.testtools.IOSpec
+import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -69,162 +70,98 @@ class MicroserviceRoutesSpec
     with should.Matchers
     with IOSpec {
 
-  "routes" should {
+  "GET /knowledge-graph/datasets?query=<phrase>" should {
 
-    "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
-      val response = routes().call(Request(Method.GET, uri"/ping"))
+    s"return $Ok when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
 
-      response.status       shouldBe Ok
-      response.body[String] shouldBe "pong"
+      val maybeAuthUser = authUsers.generateOption
+      val phrase        = nonEmptyStrings().generateOne
+      (datasetsSearchEndpoint
+        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
+        .expects(Phrase(phrase).some,
+                 Sort.By(TitleProperty, Direction.Asc),
+                 PagingRequest(Page.first, PerPage.default),
+                 maybeAuthUser
+        )
+        .returning(IO.pure(Response[IO](Ok)))
+
+      routes(maybeAuthUser)
+        .call(Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase)))
+        .status shouldBe Ok
     }
 
-    "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
-      val response = routes().call(Request(Method.GET, uri"/metrics"))
+    s"return $Ok when no ${query.parameterName} parameter given" in new TestCase {
 
-      response.status     shouldBe Ok
-      response.body[String] should include("server_response_duration_seconds")
+      val maybeAuthUser = authUsers.generateOption
+
+      (datasetsSearchEndpoint
+        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
+        .expects(Option.empty[Phrase],
+                 Sort.By(TitleProperty, Direction.Asc),
+                 PagingRequest(Page.first, PerPage.default),
+                 maybeAuthUser
+        )
+        .returning(IO.pure(Response[IO](Ok)))
+
+      routes(maybeAuthUser).call(Request[IO](Method.GET, uri"/knowledge-graph/datasets")).status shouldBe Ok
     }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
-      "when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
-
-        val maybeAuthUser = authUsers.generateOption
-        val phrase        = nonEmptyStrings().generateOne
-        (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
-          .expects(Phrase(phrase).some,
-                   Sort.By(TitleProperty, Direction.Asc),
-                   PagingRequest(Page.first, PerPage.default),
-                   maybeAuthUser
-          )
-          .returning(IO.pure(Response[IO](Ok)))
-
-        routes(maybeAuthUser)
-          .call(Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase)))
-          .status shouldBe Ok
-      }
-
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Unauthorized when user authentication failed " +
-      "when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
-        val phrase = nonEmptyStrings().generateOne
-
-        routes(givenAuthFailing())
-          .call(Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase)))
-          .status shouldBe Unauthorized
-      }
-
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
-      s"when no ${query.parameterName} parameter given" in new TestCase {
-
-        val maybeAuthUser = authUsers.generateOption
-
-        (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
-          .expects(Option.empty[Phrase],
-                   Sort.By(TitleProperty, Direction.Asc),
-                   PagingRequest(Page.first, PerPage.default),
-                   maybeAuthUser
-          )
-          .returning(IO.pure(Response[IO](Ok)))
-
-        routes(maybeAuthUser).call(Request[IO](Method.GET, uri"/knowledge-graph/datasets")).status shouldBe Ok
-      }
-
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Unauthorized when user authentication failed " +
-      s"and when no parameters are given" in new TestCase {
-        val request = Request[IO](Method.GET, uri"/knowledge-graph/datasets")
-
-        routes(givenAuthFailing())
-          .call(request)
-          .status shouldBe Unauthorized
-      }
+    s"return $Unauthorized when user authentication failed" in new TestCase {
+      routes(givenAuthFailing())
+        .call(Request[IO](Method.GET, uri"/knowledge-graph/datasets"))
+        .status shouldBe Unauthorized
+    }
 
     Sort.properties foreach { sortProperty =>
       val sortBy = Sort.By(sortProperty, Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc).generateOne)
 
-      s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $Ok " +
-        s"when '${query.parameterName}' and 'sort=${sortBy.property}:${sortBy.direction}' parameters given" in new TestCase {
-          val maybeAuthUser = authUsers.generateOption
+      s"return $Ok when '${query.parameterName}' and 'sort=${sortBy.property}:${sortBy.direction}' parameters given" in new TestCase {
+        val maybeAuthUser = authUsers.generateOption
 
-          val phrase = phrases.generateOne
-          val request = Request[IO](
-            Method.GET,
-            uri"/knowledge-graph/datasets"
-              .withQueryParam("query", phrase.value)
-              .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
-          )
-          (datasetsSearchEndpoint
-            .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
-            .expects(phrase.some, sortBy, PagingRequest.default, maybeAuthUser)
-            .returning(IO.pure(Response[IO](Ok)))
+        val phrase = phrases.generateOne
+        val request = Request[IO](
+          Method.GET,
+          uri"/knowledge-graph/datasets"
+            .withQueryParam("query", phrase.value)
+            .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
+        )
+        (datasetsSearchEndpoint
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
+          .expects(phrase.some, sortBy, PagingRequest.default, maybeAuthUser)
+          .returning(IO.pure(Response[IO](Ok)))
 
-          val response = routes(maybeAuthUser).call(request)
+        val response = routes(maybeAuthUser).call(request)
 
-          response.status shouldBe Ok
+        response.status shouldBe Ok
 
-          routesMetrics.clearRegistry()
-        }
-
-      s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Unauthorized when user authentication failed " +
-        s"when '${query.parameterName}' and 'sort=${sortBy.property}:${sortBy.direction}' parameters given" in new TestCase {
-          val phrase = phrases.generateOne
-          val request =
-            Request[IO](
-              Method.GET,
-              uri"/knowledge-graph/datasets"
-                .withQueryParam("query", phrase.value)
-                .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
-            )
-
-          routes(givenAuthFailing())
-            .call(request)
-            .status shouldBe Unauthorized
-        }
+        routesMetrics.clearRegistry()
+      }
     }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase>&page=<page>&per_page=<per_page> endpoint returning $Ok " +
-      s"when query, ${PagingRequest.Decoders.page.parameterName} and ${PagingRequest.Decoders.perPage.parameterName} parameters given" in new TestCase {
-        forAll(phrases, pages, perPages) { (phrase, page, perPage) =>
-          val maybeAuthUser = authUsers.generateOption
+    s"return $Ok when query, ${PagingRequest.Decoders.page.parameterName} and ${PagingRequest.Decoders.perPage.parameterName} parameters given" in new TestCase {
+      forAll(phrases, pages, perPages) { (phrase, page, perPage) =>
+        val maybeAuthUser = authUsers.generateOption
 
-          val request = Request[IO](
-            Method.GET,
-            uri"/knowledge-graph/datasets"
-              .withQueryParam("query", phrase.value)
-              .withQueryParam("page", page.value)
-              .withQueryParam("per_page", perPage.value)
-          )
-          (datasetsSearchEndpoint
-            .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
-            .expects(phrase.some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(page, perPage), maybeAuthUser)
-            .returning(IO.pure(Response[IO](Ok)))
+        val request = Request[IO](
+          Method.GET,
+          uri"/knowledge-graph/datasets"
+            .withQueryParam("query", phrase.value)
+            .withQueryParam("page", page.value)
+            .withQueryParam("per_page", perPage.value)
+        )
+        (datasetsSearchEndpoint
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest, _: Option[AuthUser]))
+          .expects(phrase.some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(page, perPage), maybeAuthUser)
+          .returning(IO.pure(Response[IO](Ok)))
 
-          routes(maybeAuthUser).call(request).status shouldBe Ok
+        routes(maybeAuthUser).call(request).status shouldBe Ok
 
-          routesMetrics.clearRegistry()
-        }
+        routesMetrics.clearRegistry()
       }
+    }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Unauthorized when user authentication failed " +
-      s"when query, ${PagingRequest.Decoders.page.parameterName} and ${PagingRequest.Decoders.perPage.parameterName} parameters given" in new TestCase {
-        forAll(phrases, pages, perPages) { (phrase, page, perPage) =>
-          val request =
-            Request[IO](
-              Method.GET,
-              uri"/knowledge-graph/datasets"
-                .withQueryParam("query", phrase.value)
-                .withQueryParam("page", page.value)
-                .withQueryParam("per_page", perPage.value)
-            )
-
-          routes(givenAuthFailing())
-            .call(request)
-            .status shouldBe Unauthorized
-        }
-      }
-
-    s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $BadRequest " +
-      s"for invalid ${query.parameterName} parameter " +
+    s"return $BadRequest for invalid " +
+      s"${query.parameterName} parameter, " +
       s"${Sort.sort.parameterName} parameter, " +
       s"${PagingRequest.Decoders.page.parameterName} parameter and " +
       s"${PagingRequest.Decoders.perPage.parameterName} parameter" in new TestCase {
@@ -254,36 +191,39 @@ class MicroserviceRoutesSpec
           ).mkString("; ")
         )
       }
+  }
 
-    s"define a GET /knowledge-graph/datasets/:id endpoint returning $Ok when valid :id path parameter given" in new TestCase {
+  "GET /knowledge-graph/datasets/:id" should {
+
+    s"return $Ok when a valid :id path parameter given" in new TestCase {
       val id            = datasetIdentifiers.generateOne
       val maybeAuthUser = authUsers.generateOption
 
-      val authContext: AuthContext[datasets.Identifier] = AuthContext(maybeAuthUser, id, projectPaths.generateSet())
+      val authContext = AuthContext(maybeAuthUser, id, projectPaths.generateSet())
       (datasetIdAuthorizer.authorize _)
         .expects(id, maybeAuthUser)
         .returning(rightT[IO, EndpointSecurityException](authContext))
 
-      (datasetsEndpoint.getDataset _).expects(id, authContext).returning(IO.pure(Response[IO](Ok)))
+      (datasetEndpoint.getDataset _).expects(id, authContext).returning(IO.pure(Response[IO](Ok)))
 
       routes(maybeAuthUser)
         .call(Request(Method.GET, uri"/knowledge-graph/datasets" / id.value))
         .status shouldBe Ok
     }
 
-    s"define a GET /knowledge-graph/datasets/:id endpoint returning $NotFound when no :id path parameter given" in new TestCase {
+    s"return $NotFound when no :id path parameter given" in new TestCase {
       routes()
         .call(Request(Method.GET, uri"/knowledge-graph/datasets/"))
         .status shouldBe NotFound
     }
 
-    s"define a GET /knowledge-graph/datasets/:id endpoint returning $Unauthorized when user is not authorized" in new TestCase {
+    s"return $Unauthorized when user authentication failed" in new TestCase {
       routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
         .call(Request(Method.GET, uri"/knowledge-graph/datasets" / datasetIdentifiers.generateOne.value))
         .status shouldBe Unauthorized
     }
 
-    s"define a GET /knowledge-graph/datasets/:id endpoint returning $NotFound when user has no rights for the project the dataset belongs to" in new TestCase {
+    s"return $NotFound when user has no rights for the project the dataset belongs to" in new TestCase {
       val id            = datasetIdentifiers.generateOne
       val maybeAuthUser = authUsers.generateOption
 
@@ -294,20 +234,140 @@ class MicroserviceRoutesSpec
       val response = routes(maybeAuthUser).call(Request(Method.GET, uri"/knowledge-graph/datasets" / id.show))
 
       response.status             shouldBe NotFound
-      response.contentType        shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
       response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
     }
+  }
 
-    "define a GET /knowledge-graph/graphql endpoint" in new TestCase {
+  "GET /knowledge-graph/entities" should {
+    import entities.Endpoint.Criteria.Sorting._
+    import entities.Endpoint.Criteria._
+    import entities.Endpoint._
+    import entities._
 
-      (queryEndpoint.schema _).expects().returning(IO.pure(Response[IO](Ok)))
+    forAll {
+      Table(
+        "uri"                          -> "criteria",
+        uri"/knowledge-graph/entities" -> Criteria(),
+        queryParams
+          .map(query =>
+            uri"/knowledge-graph/entities" +? ("query" -> query.value) -> Criteria(Filters(maybeQuery = query.some))
+          )
+          .generateOne,
+        typeParams
+          .map(t =>
+            uri"/knowledge-graph/entities" +? ("type" -> t.value) -> Criteria(Filters(maybeEntityType = t.some))
+          )
+          .generateOne,
+        personNames
+          .map(name =>
+            uri"/knowledge-graph/entities" +? ("creator" -> name.value) -> Criteria(Filters(maybeCreator = name.some))
+          )
+          .generateOne,
+        projectVisibilities
+          .map(v =>
+            uri"/knowledge-graph/entities" +? ("visibility" -> v.value) -> Criteria(Filters(maybeVisibility = v.some))
+          )
+          .generateOne,
+        dateParams
+          .map(d =>
+            uri"/knowledge-graph/entities" +? ("date" -> d.value.toString) -> Criteria(Filters(maybeDate = d.some))
+          )
+          .generateOne,
+        sortingDirections
+          .map(dir =>
+            uri"/knowledge-graph/entities" +? ("sort" -> s"matchingScore:$dir") -> Criteria(sorting =
+              Sorting.By(ByMatchingScore, dir)
+            )
+          )
+          .generateOne,
+        sortingDirections
+          .map(dir =>
+            uri"/knowledge-graph/entities" +? ("sort" -> s"name:$dir") -> Criteria(sorting = Sorting.By(ByName, dir))
+          )
+          .generateOne,
+        sortingDirections
+          .map(dir =>
+            uri"/knowledge-graph/entities" +? ("sort" -> s"date:$dir") -> Criteria(sorting = Sorting.By(ByDate, dir))
+          )
+          .generateOne,
+        pages
+          .map(page =>
+            uri"/knowledge-graph/entities" +? ("page" -> page.show) -> Criteria(paging =
+              PagingRequest.default.copy(page = page)
+            )
+          )
+          .generateOne,
+        perPages
+          .map(perPage =>
+            uri"/knowledge-graph/entities" +? ("per_page" -> perPage.show) -> Criteria(paging =
+              PagingRequest.default.copy(perPage = perPage)
+            )
+          )
+          .generateOne
+      )
+    } { (uri, criteria) =>
+      s"read the query parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
+        val request = Request[IO](Method.GET, uri)
+
+        val responseBody = jsons.generateOne
+        (entitiesEndpoint.`GET /entities` _)
+          .expects(criteria, request)
+          .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+        val response = routes().call(request)
+
+        response.status      shouldBe Ok
+        response.contentType shouldBe Some(`Content-Type`(application.json))
+        response.body[Json]  shouldBe responseBody
+      }
+    }
+
+    s"return $BadRequest for invalid parameter values" in new TestCase {
+      val response = routes()
+        .call(
+          Request[IO](Method.GET, uri"/knowledge-graph/entities" +? ("visibility" -> nonEmptyStrings().generateOne))
+        )
+
+      response.status             shouldBe BadRequest
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe ErrorMessage("'visibility' parameter with invalid value")
+    }
+
+    "authenticate user from the request if given" in new TestCase {
+      val maybeAuthUser = authUsers.generateOption
+      val request       = Request[IO](Method.GET, uri"/knowledge-graph/entities")
+
+      val responseBody = jsons.generateOne
+      (entitiesEndpoint.`GET /entities` _)
+        .expects(Criteria(maybeUser = maybeAuthUser), request)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      routes(maybeAuthUser).call(request).status shouldBe Ok
+    }
+
+    s"return $Unauthorized when user authentication fails" in new TestCase {
+      routes(givenAuthFailing())
+        .call(Request[IO](Method.GET, uri"/knowledge-graph/entities"))
+        .status shouldBe Unauthorized
+    }
+  }
+
+  "GET /knowledge-graph/graphql" should {
+
+    "pass the response from the QueryEndpoint.schema" in new TestCase {
+
+      (queryEndpoint.schema _).expects().returning(Response[IO](Ok).pure[IO])
 
       routes()
         .call(Request(Method.GET, uri"/knowledge-graph/graphql"))
         .status shouldBe Ok
     }
+  }
 
-    "define a POST /knowledge-graph/graphql endpoint" in new TestCase {
+  "POST /knowledge-graph/graphql" should {
+
+    "pass the response from the QueryEndpoint.handleQuery" in new TestCase {
       val maybeAuthUser = authUsers.generateOption
 
       val request: Request[IO] = Request(Method.POST, uri"/knowledge-graph/graphql")
@@ -319,15 +379,16 @@ class MicroserviceRoutesSpec
       routes(maybeAuthUser).call(request).status shouldBe Ok
     }
 
-    s"define a POST /knowledge-graph/graphql endpoint endpoint returning $Unauthorized when user authentication failed" in new TestCase {
-      val request: Request[IO] = Request(Method.POST, uri"/knowledge-graph/graphql")
-
+    s"return $Unauthorized when user authentication failed" in new TestCase {
       routes(givenAuthFailing())
-        .call(request)
+        .call(Request(Method.POST, uri"/knowledge-graph/graphql"))
         .status shouldBe Unauthorized
     }
+  }
 
-    s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Ok for valid path parameters" in new TestCase {
+  "GET /knowledge-graph/projects/:namespace/../:name" should {
+
+    s"return $Ok for valid path parameters" in new TestCase {
       val maybeAuthUser = authUsers.generateOption
       val projectPath   = projectPaths.generateOne
 
@@ -344,7 +405,7 @@ class MicroserviceRoutesSpec
       routesMetrics.clearRegistry()
     }
 
-    s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $NotFound for invalid project paths" in new TestCase {
+    s"return $NotFound for invalid project paths" in new TestCase {
       val maybeAuthUser = authUsers.generateOption
       val namespace     = nonBlankStrings().generateOne.value
 
@@ -353,17 +414,17 @@ class MicroserviceRoutesSpec
       )
 
       response.status            shouldBe NotFound
-      response.contentType       shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.contentType       shouldBe Some(`Content-Type`(application.json))
       response.body[InfoMessage] shouldBe InfoMessage("Resource not found")
     }
 
-    s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Unauthorized when user is not authorized" in new TestCase {
+    s"return $Unauthorized when user authentication fails" in new TestCase {
       routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
         .call(Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}")))
         .status shouldBe Unauthorized
     }
 
-    s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $NotFound when user has no rights for the project" in new TestCase {
+    s"return $NotFound when auth user has no rights for the project" in new TestCase {
       val maybeAuthUser = authUsers.generateOption
       val projectPath   = projectPaths.generateOne
 
@@ -376,11 +437,14 @@ class MicroserviceRoutesSpec
       )
 
       response.status             shouldBe NotFound
-      response.contentType        shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
       response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
     }
+  }
 
-    s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $Ok for valid path parameters" in new TestCase {
+  "GET /knowledge-graph/projects/:namespace/../:name/datasets" should {
+
+    s"return $Ok for valid path parameters" in new TestCase {
       val projectPath   = projectPaths.generateOne
       val maybeAuthUser = authUsers.generateOption
 
@@ -397,7 +461,7 @@ class MicroserviceRoutesSpec
       routesMetrics.clearRegistry()
     }
 
-    s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $Unauthorized when user is not authorized" in new TestCase {
+    s"return $Unauthorized when user authentication fails" in new TestCase {
       routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
         .call(
           Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}/datasets"))
@@ -405,7 +469,7 @@ class MicroserviceRoutesSpec
         .status shouldBe Unauthorized
     }
 
-    s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $NotFound when user has no rights for the project" in new TestCase {
+    s"return $NotFound when auth user has no rights for the project" in new TestCase {
       val projectPath   = projectPaths.generateOne
       val maybeAuthUser = authUsers.generateOption
 
@@ -419,18 +483,39 @@ class MicroserviceRoutesSpec
         )
 
       response.status             shouldBe NotFound
-      response.contentType        shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
       response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
+    }
+  }
+
+  "GET /metrics" should {
+
+    s"return $Ok with some prometheus metrics" in new TestCase {
+      val response = routes().call(Request(Method.GET, uri"/metrics"))
+
+      response.status     shouldBe Ok
+      response.body[String] should include("server_response_duration_seconds")
+    }
+  }
+
+  "GET /ping" should {
+
+    s"return $Ok with 'pong' body" in new TestCase {
+      val response = routes().call(Request(Method.GET, uri"/ping"))
+
+      response.status       shouldBe Ok
+      response.body[String] shouldBe "pong"
     }
   }
 
   private trait TestCase {
 
+    val datasetsSearchEndpoint  = mock[DatasetsSearchEndpoint[IO]]
+    val datasetEndpoint         = mock[DatasetEndpoint[IO]]
+    val entitiesEndpoint        = mock[entities.Endpoint[IO]]
     val queryEndpoint           = mock[QueryEndpoint[IO]]
     val projectEndpoint         = mock[ProjectEndpoint[IO]]
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
-    val datasetsEndpoint        = mock[DatasetEndpoint[IO]]
-    val datasetsSearchEndpoint  = mock[DatasetsSearchEndpoint[IO]]
     val projectPathAuthorizer   = mock[Authorizer[IO, model.projects.Path]]
     val datasetIdAuthorizer     = mock[Authorizer[IO, model.datasets.Identifier]]
     val routesMetrics           = TestRoutesMetrics()
@@ -441,11 +526,12 @@ class MicroserviceRoutesSpec
 
     def routes(middleware: AuthMiddleware[IO, Option[AuthUser]]): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] =
       new MicroserviceRoutes[IO](
+        datasetsSearchEndpoint,
+        datasetEndpoint,
+        entitiesEndpoint,
         queryEndpoint,
         projectEndpoint,
         projectDatasetsEndpoint,
-        datasetsEndpoint,
-        datasetsSearchEndpoint,
         middleware,
         projectPathAuthorizer,
         datasetIdAuthorizer,

@@ -94,6 +94,21 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     }
   }
 
+  "EntityType" should {
+
+    Endpoint.Criteria.Filters.EntityType.all.map {
+      case t @ Endpoint.Criteria.Filters.EntityType.Project  => "project"  -> t
+      case t @ Endpoint.Criteria.Filters.EntityType.Dataset  => "dataset"  -> t
+      case t @ Endpoint.Criteria.Filters.EntityType.Workflow => "workflow" -> t
+      case t @ Endpoint.Criteria.Filters.EntityType.Person   => "person"   -> t
+    } foreach { case (name, t) =>
+      s"be instantiatable from '$name'" in {
+        Endpoint.Criteria.Filters.EntityType.from(name) shouldBe t.asRight
+      }
+    }
+
+  }
+
   private lazy val renkuResourcesUrl = renkuResourcesUrls.generateOne
 
   private trait TestCase {

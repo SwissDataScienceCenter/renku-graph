@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.entities
 
+import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
@@ -27,10 +28,12 @@ import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
 import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{EntityEncoder, Header, Request, Response, Status}
+import org.http4s.dsl.io.OptionalValidatingQueryParamDecoderMatcher
+import org.http4s.{EntityEncoder, Header, ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
 import java.time.LocalDate
@@ -62,7 +65,15 @@ object Endpoint {
     object Filters {
 
       final class Query private (val value: String) extends AnyVal with StringTinyType
-      object Query                                  extends TinyTypeFactory[Query](new Query(_)) with NonBlank
+      object Query extends TinyTypeFactory[Query](new Query(_)) with NonBlank {
+        private implicit val queryParameterDecoder: QueryParamDecoder[Query] =
+          (value: QueryParameterValue) =>
+            Query.from(value.value).leftMap(_ => parsingFailure(query.parameterName)).toValidatedNel
+
+        object query extends OptionalValidatingQueryParamDecoderMatcher[Query]("query") {
+          val parameterName: String = "query"
+        }
+      }
 
       sealed trait EntityType extends StringTinyType with Product with Serializable
       object EntityType extends TinyTypeFactory[EntityType](EntityTypeApply) {
@@ -77,6 +88,34 @@ object Endpoint {
         import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
 
         implicit val decoder: Decoder[EntityType] = stringDecoder(EntityType)
+
+        private implicit val entityTypeParameterDecoder: QueryParamDecoder[EntityType] =
+          (value: QueryParameterValue) =>
+            EntityType.from(value.value).leftMap(_ => parsingFailure(entityType.parameterName)).toValidatedNel
+
+        object entityType extends OptionalValidatingQueryParamDecoderMatcher[EntityType]("type") {
+          val parameterName: String = "type"
+        }
+      }
+
+      object CreatorName {
+        private implicit val creatorNameParameterDecoder: QueryParamDecoder[persons.Name] =
+          (value: QueryParameterValue) =>
+            persons.Name.from(value.value).leftMap(_ => parsingFailure(creatorName.parameterName)).toValidatedNel
+
+        object creatorName extends OptionalValidatingQueryParamDecoderMatcher[persons.Name]("creator") {
+          val parameterName: String = "creator"
+        }
+      }
+
+      object Visibility {
+        private implicit val visibilityParameterDecoder: QueryParamDecoder[projects.Visibility] =
+          (value: QueryParameterValue) =>
+            projects.Visibility.from(value.value).leftMap(_ => parsingFailure(visibility.parameterName)).toValidatedNel
+
+        object visibility extends OptionalValidatingQueryParamDecoderMatcher[projects.Visibility]("visibility") {
+          val parameterName: String = "visibility"
+        }
       }
 
       private object EntityTypeApply extends (String => EntityType) {
@@ -86,7 +125,19 @@ object Endpoint {
       }
 
       final class Date private (val value: LocalDate) extends AnyVal with LocalDateTinyType
-      object Date extends TinyTypeFactory[Date](new Date(_)) with LocalDateNotInTheFuture
+      object Date extends TinyTypeFactory[Date](new Date(_)) with LocalDateNotInTheFuture {
+        private implicit val dateParameterDecoder: QueryParamDecoder[Date] =
+          (value: QueryParameterValue) =>
+            Either
+              .catchNonFatal(LocalDate.parse(value.value))
+              .flatMap(Date.from)
+              .leftMap(_ => parsingFailure(date.parameterName))
+              .toValidatedNel
+
+        object date extends OptionalValidatingQueryParamDecoderMatcher[Date]("date") {
+          val parameterName: String = "date"
+        }
+      }
     }
 
     object Sorting extends io.renku.http.rest.SortBy {
@@ -104,6 +155,13 @@ object Endpoint {
       override lazy val properties: Set[SortProperty] = Set(ByName, ByMatchingScore, ByDate)
     }
   }
+
+  private def parsingFailure(paramName: String) = ParseFailure(s"'$paramName' parameter with invalid value", "")
+
+  def apply[F[_]: Async: NonEmptyParallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[Endpoint[F]] = for {
+    entitiesFinder    <- EntitiesFinder(timeRecorder)
+    renkuResourcesUrl <- renku.ResourcesUrl()
+  } yield new EndpointImpl(entitiesFinder, renkuResourcesUrl)
 }
 
 private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F], renkuResourcesUrl: renku.ResourcesUrl)

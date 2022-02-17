@@ -19,7 +19,7 @@
 package io.renku.http.rest
 
 import cats.syntax.all._
-import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
+import org.http4s.dsl.io.OptionalValidatingQueryParamDecoderMatcher
 import org.http4s.{ParseFailure, QueryParamDecoder}
 
 trait SortBy {

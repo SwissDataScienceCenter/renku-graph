@@ -35,6 +35,11 @@ private trait EntitiesFinder[F[_]] {
   def findEntities(criteria: Criteria): F[PagingResponse[Entity]]
 }
 
+private object EntitiesFinder {
+  def apply[F[_]: Async: NonEmptyParallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[EntitiesFinder[F]] =
+    RdfStoreConfig[F]().map(new EntitiesFinderImpl(_, timeRecorder))
+}
+
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     rdfStoreConfig: RdfStoreConfig,
     timeRecorder:   SparqlQueryTimeRecorder[F]
