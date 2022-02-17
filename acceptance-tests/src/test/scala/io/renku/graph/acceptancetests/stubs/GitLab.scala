@@ -121,6 +121,17 @@ trait GitLab {
     }
     ()
   }
+
+  def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning NOT_FOUND`(
+      project:            data.Project
+  )(implicit accessToken: AccessToken): Unit = {
+    stubFor {
+      get(s"/api/v4/projects/${project.id}/events?action=pushed&page=1").withAccessTokenInHeader
+        .willReturn(notFound())
+    }
+    ()
+  }
+
   def `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
@@ -176,6 +187,27 @@ trait GitLab {
     ()
   }
 
+  def `GET <gitlabApi>/projects/:id/repository/commits per page returning NOT_FOUND`(
+      projectId:          Id
+  )(implicit accessToken: AccessToken): Unit = {
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits")
+        .willReturn(notFound())
+        .withAccessTokenInHeader
+    }
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
+        .willReturn(notFound())
+        .withAccessTokenInHeader
+    }
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits?page=1&per_page=50")
+        .willReturn(notFound())
+        .withAccessTokenInHeader
+    }
+    ()
+  }
+
   private def commitAsJson(commitId: CommitId, theMostRecentEventDate: Instant) = json"""{
     "id":              ${commitId.value},
     "author_name":     ${nonEmptyStrings().generateOne},
@@ -219,6 +251,20 @@ trait GitLab {
           "committed_date":  ${theMostRecentEventDate.toString},
           "parent_ids":      ${parentIds.map(_.value).toList}
         }""".noSpaces))
+    }
+  }
+
+  def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning NOT_FOUND`(
+      project:            data.Project,
+      commitId:           CommitId
+  )(implicit accessToken: AccessToken): StubMapping = {
+    stubFor {
+      get(s"/api/v4/projects/${project.id}/repository/commits/$commitId").withAccessTokenInHeader
+        .willReturn(notFound())
+    }
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(project.path.show)}/repository/commits/$commitId").withAccessTokenInHeader
+        .willReturn(notFound())
     }
   }
 
@@ -340,6 +386,20 @@ trait GitLab {
   )(implicit accessToken: AccessToken): StubMapping = stubFor {
     get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
       .willReturn(badRequest())
+  }
+
+  def `GET <gitlabApi>/projects/:path AND :id returning NOT_FOUND`(
+      project:            data.Project
+  )(implicit accessToken: AccessToken) = {
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/${urlEncode(project.path.value)}")).withAccessTokenInHeader
+        .willReturn(notFound())
+    }
+
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/${project.id.value}")).withAccessTokenInHeader
+        .willReturn(notFound())
+    }
   }
 
   def `GET <gitlabApi>/projects/:path having connectivity issues`(
