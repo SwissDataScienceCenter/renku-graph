@@ -77,34 +77,30 @@ private class TriplesGeneratedEventFinderImpl[F[_]: Async](
   private def findProjectsWithEventsInQueue = measureExecutionTime {
     SqlStatement(
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
-    ).select[ExecutionDate ~ Int, ProjectInfo](
+    ).select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
       sql"""
-        SELECT
-          candidate_projects.project_id,
-          proj.project_path,
-          proj.latest_event_date,
-          (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = proj.project_id AND evt_int.status = '#${TransformingTriples.value}') AS current_occupancy
+        SELECT p.project_id, p.project_path, p.latest_event_date,
+  	      (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = p.project_id AND evt_int.status = '#${TransformingTriples.value}') AS current_occupancy
         FROM (
-          SELECT candidate_events.project_id
-          FROM (
-            SELECT DISTINCT ON (evt.project_id) evt.project_id, evt.status
-            FROM event evt
-            JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id AND evt.project_id = evt_payload.project_id
-            WHERE #${`status IN`(TransformingTriples, TriplesGenerated, TransformationRecoverableFailure)}
-              AND execution_date <= $executionDateEncoder
-            ORDER BY evt.project_id DESC, evt.event_date DESC
-          ) candidate_events
-          WHERE candidate_events.status <> '#${TransformingTriples.value}'
+          SELECT DISTINCT evt.project_id
+          FROM event evt
+          JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id AND evt.project_id = evt_payload.project_id
+          WHERE evt.status IN ('#${TriplesGenerated.value}', '#${TransformationRecoverableFailure.value}')
+            AND evt.execution_date <= $executionDateEncoder
         ) candidate_projects
-        JOIN project proj ON proj.project_id = candidate_projects.project_id
-        ORDER BY proj.latest_event_date DESC
+        JOIN project p ON p.project_id = candidate_projects.project_id
+        JOIN event e ON e.project_id = candidate_projects.project_id 
+          AND e.event_date = p.latest_event_date
+          AND e.execution_date <= $executionDateEncoder
+          AND e.status IN ('#${TriplesGenerated.value}', '#${GenerationNonRecoverableFailure.value}', '#${TransformationRecoverableFailure.value}', '#${TransformationNonRecoverableFailure.value}', '#${Skipped.value}')
+        ORDER BY p.latest_event_date DESC
         LIMIT $int4;
       """
         .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
         .map { case (id: projects.Id) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
           ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
         }
-    ).arguments(ExecutionDate(now()) ~ projectsFetchingLimit.value)
+    ).arguments(ExecutionDate(now()) ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
       .build(_.toList)
   }
 

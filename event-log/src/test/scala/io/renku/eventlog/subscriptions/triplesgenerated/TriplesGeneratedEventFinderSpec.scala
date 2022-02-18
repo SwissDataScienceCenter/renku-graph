@@ -102,6 +102,83 @@ private class TriplesGeneratedEventFinderSpec
         )
       }
 
+    "return an event if there are multiple latest events with the same date" in new TestCase {
+
+      val projectId       = projectIds.generateOne
+      val projectPath     = projectPaths.generateOne
+      val latestEventDate = eventDates.generateOne
+
+      val (event1Id, _, _, _, event1Payload) = createEvent(
+        status = Gen.oneOf(TriplesGenerated, TransformationRecoverableFailure).generateOne,
+        eventDate = latestEventDate,
+        projectId = projectId,
+        projectPath = projectPath
+      )
+
+      val (event2Id, _, _, _, event2Payload) = createEvent(
+        status = Gen.oneOf(TriplesGenerated, TransformationRecoverableFailure).generateOne,
+        eventDate = latestEventDate,
+        projectId = projectId,
+        projectPath = projectPath
+      )
+
+      findEvents(TransformingTriples) shouldBe List.empty
+
+      // 1st event with the same event date
+      expectAwaitingTransformationGaugeDecrement(projectPath)
+      expectUnderTransformationGaugeIncrement(projectPath)
+
+      givenPrioritisation(
+        takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
+        returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
+      )
+
+      val Some(TriplesGeneratedEvent(actualEventId, actualPath, actualPayload)) = finder.popEvent().unsafeRunSync()
+      if (actualEventId == event1Id) {
+        actualEventId     shouldBe event1Id
+        actualPath        shouldBe projectPath
+        actualPayload.value should contain theSameElementsAs event1Payload.value
+      } else {
+        actualEventId     shouldBe event2Id
+        actualPath        shouldBe projectPath
+        actualPayload.value should contain theSameElementsAs event2Payload.value
+      }
+
+      findEvents(TransformingTriples).noBatchDate should {
+        be(List((event1Id, executionDate))) or be(List((event2Id, executionDate)))
+      }
+
+      // 2nd event with the same event date
+      expectAwaitingTransformationGaugeDecrement(projectPath)
+      expectUnderTransformationGaugeIncrement(projectPath)
+
+      givenPrioritisation(
+        takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
+        returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
+      )
+
+      val Some(TriplesGeneratedEvent(nextActualEventId, nextActualPath, nextActualPayload)) =
+        finder.popEvent().unsafeRunSync()
+      if (nextActualEventId == event1Id) {
+        nextActualEventId     shouldBe event1Id
+        nextActualPath        shouldBe projectPath
+        nextActualPayload.value should contain theSameElementsAs event1Payload.value
+      } else {
+        nextActualEventId     shouldBe event2Id
+        nextActualPath        shouldBe projectPath
+        nextActualPayload.value should contain theSameElementsAs event2Payload.value
+      }
+
+      findEvents(TransformingTriples).noBatchDate should contain theSameElementsAs List(event1Id -> executionDate,
+                                                                                        event2Id -> executionDate
+      )
+
+      // no more events left
+      givenPrioritisation(takes = Nil, returns = Nil)
+
+      finder.popEvent().unsafeRunSync() shouldBe None
+    }
+
     "return an event with the latest event date " +
       s"and status $TriplesGenerated or $TransformationRecoverableFailure " +
       s"and mark it as $TransformingTriples " +
@@ -255,12 +332,14 @@ private class TriplesGeneratedEventFinderSpec
 
         val (event1Id, _, event1Date, _, eventPayload1) = createEvent(
           status = TriplesGenerated,
+          eventDate = timestamps(max = Instant.now().minusSeconds(5)).generateAs(EventDate),
           projectId = projectId,
           projectPath = projectPath
         )
 
         val (_, _, event2Date, _, _) = createEvent(
           status = TransformationRecoverableFailure,
+          eventDate = EventDate(event1Date.value plusSeconds 1),
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
           projectPath = projectPath
@@ -268,6 +347,7 @@ private class TriplesGeneratedEventFinderSpec
 
         val (_, _, event3Date, _, _) = createEvent(
           status = TriplesGenerated,
+          eventDate = EventDate(event2Date.value plusSeconds 1),
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
           projectPath = projectPath
@@ -275,29 +355,9 @@ private class TriplesGeneratedEventFinderSpec
 
         findEvents(TransformingTriples) shouldBe List.empty
 
-        expectAwaitingTransformationGaugeDecrement(projectPath)
-        expectUnderTransformationGaugeIncrement(projectPath)
-
-        givenPrioritisation(
-          takes = List(ProjectInfo(projectId, projectPath, List(event1Date, event2Date, event3Date).max, 0)),
-          returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
-        )
-
-        val Some(TriplesGeneratedEvent(actualEventId, actualPath, actualPayload)) = finder.popEvent().unsafeRunSync()
-        actualEventId     shouldBe event1Id
-        actualPath        shouldBe projectPath
-        actualPayload.value should contain theSameElementsAs eventPayload1.value
-
-        findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
-
         givenPrioritisation(takes = Nil, returns = Nil)
 
         finder.popEvent().unsafeRunSync() shouldBe None
-
-        queriesExecTimes.verifyExecutionTimeMeasured("triples_generated - find projects",
-                                                     "triples_generated - find oldest",
-                                                     "triples_generated - update status"
-        )
       }
 
     "return events from all the projects" in new TestCase {
