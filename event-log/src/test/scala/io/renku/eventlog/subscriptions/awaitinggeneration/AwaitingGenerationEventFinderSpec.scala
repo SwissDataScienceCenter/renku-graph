@@ -155,8 +155,9 @@ private class AwaitingGenerationEventFinderSpec
             be(AwaitingGenerationEvent(event2Id, projectPath, event2Body).some)
         }
 
-        findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate),
-                                                                            (event2Id, executionDate)
+        findEvents(EventStatus.GeneratingTriples).noBatchDate should contain theSameElementsAs List(
+          event1Id -> executionDate,
+          event2Id -> executionDate
         )
 
         // no more events left

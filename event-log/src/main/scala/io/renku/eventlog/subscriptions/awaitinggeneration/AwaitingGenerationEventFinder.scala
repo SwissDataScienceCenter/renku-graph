@@ -97,7 +97,7 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
       JOIN event e ON e.project_id = candidate_projects.project_id 
         AND e.event_date = p.latest_event_date
         AND e.execution_date <= $executionDateEncoder
-        AND e.status NOT IN ('#${GeneratingTriples.value}', '#${TriplesGenerated.value}', '#${TransformingTriples.value}', '#${TransformationRecoverableFailure.value}', '#${TriplesStore.value}', '#${AwaitingDeletion.value}', '#${Deleting.value}')
+        AND e.status IN ('#${New.value}', '#${GenerationRecoverableFailure.value}', '#${GenerationNonRecoverableFailure.value}', '#${TransformationNonRecoverableFailure.value}', '#${Skipped.value}')
       ORDER BY p.latest_event_date DESC
       LIMIT $int4
       """
