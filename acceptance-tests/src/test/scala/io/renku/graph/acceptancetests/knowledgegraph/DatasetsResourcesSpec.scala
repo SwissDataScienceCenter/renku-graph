@@ -125,7 +125,7 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with project details")
       getProjectResponse._1 shouldBe Ok
-      getProjectResponse._2 shouldBe ProjectsResources.fullJson(project)
+      getProjectResponse._2 shouldBe fullJson(project)
 
       When("user fetches initial version of the modified dataset with the link from the response")
       val modifiedDataset2Json = foundDatasets
