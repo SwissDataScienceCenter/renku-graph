@@ -40,6 +40,7 @@ import io.renku.webhookservice.model
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 import io.renku.graph.acceptancetests.db.EventLog
+import io.renku.graph.model.events
 
 class ProjectReProvisioningSpec
     extends AnyFeatureSpec
@@ -56,46 +57,54 @@ class ProjectReProvisioningSpec
     Scenario("A change in the commit history should trigger a re-provisioning") {
 
       val project = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
-      val commits = commitIds.generateNonEmptyList(3, 3)
+      val commits = commitIds.generateNonEmptyList(minElements = 3)
 
-      Given("There is data in the triple store")
+      Given("there is data in the triple store")
 
       `GET <gitlabApi>/user returning OK`(user)
 
       mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commits)
-      `data in the RDF store`(project, commits)
+      `data in the RDF store`(project, commits.last)
+
+      eventually {
+        EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
+      }
 
       AssertProjectDataIsCorrect(project, project.entitiesProject)
 
       When("the commit history changes")
 
+
+      val newCommits  = commitIds.generateNonEmptyList(minElements = 3)
+      val newEntities = generateNewActivitiesAndDataset(project.entitiesProject)
+
+      mockDataOnGitLabAPIs(project, newEntities.asJsonLD, newCommits)
+
       commits.toList.foreach { commitId =>
         `GET <gitlabApi>/projects/:id/repository/commits/:sha returning NOT_FOUND`(project, commitId)
       }
 
-      val newCommits  = commitIds.generateNonEmptyList(3, 3)
-      val newEntities = generateNewActivitiesAndDataset(project.entitiesProject)
+      webhookServiceClient
+        .POST("webhooks/events", model.HookToken(project.id), GitLab.pushEvent(project, newCommits.last))
+        .status shouldBe Accepted
 
-      mockDataOnGitLabAPIs(project, newEntities.asJsonLD, newCommits)
-      newCommits.toList.foreach { commitId =>
-        webhookServiceClient
-          .POST("webhooks/events", model.HookToken(project.id), GitLab.pushEvent(project, commitId))
-          .status shouldBe Accepted
-
-        sleep((3 second).toMillis)
-      }
+      sleep((3 second).toMillis)
 
       `wait for events to be processed`(project.id)
+
+      eventually {
+        EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe newCommits.toList.toSet
+      }
 
       Then("the project should show the new data")
 
       AssertProjectDataIsCorrect(project, newEntities)
     }
 
-    Scenario("Removing a project should trigger a re-provisioning") {
+    Scenario("Removing a project from GitLab should remove it from the knowledge-graph") {
 
       val project = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
-      val commits = commitIds.generateNonEmptyList(3, 3)
+      val commits = commitIds.generateNonEmptyList(minElements = 3)
 
       Given("There is data in the triple store")
 
