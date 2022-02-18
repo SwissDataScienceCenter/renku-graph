@@ -121,6 +121,17 @@ trait GitLab {
     }
     ()
   }
+
+  def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning NOT_FOUND`(
+      project:            data.Project
+  )(implicit accessToken: AccessToken): Unit = {
+    stubFor {
+      get(s"/api/v4/projects/${project.id}/events?action=pushed&page=1").withAccessTokenInHeader
+        .willReturn(notFound())
+    }
+    ()
+  }
+
   def `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
@@ -152,10 +163,17 @@ trait GitLab {
     }
     ()
   }
+  def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(
+      projectId:          Id,
+      commitId:           CommitId
+  )(implicit accessToken: AccessToken): Unit =
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(projectId,
+                                                                                         NonEmptyList(commitId, Nil)
+    )
 
   def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(
       projectId:          Id,
-      commitIds:          CommitId*
+      commitIds:          NonEmptyList[CommitId]
   )(implicit accessToken: AccessToken): Unit = {
     val theMostRecentEventDate = Instant.now()
     stubFor {
@@ -163,9 +181,12 @@ trait GitLab {
         .willReturn(okJson(commitIds.map(commitAsJson(_, theMostRecentEventDate)).asJson.noSpaces))
         .withAccessTokenInHeader
     }
+
     stubFor {
       get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
-        .willReturn(okJson(Json.arr(commitAsJson(commitIds.last, theMostRecentEventDate)).noSpaces))
+        .willReturn(
+          okJson(Json.arr(commitAsJson(commitIds.last, commitIds.init.lastOption, theMostRecentEventDate)).noSpaces)
+        )
         .withAccessTokenInHeader
     }
     stubFor {
@@ -176,17 +197,54 @@ trait GitLab {
     ()
   }
 
-  private def commitAsJson(commitId: CommitId, theMostRecentEventDate: Instant) = json"""{
-    "id":              ${commitId.value},
-    "author_name":     ${nonEmptyStrings().generateOne},
-    "author_email":    ${personEmails.generateOne.value},
-    "committer_name":  ${nonEmptyStrings().generateOne},
-    "committer_email": ${personEmails.generateOne.value},
-    "message":         ${nonEmptyStrings().generateOne},
-    "committed_date":  ${theMostRecentEventDate.toString},
-    "parent_ids":      []
-  }  
-  """
+  def `GET <gitlabApi>/projects/:id/repository/commits per page returning NOT_FOUND`(
+      projectId:          Id
+  )(implicit accessToken: AccessToken): Unit = {
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits")
+        .willReturn(notFound())
+        .withAccessTokenInHeader
+    }
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits?per_page=1")
+        .willReturn(notFound())
+        .withAccessTokenInHeader
+    }
+    stubFor {
+      get(s"/api/v4/projects/$projectId/repository/commits?page=1&per_page=50")
+        .willReturn(notFound())
+        .withAccessTokenInHeader
+    }
+    ()
+  }
+
+  private def commitAsJson(commitId: CommitId, maybeParentId: Option[CommitId], theMostRecentEventDate: Instant) = {
+    val parentIds =
+      maybeParentId.map(id => json""" {"parent_ids": [${id.value}]}""").getOrElse(json""" {"parent_ids": []}""")
+    json"""{
+        "id":              ${commitId.value},
+        "author_name":     ${nonEmptyStrings().generateOne},
+        "author_email":    ${personEmails.generateOne.value},
+        "committer_name":  ${nonEmptyStrings().generateOne},
+        "committer_email": ${personEmails.generateOne.value},
+        "message":         ${nonEmptyStrings().generateOne},
+        "committed_date":  ${theMostRecentEventDate.toString}
+      }  
+      """ deepMerge parentIds
+  }
+
+  private def commitAsJson(commitId: CommitId, theMostRecentEventDate: Instant) =
+    json"""{
+        "id":              ${commitId.value},
+        "author_name":     ${nonEmptyStrings().generateOne},
+        "author_email":    ${personEmails.generateOne.value},
+        "committer_name":  ${nonEmptyStrings().generateOne},
+        "committer_email": ${personEmails.generateOne.value},
+        "message":         ${nonEmptyStrings().generateOne},
+        "committed_date":  ${theMostRecentEventDate.toString},
+        "parent_ids":      []
+      }  
+      """
 
   def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
       project:                data.Project,
@@ -219,6 +277,20 @@ trait GitLab {
           "committed_date":  ${theMostRecentEventDate.toString},
           "parent_ids":      ${parentIds.map(_.value).toList}
         }""".noSpaces))
+    }
+  }
+
+  def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning NOT_FOUND`(
+      project:            data.Project,
+      commitId:           CommitId
+  )(implicit accessToken: AccessToken): StubMapping = {
+    stubFor {
+      get(s"/api/v4/projects/${project.id}/repository/commits/$commitId").withAccessTokenInHeader
+        .willReturn(notFound())
+    }
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(project.path.show)}/repository/commits/$commitId").withAccessTokenInHeader
+        .willReturn(notFound())
     }
   }
 
@@ -342,6 +414,20 @@ trait GitLab {
       .willReturn(badRequest())
   }
 
+  def `GET <gitlabApi>/projects/:path AND :id returning NOT_FOUND`(
+      project:            data.Project
+  )(implicit accessToken: AccessToken): StubMapping = {
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/${urlEncode(project.path.value)}")).withAccessTokenInHeader
+        .willReturn(notFound())
+    }
+
+    stubFor {
+      get(urlPathEqualTo(s"/api/v4/projects/${project.id.value}")).withAccessTokenInHeader
+        .willReturn(notFound())
+    }
+  }
+
   def `GET <gitlabApi>/projects/:path having connectivity issues`(
       project:            data.Project
   )(implicit accessToken: AccessToken): StubMapping = stubFor {
@@ -363,20 +449,31 @@ trait GitLab {
 
     `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
-    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id,
-                                                                                         commitIds.toList: _*
-    )
+    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id, commitIds)
     `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
                                                                             project,
                                                                             commitIds
     )
-    commitIds.toList.foreach { commitId =>
-      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
+    commitIds
+      .foldLeft(List.empty[CommitId]) {
+        case (Nil, commitId) =>
+          `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
 
-      `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+          `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+          commitId :: Nil
+        case (parentIds, commitId) =>
+          `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project,
+                                                                                              commitId,
+                                                                                              Set(parentIds.last)
+          )
 
-    }
+          `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+
+          parentIds ::: commitId :: Nil
+      }
+    ()
   }
+
   private implicit class MappingBuilderOps(builder: MappingBuilder) {
     def withAccessTokenInHeader(implicit accessToken: AccessToken): MappingBuilder = accessToken match {
       case PersonalAccessToken(token) => builder.withHeader("PRIVATE-TOKEN", equalTo(token))
