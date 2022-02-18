@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import cats.data.{Kleisli, NonEmptyList}
+import cats.data.Kleisli
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
 import cats.{Id, Parallel}
@@ -85,41 +85,20 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
     ).select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
       sql"""
-      SELECT
-        proj.project_id,
-        proj.project_path,
-        proj.latest_event_date,
-        (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = proj.project_id AND evt_int.status = '#${GeneratingTriples.value}') AS current_occupancy
+      SELECT p.project_id, p.project_path, p.latest_event_date,
+	    (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = p.project_id AND evt_int.status = '#${GeneratingTriples.value}') AS current_occupancy
       FROM (
-        SELECT candidate_events.project_id
-        FROM (
-          SELECT
-            candidate_projects.project_id,
-            (
-              SELECT e.status 
-              FROM event e 
-              WHERE e.project_id = candidate_projects.project_id AND e.execution_date <= $executionDateEncoder
-              ORDER BY e.event_date DESC 
-              LIMIT 1
-            ) AS status
-          FROM (
-            SELECT DISTINCT project_id
-            FROM event evt
-            WHERE #${`status IN`(New, GenerationRecoverableFailure)}
-               AND execution_date <= $executionDateEncoder
-          ) candidate_projects
-        ) candidate_events
-        WHERE #${`status NOT IN`(GeneratingTriples,
-                                 TriplesGenerated,
-                                 TransformingTriples,
-                                 TransformationRecoverableFailure,
-                                 TriplesStore,
-                                 AwaitingDeletion,
-                                 Deleting
-      )}
-      ) projects
-      JOIN project proj ON proj.project_id = projects.project_id
-      ORDER BY proj.latest_event_date DESC
+        SELECT DISTINCT project_id
+        FROM event
+        WHERE status IN ('#${New.value}', '#${GenerationRecoverableFailure.value}')
+          AND execution_date <= $executionDateEncoder
+      ) candidate_projects
+      JOIN project p ON p.project_id = candidate_projects.project_id
+      JOIN event e ON e.project_id = candidate_projects.project_id 
+        AND e.event_date = p.latest_event_date
+        AND e.execution_date <= $executionDateEncoder
+        AND e.status NOT IN ('#${GeneratingTriples.value}', '#${TriplesGenerated.value}', '#${TransformingTriples.value}', '#${TransformationRecoverableFailure.value}', '#${TriplesStore.value}', '#${AwaitingDeletion.value}', '#${Deleting.value}')
+      ORDER BY p.latest_event_date DESC
       LIMIT $int4
       """
         .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
@@ -150,13 +129,13 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
          SELECT project_id, max(event_date) AS max_event_date
          FROM event
          WHERE project_id = $projectIdEncoder
-           AND #${`status IN`(New, GenerationRecoverableFailure)}
+           AND status IN ('#${New.value}', '#${GenerationRecoverableFailure.value}')
            AND execution_date < $executionDateEncoder
          GROUP BY project_id
        ) newest_event_date
        JOIN event evt ON newest_event_date.project_id = evt.project_id 
          AND newest_event_date.max_event_date = evt.event_date
-         AND #${`status IN`(New, GenerationRecoverableFailure)}
+         AND status IN ('#${New.value}', '#${GenerationRecoverableFailure.value}')
          AND execution_date < $executionDateEncoder
        LIMIT 1
        """
@@ -164,12 +143,6 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
     ).arguments(idAndPath.path ~ idAndPath.id ~ executionDate ~ executionDate)
       .build(_.option)
   }
-
-  private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
-    s"status IN (${NonEmptyList.of(status, otherStatuses: _*).toList.map(el => s"'$el'").mkString(",")})"
-
-  private def `status NOT IN`(status: EventStatus, otherStatuses: EventStatus*) =
-    s"status NOT IN (${NonEmptyList.of(status, otherStatuses: _*).toList.map(el => s"'$el'").mkString(",")})"
 
   private lazy val selectProject: List[(subscriptions.ProjectIds, Priority)] => Option[subscriptions.ProjectIds] = {
     case Nil                          => None
@@ -182,9 +155,8 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
-  private lazy val markAsProcessing: Option[AwaitingGenerationEvent] => Kleisli[F, Session[F], Option[
-    AwaitingGenerationEvent
-  ]] = {
+  private lazy val markAsProcessing
+      : Option[AwaitingGenerationEvent] => Kleisli[F, Session[F], Option[AwaitingGenerationEvent]] = {
     case None =>
       Kleisli.pure(Option.empty[AwaitingGenerationEvent])
     case Some(event @ AwaitingGenerationEvent(id, _, _)) =>
