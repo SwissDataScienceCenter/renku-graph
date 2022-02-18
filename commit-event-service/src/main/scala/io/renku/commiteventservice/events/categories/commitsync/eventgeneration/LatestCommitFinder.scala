@@ -19,7 +19,6 @@
 package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.Async
-import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
@@ -36,7 +35,7 @@ private trait LatestCommitFinder[F[_]] {
   def findLatestCommit(projectId: Id)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitInfo]]
 }
 
-private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](
+private class LatestCommitFinderImpl[F[_]: Async: Logger](
     gitLabClient: GitLabClient[F]
 ) extends LatestCommitFinder[F] {
 
@@ -52,9 +51,9 @@ private class LatestCommitFinderImpl[F[_]: Async: Temporal: Logger](
     )(mapResponse(projectId))
 
   private def mapResponse(projectId: Id): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
-    case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption)
-    case (NotFound, _, _)     => Option.empty[CommitInfo].pure[F]
-    case (Unauthorized, _, _) => findLatestCommit(projectId)(maybeAccessToken = None)
+    case (Ok, _, response)                => response.as[List[CommitInfo]] map (_.headOption)
+    case (NotFound, _, _)                 => Option.empty[CommitInfo].pure[F]
+    case (Unauthorized | Forbidden, _, _) => findLatestCommit(projectId)(maybeAccessToken = None)
   }
 
   private implicit val commitInfosEntityDecoder: EntityDecoder[F, List[CommitInfo]] = {

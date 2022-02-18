@@ -35,7 +35,6 @@ import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
 private trait EventDetailsFinder[F[_]] {
-  def checkIfExists(projectId:   projects.Id, commitId: CommitId): F[Boolean]
   def getEventDetails(projectId: projects.Id, commitId: CommitId): F[Option[CommitWithParents]]
 }
 
@@ -46,27 +45,12 @@ private class EventDetailsFinderImpl[F[_]: Async: Temporal: Logger](
 
   import org.http4s.Method.GET
 
-  override def checkIfExists(projectId: projects.Id, commitId: CommitId): F[Boolean] =
-    fetchEventDetails(projectId, commitId)(mapResponseToBoolean)
-
   override def getEventDetails(projectId: projects.Id, commitId: CommitId): F[Option[CommitWithParents]] =
-    fetchEventDetails(projectId, commitId)(mapResponseCommitDetails)
+    validateUri(s"$eventLogUrl/events/$commitId/$projectId") >>=
+      (uri => send(request(GET, uri))(mapResponseCommitDetails))
 
-  private def fetchEventDetails[ResultType](projectId: projects.Id, commitId: CommitId)(
-      mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[
-        ResultType
-      ]]
-  ) =
-    validateUri(s"$eventLogUrl/events/$commitId/$projectId") >>= (uri => send(request(GET, uri))(mapResponse))
-
-  private lazy val mapResponseToBoolean: PartialFunction[(Status, Request[F], Response[F]), F[Boolean]] = {
-    case (Ok, _, _)       => true.pure[F]
-    case (NotFound, _, _) => false.pure[F]
-  }
-
-  private lazy val mapResponseCommitDetails: PartialFunction[(Status, Request[F], Response[F]), F[
-    Option[CommitWithParents]
-  ]] = {
+  private lazy val mapResponseCommitDetails
+      : PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitWithParents]]] = {
     case (Ok, _, response) => response.as[CommitWithParents].map(_.some)
     case (NotFound, _, _)  => Option.empty[CommitWithParents].pure[F]
   }
@@ -86,7 +70,6 @@ private class EventDetailsFinderImpl[F[_]: Async: Temporal: Logger](
       } yield CommitWithParents(id, projectId, parents)
     jsonOf[F, CommitWithParents]
   }
-
 }
 
 private object EventDetailsFinder {

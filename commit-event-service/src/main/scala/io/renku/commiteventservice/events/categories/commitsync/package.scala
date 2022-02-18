@@ -29,5 +29,4 @@ package object commitsync {
     case MinimalCommitSyncEvent(project) =>
       s"$categoryName: projectId = ${project.id}, projectPath = ${project.path}"
   }
-
 }
