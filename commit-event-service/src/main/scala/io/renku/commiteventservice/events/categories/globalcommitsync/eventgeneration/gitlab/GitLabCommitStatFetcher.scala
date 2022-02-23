@@ -28,7 +28,7 @@ import io.renku.commiteventservice.events.categories.globalcommitsync.eventgener
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import org.http4s.Method.GET
-import org.http4s.Status.{NotFound, Ok, Unauthorized}
+import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.implicits.http4sLiteralsSyntax
@@ -65,8 +65,8 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
     )
 
   private implicit lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitsCount]]] = {
-    case (Ok, _, response)               => response.as[Option[CommitsCount]]
-    case (NotFound | Unauthorized, _, _) => Option.empty[CommitsCount].pure[F]
+    case (Ok, _, response)                           => response.as[Option[CommitsCount]]
+    case (NotFound | Unauthorized | Forbidden, _, _) => Option.empty[CommitsCount].pure[F]
   }
 
   private implicit val commitCountDecoder: EntityDecoder[F, Option[CommitsCount]] = {

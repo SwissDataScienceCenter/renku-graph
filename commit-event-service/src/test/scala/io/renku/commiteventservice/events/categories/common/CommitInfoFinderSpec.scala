@@ -70,17 +70,19 @@ class CommitInfoFinderSpec
         finder.findCommitInfo(projectId, commitId)(maybeAccessToken).unsafeRunSync() shouldBe commitInfoExpectation
       }
 
-    "fallback to fetch commit info without an access token for UNAUTHORIZED" in new TestCase {
+    Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
+      s"fallback to fetch commit info without an access token for $status" in new TestCase {
 
-      val result = commitInfos.generateOne
-      (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, CommitInfo])(
-          _: Option[AccessToken]
-        ))
-        .expects(*, *, *, *, Option.empty[AccessToken])
-        .returning(result.pure[IO])
+        val result = commitInfos.generateOne
+        (gitLabClient
+          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, CommitInfo])(
+            _: Option[AccessToken]
+          ))
+          .expects(*, *, *, *, Option.empty[AccessToken])
+          .returning(result.pure[IO])
 
-      mapToCommitOrThrow((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe result
+        mapToCommitOrThrow((status, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe result
+      }
     }
 
     "return an Error if remote client responds with invalid json" in new TestCase {
@@ -92,8 +94,7 @@ class CommitInfoFinderSpec
       }
     }
 
-    "return an Error if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
-
+    "return an Error if remote client responds with other status" in new TestCase {
       intercept[Exception] {
         mapToCommitOrThrow((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync()
       }
@@ -145,18 +146,20 @@ class CommitInfoFinderSpec
     mapToMaybeCommit((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
   }
 
-  "fallback to fetch commit info without an access token for UNAUTHORIZED" in new TestCase {
+  Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
+    s"fallback to fetch commit info without an access token for $status" in new TestCase {
 
-    val result = commitInfos.generateOption
+      val result = commitInfos.generateOption
 
-    (gitLabClient
-      .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
-        _: Option[AccessToken]
-      ))
-      .expects(*, *, *, *, Option.empty[AccessToken])
-      .returning(result.pure[IO])
+      (gitLabClient
+        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+          _: Option[AccessToken]
+        ))
+        .expects(*, *, *, *, Option.empty[AccessToken])
+        .returning(result.pure[IO])
 
-    mapToMaybeCommit((Status.Unauthorized, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe result
+      mapToMaybeCommit((status, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe result
+    }
   }
 
   "return an Error if remote client responds with invalid json" in new TestCase {

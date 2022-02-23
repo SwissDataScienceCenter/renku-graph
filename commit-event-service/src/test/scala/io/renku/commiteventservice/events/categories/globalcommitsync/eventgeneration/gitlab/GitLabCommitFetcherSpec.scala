@@ -44,7 +44,7 @@ import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.ci.CIStringSyntax
+import org.typelevel.ci._
 
 class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
@@ -107,20 +107,22 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .unsafeRunSync() shouldBe PageResult.empty
     }
 
-    "fallback to fetch commits without an access token for Unauthorized" in new AllCommitsEndpointTestCase {
+    Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
+      s"fallback to fetch commits without an access token for $status" in new AllCommitsEndpointTestCase {
 
-      val pageResult = PageResult(commits = commitIds.generateFixedSizeList(1), maybeNextPage = None)
+        val pageResult = PageResult(commits = commitIds.generateFixedSizeList(1), maybeNextPage = None)
 
-      (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
-          _: Option[AccessToken]
-        ))
-        .expects(GET, uri, endpointName, *, Option.empty[AccessToken])
-        .returning(pageResult.pure[IO])
+        (gitLabClient
+          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+            _: Option[AccessToken]
+          ))
+          .expects(GET, uri, endpointName, *, Option.empty[AccessToken])
+          .returning(pageResult.pure[IO])
 
-      responseMapping
-        .value((Status.Unauthorized, Request[IO](), Response[IO]()))
-        .unsafeRunSync() shouldBe pageResult
+        responseMapping
+          .value((status, Request[IO](), Response[IO]()))
+          .unsafeRunSync() shouldBe pageResult
+      }
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new AllCommitsEndpointTestCase {
@@ -180,23 +182,25 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .unsafeRunSync() shouldBe None
     }
 
-    "fallback to fetch latest commit without an access token for Unauthorized" in new LatestCommitsEndpointTestCase {
+    Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
+      s"fallback to fetch latest commit without an access token for $status" in new LatestCommitsEndpointTestCase {
 
-      val pageResult = pageResults().generateOne
+        val pageResult = pageResults().generateOne
 
-      (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
-          _: Option[AccessToken]
-        ))
-        .expects(GET, uri, endpointName, *, Option.empty[AccessToken])
-        .returning(pageResult.pure[IO])
+        (gitLabClient
+          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+            _: Option[AccessToken]
+          ))
+          .expects(GET, uri, endpointName, *, Option.empty[AccessToken])
+          .returning(pageResult.pure[IO])
 
-      responseMapping
-        .value((Status.Unauthorized, Request[IO](), Response[IO]()))
-        .unsafeRunSync() shouldBe pageResult
+        responseMapping
+          .value((status, Request[IO](), Response[IO]()))
+          .unsafeRunSync() shouldBe pageResult
+      }
     }
 
-    "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new LatestCommitsEndpointTestCase {
+    "return an Exception if remote client responds with other status" in new LatestCommitsEndpointTestCase {
       intercept[Exception] {
         responseMapping
           .value((Status.BadRequest, Request[IO](), Response[IO]()))

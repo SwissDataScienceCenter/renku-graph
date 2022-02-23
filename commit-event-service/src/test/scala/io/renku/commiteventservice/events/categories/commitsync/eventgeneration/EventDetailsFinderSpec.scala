@@ -20,13 +20,20 @@ package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
+import io.circe.Encoder
+import io.circe.literal._
+import io.circe.syntax._
+import io.renku.commiteventservice.events.categories.common.CommitWithParents
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.config.EventLogUrl
+import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import org.http4s.Status.{Created, NotFound, Ok}
+import org.http4s.Status.Created
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -38,36 +45,38 @@ class EventDetailsFinderSpec
     with ExternalServiceStubbing
     with should.Matchers {
 
-  "checkIfExists" should {
+  "getEventDetails" should {
 
-    s"return true when event log responds with Ok" in new TestCase {
+    "return commit info when event log responds with Ok" in new TestCase {
 
-      stubFor {
-        get(s"/events/${event.id}/${event.project.id}")
-          .willReturn(aResponse().withStatus(Ok.code))
-      }
-
-      eventDetailsFinder.checkIfExists(event.project.id, event.id).unsafeRunSync() shouldBe true
-    }
-
-    s"return false when event log responds with NotFound" in new TestCase {
+      val commit = commitWithParentsGen.generateOne
 
       stubFor {
         get(s"/events/${event.id}/${event.project.id}")
-          .willReturn(aResponse().withStatus(NotFound.code))
+          .willReturn(okJson(commit.asJson.noSpaces))
       }
 
-      eventDetailsFinder.checkIfExists(event.project.id, event.id).unsafeRunSync() shouldBe false
+      eventDetailsFinder.getEventDetails(event.project.id, event.id).unsafeRunSync() shouldBe Some(commit)
     }
 
-    s"fail when event log responds with other statuses" in new TestCase {
+    "return None when event log responds with NotFound" in new TestCase {
+
+      stubFor {
+        get(s"/events/${event.id}/${event.project.id}")
+          .willReturn(notFound())
+      }
+
+      eventDetailsFinder.getEventDetails(event.project.id, event.id).unsafeRunSync() shouldBe None
+    }
+
+    "fail when event log responds with other statuses" in new TestCase {
 
       stubFor {
         get(s"/events/${event.id}/${event.project.id}")
           .willReturn(aResponse().withStatus(Created.code))
       }
       intercept[Exception] {
-        eventDetailsFinder.checkIfExists(event.project.id, event.id).unsafeRunSync()
+        eventDetailsFinder.getEventDetails(event.project.id, event.id).unsafeRunSync()
       }
     }
   }
@@ -77,5 +86,21 @@ class EventDetailsFinderSpec
     val event              = newCommitEvents.generateOne
     val eventLogUrl        = EventLogUrl(externalServiceBaseUrl)
     val eventDetailsFinder = new EventDetailsFinderImpl[IO](eventLogUrl)
+  }
+
+  private lazy val commitWithParentsGen: Gen[CommitWithParents] = for {
+    commitId  <- commitIds
+    projectId <- projectIds
+    parents   <- commitIds.toGeneratorOfList()
+  } yield CommitWithParents(commitId, projectId, parents)
+
+  private implicit val encoder: Encoder[CommitWithParents] = Encoder.instance {
+    case CommitWithParents(id, projectId, parents) => json"""{
+      "id": ${id.value},
+      "project": {
+        "id": ${projectId.value}
+      },
+      "body": ${json"""{"parents": ${parents.map(_.value)}}""".noSpaces}
+    }"""
   }
 }
