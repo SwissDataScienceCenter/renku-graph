@@ -190,7 +190,7 @@ trait GitLab {
         .withAccessTokenInHeader
     }
     stubFor {
-      get(s"/api/v4/projects/$projectId/repository/commits?page=1&per_page=50")
+      get(s"/api/v4/projects/$projectId/repository/commits?page=1&per_page=50&order=topo")
         .willReturn(okJson(commitIds.map(commitAsJson(_, theMostRecentEventDate)).asJson.noSpaces))
         .withAccessTokenInHeader
     }
