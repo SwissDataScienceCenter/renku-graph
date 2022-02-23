@@ -52,8 +52,7 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
 
   override def popEvent(): F[Option[GlobalCommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
-  private def findEventAndMarkTaken =
-    findProject >>= updateLastSyncDate >>= findCommitsInfo
+  private def findEventAndMarkTaken = findProject >>= updateLastSyncDate >>= findCommitsInfo
 
   private def updateLastSyncDate(
       maybeProject: Option[(Project, Option[LastSyncedDate])]
@@ -68,7 +67,6 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
   }
 
   private def findProject = measureExecutionTime {
-    val lastSyncDate = LastSyncedDate(now())
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find project"))
       .select[CategoryName ~ LastSyncedDate, (Project, Option[LastSyncedDate])](
         sql"""
@@ -87,30 +85,30 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
           .query(projectDecoder ~ lastSyncedDateDecoder.opt)
           .map { case project ~ lastSyncedDate => (project, lastSyncedDate) }
       )
-      .arguments(categoryName ~ lastSyncDate)
+      .arguments(categoryName ~ LastSyncedDate(now()))
       .build(_.option)
   }
   private val deletionStatus = Set(AwaitingDeletion, Deleting)
-  private def findCommitsInfo(maybeProjectAndLastSyncedDate: Option[(Project, Option[LastSyncedDate])]) =
-    maybeProjectAndLastSyncedDate match {
-      case Some((project, maybeLastSyncedDate)) =>
-        measureExecutionTime {
-          SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find commits"))
-            .select[projects.Id ~ projects.Id, (Long, Option[CommitId])](
-              sql"""
+  private def findCommitsInfo
+      : Option[(Project, Option[LastSyncedDate])] => Kleisli[F, Session[F], Option[GlobalCommitSyncEvent]] = {
+    case Some((project, maybeLastSyncedDate)) =>
+      measureExecutionTime {
+        SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find commits"))
+          .select[projects.Id ~ projects.Id, (Long, Option[CommitId])](
+            sql"""
                    SELECT
                      (SELECT COUNT(event_id) FROM event 
                        WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)}) AS count,
                      (SELECT event_id FROM event 
                        WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)} ORDER BY event_date DESC LIMIT 1) AS latest
                  """.query(int8 ~ commitIdDecoder.opt)
-            )
-            .arguments(project.id ~ project.id)
-            .build[Id](_.unique)
-            .mapResult(toEvent(project, maybeLastSyncedDate))
-        }
-      case None => Kleisli.pure(Option.empty[GlobalCommitSyncEvent])
-    }
+          )
+          .arguments(project.id ~ project.id)
+          .build[Id](_.unique)
+          .mapResult(toEvent(project, maybeLastSyncedDate))
+      }
+    case None => Kleisli.pure(Option.empty[GlobalCommitSyncEvent])
+  }
 
   private def `status NOT IN`(statuses: Set[EventStatus]) =
     s"status NOT IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"
