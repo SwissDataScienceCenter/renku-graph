@@ -21,12 +21,13 @@ All endpoints (except for `/ping` and `/metrics`) will return 503 while the data
 
 Returns information about the selected events.
 
-| Query Parameter | Mandatory | Default | Description                                            |
-|-----------------|-----------|---------|--------------------------------------------------------|
-| project-path    | No        | -       | Url-encoded non-blank project path                     |
-| status          | No        | -       | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED` |
-| page            | No        | 1       | Page number                                            |
-| per_page        | No        | 20      | Number of items per page                               |
+| Query Parameter | Mandatory | Default        | Description                                                        |
+|-----------------|-----------|----------------|--------------------------------------------------------------------|
+| project-path    | No        | -              | Url-encoded non-blank project path                                 |
+| status          | No        | -              | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED`             |
+| page            | No        | 1              | Page number                                                        |
+| per_page        | No        | 20             | Number of items per page                                           |
+| sort            | No        | eventDate:DESC | Sorting; allowed properties: `eventDate`, directions: `ASC`, `DESC`|
 
 NOTES:
 
@@ -35,11 +36,12 @@ NOTES:
 
 **Response**
 
-| Status                     | Description                     |
-|----------------------------|---------------------------------|
-| OK (200)                   | If finding events is successful |
-| INTERNAL SERVER ERROR (500)| When there are problems         |
-| SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
+| Status                          | Description                        |
+|---------------------------------|------------------------------------|
+| OK (200)                        | If finding events is successful    |
+| BAD REQUEST (400)               | For invalid query parameter values |
+| INTERNAL SERVER ERROR (500)     | When there are problems            |
+| SERVICE UNAVAILABLE ERROR (503) | When a migration is running        |
 
 Response body example:
 

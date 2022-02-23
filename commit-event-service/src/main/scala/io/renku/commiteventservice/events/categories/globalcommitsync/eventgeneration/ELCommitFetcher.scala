@@ -30,6 +30,7 @@ import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.Page
 import org.http4s.Method.GET
@@ -70,9 +71,13 @@ private class ELCommitFetcherImpl[F[_]: Async: Logger](
 
   private def createUrl(projectPath: projects.Path, pageRequest: PagingRequest) =
     validateUri(s"$eventLogUrl/events").map(
-      _.withQueryParam("project-path", projectPath.show)
-        .withQueryParam("page", pageRequest.page.show)
-        .withQueryParam("per_page", pageRequest.perPage.show)
+      _.withQueryParams(
+        Map("project-path" -> projectPath.show,
+            "page"         -> pageRequest.page.show,
+            "per_page"     -> pageRequest.perPage.show,
+            "sort"         -> show"eventDate:${Direction.Asc}"
+        )
+      )
     )
 
   private implicit lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {

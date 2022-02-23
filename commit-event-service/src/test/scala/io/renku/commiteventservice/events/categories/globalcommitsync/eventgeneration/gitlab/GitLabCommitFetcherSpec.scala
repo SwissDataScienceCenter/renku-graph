@@ -228,7 +228,8 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
     val uri = uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
       "page"     -> pageRequest.page.show,
-      "per_page" -> pageRequest.perPage.show
+      "per_page" -> pageRequest.perPage.show,
+      "order"    -> "topo"
     )
 
     val endpointName: String Refined NonEmpty = "commits"

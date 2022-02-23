@@ -69,7 +69,8 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
     GET,
     uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
       "page"     -> pageRequest.page.show,
-      "per_page" -> pageRequest.perPage.show
+      "per_page" -> pageRequest.perPage.show,
+      "order"    -> "topo"
     ),
     "commits"
   )(mapCommitsPage(projectId, pageRequest))
@@ -104,5 +105,5 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
 
 private[globalcommitsync] object GitLabCommitFetcher {
   def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[GitLabCommitFetcher[F]] =
-    (new GitLabCommitFetcherImpl[F](gitLabClient)).pure[F].widen
+    new GitLabCommitFetcherImpl[F](gitLabClient).pure[F].widen
 }
