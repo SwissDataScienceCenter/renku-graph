@@ -128,7 +128,7 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
     val request  = Request[IO](GET, uri"/events")
 
     val eventLogUrl:          EventLogUrl = httpUrls().generateAs(EventLogUrl)
-    implicit val resourceUrl: EventLogUrl = eventLogUrl / request.uri.show
+    implicit val resourceUrl: EventLogUrl = EventLogUrl(show"$eventLogUrl${request.uri}")
 
     val eventsFinder = mock[EventsFinder[IO]]
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
@@ -152,6 +152,5 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
       processingTime <- cursor.downField("processingTime").as[EventProcessingTime]
     } yield StatusProcessingTime(status, processingTime)
 
-  private implicit val entityDecoder: EntityDecoder[IO, List[EventInfo]] =
-    org.http4s.circe.jsonOf[IO, List[EventInfo]]
+  private implicit val entityDecoder: EntityDecoder[IO, List[EventInfo]] = org.http4s.circe.jsonOf[IO, List[EventInfo]]
 }

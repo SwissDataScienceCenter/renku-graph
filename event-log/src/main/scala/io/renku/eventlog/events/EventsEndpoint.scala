@@ -51,8 +51,10 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
   override def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]] =
     eventsFinder
       .findEvents(criteria)
-      .map(_.toHttpResponse[F, EventLogUrl](eventLogUrl / request.uri.show, EventLogUrl, EventInfo.infoEncoder))
+      .map(_.toHttpResponse[F, EventLogUrl](resourceUrl(request), EventLogUrl, EventInfo.infoEncoder))
       .recoverWith(httpResponse(request))
+
+  private def resourceUrl(request: Request[F]) = EventLogUrl(show"$eventLogUrl${request.uri}")
 
   private def httpResponse(request: Request[F]): PartialFunction[Throwable, F[Response[F]]] = {
     case NonFatal(exception) =>
