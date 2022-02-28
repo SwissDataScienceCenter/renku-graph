@@ -34,31 +34,151 @@ import io.renku.tokenrepository.repository.deletion.TokenRemover
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
+import cats.data.OptionT
+import eu.timepit.refined.types.numeric.NonNegInt
 
 class TokenAssociatorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "associate" should {
 
-    "succeed if finding the Project Path, token encryption and storing in the db is successful" in new TestCase {
-      val projectPath = projectPaths.generateOne
-      (projectPathFinder
-        .findProjectPath(_: Id, _: Option[AccessToken]))
-        .expects(projectId, Some(accessToken))
-        .returning(Some(projectPath).pure[IO])
+    "succeed if finding the Project Path, token encryption, storing in the db is successful " +
+      "and token in the db can be decrypted" in new TestCase {
+        val projectPath = projectPaths.generateOne
+        (projectPathFinder
+          .findProjectPath(_: Id, _: Option[AccessToken]))
+          .expects(projectId, Some(accessToken))
+          .returning(Some(projectPath).pure[IO])
 
-      val encryptedAccessToken = encryptedAccessTokens.generateOne
-      (accessTokenCrypto
-        .encrypt(_: AccessToken))
-        .expects(accessToken)
-        .returning(encryptedAccessToken.pure[IO])
+        val encryptedAccessToken = encryptedAccessTokens.generateOne
+        (accessTokenCrypto
+          .encrypt(_: AccessToken))
+          .expects(accessToken)
+          .returning(encryptedAccessToken.pure[IO])
 
-      (associationPersister
-        .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
-        .expects(projectId, projectPath, encryptedAccessToken)
-        .returning(IO.unit)
+        (associationPersister
+          .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
+          .expects(projectId, projectPath, encryptedAccessToken)
+          .returning(IO.unit)
 
-      tokenAssociator.associate(projectId, accessToken).unsafeRunSync() shouldBe ()
-    }
+        (tokenFinder
+          .findToken(_: Path))
+          .expects(projectPath)
+          .returning(OptionT.some[IO](encryptedAccessToken))
+
+        (accessTokenCrypto
+          .decrypt(_: EncryptedAccessToken))
+          .expects(encryptedAccessToken)
+          .returning(accessToken.pure[IO])
+
+        tokenAssociator.associate(projectId, accessToken).unsafeRunSync() shouldBe ()
+      }
+
+    "retry if finding the Project Path, token encryption, storing in the db is successful " +
+      "and token in the db cannot be decrypted" in new TestCase {
+        override val tokenAssociator: TokenAssociatorImpl[IO] =
+          new TokenAssociatorImpl[IO](projectPathFinder,
+                                      accessTokenCrypto,
+                                      associationPersister,
+                                      tokenRemover,
+                                      tokenFinder,
+                                      maxRetries = NonNegInt.unsafeFrom(1)
+          )
+        val projectPath = projectPaths.generateOne
+        (projectPathFinder
+          .findProjectPath(_: Id, _: Option[AccessToken]))
+          .expects(projectId, Some(accessToken))
+          .returning(Some(projectPath).pure[IO])
+
+        val encryptedAccessToken = encryptedAccessTokens.generateOne
+        (accessTokenCrypto
+          .encrypt(_: AccessToken))
+          .expects(accessToken)
+          .returning(encryptedAccessToken.pure[IO])
+
+        (associationPersister
+          .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
+          .expects(projectId, projectPath, encryptedAccessToken)
+          .returning(IO.unit)
+
+        (tokenFinder
+          .findToken(_: Path))
+          .expects(projectPath)
+          .returning(OptionT.some[IO](encryptedAccessToken))
+
+        val exception = exceptions.generateOne
+        (accessTokenCrypto
+          .decrypt(_: EncryptedAccessToken))
+          .expects(encryptedAccessToken)
+          .returning(exception.raiseError[IO, AccessToken])
+
+        (associationPersister
+          .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
+          .expects(projectId, projectPath, encryptedAccessToken)
+          .returning(IO.unit)
+
+        (tokenFinder
+          .findToken(_: Path))
+          .expects(projectPath)
+          .returning(OptionT.some[IO](encryptedAccessToken))
+
+        (accessTokenCrypto
+          .decrypt(_: EncryptedAccessToken))
+          .expects(encryptedAccessToken)
+          .returning(accessToken.pure[IO])
+
+        tokenAssociator.associate(projectId, accessToken).unsafeRunSync() shouldBe ()
+      }
+
+    "retry if finding the Project Path, token encryption, storing in the db is successful " +
+      "and token in the db is cannot be found" in new TestCase {
+        override val tokenAssociator: TokenAssociatorImpl[IO] =
+          new TokenAssociatorImpl[IO](projectPathFinder,
+                                      accessTokenCrypto,
+                                      associationPersister,
+                                      tokenRemover,
+                                      tokenFinder,
+                                      maxRetries = NonNegInt.unsafeFrom(1)
+          )
+        val projectPath = projectPaths.generateOne
+        (projectPathFinder
+          .findProjectPath(_: Id, _: Option[AccessToken]))
+          .expects(projectId, Some(accessToken))
+          .returning(Some(projectPath).pure[IO])
+
+        val encryptedAccessToken = encryptedAccessTokens.generateOne
+        (accessTokenCrypto
+          .encrypt(_: AccessToken))
+          .expects(accessToken)
+          .returning(encryptedAccessToken.pure[IO])
+
+        (associationPersister
+          .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
+          .expects(projectId, projectPath, encryptedAccessToken)
+          .returning(IO.unit)
+
+        (tokenFinder
+          .findToken(_: Path))
+          .expects(projectPath)
+          .returning(OptionT.none[IO, EncryptedAccessToken])
+
+        (associationPersister
+          .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
+          .expects(projectId, projectPath, encryptedAccessToken)
+          .returning(IO.unit)
+
+        (tokenFinder
+          .findToken(_: Path))
+          .expects(projectPath)
+          .returning(OptionT.some[IO](encryptedAccessToken))
+
+        (accessTokenCrypto
+          .decrypt(_: EncryptedAccessToken))
+          .expects(encryptedAccessToken)
+          .returning(accessToken.pure[IO])
+
+        tokenAssociator.associate(projectId, accessToken).unsafeRunSync() shouldBe ()
+      }
 
     "succeed if finding the Project Path returns none and removing the token is successful" in new TestCase {
       (projectPathFinder
@@ -128,6 +248,70 @@ class TokenAssociatorSpec extends AnyWordSpec with IOSpec with MockFactory with 
       }.getMessage shouldBe exception.getMessage
     }
 
+    "fail if finding the Project Path, token encryption, storing in the db is successful, " +
+      "the token cannot be decrypted and there are no retries left" in new TestCase {
+        val projectPath = projectPaths.generateOne
+        (projectPathFinder
+          .findProjectPath(_: Id, _: Option[AccessToken]))
+          .expects(projectId, Some(accessToken))
+          .returning(Some(projectPath).pure[IO])
+
+        val encryptedAccessToken = encryptedAccessTokens.generateOne
+        (accessTokenCrypto
+          .encrypt(_: AccessToken))
+          .expects(accessToken)
+          .returning(encryptedAccessToken.pure[IO])
+
+        (associationPersister
+          .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
+          .expects(projectId, projectPath, encryptedAccessToken)
+          .returning(IO.unit)
+
+        (tokenFinder
+          .findToken(_: Path))
+          .expects(projectPath)
+          .returning(OptionT.some[IO](encryptedAccessToken))
+
+        val exception = exceptions.generateOne
+        (accessTokenCrypto
+          .decrypt(_: EncryptedAccessToken))
+          .expects(encryptedAccessToken)
+          .returning(exception.raiseError[IO, AccessToken])
+
+        intercept[Exception] {
+          tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
+        }.getMessage shouldBe exception.getMessage
+      }
+
+    "fail if finding the Project Path, token encryption, storing in the db is successful, " +
+      "the token cannot be found in the DB and there are no retries left" in new TestCase {
+        val projectPath = projectPaths.generateOne
+        (projectPathFinder
+          .findProjectPath(_: Id, _: Option[AccessToken]))
+          .expects(projectId, Some(accessToken))
+          .returning(Some(projectPath).pure[IO])
+
+        val encryptedAccessToken = encryptedAccessTokens.generateOne
+        (accessTokenCrypto
+          .encrypt(_: AccessToken))
+          .expects(accessToken)
+          .returning(encryptedAccessToken.pure[IO])
+
+        (associationPersister
+          .persistAssociation(_: Id, _: Path, _: EncryptedAccessToken))
+          .expects(projectId, projectPath, encryptedAccessToken)
+          .returning(IO.unit)
+
+        (tokenFinder
+          .findToken(_: Path))
+          .expects(projectPath)
+          .returning(OptionT.none[IO, EncryptedAccessToken])
+
+        intercept[Exception] {
+          tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
+        }.getMessage shouldBe show"Token associator - saved encrypted token cannot be found for project: $projectPath"
+      }
+
     "fail if removing the token fails" in new TestCase {
       (projectPathFinder
         .findProjectPath(_: Id, _: Option[AccessToken]))
@@ -154,7 +338,14 @@ class TokenAssociatorSpec extends AnyWordSpec with IOSpec with MockFactory with 
     val accessTokenCrypto    = mock[AccessTokenCrypto[IO]]
     val associationPersister = mock[AssociationPersister[IO]]
     val tokenRemover         = mock[TokenRemover[IO]]
+    val tokenFinder          = mock[PersistedTokensFinder[IO]]
     val tokenAssociator =
-      new TokenAssociatorImpl[IO](projectPathFinder, accessTokenCrypto, associationPersister, tokenRemover)
+      new TokenAssociatorImpl[IO](projectPathFinder,
+                                  accessTokenCrypto,
+                                  associationPersister,
+                                  tokenRemover,
+                                  tokenFinder,
+                                  NonNegInt.unsafeFrom(0)
+      )
   }
 }
