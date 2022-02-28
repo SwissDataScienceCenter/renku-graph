@@ -35,7 +35,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityG
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
 import org.scalamock.scalatest.MockFactory

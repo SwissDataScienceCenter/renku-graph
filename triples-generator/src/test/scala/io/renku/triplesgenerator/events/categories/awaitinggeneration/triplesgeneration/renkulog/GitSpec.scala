@@ -28,7 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors._
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitImpl, RepositoryPath}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

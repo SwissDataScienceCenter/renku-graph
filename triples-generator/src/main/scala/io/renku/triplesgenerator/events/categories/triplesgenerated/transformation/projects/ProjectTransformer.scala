@@ -25,9 +25,9 @@ import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.rdfstore.SparqlQueryTimeRecorder
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.{RecoverableErrorsRecovery, TransformationStep}
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.{RecoverableErrorsRecovery, TransformationStep}
 import org.typelevel.log4cats.Logger
 
 private[transformation] trait ProjectTransformer[F[_]] {

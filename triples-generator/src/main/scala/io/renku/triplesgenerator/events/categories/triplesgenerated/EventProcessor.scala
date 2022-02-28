@@ -18,10 +18,10 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import cats.data.EitherT.right
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import io.prometheus.client.Histogram
 import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
@@ -31,9 +31,9 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
-import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}

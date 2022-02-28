@@ -38,7 +38,8 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, Property}
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, categoryName}
 import org.scalacheck.Gen

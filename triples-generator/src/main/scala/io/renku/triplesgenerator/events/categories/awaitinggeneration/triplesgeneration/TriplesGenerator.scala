@@ -26,7 +26,7 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.triplesgenerator.config.TriplesGeneration
 import io.renku.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import org.typelevel.log4cats.Logger

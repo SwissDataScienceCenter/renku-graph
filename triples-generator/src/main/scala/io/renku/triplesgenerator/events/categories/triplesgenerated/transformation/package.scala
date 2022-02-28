@@ -24,7 +24,7 @@ import io.circe.Decoder
 import io.circe.Decoder.decodeString
 import io.renku.graph.model.entities.Project
 import io.renku.jsonld.EntityId
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 
 package object transformation {
 
