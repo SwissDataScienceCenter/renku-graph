@@ -28,7 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors.LogWorthyRecoverableError
+import io.renku.triplesgenerator.events.categories.Errors._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitImpl, RepositoryPath}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -81,6 +81,27 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
           )
         )
       }
+    }
+
+    s"return $AuthRecoverableError if command fails with a message 'remote: HTTP Basic: Access denied'" in new TestCase {
+
+      val errorMessage = sentenceContaining(
+        Refined.unsafeApply("""|remote: HTTP Basic: Access denied
+                               |fatal: Authentication failed for""".stripMargin)
+      ).generateOne.value
+      val commandResultException = ShelloutException {
+        CommandResult(
+          exitCode = 1,
+          chunks = Seq(Left(new Bytes(errorMessage.getBytes())))
+        )
+      }
+      cloneCommand
+        .expects(repositoryUrl, destDirectory, workDirectory)
+        .throwing(commandResultException)
+
+      git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Left(
+        AuthRecoverableError(s"git clone failed with: ${commandResultException.result.toString}")
+      )
     }
 
     "fail if command fails with an unknown message" in new TestCase {
