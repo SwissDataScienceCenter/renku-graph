@@ -28,12 +28,12 @@ import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToke
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTypeSerializers}
 import skunk.implicits._
 
-private trait PersistedTokensFinder[F[_]] {
+private[repository] trait PersistedTokensFinder[F[_]] {
   def findToken(projectId:   Id):   OptionT[F, EncryptedAccessToken]
   def findToken(projectPath: Path): OptionT[F, EncryptedAccessToken]
 }
 
-private class PersistedTokensFinderImpl[F[_]: MonadCancelThrow](
+private[repository] class PersistedTokensFinderImpl[F[_]: MonadCancelThrow](
     sessionResource:  SessionResource[F, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
 ) extends DbClient[F](Some(queriesExecTimes))
