@@ -31,7 +31,7 @@ import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import org.typelevel.log4cats.Logger
 
@@ -163,7 +163,8 @@ private object Commands {
       %%("git", "status")(repositoryDirectory.value).out.string
     }
 
-    private val recoverableErrors = Set(
+    private val authRecoverableErrors = Set("fatal: Authentication failed for")
+    private val nonAuthRecoverableErrors = Set(
       "SSL_ERROR_SYSCALL",
       "the remote end hung up unexpectedly",
       "The requested URL returned error: 502",
@@ -178,8 +179,13 @@ private object Commands {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"
 
-        MonadThrow[F].catchNonFatal(result.toString()) flatMap {
-          case out if recoverableErrors exists out.contains =>
+        MonadThrow[F].catchNonFatal(result.toString()) >>= {
+          case out if authRecoverableErrors exists out.contains =>
+            AuthRecoverableError(errorMessage(result.toString()))
+              .asLeft[Unit]
+              .leftWiden[ProcessingRecoverableError]
+              .pure[F]
+          case out if nonAuthRecoverableErrors exists out.contains =>
             LogWorthyRecoverableError(errorMessage(result.toString()))
               .asLeft[Unit]
               .leftWiden[ProcessingRecoverableError]
