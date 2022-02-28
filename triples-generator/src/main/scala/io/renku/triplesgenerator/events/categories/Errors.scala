@@ -34,5 +34,4 @@ object Errors {
   object AuthRecoverableError {
     def apply(message: String): AuthRecoverableError = AuthRecoverableError(message, null)
   }
-
 }
