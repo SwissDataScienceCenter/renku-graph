@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.generators
 
 import io.renku.generators.Generators._
 import Implicits._
-import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import org.scalacheck.Gen
 
@@ -37,4 +37,9 @@ object ErrorGenerators {
 
   lazy val processingRecoverableErrors: Gen[ProcessingRecoverableError] =
     Gen.oneOf(logWorthyRecoverableErrors, authRecoverableErrors)
+
+  lazy val nonRecoverableDataErrors: Gen[ProcessingNonRecoverableError.DataError] = for {
+    message <- nonEmptyStrings()
+    cause   <- exceptions
+  } yield ProcessingNonRecoverableError.DataError(message, cause)
 }

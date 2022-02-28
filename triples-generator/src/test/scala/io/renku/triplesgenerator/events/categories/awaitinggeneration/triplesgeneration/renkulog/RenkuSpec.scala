@@ -24,7 +24,9 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.categories.ProcessingNonRecoverableError
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators.commitEvents
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{RenkuImpl, RepositoryPath}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -32,7 +34,33 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFactory {
 
-  "export" should {
+  "migrate" should {
+
+    "succeed if 'renku migrate' succeeds" in new TestCase {
+      val commandResult = CommandResult(exitCode = 0, chunks = Seq.empty)
+      renkuMigrate.expects(path.value).returning(commandResult)
+
+      val event = commitEvents.generateOne
+
+      renku.migrate(event)(path).unsafeRunSync() shouldBe ()
+    }
+
+    "fail with some ProcessingNonRecoverableError.DataError if 'renku migrate' fails" in new TestCase {
+      val exception = exceptions.generateOne
+      renkuMigrate.expects(path.value).throws(exception)
+
+      val event = commitEvents.generateOne
+
+      val failure = intercept[ProcessingNonRecoverableError.DataError] {
+        renku.migrate(event)(path).unsafeRunSync()
+      }
+
+      failure.getMessage shouldBe s"'renku migrate' failed for commit: ${event.commitId}, project: ${event.project.id}"
+      failure.getCause   shouldBe exception
+    }
+  }
+
+  "graphExport" should {
 
     "return the 'renku export' output if renku export succeeds" in new TestCase {
       val commandBody = jsonLDEntities.generateOne
@@ -48,17 +76,19 @@ class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFa
       triples shouldBe commandBody
     }
 
-    "fail if calling 'renku export' results in a failure" in new TestCase {
+    "fail if calling 'renku export' results with a DataError" in new TestCase {
       val exception = exceptions.generateOne
-
       renkuExport.expects(path.value).throws(exception)
 
-      intercept[Exception] {
+      val failure = intercept[ProcessingNonRecoverableError.DataError] {
         renku.graphExport(path).value.unsafeRunSync()
-      } shouldBe exception
+      }
+
+      failure.getMessage shouldBe "'renku graph export' failed"
+      failure.getCause   shouldBe exception
     }
 
-    s"return $LogWorthyRecoverableError if calling 'renku export' results in a 137 exit code" in new TestCase {
+    "return LogWorthyRecoverableError if calling 'renku export' results in a 137 exit code" in new TestCase {
       val exception = ShelloutException(CommandResult(exitCode = 137, chunks = Nil))
       renkuExport.expects(path.value).throws(exception)
 
@@ -70,9 +100,10 @@ class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFa
   }
 
   private trait TestCase {
-    val path        = RepositoryPath(paths.generateOne)
-    val renkuExport = mockFunction[Path, CommandResult]
+    val path         = RepositoryPath(paths.generateOne)
+    val renkuMigrate = mockFunction[Path, CommandResult]
+    val renkuExport  = mockFunction[Path, CommandResult]
 
-    val renku = new RenkuImpl[IO](renkuExport)
+    val renku = new RenkuImpl[IO](renkuMigrate, renkuExport)
   }
 }

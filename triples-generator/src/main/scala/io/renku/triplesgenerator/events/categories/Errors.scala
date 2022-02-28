@@ -33,3 +33,12 @@ object ProcessingRecoverableError {
     def apply(message: String): AuthRecoverableError = AuthRecoverableError(message, null)
   }
 }
+
+abstract class ProcessingNonRecoverableError(message: String, cause: Throwable) extends Exception(message, cause)
+object ProcessingNonRecoverableError {
+
+  final case class DataError(message: String, cause: Throwable) extends ProcessingNonRecoverableError(message, cause)
+  object DataError {
+    def apply(message: String): DataError = DataError(message, null)
+  }
+}

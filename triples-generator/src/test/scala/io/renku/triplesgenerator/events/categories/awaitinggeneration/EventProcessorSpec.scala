@@ -40,12 +40,12 @@ import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
-import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
-import io.renku.triplesgenerator.generators.ErrorGenerators.{authRecoverableErrors, logWorthyRecoverableErrors}
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
+import io.renku.triplesgenerator.generators.ErrorGenerators.{authRecoverableErrors, logWorthyRecoverableErrors, nonRecoverableDataErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -84,7 +84,27 @@ class EventProcessorSpec
       verifyMetricsCollected()
     }
 
-    "succeed if event fails during triples generation" in new TestCase {
+    "succeed if event fails during triples generation with a DataError" in new TestCase {
+
+      val commitEvent = commitEvents.generateOne
+
+      givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
+        .returning(maybeAccessToken.pure[Try])
+
+      val exception = nonRecoverableDataErrors.generateOne
+      (triplesFinder
+        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
+        .expects(commitEvent, maybeAccessToken)
+        .returning(EitherT.liftF(exception.raiseError[Try, JsonLD]))
+
+      expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
+
+      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+
+      logger.expectNoLogs()
+    }
+
+    "log an error and succeed if event fails during triples generation with a non data problem" in new TestCase {
 
       val commitEvent = commitEvents.generateOne
 

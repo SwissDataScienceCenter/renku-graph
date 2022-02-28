@@ -31,9 +31,8 @@ import io.renku.jsonld.JsonLD
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
-import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import org.typelevel.log4cats.Logger
@@ -140,10 +139,14 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
   private def toNonRecoverableFailure(
       commit: CommitEvent
-  ): PartialFunction[Throwable, F[TriplesGenerationResult]] = { case NonFatal(exception) =>
-    Logger[F]
-      .error(exception)(s"${logMessageCommon(commit)} failed")
-      .map(_ => NonRecoverableError(commit, exception): TriplesGenerationResult)
+  ): PartialFunction[Throwable, F[TriplesGenerationResult]] = {
+    case exception: ProcessingNonRecoverableError.DataError =>
+      NonRecoverableError(commit, exception).pure[F].widen[TriplesGenerationResult]
+    case NonFatal(exception) =>
+      Logger[F]
+        .error(exception)(s"${logMessageCommon(commit)} failed")
+        .map(_ => NonRecoverableError(commit, exception))
+        .widen[TriplesGenerationResult]
   }
 
   private def logSummary: ((ElapsedTime, TriplesGenerationResult)) => F[Unit] = {
