@@ -31,6 +31,7 @@ import io.renku.eventlog.events.categories.statuschange.projectCleaner.ProjectCl
 import io.renku.eventlog.{EventDate, ExecutionDate}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, New, Skipped}
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
@@ -48,10 +49,9 @@ private object ProjectEventsToNewUpdater {
       queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
       awaitingDeletionGauge: LabeledGauge[F, projects.Path],
       deletingEventGauge:    LabeledGauge[F, projects.Path]
-  ): F[DBUpdater[F, ProjectEventsToNew]] =
-    ProjectCleaner[F](queriesExecTimes).map(
-      new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes, awaitingDeletionGauge, deletingEventGauge)
-    )
+  ): F[DBUpdater[F, ProjectEventsToNew]] = ProjectCleaner[F](queriesExecTimes).map(
+    new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes, awaitingDeletionGauge, deletingEventGauge)
+  )
 }
 
 private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
@@ -68,8 +68,8 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
     _                        <- removeProjectProcessingTimes(event.project)
     _                        <- removeProjectPayloads(event.project)
     _                        <- removeProjectDeliveryInfo(event.project)
-    removedAwaitingDeletions <- removeProjectEvents(event.project, EventStatus.AwaitingDeletion)
-    removedDeletingEvents    <- removeProjectEvents(event.project, EventStatus.Deleting)
+    removedAwaitingDeletions <- removeProjectEvents(event.project, AwaitingDeletion)
+    removedDeletingEvents    <- removeProjectEvents(event.project, Deleting)
     maybeLatestEventDate     <- getLatestEventDate(event.project)
     _                        <- updateLatestEventDate(event.project)(maybeLatestEventDate)
     _                        <- cleanUpProjectIfGone(event.project)(maybeLatestEventDate)
@@ -84,27 +84,26 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
   ) = statuses
     .groupBy(identity)
     .map { case (eventStatus, eventStatuses) => (eventStatus, -1 * eventStatuses.length) }
-    .updatedWith(EventStatus.New) { maybeNewEventsCount =>
+    .updatedWith(New) { maybeNewEventsCount =>
       maybeNewEventsCount
         .map(_ + statuses.length)
         .orElse(if (statuses.nonEmpty) Some(statuses.length) else None)
     }
-    .updated(EventStatus.AwaitingDeletion, -removedAwaitingDeletions)
-    .updated(EventStatus.Deleting, -removedDeletingEvent)
+    .updated(AwaitingDeletion, -removedAwaitingDeletions)
+    .updated(Deleting, -removedDeletingEvent)
 
   private def updateStatuses(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
       .select[ExecutionDate ~ projects.Id, EventStatus](
         sql"""UPDATE event evt
-              SET status = '#${EventStatus.New.value}',
+              SET status = '#${New.value}',
                   execution_date = $executionDateEncoder,
                   message = NULL
               FROM (
                 SELECT event_id, project_id, status 
                 FROM event
-                WHERE project_id = $projectIdEncoder AND #${`status IN`(
-          EventStatus.all.diff(Set(EventStatus.Skipped, EventStatus.AwaitingDeletion, EventStatus.Deleting))
-        )}
+                WHERE project_id = $projectIdEncoder 
+                  AND #${`status IN`(EventStatus.all diff Set(Skipped, AwaitingDeletion, Deleting))}
                 FOR UPDATE
               ) old_evt
               WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
@@ -121,7 +120,8 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
   private def removeProjectProcessingTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - processing_times removal")
       .command[projects.Id](
-        sql"""DELETE FROM status_processing_time WHERE project_id = $projectIdEncoder""".command
+        sql"""DELETE FROM status_processing_time 
+              WHERE project_id = $projectIdEncoder""".command
       )
       .arguments(project.id)
       .build
@@ -131,7 +131,8 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
   private def removeProjectPayloads(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - payloads removal")
       .command[projects.Id](
-        sql"""DELETE FROM event_payload WHERE project_id = $projectIdEncoder""".command
+        sql"""DELETE FROM event_payload 
+              WHERE project_id = $projectIdEncoder""".command
       )
       .arguments(project.id)
       .build
@@ -156,7 +157,8 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
   private def removeProjectDeliveryInfo(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - delivery removal")
       .command[projects.Id](
-        sql"""DELETE FROM event_delivery WHERE project_id = $projectIdEncoder""".command
+        sql"""DELETE FROM event_delivery 
+              WHERE project_id = $projectIdEncoder""".command
       )
       .arguments(project.id)
       .build
@@ -209,5 +211,6 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
     case NonFatal(error) =>
       Kleisli.liftF(Logger[F].error(error)(s"Clean up project failed: ${project.show}"))
   }
+
   override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())
 }
