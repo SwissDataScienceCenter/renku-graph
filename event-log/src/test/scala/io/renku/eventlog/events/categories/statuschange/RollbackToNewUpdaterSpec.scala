@@ -64,16 +64,14 @@ class RollbackToNewUpdaterSpec
       findEvent(CompoundEventId(otherEventId, projectId)).map(_._2) shouldBe Some(GeneratingTriples)
     }
 
-    s"fail if the given event is not in the $GeneratingTriples status" in new TestCase {
+    s"do nothing if event is not in the $GeneratingTriples status" in new TestCase {
 
       val invalidStatus = Gen.oneOf(EventStatus.all.filterNot(_ == GeneratingTriples)).generateOne
       val eventId       = addEvent(invalidStatus)
 
-      intercept[Exception] {
-        sessionResource
-          .useK(dbUpdater.updateDB(RollbackToNew(CompoundEventId(eventId, projectId), projectPath)))
-          .unsafeRunSync()
-      }.getMessage shouldBe s"Could not rollback event ${CompoundEventId(eventId, projectId)} to status $New"
+      sessionResource
+        .useK(dbUpdater.updateDB(RollbackToNew(CompoundEventId(eventId, projectId), projectPath)))
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
 
       findEvent(CompoundEventId(eventId, projectId)).map(_._2) shouldBe Some(invalidStatus)
     }
