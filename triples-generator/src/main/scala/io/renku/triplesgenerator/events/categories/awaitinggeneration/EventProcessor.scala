@@ -140,7 +140,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
   private def toNonRecoverableFailure(
       commit: CommitEvent
   ): PartialFunction[Throwable, F[TriplesGenerationResult]] = {
-    case exception: ProcessingNonRecoverableError.DataError =>
+    case exception: ProcessingNonRecoverableError.MalformedRepository =>
       NonRecoverableError(commit, exception).pure[F].widen[TriplesGenerationResult]
     case NonFatal(exception) =>
       Logger[F]

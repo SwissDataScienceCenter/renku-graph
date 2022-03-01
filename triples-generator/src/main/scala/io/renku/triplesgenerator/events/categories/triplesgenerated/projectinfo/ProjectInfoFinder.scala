@@ -39,12 +39,11 @@ private[triplesgenerated] trait ProjectInfoFinder[F[_]] {
 private[triplesgenerated] object ProjectInfoFinder {
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
       gitLabThrottler: Throttler[F, GitLab]
-  ): F[ProjectInfoFinder[F]] =
-    for {
-      projectFinder     <- ProjectFinder[F](gitLabThrottler)
-      membersFinder     <- ProjectMembersFinder[F](gitLabThrottler)
-      memberEmailFinder <- MemberEmailFinder[F](gitLabThrottler)
-    } yield new ProjectInfoFinderImpl(projectFinder, membersFinder, memberEmailFinder)
+  ): F[ProjectInfoFinder[F]] = for {
+    projectFinder     <- ProjectFinder[F](gitLabThrottler)
+    membersFinder     <- ProjectMembersFinder[F](gitLabThrottler)
+    memberEmailFinder <- MemberEmailFinder[F](gitLabThrottler)
+  } yield new ProjectInfoFinderImpl(projectFinder, membersFinder, memberEmailFinder)
 }
 
 private[triplesgenerated] class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](

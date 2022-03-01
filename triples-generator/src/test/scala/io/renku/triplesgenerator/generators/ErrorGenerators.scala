@@ -38,8 +38,10 @@ object ErrorGenerators {
   lazy val processingRecoverableErrors: Gen[ProcessingRecoverableError] =
     Gen.oneOf(logWorthyRecoverableErrors, authRecoverableErrors)
 
-  lazy val nonRecoverableDataErrors: Gen[ProcessingNonRecoverableError.DataError] = for {
-    message <- nonEmptyStrings()
-    cause   <- exceptions
-  } yield ProcessingNonRecoverableError.DataError(message, cause)
+  lazy val nonRecoverableMalformedRepoErrors: Gen[ProcessingNonRecoverableError.MalformedRepository] = for {
+    message    <- nonEmptyStrings()
+    maybeCause <- exceptions.toGeneratorOfOptions
+  } yield maybeCause
+    .map(ProcessingNonRecoverableError.MalformedRepository(message, _))
+    .getOrElse(ProcessingNonRecoverableError.MalformedRepository(message))
 }

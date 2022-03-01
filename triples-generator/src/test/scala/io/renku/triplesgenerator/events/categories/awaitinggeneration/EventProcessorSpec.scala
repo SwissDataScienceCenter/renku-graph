@@ -45,7 +45,7 @@ import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProce
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
-import io.renku.triplesgenerator.generators.ErrorGenerators.{authRecoverableErrors, logWorthyRecoverableErrors, nonRecoverableDataErrors}
+import io.renku.triplesgenerator.generators.ErrorGenerators.{authRecoverableErrors, logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -84,14 +84,14 @@ class EventProcessorSpec
       verifyMetricsCollected()
     }
 
-    "succeed if event fails during triples generation with a DataError" in new TestCase {
+    "succeed if event fails during triples generation with a ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
         .returning(maybeAccessToken.pure[Try])
 
-      val exception = nonRecoverableDataErrors.generateOne
+      val exception = nonRecoverableMalformedRepoErrors.generateOne
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commitEvent, maybeAccessToken)
@@ -104,27 +104,28 @@ class EventProcessorSpec
       logger.expectNoLogs()
     }
 
-    "log an error and succeed if event fails during triples generation with a non data problem" in new TestCase {
+    "log an error and succeed " +
+      "if event fails during triples generation with a non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
-      val commitEvent = commitEvents.generateOne
+        val commitEvent = commitEvents.generateOne
 
-      givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
-        .returning(maybeAccessToken.pure[Try])
+        givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
+          .returning(maybeAccessToken.pure[Try])
 
-      val exception = exceptions.generateOne
-      (triplesFinder
-        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(commitEvent, maybeAccessToken)
-        .returning(EitherT.liftF(exception.raiseError[Try, JsonLD]))
+        val exception = exceptions.generateOne
+        (triplesFinder
+          .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
+          .expects(commitEvent, maybeAccessToken)
+          .returning(EitherT.liftF(exception.raiseError[Try, JsonLD]))
 
-      expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
+        expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
 
-      eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+        eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
-      logError(commitEvent, exception)
-    }
+        logError(commitEvent, exception)
+      }
 
-    s"mark event as RecoverableFailure and log an error if finding triples fails with $LogWorthyRecoverableError" in new TestCase {
+    "mark event as RecoverableFailure and log an error if finding triples fails with LogWorthyRecoverableError" in new TestCase {
 
       val commitEvent = commitEvents.generateOne
 
@@ -145,7 +146,7 @@ class EventProcessorSpec
     }
 
     "mark event as RecoverableFailure and refrain from loggin an error " +
-      s"if finding triples fails with $AuthRecoverableError" in new TestCase {
+      "if finding triples fails with AuthRecoverableError" in new TestCase {
 
         val commitEvent = commitEvents.generateOne
 

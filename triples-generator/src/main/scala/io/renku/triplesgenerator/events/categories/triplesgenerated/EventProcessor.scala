@@ -32,7 +32,7 @@ import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
-import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
@@ -111,10 +111,13 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
   private def nonRecoverableFailure(
       triplesGeneratedEvent: TriplesGeneratedEvent
-  ): PartialFunction[Throwable, F[UploadingResult]] = { case NonFatal(exception) =>
-    Logger[F]
-      .error(exception)(s"${logMessageCommon(triplesGeneratedEvent)} ${exception.getMessage}")
-      .map(_ => NonRecoverableError(triplesGeneratedEvent, exception))
+  ): PartialFunction[Throwable, F[UploadingResult]] = {
+    case exception: ProcessingNonRecoverableError.MalformedRepository =>
+      NonRecoverableError(triplesGeneratedEvent, exception).pure[F].widen[UploadingResult]
+    case NonFatal(exception) =>
+      Logger[F]
+        .error(exception)(s"${logMessageCommon(triplesGeneratedEvent)} ${exception.getMessage}")
+        .map(_ => NonRecoverableError(triplesGeneratedEvent, exception))
   }
 
   private def toUploadingError(

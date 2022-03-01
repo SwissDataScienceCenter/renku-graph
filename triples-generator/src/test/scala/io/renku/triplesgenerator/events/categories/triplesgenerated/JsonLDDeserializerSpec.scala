@@ -35,7 +35,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityG
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
 import org.scalamock.scalatest.MockFactory
@@ -108,8 +108,8 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         )
         .value
 
-      error            shouldBe a[IllegalStateException]
-      error.getMessage shouldBe s"No project ${eventProject.show} found in GitLab"
+      error            shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
+      error.getMessage shouldBe show"$eventProject not found in GitLab"
     }
 
     "fail if fetching the project info fails" in new TestCase {
@@ -146,7 +146,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         )
         .value
 
-      error            shouldBe a[IllegalStateException]
+      error            shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
       error.getMessage shouldBe show"0 Project entities found in the JsonLD for $eventProject"
     }
 
@@ -171,7 +171,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         )
         .value
 
-      error            shouldBe a[IllegalStateException]
+      error            shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
       error.getMessage shouldBe show"2 Project entities found in the JsonLD for $eventProject"
     }
 
@@ -189,7 +189,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         )
       }.value
 
-      error            shouldBe a[IllegalStateException]
+      error            shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
       error.getMessage shouldBe show"Event for project $eventProject contains payload for project ${project.path}"
     }
 
@@ -237,7 +237,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
         )
         .value
 
-      error            shouldBe a[IllegalStateException]
+      error            shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
       error.getMessage shouldBe show"Finding Project entity in the JsonLD for $eventProject failed"
     }
   }

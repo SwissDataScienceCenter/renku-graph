@@ -36,7 +36,10 @@ class TestLogger[F[_]: Monad] extends Logger[F] with should.Matchers {
   private[this] val invocations = new ConcurrentLinkedQueue[LogEntry]()
 
   def getMessages(severity: Level): List[LogMessage] =
-    invocations.asScala.filter(_.level === severity).toList.map(_.message)
+    invocations(of = severity).toList.map(_.message)
+
+  private def invocations(of: Level): Iterable[LogEntry] =
+    invocations.asScala.filter(_.level === of)
 
   def logged(expected: LogEntry*): Assertion =
     invocations should contain allElementsOf expected
@@ -55,6 +58,11 @@ class TestLogger[F[_]: Monad] extends Logger[F] with should.Matchers {
 
   def expectNoLogs(): Unit =
     if (!invocations.isEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")
+
+  def expectNoLogs(severity: Level): Unit = invocations(of = severity).toList match {
+    case Nil         => ()
+    case invocations => fail(s"No $severity logs expected but got ${prettyPrint(invocations)}")
+  }
 
   def reset(): Unit = invocations.clear()
 
@@ -108,15 +116,16 @@ class TestLogger[F[_]: Monad] extends Logger[F] with should.Matchers {
     implicitly[Monad[F]].pure(())
   }
 
-  private def invocationsPrettyPrint: String =
-    invocations.asScala
-      .map {
-        case LogEntry(level, Message(message))                        => s"$level '$message'"
-        case LogEntry(level, MessageAndThrowable(message, throwable)) => s"$level '$message' $throwable"
-        case LogEntry(level, MessageAndThrowableMatcher(message, throwableMatcher)) =>
-          s"$level '$message' $throwableMatcher"
-      }
-      .mkString("\n", "\n", "")
+  private def invocationsPrettyPrint: String = prettyPrint(invocations.asScala)
+
+  private def prettyPrint(invocations: Iterable[LogEntry]): String = invocations
+    .map {
+      case LogEntry(level, Message(message))                        => s"$level '$message'"
+      case LogEntry(level, MessageAndThrowable(message, throwable)) => s"$level '$message' $throwable"
+      case LogEntry(level, MessageAndThrowableMatcher(message, throwableMatcher)) =>
+        s"$level '$message' $throwableMatcher"
+    }
+    .mkString("\n", "\n", "")
 }
 
 object TestLogger {

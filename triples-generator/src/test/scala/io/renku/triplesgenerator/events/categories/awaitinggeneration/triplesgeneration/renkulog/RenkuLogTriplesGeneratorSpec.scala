@@ -42,7 +42,7 @@ import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableErro
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, categoryName}
-import io.renku.triplesgenerator.generators.ErrorGenerators.nonRecoverableDataErrors
+import io.renku.triplesgenerator.generators.ErrorGenerators.nonRecoverableMalformedRepoErrors
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -601,7 +601,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       actual.getCause   shouldBe exception
     }
 
-    "fail if calling 'renku migrate' fails with DataError" in new TestCase {
+    "fail if calling 'renku migrate' fails with ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -626,7 +626,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
-      val exception = nonRecoverableDataErrors.generateOne
+      val exception = nonRecoverableMalformedRepoErrors.generateOne
       (renku
         .migrate(_: CommitEvent)(_: RepositoryPath))
         .expects(commitEvent, repositoryDirectory)
@@ -638,14 +638,14 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.unit)
         .atLeastOnce()
 
-      val actual = intercept[ProcessingNonRecoverableError.DataError] {
+      val actual = intercept[ProcessingNonRecoverableError.MalformedRepository] {
         triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} ${exception.message}"
       actual.getCause   shouldBe exception.cause
     }
 
-    "fail if calling 'renku migrate' fails with non-DataError" in new TestCase {
+    "fail if calling 'renku migrate' fails with non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -689,7 +689,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       actual.getCause   shouldBe exception
     }
 
-    "fail if calling 'renku graph export' fails with DataError" in new TestCase {
+    "fail if calling 'renku graph export' fails with ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -719,7 +719,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .expects(commitEvent, repositoryDirectory)
         .returning(IO.unit)
 
-      val exception = nonRecoverableDataErrors.generateOne
+      val exception = nonRecoverableMalformedRepoErrors.generateOne
       (renku
         .graphExport(_: RepositoryPath))
         .expects(repositoryDirectory)
@@ -731,14 +731,14 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         .returning(IO.unit)
         .atLeastOnce()
 
-      val actual = intercept[ProcessingNonRecoverableError.DataError] {
+      val actual = intercept[ProcessingNonRecoverableError.MalformedRepository] {
         triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
       }
       actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} ${exception.message}"
       actual.getCause   shouldBe exception.cause
     }
 
-    "fail if calling 'renku graph export' fails with non-DataError" in new TestCase {
+    "fail if calling 'renku graph export' fails with non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
       (file
         .mkdir(_: Path))

@@ -45,19 +45,20 @@ class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFa
       renku.migrate(event)(path).unsafeRunSync() shouldBe ()
     }
 
-    "fail with some ProcessingNonRecoverableError.DataError if 'renku migrate' fails" in new TestCase {
-      val exception = exceptions.generateOne
-      renkuMigrate.expects(path.value).throws(exception)
+    "fail with some ProcessingNonRecoverableError.MalformedRepository " +
+      "if 'renku migrate' fails" in new TestCase {
+        val exception = exceptions.generateOne
+        renkuMigrate.expects(path.value).throws(exception)
 
-      val event = commitEvents.generateOne
+        val event = commitEvents.generateOne
 
-      val failure = intercept[ProcessingNonRecoverableError.DataError] {
-        renku.migrate(event)(path).unsafeRunSync()
+        val failure = intercept[ProcessingNonRecoverableError.MalformedRepository] {
+          renku.migrate(event)(path).unsafeRunSync()
+        }
+
+        failure.getMessage shouldBe s"'renku migrate' failed for commit: ${event.commitId}, project: ${event.project.id}"
+        failure.getCause shouldBe exception
       }
-
-      failure.getMessage shouldBe s"'renku migrate' failed for commit: ${event.commitId}, project: ${event.project.id}"
-      failure.getCause   shouldBe exception
-    }
   }
 
   "graphExport" should {
@@ -76,11 +77,11 @@ class RenkuSpec extends AnyWordSpec with IOSpec with should.Matchers with MockFa
       triples shouldBe commandBody
     }
 
-    "fail if calling 'renku export' results with a DataError" in new TestCase {
+    "fail if calling 'renku export' results with a ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
       val exception = exceptions.generateOne
       renkuExport.expects(path.value).throws(exception)
 
-      val failure = intercept[ProcessingNonRecoverableError.DataError] {
+      val failure = intercept[ProcessingNonRecoverableError.MalformedRepository] {
         renku.graphExport(path).value.unsafeRunSync()
       }
 

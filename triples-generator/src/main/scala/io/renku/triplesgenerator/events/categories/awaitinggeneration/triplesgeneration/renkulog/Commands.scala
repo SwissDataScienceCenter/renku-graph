@@ -218,7 +218,7 @@ private object Commands {
         .catchNonFatal(renkuMigrate(directory.value))
         .void
         .recoverWith { case NonFatal(exception) =>
-          new ProcessingNonRecoverableError.DataError(
+          new ProcessingNonRecoverableError.MalformedRepository(
             s"'renku migrate' failed for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id}",
             exception
           ).raiseError[F, Unit]
@@ -236,7 +236,7 @@ private object Commands {
             LogWorthyRecoverableError("Not enough memory").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
           case NonFatal(exception) =>
             ProcessingNonRecoverableError
-              .DataError("'renku graph export' failed", exception)
+              .MalformedRepository("'renku graph export' failed", exception)
               .raiseError[F, Either[ProcessingRecoverableError, JsonLD]]
         }
       }

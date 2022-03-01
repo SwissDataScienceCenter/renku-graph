@@ -139,9 +139,9 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
       commitEvent:      CommitEvent,
       maybeAccessToken: Option[AccessToken]
   ): PartialFunction[Throwable, F[Either[ProcessingRecoverableError, JsonLD]]] = {
-    case ProcessingNonRecoverableError.DataError(message, cause) =>
+    case ProcessingNonRecoverableError.MalformedRepository(message, cause) =>
       ProcessingNonRecoverableError
-        .DataError(s"${logMessageCommon(commitEvent)} $message", cause)
+        .MalformedRepository(s"${logMessageCommon(commitEvent)} $message", cause)
         .raiseError[F, Either[ProcessingRecoverableError, JsonLD]]
     case NonFatal(exception) =>
       (Option(exception.getMessage) -> maybeAccessToken)
