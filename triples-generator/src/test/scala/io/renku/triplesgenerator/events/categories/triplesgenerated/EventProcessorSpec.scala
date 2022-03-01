@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.MonadThrow
 import cats.data.EitherT
+import cats.data.EitherT.leftT
 import cats.effect.IO
 import cats.syntax.all._
 import io.prometheus.client.Histogram
@@ -42,16 +43,16 @@ import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.EventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.generators.ErrorGenerators.{authRecoverableErrors, logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
@@ -94,74 +95,136 @@ class EventProcessorSpec
       verifyMetricsCollected()
     }
 
-    "mark event with TransformationRecoverableFailure if deserialization fails with ProcessingRecoverableError" in new TestCase {
+    "mark event as TransformationRecoverableFailure and log an error " +
+      s"if deserialization fails with $LogWorthyRecoverableError" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
-        .returning(maybeAccessToken.pure[Try])
+        givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
+          .returning(maybeAccessToken.pure[Try])
 
-      val processingError = processingRecoverableErrors.generateOne
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.leftT(processingError))
+        val processingError = logWorthyRecoverableErrors.generateOne
+        givenDeserialization(triplesGeneratedEvent, returning = leftT(processingError))
 
-      expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, processingError)
+        expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, processingError)
 
-      eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
+        eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
 
-      if (processingError.isInstanceOf[LogWorthyRecoverableError])
         logError(triplesGeneratedEvent, processingError, processingError.getMessage)
-      else logger.getMessages(Error) shouldBe Nil
-      logSummary(triplesGeneratedEvent, isSuccessful = false)
-    }
+        logSummary(triplesGeneratedEvent, isSuccessful = false)
+      }
 
-    "mark event with TransformationNonRecoverableFailure if deserialization fails" in new TestCase {
+    "mark event as TransformationRecoverableFailure and refrain from logging an error " +
+      s"if deserialization fails with $AuthRecoverableError" in new TestCase {
 
-      givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
-        .returning(maybeAccessToken.pure[Try])
+        givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
+          .returning(maybeAccessToken.pure[Try])
 
-      val exception = exceptions.generateOne
+        val processingError = authRecoverableErrors.generateOne
+        givenDeserialization(triplesGeneratedEvent, returning = leftT(processingError))
 
-      givenDeserialization(triplesGeneratedEvent,
-                           returning = EitherT.right[ProcessingRecoverableError](exception.raiseError[Try, Project])
-      )
+        expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, processingError)
 
-      expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, exception)
+        eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
 
-      eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
+        logSummary(triplesGeneratedEvent, isSuccessful = false)
+      }
 
-      logError(triplesGeneratedEvent, exception, exception.getMessage)
-      logSummary(triplesGeneratedEvent, isSuccessful = false)
-    }
+    "mark event with TransformationNonRecoverableFailure and log an error " +
+      "if deserialization fails with a non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
-    s"mark event with TransformationRecoverableFailure if transforming triples fails with a ProcessingRecoverableError" in new TestCase {
+        givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
+          .returning(maybeAccessToken.pure[Try])
 
-      givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
-        .returning(maybeAccessToken.pure[Try])
+        val exception = exceptions.generateOne
 
-      val project = anyProjectEntities.generateOne.to[entities.Project]
-      givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(project))
+        givenDeserialization(triplesGeneratedEvent,
+                             returning = EitherT.right[ProcessingRecoverableError](exception.raiseError[Try, Project])
+        )
 
-      val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
-        .returning(steps)
+        expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, exception)
 
-      val processingRecoverableError = processingRecoverableErrors.generateOne
-      val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-      (triplesUploader.run _)
-        .expects(steps, project)
-        .returning(failure.pure[Try].widen[TriplesUploadResult])
+        eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
 
-      expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, failure.error)
+        logError(triplesGeneratedEvent, exception, exception.getMessage)
+        logSummary(triplesGeneratedEvent, isSuccessful = false)
+      }
 
-      eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
+    "mark event with TransformationNonRecoverableFailure and refrain from logging an error " +
+      "if deserialization fails with ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
-      if (processingRecoverableError.isInstanceOf[LogWorthyRecoverableError])
+        givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
+          .returning(maybeAccessToken.pure[Try])
+
+        val exception = nonRecoverableMalformedRepoErrors.generateOne
+
+        givenDeserialization(triplesGeneratedEvent,
+                             returning = EitherT.right[ProcessingRecoverableError](exception.raiseError[Try, Project])
+        )
+
+        expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, exception)
+
+        eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
+
+        logSummary(triplesGeneratedEvent, isSuccessful = false)
+        logger.expectNoLogs(severity = Error)
+      }
+
+    "mark event with TransformationRecoverableFailure and log an error " +
+      "if transforming triples fails with a LogWorthyRecoverableError" in new TestCase {
+
+        givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
+          .returning(maybeAccessToken.pure[Try])
+
+        val project = anyProjectEntities.generateOne.to[entities.Project]
+        givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(project))
+
+        val steps = transformationSteps[Try].generateList()
+        (() => stepsCreator.createSteps)
+          .expects()
+          .returning(steps)
+
+        val processingRecoverableError = logWorthyRecoverableErrors.generateOne
+        val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
+        (triplesUploader.run _)
+          .expects(steps, project)
+          .returning(failure.pure[Try].widen[TriplesUploadResult])
+
+        expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, failure.error)
+
+        eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
+
         logError(triplesGeneratedEvent, failure.error, failure.message)
-      else logger.getMessages(Error) shouldBe Nil
-      logSummary(triplesGeneratedEvent, isSuccessful = false)
-    }
+        logSummary(triplesGeneratedEvent, isSuccessful = false)
+      }
 
-    s"mark event with TransformationRecoverableFailure if transforming triples fails with $AuthRecoverableError " +
-      s"but doesn't log any errors" in new TestCase {
+    "mark event with TransformationRecoverableFailure and refrain from log an error " +
+      "if transforming triples fails with a AuthRecoverableError" in new TestCase {
+
+        givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
+          .returning(maybeAccessToken.pure[Try])
+
+        val project = anyProjectEntities.generateOne.to[entities.Project]
+        givenDeserialization(triplesGeneratedEvent, returning = EitherT.rightT(project))
+
+        val steps = transformationSteps[Try].generateList()
+        (() => stepsCreator.createSteps)
+          .expects()
+          .returning(steps)
+
+        val processingRecoverableError = authRecoverableErrors.generateOne
+        val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
+        (triplesUploader.run _)
+          .expects(steps, project)
+          .returning(failure.pure[Try].widen[TriplesUploadResult])
+
+        expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, failure.error)
+
+        eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
+
+        logSummary(triplesGeneratedEvent, isSuccessful = false)
+      }
+
+    "mark event with TransformationRecoverableFailure if transforming triples fails with AuthRecoverableError " +
+      "but doesn't log any errors" in new TestCase {
 
         givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
           .returning(maybeAccessToken.pure[Try])
@@ -215,7 +278,7 @@ class EventProcessorSpec
     }
 
     "mark event with TransformationRecoverableFailure " +
-      s"if uploading triples fails with $RecoverableFailure" in new TestCase {
+      "if uploading triples fails with RecoverableFailure" in new TestCase {
 
         givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
           .returning(maybeAccessToken.pure[Try])
@@ -242,8 +305,8 @@ class EventProcessorSpec
         logSummary(triplesGeneratedEvent, isSuccessful = false)
       }
 
-    " mark event with TransformationNonRecoverableFailure " +
-      s"if uploading triples to the store fails with either $NonRecoverableFailure" in new TestCase {
+    "mark event with TransformationNonRecoverableFailure " +
+      "if uploading triples to the store fails with either NonRecoverableFailure" in new TestCase {
         val failure = NonRecoverableFailure("error")
         givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
           .returning(maybeAccessToken.pure[Try])
@@ -266,8 +329,6 @@ class EventProcessorSpec
 
         logError(triplesGeneratedEvent, failure, failure.message)
         logSummary(triplesGeneratedEvent, isSuccessful = false)
-        logger.reset()
-
       }
 
     "succeed and log an error if marking event as TriplesStore fails" in new TestCase {

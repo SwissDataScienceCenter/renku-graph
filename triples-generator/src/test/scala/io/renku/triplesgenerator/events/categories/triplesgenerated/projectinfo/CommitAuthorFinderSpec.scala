@@ -42,7 +42,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeEncoders
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

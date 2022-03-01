@@ -31,8 +31,9 @@ import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
+import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -206,17 +207,18 @@ private object Commands {
   }
 
   class RenkuImpl[F[_]: Async](
-      renkuExport: Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict")(_)
+      renkuMigrate: Path => CommandResult = %%("renku", "migrate", "--preserve-identifiers")(_),
+      renkuExport:  Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict")(_)
   ) extends Renku[F] {
 
     import cats.syntax.all._
 
-    override def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit] =
+    override def migrate(commitEvent: CommitEvent)(implicit directory: RepositoryPath): F[Unit] =
       MonadThrow[F]
-        .catchNonFatal(%%("renku", "migrate", "--preserve-identifiers")(destinationDirectory.value))
+        .catchNonFatal(renkuMigrate(directory.value))
         .void
         .recoverWith { case NonFatal(exception) =>
-          new Exception(
+          new ProcessingNonRecoverableError.MalformedRepository(
             s"'renku migrate' failed for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id}",
             exception
           ).raiseError[F, Unit]
@@ -229,9 +231,13 @@ private object Commands {
             triplesAsString <- MonadThrow[F].catchNonFatal(renkuExport(directory.value).out.string.trim)
             wrappedTriples  <- MonadThrow[F].fromEither(parse(triplesAsString))
           } yield wrappedTriples.asRight[ProcessingRecoverableError]
-        }.recoverWith {
+        } recoverWith {
           case ShelloutException(result) if result.exitCode == 137 =>
             LogWorthyRecoverableError("Not enough memory").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
+          case NonFatal(exception) =>
+            ProcessingNonRecoverableError
+              .MalformedRepository("'renku graph export' failed", exception)
+              .raiseError[F, Either[ProcessingRecoverableError, JsonLD]]
         }
       }
   }

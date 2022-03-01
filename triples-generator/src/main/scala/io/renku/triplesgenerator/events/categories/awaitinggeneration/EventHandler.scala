@@ -77,7 +77,7 @@ object EventHandler {
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
-    eventProcessor           <- CommitEventProcessor(metricsRegistry)
+    eventProcessor           <- EventProcessor(metricsRegistry)
     generationProcesses      <- GenerationProcessesNumber[F](config)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
   } yield new EventHandler[F](categoryName,

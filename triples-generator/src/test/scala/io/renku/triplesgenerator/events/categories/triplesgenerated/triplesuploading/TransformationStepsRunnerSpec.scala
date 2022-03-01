@@ -27,7 +27,7 @@ import io.renku.graph.model.GraphModelGenerators.userNames
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Queries}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators._

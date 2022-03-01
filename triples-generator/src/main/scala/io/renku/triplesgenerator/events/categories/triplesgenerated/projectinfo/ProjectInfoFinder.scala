@@ -27,7 +27,7 @@ import io.renku.control.Throttler
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 
 private[triplesgenerated] trait ProjectInfoFinder[F[_]] {
@@ -39,12 +39,11 @@ private[triplesgenerated] trait ProjectInfoFinder[F[_]] {
 private[triplesgenerated] object ProjectInfoFinder {
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
       gitLabThrottler: Throttler[F, GitLab]
-  ): F[ProjectInfoFinder[F]] =
-    for {
-      projectFinder     <- ProjectFinder[F](gitLabThrottler)
-      membersFinder     <- ProjectMembersFinder[F](gitLabThrottler)
-      memberEmailFinder <- MemberEmailFinder[F](gitLabThrottler)
-    } yield new ProjectInfoFinderImpl(projectFinder, membersFinder, memberEmailFinder)
+  ): F[ProjectInfoFinder[F]] = for {
+    projectFinder     <- ProjectFinder[F](gitLabThrottler)
+    membersFinder     <- ProjectMembersFinder[F](gitLabThrottler)
+    memberEmailFinder <- MemberEmailFinder[F](gitLabThrottler)
+  } yield new ProjectInfoFinderImpl(projectFinder, membersFinder, memberEmailFinder)
 }
 
 private[triplesgenerated] class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel: Logger](
@@ -53,9 +52,9 @@ private[triplesgenerated] class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel
     memberEmailFinder: MemberEmailFinder[F]
 ) extends ProjectInfoFinder[F] {
 
+  import memberEmailFinder._
   import membersFinder._
   import projectFinder._
-  import memberEmailFinder._
 
   override def findProjectInfo(
       path:                    projects.Path
