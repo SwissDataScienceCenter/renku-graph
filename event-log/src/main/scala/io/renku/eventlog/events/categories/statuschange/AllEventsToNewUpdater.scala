@@ -65,8 +65,8 @@ private class AllEventsToNewUpdater[F[_]: Async](
     SqlStatement(name = "all_to_new - find projects")
       .select[Void, ProjectEventsToNew](
         sql"""SELECT proj.project_id, proj.project_path
-                FROM project proj
-                ORDER BY proj.latest_event_date ASC"""
+              FROM project proj
+              ORDER BY proj.latest_event_date ASC"""
           .query(projectIdDecoder ~ projectPathDecoder)
           .map { case (id: projects.Id) ~ (path: projects.Path) => ProjectEventsToNew(Project(id, path)) }
       )

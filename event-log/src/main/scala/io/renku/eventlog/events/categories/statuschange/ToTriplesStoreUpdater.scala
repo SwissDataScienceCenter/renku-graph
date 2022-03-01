@@ -21,6 +21,7 @@ package io.renku.eventlog.events.categories.statuschange
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Async
+import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.implicits._
@@ -48,13 +49,13 @@ private class ToTriplesStoreUpdater[F[_]: MonadCancelThrow: Async](
 
   import deliveryInfoRemover._
 
+  override def onRollback(event: ToTriplesStore) = deleteDelivery(event.eventId)
+
   override def updateDB(event: ToTriplesStore): UpdateResult[F] = for {
     _                      <- deleteDelivery(event.eventId)
     updateResults          <- updateEvent(event)
-    ancestorsUpdateResults <- updateAncestorsStatus(event) recoverWith retryOnDeadlock(event)
+    ancestorsUpdateResults <- updateAncestors(event, updateResults) recoverWith retryOnDeadlock(event, updateResults)
   } yield updateResults combine ancestorsUpdateResults
-
-  override def onRollback(event: ToTriplesStore) = deleteDelivery(event.eventId)
 
   private def updateEvent(event: ToTriplesStore) = for {
     updateResults <- updateStatus(event)
@@ -65,12 +66,12 @@ private class ToTriplesStoreUpdater[F[_]: MonadCancelThrow: Async](
     SqlStatement(name = "to_triples_store - status update")
       .command[ExecutionDate ~ EventId ~ projects.Id](
         sql"""UPDATE event evt
-          SET status = '#${EventStatus.TriplesStore.value}',
-            execution_date = $executionDateEncoder,
-            message = NULL
-          WHERE evt.event_id = $eventIdEncoder 
-            AND evt.project_id = $projectIdEncoder 
-            AND evt.status = '#${EventStatus.TransformingTriples.value}'""".command
+              SET status = '#${EventStatus.TriplesStore.value}',
+                execution_date = $executionDateEncoder,
+                message = NULL
+              WHERE evt.event_id = $eventIdEncoder 
+                AND evt.project_id = $projectIdEncoder 
+                AND evt.status = '#${EventStatus.TransformingTriples.value}'""".command
       )
       .arguments(ExecutionDate(now()) ~ event.eventId.id ~ event.eventId.projectId)
       .build
@@ -79,6 +80,7 @@ private class ToTriplesStoreUpdater[F[_]: MonadCancelThrow: Async](
           DBUpdateResults
             .ForProjects(event.projectPath, Map(TransformingTriples -> -1, TriplesStore -> 1))
             .pure[F]
+        case Completion.Update(0) => Monoid[DBUpdateResults.ForProjects].empty.pure[F]
         case completion =>
           new Exception(s"Could not update event ${event.eventId} to status ${EventStatus.TriplesStore}: $completion")
             .raiseError[F, DBUpdateResults.ForProjects]
@@ -96,59 +98,64 @@ private class ToTriplesStoreUpdater[F[_]: MonadCancelThrow: Async](
       )
       .arguments(event.eventId.id ~ event.eventId.projectId ~ EventStatus.TriplesStore ~ event.processingTime)
       .build
-      .mapResult(_ => 1)
+      .void
   }
 
-  private def updateAncestorsStatus(event: ToTriplesStore) = measureExecutionTime {
-    val statusesToUpdate = Set(New,
-                               GeneratingTriples,
-                               GenerationRecoverableFailure,
-                               TriplesGenerated,
-                               TransformingTriples,
-                               TransformationRecoverableFailure
-    )
-    SqlStatement(name = "to_triples_store - ancestors update")
-      .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventStatus](
-        sql"""UPDATE event evt
-              SET status = '#${EventStatus.TriplesStore.value}',
-                  execution_date = $executionDateEncoder,
-                  message = NULL
-              FROM (
-                SELECT event_id, project_id, status 
-                FROM event
-                WHERE project_id = $projectIdEncoder
-                  AND #${`status IN`(statusesToUpdate)}
-                  AND event_date < (
-                    SELECT event_date
-                    FROM event
-                    WHERE project_id = $projectIdEncoder
-                      AND event_id = $eventIdEncoder
-                  )
-                  AND event_id <> $eventIdEncoder
-                    FOR UPDATE
-              ) old_evt
-              WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
-              RETURNING old_evt.status
+  private def updateAncestors(event: ToTriplesStore, updateResults: DBUpdateResults.ForProjects) =
+    updateResults match {
+      case results @ DBUpdateResults.ForProjects.empty => Kleisli.pure(results)
+      case _ =>
+        measureExecutionTime {
+          val statusesToUpdate = Set(New,
+                                     GeneratingTriples,
+                                     GenerationRecoverableFailure,
+                                     TriplesGenerated,
+                                     TransformingTriples,
+                                     TransformationRecoverableFailure
+          )
+          SqlStatement(name = "to_triples_store - ancestors update")
+            .select[ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventStatus](
+              sql"""UPDATE event evt
+                SET status = '#${EventStatus.TriplesStore.value}',
+                    execution_date = $executionDateEncoder,
+                    message = NULL
+                FROM (
+                  SELECT event_id, project_id, status 
+                  FROM event
+                  WHERE project_id = $projectIdEncoder
+                    AND #${`status IN`(statusesToUpdate)}
+                    AND event_date < (
+                      SELECT event_date
+                      FROM event
+                      WHERE project_id = $projectIdEncoder
+                        AND event_id = $eventIdEncoder
+                    )
+                    AND event_id <> $eventIdEncoder
+                      FOR UPDATE
+                ) old_evt
+                WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
+                RETURNING old_evt.status
          """.query(eventStatusDecoder)
-      )
-      .arguments(
-        ExecutionDate(now()) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
-      )
-      .build(_.toList)
-      .mapResult { oldStatuses =>
-        val decrementedStatuses = oldStatuses.groupBy(identity).view.mapValues(-_.size).toMap
-        val incrementedStatuses = TriplesStore -> oldStatuses.size
-        DBUpdateResults.ForProjects(
-          event.projectPath,
-          decrementedStatuses + incrementedStatuses
-        )
-      }
-  }
+            )
+            .arguments(
+              ExecutionDate(
+                now()
+              ) ~ event.eventId.projectId ~ event.eventId.projectId ~ event.eventId.id ~ event.eventId.id
+            )
+            .build(_.toList)
+            .mapResult { oldStatuses =>
+              val decrementedStatuses = oldStatuses.groupBy(identity).view.mapValues(-_.size).toMap
+              val incrementedStatuses = TriplesStore -> oldStatuses.size
+              DBUpdateResults.ForProjects(event.projectPath, decrementedStatuses + incrementedStatuses)
+            }
+        }
+    }
 
   private def retryOnDeadlock(
-      event: ToTriplesStore
+      event:         ToTriplesStore,
+      updateResults: DBUpdateResults.ForProjects
   ): PartialFunction[Throwable, Kleisli[F, Session[F], DBUpdateResults.ForProjects]] = { case DeadlockDetected(_) =>
-    updateAncestorsStatus(event)
+    updateAncestors(event, updateResults)
   }
 
   private def `status IN`(statuses: Set[EventStatus]) =

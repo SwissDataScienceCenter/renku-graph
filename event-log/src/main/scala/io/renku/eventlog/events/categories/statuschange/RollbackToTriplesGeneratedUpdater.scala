@@ -60,6 +60,7 @@ private class RollbackToTriplesGeneratedUpdater[F[_]: MonadCancelThrow](
             .ForProjects(event.projectPath, Map(TransformingTriples -> -1, TriplesGenerated -> 1))
             .pure[F]
             .widen[DBUpdateResults]
+        case Completion.Update(0) => DBUpdateResults.ForProjects.empty.pure[F].widen[DBUpdateResults]
         case _ =>
           new Exception(s"Could not rollback event ${event.eventId} to status $TriplesGenerated")
             .raiseError[F, DBUpdateResults]

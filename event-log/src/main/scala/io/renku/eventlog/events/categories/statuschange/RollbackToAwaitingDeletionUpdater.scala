@@ -47,8 +47,7 @@ private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
       .command[EventStatus ~ ExecutionDate ~ projects.Id ~ EventStatus](
         sql"""UPDATE event evt
               SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
-              WHERE project_id = $projectIdEncoder
-                  AND status = $eventStatusEncoder
+              WHERE project_id = $projectIdEncoder AND status = $eventStatusEncoder
               """.command
       )
       .arguments(AwaitingDeletion ~ ExecutionDate(now()) ~ event.project.id ~ Deleting)
@@ -62,8 +61,7 @@ private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
         case _ =>
           new Exception(
             s"Could not update $Deleting events for project ${event.project.path} to status $AwaitingDeletion"
-          )
-            .raiseError[F, DBUpdateResults]
+          ).raiseError[F, DBUpdateResults]
       }
   }
 
