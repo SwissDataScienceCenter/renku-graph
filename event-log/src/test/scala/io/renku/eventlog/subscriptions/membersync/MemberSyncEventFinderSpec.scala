@@ -74,20 +74,22 @@ class MemberSyncEventFinderSpec
       }
 
     "return projects with a latest event date less than an hour ago " +
-      "and a last sync time more than a minute ago " +
+      "and a last sync time more than 5 minutes ago " +
       "AND not projects with a latest event date less than an hour ago " +
-      "and a last sync time less than a minute ago" in new TestCase {
+      "and a last sync time less than 5 minutes ago" in new TestCase {
         val compoundId0  = compoundEventIds.generateOne
         val projectPath0 = projectPaths.generateOne
         val eventDate0   = EventDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(59)).generateOne)
-        val lastSynced0  = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofSeconds(62)).generateOne)
+        val lastSynced0 =
+          LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofMinutes(5).plusSeconds(1)).generateOne)
         upsertProject(compoundId0, projectPath0, eventDate0)
         upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
         val eventDate1   = EventDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(59)).generateOne)
-        val lastSynced1  = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofSeconds(58)).generateOne)
+        val lastSynced1 =
+          LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(5).minusSeconds(1)).generateOne)
         upsertProject(compoundId1, projectPath1, eventDate1)
         upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
 

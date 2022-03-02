@@ -67,7 +67,7 @@ private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow](
                   WHERE
                     sync_time.last_synced IS NULL
                     OR (
-                         (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 minute')
+                         (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '5 minutes')
                       OR (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
                       OR (($eventDateEncoder - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
                     )
@@ -113,8 +113,7 @@ private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow](
             INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
             VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
             ON CONFLICT (project_id, category_name)
-            DO
-              UPDATE SET last_synced = EXCLUDED.last_synced
+            DO UPDATE SET last_synced = EXCLUDED.last_synced
             """.command
         )
         .arguments(projectId ~ categoryName ~ LastSyncedDate(now()))
