@@ -86,7 +86,7 @@ class EventHandlerSpec
         projectEventToNewEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson)))
-      ).map(_.generateOne) foreach { case (eventRequestContent, waitForUpdate, eventAsString) =>
+      ).map(_.generateOne) foreach { case (event, eventRequestContent, waitForUpdate, eventAsString) =>
         handler
           .createHandlingProcess(eventRequestContent)
           .unsafeRunSync()
@@ -96,7 +96,8 @@ class EventHandlerSpec
 
         waitForUpdate.get.unsafeRunSync()
 
-        logger.loggedOnly(Info(s"$categoryName: $eventAsString -> $Accepted"))
+        if (event.silent) logger.expectNoLogs()
+        else logger.loggedOnly(Info(s"$categoryName: $eventAsString -> $Accepted"))
         logger.reset()
       }
     }
@@ -167,8 +168,8 @@ class EventHandlerSpec
 
     def toRequestContent[E <: StatusChangeEvent](
         f: E => EventRequestContent
-    ): ((E, Deferred[IO, Unit], String)) => (EventRequestContent, Deferred[IO, Unit], String) = {
-      case (event, waitForUpdate, eventShow) => (f(event), waitForUpdate, eventShow)
+    ): ((E, Deferred[IO, Unit], String)) => (E, EventRequestContent, Deferred[IO, Unit], String) = {
+      case (event, waitForUpdate, eventShow) => (event, f(event), waitForUpdate, eventShow)
     }
   }
 

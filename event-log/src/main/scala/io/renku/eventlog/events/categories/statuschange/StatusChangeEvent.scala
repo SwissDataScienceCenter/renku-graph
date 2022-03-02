@@ -28,13 +28,18 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.tinytypes.json.TinyTypeDecoders._
+
 import java.time.Duration
 
-private sealed trait StatusChangeEvent extends Product with Serializable
+private sealed trait StatusChangeEvent extends Product with Serializable {
+  val silent: Boolean
+}
 
 private object StatusChangeEvent {
 
-  final case class RollbackToNew(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent
+  final case class RollbackToNew(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent {
+    override val silent: Boolean = true
+  }
   object RollbackToNew {
     implicit lazy val show: Show[RollbackToNew] = Show.show { case RollbackToNew(eventId, projectPath) =>
       s"$eventId, projectPath = $projectPath, status = $New - rollback"
@@ -45,7 +50,9 @@ private object StatusChangeEvent {
                                       projectPath:    projects.Path,
                                       processingTime: EventProcessingTime,
                                       payload:        ZippedEventPayload
-  ) extends StatusChangeEvent
+  ) extends StatusChangeEvent {
+    override val silent: Boolean = false
+  }
   object ToTriplesGenerated {
     implicit lazy val show: Show[ToTriplesGenerated] = Show.show {
       case ToTriplesGenerated(eventId, projectPath, _, _) =>
@@ -60,7 +67,9 @@ private object StatusChangeEvent {
                                                                           newStatus:           N,
                                                                           maybeExecutionDelay: Option[Duration]
   )(implicit evidence:                                                                         AllowedCombination[C, N])
-      extends StatusChangeEvent
+      extends StatusChangeEvent {
+    override val silent: Boolean = false
+  }
   object ToFailure {
     implicit lazy val show: Show[ToFailure[ProcessingStatus, FailureStatus]] = Show.show {
       case ToFailure(eventId, projectPath, _, _, newStatus, _) =>
@@ -80,7 +89,9 @@ private object StatusChangeEvent {
       extends AllowedCombination[TransformingTriples, TransformationRecoverableFailure]
 
   final case class RollbackToTriplesGenerated(eventId: CompoundEventId, projectPath: projects.Path)
-      extends StatusChangeEvent
+      extends StatusChangeEvent {
+    override val silent: Boolean = true
+  }
   object RollbackToTriplesGenerated {
     implicit lazy val show: Show[RollbackToTriplesGenerated] = Show.show {
       case RollbackToTriplesGenerated(eventId, projectPath) =>
@@ -91,21 +102,27 @@ private object StatusChangeEvent {
   final case class ToTriplesStore(eventId:        CompoundEventId,
                                   projectPath:    projects.Path,
                                   processingTime: EventProcessingTime
-  ) extends StatusChangeEvent
+  ) extends StatusChangeEvent {
+    override val silent: Boolean = false
+  }
   object ToTriplesStore {
     implicit lazy val show: Show[ToTriplesStore] = Show.show { case ToTriplesStore(eventId, projectPath, _) =>
       s"$eventId, projectPath = $projectPath, status = $TriplesStore - update"
     }
   }
 
-  final case class ToAwaitingDeletion(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent
+  final case class ToAwaitingDeletion(eventId: CompoundEventId, projectPath: projects.Path) extends StatusChangeEvent {
+    override val silent: Boolean = false
+  }
   object ToAwaitingDeletion {
     implicit lazy val show: Show[ToAwaitingDeletion] = Show.show { case ToAwaitingDeletion(eventId, projectPath) =>
       s"$eventId, projectPath = $projectPath, status = $AwaitingDeletion"
     }
   }
 
-  final case class RollbackToAwaitingDeletion(project: Project) extends StatusChangeEvent
+  final case class RollbackToAwaitingDeletion(project: Project) extends StatusChangeEvent {
+    override val silent: Boolean = true
+  }
   object RollbackToAwaitingDeletion {
     implicit lazy val show: Show[RollbackToAwaitingDeletion] = Show.show {
       case RollbackToAwaitingDeletion(Project(id, path)) =>
@@ -115,10 +132,13 @@ private object StatusChangeEvent {
 
   type AllEventsToNew = AllEventsToNew.type
   final case object AllEventsToNew extends StatusChangeEvent {
+    override val silent:    Boolean              = false
     implicit lazy val show: Show[AllEventsToNew] = Show.show(_ => s"status = $New")
   }
 
-  final case class ProjectEventsToNew(project: Project) extends StatusChangeEvent
+  final case class ProjectEventsToNew(project: Project) extends StatusChangeEvent {
+    override val silent: Boolean = false
+  }
   object ProjectEventsToNew {
     implicit lazy val show: Show[ProjectEventsToNew] = Show.show { case ProjectEventsToNew(project) =>
       show"$project, status = $New"
