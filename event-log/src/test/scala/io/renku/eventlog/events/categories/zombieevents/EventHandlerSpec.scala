@@ -51,7 +51,7 @@ class EventHandlerSpec
 
   "handle" should {
 
-    List(Updated, NotUpdated) foreach { result =>
+    Updated :: NotUpdated :: Nil foreach { result =>
       s"decode an event with the $GeneratingTriples status from the request, " +
         "schedule event update " +
         s"and return $Accepted if the event status cleaning returned $result" in new TestCase {
@@ -80,9 +80,6 @@ class EventHandlerSpec
             logger.loggedOnly(
               Info(
                 s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
-              ),
-              Info(
-                s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $result"
               )
             )
           }
@@ -118,9 +115,6 @@ class EventHandlerSpec
             logger.loggedOnly(
               Info(
                 s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
-              ),
-              Info(
-                s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $result"
               )
             )
           }

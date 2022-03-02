@@ -22,7 +22,7 @@ import cats.data.EitherT.fromEither
 import cats.effect.Concurrent
 import cats.effect.kernel.Spawn
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow, Show}
+import cats.{MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog._
@@ -66,11 +66,10 @@ private class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
   } yield result
 
   private def cleanZombieStatus(event: ZombieEvent): F[Unit] = {
-    for {
-      result <- zombieStatusCleaner.cleanZombieStatus(event)
-      _      <- Applicative[F].whenA(result == Updated)(updateGauges(event))
-      _      <- Logger[F].logInfo(event, result.toString)
-    } yield ()
+    zombieStatusCleaner.cleanZombieStatus(event) >>= {
+      case Updated => updateGauges(event)
+      case _       => ().pure[F]
+    }
   } recoverWith { case NonFatal(exception) => Logger[F].logError(event, exception) }
 
   private lazy val updateGauges: ZombieEvent => F[Unit] = {

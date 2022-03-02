@@ -92,14 +92,11 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad](processesLimiter: Con
 
     def log[EventInfo](
         eventInfo: EventInfo
-    )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): F[Unit] =
-      result match {
-        case Accepted =>
-          logger.info(show"$categoryName: $eventInfo -> $result")
-        case error @ SchedulingError(exception) =>
-          logger.error(exception)(show"$categoryName: $eventInfo -> $error")
-        case _ => ME.unit
-      }
+    )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): F[Unit] = result match {
+      case Accepted                           => logger.info(show"$categoryName: $eventInfo -> $result")
+      case error @ SchedulingError(exception) => logger.error(exception)(show"$categoryName: $eventInfo -> $error")
+      case _                                  => ME.unit
+    }
 
     def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit
         show:                         Show[EventInfo]
