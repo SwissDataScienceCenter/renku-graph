@@ -36,8 +36,7 @@ private trait EventLogTableCreator[F[_]] {
 private object EventLogTableCreator {
   def apply[F[_]: MonadCancelThrow: Logger](
       sessionResource: SessionResource[F, EventLogDB]
-  ): EventLogTableCreator[F] =
-    new EventLogTableCreatorImpl(sessionResource)
+  ): EventLogTableCreator[F] = new EventLogTableCreatorImpl(sessionResource)
 }
 
 private class EventLogTableCreatorImpl[F[_]: MonadCancelThrow: Logger](

@@ -42,14 +42,14 @@ class DbInitializerSpec
     "succeed if all the migration processes run fine" +
       "set and unset the value of isMigrating before/after migrating" in new TestCase {
         (isMigrating.update _)
-          .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+          .expects(where((f: Boolean => Boolean) => f(true) && f(false)))
           .returning(IO.unit)
 
         given(migrator1).succeeds(returning = ())
         given(migrator2).succeeds(returning = ())
 
         (isMigrating.update _)
-          .expects(where((f: Boolean => Boolean) => f(true) == false && f(false) == false))
+          .expects(where((f: Boolean => Boolean) => !f(true) && !f(false)))
           .returning(IO.unit)
 
         dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
@@ -61,21 +61,21 @@ class DbInitializerSpec
       val exception = exceptions.generateOne
       inSequence {
         (isMigrating.update _)
-          .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+          .expects(where((f: Boolean => Boolean) => f(true) && f(false)))
           .returning(IO.unit)
 
         given(migrator1).succeeds(returning = ())
         given(migrator2).fails(becauseOf = exception)
 
         (isMigrating.update _)
-          .expects(where((f: Boolean => Boolean) => f(true) == true && f(false) == true))
+          .expects(where((f: Boolean => Boolean) => f(true) && f(false)))
           .returning(IO.unit)
 
         given(migrator1).succeeds(returning = ())
         given(migrator2).succeeds(returning = ())
 
         (isMigrating.update _)
-          .expects(where((f: Boolean => Boolean) => f(true) == false && f(false) == false))
+          .expects(where((f: Boolean => Boolean) => !f(true) && !f(false)))
           .returning(IO.unit)
 
       }

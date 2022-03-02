@@ -18,6 +18,7 @@
 
 package io.renku.tokenrepository.repository.association
 
+import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -85,7 +86,7 @@ private class AssociationPersisterImpl[F[_]: MonadCancelThrow](
       .arguments(projectId ~ projectPath ~ encryptedToken)
       .build
       .flatMapResult(failIfMultiUpdate(projectId, projectPath))
-  }
+  } recoverWith { case SqlState.UniqueViolation(_) => Kleisli.pure(()) }
 
   private def failIfMultiUpdate(projectId: Id, projectPath: Path): Completion => F[Unit] = {
     case Insert(1) | Update(1) => ().pure[F]

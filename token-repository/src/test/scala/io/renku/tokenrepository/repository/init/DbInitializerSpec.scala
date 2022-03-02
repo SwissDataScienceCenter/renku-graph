@@ -18,93 +18,63 @@
 
 package io.renku.tokenrepository.repository.init
 
-import cats.effect._
+import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
-import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.concurrent.duration._
+
 class DbInitializerSpec
     extends AnyWordSpec
-    with IOSpec
-    with InMemoryProjectsTokensDb
     with MockFactory
+    with IOSpec
     with should.Matchers
     with MockedRunnableCollaborators {
 
+  import DbInitializer.Runnable
+
   "run" should {
 
-    "do nothing if projects_tokens table already exists" in new TestCase {
-      if (!tableExists()) createTable()
+    "run all the migrations" in new TestCase {
+      given(migrator1).succeeds(returning = ())
+      given(migrator2).succeeds(returning = ())
 
-      tableExists() shouldBe true
-
-      given(projectPathAdder).succeeds(returning = ())
-      given(duplicateProjectsRemover).succeeds(returning = ())
-
-      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists() shouldBe true
+      initializer.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("Projects Tokens database initialization success"))
     }
 
-    "create the projects_tokens table if id does not exist" in new TestCase {
-      if (tableExists()) dropTable()
-
-      tableExists() shouldBe false
-
-      given(projectPathAdder).succeeds(returning = ())
-      given(duplicateProjectsRemover).succeeds(returning = ())
-
-      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
-
-      tableExists() shouldBe true
-
-      logger.loggedOnly(Info("Projects Tokens database initialization success"))
-    }
-
-    "fail if the Projects Paths adding process fails" in new TestCase {
-      if (tableExists()) dropTable()
-
-      tableExists() shouldBe false
-
+    "retry if migration fails" in new TestCase {
       val exception = exceptions.generateOne
-      given(projectPathAdder).fails(becauseOf = exception)
+      inSequence {
+        given(migrator1).succeeds(returning = ())
+        given(migrator2).fails(becauseOf = exception)
 
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
-      } shouldBe exception
+        given(migrator1).succeeds(returning = ())
+        given(migrator2).succeeds(returning = ())
+      }
 
-      logger.loggedOnly(Error("Projects Tokens database initialization failure", exception))
-    }
+      initializer.run().unsafeRunSync() shouldBe ()
 
-    "fail if the Projects de-duplication fails" in new TestCase {
-      if (tableExists()) dropTable()
-
-      tableExists() shouldBe false
-
-      given(projectPathAdder).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(duplicateProjectsRemover).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
-      } shouldBe exception
-
-      logger.loggedOnly(Error("Projects Tokens database initialization failure", exception))
+      logger.loggedOnly(Error("Projects Tokens database initialization failed", exception),
+                        Info("Projects Tokens database initialization success")
+      )
     }
   }
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val projectPathAdder         = mock[ProjectPathAdder[IO]]
-    val duplicateProjectsRemover = mock[DuplicateProjectsRemover[IO]]
-    val dbInitializer = new DbInitializerImpl[IO](projectPathAdder, duplicateProjectsRemover, sessionResource)
+    val migrator1 = mock[ProjectsTokensTableCreator[IO]]
+    val migrator2 = mock[ProjectPathAdder[IO]]
+    val initializer = new DbInitializerImpl(
+      List[Runnable[IO, Unit]](migrator1, migrator2),
+      retrySleepDuration = 500 millis
+    )
   }
 }

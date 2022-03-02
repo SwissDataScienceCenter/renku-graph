@@ -28,37 +28,39 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.AccessToken
-import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.repository.AccessTokenCrypto
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import io.renku.tokenrepository.repository.association.ProjectPathFinder
 import io.renku.tokenrepository.repository.deletion.TokenRemoverImpl
-import io.renku.tokenrepository.repository.{AccessTokenCrypto, InMemoryProjectsTokensDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.codec.all._
-import skunk.data.Completion
 import skunk.implicits._
 
 class ProjectPathAdderSpec
     extends AnyWordSpec
     with IOSpec
-    with InMemoryProjectsTokensDbSpec
+    with DbInitSpec
     with MockFactory
     with Eventually
     with IntegrationPatience
     with should.Matchers {
 
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: ProjectPathAdderImpl[_] => false
+    case _ => true
+  }
+
   "run" should {
 
     "do nothing if the 'project_path' column already exists" in new TestCase {
-      if (!tableExists()) createTable()
       addProjectPath()
       checkColumnExists shouldBe true
 
@@ -70,10 +72,6 @@ class ProjectPathAdderSpec
     }
 
     "add the 'project_path' column if does not exist and add paths fetched from GitLab" in new TestCase {
-      if (tableExists()) {
-        dropTable()
-        createTable()
-      }
       checkColumnExists shouldBe false
 
       val project1Id             = projectIds.generateOne
@@ -106,10 +104,6 @@ class ProjectPathAdderSpec
     }
 
     "add the 'project_path' column if does not exist and remove entries for non-existing projects in GitLab" in new TestCase {
-      if (tableExists()) {
-        dropTable()
-        createTable()
-      }
       checkColumnExists shouldBe false
 
       val project1Id             = projectIds.generateOne
@@ -142,7 +136,8 @@ class ProjectPathAdderSpec
   }
 
   private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    logger.reset()
+
     val accessTokenCrypto = mock[AccessTokenCrypto[IO]]
     val pathFinder        = mock[ProjectPathFinder[IO]]
     val queriesExecTimes  = TestLabeledHistogram[SqlStatement.Name]("query_id")
@@ -193,27 +188,10 @@ class ProjectPathAdderSpec
     Kleisli[IO, Session[IO], Unit] { session =>
       val query: Command[Int ~ String] =
         sql"""insert into
-            projects_tokens (project_id, token)
-            values ($int4, $varchar)
+              projects_tokens (project_id, token)
+              values ($int4, $varchar)
          """.command
       session.prepare(query).use(_.execute(projectId.value ~ encryptedToken.value)).map(assureInserted)
-    }
-  }
-
-  private lazy val assureInserted: Completion => Unit = {
-    case Completion.Insert(1) => ()
-    case _                    => fail("insertion problem")
-  }
-
-  protected override def createTable(): Unit = execute {
-    Kleisli[IO, Session[IO], Unit] { session =>
-      val query: Command[Void] =
-        sql"""CREATE TABLE projects_tokens(
-                project_id int4 PRIMARY KEY,
-                token VARCHAR NOT NULL
-              );
-        """.command
-      session.execute(query).void
     }
   }
 }
