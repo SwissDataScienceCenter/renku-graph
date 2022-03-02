@@ -127,10 +127,8 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
       .select[projects.Id, BatchDate](
         sql"""SELECT batch_date
               FROM event
-              WHERE project_id = $projectIdEncoder AND #${`status IN`(New,
-                                                                      GenerationRecoverableFailure,
-                                                                      GeneratingTriples
-        )}
+              WHERE project_id = $projectIdEncoder 
+                AND #${`status IN`(New, GenerationRecoverableFailure, GeneratingTriples)}
               ORDER BY batch_date DESC
               LIMIT 1
           """.query(batchDateDecoder)
