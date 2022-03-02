@@ -107,7 +107,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
           cause,
           executionDelay = cause match {
             case _: AuthRecoverableError => ExecutionDelay(Duration ofHours 1)
-            case _ => ExecutionDelay(Duration ofMinutes 5)
+            case _ => ExecutionDelay(Duration ofMinutes 15)
           }
         )
       case NonRecoverableError(commit, cause) =>

@@ -248,8 +248,8 @@ class EventProcessorSpec
 
     def expectEventMarkedAsRecoverableFailure(commit: CommitEvent, exception: ProcessingRecoverableError) = {
       val executionDelay = exception match {
-        case _: AuthRecoverableError      => ExecutionDelay(Duration.ofHours(1))
-        case _: LogWorthyRecoverableError => ExecutionDelay(Duration.ofMinutes(5))
+        case _: AuthRecoverableError      => ExecutionDelay(Duration ofHours 1)
+        case _: LogWorthyRecoverableError => ExecutionDelay(Duration ofMinutes 15)
       }
       (eventStatusUpdater
         .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable, _: ExecutionDelay))
