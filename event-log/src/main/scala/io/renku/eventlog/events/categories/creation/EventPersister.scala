@@ -148,7 +148,9 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
             EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
           ](
             sql"""INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
-                VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
+                  VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
+                  ON CONFLICT (event_id, project_id)
+                  DO UPDATE SET event_date = EXCLUDED.event_date
               """.command
           )
           .arguments(id ~ project.id ~ status ~ createdDate ~ executionDate ~ date ~ batchDate ~ body)
@@ -162,9 +164,10 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
           .command[
             EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody ~ EventMessage
           ](
-            sql"""INSERT INTO
-                  event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
+            sql"""INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
                   VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder, $eventMessageEncoder)
+                  ON CONFLICT (event_id, project_id)
+                  DO UPDATE SET event_date = EXCLUDED.event_date
               """.command
           )
           .arguments(id ~ project.id ~ Skipped ~ createdDate ~ executionDate ~ date ~ batchDate ~ body ~ message)
@@ -177,8 +180,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
     SqlStatement(name = "new - upsert project")
       .command[projects.Id ~ projects.Path ~ EventDate](
         sql"""
-            INSERT INTO
-            project (project_id, project_path, latest_event_date)
+            INSERT INTO project (project_id, project_path, latest_event_date)
             VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
             ON CONFLICT (project_id)
             DO 
