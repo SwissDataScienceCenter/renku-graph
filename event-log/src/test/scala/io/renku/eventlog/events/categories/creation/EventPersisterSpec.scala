@@ -223,7 +223,7 @@ class EventPersisterSpec
 
     }
 
-    "add a *skipped* event if there is no event with the given id for the given project " in new TestCase {
+    "add a *SKIPPED* event if there is no event with the given id for the given project " in new TestCase {
       val skippedEvent = skippedEvents.generateOne
 
       // storeNewEvent 1
