@@ -65,29 +65,16 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
       .unsafeRunSync()
       .isDefined
 
-  protected def createTable(): Unit = execute {
+  protected def dropTable(table: String): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
-      val query: Command[Void] =
-        sql"""CREATE TABLE projects_tokens(
-              project_id int4 PRIMARY KEY,
-              project_path VARCHAR NOT NULL,
-              token VARCHAR NOT NULL
-             );
-        """.command
-      session.execute(query).map(_ => ())
-    }
-  }
-
-  protected def dropTable(): Unit = execute {
-    Kleisli[IO, Session[IO], Unit] { session =>
-      val query: Command[Void] = sql"DROP TABLE IF EXISTS projects_tokens".command
-      session.execute(query).map(_ => ())
+      val query: Command[Void] = sql"DROP TABLE IF EXISTS #$table".command
+      session.execute(query).void
     }
   }
 
   protected def verifyTrue(sql: Command[Void]): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
-      session.execute(sql).map(_ => ())
+      session.execute(sql).void
     }
   }
 }
