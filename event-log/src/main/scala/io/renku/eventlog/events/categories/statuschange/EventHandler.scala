@@ -95,12 +95,12 @@ private class EventHandler[F[_]: Async: Logger](
 
   private def executeUpdate[E <: StatusChangeEvent](
       event:                 E
-  )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = (for {
-    factory <- updaterFactory(eventsQueue, deliveryInfoRemover, queriesExecTimes)
-    result <- statusChanger
-                .updateStatuses(event)(factory)
-                .flatTap(_ => Logger[F].logInfo(event, "Processed"))
-  } yield result) recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
+  )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = {
+    for {
+      factory <- updaterFactory(eventsQueue, deliveryInfoRemover, queriesExecTimes)
+      result  <- statusChanger.updateStatuses(event)(factory)
+    } yield result
+  } recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
 }
 
 private object EventHandler {
