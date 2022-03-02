@@ -167,14 +167,15 @@ private object Commands {
     private val authRecoverableErrors = Set("fatal: Authentication failed for")
     private val nonAuthRecoverableErrors = Set(
       "SSL_ERROR_SYSCALL",
-      "the remote end hung up unexpectedly",
       "The requested URL returned error: 502",
       "The requested URL returned error: 503",
-      "The requested URL returned error: 504",
-      "Error in the HTTP2 framing layer",
-      "HTTP/2 stream 3 was not closed cleanly before end of the underlying stream",
       "Could not resolve host:",
       "Host is unreachable"
+    )
+    private val malformedRepositoryErrors = Set(
+      "the remote end hung up unexpectedly",
+      "The requested URL returned error: 504",
+      "Error in the HTTP2 framing layer"
     )
     private lazy val relevantError: PartialFunction[Throwable, F[Either[ProcessingRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
@@ -191,6 +192,10 @@ private object Commands {
               .asLeft[Unit]
               .leftWiden[ProcessingRecoverableError]
               .pure[F]
+          case out if malformedRepositoryErrors exists out.contains =>
+            ProcessingNonRecoverableError
+              .MalformedRepository(errorMessage(result.toString()))
+              .raiseError[F, Either[ProcessingRecoverableError, Unit]]
           case _ =>
             new Exception(errorMessage(result.toString())).raiseError[F, Either[ProcessingRecoverableError, Unit]]
         }
