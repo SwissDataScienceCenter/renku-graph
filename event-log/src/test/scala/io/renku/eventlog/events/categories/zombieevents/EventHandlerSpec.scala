@@ -41,6 +41,8 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.lang.Thread.sleep
+
 class EventHandlerSpec
     extends AnyWordSpec
     with IOSpec
@@ -75,6 +77,8 @@ class EventHandlerSpec
             .process
             .value
             .unsafeRunSync() shouldBe Right(Accepted)
+
+          sleep(1000)
 
           eventually {
             logger.loggedOnly(
