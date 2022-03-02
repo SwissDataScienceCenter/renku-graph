@@ -25,6 +25,7 @@ object SparqlValueEncoder {
       .replaceAll("\\\\", "\\\\\\\\")
       .map {
         case c if c.isLetterOrDigit => c.toString
+        case '\''                   => """\'"""
         case c                      => f"\\u${c.toInt}%04x"
       }
       .mkString("")

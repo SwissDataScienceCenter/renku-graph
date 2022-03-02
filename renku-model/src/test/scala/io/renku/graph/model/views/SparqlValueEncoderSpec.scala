@@ -41,6 +41,10 @@ class SparqlValueEncoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
       }
     }
 
+    "escape ' with \\" in {
+      sparqlEncode("a'b") shouldBe """a\'b"""
+    }
+
     "convert to '\\uxxxx' any non-letter and non-digit char" in {
       Set("+", "-", "@", "*") foreach { s =>
         sparqlEncode(s) shouldBe s.map(c => f"\\u${c.toInt}%04x").mkString("")
