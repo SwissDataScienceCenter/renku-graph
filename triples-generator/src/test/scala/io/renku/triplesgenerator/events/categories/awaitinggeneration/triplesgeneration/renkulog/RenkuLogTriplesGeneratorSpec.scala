@@ -157,6 +157,21 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
           .expects(repositoryDirectory)
           .returning(IO.unit)
 
+        (git
+          .`rm --cached`(_: RepositoryPath))
+          .expects(repositoryDirectory)
+          .returning(IO.unit)
+
+        (git
+          .`add -A`(_: RepositoryPath))
+          .expects(repositoryDirectory)
+          .returning(IO.unit)
+
+        (git
+          .commit(_: String)(_: RepositoryPath))
+          .expects("fixing dirty repo problem", repositoryDirectory)
+          .returning(IO.unit)
+
         (renku
           .migrate(_: CommitEvent)(_: RepositoryPath))
           .expects(commitEvent, repositoryDirectory)

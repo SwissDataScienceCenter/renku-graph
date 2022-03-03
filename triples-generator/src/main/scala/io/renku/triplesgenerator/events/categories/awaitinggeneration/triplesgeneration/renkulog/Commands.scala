@@ -114,6 +114,9 @@ private object Commands {
   trait Git[F[_]] {
     def checkout(commitId:                           CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit]
     def `reset --hard`(implicit repositoryDirectory: RepositoryPath): F[Unit]
+    def `rm --cached`(implicit repositoryDirectory:  RepositoryPath): F[Unit]
+    def `add -A`(implicit repositoryDirectory:       RepositoryPath): F[Unit]
+    def commit(message:                              String)(implicit repositoryDirectory:   RepositoryPath): F[Unit]
     def clone(
         repositoryUrl:                       ServiceUrl,
         workDirectory:                       Path
@@ -140,6 +143,18 @@ private object Commands {
 
     override def `reset --hard`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
       %%("git", "reset", "--hard")(repositoryDirectory.value)
+    }.void
+
+    override def `rm --cached`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
+      %%("git", "rm", "--cached", ".")(repositoryDirectory.value)
+    }.void
+
+    override def `add -A`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
+      %%("git", "add", "-A")(repositoryDirectory.value)
+    }.void
+
+    override def commit(message: String)(implicit repoDir: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
+      %%("git", "commit", "-m", message)(repoDir.value)
     }.void
 
     override def clone(
