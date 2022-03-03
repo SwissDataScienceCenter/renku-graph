@@ -39,8 +39,8 @@ class ProjectPathRemoverSpec
     with Eventually
     with IntegrationPatience {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: ProjectPathRemoverImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: ProjectPathRemoverImpl[IO] => false
     case _ => true
   }
 
@@ -75,7 +75,7 @@ class ProjectPathRemoverSpec
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val projectPathRemover = new ProjectPathRemoverImpl[IO](sessionResource)
+    val projectPathRemover = new ProjectPathRemoverImpl[IO]
   }
 
   private def checkColumnExists: Boolean = sessionResource

@@ -19,10 +19,9 @@
 package io.renku.eventlog.init
 
 import cats.effect.kernel.Ref
-import cats.effect.{IO, Temporal}
+import cats.effect.{MonadCancelThrow, Temporal}
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -61,29 +60,28 @@ class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[DbMigrator[F]],
 }
 
 object DbInitializer {
-  def apply(sessionResource: SessionResource[IO, EventLogDB], isMigrating: Ref[IO, Boolean])(implicit
-      logger:                Logger[IO]
-  ): IO[DbInitializer[IO]] = IO {
-    new DbInitializerImpl[IO](
-      migrators = List(
-        EventLogTableCreator(sessionResource),
-        ProjectPathAdder(sessionResource),
-        BatchDateAdder(sessionResource),
-        ProjectTableCreator(sessionResource),
-        ProjectPathRemover(sessionResource),
-        EventLogTableRenamer(sessionResource),
-        EventStatusRenamer(sessionResource),
-        EventPayloadTableCreator(sessionResource),
-        SubscriptionCategorySyncTimeTableCreator(sessionResource),
-        StatusesProcessingTimeTableCreator(sessionResource),
-        SubscriberTableCreator(sessionResource),
-        EventDeliveryTableCreator(sessionResource),
-        TimestampZoneAdder(sessionResource),
-        PayloadTypeChanger(sessionResource),
-        StatusChangeEventsTableCreator(sessionResource),
-        EventDeliveryEventTypeAdder(sessionResource)
-      ),
-      isMigrating
-    )
-  }
+  def apply[F[_]: Temporal: Logger: SessionResource](isMigrating: Ref[F, Boolean]): F[DbInitializer[F]] =
+    MonadCancelThrow[F].catchNonFatal {
+      new DbInitializerImpl[F](
+        migrators = List(
+          EventLogTableCreator[F],
+          ProjectPathAdder[F],
+          BatchDateAdder[F],
+          ProjectTableCreator[F],
+          ProjectPathRemover[F],
+          EventLogTableRenamer[F],
+          EventStatusRenamer[F],
+          EventPayloadTableCreator[F],
+          SubscriptionCategorySyncTimeTableCreator[F],
+          StatusesProcessingTimeTableCreator[F],
+          SubscriberTableCreator[F],
+          EventDeliveryTableCreator[F],
+          TimestampZoneAdder[F],
+          PayloadTypeChanger[F],
+          StatusChangeEventsTableCreator[F],
+          EventDeliveryEventTypeAdder[F]
+        ),
+        isMigrating
+      )
+    }
 }

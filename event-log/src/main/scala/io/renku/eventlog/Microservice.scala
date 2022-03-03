@@ -55,12 +55,12 @@ object Microservice extends IOMicroservice {
   } yield exitCode
 
   private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
-    sessionPoolResource.use { sessionResource =>
+    sessionPoolResource.use { implicit sessionResource =>
       for {
         certificateLoader           <- CertificateLoader[IO]
         sentryInitializer           <- SentryInitializer[IO]
         isMigrating                 <- Ref.of[IO, Boolean](true)
-        dbInitializer               <- DbInitializer(sessionResource, isMigrating)
+        dbInitializer               <- DbInitializer[IO](isMigrating)
         metricsRegistry             <- MetricsRegistry[IO]()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
         eventsQueue                 <- StatusChangeEventsQueue[IO](sessionResource, queriesExecTimes)

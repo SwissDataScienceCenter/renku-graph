@@ -24,8 +24,16 @@ import io.renku.db.DBConfigProvider
 
 sealed trait EventLogDB
 
-class EventLogDbConfigProvider[F[_]: MonadThrow](
-) extends DBConfigProvider[F, EventLogDB](
+object EventLogDB {
+  type SessionResource[F[_]] = io.renku.db.SessionResource[F, EventLogDB]
+
+  object SessionResource {
+    def apply[F[_]](implicit sr: SessionResource[F]): SessionResource[F] = sr
+  }
+}
+
+class EventLogDbConfigProvider[F[_]: MonadThrow]()
+    extends DBConfigProvider[F, EventLogDB](
       namespace = "event-log",
       dbName = "event_log"
     )

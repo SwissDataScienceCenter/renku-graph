@@ -20,8 +20,7 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
@@ -29,13 +28,12 @@ import skunk.implicits._
 
 private trait SubscriberTableCreator[F[_]] extends DbMigrator[F]
 
-private class SubscriberTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends SubscriberTableCreator[F] {
+private class SubscriberTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends SubscriberTableCreator[F] {
 
   import cats.syntax.all._
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     checkTableExists >>= {
       case true  => Kleisli.liftF(Logger[F] info "'subscriber' table exists")
       case false => createTable()
@@ -66,11 +64,9 @@ private class SubscriberTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
       PRIMARY KEY (delivery_url, source_url)
     )
     """.command
-
 }
 
 private object SubscriberTableCreator {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): SubscriberTableCreator[F] = new SubscriberTableCreatorImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: SubscriberTableCreator[F] =
+    new SubscriberTableCreatorImpl[F]
 }

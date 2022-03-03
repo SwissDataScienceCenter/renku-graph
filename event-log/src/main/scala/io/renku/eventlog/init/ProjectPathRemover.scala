@@ -21,8 +21,7 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
@@ -31,17 +30,14 @@ import skunk.implicits._
 private trait ProjectPathRemover[F[_]] extends DbMigrator[F]
 
 private object ProjectPathRemover {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): ProjectPathRemover[F] = new ProjectPathRemoverImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: ProjectPathRemover[F] = new ProjectPathRemoverImpl[F]
 }
 
-private class ProjectPathRemoverImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends ProjectPathRemover[F]
+private class ProjectPathRemoverImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends ProjectPathRemover[F]
     with EventTableCheck {
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     whenEventTableExists(
       Kleisli.liftF(Logger[F] info "'project_path' column dropping skipped"),
       otherwise = checkColumnExists >>= {

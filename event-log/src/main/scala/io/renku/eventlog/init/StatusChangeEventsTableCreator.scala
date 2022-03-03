@@ -20,28 +20,25 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 
 private trait StatusChangeEventsTableCreator[F[_]] extends DbMigrator[F]
 
 private object StatusChangeEventsTableCreator {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): StatusChangeEventsTableCreator[F] = new StatusChangeEventsTableCreatorImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: StatusChangeEventsTableCreator[F] =
+    new StatusChangeEventsTableCreatorImpl[F]
 }
 
-private class StatusChangeEventsTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends StatusChangeEventsTableCreator[F] {
+private class StatusChangeEventsTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends StatusChangeEventsTableCreator[F] {
 
   import cats.syntax.all._
   import skunk._
   import skunk.codec.all._
   import skunk.implicits._
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     checkTableExists flatMap {
       case true  => Kleisli.liftF(Logger[F] info "'status_change_events_queue' table exists")
       case false => createTable()

@@ -22,8 +22,7 @@ import cats.data.Kleisli
 import cats.data.Kleisli._
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
@@ -34,16 +33,14 @@ import scala.util.control.NonFatal
 private trait TimestampZoneAdder[F[_]] extends DbMigrator[F]
 
 private object TimestampZoneAdder {
-  def apply[F[_]: MonadCancelThrow: Logger](sessionResource: SessionResource[F, EventLogDB]): TimestampZoneAdder[F] =
-    TimestampZoneAdderImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: TimestampZoneAdder[F] = new TimestampZoneAdderImpl[F]
 }
 
-private case class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends TimestampZoneAdder[F]
+private class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends TimestampZoneAdder[F]
     with EventTableCheck {
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     columnsToMigrate.map { case (table, column) => migrateIfNeeded(table, column) }.sequence.void
   }
 

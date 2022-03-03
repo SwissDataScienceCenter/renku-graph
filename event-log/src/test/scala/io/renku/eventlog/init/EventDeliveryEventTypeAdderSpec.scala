@@ -34,8 +34,8 @@ class EventDeliveryEventTypeAdderSpec
     with Eventually
     with IntegrationPatience {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: EventDeliveryEventTypeAdder[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: EventDeliveryEventTypeAdder[IO] => false
     case _ => true
   }
 
@@ -43,11 +43,11 @@ class EventDeliveryEventTypeAdderSpec
 
     "do nothing if the 'event_type_id' collumn already exists" in new TestCase {
 
-      eventTypeAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      eventTypeAdder.run().unsafeRunSync() shouldBe ()
 
       verifyColumnExists("event_delivery", "event_type_id") shouldBe true
 
-      eventTypeAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      eventTypeAdder.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'event_type_id' column added"), Info("'event_type_id' column adding skipped"))
 
@@ -74,7 +74,6 @@ class EventDeliveryEventTypeAdderSpec
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventTypeAdder = new EventDeliveryEventTypeAdderImpl[IO](sessionResource)
+    val eventTypeAdder = new EventDeliveryEventTypeAdderImpl[IO]
   }
-
 }

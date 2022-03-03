@@ -20,8 +20,7 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
@@ -30,19 +29,16 @@ import skunk.implicits._
 private trait StatusesProcessingTimeTableCreator[F[_]] extends DbMigrator[F]
 
 private object StatusesProcessingTimeTableCreator {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): StatusesProcessingTimeTableCreator[F] =
-    new StatusesProcessingTimeTableCreatorImpl[F](sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: StatusesProcessingTimeTableCreator[F] =
+    new StatusesProcessingTimeTableCreatorImpl[F]
 }
 
-private class StatusesProcessingTimeTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends StatusesProcessingTimeTableCreator[F] {
+private class StatusesProcessingTimeTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends StatusesProcessingTimeTableCreator[F] {
 
   import cats.syntax.all._
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     checkTableExists >>= {
       case true  => Kleisli.liftF(Logger[F] info "'status_processing_time' table exists")
       case false => createTable()

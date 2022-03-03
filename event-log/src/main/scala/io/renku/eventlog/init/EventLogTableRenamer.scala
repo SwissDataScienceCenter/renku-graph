@@ -21,8 +21,7 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
@@ -31,17 +30,14 @@ import skunk.implicits._
 private trait EventLogTableRenamer[F[_]] extends DbMigrator[F]
 
 private object EventLogTableRenamer {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): EventLogTableRenamer[F] = new EventLogTableRenamerImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: EventLogTableRenamer[F] = new EventLogTableRenamerImpl[F]
 }
 
-private class EventLogTableRenamerImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends EventLogTableRenamer[F]
+private class EventLogTableRenamerImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends EventLogTableRenamer[F]
     with EventTableCheck {
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     checkOldTableExists >>= {
       case false => Kleisli.liftF(Logger[F] info "'event' table already exists")
       case true =>

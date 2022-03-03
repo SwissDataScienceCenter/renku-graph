@@ -21,8 +21,7 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
@@ -31,18 +30,16 @@ import skunk.implicits._
 private trait EventDeliveryEventTypeAdder[F[_]] extends DbMigrator[F]
 
 private object EventDeliveryEventTypeAdder {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): EventDeliveryEventTypeAdder[F] = EventDeliveryEventTypeAdderImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: EventDeliveryEventTypeAdder[F] =
+    new EventDeliveryEventTypeAdderImpl[F]
 }
 
-private case class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends EventDeliveryEventTypeAdder[F] {
-  override def run(): F[Unit] = sessionResource.useK {
+private class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends EventDeliveryEventTypeAdder[F] {
+
+  override def run(): F[Unit] = SessionResource[F].useK {
     checkColumnExists() >>= {
-      case true =>
-        Kleisli.liftF(Logger[F] info "'event_type_id' column adding skipped")
+      case true  => Kleisli.liftF(Logger[F] info "'event_type_id' column adding skipped")
       case false => addEventTypeCollumn()
     }
   }

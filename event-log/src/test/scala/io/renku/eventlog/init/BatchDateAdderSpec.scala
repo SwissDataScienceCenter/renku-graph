@@ -43,7 +43,7 @@ import java.time.{LocalDateTime, ZoneOffset}
 
 class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = List(
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = List(
     eventLogTableCreator,
     projectPathAdder
   )
@@ -98,8 +98,8 @@ class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
   }
 
   private trait TestCase {
-    implicit val logger = TestLogger[IO]()
-    val batchDateAdder  = new BatchDateAdderImpl[IO](sessionResource)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val batchDateAdder = new BatchDateAdderImpl[IO]
   }
 
   private def checkColumnExists: Boolean =

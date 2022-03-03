@@ -39,8 +39,8 @@ import skunk.{Command, Query, ~}
 
 class PayloadTypeChangerSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: PayloadTypeChangerImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: PayloadTypeChangerImpl[IO] => false
     case _ => true
   }
 
@@ -93,7 +93,7 @@ class PayloadTypeChangerSpec extends AnyWordSpec with IOSpec with DbInitSpec wit
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableRefactor = new PayloadTypeChangerImpl[IO](sessionResource)
+    val tableRefactor = new PayloadTypeChangerImpl[IO]
   }
 
   private def generateEvent(eventId: CompoundEventId): Unit = {
@@ -102,7 +102,7 @@ class PayloadTypeChangerSpec extends AnyWordSpec with IOSpec with DbInitSpec wit
     insertPayload(eventId)
   }
 
-  private def insertEvent(eventId: CompoundEventId) = execute[Unit] {
+  private def insertEvent(eventId: CompoundEventId): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[
         EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ EventBody ~ BatchDate
