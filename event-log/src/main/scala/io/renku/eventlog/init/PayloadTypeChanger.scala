@@ -28,9 +28,7 @@ import skunk.codec.all.varchar
 import skunk.implicits.toStringOps
 import skunk.{Query, Session, Void}
 
-private trait PayloadTypeChanger[F[_]] {
-  def run(): F[Unit]
-}
+private trait PayloadTypeChanger[F[_]] extends DbMigrator[F]
 
 private object PayloadTypeChanger {
   def apply[F[_]: MonadCancelThrow: Logger](

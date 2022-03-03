@@ -27,9 +27,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait StatusesProcessingTimeTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait StatusesProcessingTimeTableCreator[F[_]] extends DbMigrator[F]
 
 private object StatusesProcessingTimeTableCreator {
   def apply[F[_]: MonadCancelThrow: Logger](

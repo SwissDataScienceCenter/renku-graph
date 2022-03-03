@@ -35,9 +35,7 @@ import skunk.implicits._
 
 import scala.util.control.NonFatal
 
-private trait ProjectPathAdder[F[_]] {
-  def run(): F[Unit]
-}
+private trait ProjectPathAdder[F[_]] extends DbMigrator[F]
 
 private object ProjectPathAdder {
   def apply[F[_]: MonadCancelThrow: Logger](

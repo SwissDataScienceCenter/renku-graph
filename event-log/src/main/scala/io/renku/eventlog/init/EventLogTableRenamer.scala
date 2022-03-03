@@ -28,9 +28,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait EventLogTableRenamer[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventLogTableRenamer[F[_]] extends DbMigrator[F]
 
 private object EventLogTableRenamer {
   def apply[F[_]: MonadCancelThrow: Logger](

@@ -27,9 +27,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait SubscriptionCategorySyncTimeTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait SubscriptionCategorySyncTimeTableCreator[F[_]] extends DbMigrator[F]
 
 private object SubscriptionCategorySyncTimeTableCreator {
   def apply[F[_]: MonadCancelThrow: Logger](

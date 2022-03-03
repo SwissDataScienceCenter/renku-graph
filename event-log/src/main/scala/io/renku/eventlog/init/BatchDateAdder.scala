@@ -32,9 +32,7 @@ import skunk.implicits._
 import java.time.{LocalDateTime, ZoneOffset}
 import scala.util.control.NonFatal
 
-private trait BatchDateAdder[F[_]] {
-  def run(): F[Unit]
-}
+private trait BatchDateAdder[F[_]] extends DbMigrator[F]
 
 private object BatchDateAdder {
   def apply[F[_]: MonadCancelThrow: Logger](

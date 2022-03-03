@@ -30,9 +30,7 @@ import skunk.implicits._
 
 import scala.util.control.NonFatal
 
-trait EventStatusRenamer[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventStatusRenamer[F[_]] extends DbMigrator[F]
 
 private case class EventStatusRenamerImpl[F[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[F, EventLogDB]

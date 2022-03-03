@@ -28,9 +28,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait EventDeliveryEventTypeAdder[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventDeliveryEventTypeAdder[F[_]] extends DbMigrator[F]
 
 private object EventDeliveryEventTypeAdder {
   def apply[F[_]: MonadCancelThrow: Logger](

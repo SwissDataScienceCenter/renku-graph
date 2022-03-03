@@ -27,9 +27,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait ProjectTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait ProjectTableCreator[F[_]] extends DbMigrator[F]
 
 private object ProjectTableCreator {
   def apply[F[_]: MonadCancelThrow: Logger](

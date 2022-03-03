@@ -24,9 +24,7 @@ import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import org.typelevel.log4cats.Logger
 
-private trait StatusChangeEventsTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait StatusChangeEventsTableCreator[F[_]] extends DbMigrator[F]
 
 private object StatusChangeEventsTableCreator {
   def apply[F[_]: MonadCancelThrow: Logger](

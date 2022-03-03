@@ -23,18 +23,16 @@ import cats.effect.{IO, Temporal}
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.init.DbInitializer._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
 trait DbInitializer[F[_]] {
   def run(): F[Unit]
 }
 
-class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[Runnable[F, Unit]],
+class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[DbMigrator[F]],
                                                 isMigrating:        Ref[F, Boolean],
                                                 retrySleepDuration: FiniteDuration = 20.seconds
 ) extends DbInitializer[F] {
@@ -67,7 +65,7 @@ object DbInitializer {
       logger:                Logger[IO]
   ): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
-      migrators = List[Runnable[IO, Unit]](
+      migrators = List(
         EventLogTableCreator(sessionResource),
         ProjectPathAdder(sessionResource),
         BatchDateAdder(sessionResource),
@@ -88,6 +86,4 @@ object DbInitializer {
       isMigrating
     )
   }
-
-  private[init] type Runnable[F[_], R] = { def run(): F[R] }
 }

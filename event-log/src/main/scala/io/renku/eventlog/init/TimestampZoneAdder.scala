@@ -31,9 +31,7 @@ import skunk.implicits._
 
 import scala.util.control.NonFatal
 
-private trait TimestampZoneAdder[F[_]] {
-  def run(): F[Unit]
-}
+private trait TimestampZoneAdder[F[_]] extends DbMigrator[F]
 
 private object TimestampZoneAdder {
   def apply[F[_]: MonadCancelThrow: Logger](sessionResource: SessionResource[F, EventLogDB]): TimestampZoneAdder[F] =

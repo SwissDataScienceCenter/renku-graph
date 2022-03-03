@@ -28,9 +28,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait ProjectPathRemover[F[_]] {
-  def run(): F[Unit]
-}
+private trait ProjectPathRemover[F[_]] extends DbMigrator[F]
 
 private object ProjectPathRemover {
   def apply[F[_]: MonadCancelThrow: Logger](

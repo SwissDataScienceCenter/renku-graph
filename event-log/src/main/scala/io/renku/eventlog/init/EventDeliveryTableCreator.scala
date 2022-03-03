@@ -27,9 +27,7 @@ import skunk._
 import skunk.codec.all.bool
 import skunk.implicits._
 
-private trait EventDeliveryTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventDeliveryTableCreator[F[_]] extends DbMigrator[F]
 
 private class EventDeliveryTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[F, EventLogDB]

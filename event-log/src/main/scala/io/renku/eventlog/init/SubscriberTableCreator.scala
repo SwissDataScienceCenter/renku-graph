@@ -27,9 +27,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait SubscriberTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait SubscriberTableCreator[F[_]] extends DbMigrator[F]
 
 private class SubscriberTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
     sessionResource: SessionResource[F, EventLogDB]

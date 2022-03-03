@@ -27,9 +27,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait EventPayloadTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventPayloadTableCreator[F[_]] extends DbMigrator[F]
 
 private object EventPayloadTableCreator {
   def apply[F[_]: MonadCancelThrow: Logger](
