@@ -40,7 +40,7 @@ private class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logger: Se
   override def run(): F[Unit] = SessionResource[F].useK {
     checkColumnExists() >>= {
       case true  => Kleisli.liftF(Logger[F] info "'event_type_id' column adding skipped")
-      case false => addEventTypeCollumn()
+      case false => addEventTypeColumn()
     }
   }
 
@@ -55,7 +55,7 @@ private class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logger: Se
     }
   }
 
-  private def addEventTypeCollumn(): Kleisli[F, Session[F], Unit] =
+  private def addEventTypeColumn(): Kleisli[F, Session[F], Unit] =
     for {
       _ <-
         execute(
