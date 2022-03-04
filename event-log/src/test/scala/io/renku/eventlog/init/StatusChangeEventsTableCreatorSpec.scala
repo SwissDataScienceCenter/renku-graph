@@ -28,8 +28,8 @@ import skunk.implicits._
 
 class StatusChangeEventsTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: StatusChangeEventsTableCreatorImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: StatusChangeEventsTableCreatorImpl[IO] => false
     case _ => true
   }
 
@@ -59,6 +59,6 @@ class StatusChangeEventsTableCreatorSpec extends AnyWordSpec with IOSpec with Db
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new StatusChangeEventsTableCreatorImpl[IO](sessionResource)
+    val tableCreator = new StatusChangeEventsTableCreatorImpl[IO]
   }
 }

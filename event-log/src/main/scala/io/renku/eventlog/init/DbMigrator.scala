@@ -16,15 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog
+package io.renku.eventlog.init
 
-import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
-import cats.syntax.all._
-import skunk._
-
-package object init {
-
-  def execute[F[_]: MonadCancelThrow](sql: Command[Void]): Kleisli[F, Session[F], Unit] =
-    Kleisli(_.execute(sql).void)
+private trait DbMigrator[F[_]] {
+  def run(): F[Unit]
 }

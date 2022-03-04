@@ -26,9 +26,7 @@ import io.renku.db.DBConfigProvider.DBConfig
 import natchez.Trace
 import skunk.{Session, Transaction}
 
-class SessionResource[F[_]: MonadCancelThrow, TargetDB](
-    resource: Resource[F, Session[F]]
-) {
+class SessionResource[F[_]: MonadCancelThrow, TargetDB](resource: Resource[F, Session[F]]) {
 
   def useK[ResultType](
       query: Kleisli[F, Session[F], ResultType]
@@ -42,6 +40,7 @@ class SessionResource[F[_]: MonadCancelThrow, TargetDB](
 }
 
 object SessionPoolResource {
+
   def apply[F[_]: Concurrent: Trace: Network: Console, TargetDB](
       dbConfig: DBConfig[TargetDB]
   ): Resource[F, SessionResource[F, TargetDB]] =

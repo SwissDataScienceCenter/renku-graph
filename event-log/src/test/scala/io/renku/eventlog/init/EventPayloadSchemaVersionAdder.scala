@@ -20,32 +20,26 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait EventPayloadSchemaVersionAdder[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventPayloadSchemaVersionAdder[F[_]] extends DbMigrator[F]
 
 private object EventPayloadSchemaVersionAdder {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): EventPayloadSchemaVersionAdder[F] =
-    new EventPayloadSchemaVersionAdderImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: EventPayloadSchemaVersionAdder[F] =
+    new EventPayloadSchemaVersionAdderImpl[F]
 }
 
-private class EventPayloadSchemaVersionAdderImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends EventPayloadSchemaVersionAdder[F]
+private class EventPayloadSchemaVersionAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends EventPayloadSchemaVersionAdder[F]
     with EventTableCheck {
 
   import cats.syntax.all._
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     checkTableExists >>= {
       case true => alterTable()
       case false =>

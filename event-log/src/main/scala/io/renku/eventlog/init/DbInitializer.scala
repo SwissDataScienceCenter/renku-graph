@@ -19,22 +19,20 @@
 package io.renku.eventlog.init
 
 import cats.effect.kernel.Ref
-import cats.effect.{IO, Temporal}
+import cats.effect.{MonadCancelThrow, Temporal}
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.init.DbInitializer._
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.graph.model.events.EventStatus._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
 trait DbInitializer[F[_]] {
   def run(): F[Unit]
 }
 
-class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[Runnable[F, Unit]],
+class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[DbMigrator[F]],
                                                 isMigrating:        Ref[F, Boolean],
                                                 retrySleepDuration: FiniteDuration = 20.seconds
 ) extends DbInitializer[F] {
@@ -63,31 +61,53 @@ class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[Runnable[F, Unit
 }
 
 object DbInitializer {
-  def apply(sessionResource: SessionResource[IO, EventLogDB], isMigrating: Ref[IO, Boolean])(implicit
-      logger:                Logger[IO]
-  ): IO[DbInitializer[IO]] = IO {
-    new DbInitializerImpl[IO](
-      migrators = List[Runnable[IO, Unit]](
-        EventLogTableCreator(sessionResource),
-        ProjectPathAdder(sessionResource),
-        BatchDateAdder(sessionResource),
-        ProjectTableCreator(sessionResource),
-        ProjectPathRemover(sessionResource),
-        EventLogTableRenamer(sessionResource),
-        EventStatusRenamer(sessionResource),
-        EventPayloadTableCreator(sessionResource),
-        SubscriptionCategorySyncTimeTableCreator(sessionResource),
-        StatusesProcessingTimeTableCreator(sessionResource),
-        SubscriberTableCreator(sessionResource),
-        EventDeliveryTableCreator(sessionResource),
-        TimestampZoneAdder(sessionResource),
-        PayloadTypeChanger(sessionResource),
-        StatusChangeEventsTableCreator(sessionResource),
-        EventDeliveryEventTypeAdder(sessionResource)
-      ),
-      isMigrating
-    )
-  }
-
-  private[init] type Runnable[F[_], R] = { def run(): F[R] }
+  def apply[F[_]: Temporal: Logger: SessionResource](isMigrating: Ref[F, Boolean]): F[DbInitializer[F]] =
+    MonadCancelThrow[F].catchNonFatal {
+      new DbInitializerImpl[F](
+        migrators = List(
+          EventLogTableCreator[F],
+          ProjectPathAdder[F],
+          BatchDateAdder[F],
+          ProjectTableCreator[F],
+          ProjectPathRemover[F],
+          EventLogTableRenamer[F],
+          EventStatusRenamer[F],
+          EventPayloadTableCreator[F],
+          SubscriptionCategorySyncTimeTableCreator[F],
+          StatusesProcessingTimeTableCreator[F],
+          SubscriberTableCreator[F],
+          EventDeliveryTableCreator[F],
+          TimestampZoneAdder[F],
+          PayloadTypeChanger[F],
+          StatusChangeEventsTableCreator[F],
+          EventDeliveryEventTypeAdder[F],
+          EventDeliveryEventTypeAdder[F],
+          FailedEventsRestorer[F](
+            "%Error: The repository is dirty. Please use the \"git\" command to clean it.%",
+            currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%BadRequestException: POST http://renku-jena-master:3030/renku/update returned 400 Bad Request; body: Error 400: Lexical error%",
+            currentStatus = TransformationNonRecoverableFailure,
+            destinationStatus = TriplesGenerated,
+            discardingStatuses = TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%remote: HTTP Basic: Access denied%",
+            currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%Error: Cannot find object:%",
+            currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          )
+        ),
+        isMigrating
+      )
+    }
 }

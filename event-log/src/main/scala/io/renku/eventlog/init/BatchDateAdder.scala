@@ -21,8 +21,7 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger
 import skunk._
@@ -32,24 +31,17 @@ import skunk.implicits._
 import java.time.{LocalDateTime, ZoneOffset}
 import scala.util.control.NonFatal
 
-private trait BatchDateAdder[F[_]] {
-  def run(): F[Unit]
-}
+private trait BatchDateAdder[F[_]] extends DbMigrator[F]
 
 private object BatchDateAdder {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): BatchDateAdder[F] = new BatchDateAdderImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: BatchDateAdder[F] = new BatchDateAdderImpl[F]
 }
 
-private class BatchDateAdderImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends BatchDateAdder[F]
+private class BatchDateAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends BatchDateAdder[F]
     with EventTableCheck {
 
-  private implicit val transact: SessionResource[F, EventLogDB] = sessionResource
-
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     whenEventTableExists(
       Kleisli.liftF(Logger[F] info "'batch_date' column adding skipped"),
       otherwise = checkColumnExists >>= {

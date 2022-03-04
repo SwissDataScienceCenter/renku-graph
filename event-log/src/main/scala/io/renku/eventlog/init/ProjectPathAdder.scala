@@ -23,8 +23,8 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}
-import io.renku.db.SessionResource
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.TypeSerializers
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -35,24 +35,18 @@ import skunk.implicits._
 
 import scala.util.control.NonFatal
 
-private trait ProjectPathAdder[F[_]] {
-  def run(): F[Unit]
-}
+private trait ProjectPathAdder[F[_]] extends DbMigrator[F]
 
 private object ProjectPathAdder {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): ProjectPathAdder[F] =
-    new ProjectPathAdderImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: ProjectPathAdder[F] = new ProjectPathAdderImpl[F]
 }
 
-private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends ProjectPathAdder[F]
+private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends ProjectPathAdder[F]
     with EventTableCheck
     with TypeSerializers {
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     whenEventTableExists(
       Kleisli.liftF(Logger[F] info "'project_path' column adding skipped"),
       otherwise = checkColumnExists >>= {

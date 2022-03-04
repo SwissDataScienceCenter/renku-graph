@@ -28,8 +28,8 @@ import skunk.implicits._
 
 class SubscriberTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: SubscriberTableCreatorImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: SubscriberTableCreatorImpl[IO] => false
     case _ => true
   }
 
@@ -66,6 +66,6 @@ class SubscriberTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new SubscriberTableCreatorImpl[IO](sessionResource)
+    val tableCreator = new SubscriberTableCreatorImpl[IO]
   }
 }

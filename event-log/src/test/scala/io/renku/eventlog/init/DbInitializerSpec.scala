@@ -89,17 +89,11 @@ class DbInitializerSpec
 
   private trait TestCase {
 
-    import DbInitializer.Runnable
-
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val migrator1   = mock[EventLogTableCreator[IO]]
     val migrator2   = mock[EventPayloadTableCreator[IO]]
     val isMigrating = mock[Ref[IO, Boolean]]
-
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-
-    val dbInitializer = new DbInitializerImpl[IO](List[Runnable[IO, Unit]](migrator1, migrator2),
-                                                  isMigrating,
-                                                  retrySleepDuration = 0.5.seconds
-    )
+    val dbInitializer =
+      new DbInitializerImpl[IO](List(migrator1, migrator2), isMigrating, retrySleepDuration = 0.5 seconds)
   }
 }

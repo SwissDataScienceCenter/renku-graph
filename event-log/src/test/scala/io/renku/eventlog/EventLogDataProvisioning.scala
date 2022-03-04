@@ -46,12 +46,13 @@ trait EventLogDataProvisioning {
   protected def storeGeneratedEvent(status:      EventStatus,
                                     eventDate:   EventDate,
                                     projectId:   projects.Id,
-                                    projectPath: projects.Path
+                                    projectPath: projects.Path,
+                                    message:     Option[EventMessage] = None
   ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) = {
     val eventId = CompoundEventId(eventIds.generateOne, projectId)
     val maybeMessage = status match {
-      case _: EventStatus.FailureStatus => eventMessages.generateSome
-      case _ => eventMessages.generateOption
+      case _: EventStatus.FailureStatus => message orElse eventMessages.generateSome
+      case _ => message orElse eventMessages.generateOption
     }
     val maybePayload = status match {
       case TriplesGenerated | TransformingTriples | TriplesStore => zippedEventPayloads.generateSome

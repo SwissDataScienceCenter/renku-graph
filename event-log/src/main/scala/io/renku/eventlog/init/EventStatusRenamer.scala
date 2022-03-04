@@ -21,8 +21,7 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
@@ -30,13 +29,9 @@ import skunk.implicits._
 
 import scala.util.control.NonFatal
 
-trait EventStatusRenamer[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventStatusRenamer[F[_]] extends DbMigrator[F]
 
-private case class EventStatusRenamerImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends EventStatusRenamer[F] {
+private class EventStatusRenamerImpl[F[_]: MonadCancelThrow: Logger: SessionResource]() extends EventStatusRenamer[F] {
 
   override def run(): F[Unit] = {
     for {
@@ -52,7 +47,7 @@ private case class EventStatusRenamerImpl[F[_]: MonadCancelThrow: Logger](
     } yield ()
   } recoverWith logging
 
-  private def renameAllStatuses(from: String, to: String) = sessionResource.useK {
+  private def renameAllStatuses(from: String, to: String) = SessionResource[F].useK {
     val query: Command[String ~ String] = sql"""UPDATE event SET status = $varchar WHERE status = $varchar""".command
     Kleisli(_.prepare(query).use(_.execute(to ~ from)).void)
   }
@@ -64,7 +59,5 @@ private case class EventStatusRenamerImpl[F[_]: MonadCancelThrow: Logger](
 }
 
 private object EventStatusRenamer {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): EventStatusRenamer[F] = EventStatusRenamerImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: EventStatusRenamer[F] = new EventStatusRenamerImpl()
 }
