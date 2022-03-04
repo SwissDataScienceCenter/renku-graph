@@ -29,7 +29,7 @@ import io.renku.generators.Generators._
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.ProcessingNonRecoverableError
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitImpl, RepositoryPath}
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,26 +47,26 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
       git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Right(())
     }
 
-    "return AuthRecoverableError if command fails with a message 'remote: HTTP Basic: Access denied'" in new TestCase {
+    "fatal: could not read Username for" ::
+      "fatal: Authentication failed for" :: Nil foreach { failure =>
+        s"return AuthRecoverableError if command fails with a message '$failure'" in new TestCase {
 
-      val errorMessage = sentenceContaining(
-        Refined.unsafeApply("""|remote: HTTP Basic: Access denied
-                               |fatal: Authentication failed for""".stripMargin)
-      ).generateOne.value
-      val commandResultException = ShelloutException {
-        CommandResult(
-          exitCode = 1,
-          chunks = Seq(Left(new Bytes(errorMessage.getBytes())))
-        )
+          val errorMessage = sentenceContaining(Refined.unsafeApply(failure)).generateOne.value
+          val commandResultException = ShelloutException {
+            CommandResult(
+              exitCode = 1,
+              chunks = Seq(Left(new Bytes(errorMessage.getBytes())))
+            )
+          }
+          cloneCommand
+            .expects(repositoryUrl, destDirectory, workDirectory)
+            .throwing(commandResultException)
+
+          git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Left(
+            AuthRecoverableError(s"git clone failed with: ${commandResultException.result.toString}")
+          )
+        }
       }
-      cloneCommand
-        .expects(repositoryUrl, destDirectory, workDirectory)
-        .throwing(commandResultException)
-
-      git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Left(
-        AuthRecoverableError(s"git clone failed with: ${commandResultException.result.toString}")
-      )
-    }
 
     val recoverableFailures = Set[NonBlank](
       "SSL_ERROR_SYSCALL",

@@ -101,6 +101,12 @@ object DbInitializer {
             discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
           ),
           FailedEventsRestorer[F](
+            "%fatal: could not read Username for%",
+            currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
             "%Error: Cannot find object:%",
             currentStatus = GenerationNonRecoverableFailure,
             destinationStatus = New,

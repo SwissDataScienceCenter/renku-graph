@@ -179,7 +179,10 @@ private object Commands {
       %%("git", "status")(repositoryDirectory.value).out.string
     }
 
-    private val authRecoverableErrors = Set("fatal: Authentication failed for")
+    private val authRecoverableErrors = Set(
+      "fatal: Authentication failed for",
+      "fatal: could not read Username for"
+    )
     private val nonAuthRecoverableErrors = Set(
       "SSL_ERROR_SYSCALL",
       "The requested URL returned error: 502",
