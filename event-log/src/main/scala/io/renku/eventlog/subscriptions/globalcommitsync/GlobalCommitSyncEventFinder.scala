@@ -28,9 +28,10 @@ import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEventFinder.syncInterval
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
+import io.renku.events.CategoryName
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
-import io.renku.graph.model.events.{CategoryName, CommitId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events.{CommitId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk._

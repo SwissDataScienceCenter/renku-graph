@@ -26,8 +26,7 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.events.consumers.EventSchedulingResult.Accepted
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
-import io.renku.events.{EventRequestContent, consumers}
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 

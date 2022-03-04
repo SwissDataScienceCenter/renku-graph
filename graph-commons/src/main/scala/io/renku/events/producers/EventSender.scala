@@ -37,6 +37,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration._
 
 trait EventSender[F[_]] {
+
   def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): F[Unit]
 
   def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(implicit
@@ -57,14 +58,13 @@ class EventSenderImpl[F[_]: Async: Logger](
     )
     with EventSender[F] {
 
-  override def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): F[Unit] =
-    for {
-      uri <- validateUri(s"$eventLogUrl/events")
-      request = createRequest(uri, eventContent)
-      sendingResult <-
-        send(request)(responseMapping)
-          .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
-    } yield sendingResult
+  override def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): F[Unit] = for {
+    uri <- validateUri(s"$eventLogUrl/events")
+    request = createRequest(uri, eventContent)
+    sendingResult <-
+      send(request)(responseMapping)
+        .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
+  } yield sendingResult
 
   override def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(
       implicit partEncoder:                         RestClient.PartEncoder[PayloadType]

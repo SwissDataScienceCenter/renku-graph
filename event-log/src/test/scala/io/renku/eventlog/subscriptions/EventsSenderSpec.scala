@@ -21,8 +21,8 @@ package io.renku.eventlog.subscriptions
 import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
-import io.renku.eventlog.subscriptions.Generators.categoryNames
 import io.renku.eventlog.subscriptions.TestCategoryEvent._
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

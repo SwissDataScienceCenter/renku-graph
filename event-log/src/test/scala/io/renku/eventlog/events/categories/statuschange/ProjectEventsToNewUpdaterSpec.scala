@@ -27,13 +27,14 @@ import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.categories.statuschange.projectCleaner.ProjectCleaner
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
-import io.renku.graph.model.EventsGenerators.{categoryNames, compoundEventIds, eventBodies, eventProcessingTimes, lastSyncedDates, zippedEventPayloads}
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, lastSyncedDates, zippedEventPayloads}
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, FailureStatus, Skipped, TriplesGenerated, TriplesStore}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects

@@ -20,10 +20,10 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration.subscript
 
 import cats.syntax.all._
 import io.circe.literal._
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, positiveInts}
-import io.renku.graph.model.EventsGenerators.categoryNames
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 import org.scalamock.scalatest.MockFactory

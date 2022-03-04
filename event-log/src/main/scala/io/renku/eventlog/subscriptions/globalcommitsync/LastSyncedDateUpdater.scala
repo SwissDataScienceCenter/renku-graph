@@ -26,7 +26,8 @@ import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.SubscriptionTypeSerializers
-import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.events.CategoryName
+import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion

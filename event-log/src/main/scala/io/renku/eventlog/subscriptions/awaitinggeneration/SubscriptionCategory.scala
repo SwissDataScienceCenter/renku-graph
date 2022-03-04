@@ -26,7 +26,7 @@ import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.awaitinggeneration.AwaitingGenerationEventEncoder.{encodeEvent, encodePayload}
 import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.{EventLogDB, subscriptions}
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.CategoryName
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger

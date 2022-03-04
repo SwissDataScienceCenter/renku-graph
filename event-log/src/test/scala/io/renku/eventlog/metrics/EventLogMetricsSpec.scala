@@ -22,10 +22,12 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.renku.events.CategoryName
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.events.{CategoryName, EventStatus}
+import io.renku.graph.model.events.EventStatus
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.metrics.{LabeledGauge, SingleValueGauge}

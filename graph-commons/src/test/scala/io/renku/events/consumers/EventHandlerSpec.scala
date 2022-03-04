@@ -22,11 +22,11 @@ import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal.JsonStringContext
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
-import io.renku.graph.model.events
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -77,7 +77,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
 
   private trait TestCase {
     val processesLimiter = mock[ConcurrentProcessesLimiter[IO]]
-    val anyCategoryName  = nonEmptyStrings().generateOne
+    val anyCategoryName  = categoryNames.generateOne
 
     val eventRequestContent = EventRequestContent.NoPayload(
       json"""{ "categoryName": $anyCategoryName }"""
@@ -85,7 +85,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
 
     def handlerWithProcess(process: EventHandlingProcess[IO]): EventHandlerWithProcessLimiter[IO] =
       new EventHandlerWithProcessLimiter[IO](processesLimiter) {
-        override val categoryName: events.CategoryName = anyCategoryName
+        override val categoryName: CategoryName = anyCategoryName
 
         protected override def createHandlingProcess(request: EventRequestContent): IO[EventHandlingProcess[IO]] =
           IO(process)

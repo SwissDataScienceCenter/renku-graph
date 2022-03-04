@@ -20,7 +20,8 @@ package io.renku.eventlog.metrics
 
 import cats.effect.kernel.Temporal
 import cats.syntax.all._
-import io.renku.graph.model.events.{CategoryName, EventStatus}
+import io.renku.events.CategoryName
+import io.renku.graph.model.events.EventStatus
 import io.renku.metrics._
 import org.typelevel.log4cats.Logger
 

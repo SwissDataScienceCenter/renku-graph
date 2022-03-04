@@ -22,9 +22,9 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
-import io.renku.graph.model.EventsGenerators.categoryNames
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec

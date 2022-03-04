@@ -150,7 +150,7 @@ object CommonGraphGenerators {
   } yield Link(rel, href)
   implicit val linksObjects: Gen[Links] = nonEmptyList(linkObjects) map Links.apply
 
-  lazy val directions = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
+  lazy val directions: Gen[SortBy.Direction] = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
   def sortBys[T <: SortBy](sortBy: T): Gen[T#By] =
     for {
       property  <- Gen.oneOf(sortBy.properties.toList)

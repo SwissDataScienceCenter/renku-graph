@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.categories
 
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.CategoryName
 
 package object globalcommitsyncrequest {
   val categoryName: CategoryName = CategoryName("GLOBAL_COMMIT_SYNC_REQUEST")

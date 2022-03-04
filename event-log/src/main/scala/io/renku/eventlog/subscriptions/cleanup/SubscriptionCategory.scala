@@ -21,18 +21,15 @@ package io.renku.eventlog.subscriptions.cleanup
 import cats.Parallel
 import cats.effect._
 import cats.syntax.all._
+import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.eventlog.subscriptions._
-import io.renku.eventlog.subscriptions.eventdelivery._
-import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.cleanup.CleanUpEventEncoder.encodeEvent
-import io.renku.graph.model.events._
-import org.typelevel.log4cats.Logger
-import io.renku.metrics.LabeledHistogram
-import io.renku.db.SqlStatement
-import io.renku.db.SessionResource
-import io.renku.metrics.LabeledGauge
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.subscriptions.eventdelivery._
+import io.renku.events.CategoryName
 import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
