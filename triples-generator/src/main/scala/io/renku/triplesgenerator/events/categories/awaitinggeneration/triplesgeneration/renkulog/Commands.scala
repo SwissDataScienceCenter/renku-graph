@@ -193,7 +193,8 @@ private object Commands {
     private val malformedRepositoryErrors = Set(
       "the remote end hung up unexpectedly",
       "The requested URL returned error: 504",
-      "Error in the HTTP2 framing layer"
+      "Error in the HTTP2 framing layer",
+      "remote: The project you were looking for could not be found or you don't have permission to view it."
     )
     private lazy val relevantError: PartialFunction[Throwable, F[Either[ProcessingRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
