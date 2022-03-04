@@ -16,13 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories
+package io.renku.events
 
-import io.renku.events.CategoryName
+import io.renku.tinytypes.constraints.NonBlank
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
-package object awaitinggeneration {
-  val categoryName: CategoryName = CategoryName("AWAITING_GENERATION")
+final class CategoryName private (val value: String) extends AnyVal with StringTinyType
+object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank {
+  import io.circe.{Decoder, Encoder}
+  import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
+  import io.renku.tinytypes.json.TinyTypeEncoders.stringEncoder
 
-  private[awaitinggeneration] def logMessageCommon(event: CommitEvent): String =
-    s"$categoryName: Commit Event ${event.compoundEventId}, ${event.project.path}"
+  implicit val decoder: Decoder[CategoryName] = stringDecoder(CategoryName)
+  implicit val encoder: Encoder[CategoryName] = stringEncoder[CategoryName]
 }

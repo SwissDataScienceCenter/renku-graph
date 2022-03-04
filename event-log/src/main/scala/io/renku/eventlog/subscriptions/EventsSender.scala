@@ -22,8 +22,8 @@ import cats.effect.Async
 import cats.{MonadThrow, Show}
 import io.renku.control.Throttler
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.graph.model.events.CategoryName
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException}
 import org.typelevel.log4cats.Logger

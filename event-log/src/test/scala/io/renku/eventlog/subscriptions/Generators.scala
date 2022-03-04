@@ -20,14 +20,12 @@ package io.renku.eventlog.subscriptions
 
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{nonBlankStrings, positiveInts}
-import io.renku.graph.model.events.CategoryName
+import io.renku.generators.Generators.positiveInts
 import org.scalacheck.Gen
 
 private object Generators {
 
-  val capacities:    Gen[Capacity]     = positiveInts() map (v => Capacity(v.value))
-  val categoryNames: Gen[CategoryName] = nonBlankStrings() map (value => CategoryName(value.value))
+  val capacities: Gen[Capacity] = positiveInts() map (v => Capacity(v.value))
 
   final case class TestSubscriptionInfo(subscriberUrl: SubscriberUrl,
                                         subscriberId:  SubscriberId,

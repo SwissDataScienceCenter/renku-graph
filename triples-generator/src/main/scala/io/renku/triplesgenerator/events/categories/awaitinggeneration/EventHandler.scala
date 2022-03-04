@@ -28,8 +28,8 @@ import eu.timepit.refined.api.Refined
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
-import io.renku.events.{EventRequestContent, consumers}
-import io.renku.graph.model.events.{CategoryName, EventBody}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.graph.model.events.EventBody
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 

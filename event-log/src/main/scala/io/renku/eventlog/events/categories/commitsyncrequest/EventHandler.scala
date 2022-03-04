@@ -27,8 +27,7 @@ import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog.EventLogDB
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
-import io.renku.events.{EventRequestContent, consumers}
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 

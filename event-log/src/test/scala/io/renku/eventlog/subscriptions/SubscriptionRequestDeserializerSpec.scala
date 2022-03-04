@@ -22,6 +22,7 @@ import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

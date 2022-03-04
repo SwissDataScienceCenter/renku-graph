@@ -24,11 +24,11 @@ import io.circe.Encoder
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
 import io.renku.events
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New, TriplesGenerated, TriplesStore}
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.json.JsonOps._
 import io.renku.jsonld.JsonLD

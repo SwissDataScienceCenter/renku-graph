@@ -23,9 +23,9 @@ import cats.data.EitherT._
 import cats.syntax.all._
 import cats.{Monad, MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.EventSchedulingResult._
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId}
+import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
 

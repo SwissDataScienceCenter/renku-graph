@@ -25,12 +25,13 @@ import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
+import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, timestamps}
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec

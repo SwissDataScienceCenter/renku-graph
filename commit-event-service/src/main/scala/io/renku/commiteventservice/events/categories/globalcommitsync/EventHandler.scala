@@ -31,8 +31,8 @@ import io.renku.commiteventservice.events.categories.globalcommitsync.eventgener
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.{EventRequestContent, consumers}
-import io.renku.graph.model.events.{CategoryName, CommitId}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.graph.model.events.CommitId
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger

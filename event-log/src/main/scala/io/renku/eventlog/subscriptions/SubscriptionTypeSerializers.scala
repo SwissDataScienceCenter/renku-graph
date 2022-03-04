@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 import io.renku.eventlog.TypeSerializers
-import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.events.CategoryName
+import io.renku.graph.model.events.LastSyncedDate
 import skunk.codec.all.{timestamptz, varchar}
 import skunk.{Decoder, Encoder}
 

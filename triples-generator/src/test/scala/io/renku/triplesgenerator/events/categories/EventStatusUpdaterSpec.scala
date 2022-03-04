@@ -24,6 +24,7 @@ import io.circe.literal._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
 import io.renku.events.EventRequestContent
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
@@ -31,7 +32,6 @@ import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events
 import io.renku.graph.model.events.EventStatus._
 import io.renku.http.client.RestClient._
 import io.renku.testtools.IOSpec
@@ -225,9 +225,9 @@ class EventStatusUpdaterSpec
     val eventId     = compoundEventIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val categoryName: events.CategoryName = categoryNames.generateOne
-    val eventSender = mock[EventSender[IO]]
-    val zip         = mock[Zip]
-    val updater     = new EventStatusUpdaterImpl[IO](eventSender, categoryName, zip)
+    val categoryName = categoryNames.generateOne
+    val eventSender  = mock[EventSender[IO]]
+    val zip          = mock[Zip]
+    val updater      = new EventStatusUpdaterImpl[IO](eventSender, categoryName, zip)
   }
 }

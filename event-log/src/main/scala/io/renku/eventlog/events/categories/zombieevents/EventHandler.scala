@@ -28,9 +28,9 @@ import io.renku.db.{SessionResource, SqlStatement}
 import io.renku.eventlog._
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
-import io.renku.events.{EventRequestContent, consumers}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger

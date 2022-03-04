@@ -29,7 +29,8 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SessionResource, SqlStatement}
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
-import io.renku.graph.model.events.{CategoryName, EventStatus, LastSyncedDate}
+import io.renku.events.CategoryName
+import io.renku.graph.model.events.{EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects.Path
 import io.renku.metrics.LabeledHistogram
 import skunk._

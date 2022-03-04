@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.CategoryName
 
 package object zombieevents {
   val categoryName: CategoryName = CategoryName("ZOMBIE_CHASING")

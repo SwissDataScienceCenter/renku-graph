@@ -29,9 +29,9 @@ import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import io.renku.eventlog.{EventLogDB, EventMessage}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.renku.events.consumers._
-import io.renku.events.{EventRequestContent, consumers}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger

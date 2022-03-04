@@ -22,6 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.interpreters.TestLogger

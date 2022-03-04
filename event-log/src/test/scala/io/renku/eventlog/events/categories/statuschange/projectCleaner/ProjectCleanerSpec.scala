@@ -25,11 +25,13 @@ import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.events.CategoryName
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.graph.model.events.LastSyncedDate
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.metrics.TestLabeledHistogram

@@ -28,8 +28,8 @@ import io.circe.Decoder
 import io.renku.commiteventservice.events.categories.commitsync.eventgeneration.CommitsSynchronizer
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
-import io.renku.events.{EventRequestContent, consumers}
-import io.renku.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.graph.model.events.{CommitId, LastSyncedDate}
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import org.typelevel.log4cats.Logger

@@ -21,6 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats.effect.{Deferred, IO}
 import cats.syntax.all._
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
