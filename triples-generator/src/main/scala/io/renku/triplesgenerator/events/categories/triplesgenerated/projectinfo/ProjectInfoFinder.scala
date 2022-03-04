@@ -24,6 +24,7 @@ import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import io.renku.config.GitLab
 import io.renku.control.Throttler
+import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
@@ -72,7 +73,17 @@ private[triplesgenerated] class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel
       .map(findMemberEmail(_, Project(project.id, project.path)).value)
       .parSequence
       .map(_.sequence)
-  }.map(members => (updateCreator(members) andThen updateMembers(members))(project))
+  }.map(deduplicateSameIdMembers)
+    .map(members => (updateCreator(members) andThen updateMembers(members))(project))
+
+  private lazy val deduplicateSameIdMembers: List[ProjectMember] => List[ProjectMember] =
+    _.foldLeft(List.empty[ProjectMember]) { (deduplicated, member) =>
+      deduplicated.find(_.gitLabId == member.gitLabId) match {
+        case None                                => member :: deduplicated
+        case Some(dedup: ProjectMemberWithEmail) => dedup :: deduplicated
+        case Some(_: ProjectMemberNoEmail)       => deduplicated
+      }
+    }
 
   private def updateCreator(members: List[ProjectMember]): GitLabProjectInfo => GitLabProjectInfo = project =>
     project.maybeCreator
