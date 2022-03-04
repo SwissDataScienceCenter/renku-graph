@@ -98,13 +98,10 @@ private object Commands {
       newDir
     }
 
-    override def deleteDirectory(repositoryDirectory: Path): F[Unit] = MonadThrow[F]
-      .catchNonFatal {
-        ops.rm ! repositoryDirectory
-      }
-      .recoverWith { case NonFatal(ex) =>
-        Logger[F].error(ex)("Error when deleting repo directory")
-      }
+    override def deleteDirectory(repositoryDirectory: Path): F[Unit] =
+      MonadThrow[F]
+        .catchNonFatal(ops.rm ! repositoryDirectory)
+        .recoverWith { case NonFatal(ex) => Logger[F].error(ex)("Error when deleting repo directory") }
 
     override def exists(fileName: Path): F[Boolean] = MonadThrow[F].catchNonFatal {
       ops.exists(fileName)

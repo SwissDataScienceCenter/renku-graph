@@ -20,6 +20,7 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
+import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
@@ -65,9 +66,7 @@ private class ToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
             .ForProjects(event.projectPath, Map(oldEventStatus -> -1, AwaitingDeletion -> 1))
             .pure[F]
             .widen[DBUpdateResults]
-        case _ =>
-          new Exception(s"Could not update event ${event.eventId} to status $AwaitingDeletion: event not found")
-            .raiseError[F, DBUpdateResults]
+        case _ => Monoid[DBUpdateResults.ForProjects].empty.pure[F].widen[DBUpdateResults]
       }
   }
 
