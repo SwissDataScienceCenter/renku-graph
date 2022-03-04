@@ -111,6 +111,12 @@ object DbInitializer {
             currentStatus = GenerationNonRecoverableFailure,
             destinationStatus = New,
             discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%Not equal entity(ies) in json-ld%",
+            currentStatus = TransformationNonRecoverableFailure,
+            destinationStatus = TriplesGenerated,
+            discardingStatuses = TriplesStore :: Nil
           )
         ),
         isMigrating
