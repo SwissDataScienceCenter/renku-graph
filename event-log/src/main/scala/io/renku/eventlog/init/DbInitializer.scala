@@ -22,6 +22,7 @@ import cats.effect.kernel.Ref
 import cats.effect.{MonadCancelThrow, Temporal}
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.graph.model.events.EventStatus._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -79,7 +80,32 @@ object DbInitializer {
           TimestampZoneAdder[F],
           PayloadTypeChanger[F],
           StatusChangeEventsTableCreator[F],
-          EventDeliveryEventTypeAdder[F]
+          EventDeliveryEventTypeAdder[F],
+          EventDeliveryEventTypeAdder[F],
+          FailedEventsRestorer[F](
+            "%Error: The repository is dirty. Please use the \"git\" command to clean it.%",
+            currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%BadRequestException: POST http://renku-jena-master:3030/renku/update returned 400 Bad Request; body: Error 400: Lexical error%",
+            currentStatus = TransformationNonRecoverableFailure,
+            destinationStatus = TriplesGenerated,
+            discardingStatuses = TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%remote: HTTP Basic: Access denied%",
+            currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%Error: Cannot find object:%",
+            currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          )
         ),
         isMigrating
       )

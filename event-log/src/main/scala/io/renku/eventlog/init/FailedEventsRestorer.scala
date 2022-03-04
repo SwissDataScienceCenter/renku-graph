@@ -30,6 +30,16 @@ import skunk.implicits._
 
 private trait FailedEventsRestorer[F[_]] extends DbMigrator[F]
 
+private object FailedEventsRestorer {
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource](
+      failure:            String,
+      currentStatus:      EventStatus,
+      destinationStatus:  EventStatus,
+      discardingStatuses: List[EventStatus]
+  ): FailedEventsRestorer[F] =
+    new FailedEventsRestorerImpl[F](failure, currentStatus, destinationStatus, discardingStatuses)
+}
+
 private class FailedEventsRestorerImpl[F[_]: MonadCancelThrow: Logger: SessionResource](
     failure:            String,
     currentStatus:      EventStatus,
