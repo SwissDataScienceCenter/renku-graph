@@ -21,10 +21,10 @@ package io.renku.knowledgegraph.projects.rest
 import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import io.renku.config.{GitLab, renku}
-import io.renku.control.Throttler
+import io.renku.config.renku
 import io.renku.graph.model.projects
 import io.renku.http.InfoMessage._
+import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
@@ -171,11 +171,10 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
 
 object ProjectEndpoint {
 
-  def apply[F[_]: Parallel: Async: Logger](
-      gitLabThrottler: Throttler[F, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[F]
+  def apply[F[_]: Parallel: Async: Logger](gitLabClient: GitLabClient[F],
+                                           timeRecorder: SparqlQueryTimeRecorder[F]
   ): F[ProjectEndpoint[F]] = for {
-    projectFinder         <- ProjectFinder[F](gitLabThrottler, timeRecorder)
+    projectFinder         <- ProjectFinder[F](gitLabClient, timeRecorder)
     renkuResourceUrl      <- renku.ResourcesUrl[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
   } yield new ProjectEndpointImpl[F](

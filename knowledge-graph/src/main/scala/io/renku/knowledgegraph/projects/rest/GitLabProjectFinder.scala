@@ -18,46 +18,39 @@
 
 package io.renku.knowledgegraph.projects.rest
 
-import cats.data.OptionT
 import cats.effect.kernel.Async
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
+import eu.timepit.refined.auto._
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Id, Visibility}
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.knowledgegraph.projects.model.Forking.ForksCount
 import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
 import io.renku.knowledgegraph.projects.model._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private trait GitLabProjectFinder[F[_]] {
-  def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): OptionT[F, GitLabProject]
+  def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): F[Option[GitLabProject]]
 }
 
 private class GitLabProjectFinderImpl[F[_]: Async: Logger](
-    gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[F, GitLab]
-) extends RestClient(gitLabThrottler)
-    with GitLabProjectFinder[F] {
+    gitLabClient: GitLabClient[F]
+) extends GitLabProjectFinder[F] {
 
   import cats.syntax.all._
   import io.circe._
-  import io.renku.http.client.UrlEncoder.urlEncode
   import io.renku.tinytypes.json.TinyTypeDecoders._
   import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): OptionT[F, GitLabProject] = OptionT {
-    for {
-      uri     <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(projectPath.value)}?statistics=true")
-      project <- send(secureRequest(GET, uri)(accessToken.some))(mapResponse)
-    } yield project
-  }
+  def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): F[Option[GitLabProject]] =
+    gitLabClient.send(GET, uri"projects" / projectPath.value withQueryParam ("statistics", "true"), "project")(
+      mapResponse
+    )(accessToken.some)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[GitLabProject]]] = {
     case (Ok, _, response) => response.as[GitLabProject].map(Option.apply)
@@ -151,7 +144,6 @@ private object GitLabProjectFinder {
                                  statistics:  Statistics
   )
 
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[GitLabProjectFinder[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new GitLabProjectFinderImpl(gitLabUrl, gitLabThrottler)
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[GitLabProjectFinder[F]] =
+    new GitLabProjectFinderImpl(gitLabClient).pure[F].widen
 }

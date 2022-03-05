@@ -24,7 +24,10 @@ import io.circe.{Encoder, Json}
 
 object JsonOps {
 
-  implicit class JsonOps(json: Json) {
+  implicit class JsonOps(override val json: Json) extends JsonExt
+
+  trait JsonExt {
+    val json: Json
 
     def addIfDefined[V](propertyAndValue: (String, Option[V]))(implicit encoder: Encoder[V]): Json =
       propertyAndValue match {

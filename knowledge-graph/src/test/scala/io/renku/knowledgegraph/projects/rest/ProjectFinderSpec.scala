@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projects.rest
 
-import cats.data.OptionT
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
@@ -60,7 +59,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       (gitLabProjectFinder
         .findProject(_: Path)(_: AccessToken))
         .expects(kgProject.path, accessToken)
-        .returning(OptionT.some[IO](gitLabProject))
+        .returning(IO(gitLabProject.some))
 
       projectFinder.findProject(kgProject.path, maybeAuthUser).unsafeRunSync() shouldBe Some(
         projectFrom(kgProject, gitLabProject)
@@ -81,7 +80,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       (gitLabProjectFinder
         .findProject(_: Path)(_: AccessToken))
         .expects(kgProject.path, accessToken)
-        .returning(OptionT.some[IO](gitLabProject))
+        .returning(IO(gitLabProject.some))
 
       projectFinder.findProject(kgProject.path, maybeAuthUser = None).unsafeRunSync() shouldBe Some(
         projectFrom(kgProject, gitLabProject)
@@ -103,7 +102,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       (gitLabProjectFinder
         .findProject(_: Path)(_: AccessToken))
         .expects(projectPath, accessToken)
-        .returning(OptionT.some[IO](gitLabProject))
+        .returning(IO(gitLabProject.some))
 
       projectFinder.findProject(projectPath, maybeAuthUser).unsafeRunSync() shouldBe None
     }
@@ -122,7 +121,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       (gitLabProjectFinder
         .findProject(_: Path)(_: AccessToken))
         .expects(kgProject.path, accessToken)
-        .returning(OptionT.none[IO, GitLabProject])
+        .returning(IO(Option.empty[GitLabProject]))
 
       projectFinder.findProject(kgProject.path, maybeAuthUser).unsafeRunSync() shouldBe None
     }
@@ -158,7 +157,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       (gitLabProjectFinder
         .findProject(_: Path)(_: AccessToken))
         .expects(projectPath, accessToken)
-        .returning(OptionT.none[IO, GitLabProject])
+        .returning(IO(Option.empty[GitLabProject]))
         .noMoreThanOnce()
 
       intercept[Exception] {
@@ -201,7 +200,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       (gitLabProjectFinder
         .findProject(_: Path)(_: AccessToken))
         .expects(kgProject.path, accessToken)
-        .returning(OptionT.liftF(exception.raiseError[IO, GitLabProject]))
+        .returning(exception.raiseError[IO, Option[GitLabProject]])
 
       intercept[Exception] {
         projectFinder.findProject(kgProject.path, maybeAuthUser).unsafeRunSync()
