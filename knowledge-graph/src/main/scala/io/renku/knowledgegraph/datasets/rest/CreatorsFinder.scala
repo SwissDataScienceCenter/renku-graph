@@ -52,7 +52,7 @@ private class CreatorsFinderImpl[F[_]: Async: Logger](
     s"""|SELECT DISTINCT ?email ?name ?affiliation
         |WHERE {
         |  ?dataset a schema:Dataset ;
-        |           schema:identifier "$identifier" ;
+        |           schema:identifier '$identifier' ;
         |           schema:creator ?creatorResource .
         |  OPTIONAL { ?creatorResource a schema:Person ;
         |                              schema:email ?email . } .
@@ -60,7 +60,8 @@ private class CreatorsFinderImpl[F[_]: Async: Logger](
         |                              schema:affiliation ?affiliation . } .
         |  ?creatorResource a schema:Person ;
         |                   schema:name ?name .
-        |}""".stripMargin
+        |}
+        |""".stripMargin
   )
 }
 
