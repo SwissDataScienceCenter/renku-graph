@@ -28,7 +28,6 @@ import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
