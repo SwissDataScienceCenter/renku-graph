@@ -25,102 +25,114 @@ import com.github.tomakehurst.wiremock.stubbing.Scenario
 import eu.timepit.refined.auto._
 import io.renku.events.Generators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonBlankStrings
+import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.config.EventLogUrl
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
 
-class EventSenderSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
+class EventSenderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with ExternalServiceStubbing
+    with should.Matchers
+    with TableDrivenPropertyChecks {
 
-  "sendEvent" should {
-    Set(Accepted, NotFound) foreach { status =>
-      s"succeed if remote responds with status such as $status" in new TestCase {
-        val eventRequest = post(urlEqualTo(s"/events"))
-        stubFor {
-          eventRequest
-            .willReturn(aResponse().withStatus(status.code))
-        }
-
-        eventSender
-          .sendEvent(eventRequestContentNoPayloads.generateOne, nonBlankStrings().generateOne.value)
-          .unsafeRunSync() shouldBe ()
-
-        reset()
+  forAll {
+    Table(
+      "Request Content Type" -> "SendEvent generator",
+      "No Payload" -> { (sender: EventSender[IO]) =>
+        eventRequestContentNoPayloads.map(ev => sender.sendEvent(ev, nonEmptyStrings().generateOne))
+      },
+      "With Payload" -> { (sender: EventSender[IO]) =>
+        eventRequestContentWithZippedPayloads.map(ev => sender.sendEvent(ev, nonEmptyStrings().generateOne))
       }
-    }
-
-    Set(BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
-      s"retry if remote responds with status such as $errorStatus" in new TestCase {
-        val eventRequest = post(urlEqualTo(s"/events")).inScenario("Retry")
-
-        stubFor {
-          eventRequest
-            .whenScenarioStateIs(Scenario.STARTED)
-            .willSetStateTo("Error")
-            .willReturn(aResponse().withStatus(errorStatus.code))
-        }
-
-        stubFor {
-          eventRequest
-            .whenScenarioStateIs("Error")
-            .willSetStateTo("Successful")
-            .willReturn(aResponse().withStatus(errorStatus.code))
-        }
-
-        stubFor {
-          eventRequest
-            .whenScenarioStateIs("Successful")
-            .willReturn(aResponse().withStatus(Accepted.code))
-        }
-        eventSender
-          .sendEvent(eventRequestContentNoPayloads.generateOne, nonBlankStrings().generateOne.value)
-          .unsafeRunSync() shouldBe ()
-
-        reset()
-      }
-    }
-
-    val failureResponses = List(
-      "connection error"   -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
-      "other client error" -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt)
     )
+  } { (eventType, callGenerator) =>
+    s"sendEvent - $eventType" should {
+      Set(Accepted, NotFound) foreach { status =>
+        s"succeed if remote responds with status such as $status" in new TestCase {
+          val eventRequest = post(urlEqualTo(s"/events"))
+          stubFor {
+            eventRequest.willReturn(aResponse().withStatus(status.code))
+          }
 
-    failureResponses foreach { case (responseName, failureResponse) =>
-      s"retry in case of $responseName" in new TestCase {
-        val eventRequest = post(urlEqualTo(s"/events"))
-          .inScenario("Retry")
+          callGenerator(eventSender).generateOne.unsafeRunSync() shouldBe ()
 
-        stubFor {
-          eventRequest
-            .whenScenarioStateIs(Scenario.STARTED)
-            .willSetStateTo("Error")
-            .willReturn(failureResponse)
+          reset()
         }
+      }
 
-        stubFor {
-          eventRequest
-            .whenScenarioStateIs("Error")
-            .willSetStateTo("Successful")
-            .willReturn(failureResponse)
+      Set(BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
+        s"retry if remote responds with status such as $errorStatus" in new TestCase {
+          val eventRequest = post(urlEqualTo(s"/events")).inScenario("Retry")
+
+          stubFor {
+            eventRequest
+              .whenScenarioStateIs(Scenario.STARTED)
+              .willSetStateTo("Error")
+              .willReturn(aResponse().withStatus(errorStatus.code))
+          }
+
+          stubFor {
+            eventRequest
+              .whenScenarioStateIs("Error")
+              .willSetStateTo("Successful")
+              .willReturn(aResponse().withStatus(errorStatus.code))
+          }
+
+          stubFor {
+            eventRequest
+              .whenScenarioStateIs("Successful")
+              .willReturn(aResponse().withStatus(Accepted.code))
+          }
+
+          callGenerator(eventSender).generateOne.unsafeRunSync() shouldBe ()
+
+          reset()
         }
+      }
 
-        stubFor {
-          eventRequest
-            .whenScenarioStateIs("Successful")
-            .willReturn(aResponse().withStatus(Accepted.code))
+      val failureResponses = List(
+        "connection error"   -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
+        "other client error" -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt)
+      )
+
+      failureResponses foreach { case (responseName, failureResponse) =>
+        s"retry in case of $responseName" in new TestCase {
+          val eventRequest = post(urlEqualTo(s"/events"))
+            .inScenario("Retry")
+
+          stubFor {
+            eventRequest
+              .whenScenarioStateIs(Scenario.STARTED)
+              .willSetStateTo("Error")
+              .willReturn(failureResponse)
+          }
+
+          stubFor {
+            eventRequest
+              .whenScenarioStateIs("Error")
+              .willSetStateTo("Successful")
+              .willReturn(failureResponse)
+          }
+
+          stubFor {
+            eventRequest
+              .whenScenarioStateIs("Successful")
+              .willReturn(aResponse().withStatus(Accepted.code))
+          }
+
+          callGenerator(eventSender).generateOne.unsafeRunSync() shouldBe ()
+
+          reset()
         }
-
-        eventSender
-          .sendEvent(eventRequestContentNoPayloads.generateOne, nonBlankStrings().generateOne.value)
-          .unsafeRunSync() shouldBe ()
-
-        reset()
       }
     }
   }
