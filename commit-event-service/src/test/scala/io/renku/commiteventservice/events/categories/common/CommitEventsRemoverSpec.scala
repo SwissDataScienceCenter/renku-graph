@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
 import io.renku.commiteventservice.events.categories.common.UpdateResult.{Deleted, Failed}
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
@@ -54,8 +54,12 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
       }""")
 
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
-        .expects(eventRequestContent, s"$categoryName: Marking event as $AwaitingDeletion failed")
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+        .expects(eventRequestContent,
+                 EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                          s"$categoryName: Marking event as $AwaitingDeletion failed"
+                 )
+        )
         .returning(().pure[Try])
 
       commitRemover.removeDeletedEvent(project, commitId) shouldBe Deleted.pure[Try]
@@ -65,7 +69,7 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
 
       val exception = exceptions.generateOne
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(*, *)
         .returning(exception.raiseError[Try, Unit])
 

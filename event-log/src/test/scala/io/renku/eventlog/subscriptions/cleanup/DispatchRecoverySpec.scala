@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions.cleanup
 import Generators._
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions._
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
@@ -52,10 +52,13 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
       }""")
 
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(
           eventRequestContent,
-          s"${SubscriptionCategory.name}: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
+          EventSender.EventContext(
+            CategoryName("EVENTS_STATUS_CHANGE"),
+            s"${SubscriptionCategory.name}: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
+          )
         )
         .returning(().pure[Try])
 
@@ -80,10 +83,12 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
       }""")
 
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(
           eventRequestContent,
-          s"${SubscriptionCategory.name}: $event, url = $subscriber -> $AwaitingDeletion"
+          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                   s"${SubscriptionCategory.name}: $event, url = $subscriber -> $AwaitingDeletion"
+          )
         )
         .returning(().pure[Try])
 

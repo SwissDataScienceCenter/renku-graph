@@ -24,7 +24,8 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.control.Throttler
-import io.renku.events.EventRequestContent
+import io.renku.events.producers.EventSender.EventContext
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.config.EventLogUrl
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
@@ -38,9 +39,9 @@ import scala.concurrent.duration._
 
 trait EventSender[F[_]] {
 
-  def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): F[Unit]
+  def sendEvent(eventContent: EventRequestContent.NoPayload, context: EventContext): F[Unit]
 
-  def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(implicit
+  def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], context: EventContext)(implicit
       partEncoder:                         RestClient.PartEncoder[PayloadType]
   ): F[Unit]
 }
@@ -58,21 +59,24 @@ class EventSenderImpl[F[_]: Async: Logger](
     )
     with EventSender[F] {
 
-  override def sendEvent(eventContent: EventRequestContent.NoPayload, errorMessage: String): F[Unit] = for {
+  override def sendEvent(eventContent: EventRequestContent.NoPayload, context: EventContext): F[Unit] = for {
     uri <- validateUri(s"$eventLogUrl/events")
     request = createRequest(uri, eventContent)
     sendingResult <-
       send(request)(responseMapping)
-        .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
+        .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, context)), context))
   } yield sendingResult
 
-  override def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType], errorMessage: String)(
-      implicit partEncoder:                         RestClient.PartEncoder[PayloadType]
+  override def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType],
+                                      context:      EventContext
+  )(implicit
+      partEncoder: RestClient.PartEncoder[PayloadType]
   ): F[Unit] = for {
     uri <- validateUri(s"$eventLogUrl/events")
     request = createRequest(uri, eventContent)
-    _ <- send(request)(responseMapping)
-           .recoverWith(retryOnServerError(Eval.always(sendEvent(eventContent, errorMessage)), errorMessage))
+    _ <- send(request)(responseMapping).recoverWith(
+           retryOnServerError(Eval.always(sendEvent(eventContent, context)), context)
+         )
   } yield ()
 
   private def createRequest(uri: Uri, eventRequestContent: EventRequestContent.NoPayload) =
@@ -88,13 +92,13 @@ class EventSenderImpl[F[_]: Async: Logger](
     .build()
 
   private def retryOnServerError(
-      retry:        Eval[F[Unit]],
-      errorMessage: String
+      retry:   Eval[F[Unit]],
+      context: EventContext
   ): PartialFunction[Throwable, F[Unit]] = {
     case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
-      waitAndRetry(retry, exception, errorMessage)
+      waitAndRetry(retry, exception, context.errorMessage)
     case exception @ (_: ConnectivityException | _: ClientException) =>
-      waitAndRetry(retry, exception, errorMessage)
+      waitAndRetry(retry, exception, context.errorMessage)
   }
 
   private def waitAndRetry(retry: Eval[F[Unit]], exception: Throwable, errorMessage: String) = for {
@@ -112,4 +116,6 @@ object EventSender {
   def apply[F[_]: Async: Logger]: F[EventSender[F]] = for {
     eventLogUrl <- EventLogUrl[F]()
   } yield new EventSenderImpl(eventLogUrl, onErrorSleep = 15 seconds)
+
+  final case class EventContext(categoryName: CategoryName, errorMessage: String)
 }

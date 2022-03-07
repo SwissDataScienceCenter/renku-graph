@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.graph.model.events.CommitId
@@ -38,9 +38,8 @@ private[categories] trait CommitEventsRemover[F[_]] {
   def removeDeletedEvent(project: Project, commitId: CommitId): F[UpdateResult]
 }
 
-private class CommitEventsRemoverImpl[F[_]: MonadThrow](
-    eventSender: EventSender[F]
-) extends CommitEventsRemover[F]
+private class CommitEventsRemoverImpl[F[_]: MonadThrow](eventSender: EventSender[F])
+    extends CommitEventsRemover[F]
     with TinyTypeEncoders {
 
   override def removeDeletedEvent(project: Project, commitId: CommitId): F[UpdateResult] =
@@ -55,7 +54,9 @@ private class CommitEventsRemoverImpl[F[_]: MonadThrow](
           },
           "newStatus": $AwaitingDeletion
         }"""),
-        errorMessage = s"$categoryName: Marking event as $AwaitingDeletion failed"
+        EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                 errorMessage = s"$categoryName: Marking event as $AwaitingDeletion failed"
+        )
       )
       .map(_ => Deleted: UpdateResult)
       .recoverWith { case NonFatal(e) =>

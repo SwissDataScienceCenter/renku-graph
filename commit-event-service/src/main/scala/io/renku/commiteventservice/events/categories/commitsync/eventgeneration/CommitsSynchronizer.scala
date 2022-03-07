@@ -36,9 +36,10 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import org.typelevel.log4cats.Logger
 import io.circe.literal._
+
 import scala.util.control.NonFatal
 import io.renku.events.producers.EventSender
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 
 private[commitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: CommitSyncEvent): F[Unit]
@@ -103,9 +104,14 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
   private def triggerGlobalCommitSync(event: CommitSyncEvent): F[Unit] =
     eventSender.sendEvent(
       EventRequestContent.NoPayload(
-        json"""{ "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST", "project":{ "id": ${event.project.id.value}, "path": ${event.project.path.value} }}"""
+        json"""{
+          "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST", 
+          "project":{ "id": ${event.project.id.value}, "path": ${event.project.path.value}}
+        }"""
       ),
-      s"$categoryName - Triggering Global Commit Sync Failed"
+      EventSender.EventContext(CategoryName("GLOBAL_COMMIT_SYNC_REQUEST"),
+                               s"$categoryName - Triggering Global Commit Sync Failed"
+      )
     )
 
   private val DontCareCommitId = CommitId("0000000000000000000000000000000000000000")
@@ -168,8 +174,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
   private def loggingErrorAndIgnoreError(event:        CommitSyncEvent,
                                          errorMessage: String
   ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F]
-      .error(exception)(s"${logMessageCommon(event)} -> $errorMessage")
+    Logger[F].error(exception)(s"${logMessageCommon(event)} -> $errorMessage")
   }
 
   private def loggingError(event: CommitSyncEvent, errorMessage: String): PartialFunction[Throwable, F[Unit]] = {

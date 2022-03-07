@@ -26,7 +26,7 @@ import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
@@ -65,9 +65,12 @@ class AllEventsToNewUpdaterSpec
 
       projects foreach { project =>
         (eventSender
-          .sendEvent(_: EventRequestContent.NoPayload, _: String))
-          .expects(EventRequestContent.NoPayload(toEventJson(project)),
-                   show"$categoryName: Generating ${ProjectEventsToNew.eventType} for $project failed"
+          .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+          .expects(
+            EventRequestContent.NoPayload(toEventJson(project)),
+            EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                     show"$categoryName: Generating ${ProjectEventsToNew.eventType} for $project failed"
+            )
           )
           .returning(().pure[IO])
       }

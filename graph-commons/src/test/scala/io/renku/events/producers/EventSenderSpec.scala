@@ -18,11 +18,13 @@
 
 package io.renku.events.producers
 
+import EventSender.EventContext
 import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import eu.timepit.refined.auto._
+import io.renku.events.CategoryName
 import io.renku.events.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
@@ -47,11 +49,15 @@ class EventSenderSpec
   forAll {
     Table(
       "Request Content Type" -> "SendEvent generator",
-      "No Payload" -> { (sender: EventSender[IO]) =>
-        eventRequestContentNoPayloads.map(ev => sender.sendEvent(ev, nonEmptyStrings().generateOne))
+      "No Payload" -> { (sender: EventSender[IO], categoryName: CategoryName) =>
+        eventRequestContentNoPayloads.map(ev =>
+          sender.sendEvent(ev, EventContext(categoryName, nonEmptyStrings().generateOne))
+        )
       },
-      "With Payload" -> { (sender: EventSender[IO]) =>
-        eventRequestContentWithZippedPayloads.map(ev => sender.sendEvent(ev, nonEmptyStrings().generateOne))
+      "With Payload" -> { (sender: EventSender[IO], categoryName: CategoryName) =>
+        eventRequestContentWithZippedPayloads.map(ev =>
+          sender.sendEvent(ev, EventContext(categoryName, nonEmptyStrings().generateOne))
+        )
       }
     )
   } { (eventType, callGenerator) =>
@@ -63,7 +69,7 @@ class EventSenderSpec
             eventRequest.willReturn(aResponse().withStatus(status.code))
           }
 
-          callGenerator(eventSender).generateOne.unsafeRunSync() shouldBe ()
+          callGenerator(eventSender, categoryName).generateOne.unsafeRunSync() shouldBe ()
 
           reset()
         }
@@ -93,7 +99,7 @@ class EventSenderSpec
               .willReturn(aResponse().withStatus(Accepted.code))
           }
 
-          callGenerator(eventSender).generateOne.unsafeRunSync() shouldBe ()
+          callGenerator(eventSender, categoryName).generateOne.unsafeRunSync() shouldBe ()
 
           reset()
         }
@@ -129,7 +135,7 @@ class EventSenderSpec
               .willReturn(aResponse().withStatus(Accepted.code))
           }
 
-          callGenerator(eventSender).generateOne.unsafeRunSync() shouldBe ()
+          callGenerator(eventSender, categoryName).generateOne.unsafeRunSync() shouldBe ()
 
           reset()
         }
@@ -140,10 +146,11 @@ class EventSenderSpec
   private lazy val requestTimeout: FiniteDuration = 1 second
 
   private trait TestCase {
+    val categoryName = categoryNames.generateOne
+
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventLogUrl:     EventLogUrl    = EventLogUrl(externalServiceBaseUrl)
     val onErrorSleep:    FiniteDuration = 1 second
-
     val eventSender = new EventSenderImpl[IO](eventLogUrl,
                                               onErrorSleep,
                                               retryInterval = 100 millis,

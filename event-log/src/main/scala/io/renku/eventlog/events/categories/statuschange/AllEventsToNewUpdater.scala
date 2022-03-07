@@ -29,7 +29,7 @@ import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.graph.model.events.EventStatus
@@ -81,7 +81,10 @@ private class AllEventsToNewUpdater[F[_]: Async](
         case (event :: _, areMore) =>
           sendEvent(
             EventRequestContent.NoPayload(event.asJson),
-            show"$categoryName: Generating ${ProjectEventsToNew.eventType} for ${event.project} failed"
+            EventSender.EventContext(
+              CategoryName(ProjectEventsToNew.eventType.show),
+              show"$categoryName: Generating ${ProjectEventsToNew.eventType} for ${event.project} failed"
+            )
           ) >> sendEventIfFound(cursor, areMore)
       }
     }
