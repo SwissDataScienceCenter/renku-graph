@@ -48,7 +48,7 @@ private class GitLabProjectFinderImpl[F[_]: Async: Logger](
   import org.http4s.dsl.io._
 
   def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): F[Option[GitLabProject]] =
-    gitLabClient.send(GET, uri"projects" / projectPath.value withQueryParam ("statistics", "true"), "project")(
+    gitLabClient.send(GET, uri"projects" / projectPath.value withQueryParam ("statistics", "true"), "single project")(
       mapResponse
     )(accessToken.some)
 
