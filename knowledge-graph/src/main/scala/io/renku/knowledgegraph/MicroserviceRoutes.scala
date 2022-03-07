@@ -27,6 +27,7 @@ import io.renku.config.GitLab
 import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.http.server.security.{Authorizer, DatasetIdRecordsFinder, GitLabAuthenticator, ProjectPathRecordsFinder}
 import io.renku.graph.model
+import io.renku.http.client.GitLabClient
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.PagingRequest.Decoders._
@@ -147,8 +148,9 @@ private object MicroserviceRoutes {
     for {
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
+      gitLabClient            <- GitLabClient(gitLabThrottler)
       queryEndpoint           <- QueryEndpoint(sparqlTimeRecorder)
-      projectEndpoint         <- ProjectEndpoint[IO](gitLabThrottler, sparqlTimeRecorder)
+      projectEndpoint         <- ProjectEndpoint[IO](gitLabClient, sparqlTimeRecorder)
       projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO](sparqlTimeRecorder)
       datasetEndpoint         <- DatasetEndpoint[IO](sparqlTimeRecorder)
       datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO](sparqlTimeRecorder)

@@ -24,6 +24,7 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
+import io.circe.literal._
 import io.renku.commiteventservice.events.categories.common.CommitInfo
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.generators.CommonGraphGenerators.accessTokens
@@ -31,16 +32,17 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Method.GET
-import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.implicits._
 import org.http4s.{Header, Method, Request, Response, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.typelevel.ci.CIStringSyntax
+import org.typelevel.ci._
 
 class LatestCommitFinderSpec
     extends AnyWordSpec
@@ -74,7 +76,7 @@ class LatestCommitFinderSpec
     "responseMapping: return None if remote responds with OK and no commits" in new TestCase {
 
       mapResponse(
-        (Status.Ok, Request[IO](), Response[IO]().withEntity("[]").withHeaders(Header.Raw(ci"X-Next-Page", "")))
+        (Status.Ok, Request[IO](), Response[IO]().withEntity(json"""[]""").withHeaders(Header.Raw(ci"X-Next-Page", "")))
       ).unsafeRunSync() shouldBe None
     }
 
@@ -104,7 +106,10 @@ class LatestCommitFinderSpec
     "return an Exception if remote client responds with unexpected body" in new TestCase {
       intercept[Exception] {
         mapResponse(
-          (Status.Ok, Request[IO](), Response[IO]().withEntity("{}").withHeaders(Header.Raw(ci"X-Next-Page", "")))
+          (Status.Ok,
+           Request[IO](),
+           Response[IO]().withEntity(json"""{}""").withHeaders(Header.Raw(ci"X-Next-Page", ""))
+          )
         ).unsafeRunSync()
       }
     }

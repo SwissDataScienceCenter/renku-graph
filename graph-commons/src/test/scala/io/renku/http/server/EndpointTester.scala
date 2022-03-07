@@ -28,6 +28,7 @@ import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.json.JsonOps.JsonExt
 import org.http4s._
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.headers.`Content-Type`
@@ -68,7 +69,7 @@ object EndpointTester {
 
   implicit def errorMessageEntityDecoder[F[_]: Concurrent]: EntityDecoder[F, ErrorMessage] = jsonOf[F, ErrorMessage]
 
-  implicit class JsonOps(json: Json) {
+  implicit class JsonOps(override val json: Json) extends JsonExt {
     import io.circe.Decoder
     import io.renku.http.rest.Links
     import io.renku.http.rest.Links._
