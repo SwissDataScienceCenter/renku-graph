@@ -122,7 +122,6 @@ object Microservice extends IOMicroservice {
           eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
           processingStatusEndpoint <- ProcessingStatusEndpoint(sessionResource, queriesExecTimes)
           eventProducersRegistry <- EventProducersRegistry(
-                                      sessionResource,
                                       awaitingGenerationGauge,
                                       underTriplesGenerationGauge,
                                       awaitingTransformationGauge,

@@ -21,11 +21,12 @@ package io.renku.eventlog.subscriptions.awaitinggeneration
 import cats.Parallel
 import cats.effect._
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SqlStatement
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.awaitinggeneration.AwaitingGenerationEventEncoder.{encodeEvent, encodePayload}
 import io.renku.eventlog.subscriptions.eventdelivery._
-import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.events.CategoryName
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
@@ -35,23 +36,20 @@ private[subscriptions] object SubscriptionCategory {
 
   val name: CategoryName = CategoryName("AWAITING_GENERATION")
 
-  def apply[F[_]: Async: Parallel: Logger: MetricsRegistry](
-      sessionResource:                SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
       awaitingTriplesGenerationGauge: LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],
       queriesExecTimes:               LabeledHistogram[F, SqlStatement.Name],
       subscriberTracker:              SubscriberTracker[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers <- Subscribers(name, subscriberTracker)
-    eventFetcher <- AwaitingGenerationEventFinder(sessionResource,
-                                                  subscribers,
+    eventFetcher <- AwaitingGenerationEventFinder(subscribers,
                                                   awaitingTriplesGenerationGauge,
                                                   underTriplesGenerationGauge,
                                                   queriesExecTimes
                     )
     dispatchRecovery <- DispatchRecovery[F]
     eventDelivery <- eventdelivery.EventDelivery[F, AwaitingGenerationEvent](
-                       sessionResource,
                        eventDeliveryIdExtractor = (event: AwaitingGenerationEvent) => CompoundEventDeliveryId(event.id),
                        queriesExecTimes
                      )

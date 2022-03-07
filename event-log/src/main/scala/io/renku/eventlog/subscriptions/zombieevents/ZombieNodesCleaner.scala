@@ -24,8 +24,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.implicits._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.metrics.LabeledHistogram
@@ -39,8 +40,7 @@ private trait ZombieNodesCleaner[F[_]] {
   def removeZombieNodes(): F[Unit]
 }
 
-private class ZombieNodesCleanerImpl[F[_]: Async: Parallel](
-    sessionResource:      SessionResource[F, EventLogDB],
+private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource](
     queriesExecTimes:     LabeledHistogram[F, SqlStatement.Name],
     microserviceBaseUrl:  MicroserviceBaseUrl,
     serviceHealthChecker: ServiceHealthChecker[F]
@@ -48,7 +48,7 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel](
     with ZombieNodesCleaner[F]
     with TypeSerializers {
 
-  override def removeZombieNodes(): F[Unit] = sessionResource.useK {
+  override def removeZombieNodes(): F[Unit] = SessionResource[F].useK {
     for {
       maybeZombieRecords <- findPotentialZombieRecords
       actions            <- Kleisli.liftF((maybeZombieRecords map toAction).parSequence.map(_.filter(_.actionable)))
@@ -147,12 +147,11 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel](
 }
 
 private object ZombieNodesCleaner {
-  def apply[F[_]: Async: Parallel: Logger](
-      sessionResource:  SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: Parallel: SessionResource: Logger](
       queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
   ): F[ZombieNodesCleaner[F]] = for {
     serviceUrlFinder     <- MicroserviceUrlFinder(Microservice.ServicePort)
     serviceBaseUrl       <- serviceUrlFinder.findBaseUrl()
     serviceHealthChecker <- ServiceHealthChecker[F]
-  } yield new ZombieNodesCleanerImpl(sessionResource, queriesExecTimes, serviceBaseUrl, serviceHealthChecker)
+  } yield new ZombieNodesCleanerImpl(queriesExecTimes, serviceBaseUrl, serviceHealthChecker)
 }

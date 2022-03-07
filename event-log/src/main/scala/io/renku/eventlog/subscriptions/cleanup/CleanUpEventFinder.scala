@@ -18,34 +18,27 @@
 
 package io.renku.eventlog.subscriptions.cleanup
 
-import cats.MonadThrow
-import cats.syntax.all._
-import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
-import io.renku.metrics.LabeledHistogram
-import io.renku.db.SqlStatement
-import io.renku.db.DbClient
-import io.renku.db.SessionResource
-import io.renku.metrics.LabeledGauge
-import java.time.Instant
-import io.renku.eventlog.EventLogDB
-import io.renku.graph.model.projects
-import cats.effect.Async
-import cats.Parallel
-import io.renku.eventlog.TypeSerializers
-import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
-import io.renku.eventlog.ExecutionDate
-import eu.timepit.refined.auto._
-import eu.timepit.refined.api.Refined
-
-import skunk._
-import skunk.implicits._
-import io.renku.graph.model.events._
-import io.renku.events.consumers.Project
+import cats.{MonadThrow, Parallel}
 import cats.data.Kleisli
+import cats.effect.Async
+import cats.syntax.all._
+import eu.timepit.refined.api.Refined
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.{ExecutionDate, TypeSerializers}
+import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
+import io.renku.events.consumers.Project
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
+import io.renku.graph.model.events._
+import io.renku.graph.model.projects
+import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import skunk._
 import skunk.data.Completion
+import skunk.implicits._
 
-private class CleanUpEventFinderImpl[F[_]: Async: Parallel](
-    sessionResource:       SessionResource[F, EventLogDB],
+import java.time.Instant
+
+private class CleanUpEventFinderImpl[F[_]: Async: Parallel: SessionResource](
     awaitingDeletionGauge: LabeledGauge[F, projects.Path],
     deletingGauge:         LabeledGauge[F, projects.Path],
     queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
@@ -55,7 +48,7 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel](
     with SubscriptionTypeSerializers
     with TypeSerializers {
 
-  override def popEvent(): F[Option[CleanUpEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[CleanUpEvent]] = SessionResource[F].useK {
     for {
       maybeCleanUpEvent <- findEventAndUpdateForProcessing
       _                 <- maybeUpdateMetrics(maybeCleanUpEvent)
@@ -121,12 +114,11 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel](
 }
 
 private object CleanUpEventFinder {
-  def apply[F[_]: Async: Parallel](
-      sessionResource:      SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: Parallel: SessionResource](
       awatingDeletionGauge: LabeledGauge[F, projects.Path],
       deletingGauge:        LabeledGauge[F, projects.Path],
       queriesExecTimes:     LabeledHistogram[F, SqlStatement.Name]
   ): F[EventFinder[F, CleanUpEvent]] = MonadThrow[F].catchNonFatal {
-    new CleanUpEventFinderImpl(sessionResource, awatingDeletionGauge, deletingGauge, queriesExecTimes)
+    new CleanUpEventFinderImpl(awatingDeletionGauge, deletingGauge, queriesExecTimes)
   }
 }

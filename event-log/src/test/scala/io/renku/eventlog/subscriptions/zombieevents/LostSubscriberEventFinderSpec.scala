@@ -70,13 +70,13 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with IOSpec with InMemor
   }
 
   private trait TestCase {
-    val eventId          = compoundEventIds.generateOne
-    val subscriberId     = subscriberIds.generateOne
-    val sourceUrl        = microserviceBaseUrls.generateOne
-    val projectPath      = projectPaths.generateOne
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val eventId      = compoundEventIds.generateOne
+    val subscriberId = subscriberIds.generateOne
+    val sourceUrl    = microserviceBaseUrls.generateOne
+    val projectPath  = projectPaths.generateOne
 
-    val finder = new LostSubscriberEventFinder(sessionResource, queriesExecTimes)
+    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    val finder           = new LostSubscriberEventFinder(queriesExecTimes)
 
     def addEvent(eventId: CompoundEventId, status: EventStatus): Unit = storeEvent(
       eventId,

@@ -26,7 +26,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.db.implicits._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, SubscriptionTypeSerializers}
@@ -43,8 +44,7 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class TriplesGeneratedEventFinderImpl[F[_]: Async](
-    sessionResource:             SessionResource[F, EventLogDB],
+private class TriplesGeneratedEventFinderImpl[F[_]: Async: SessionResource](
     awaitingTransformationGauge: LabeledGauge[F, projects.Path],
     underTransformationGauge:    LabeledGauge[F, projects.Path],
     queriesExecTimes:            LabeledHistogram[F, SqlStatement.Name],
@@ -58,7 +58,7 @@ private class TriplesGeneratedEventFinderImpl[F[_]: Async](
 
   import projectPrioritisation._
 
-  override def popEvent(): F[Option[TriplesGeneratedEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[TriplesGeneratedEvent]] = SessionResource[F].useK {
     for {
       maybeProjectAndEvent <- findEventAndUpdateForProcessing()
       (maybeProject, maybeTriplesGeneratedEvent) = maybeProjectAndEvent
@@ -192,13 +192,11 @@ private object TriplesGeneratedEventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
-  def apply[F[_]: Async](sessionResource: SessionResource[F, EventLogDB],
-                         awaitingTransformationGauge: LabeledGauge[F, projects.Path],
-                         underTransformationGauge:    LabeledGauge[F, projects.Path],
-                         queriesExecTimes:            LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: Async: SessionResource](awaitingTransformationGauge: LabeledGauge[F, projects.Path],
+                                          underTransformationGauge: LabeledGauge[F, projects.Path],
+                                          queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name]
   ): F[EventFinder[F, TriplesGeneratedEvent]] = MonadThrow[F].catchNonFatal {
-    new TriplesGeneratedEventFinderImpl(sessionResource,
-                                        awaitingTransformationGauge,
+    new TriplesGeneratedEventFinderImpl(awaitingTransformationGauge,
                                         underTransformationGauge,
                                         queriesExecTimes,
                                         projectsFetchingLimit = ProjectsFetchingLimit,

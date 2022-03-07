@@ -26,7 +26,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.db.implicits._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.graph.model.events.EventStatus._
@@ -42,8 +43,7 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: Parallel](
-    sessionResource:       SessionResource[F, EventLogDB],
+private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: Parallel: SessionResource](
     waitingEventsGauge:    LabeledGauge[F, projects.Path],
     underProcessingGauge:  LabeledGauge[F, projects.Path],
     queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
@@ -59,7 +59,7 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
 
   import projectPrioritisation._
 
-  override def popEvent(): F[Option[AwaitingGenerationEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[AwaitingGenerationEvent]] = SessionResource[F].useK {
     for {
       maybeProjectAwaitingGenerationEvent <- findEventAndUpdateForProcessing
       (maybeProject, maybeAwaitingGenerationEvent) = maybeProjectAwaitingGenerationEvent
@@ -205,16 +205,14 @@ private object AwaitingGenerationEventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 20
 
-  def apply[F[_]: MonadCancelThrow: Async: Parallel](
-      sessionResource:      SessionResource[F, EventLogDB],
+  def apply[F[_]: MonadCancelThrow: Async: Parallel: SessionResource](
       subscribers:          subscriptions.Subscribers[F],
       waitingEventsGauge:   LabeledGauge[F, projects.Path],
       underProcessingGauge: LabeledGauge[F, projects.Path],
       queriesExecTimes:     LabeledHistogram[F, SqlStatement.Name]
   ): F[subscriptions.EventFinder[F, AwaitingGenerationEvent]] = for {
     projectPrioritisation <- ProjectPrioritisation(subscribers)
-  } yield new AwaitingGenerationEventFinderImpl(sessionResource,
-                                                waitingEventsGauge,
+  } yield new AwaitingGenerationEventFinderImpl(waitingEventsGauge,
                                                 underProcessingGauge,
                                                 queriesExecTimes,
                                                 projectsFetchingLimit = ProjectsFetchingLimit,

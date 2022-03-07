@@ -166,8 +166,7 @@ class ZombieNodesCleanerSpec
     val queriesExecTimes     = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val microserviceBaseUrl  = microserviceBaseUrls.generateOne
     val serviceHealthChecker = mock[ServiceHealthChecker[IO]]
-    val cleaner =
-      new ZombieNodesCleanerImpl(sessionResource, queriesExecTimes, microserviceBaseUrl, serviceHealthChecker)
+    val cleaner              = new ZombieNodesCleanerImpl(queriesExecTimes, microserviceBaseUrl, serviceHealthChecker)
   }
 
   private def findAllSubscribers(): List[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {

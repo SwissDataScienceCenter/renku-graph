@@ -20,23 +20,24 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SqlStatement
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEventEncoder.encodeEvent
-import io.renku.eventlog.{EventLogDB, subscriptions}
-import io.renku.metrics.LabeledHistogram
+import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply[F[_]: Async: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                 queriesExecTimes:  LabeledHistogram[F, SqlStatement.Name],
-                                 subscriberTracker: SubscriberTracker[F]
+  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
+      queriesExecTimes:  LabeledHistogram[F, SqlStatement.Name],
+      subscriberTracker: SubscriberTracker[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers           <- Subscribers(categoryName, subscriberTracker)
-    lastSyncedDateUpdater <- LastSyncedDateUpdater(sessionResource, queriesExecTimes)
-    eventsFinder          <- GlobalCommitSyncEventFinder(sessionResource, lastSyncedDateUpdater, queriesExecTimes)
+    lastSyncedDateUpdater <- LastSyncedDateUpdater(queriesExecTimes)
+    eventsFinder          <- GlobalCommitSyncEventFinder(lastSyncedDateUpdater, queriesExecTimes)
     dispatchRecovery      <- DispatchRecovery(lastSyncedDateUpdater)
     eventDelivery         <- EventDelivery.noOp[F, GlobalCommitSyncEvent]
     eventsDistributor <- EventsDistributor(categoryName,

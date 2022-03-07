@@ -22,8 +22,8 @@ import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import io.renku.db.{SessionResource, SqlStatement}
-import io.renku.eventlog.EventLogDB
+import io.renku.db.SqlStatement
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
@@ -52,14 +52,13 @@ private class ZombieEventFinder[F[_]: MonadThrow: Logger](
 
 private object ZombieEventFinder {
 
-  def apply[F[_]: Async: Parallel: Logger](
-      sessionResource:  SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: Parallel: SessionResource: Logger](
       queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
   ): F[EventFinder[F, ZombieEvent]] = for {
-    longProcessingEventFinder <- LongProcessingEventFinder(sessionResource, queriesExecTimes)
-    lostSubscriberEventFinder <- LostSubscriberEventFinder(sessionResource, queriesExecTimes)
-    zombieNodesCleaner        <- ZombieNodesCleaner(sessionResource, queriesExecTimes)
-    lostZombieEventFinder     <- LostZombieEventFinder(sessionResource, queriesExecTimes)
+    longProcessingEventFinder <- LongProcessingEventFinder(queriesExecTimes)
+    lostSubscriberEventFinder <- LostSubscriberEventFinder(queriesExecTimes)
+    zombieNodesCleaner        <- ZombieNodesCleaner(queriesExecTimes)
+    lostZombieEventFinder     <- LostZombieEventFinder(queriesExecTimes)
   } yield new ZombieEventFinder[F](longProcessingEventFinder,
                                    lostSubscriberEventFinder,
                                    zombieNodesCleaner,

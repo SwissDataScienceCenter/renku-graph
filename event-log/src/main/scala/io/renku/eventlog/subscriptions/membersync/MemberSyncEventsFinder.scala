@@ -23,9 +23,10 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventDate
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
-import io.renku.eventlog.{EventDate, EventLogDB}
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
@@ -36,15 +37,14 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
+private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource](
     queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, MemberSyncEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): F[Option[MemberSyncEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[MemberSyncEvent]] = SessionResource[F].useK {
     findEventAndMarkTaken()
   }
 
@@ -87,47 +87,45 @@ private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow](
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(projectId)
     else insertLastSyncedDate(projectId)
 
-  private def updateLastSyncedDate(projectId: projects.Id) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-        .command[LastSyncedDate ~ projects.Id ~ CategoryName](sql"""UPDATE subscription_category_sync_time
+  private def updateLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
+      .command[LastSyncedDate ~ projects.Id ~ CategoryName](sql"""UPDATE subscription_category_sync_time
                   SET last_synced = $lastSyncedDateEncoder
                   WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
             """.command)
-        .arguments(LastSyncedDate(now()) ~ projectId ~ categoryName)
-        .build
-        .flatMapResult {
-          case Completion.Update(1) => true.pure[F]
-          case Completion.Update(0) => false.pure[F]
-          case completion =>
-            new Exception(
-              s"${categoryName.value.toLowerCase} - update last_synced failed with completion code $completion"
-            ).raiseError[F, Boolean]
-        }
-    }
+      .arguments(LastSyncedDate(now()) ~ projectId ~ categoryName)
+      .build
+      .flatMapResult {
+        case Completion.Update(1) => true.pure[F]
+        case Completion.Update(0) => false.pure[F]
+        case completion =>
+          new Exception(
+            s"${categoryName.value.toLowerCase} - update last_synced failed with completion code $completion"
+          ).raiseError[F, Boolean]
+      }
+  }
 
-  private def insertLastSyncedDate(projectId: projects.Id) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
-        .command[projects.Id ~ CategoryName ~ LastSyncedDate](
-          sql"""
+  private def insertLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
+      .command[projects.Id ~ CategoryName ~ LastSyncedDate](
+        sql"""
             INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
             VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
             ON CONFLICT (project_id, category_name)
             DO UPDATE SET last_synced = EXCLUDED.last_synced
             """.command
-        )
-        .arguments(projectId ~ categoryName ~ LastSyncedDate(now()))
-        .build
-        .flatMapResult {
-          case Completion.Insert(1) => true.pure[F]
-          case Completion.Insert(0) => false.pure[F]
-          case completion =>
-            new Exception(
-              s"${categoryName.value.toLowerCase} - insert last_synced failed with completion code $completion"
-            ).raiseError[F, Boolean]
-        }
-    }
+      )
+      .arguments(projectId ~ categoryName ~ LastSyncedDate(now()))
+      .build
+      .flatMapResult {
+        case Completion.Insert(1) => true.pure[F]
+        case Completion.Insert(0) => false.pure[F]
+        case completion =>
+          new Exception(
+            s"${categoryName.value.toLowerCase} - insert last_synced failed with completion code $completion"
+          ).raiseError[F, Boolean]
+      }
+  }
 
   private def toNoneIfEventAlreadyTaken(event: MemberSyncEvent): Boolean => Option[MemberSyncEvent] = {
     case true  => Some(event)
@@ -136,10 +134,9 @@ private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow](
 }
 
 private object MemberSyncEventFinder {
-  def apply[F[_]: MonadCancelThrow](
-      sessionResource:  SessionResource[F, EventLogDB],
+  def apply[F[_]: MonadCancelThrow: SessionResource](
       queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
   ): F[EventFinder[F, MemberSyncEvent]] = MonadThrow[F].catchNonFatal {
-    new MemberSyncEventFinderImpl(sessionResource, queriesExecTimes)
+    new MemberSyncEventFinderImpl(queriesExecTimes)
   }
 }

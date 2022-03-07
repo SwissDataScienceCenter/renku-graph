@@ -148,6 +148,6 @@ class MemberSyncEventFinderSpec
 
   private trait TestCase {
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val finder           = new MemberSyncEventFinderImpl(sessionResource, queriesExecTimes)
+    val finder           = new MemberSyncEventFinderImpl(queriesExecTimes)
   }
 }
