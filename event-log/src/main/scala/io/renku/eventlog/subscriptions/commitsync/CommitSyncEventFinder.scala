@@ -28,8 +28,9 @@ import io.renku.eventlog.EventDate
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import io.renku.events.CategoryName
+import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
-import io.renku.graph.model.events.{EventStatus, LastSyncedDate}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk._
@@ -96,7 +97,9 @@ private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource]
             eventIdDecoder.opt ~ eventStatusDecoder.opt ~ projectDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
           )
           .map {
-            case Some(eventId) ~ maybeEventStatus ~ project ~ maybeLastSyncDate ~ latestEventDate =>
+            case Some(eventId: EventId) ~
+                (maybeEventStatus: Option[EventStatus]) ~
+                (project: Project) ~ (maybeLastSyncDate: Option[LastSyncedDate]) ~ (latestEventDate: EventDate) =>
               (FullCommitSyncEvent(CompoundEventId(eventId, project.id),
                                    project.path,
                                    maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
@@ -104,7 +107,7 @@ private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource]
                maybeLastSyncDate,
                maybeEventStatus
               )
-            case None ~ _ ~ project ~ maybeLastSyncDate ~ _ =>
+            case None ~ _ ~ (project: Project) ~ (maybeLastSyncDate: Option[LastSyncedDate]) ~ _ =>
               (MinimalCommitSyncEvent(project), maybeLastSyncDate, None)
           }
       )
