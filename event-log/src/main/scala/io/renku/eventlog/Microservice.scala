@@ -56,107 +56,107 @@ object Microservice extends IOMicroservice {
 
   private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
     sessionPoolResource.use { implicit sessionResource =>
-      for {
-        certificateLoader           <- CertificateLoader[IO]
-        sentryInitializer           <- SentryInitializer[IO]
-        isMigrating                 <- Ref.of[IO, Boolean](true)
-        dbInitializer               <- DbInitializer[IO](isMigrating)
-        metricsRegistry             <- MetricsRegistry[IO]()
-        queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
-        eventsQueue                 <- StatusChangeEventsQueue[IO](sessionResource, queriesExecTimes)
-        statsFinder                 <- StatsFinder(sessionResource, queriesExecTimes)
-        eventLogMetrics             <- EventLogMetrics(metricsRegistry, statsFinder)
-        awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder)
-        awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder)
-        underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder)
-        underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder)
-        awaitingDeletionGauge       <- AwaitingDeletionGauge(metricsRegistry, statsFinder)
-        deletingGauge               <- DeletingGauge(metricsRegistry, statsFinder)
-        metricsResetScheduler <- GaugeResetScheduler[IO, projects.Path](
-                                   List(awaitingGenerationGauge,
+      MetricsRegistry[IO]().flatMap { implicit metricsRegistry =>
+        for {
+          certificateLoader           <- CertificateLoader[IO]
+          sentryInitializer           <- SentryInitializer[IO]
+          isMigrating                 <- Ref.of[IO, Boolean](true)
+          dbInitializer               <- DbInitializer[IO](isMigrating)
+          queriesExecTimes            <- QueriesExecutionTimes[IO]
+          eventsQueue                 <- StatusChangeEventsQueue[IO](sessionResource, queriesExecTimes)
+          statsFinder                 <- StatsFinder(sessionResource, queriesExecTimes)
+          eventLogMetrics             <- EventLogMetrics(statsFinder)
+          awaitingGenerationGauge     <- AwaitingGenerationGauge(statsFinder)
+          awaitingTransformationGauge <- AwaitingTransformationGauge(statsFinder)
+          underTransformationGauge    <- UnderTransformationGauge(statsFinder)
+          underTriplesGenerationGauge <- UnderTriplesGenerationGauge(statsFinder)
+          awaitingDeletionGauge       <- AwaitingDeletionGauge(statsFinder)
+          deletingGauge               <- DeletingGauge(statsFinder)
+          metricsResetScheduler <- GaugeResetScheduler[IO, projects.Path](
+                                     List(awaitingGenerationGauge,
+                                          underTriplesGenerationGauge,
+                                          awaitingTransformationGauge,
+                                          underTransformationGauge,
+                                          awaitingDeletionGauge,
+                                          deletingGauge
+                                     ),
+                                     MetricsConfigProvider()
+                                   )
+          creationSubscription <-
+            events.categories.creation.SubscriptionFactory(sessionResource, awaitingGenerationGauge, queriesExecTimes)
+          zombieEventsSubscription <- events.categories.zombieevents.SubscriptionFactory(
+                                        sessionResource,
+                                        awaitingGenerationGauge,
                                         underTriplesGenerationGauge,
                                         awaitingTransformationGauge,
                                         underTransformationGauge,
-                                        awaitingDeletionGauge,
-                                        deletingGauge
-                                   ),
-                                   MetricsConfigProvider()
-                                 )
-        creationSubscription <-
-          events.categories.creation.SubscriptionFactory(sessionResource, awaitingGenerationGauge, queriesExecTimes)
-        zombieEventsSubscription <- events.categories.zombieevents.SubscriptionFactory(
-                                      sessionResource,
+                                        queriesExecTimes
+                                      )
+          commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(
+                                             sessionResource,
+                                             queriesExecTimes
+                                           )
+          globalCommitSyncRequestSubscription <- events.categories.globalcommitsyncrequest.SubscriptionFactory(
+                                                   sessionResource,
+                                                   queriesExecTimes
+                                                 )
+          statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
+                                             sessionResource,
+                                             eventsQueue,
+                                             awaitingGenerationGauge,
+                                             underTriplesGenerationGauge,
+                                             awaitingTransformationGauge,
+                                             underTransformationGauge,
+                                             awaitingDeletionGauge,
+                                             deletingGauge,
+                                             queriesExecTimes
+                                           )
+          eventConsumersRegistry <- consumers.EventConsumersRegistry(
+                                      creationSubscription,
+                                      zombieEventsSubscription,
+                                      commitSyncRequestSubscription,
+                                      statusChangeEventSubscription,
+                                      globalCommitSyncRequestSubscription
+                                    )
+          serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
+          eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
+          processingStatusEndpoint <- ProcessingStatusEndpoint(sessionResource, queriesExecTimes)
+          eventProducersRegistry <- EventProducersRegistry(
                                       awaitingGenerationGauge,
                                       underTriplesGenerationGauge,
                                       awaitingTransformationGauge,
                                       underTransformationGauge,
+                                      awaitingDeletionGauge,
+                                      deletingGauge,
                                       queriesExecTimes
                                     )
-        commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(
-                                           sessionResource,
-                                           queriesExecTimes
-                                         )
-        globalCommitSyncRequestSubscription <- events.categories.globalcommitsyncrequest.SubscriptionFactory(
-                                                 sessionResource,
-                                                 queriesExecTimes
-                                               )
-        statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
-                                           sessionResource,
-                                           eventsQueue,
-                                           awaitingGenerationGauge,
-                                           underTriplesGenerationGauge,
-                                           awaitingTransformationGauge,
-                                           underTransformationGauge,
-                                           awaitingDeletionGauge,
-                                           deletingGauge,
-                                           queriesExecTimes
-                                         )
-        eventConsumersRegistry <- consumers.EventConsumersRegistry(
-                                    creationSubscription,
-                                    zombieEventsSubscription,
-                                    commitSyncRequestSubscription,
-                                    statusChangeEventSubscription,
-                                    globalCommitSyncRequestSubscription
-                                  )
-        serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
-        eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
-        processingStatusEndpoint <- ProcessingStatusEndpoint(sessionResource, queriesExecTimes)
-        eventProducersRegistry <- EventProducersRegistry(
-                                    sessionResource,
-                                    awaitingGenerationGauge,
-                                    underTriplesGenerationGauge,
-                                    awaitingTransformationGauge,
-                                    underTransformationGauge,
-                                    awaitingDeletionGauge,
-                                    deletingGauge,
-                                    queriesExecTimes
-                                  )
-        subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
-        eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes)
-        eventsEndpoint        <- EventsEndpoint(sessionResource, queriesExecTimes)
-        microserviceRoutes = new MicroserviceRoutes[IO](
-                               eventEndpoint,
-                               eventsEndpoint,
-                               processingStatusEndpoint,
-                               subscriptionsEndpoint,
-                               eventDetailsEndpoint,
-                               new RoutesMetrics[IO](metricsRegistry),
-                               isMigrating
-                             ).routes
-        exitCode <- microserviceRoutes.use { routes =>
-                      new MicroserviceRunner(serviceReadinessChecker,
-                                             certificateLoader,
-                                             sentryInitializer,
-                                             dbInitializer,
-                                             eventLogMetrics,
-                                             eventsQueue,
-                                             eventProducersRegistry,
-                                             eventConsumersRegistry,
-                                             metricsResetScheduler,
-                                             HttpServer[IO](serverPort = ServicePort.value, routes)
-                      ).run()
-                    }
-      } yield exitCode
+          subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
+          eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes)
+          eventsEndpoint        <- EventsEndpoint(sessionResource, queriesExecTimes)
+          microserviceRoutes = new MicroserviceRoutes[IO](
+                                 eventEndpoint,
+                                 eventsEndpoint,
+                                 processingStatusEndpoint,
+                                 subscriptionsEndpoint,
+                                 eventDetailsEndpoint,
+                                 new RoutesMetrics[IO],
+                                 isMigrating
+                               ).routes
+          exitCode <- microserviceRoutes.use { routes =>
+                        new MicroserviceRunner(serviceReadinessChecker,
+                                               certificateLoader,
+                                               sentryInitializer,
+                                               dbInitializer,
+                                               eventLogMetrics,
+                                               eventsQueue,
+                                               eventProducersRegistry,
+                                               eventConsumersRegistry,
+                                               metricsResetScheduler,
+                                               HttpServer[IO](serverPort = ServicePort.value, routes)
+                        ).run()
+                      }
+        } yield exitCode
+      }
     }
 }
 

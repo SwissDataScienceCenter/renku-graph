@@ -120,15 +120,13 @@ class EventDeliverySpec
 
     val compoundIdExtractor: TestCompoundIdEvent => CompoundEventDeliveryId = e =>
       CompoundEventDeliveryId(e.compoundEventId)
-    val delivery =
-      new EventDeliveryImpl[IO, TestCompoundIdEvent](sessionResource, compoundIdExtractor, queriesExecTimes, sourceUrl)
+    val delivery = new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, queriesExecTimes, sourceUrl)
   }
 
   private trait DeletingProjectTestCase extends CommonTestCase {
 
     val compoundIdExtractor: TestCompoundIdEvent => EventDeliveryId = event => DeletingProjectDeliverId(event.projectId)
-    val delivery =
-      new EventDeliveryImpl[IO, TestCompoundIdEvent](sessionResource, compoundIdExtractor, queriesExecTimes, sourceUrl)
+    val delivery = new EventDeliveryImpl[IO, TestCompoundIdEvent](compoundIdExtractor, queriesExecTimes, sourceUrl)
   }
 
   private def addEvent(eventId: CompoundEventId): Unit = storeEvent(eventId,

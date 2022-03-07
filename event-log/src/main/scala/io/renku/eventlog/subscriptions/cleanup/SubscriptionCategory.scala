@@ -21,35 +21,34 @@ package io.renku.eventlog.subscriptions.cleanup
 import cats.Parallel
 import cats.effect._
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
-import io.renku.eventlog.{EventLogDB, subscriptions}
+import io.renku.db.SqlStatement
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.cleanup.CleanUpEventEncoder.encodeEvent
 import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.events.CategoryName
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
   val name: CategoryName = CategoryName("CLEAN_UP")
 
-  def apply[F[_]: Async: Parallel: Logger](
+  def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
       subscriberTracker:     SubscriberTracker[F],
-      sessionResource:       SessionResource[F, EventLogDB],
       awaitingDeletionGauge: LabeledGauge[F, projects.Path],
       deletingGauge:         LabeledGauge[F, projects.Path],
       queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers <- Subscribers(name, subscriberTracker)
     eventDelivery <- eventdelivery.EventDelivery[F, CleanUpEvent](
-                       sessionResource,
                        eventDeliveryIdExtractor = (event: CleanUpEvent) => DeletingProjectDeliverId(event.project.id),
                        queriesExecTimes
                      )
     dispatchRecovery <- DispatchRecovery[F]
-    eventFinder      <- CleanUpEventFinder(sessionResource, awaitingDeletionGauge, deletingGauge, queriesExecTimes)
+    eventFinder      <- CleanUpEventFinder(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
     eventsDistributor <-
       EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)
     deserializer <-

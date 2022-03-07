@@ -22,10 +22,10 @@ import cats.MonadThrow
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
@@ -38,8 +38,7 @@ private[subscriptions] trait EventDelivery[F[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit]
 }
 
-private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
-    sessionResource:          SessionResource[F, EventLogDB],
+private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource, CategoryEvent](
     eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId,
     queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name],
     sourceUrl:                MicroserviceBaseUrl
@@ -47,7 +46,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
     with EventDelivery[F, CategoryEvent]
     with TypeSerializers {
 
-  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit] = sessionResource.useK {
+  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): F[Unit] = SessionResource[F].useK {
     val eventDeliveryId = eventDeliveryIdExtractor(event)
     for {
       _      <- deleteDelivery(eventDeliveryId)
@@ -120,18 +119,13 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow, CategoryEvent](
 
 private[subscriptions] object EventDelivery {
 
-  def apply[F[_]: MonadCancelThrow, CategoryEvent](
-      sessionResource:          SessionResource[F, EventLogDB],
+  def apply[F[_]: MonadCancelThrow: SessionResource, CategoryEvent](
       eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId,
       queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name]
   ): F[EventDelivery[F, CategoryEvent]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     microserviceUrl       <- microserviceUrlFinder.findBaseUrl()
-  } yield new EventDeliveryImpl[F, CategoryEvent](sessionResource,
-                                                  eventDeliveryIdExtractor,
-                                                  queriesExecTimes,
-                                                  microserviceUrl
-  )
+  } yield new EventDeliveryImpl[F, CategoryEvent](eventDeliveryIdExtractor, queriesExecTimes, microserviceUrl)
 
   def noOp[F[_]: MonadThrow, CategoryEvent]: F[EventDelivery[F, CategoryEvent]] =
     new NoOpEventDelivery[F, CategoryEvent]()

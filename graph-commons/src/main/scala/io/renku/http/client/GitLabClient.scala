@@ -79,15 +79,14 @@ final class GitLabClientImpl[F[_]: Async: Logger](
 }
 
 object GitLabClient {
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       gitLabThrottler:        Throttler[F, GitLab],
       retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
       maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
       requestTimeoutOverride: Option[Duration] = None
   ): F[GitLabClientImpl[F]] = for {
-    metricsRegistry <- MetricsRegistry[F]()
     gitLabUrl       <- GitLabUrlLoader[F]()
-    apiCallRecorder <- GitLabApiCallRecorder[F](metricsRegistry)
+    apiCallRecorder <- GitLabApiCallRecorder[F]
   } yield new GitLabClientImpl[F](gitLabUrl.apiV4,
                                   apiCallRecorder,
                                   gitLabThrottler,
@@ -95,5 +94,4 @@ object GitLabClient {
                                   maxRetries,
                                   requestTimeoutOverride
   )
-
 }

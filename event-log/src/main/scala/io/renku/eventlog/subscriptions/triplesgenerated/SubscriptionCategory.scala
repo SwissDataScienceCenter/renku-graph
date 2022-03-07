@@ -20,35 +20,30 @@ package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SqlStatement
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.subscriptions.triplesgenerated.TriplesGeneratedEventEncoder.{encodeEvent, encodePayload}
-import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.events.CategoryName
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
   val name: CategoryName = CategoryName("TRIPLES_GENERATED")
 
-  def apply[F[_]: Async: Logger](
-      sessionResource:             SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
       awaitingTransformationGauge: LabeledGauge[F, projects.Path],
       underTransformationGauge:    LabeledGauge[F, projects.Path],
       queriesExecTimes:            LabeledHistogram[F, SqlStatement.Name],
       subscriberTracker:           SubscriberTracker[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers <- Subscribers(name, subscriberTracker)
-    eventFetcher <- TriplesGeneratedEventFinder(sessionResource,
-                                                awaitingTransformationGauge,
-                                                underTransformationGauge,
-                                                queriesExecTimes
-                    )
+    subscribers  <- Subscribers(name, subscriberTracker)
+    eventFetcher <- TriplesGeneratedEventFinder(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
     dispatchRecovery <- DispatchRecovery[F]
     eventDelivery <- EventDelivery[F, TriplesGeneratedEvent](
-                       sessionResource,
                        eventDeliveryIdExtractor = (event: TriplesGeneratedEvent) => CompoundEventDeliveryId(event.id),
                        queriesExecTimes
                      )

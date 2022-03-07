@@ -22,12 +22,12 @@ import cats._
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Json
-import io.renku.db.{SessionResource, SqlStatement}
-import io.renku.eventlog.EventLogDB
+import io.renku.db.SqlStatement
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 trait EventProducersRegistry[F[_]] {
@@ -61,8 +61,7 @@ object EventProducersRegistry {
   final case object SuccessfulSubscription             extends SubscriptionResult
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
-  def apply[F[_]: Async: Parallel: Logger](
-      sessionResource:                SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
       awaitingTriplesGenerationGauge: LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],
       awaitingTransformationGauge:    LabeledGauge[F, projects.Path],
@@ -71,31 +70,23 @@ object EventProducersRegistry {
       deletingGauge:                  LabeledGauge[F, projects.Path],
       queriesExecTimes:               LabeledHistogram[F, SqlStatement.Name]
   ): F[EventProducersRegistry[F]] = for {
-    subscriberTracker <- SubscriberTracker(sessionResource, queriesExecTimes)
-    awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(sessionResource,
-                                                                          awaitingTriplesGenerationGauge,
+    subscriberTracker <- SubscriberTracker(queriesExecTimes)
+    awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(awaitingTriplesGenerationGauge,
                                                                           underTriplesGenerationGauge,
                                                                           queriesExecTimes,
                                                                           subscriberTracker
                                   )
-    memberSyncCategory <- membersync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
-    commitSyncCategory <- commitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
-    globalCommitSyncCategory <-
-      globalcommitsync.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
-    triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(sessionResource,
-                                                                      awaitingTransformationGauge,
+    memberSyncCategory       <- membersync.SubscriptionCategory(queriesExecTimes, subscriberTracker)
+    commitSyncCategory       <- commitsync.SubscriptionCategory(queriesExecTimes, subscriberTracker)
+    globalCommitSyncCategory <- globalcommitsync.SubscriptionCategory(queriesExecTimes, subscriberTracker)
+    triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(awaitingTransformationGauge,
                                                                       underTransformationGauge,
                                                                       queriesExecTimes,
                                                                       subscriberTracker
                                 )
     cleanUpEventCategory <-
-      cleanup.SubscriptionCategory(subscriberTracker,
-                                   sessionResource,
-                                   awaitingDeletionGauge,
-                                   deletingGauge,
-                                   queriesExecTimes
-      )
-    zombieEventsCategory <- zombieevents.SubscriptionCategory(sessionResource, queriesExecTimes, subscriberTracker)
+      cleanup.SubscriptionCategory(subscriberTracker, awaitingDeletionGauge, deletingGauge, queriesExecTimes)
+    zombieEventsCategory <- zombieevents.SubscriptionCategory(queriesExecTimes, subscriberTracker)
   } yield new EventProducersRegistryImpl(
     Set[SubscriptionCategory[F]](
       awaitingGenerationCategory,

@@ -39,8 +39,8 @@ object GitLabApiCallRecorder {
     .help("GitLab API Calls")
     .buckets(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10)
 
-  def apply[F[_]: Sync: Logger](metricsRegistry: MetricsRegistry): F[GitLabApiCallRecorder[F]] = for {
-    histogram             <- metricsRegistry.register[F, Histogram, Histogram.Builder](apiCallCountsHistogram)
+  def apply[F[_]: Sync: Logger: MetricsRegistry]: F[GitLabApiCallRecorder[F]] = for {
+    histogram             <- MetricsRegistry[F].register[Histogram, Histogram.Builder](apiCallCountsHistogram)
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
   } yield new GitLabApiCallRecorder(executionTimeRecorder)
 }

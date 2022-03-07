@@ -37,7 +37,7 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> false).asJava).asJava)
       )
 
-      registry shouldBe a[DisabledMetricsRegistry.type]
+      registry.getClass shouldBe classOf[DisabledMetricsRegistry[Try]]
     }
 
     "return an enabled Metrics Registry if the 'metrics.enabled' flag is set to true" in {
@@ -45,12 +45,12 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> true).asJava).asJava)
       )
 
-      registry shouldBe a[EnabledMetricsRegistry.type]
+      registry.getClass shouldBe classOf[EnabledMetricsRegistry[Try]]
     }
 
     "return an enabled Metrics Registry if there is no value for the 'metrics.enabled' flag" in {
       val Success(registry) = MetricsRegistry[Try](ConfigFactory.empty())
-      registry shouldBe a[EnabledMetricsRegistry.type]
+      registry.getClass shouldBe classOf[EnabledMetricsRegistry[Try]]
     }
   }
 
@@ -59,8 +59,10 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
     "register the given collector in the collector registry" in {
       val gaugeName = "gauge_name"
 
-      val Success(gauge) = EnabledMetricsRegistry
-        .register[Try, LibGauge, LibGauge.Builder](
+      val registry = new EnabledMetricsRegistry[Try]
+
+      val Success(gauge) = registry
+        .register[LibGauge, LibGauge.Builder](
           LibGauge
             .build()
             .name(gaugeName)
@@ -70,7 +72,7 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
 
       gauge.labels("lbl").set(2)
 
-      EnabledMetricsRegistry.maybeCollectorRegistry.flatMap(
+      registry.maybeCollectorRegistry.flatMap(
         _.metricFamilySamples().asScala
           .find(_.name == gaugeName)
           .map(_.samples.asScala.map(_.value).toList)
@@ -83,8 +85,10 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
     "not register the given collector in any registry" in {
       val gaugeName = "gauge_name"
 
-      val Success(gauge) = DisabledMetricsRegistry
-        .register[Try, LibGauge, LibGauge.Builder](
+      val registry = new DisabledMetricsRegistry[Try]
+
+      val Success(gauge) = registry
+        .register[LibGauge, LibGauge.Builder](
           LibGauge
             .build()
             .name(gaugeName)
@@ -94,7 +98,7 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
 
       gauge.labels("lbl").set(2)
 
-      DisabledMetricsRegistry.maybeCollectorRegistry shouldBe None
+      registry.maybeCollectorRegistry shouldBe None
     }
   }
 }

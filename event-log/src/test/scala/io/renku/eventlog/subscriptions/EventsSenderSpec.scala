@@ -19,9 +19,11 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.IO
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
 import io.renku.eventlog.subscriptions.TestCategoryEvent._
+import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.generators.Generators.Implicits._
@@ -30,6 +32,7 @@ import io.renku.http.client.RestClientError.ClientException
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.interpreters.TestLogger.LogMessage.MessageAndThrowable
+import io.renku.metrics.LabeledGauge
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status._
@@ -65,6 +68,8 @@ class EventsSenderSpec
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
+      (sentEventsGauge.increment _).expects(categoryName).returning(().pure[IO])
+
       sender.sendEvent(subscriberUrl, event).unsafeRunSync() shouldBe Delivered
     }
 
@@ -91,7 +96,8 @@ class EventsSenderSpec
     }
 
     "return Misdelivered if call to the remote fails with ConnectivityException" in new TestCase {
-      override val sender = new EventsSenderImpl(categoryName, categoryEventEncoder, retryInterval = 10 millis)
+      override val sender =
+        new EventsSenderImpl(categoryName, categoryEventEncoder, sentEventsGauge, retryInterval = 10 millis)
 
       expectEventEncoding(event)
 
@@ -158,8 +164,10 @@ class EventsSenderSpec
     val event                = testCategoryEvents.generateOne
     val subscriberUrl        = SubscriberUrl(externalServiceBaseUrl)
     val categoryEventEncoder = mock[EventEncoder[TestCategoryEvent]]
+    val sentEventsGauge      = mock[LabeledGauge[IO, CategoryName]]
     val sender = new EventsSenderImpl[IO, TestCategoryEvent](categoryName,
                                                              categoryEventEncoder,
+                                                             sentEventsGauge,
                                                              requestTimeoutOverride = Some(requestTimeout)
     )
 

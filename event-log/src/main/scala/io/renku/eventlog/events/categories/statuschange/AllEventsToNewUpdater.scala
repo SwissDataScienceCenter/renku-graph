@@ -29,12 +29,12 @@ import io.circe.syntax._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
+import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 import skunk._
@@ -81,7 +81,10 @@ private class AllEventsToNewUpdater[F[_]: Async](
         case (event :: _, areMore) =>
           sendEvent(
             EventRequestContent.NoPayload(event.asJson),
-            show"$categoryName: Generating ${ProjectEventsToNew.eventType} for ${event.project} failed"
+            EventSender.EventContext(
+              CategoryName(ProjectEventsToNew.eventType.show),
+              show"$categoryName: Generating ${ProjectEventsToNew.eventType} for ${event.project} failed"
+            )
           ) >> sendEventIfFound(cursor, areMore)
       }
     }
@@ -99,7 +102,7 @@ private class AllEventsToNewUpdater[F[_]: Async](
 }
 
 private object AllEventsToNewUpdater {
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
   ): F[AllEventsToNewUpdater[F]] = EventSender[F] map (new AllEventsToNewUpdater(_, queriesExecTimes))
 }

@@ -18,13 +18,9 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.leftT
-import cats.effect.IO
 import cats.syntax.all._
-import io.prometheus.client.Histogram
-import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -40,11 +36,8 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.interpreters.TestLogger.Matcher.NotRefEqual
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
-import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.EventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
@@ -52,6 +45,7 @@ import io.renku.triplesgenerator.events.categories.triplesgenerated.transformati
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
 import io.renku.triplesgenerator.generators.ErrorGenerators.{authRecoverableErrors, logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -385,23 +379,6 @@ class EventProcessorSpec
       eventsProcessingTimes.collect().asScala.headOption.map(_.name) shouldBe Some(
         "triples_transformation_processing_times"
       )
-    }
-
-    "be registered in the Metrics Registry" in {
-
-      val metricsRegistry = mock[MetricsRegistry]
-
-      (metricsRegistry
-        .register[IO, Histogram, Histogram.Builder](_: Histogram.Builder)(_: MonadThrow[IO]))
-        .expects(eventsProcessingTimesBuilder, MonadThrow[IO])
-        .returning(eventsProcessingTimes.pure[IO])
-
-      implicit val logger: TestLogger[IO] = TestLogger[IO]()
-      EventProcessor[IO](
-        metricsRegistry,
-        Throttler.noThrottling[IO],
-        new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
-      ).unsafeRunSync()
     }
   }
 

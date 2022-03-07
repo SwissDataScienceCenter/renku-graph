@@ -42,8 +42,8 @@ object SparqlQueryTimeRecorder {
 
   import io.renku.metrics.MetricsRegistry
 
-  def apply[F[_]: Sync: Logger](metricsRegistry: MetricsRegistry): F[SparqlQueryTimeRecorder[F]] = for {
-    histogram             <- metricsRegistry.register[F, Histogram, Histogram.Builder](queriesExecutionTimesHistogram)
+  def apply[F[_]: Sync: Logger: MetricsRegistry]: F[SparqlQueryTimeRecorder[F]] = for {
+    histogram             <- MetricsRegistry[F].register[Histogram, Histogram.Builder](queriesExecutionTimesHistogram)
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
   } yield new SparqlQueryTimeRecorder(executionTimeRecorder)
 }

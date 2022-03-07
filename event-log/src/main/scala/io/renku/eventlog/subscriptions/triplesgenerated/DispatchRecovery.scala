@@ -24,10 +24,11 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.{EventMessage, subscriptions}
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
 import io.renku.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TriplesGenerated}
+import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
@@ -48,7 +49,9 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         },
         "newStatus": $TriplesGenerated
       }"""),
-    errorMessage = s"${SubscriptionCategory.name}: Marking event as $TriplesGenerated failed"
+    EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                             errorMessage = s"${SubscriptionCategory.name}: Marking event as $TriplesGenerated failed"
+    )
   )
 
   override def recover(
@@ -65,7 +68,10 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         },
         "newStatus": $TransformationNonRecoverableFailure,
         "message":   ${EventMessage(exception)} }"""),
-      errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
+      EventSender.EventContext(
+        CategoryName("EVENTS_STATUS_CHANGE"),
+        errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
+      )
     ) >> Logger[F].error(exception)(
       s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
     )
@@ -74,6 +80,6 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
 
 private object DispatchRecovery {
 
-  def apply[F[_]: Async: Logger]: F[DispatchRecovery[F, TriplesGeneratedEvent]] =
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[DispatchRecovery[F, TriplesGeneratedEvent]] =
     EventSender[F].map(new DispatchRecoveryImpl[F](_))
 }

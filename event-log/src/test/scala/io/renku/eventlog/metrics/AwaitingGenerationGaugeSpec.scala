@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.metrics
 
-import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
 import io.prometheus.client.{Gauge => LibGauge}
@@ -46,16 +45,16 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockFacto
     "create and register an events_awaiting_generation_count named gauge" in new TestCase {
 
       (metricsRegistry
-        .register[IO, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
-        .expects(*, *)
-        .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
+        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder))
+        .expects(*)
+        .onCall { (builder: LibGauge.Builder) =>
           val actual = builder.create()
           actual.describe().asScala.head.name shouldBe underlying.describe().asScala.head.name
           actual.describe().asScala.head.help shouldBe underlying.describe().asScala.head.help
           actual.pure[IO]
         }
 
-      val gauge = AwaitingGenerationGauge(metricsRegistry, statsFinder).unsafeRunSync()
+      val gauge = AwaitingGenerationGauge(statsFinder).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
     }
@@ -63,16 +62,16 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockFacto
     "return a gauge with reset method provisioning it with values from the Event Log" in new TestCase {
 
       (metricsRegistry
-        .register[IO, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
-        .expects(*, *)
-        .onCall((_: LibGauge.Builder, _: MonadError[IO, Throwable]) => underlying.pure[IO])
+        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder))
+        .expects(*)
+        .onCall((_: LibGauge.Builder) => underlying.pure[IO])
 
       val waitingEvents = waitingEventsGen.generateOne
       (statsFinder.countEvents _)
         .expects(Set(New, GenerationRecoverableFailure), Some(NumberOfProjects))
         .returning(waitingEvents.pure[IO])
 
-      AwaitingGenerationGauge(metricsRegistry, statsFinder).flatMap(_.reset()).unsafeRunSync()
+      AwaitingGenerationGauge(statsFinder).flatMap(_.reset()).unsafeRunSync()
 
       underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (project, count) =>
         ("project", project.value, count.toDouble)
@@ -88,8 +87,8 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockFacto
       .labelNames("project")
       .create()
 
-    val metricsRegistry = mock[MetricsRegistry]
-    val statsFinder     = mock[StatsFinder[IO]]
+    implicit val metricsRegistry: MetricsRegistry[IO] = mock[MetricsRegistry[IO]]
+    val statsFinder = mock[StatsFinder[IO]]
   }
 
   private lazy val waitingEventsGen: Gen[Map[Path, Long]] = nonEmptySet {

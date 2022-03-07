@@ -79,22 +79,16 @@ object EventLogMetrics {
 
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Temporal: Logger](
-      metricsRegistry: MetricsRegistry,
-      statsFinder:     StatsFinder[F]
-  ): F[EventLogMetrics[F]] = for {
+  def apply[F[_]: Temporal: Logger: MetricsRegistry](statsFinder: StatsFinder[F]): F[EventLogMetrics[F]] = for {
     categoryNameEventsGauge <- Gauge[F, CategoryName](
                                  name = "category_name_events_count",
                                  help = "Number of events waiting for processing per Category Name.",
                                  labelName = "category_name"
-                               )(metricsRegistry)
+                               )
     statusesGauge <- Gauge[F, EventStatus](name = "events_statuses_count",
                                            help = "Total Commit Events by status.",
                                            labelName = "status"
-                     )(metricsRegistry)
-    totalGauge <- Gauge(
-                    name = "events_count",
-                    help = "Total Commit Events."
-                  )(metricsRegistry)
+                     )
+    totalGauge <- Gauge(name = "events_count", help = "Total Commit Events.")
   } yield new EventLogMetricsImpl(statsFinder, categoryNameEventsGauge, statusesGauge, totalGauge)
 }

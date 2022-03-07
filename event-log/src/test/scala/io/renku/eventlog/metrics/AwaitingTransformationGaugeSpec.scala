@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.metrics
 
-import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
 import io.prometheus.client.{Gauge => LibGauge}
@@ -47,16 +46,16 @@ class AwaitingTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockF
     "create and register an events_awaiting_transformation_count named gauge" in new TestCase {
 
       (metricsRegistry
-        .register[IO, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
-        .expects(*, *)
-        .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
+        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder))
+        .expects(*)
+        .onCall { (builder: LibGauge.Builder) =>
           val actual = builder.create()
           actual.describe().asScala.head.name shouldBe underlying.describe().asScala.head.name
           actual.describe().asScala.head.help shouldBe underlying.describe().asScala.head.help
           actual.pure[IO]
         }
 
-      val gauge = AwaitingTransformationGauge(metricsRegistry, statsFinder).unsafeRunSync()
+      val gauge = AwaitingTransformationGauge(statsFinder).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
     }
@@ -64,9 +63,9 @@ class AwaitingTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockF
     "return a gauge with reset method provisioning it with values from the Event Log" in new TestCase {
 
       (metricsRegistry
-        .register[IO, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
-        .expects(*, *)
-        .onCall((_: LibGauge.Builder, _: MonadError[IO, Throwable]) => underlying.pure[IO])
+        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder))
+        .expects(*)
+        .onCall((_: LibGauge.Builder) => underlying.pure[IO])
 
       val waitingEvents = awaitingTransformationEvents.generateOne
 
@@ -74,7 +73,7 @@ class AwaitingTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockF
         .expects(Set[EventStatus](TriplesGenerated), Some(NumberOfProjects))
         .returning(waitingEvents.pure[IO])
 
-      AwaitingTransformationGauge(metricsRegistry, statsFinder).flatMap(_.reset()).unsafeRunSync()
+      AwaitingTransformationGauge(statsFinder).flatMap(_.reset()).unsafeRunSync()
 
       underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (project, count) =>
         ("project", project.value, count.toDouble)
@@ -90,8 +89,8 @@ class AwaitingTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockF
       .labelNames("project")
       .create()
 
-    val metricsRegistry = mock[MetricsRegistry]
-    val statsFinder     = mock[StatsFinder[IO]]
+    implicit val metricsRegistry: MetricsRegistry[IO] = mock[MetricsRegistry[IO]]
+    val statsFinder = mock[StatsFinder[IO]]
   }
 
   private lazy val awaitingTransformationEvents: Gen[Map[Path, Long]] = nonEmptySet {

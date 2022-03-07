@@ -26,11 +26,12 @@ import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: NonEmptyParallel: Logger](
+  def apply[F[_]: Async: NonEmptyParallel: Logger: MetricsRegistry](
       gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {

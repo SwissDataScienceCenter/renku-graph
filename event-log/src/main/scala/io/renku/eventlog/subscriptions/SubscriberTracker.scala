@@ -21,8 +21,9 @@ package io.renku.eventlog.subscriptions
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.{Microservice, TypeSerializers}
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import io.renku.metrics.LabeledHistogram
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -35,15 +36,14 @@ private trait SubscriberTracker[F[_]] {
   def remove(subscriberUrl: SubscriberUrl):    F[Boolean]
 }
 
-private class SubscriberTrackerImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
+private class SubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResource](
     queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
     sourceUrl:        MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
     with SubscriberTracker[F]
     with TypeSerializers {
 
-  override def add(subscriptionInfo: SubscriptionInfo): F[Boolean] = sessionResource.useK {
+  override def add(subscriptionInfo: SubscriptionInfo): F[Boolean] = SessionResource[F].useK {
     measureExecutionTime(
       SqlStatement(name = "subscriber - add")
         .command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId](
@@ -60,7 +60,7 @@ private class SubscriberTrackerImpl[F[_]: MonadCancelThrow](
     ) map insertToTableResult
   }
 
-  override def remove(subscriberUrl: SubscriberUrl): F[Boolean] = sessionResource.useK {
+  override def remove(subscriberUrl: SubscriberUrl): F[Boolean] = SessionResource[F].useK {
     measureExecutionTime(
       SqlStatement(name = "subscriber - delete")
         .command[SubscriberUrl ~ MicroserviceBaseUrl](
@@ -85,10 +85,10 @@ private class SubscriberTrackerImpl[F[_]: MonadCancelThrow](
 }
 
 private object SubscriberTracker {
-  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
-                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: MonadCancelThrow: SessionResource](
+      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
   ): F[SubscriberTracker[F]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     sourceUrl             <- microserviceUrlFinder.findBaseUrl()
-  } yield new SubscriberTrackerImpl[F](sessionResource, queriesExecTimes, sourceUrl)
+  } yield new SubscriberTrackerImpl[F](queriesExecTimes, sourceUrl)
 }

@@ -31,10 +31,10 @@ import io.renku.jsonld.JsonLD
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
 
 import java.time.Duration
@@ -194,11 +194,11 @@ private object EventProcessor {
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000,
                50000000, 100000000, 500000000)
 
-  def apply[F[_]: Async: Logger](metricsRegistry: MetricsRegistry): F[EventProcessor[F]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[EventProcessor[F]] = for {
     triplesGenerator        <- TriplesGenerator()
     accessTokenFinder       <- AccessTokenFinder[F]
     eventStatusUpdater      <- EventStatusUpdater(categoryName)
-    eventsProcessingTimes   <- metricsRegistry.register[F, Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
+    eventsProcessingTimes   <- MetricsRegistry[F].register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
     allEventsTimeRecorder   <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
     singleEventTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
   } yield new EventProcessorImpl(

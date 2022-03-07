@@ -93,15 +93,14 @@ private[events] object EventHandler {
   import ConfigLoader.find
   import eu.timepit.refined.pureconfig._
 
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
-      metricsRegistry:       MetricsRegistry,
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
       gitLabThrottler:       Throttler[F, GitLab],
       timeRecorder:          SparqlQueryTimeRecorder[F],
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
     generationProcesses        <- find[F, Int Refined Positive]("transformation-processes-number", config)
-    eventProcessor             <- EventProcessor(metricsRegistry, gitLabThrottler, timeRecorder)
+    eventProcessor             <- EventProcessor(gitLabThrottler, timeRecorder)
     concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
   } yield new EventHandler[F](categoryName,
                               EventBodyDeserializer[F],

@@ -218,8 +218,7 @@ private object EventProcessor {
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000,
                50000000, 100000000, 500000000)
 
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
-      metricsRegistry: MetricsRegistry,
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
       gitLabThrottler: Throttler[F, GitLab],
       timeRecorder:    SparqlQueryTimeRecorder[F]
   ): F[EventProcessor[F]] = for {
@@ -227,7 +226,7 @@ private object EventProcessor {
     accessTokenFinder     <- AccessTokenFinder[F]
     triplesCurator        <- TransformationStepsCreator(timeRecorder)
     eventStatusUpdater    <- EventStatusUpdater(categoryName)
-    eventsProcessingTimes <- metricsRegistry.register[F, Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
+    eventsProcessingTimes <- MetricsRegistry[F].register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
     jsonLDDeserializer    <- JsonLDDeserializer(gitLabThrottler)
   } yield new EventProcessorImpl(

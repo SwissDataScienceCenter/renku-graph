@@ -98,7 +98,7 @@ class LastSyncedDateUpdaterSpec
 
   private trait TestCase {
     val project = consumerProjects.generateOne
-    val updater = new LastSyncedDateUpdateImpl[IO](sessionResource, TestLabeledHistogram[Name]("query_id"))
+    val updater = new LastSyncedDateUpdateImpl[IO](TestLabeledHistogram[Name]("query_id"))
 
     upsertProject(project.id, project.path, eventDates.generateOne)
   }

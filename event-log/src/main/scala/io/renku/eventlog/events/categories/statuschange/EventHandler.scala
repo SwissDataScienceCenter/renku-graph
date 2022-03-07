@@ -33,13 +33,13 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 import java.time.{Duration => JDuration}
 import scala.util.control.NonFatal
 
-private class EventHandler[F[_]: Async: Logger](
+private class EventHandler[F[_]: Async: Logger: MetricsRegistry](
     override val categoryName: CategoryName,
     eventsQueue:               StatusChangeEventsQueue[F],
     statusChanger:             StatusChanger[F],
@@ -110,7 +110,7 @@ private class EventHandler[F[_]: Async: Logger](
 
 private object EventHandler {
 
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       sessionResource:                    SessionResource[F, EventLogDB],
       eventsQueue:                        StatusChangeEventsQueue[F],
       queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name],

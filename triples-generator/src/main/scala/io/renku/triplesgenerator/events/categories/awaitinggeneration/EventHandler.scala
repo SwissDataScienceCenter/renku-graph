@@ -72,12 +72,11 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 
 object EventHandler {
 
-  def apply[F[_]: Async: Logger](
-      metricsRegistry:       MetricsRegistry,
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
-    eventProcessor           <- EventProcessor(metricsRegistry)
+    eventProcessor           <- EventProcessor[F]
     generationProcesses      <- GenerationProcessesNumber[F](config)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
   } yield new EventHandler[F](categoryName,

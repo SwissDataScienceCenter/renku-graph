@@ -44,12 +44,12 @@ object Histogram {
     }
   }
 
-  def apply[F[_]: MonadThrow, LabelValue](
-      name:          String Refined NonEmpty,
-      help:          String Refined NonEmpty,
-      labelName:     String Refined NonEmpty,
-      buckets:       Seq[Double]
-  )(metricsRegistry: MetricsRegistry): F[LabeledHistogram[F, LabelValue]] = {
+  def apply[F[_]: MonadThrow: MetricsRegistry, LabelValue](
+      name:      String Refined NonEmpty,
+      help:      String Refined NonEmpty,
+      labelName: String Refined NonEmpty,
+      buckets:   Seq[Double]
+  ): F[LabeledHistogram[F, LabelValue]] = {
 
     val builder = LibHistogram
       .build()
@@ -59,7 +59,7 @@ object Histogram {
       .buckets(buckets: _*)
 
     for {
-      histogram <- metricsRegistry register [F, LibHistogram, LibHistogram.Builder] builder
+      histogram <- MetricsRegistry[F] register [LibHistogram, LibHistogram.Builder] builder
     } yield new LabeledHistogramImpl[F, LabelValue](histogram)
   }
 }

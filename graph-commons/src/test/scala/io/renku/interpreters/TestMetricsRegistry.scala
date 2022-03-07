@@ -22,14 +22,17 @@ import cats.MonadThrow
 import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 import io.renku.metrics.MetricsRegistry
 
-object TestMetricsRegistry extends MetricsRegistry {
+object TestMetricsRegistry {
+  def apply[F[_]: MonadThrow]: TestMetricsRegistry[F] = new TestMetricsRegistry[F]
+}
+
+class TestMetricsRegistry[F[_]: MonadThrow] extends MetricsRegistry[F] {
 
   private val collectorRegistry: CollectorRegistry = new CollectorRegistry()
 
-  override def register[F[_]: MonadThrow,
-                        Collector <: SimpleCollector[_],
-                        Builder <: SimpleCollector.Builder[Builder, Collector]
-  ](collectorBuilder: Builder): F[Collector] = MonadThrow[F].catchNonFatal(collectorBuilder register collectorRegistry)
+  override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
+      collectorBuilder: Builder
+  ): F[Collector] = MonadThrow[F].catchNonFatal(collectorBuilder register collectorRegistry)
 
   override def maybeCollectorRegistry: Option[CollectorRegistry] = Some(collectorRegistry)
 

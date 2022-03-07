@@ -23,9 +23,10 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventFinder
-import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
+import io.renku.eventlog.{ExecutionDate, TypeSerializers}
 import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
@@ -37,15 +38,14 @@ import skunk.implicits._
 
 import java.time.Instant.now
 
-private class LostSubscriberEventFinder[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
+private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource](
     queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
 
-  override def popEvent(): F[Option[ZombieEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[ZombieEvent]] = SessionResource[F].useK {
     findEvents >>= markEventTaken()
   }
 
@@ -79,28 +79,27 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow](
     case Some(event) => updateMessage(event.eventId) map toNoneIfEventAlreadyTaken(event)
   }
 
-  private def updateMessage(eventId: CompoundEventId) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - update message"))
-        .command[String ~ ExecutionDate ~ EventId ~ projects.Id](
-          sql"""UPDATE event
+  private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - update message"))
+      .command[String ~ ExecutionDate ~ EventId ~ projects.Id](
+        sql"""UPDATE event
                   SET message = $text, execution_date = $executionDateEncoder
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
-        )
-        .arguments(
-          zombieMessage ~ ExecutionDate(now) ~ eventId.id ~ eventId.projectId
-        )
-        .build
-        .flatMapResult {
-          case Completion.Update(0) => false.pure[F]
-          case Completion.Update(1) => true.pure[F]
-          case completion =>
-            new Exception(
-              s"${categoryName.value.toLowerCase} - lse - update message failed with status $completion"
-            ).raiseError[F, Boolean]
-        }
-    }
+      )
+      .arguments(
+        zombieMessage ~ ExecutionDate(now) ~ eventId.id ~ eventId.projectId
+      )
+      .build
+      .flatMapResult {
+        case Completion.Update(0) => false.pure[F]
+        case Completion.Update(1) => true.pure[F]
+        case completion =>
+          new Exception(
+            s"${categoryName.value.toLowerCase} - lse - update message failed with status $completion"
+          ).raiseError[F, Boolean]
+      }
+  }
 
   private def toNoneIfEventAlreadyTaken(event: ZombieEvent): Boolean => Option[ZombieEvent] = {
     case true  => Some(event)
@@ -111,10 +110,9 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow](
 }
 
 private object LostSubscriberEventFinder {
-  def apply[F[_]: MonadCancelThrow](
-      sessionResource:  SessionResource[F, EventLogDB],
+  def apply[F[_]: MonadCancelThrow: SessionResource](
       queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
   ): F[EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
-    new LostSubscriberEventFinder[F](sessionResource, queriesExecTimes)
+    new LostSubscriberEventFinder[F](queriesExecTimes)
   }
 }
