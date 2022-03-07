@@ -28,6 +28,7 @@ import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
 import io.renku.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TriplesGenerated}
+import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
@@ -79,6 +80,6 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
 
 private object DispatchRecovery {
 
-  def apply[F[_]: Async: Logger]: F[DispatchRecovery[F, TriplesGeneratedEvent]] =
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[DispatchRecovery[F, TriplesGeneratedEvent]] =
     EventSender[F].map(new DispatchRecoveryImpl[F](_))
 }

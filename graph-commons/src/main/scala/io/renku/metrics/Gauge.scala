@@ -92,10 +92,10 @@ class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue] private[metrics] (
 
 object Gauge {
 
-  def apply[F[_]: MonadThrow](
-      name:          String Refined NonEmpty,
-      help:          String Refined NonEmpty
-  )(metricsRegistry: MetricsRegistry): F[SingleValueGauge[F]] = {
+  def apply[F[_]: MonadThrow: MetricsRegistry](
+      name: String Refined NonEmpty,
+      help: String Refined NonEmpty
+  ): F[SingleValueGauge[F]] = {
 
     val gaugeBuilder = LibGauge
       .build()
@@ -103,23 +103,23 @@ object Gauge {
       .help(help.value)
 
     for {
-      gauge <- metricsRegistry register [F, LibGauge, LibGauge.Builder] gaugeBuilder
+      gauge <- MetricsRegistry[F] register [LibGauge, LibGauge.Builder] gaugeBuilder
     } yield new SingleValueGaugeImpl[F](gauge)
   }
 
-  def apply[F[_]: MonadThrow, LabelValue](
-      name:          String Refined NonEmpty,
-      help:          String Refined NonEmpty,
-      labelName:     String Refined NonEmpty
-  )(metricsRegistry: MetricsRegistry): F[LabeledGauge[F, LabelValue]] =
-    this(name, help, labelName, () => Map.empty[LabelValue, Double].pure[F])(metricsRegistry)
+  def apply[F[_]: MonadThrow: MetricsRegistry, LabelValue](
+      name:      String Refined NonEmpty,
+      help:      String Refined NonEmpty,
+      labelName: String Refined NonEmpty
+  ): F[LabeledGauge[F, LabelValue]] =
+    this(name, help, labelName, () => Map.empty[LabelValue, Double].pure[F])
 
-  def apply[F[_]: MonadThrow, LabelValue](
+  def apply[F[_]: MonadThrow: MetricsRegistry, LabelValue](
       name:           String Refined NonEmpty,
       help:           String Refined NonEmpty,
       labelName:      String Refined NonEmpty,
       resetDataFetch: () => F[Map[LabelValue, Double]]
-  )(metricsRegistry:  MetricsRegistry): F[LabeledGauge[F, LabelValue]] = {
+  ): F[LabeledGauge[F, LabelValue]] = {
 
     val gaugeBuilder = LibGauge
       .build()
@@ -128,7 +128,7 @@ object Gauge {
       .labelNames(labelName.value)
 
     for {
-      gauge <- metricsRegistry register [F, LibGauge, LibGauge.Builder] gaugeBuilder
+      gauge <- MetricsRegistry[F] register [LibGauge, LibGauge.Builder] gaugeBuilder
     } yield new LabeledGaugeImpl[F, LabelValue](gauge, resetDataFetch)
   }
 }

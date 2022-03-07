@@ -24,11 +24,12 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
+import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
@@ -67,7 +68,7 @@ private class CommitEventsRemoverImpl[F[_]: MonadThrow](eventSender: EventSender
 }
 
 private[categories] object CommitEventsRemover {
-  def apply[F[_]: Async: Temporal: Logger]: F[CommitEventsRemover[F]] = for {
+  def apply[F[_]: Async: Temporal: Logger: MetricsRegistry]: F[CommitEventsRemover[F]] = for {
     sender <- EventSender[F]
   } yield new CommitEventsRemoverImpl[F](sender)
 }

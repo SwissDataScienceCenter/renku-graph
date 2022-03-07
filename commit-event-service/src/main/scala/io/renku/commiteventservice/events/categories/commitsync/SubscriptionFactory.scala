@@ -19,18 +19,18 @@
 package io.renku.commiteventservice.events.categories.commitsync
 
 import cats.effect.Async
-import cats.effect.kernel.{Concurrent, Temporal}
 import cats.syntax.all._
 import io.renku.commiteventservice.Microservice
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: Concurrent: Temporal: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {

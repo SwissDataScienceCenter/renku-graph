@@ -35,6 +35,7 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.CommitId
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -97,7 +98,7 @@ private[events] object EventHandler {
   import eu.timepit.refined.auto._
   val processesLimit: Int Refined Positive = 1
 
-  def apply[F[_]: Async: NonEmptyParallel: Logger](
+  def apply[F[_]: Async: NonEmptyParallel: Logger: MetricsRegistry](
       subscriptionMechanism: SubscriptionMechanism[F],
       gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]

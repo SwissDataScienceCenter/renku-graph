@@ -41,30 +41,32 @@ object Microservice extends IOMicroservice {
   val ServicePort:             Int Refined Positive = 9006
   private implicit val logger: Logger[IO]           = ApplicationLogger
 
-  override def run(args: List[String]): IO[ExitCode] = for {
-    certificateLoader     <- CertificateLoader[IO]
-    sentryInitializer     <- SentryInitializer[IO]
-    gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-    gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-    gitLabClient          <- GitLabClient[IO](gitLabThrottler)
-    executionTimeRecorder <- ExecutionTimeRecorder[IO]()
-    commitSyncCategory <-
-      events.categories.commitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
-    globalCommitSyncCategory <-
-      events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
-    eventConsumersRegistry  <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-    metricsRegistry         <- MetricsRegistry[IO]()
-    serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-    microserviceRoutes      <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO](metricsRegistry))
-    exitcode <- microserviceRoutes.routes.use { routes =>
-                  new MicroserviceRunner[IO](serviceReadinessChecker,
-                                             certificateLoader,
-                                             sentryInitializer,
-                                             eventConsumersRegistry,
-                                             HttpServer[IO](serverPort = ServicePort.value, routes)
-                  ).run()
-                }
-  } yield exitcode
+  override def run(args: List[String]): IO[ExitCode] =
+    MetricsRegistry[IO]().flatMap { implicit metricsRegistry =>
+      for {
+        certificateLoader     <- CertificateLoader[IO]
+        sentryInitializer     <- SentryInitializer[IO]
+        gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+        gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+        gitLabClient          <- GitLabClient[IO](gitLabThrottler)
+        executionTimeRecorder <- ExecutionTimeRecorder[IO]()
+        commitSyncCategory <-
+          events.categories.commitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
+        globalCommitSyncCategory <-
+          events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
+        eventConsumersRegistry  <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
+        serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
+        microserviceRoutes      <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
+        exitcode <- microserviceRoutes.routes.use { routes =>
+                      new MicroserviceRunner[IO](serviceReadinessChecker,
+                                                 certificateLoader,
+                                                 sentryInitializer,
+                                                 eventConsumersRegistry,
+                                                 HttpServer[IO](serverPort = ServicePort.value, routes)
+                      ).run()
+                    }
+      } yield exitcode
+    }
 }
 
 class MicroserviceRunner[F[_]: Spawn: Logger](serviceReadinessChecker: ServiceReadinessChecker[F],

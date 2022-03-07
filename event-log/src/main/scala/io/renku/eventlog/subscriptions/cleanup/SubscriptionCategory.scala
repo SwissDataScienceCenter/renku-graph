@@ -28,14 +28,14 @@ import io.renku.eventlog.subscriptions.cleanup.CleanUpEventEncoder.encodeEvent
 import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.events.CategoryName
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
   val name: CategoryName = CategoryName("CLEAN_UP")
 
-  def apply[F[_]: Async: Parallel: Logger](
+  def apply[F[_]: Async: Parallel: Logger: MetricsRegistry](
       subscriberTracker:     SubscriberTracker[F],
       sessionResource:       SessionResource[F, EventLogDB],
       awaitingDeletionGauge: LabeledGauge[F, projects.Path],

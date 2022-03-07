@@ -32,6 +32,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 import io.renku.graph.model.events.EventStatus._
+import io.renku.metrics.MetricsRegistry
 
 private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
     eventSender: EventSender[F]
@@ -72,7 +73,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
 }
 
 private object DispatchRecovery {
-  def apply[F[_]: Async: Logger]: F[DispatchRecovery[F, CleanUpEvent]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[DispatchRecovery[F, CleanUpEvent]] = for {
     eventSender <- EventSender[F]
   } yield new DispatchRecoveryImpl[F](eventSender)
 }

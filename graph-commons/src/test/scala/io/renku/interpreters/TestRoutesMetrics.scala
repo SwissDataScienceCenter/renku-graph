@@ -21,16 +21,16 @@ package io.renku.interpreters
 import cats.effect.IO
 import io.renku.metrics.RoutesMetrics
 
-class TestRoutesMetrics(val metricsRegistry: TestMetricsRegistry.type) extends RoutesMetrics[IO](metricsRegistry) {
+class TestRoutesMetrics(implicit val metricsRegistry: TestMetricsRegistry[IO]) extends RoutesMetrics[IO] {
   def clearRegistry(): Unit = metricsRegistry.clear()
 }
 
 object TestRoutesMetrics {
 
   def apply(): TestRoutesMetrics = {
-    val metricsRegistry = TestMetricsRegistry
+    implicit val metricsRegistry: TestMetricsRegistry[IO] = TestMetricsRegistry[IO]
     metricsRegistry.clear()
 
-    new TestRoutesMetrics(metricsRegistry)
+    new TestRoutesMetrics
   }
 }

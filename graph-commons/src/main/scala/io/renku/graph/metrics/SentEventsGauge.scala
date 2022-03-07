@@ -16,29 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.metrics
+package io.renku.graph.metrics
 
 import cats.MonadThrow
-import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
-import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.projects
-import io.renku.metrics._
+import io.renku.events.CategoryName
+import io.renku.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 
-object DeletingGauge {
+object SentEventsGauge {
 
-  val NumberOfProjects: Int Refined Positive = 20
-
-  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[LabeledGauge[F, projects.Path]] =
-    Gauge[F, projects.Path](
-      name = "events_deleting_count",
-      help = "Number of Events being cleaned up",
-      labelName = "project",
-      resetDataFetch = () =>
-        statsFinder
-          .countEvents(Set(Deleting), maybeLimit = Some(NumberOfProjects))
-          .map(_.view.mapValues(_.toDouble).toMap)
-    )
+  def apply[F[_]: MonadThrow: MetricsRegistry]: F[LabeledGauge[F, CategoryName]] = Gauge[F, CategoryName](
+    name = "sent_events_count",
+    help = "Number of sent Events",
+    labelName = "categoryName"
+  )
 }

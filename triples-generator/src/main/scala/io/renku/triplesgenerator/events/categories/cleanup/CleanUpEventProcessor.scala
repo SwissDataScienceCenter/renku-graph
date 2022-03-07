@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.events.categories.cleanup
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.Project
+import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import org.typelevel.log4cats.Logger
@@ -51,9 +52,10 @@ private class CleanUpEventProcessorImpl[F[_]: Async: Logger](triplesRemover: Pro
 }
 
 private object CleanUpEventProcessor {
-  def apply[F[_]: Async: Logger](sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[F]): F[EventProcessor[F]] =
-    for {
-      eventStatusUpdater <- EventStatusUpdater(categoryName)
-      triplesRemover     <- ProjectTriplesRemover(sparqlQueryTimeRecorder)
-    } yield new CleanUpEventProcessorImpl[F](triplesRemover, eventStatusUpdater)
+  def apply[F[_]: Async: Logger: MetricsRegistry](
+      sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[F]
+  ): F[EventProcessor[F]] = for {
+    eventStatusUpdater <- EventStatusUpdater(categoryName)
+    triplesRemover     <- ProjectTriplesRemover(sparqlQueryTimeRecorder)
+  } yield new CleanUpEventProcessorImpl[F](triplesRemover, eventStatusUpdater)
 }

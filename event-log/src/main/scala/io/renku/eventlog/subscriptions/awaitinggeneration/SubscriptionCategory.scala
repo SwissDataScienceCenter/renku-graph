@@ -28,14 +28,14 @@ import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.events.CategoryName
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
   val name: CategoryName = CategoryName("AWAITING_GENERATION")
 
-  def apply[F[_]: Async: Parallel: Logger](
+  def apply[F[_]: Async: Parallel: Logger: MetricsRegistry](
       sessionResource:                SessionResource[F, EventLogDB],
       awaitingTriplesGenerationGauge: LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],

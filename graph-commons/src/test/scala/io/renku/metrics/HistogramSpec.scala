@@ -18,7 +18,6 @@
 
 package io.renku.metrics
 
-import cats.MonadError
 import cats.syntax.all._
 import io.prometheus.client.{Histogram => LibHistogram}
 import io.renku.generators.Generators.Implicits._
@@ -37,15 +36,13 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
       "and return an instance of the LabeledHistogram" in new TestCase {
 
         (metricsRegistry
-          .register[Try, LibHistogram, LibHistogram.Builder](_: LibHistogram.Builder)(_: MonadError[Try, Throwable]))
-          .expects(*, *)
-          .onCall { (builder: LibHistogram.Builder, _: MonadError[Try, Throwable]) =>
-            builder.create().pure[Try]
-          }
+          .register[LibHistogram, LibHistogram.Builder](_: LibHistogram.Builder))
+          .expects(*)
+          .onCall((builder: LibHistogram.Builder) => builder.create().pure[Try])
 
         val labelName = nonBlankStrings().generateOne
 
-        val Success(histogram) = Histogram[Try, String](name, help, labelName, Seq(.1, 1))(metricsRegistry)
+        val Success(histogram) = Histogram[Try, String](name, help, labelName, Seq(.1, 1))
 
         histogram.isInstanceOf[LabeledHistogram[Try, String]] shouldBe true
         histogram.name                                        shouldBe name.value
@@ -57,7 +54,7 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
     val name = nonBlankStrings().generateOne
     val help = sentences().generateOne
 
-    val metricsRegistry = mock[MetricsRegistry]
+    implicit val metricsRegistry: MetricsRegistry[Try] = mock[MetricsRegistry[Try]]
   }
 }
 
@@ -94,7 +91,6 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
     private val help = sentences().generateOne
     val underlying   = LibHistogram.build(name.value, help.value).labelNames(label).create()
 
-    val resetDataFetch = mockFunction[Try[Map[Path, Double]]]
-    val histogram      = new LabeledHistogramImpl[Try, Path](underlying)
+    val histogram = new LabeledHistogramImpl[Try, Path](underlying)
   }
 }

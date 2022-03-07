@@ -27,7 +27,7 @@ import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 trait EventProducersRegistry[F[_]] {
@@ -61,7 +61,7 @@ object EventProducersRegistry {
   final case object SuccessfulSubscription             extends SubscriptionResult
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
-  def apply[F[_]: Async: Parallel: Logger](
+  def apply[F[_]: Async: Parallel: Logger: MetricsRegistry](
       sessionResource:                SessionResource[F, EventLogDB],
       awaitingTriplesGenerationGauge: LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],

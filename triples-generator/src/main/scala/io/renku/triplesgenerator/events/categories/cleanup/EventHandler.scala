@@ -27,6 +27,7 @@ import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -65,7 +66,7 @@ object EventHandler {
 
   private val singleProcess = 1
 
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[F],
       subscriptionMechanism:   SubscriptionMechanism[F]
   ): F[EventHandler[F]] = for {

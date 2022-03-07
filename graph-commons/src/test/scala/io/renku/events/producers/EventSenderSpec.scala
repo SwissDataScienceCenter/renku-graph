@@ -20,6 +20,7 @@ package io.renku.events.producers
 
 import EventSender.EventContext
 import cats.effect.IO
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import com.github.tomakehurst.wiremock.stubbing.Scenario
@@ -30,9 +31,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.config.EventLogUrl
 import io.renku.interpreters.TestLogger
+import io.renku.metrics.LabeledGauge
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
@@ -43,6 +46,7 @@ class EventSenderSpec
     extends AnyWordSpec
     with IOSpec
     with ExternalServiceStubbing
+    with MockFactory
     with should.Matchers
     with TableDrivenPropertyChecks {
 
@@ -68,6 +72,9 @@ class EventSenderSpec
           stubFor {
             eventRequest.willReturn(aResponse().withStatus(status.code))
           }
+
+          if (status == Accepted)
+            (sentEventsGauge.increment _).expects(categoryName).returning(().pure[IO])
 
           callGenerator(eventSender, categoryName).generateOne.unsafeRunSync() shouldBe ()
 
@@ -98,6 +105,8 @@ class EventSenderSpec
               .whenScenarioStateIs("Successful")
               .willReturn(aResponse().withStatus(Accepted.code))
           }
+
+          (sentEventsGauge.increment _).expects(categoryName).returning(().pure[IO])
 
           callGenerator(eventSender, categoryName).generateOne.unsafeRunSync() shouldBe ()
 
@@ -135,6 +144,8 @@ class EventSenderSpec
               .willReturn(aResponse().withStatus(Accepted.code))
           }
 
+          (sentEventsGauge.increment _).expects(categoryName).returning(().pure[IO])
+
           callGenerator(eventSender, categoryName).generateOne.unsafeRunSync() shouldBe ()
 
           reset()
@@ -149,9 +160,11 @@ class EventSenderSpec
     val categoryName = categoryNames.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventLogUrl:     EventLogUrl    = EventLogUrl(externalServiceBaseUrl)
-    val onErrorSleep:    FiniteDuration = 1 second
+    val sentEventsGauge = mock[LabeledGauge[IO, CategoryName]]
+    val eventLogUrl:  EventLogUrl    = EventLogUrl(externalServiceBaseUrl)
+    val onErrorSleep: FiniteDuration = 1 second
     val eventSender = new EventSenderImpl[IO](eventLogUrl,
+                                              sentEventsGauge,
                                               onErrorSleep,
                                               retryInterval = 100 millis,
                                               maxRetries = 2,

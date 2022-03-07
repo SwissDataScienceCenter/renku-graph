@@ -68,7 +68,7 @@ class AllEventsToNewUpdaterSpec
           .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
           .expects(
             EventRequestContent.NoPayload(toEventJson(project)),
-            EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+            EventSender.EventContext(CategoryName(ProjectEventsToNew.eventType.show),
                                      show"$categoryName: Generating ${ProjectEventsToNew.eventType} for $project failed"
             )
           )

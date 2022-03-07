@@ -18,12 +18,9 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
-import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
-import cats.effect.IO
 import cats.syntax.all._
-import io.prometheus.client.Histogram
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -37,7 +34,6 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.jsonld.JsonLD
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.metrics.MetricsRegistry
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
@@ -192,19 +188,6 @@ class EventProcessorSpec
       eventsProcessingTimes.collect().asScala.headOption.map(_.name) shouldBe Some(
         "triples_generation_processing_times"
       )
-    }
-
-    "be registered in the Metrics Registry" in {
-
-      val metricsRegistry = mock[MetricsRegistry]
-
-      (metricsRegistry
-        .register[IO, Histogram, Histogram.Builder](_: Histogram.Builder)(_: MonadThrow[IO]))
-        .expects(eventsProcessingTimesBuilder, MonadThrow[IO])
-        .returning(IO.pure(eventsProcessingTimes))
-
-      implicit val logger: TestLogger[IO] = TestLogger[IO]()
-      EventProcessor[IO](metricsRegistry).unsafeRunSync()
     }
   }
 

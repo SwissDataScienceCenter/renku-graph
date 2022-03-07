@@ -32,6 +32,7 @@ import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventS
 import io.renku.graph.model.projects
 import io.renku.json.JsonOps._
 import io.renku.jsonld.JsonLD
+import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.constraints.DurationNotNegative
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.tinytypes.json.TinyTypeEncoders.durationEncoder
@@ -197,7 +198,7 @@ private object EventStatusUpdater {
   implicit val rollbackToNew:              () => EventStatus.New              = () => EventStatus.New
   implicit val rollbackToTriplesGenerated: () => EventStatus.TriplesGenerated = () => EventStatus.TriplesGenerated
 
-  def apply[F[_]: Async: Logger](categoryName: CategoryName): F[EventStatusUpdater[F]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry](categoryName: CategoryName): F[EventStatusUpdater[F]] = for {
     eventSender <- EventSender[F]
   } yield new EventStatusUpdaterImpl(eventSender, categoryName, Zip)
 

@@ -21,25 +21,25 @@ package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 import cats.MonadThrow
 import cats.data.StateT
 import cats.effect.Async
-import cats.effect.kernel.Temporal
 import cats.syntax.all._
+import io.circe.literal._
 import io.renku.commiteventservice.events.categories.commitsync._
 import io.renku.commiteventservice.events.categories.common.SynchronizationSummary._
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
 import io.renku.commiteventservice.events.categories.common._
 import io.renku.events.consumers.Project
+import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.{BatchDate, CommitId}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
-import io.circe.literal._
 
 import scala.util.control.NonFatal
-import io.renku.events.producers.EventSender
-import io.renku.events.{CategoryName, EventRequestContent}
 
 private[commitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: CommitSyncEvent): F[Unit]
@@ -228,7 +228,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
 }
 
 private[commitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: Temporal: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ) = for {

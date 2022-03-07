@@ -21,7 +21,6 @@ package io.renku.commiteventservice.events.categories.commitsync
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
-import cats.effect.kernel.Temporal
 import cats.effect.{Async, Concurrent, Spawn}
 import cats.syntax.all._
 import io.circe.Decoder
@@ -32,6 +31,7 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.{CommitId, LastSyncedDate}
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -85,7 +85,7 @@ private[events] class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
 }
 
 private[events] object EventHandler {
-  def apply[F[_]: Async: Spawn: Concurrent: Temporal: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[EventHandler[F]] = for {

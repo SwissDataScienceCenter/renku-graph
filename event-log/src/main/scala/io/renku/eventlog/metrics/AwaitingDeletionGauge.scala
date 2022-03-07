@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.metrics
 
-import cats.effect.IO
+import cats.MonadThrow
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -30,11 +31,8 @@ object AwaitingDeletionGauge {
 
   val NumberOfProjects: Int Refined Positive = 20
 
-  def apply(
-      metricsRegistry: MetricsRegistry,
-      statsFinder:     StatsFinder[IO]
-  ): IO[LabeledGauge[IO, projects.Path]] =
-    Gauge[IO, projects.Path](
+  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[LabeledGauge[F, projects.Path]] =
+    Gauge[F, projects.Path](
       name = "events_awaiting_deletion_count",
       help = "Number of Events waiting to clean up or re-provisioned",
       labelName = "project",
@@ -42,5 +40,5 @@ object AwaitingDeletionGauge {
         statsFinder
           .countEvents(Set(AwaitingDeletion), maybeLimit = Some(NumberOfProjects))
           .map(_.view.mapValues(_.toDouble).toMap)
-    )(metricsRegistry)
+    )
 }
