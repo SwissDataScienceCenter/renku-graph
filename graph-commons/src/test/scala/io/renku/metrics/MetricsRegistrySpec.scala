@@ -18,6 +18,7 @@
 
 package io.renku.metrics
 
+import cats.effect.IO
 import com.typesafe.config.ConfigFactory
 import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.metrics.MetricsRegistry.{DisabledMetricsRegistry, EnabledMetricsRegistry}
@@ -26,30 +27,30 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
-import scala.util.{Success, Try}
+import scala.util.Try
 
 class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "apply" should {
 
     "return a disabled Metrics Registry if the 'metrics.enabled' flag is set to false" in {
-      val Success(registry) = MetricsRegistry[Try](
+      val registry = MetricsRegistry[IO](
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> false).asJava).asJava)
-      )
+      ).unsafeRunSync()
 
       registry.getClass shouldBe classOf[DisabledMetricsRegistry[Try]]
     }
 
     "return an enabled Metrics Registry if the 'metrics.enabled' flag is set to true" in {
-      val Success(registry) = MetricsRegistry[Try](
+      val registry = MetricsRegistry[IO](
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> true).asJava).asJava)
-      )
+      ).unsafeRunSync()
 
       registry.getClass shouldBe classOf[EnabledMetricsRegistry[Try]]
     }
 
     "return an enabled Metrics Registry if there is no value for the 'metrics.enabled' flag" in {
-      val Success(registry) = MetricsRegistry[Try](ConfigFactory.empty())
+      val registry = MetricsRegistry[IO](ConfigFactory.empty()).unsafeRunSync()
       registry.getClass shouldBe classOf[EnabledMetricsRegistry[Try]]
     }
   }
@@ -57,46 +58,52 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
   "EnabledMetricsRegistry.register" should {
 
     "register the given collector in the collector registry" in {
+
+      val registry = new EnabledMetricsRegistry[IO]
+
       val gaugeName = "gauge_name"
+      val metricsCollector = new MetricsCollector with PrometheusCollector {
+        override type Collector = LibGauge
+        override val wrappedCollector: LibGauge = LibGauge
+          .build()
+          .name(gaugeName)
+          .help("some gauge info")
+          .labelNames("label")
+          .create()
+        override val name: String = wrappedCollector.describe().asScala.head.name
+        override val help: String = wrappedCollector.describe().asScala.head.help
+      }
 
-      val registry = new EnabledMetricsRegistry[Try]
-
-      val Success(gauge) = registry
-        .register[LibGauge, LibGauge.Builder](
-          LibGauge
-            .build()
-            .name(gaugeName)
-            .help("some gauge info")
-            .labelNames("label")
-        )
-
-      gauge.labels("lbl").set(2)
+      registry.register(metricsCollector).unsafeRunSync()
 
       registry.maybeCollectorRegistry.flatMap(
         _.metricFamilySamples().asScala
           .find(_.name == gaugeName)
           .map(_.samples.asScala.map(_.value).toList)
-      ) shouldBe Some(List(2))
+      ) shouldBe Some(List())
     }
   }
 
   "DisabledMetricsRegistry.register" should {
 
     "not register the given collector in any registry" in {
-      val gaugeName = "gauge_name"
 
       val registry = new DisabledMetricsRegistry[Try]
 
-      val Success(gauge) = registry
-        .register[LibGauge, LibGauge.Builder](
-          LibGauge
-            .build()
-            .name(gaugeName)
-            .help("some gauge info")
-            .labelNames("label")
-        )
+      val gaugeName = "gauge_name"
+      val metricsCollector = new MetricsCollector with PrometheusCollector {
+        override type Collector = LibGauge
+        override val wrappedCollector: LibGauge = LibGauge
+          .build()
+          .name(gaugeName)
+          .help("some gauge info")
+          .labelNames("label")
+          .create()
+        override val name: String = wrappedCollector.describe().asScala.head.name
+        override val help: String = wrappedCollector.describe().asScala.head.help
+      }
 
-      gauge.labels("lbl").set(2)
+      registry register metricsCollector
 
       registry.maybeCollectorRegistry shouldBe None
     }

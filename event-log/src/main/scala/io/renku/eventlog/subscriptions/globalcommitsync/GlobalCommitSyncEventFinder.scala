@@ -42,7 +42,7 @@ import java.time.{Duration, Instant}
 
 private class GlobalCommitSyncEventFinderImpl[F[_]: Async: SessionResource](
     lastSyncedDateUpdater: LastSyncedDateUpdater[F],
-    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:      LabeledHistogram[F],
     now:                   () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, GlobalCommitSyncEvent]
@@ -134,7 +134,7 @@ private object GlobalCommitSyncEventFinder {
 
   def apply[F[_]: Async: SessionResource](
       lastSyncedDateUpdater: LastSyncedDateUpdater[F],
-      queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:      LabeledHistogram[F]
   ): F[EventFinder[F, GlobalCommitSyncEvent]] = MonadThrow[F].catchNonFatal(
     new GlobalCommitSyncEventFinderImpl(lastSyncedDateUpdater, queriesExecTimes)
   )

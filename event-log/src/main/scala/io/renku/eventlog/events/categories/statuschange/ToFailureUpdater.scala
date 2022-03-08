@@ -40,7 +40,7 @@ import java.time.{Duration, Instant}
 
 private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
     deliveryInfoRemover: DeliveryInfoRemover[F],
-    queriesExecTimes:    LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:    LabeledHistogram[F],
     now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[F, ToFailure[ProcessingStatus, FailureStatus]] {

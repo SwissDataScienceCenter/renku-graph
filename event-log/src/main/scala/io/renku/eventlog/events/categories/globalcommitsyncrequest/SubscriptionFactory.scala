@@ -20,7 +20,7 @@ package io.renku.eventlog.events.categories.globalcommitsyncrequest
 
 import cats.effect.Concurrent
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -30,7 +30,7 @@ import org.typelevel.log4cats.Logger
 object SubscriptionFactory {
 
   def apply[F[_]: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+                                      queriesExecTimes: LabeledHistogram[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     handler <- EventHandler(sessionResource, queriesExecTimes)
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)

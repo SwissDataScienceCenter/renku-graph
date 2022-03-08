@@ -47,7 +47,7 @@ import scala.util.Random
 private class TriplesGeneratedEventFinderImpl[F[_]: Async: SessionResource](
     awaitingTransformationGauge: LabeledGauge[F, projects.Path],
     underTransformationGauge:    LabeledGauge[F, projects.Path],
-    queriesExecTimes:            LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:            LabeledHistogram[F],
     now:                         () => Instant = () => Instant.now,
     projectsFetchingLimit:       Int Refined Positive,
     projectPrioritisation:       ProjectPrioritisation,
@@ -194,7 +194,7 @@ private object TriplesGeneratedEventFinder {
 
   def apply[F[_]: Async: SessionResource](awaitingTransformationGauge: LabeledGauge[F, projects.Path],
                                           underTransformationGauge: LabeledGauge[F, projects.Path],
-                                          queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name]
+                                          queriesExecTimes:         LabeledHistogram[F]
   ): F[EventFinder[F, TriplesGeneratedEvent]] = MonadThrow[F].catchNonFatal {
     new TriplesGeneratedEventFinderImpl(awaitingTransformationGauge,
                                         underTransformationGauge,

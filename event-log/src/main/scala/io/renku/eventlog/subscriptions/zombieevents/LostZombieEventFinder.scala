@@ -40,7 +40,7 @@ import java.time.Duration
 import java.time.Instant.now
 
 private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
@@ -107,7 +107,7 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource](
 
 private object LostZombieEventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
     new LostZombieEventFinder(queriesExecTimes)
   }

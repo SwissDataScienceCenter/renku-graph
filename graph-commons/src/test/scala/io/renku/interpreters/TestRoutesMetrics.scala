@@ -19,7 +19,7 @@
 package io.renku.interpreters
 
 import cats.effect.IO
-import io.renku.metrics.RoutesMetrics
+import io.renku.metrics.{RoutesMetrics, TestMetricsRegistry}
 
 class TestRoutesMetrics(implicit val metricsRegistry: TestMetricsRegistry[IO]) extends RoutesMetrics[IO] {
   def clearRegistry(): Unit = metricsRegistry.clear()

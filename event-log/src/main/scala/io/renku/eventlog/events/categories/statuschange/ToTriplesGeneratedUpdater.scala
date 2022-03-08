@@ -40,7 +40,7 @@ import java.time.Instant
 
 private class ToTriplesGeneratedUpdater[F[_]: Async](
     deliveryInfoRemover: DeliveryInfoRemover[F],
-    queriesExecTimes:    LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:    LabeledHistogram[F],
     now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[F, ToTriplesGenerated] {

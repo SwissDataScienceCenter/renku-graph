@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Async
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.metrics.LabeledHistogram
@@ -91,7 +91,7 @@ object ProcessingStatusEndpoint {
 
   def apply[F[_]: MonadCancelThrow: Async: Logger](
       sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[ProcessingStatusEndpoint[F]] = for {
     statusFinder <- ProcessingStatusFinder(sessionResource, queriesExecTimes)
   } yield new ProcessingStatusEndpointImpl[F](statusFinder)

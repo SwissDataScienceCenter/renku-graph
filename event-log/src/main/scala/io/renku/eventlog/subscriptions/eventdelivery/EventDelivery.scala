@@ -40,7 +40,7 @@ private[subscriptions] trait EventDelivery[F[_], CategoryEvent] {
 
 private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource, CategoryEvent](
     eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId,
-    queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:         LabeledHistogram[F],
     sourceUrl:                MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
     with EventDelivery[F, CategoryEvent]
@@ -121,7 +121,7 @@ private[subscriptions] object EventDelivery {
 
   def apply[F[_]: MonadCancelThrow: SessionResource, CategoryEvent](
       eventDeliveryIdExtractor: CategoryEvent => EventDeliveryId,
-      queriesExecTimes:         LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:         LabeledHistogram[F]
   ): F[EventDelivery[F, CategoryEvent]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     microserviceUrl       <- microserviceUrlFinder.findBaseUrl()

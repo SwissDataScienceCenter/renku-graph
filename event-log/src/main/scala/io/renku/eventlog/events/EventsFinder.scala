@@ -38,7 +38,7 @@ private trait EventsFinder[F[_]] {
 
 private class EventsFinderImpl[F[_]: Async: NonEmptyParallel](
     sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
     with EventsFinder[F]
     with Paging[EventInfo] {
@@ -228,7 +228,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel](
 
 private object EventsFinder {
   def apply[F[_]: Async: NonEmptyParallel](sessionResource: SessionResource[F, EventLogDB],
-                                           queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+                                           queriesExecTimes: LabeledHistogram[F]
   ): F[EventsFinder[F]] = MonadThrow[F].catchNonFatal(
     new EventsFinderImpl(sessionResource, queriesExecTimes)
   )

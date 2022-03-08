@@ -40,7 +40,7 @@ private trait GlobalCommitSyncForcer[F[_]] {
 
 private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow](
     sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with GlobalCommitSyncForcer[F]
     with TypeSerializers
@@ -86,7 +86,7 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow](
 private object GlobalCommitSyncForcer {
 
   def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
-                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+                                    queriesExecTimes: LabeledHistogram[F]
   ): F[GlobalCommitSyncForcer[F]] = MonadThrow[F].catchNonFatal {
     new GlobalCommitSyncForcerImpl(sessionResource, queriesExecTimes)
   }

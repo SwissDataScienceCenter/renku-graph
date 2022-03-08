@@ -22,21 +22,21 @@ import cats.data.EitherT.right
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
-import io.prometheus.client.Histogram
+import eu.timepit.refined.auto._
 import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.metrics.MetricsRegistry
+import io.renku.metrics.{Histogram, MetricsRegistry}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
-import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
 
 import java.time.Duration
@@ -210,23 +210,20 @@ private object EventProcessor {
   import io.renku.config.GitLab
   import io.renku.control.Throttler
 
-  private[events] lazy val eventsProcessingTimesBuilder =
-    Histogram
-      .build()
-      .name("triples_transformation_processing_times")
-      .help("Triples transformation processing times")
-      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000,
-               50000000, 100000000, 500000000)
-
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
       gitLabThrottler: Throttler[F, GitLab],
       timeRecorder:    SparqlQueryTimeRecorder[F]
   ): F[EventProcessor[F]] = for {
-    uploader              <- TransformationStepsRunner(timeRecorder)
-    accessTokenFinder     <- AccessTokenFinder[F]
-    triplesCurator        <- TransformationStepsCreator(timeRecorder)
-    eventStatusUpdater    <- EventStatusUpdater(categoryName)
-    eventsProcessingTimes <- MetricsRegistry[F].register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
+    uploader           <- TransformationStepsRunner(timeRecorder)
+    accessTokenFinder  <- AccessTokenFinder[F]
+    triplesCurator     <- TransformationStepsCreator(timeRecorder)
+    eventStatusUpdater <- EventStatusUpdater(categoryName)
+    eventsProcessingTimes <- Histogram(
+                               name = "triples_transformation_processing_times",
+                               help = "Triples transformation processing times",
+                               buckets = Seq(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000,
+                                             1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
+                             )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
     jsonLDDeserializer    <- JsonLDDeserializer(gitLabThrottler)
   } yield new EventProcessorImpl(

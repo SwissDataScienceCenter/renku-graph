@@ -37,7 +37,7 @@ import skunk.~
 import java.time.Instant
 
 private class RollbackToTriplesGeneratedUpdater[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[F, RollbackToTriplesGenerated] {

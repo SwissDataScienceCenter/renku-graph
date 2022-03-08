@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.init
 import DbInitializer.Runnable
 import cats.effect._
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
@@ -58,7 +58,7 @@ object DbInitializer {
 
   def apply[F[_]: Async: Logger](
       sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[DbInitializer[F]] = for {
     tableCreator             <- ProjectsTokensTableCreator[F](sessionResource).pure[F]
     pathAdder                <- ProjectPathAdder[F](sessionResource, queriesExecTimes)

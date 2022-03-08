@@ -22,7 +22,6 @@ import cats._
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Json
-import io.renku.db.SqlStatement
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
@@ -68,7 +67,7 @@ object EventProducersRegistry {
       underTransformationGauge:       LabeledGauge[F, projects.Path],
       awaitingDeletionGauge:          LabeledGauge[F, projects.Path],
       deletingGauge:                  LabeledGauge[F, projects.Path],
-      queriesExecTimes:               LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:               LabeledHistogram[F]
   ): F[EventProducersRegistry[F]] = for {
     subscriberTracker <- SubscriberTracker(queriesExecTimes)
     awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(awaitingTriplesGenerationGauge,

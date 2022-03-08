@@ -35,10 +35,10 @@ import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.events.ZippedEventPayload
-import io.renku.interpreters.{TestLogger, TestMetricsRegistry}
+import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.json.JsonOps._
-import io.renku.metrics.{MetricsRegistry, TestLabeledHistogram}
+import io.renku.metrics.{MetricsRegistry, TestLabeledHistogram, TestMetricsRegistry}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory

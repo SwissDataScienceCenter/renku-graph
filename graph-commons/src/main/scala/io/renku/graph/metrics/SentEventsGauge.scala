@@ -25,9 +25,10 @@ import io.renku.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 
 object SentEventsGauge {
 
-  def apply[F[_]: MonadThrow: MetricsRegistry]: F[LabeledGauge[F, CategoryName]] = Gauge[F, CategoryName](
-    name = "sent_events_count",
-    help = "Number of sent Events",
-    labelName = "categoryName"
-  )
+  def apply[F[_]: MonadThrow: MetricsRegistry]: F[LabeledGauge[F, CategoryName]] =
+    Gauge[F, CategoryName](
+      name = "sent_events_count",
+      help = "Number of sent Events",
+      labelName = "category_mame"
+    )
 }

@@ -41,7 +41,7 @@ private trait ZombieNodesCleaner[F[_]] {
 }
 
 private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource](
-    queriesExecTimes:     LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:     LabeledHistogram[F],
     microserviceBaseUrl:  MicroserviceBaseUrl,
     serviceHealthChecker: ServiceHealthChecker[F]
 ) extends DbClient(Some(queriesExecTimes))
@@ -148,7 +148,7 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource](
 
 private object ZombieNodesCleaner {
   def apply[F[_]: Async: Parallel: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[ZombieNodesCleaner[F]] = for {
     serviceUrlFinder     <- MicroserviceUrlFinder(Microservice.ServicePort)
     serviceBaseUrl       <- serviceUrlFinder.findBaseUrl()

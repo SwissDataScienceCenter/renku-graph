@@ -50,7 +50,7 @@ trait StatsFinder[F[_]] {
 
 class StatsFinderImpl[F[_]: Async](
     sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with StatsFinder[F]
@@ -225,7 +225,7 @@ object StatsFinder {
 
   def apply[F[_]: MonadThrow: Async](
       sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[StatsFinder[F]] = MonadThrow[F].catchNonFatal {
     new StatsFinderImpl(sessionResource, queriesExecTimes)
   }

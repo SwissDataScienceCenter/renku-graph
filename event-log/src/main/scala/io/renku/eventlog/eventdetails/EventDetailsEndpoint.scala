@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import io.renku.graph.model.events.{CompoundEventId, EventDetails}
 import io.renku.http.InfoMessage._
@@ -70,7 +70,7 @@ class EventDetailsEndpointImpl[F[_]: Concurrent: Logger](eventDetailsFinder: Eve
 
 object EventDetailsEndpoint {
   def apply[F[_]: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+                                      queriesExecTimes: LabeledHistogram[F]
   ): F[EventDetailsEndpoint[F]] = for {
     eventDetailFinder <- EventDetailsFinder(sessionResource, queriesExecTimes)
   } yield new EventDetailsEndpointImpl[F](eventDetailFinder)

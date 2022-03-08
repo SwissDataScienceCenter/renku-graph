@@ -22,7 +22,6 @@ import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import io.renku.db.SqlStatement
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.metrics.LabeledHistogram
@@ -53,7 +52,7 @@ private class ZombieEventFinder[F[_]: MonadThrow: Logger](
 private object ZombieEventFinder {
 
   def apply[F[_]: Async: Parallel: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, ZombieEvent]] = for {
     longProcessingEventFinder <- LongProcessingEventFinder(queriesExecTimes)
     lostSubscriberEventFinder <- LostSubscriberEventFinder(queriesExecTimes)

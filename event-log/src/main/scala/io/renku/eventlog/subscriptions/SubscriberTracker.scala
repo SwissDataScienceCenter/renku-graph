@@ -37,7 +37,7 @@ private trait SubscriberTracker[F[_]] {
 }
 
 private class SubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes: LabeledHistogram[F],
     sourceUrl:        MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
     with SubscriberTracker[F]
@@ -85,10 +85,9 @@ private class SubscriberTrackerImpl[F[_]: MonadCancelThrow: SessionResource](
 }
 
 private object SubscriberTracker {
-  def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
-  ): F[SubscriberTracker[F]] = for {
-    microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
-    sourceUrl             <- microserviceUrlFinder.findBaseUrl()
-  } yield new SubscriberTrackerImpl[F](queriesExecTimes, sourceUrl)
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[SubscriberTracker[F]] =
+    for {
+      microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
+      sourceUrl             <- microserviceUrlFinder.findBaseUrl()
+    } yield new SubscriberTrackerImpl[F](queriesExecTimes, sourceUrl)
 }

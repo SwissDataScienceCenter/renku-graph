@@ -23,7 +23,7 @@ import cats.effect.{Async, Spawn}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow, Show}
 import io.circe.DecodingFailure
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.eventlog.events.categories.statuschange.DBUpdater.EventUpdaterFactory
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import io.renku.eventlog.{EventLogDB, EventMessage}
@@ -44,7 +44,7 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry](
     eventsQueue:               StatusChangeEventsQueue[F],
     statusChanger:             StatusChanger[F],
     deliveryInfoRemover:       DeliveryInfoRemover[F],
-    queriesExecTimes:          LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes:          LabeledHistogram[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   private val applicative = Applicative[F]
@@ -113,7 +113,7 @@ private object EventHandler {
   def apply[F[_]: Async: Logger: MetricsRegistry](
       sessionResource:                    SessionResource[F, EventLogDB],
       eventsQueue:                        StatusChangeEventsQueue[F],
-      queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name],
+      queriesExecTimes:                   LabeledHistogram[F],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
@@ -137,7 +137,7 @@ private object EventHandler {
 
   private def registerHandlers[F[_]: Async: Logger](eventsQueue: StatusChangeEventsQueue[F],
                                                     statusChanger:         StatusChanger[F],
-                                                    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
+                                                    queriesExecTimes:      LabeledHistogram[F],
                                                     awaitingDeletionGauge: LabeledGauge[F, projects.Path],
                                                     deletingGauge:         LabeledGauge[F, projects.Path]
   ) = for {

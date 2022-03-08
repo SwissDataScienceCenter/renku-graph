@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.effect.kernel.{Concurrent, Temporal}
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
@@ -78,7 +78,7 @@ object AssociateTokenEndpoint {
 
   def apply[F[_]: Async: Temporal: Logger](
       sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[AssociateTokenEndpoint[F]] = for {
     tokenAssociator <- TokenAssociator(sessionResource, queriesExecTimes)
   } yield new AssociateTokenEndpointImpl[F](tokenAssociator)
