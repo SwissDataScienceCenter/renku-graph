@@ -41,14 +41,14 @@ private[statuschange] trait ProjectCleaner[F[_]] {
 }
 
 private[statuschange] object ProjectCleaner {
-  def apply[F[_]: Async: Logger](queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]): F[ProjectCleaner[F]] = for {
+  def apply[F[_]: Async: Logger](queriesExecTimes: LabeledHistogram[F]): F[ProjectCleaner[F]] = for {
     projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]()
   } yield new ProjectCleanerImpl[F](projectWebhookAndTokenRemover, queriesExecTimes)
 }
 
 private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
     projectWebhookAndTokenRemover: ProjectWebhookAndTokenRemover[F],
-    queriesExecTimes:              LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes:              LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with ProjectCleaner[F] {
   private val applicative = Applicative[F]

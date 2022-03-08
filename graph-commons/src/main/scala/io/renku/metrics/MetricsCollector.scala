@@ -16,19 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.metrics
+package io.renku.metrics
 
-import cats.MonadThrow
-import eu.timepit.refined.auto._
-import io.renku.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
+trait MetricsCollector {
+  val name: String
+  val help: String
+}
 
-object QueriesExecutionTimes {
+trait PrometheusCollector {
+  self: MetricsCollector =>
 
-  def apply[F[_]: MonadThrow: MetricsRegistry]: F[LabeledHistogram[F]] =
-    Histogram[F](
-      name = "token_repository_queries_execution_times",
-      help = "Token Repository queries execution times",
-      labelName = "query_id",
-      buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
-    )
+  type Collector <: io.prometheus.client.Collector
+  val wrappedCollector: Collector
 }

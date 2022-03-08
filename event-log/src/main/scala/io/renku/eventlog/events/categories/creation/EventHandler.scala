@@ -23,7 +23,7 @@ import cats.effect.{Concurrent, MonadCancelThrow}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.{ACursor, Decoder, DecodingFailure}
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
@@ -100,7 +100,7 @@ private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 private object EventHandler {
   def apply[F[_]: MonadCancelThrow: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
                                                         waitingEventsGauge: LabeledGauge[F, projects.Path],
-                                                        queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name]
+                                                        queriesExecTimes:   LabeledHistogram[F]
   ): F[EventHandler[F]] = for {
     eventPersister <- EventPersister(sessionResource, waitingEventsGauge, queriesExecTimes)
   } yield new EventHandler[F](categoryName, eventPersister)

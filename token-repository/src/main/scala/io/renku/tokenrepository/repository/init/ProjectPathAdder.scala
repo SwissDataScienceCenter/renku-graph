@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.LabeledHistogram
@@ -134,7 +134,7 @@ private object ProjectPathAdder {
 
   def apply[F[_]: Async: Logger](
       sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[ProjectPathAdder[F]] = for {
     accessTokenCrypto <- AccessTokenCrypto[F]()
     pathFinder        <- ProjectPathFinder[F]

@@ -38,7 +38,7 @@ private trait AssociationPersister[F[_]] {
 
 private class AssociationPersisterImpl[F[_]: MonadCancelThrow](
     sessionResource:  SessionResource[F, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
     with AssociationPersister[F]
     with TokenRepositoryTypeSerializers {

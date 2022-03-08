@@ -39,7 +39,6 @@ import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
-import io.renku.triplesgenerator.events.categories.triplesgenerated.EventProcessor.eventsProcessingTimesBuilder
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.TransformationStepsCreator
@@ -55,7 +54,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
-import scala.jdk.CollectionConverters._
 import scala.util.{Success, Try}
 
 class EventProcessorSpec
@@ -85,8 +83,6 @@ class EventProcessorSpec
       eventProcessor.process(triplesGeneratedEvent) shouldBe ().pure[Try]
 
       logSummary(triplesGeneratedEvent, isSuccessful = true)
-
-      verifyMetricsCollected()
     }
 
     "mark event as TransformationRecoverableFailure and log an error " +
@@ -371,19 +367,6 @@ class EventProcessorSpec
     }
   }
 
-  "eventsProcessingTimes histogram" should {
-
-    "have 'triples_transformation_processing_times' name" in {
-      eventsProcessingTimes.startTimer().observeDuration()
-
-      eventsProcessingTimes.collect().asScala.headOption.map(_.name) shouldBe Some(
-        "triples_transformation_processing_times"
-      )
-    }
-  }
-
-  private lazy val eventsProcessingTimes = eventsProcessingTimesBuilder.create()
-
   private trait TestCase {
 
     val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
@@ -396,7 +379,7 @@ class EventProcessorSpec
     val triplesUploader       = mock[TransformationStepsRunner[Try]]
     val eventStatusUpdater    = mock[EventStatusUpdater[Try]]
     val jsonLDDeserializer    = mock[JsonLDDeserializer[Try]]
-    val executionTimeRecorder = TestExecutionTimeRecorder[Try](Option(eventsProcessingTimes))
+    val executionTimeRecorder = TestExecutionTimeRecorder[Try](maybeHistogram = None)
     val eventProcessor = new EventProcessorImpl[Try](
       accessTokenFinder,
       stepsCreator,
@@ -474,13 +457,5 @@ class EventProcessorSpec
 
     def commonLogMessage(event: TriplesGeneratedEvent): String =
       s"$categoryName: ${event.compoundEventId}, projectPath: ${event.project.path}"
-
-    def verifyMetricsCollected() =
-      eventsProcessingTimes
-        .collect()
-        .asScala
-        .flatMap(_.samples.asScala.map(_.name))
-        .exists(_ startsWith "triples_transformation_processing_times") shouldBe true
   }
-
 }

@@ -46,7 +46,7 @@ import scala.util.Random
 private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: Parallel: SessionResource](
     waitingEventsGauge:    LabeledGauge[F, projects.Path],
     underProcessingGauge:  LabeledGauge[F, projects.Path],
-    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:      LabeledHistogram[F],
     now:                   () => Instant = () => Instant.now,
     projectsFetchingLimit: Int Refined Positive,
     projectPrioritisation: ProjectPrioritisation[F],
@@ -209,7 +209,7 @@ private object AwaitingGenerationEventFinder {
       subscribers:          subscriptions.Subscribers[F],
       waitingEventsGauge:   LabeledGauge[F, projects.Path],
       underProcessingGauge: LabeledGauge[F, projects.Path],
-      queriesExecTimes:     LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:     LabeledHistogram[F]
   ): F[subscriptions.EventFinder[F, AwaitingGenerationEvent]] = for {
     projectPrioritisation <- ProjectPrioritisation(subscribers)
   } yield new AwaitingGenerationEventFinderImpl(waitingEventsGauge,

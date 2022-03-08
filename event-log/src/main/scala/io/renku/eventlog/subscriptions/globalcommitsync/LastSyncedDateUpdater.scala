@@ -40,14 +40,14 @@ private trait LastSyncedDateUpdater[F[_]] {
 
 private object LastSyncedDateUpdater {
   def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[LastSyncedDateUpdater[F]] = MonadThrow[F].catchNonFatal(
     new LastSyncedDateUpdateImpl[F](queriesExecTimes)
   )
 }
 
 private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with LastSyncedDateUpdater[F]
     with SubscriptionTypeSerializers {

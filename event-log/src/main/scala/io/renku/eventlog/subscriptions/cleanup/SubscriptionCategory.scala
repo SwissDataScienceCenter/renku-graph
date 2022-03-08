@@ -21,7 +21,6 @@ package io.renku.eventlog.subscriptions.cleanup
 import cats.Parallel
 import cats.effect._
 import cats.syntax.all._
-import io.renku.db.SqlStatement
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions._
@@ -40,7 +39,7 @@ private[subscriptions] object SubscriptionCategory {
       subscriberTracker:     SubscriberTracker[F],
       awaitingDeletionGauge: LabeledGauge[F, projects.Path],
       deletingGauge:         LabeledGauge[F, projects.Path],
-      queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:      LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers <- Subscribers(name, subscriberTracker)
     eventDelivery <- eventdelivery.EventDelivery[F, CleanUpEvent](

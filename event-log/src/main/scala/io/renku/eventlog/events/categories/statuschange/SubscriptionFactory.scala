@@ -20,7 +20,7 @@ package io.renku.eventlog.events.categories.statuschange
 
 import cats.effect.kernel.Async
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.eventlog.EventLogDB
 import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
@@ -38,7 +38,7 @@ object SubscriptionFactory {
       underTriplesTransformationGauge:    LabeledGauge[F, projects.Path],
       awaitingDeletionGauge:              LabeledGauge[F, projects.Path],
       deletingGauge:                      LabeledGauge[F, projects.Path],
-      queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:                   LabeledHistogram[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     handler <- EventHandler(
                  sessionResource,

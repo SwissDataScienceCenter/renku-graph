@@ -38,7 +38,7 @@ import skunk.implicits._
 import java.time.Instant
 
 private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, MemberSyncEvent]
@@ -135,7 +135,7 @@ private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource]
 
 private object MemberSyncEventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, MemberSyncEvent]] = MonadThrow[F].catchNonFatal {
     new MemberSyncEventFinderImpl(queriesExecTimes)
   }

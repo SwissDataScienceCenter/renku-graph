@@ -26,18 +26,18 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
-import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
+import skunk.data.Completion
 import skunk.implicits._
 import skunk.~
 
 import java.time.Instant
-import skunk.data.Completion
 
 private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[F, RollbackToAwaitingDeletion] {

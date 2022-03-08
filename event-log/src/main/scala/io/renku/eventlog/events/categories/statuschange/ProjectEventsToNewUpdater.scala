@@ -46,7 +46,7 @@ private trait ProjectEventsToNewUpdater[F[_]] extends DBUpdater[F, ProjectEvents
 
 private object ProjectEventsToNewUpdater {
   def apply[F[_]: Async: Logger](
-      queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
+      queriesExecTimes:      LabeledHistogram[F],
       awaitingDeletionGauge: LabeledGauge[F, projects.Path],
       deletingEventGauge:    LabeledGauge[F, projects.Path]
   ): F[DBUpdater[F, ProjectEventsToNew]] = ProjectCleaner[F](queriesExecTimes).map(
@@ -56,7 +56,7 @@ private object ProjectEventsToNewUpdater {
 
 private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
     projectCleaner:        ProjectCleaner[F],
-    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:      LabeledHistogram[F],
     awaitingDeletionGauge: LabeledGauge[F, projects.Path],
     deletingEventGauge:    LabeledGauge[F, projects.Path],
     now:                   () => Instant = () => Instant.now

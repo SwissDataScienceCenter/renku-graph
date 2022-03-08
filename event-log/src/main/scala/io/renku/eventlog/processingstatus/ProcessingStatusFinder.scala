@@ -44,7 +44,7 @@ trait ProcessingStatusFinder[F[_]] {
 
 class ProcessingStatusFinderImpl[F[_]: MonadCancelThrow: Async](
     sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with ProcessingStatusFinder[F] {
 
@@ -86,7 +86,7 @@ class ProcessingStatusFinderImpl[F[_]: MonadCancelThrow: Async](
 object ProcessingStatusFinder {
   def apply[F[_]: MonadCancelThrow: Async](
       sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[ProcessingStatusFinder[F]] = MonadThrow[F].catchNonFatal {
     new ProcessingStatusFinderImpl(sessionResource, queriesExecTimes)
   }

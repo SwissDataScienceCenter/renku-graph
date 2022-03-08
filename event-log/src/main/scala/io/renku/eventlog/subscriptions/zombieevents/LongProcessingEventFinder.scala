@@ -40,7 +40,7 @@ import skunk.implicits._
 import java.time.{Duration, Instant}
 
 private class LongProcessingEventFinder[F[_]: Async: SessionResource](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, ZombieEvent]
@@ -166,7 +166,7 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
 private object LongProcessingEventFinder {
 
   def apply[F[_]: Async: SessionResource](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
     new LongProcessingEventFinder(queriesExecTimes)
   }

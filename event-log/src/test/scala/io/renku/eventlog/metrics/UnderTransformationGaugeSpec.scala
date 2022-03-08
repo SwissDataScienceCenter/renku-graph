@@ -29,14 +29,12 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.metrics.MetricsTools._
-import io.renku.metrics.{LabeledGauge, MetricsRegistry}
+import io.renku.metrics._
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
-import scala.jdk.CollectionConverters._
 
 class UnderTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
@@ -45,48 +43,42 @@ class UnderTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockFact
     "create and register an events_awaiting_transformation_count named gauge" in new TestCase {
 
       (metricsRegistry
-        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder))
-        .expects(*)
-        .onCall { (builder: LibGauge.Builder) =>
-          val actual = builder.create()
-          actual.describe().asScala.head.name shouldBe underlying.describe().asScala.head.name
-          actual.describe().asScala.head.help shouldBe underlying.describe().asScala.head.help
-          actual.pure[IO]
-        }
+        .register(_: MetricsCollector with PrometheusCollector))
+        .expects(where[MetricsCollector with PrometheusCollector](_.wrappedCollector.isInstanceOf[LibGauge]))
+        .returning(().pure[IO])
 
       val gauge = UnderTransformationGauge(statsFinder).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
+      gauge.name                                          shouldBe "events_under_transformation_count"
     }
 
     "return a gauge with reset method provisioning it with values from the Event Log" in new TestCase {
 
       (metricsRegistry
-        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder))
+        .register(_: MetricsCollector with PrometheusCollector))
         .expects(*)
-        .onCall((_: LibGauge.Builder) => underlying.pure[IO])
+        .returning(().pure[IO])
 
       val underTransformationEvents = underTransformation.generateOne
-
       (statsFinder.countEvents _)
         .expects(Set[EventStatus](TransformingTriples), None)
         .returning(underTransformationEvents.pure[IO])
 
-      UnderTransformationGauge(statsFinder).flatMap(_.reset()).unsafeRunSync()
+      val gauge = UnderTransformationGauge(statsFinder).unsafeRunSync()
 
-      underlying.collectAllSamples should contain theSameElementsAs underTransformationEvents.map {
-        case (project, count) =>
-          ("project", project.value, count.toDouble)
+      gauge.reset().unsafeRunSync()
+
+      gauge
+        .asInstanceOf[LabeledGaugeImpl[IO, projects.Path]]
+        .wrappedCollector
+        .collectAllSamples should contain theSameElementsAs underTransformationEvents.map { case (project, count) =>
+        ("project", project.value, count.toDouble)
       }
     }
   }
 
   private trait TestCase {
-    val underlying = LibGauge
-      .build("events_under_transformation_count", "Number of Events under triples transformation by project path.")
-      .labelNames("project")
-      .create()
-
     implicit val metricsRegistry: MetricsRegistry[IO] = mock[MetricsRegistry[IO]]
     val statsFinder = mock[StatsFinder[IO]]
   }
@@ -97,5 +89,4 @@ class UnderTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockFact
       count <- nonNegativeLongs()
     } yield path -> count.value
   }.map(_.toMap)
-
 }

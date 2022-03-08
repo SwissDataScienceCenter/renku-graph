@@ -21,7 +21,6 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.db.SqlStatement
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions._
@@ -34,7 +33,7 @@ import org.typelevel.log4cats.Logger
 private[subscriptions] object SubscriptionCategory {
 
   def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
-      queriesExecTimes:  LabeledHistogram[F, SqlStatement.Name],
+      queriesExecTimes:  LabeledHistogram[F],
       subscriberTracker: SubscriberTracker[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers      <- Subscribers(categoryName, subscriberTracker)

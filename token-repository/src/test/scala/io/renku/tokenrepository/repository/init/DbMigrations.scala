@@ -19,7 +19,6 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.{LabeledHistogram, TestLabeledHistogram}
@@ -31,7 +30,7 @@ trait DbMigrations {
 
   protected type Migration = { def run(): IO[Unit] }
 
-  private lazy val queriesExecTimes: LabeledHistogram[IO, SqlStatement.Name] =
+  private lazy val queriesExecTimes: LabeledHistogram[IO] =
     TestLabeledHistogram[SqlStatement.Name]("query_id")
   protected implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 

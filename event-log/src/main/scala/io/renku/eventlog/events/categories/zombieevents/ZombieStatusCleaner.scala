@@ -41,7 +41,7 @@ private trait ZombieStatusCleaner[F[_]] {
 
 private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow](
     sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with ZombieStatusCleaner[F]
@@ -94,7 +94,7 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow](
 private object ZombieStatusCleaner {
 
   def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
-                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+                                    queriesExecTimes: LabeledHistogram[F]
   ): F[ZombieStatusCleaner[F]] = MonadThrow[F].catchNonFatal(
     new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes)
   )

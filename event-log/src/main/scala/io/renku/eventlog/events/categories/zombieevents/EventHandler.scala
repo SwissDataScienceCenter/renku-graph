@@ -24,7 +24,7 @@ import cats.effect.kernel.Spawn
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure}
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.eventlog._
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
@@ -114,7 +114,7 @@ private class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
 private object EventHandler {
   def apply[F[_]: Spawn: Concurrent: Logger](
       sessionResource:                    SessionResource[F, EventLogDB],
-      queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name],
+      queriesExecTimes:                   LabeledHistogram[F],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],

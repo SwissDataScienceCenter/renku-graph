@@ -19,16 +19,16 @@
 package io.renku.metrics
 
 import cats.MonadThrow
+import cats.effect.Ref
+import cats.effect.kernel.Sync
+import io.prometheus.client.CollectorRegistry
 import io.prometheus.client.hotspot._
-import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 
 import scala.util.control.NonFatal
 
 trait MetricsRegistry[F[_]] {
 
-  def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
-      collectorBuilder: Builder
-  ): F[Collector]
+  def register(collector: MetricsCollector with PrometheusCollector): F[Unit]
 
   def maybeCollectorRegistry: Option[CollectorRegistry]
 }
@@ -41,7 +41,7 @@ object MetricsRegistry {
 
   def apply[F[_]: MonadThrow](implicit mr: MetricsRegistry[F]): MetricsRegistry[F] = mr
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[MetricsRegistry[F]] = for {
+  def apply[F[_]: Sync](config: Config = ConfigFactory.load()): F[MetricsRegistry[F]] = for {
     maybeEnabled <- find[F, Option[Boolean]]("metrics.enabled", config) recoverWith noneValue
   } yield maybeEnabled match {
     case Some(false) => new DisabledMetricsRegistry[F]
@@ -54,22 +54,24 @@ object MetricsRegistry {
 
   class DisabledMetricsRegistry[F[_]: MonadThrow] extends MetricsRegistry[F] {
 
-    override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
-        collectorBuilder: Builder
-    ): F[Collector] = MonadThrow[F].catchNonFatal(collectorBuilder.create())
+    override def register(collector: MetricsCollector with PrometheusCollector): F[Unit] = ().pure[F]
 
     override lazy val maybeCollectorRegistry: Option[CollectorRegistry] = None
   }
 
-  class EnabledMetricsRegistry[F[_]: MonadThrow] extends MetricsRegistry[F] {
+  class EnabledMetricsRegistry[F[_]: Sync] extends MetricsRegistry[F] {
 
     import EnabledMetricsRegistry._
 
-    override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
-        collectorBuilder: Builder
-    ): F[Collector] = MonadThrow[F].catchNonFatal {
-      collectorBuilder register registry
-    }
+    private val wrappersRegistrationLeger: Ref[F, Set[String]] = Ref.unsafe[F, Set[String]](Set.empty)
+
+    override def register(collector: MetricsCollector with PrometheusCollector): F[Unit] =
+      wrappersRegistrationLeger.update {
+        case leger if leger contains collector.name => leger
+        case leger =>
+          registry register collector.wrappedCollector
+          leger + collector.name
+      }
 
     override lazy val maybeCollectorRegistry: Option[CollectorRegistry] = Some(registry)
   }

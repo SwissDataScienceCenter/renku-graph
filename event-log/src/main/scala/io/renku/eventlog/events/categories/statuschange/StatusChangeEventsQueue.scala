@@ -57,14 +57,14 @@ object StatusChangeEventsQueue {
 
   def apply[F[_]: Async: Logger](
       sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[StatusChangeEventsQueue[F]] = MonadThrow[F].catchNonFatal {
     new StatusChangeEventsQueueImpl[F](sessionResource, queriesExecTimes)
   }
 }
 
 private class StatusChangeEventsQueueImpl[F[_]: Async: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                                               queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+                                                               queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
     with StatusChangeEventsQueue[F] {
 

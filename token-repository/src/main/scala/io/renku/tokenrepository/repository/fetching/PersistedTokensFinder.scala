@@ -35,7 +35,7 @@ private[repository] trait PersistedTokensFinder[F[_]] {
 
 private[repository] class PersistedTokensFinderImpl[F[_]: MonadCancelThrow](
     sessionResource:  SessionResource[F, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
     with PersistedTokensFinder[F]
     with TokenRepositoryTypeSerializers {

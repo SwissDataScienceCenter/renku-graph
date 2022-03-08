@@ -44,7 +44,7 @@ private trait EventPersister[F[_]] {
 private class EventPersisterImpl[F[_]: MonadCancelThrow](
     sessionResource:    SessionResource[F, EventLogDB],
     waitingEventsGauge: LabeledGauge[F, projects.Path],
-    queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:   LabeledHistogram[F],
     now:                () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventPersister[F] {
@@ -199,7 +199,7 @@ private object EventPersister {
   def apply[F[_]: MonadCancelThrow](
       sessionResource:    SessionResource[F, EventLogDB],
       waitingEventsGauge: LabeledGauge[F, projects.Path],
-      queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:   LabeledHistogram[F]
   ): F[EventPersisterImpl[F]] = MonadThrow[F].catchNonFatal {
     new EventPersisterImpl[F](sessionResource, waitingEventsGauge, queriesExecTimes)
   }

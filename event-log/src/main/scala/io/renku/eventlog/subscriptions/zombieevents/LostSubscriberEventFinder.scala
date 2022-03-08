@@ -39,7 +39,7 @@ import skunk.implicits._
 import java.time.Instant.now
 
 private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
@@ -111,7 +111,7 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource]
 
 private object LostSubscriberEventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
     new LostSubscriberEventFinder[F](queriesExecTimes)
   }

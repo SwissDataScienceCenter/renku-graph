@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.interpreters
+package io.renku.metrics
 
 import cats.MonadThrow
-import io.prometheus.client.{CollectorRegistry, SimpleCollector}
-import io.renku.metrics.MetricsRegistry
+import io.prometheus.client.CollectorRegistry
 
 object TestMetricsRegistry {
   def apply[F[_]: MonadThrow]: TestMetricsRegistry[F] = new TestMetricsRegistry[F]
@@ -30,9 +29,8 @@ class TestMetricsRegistry[F[_]: MonadThrow] extends MetricsRegistry[F] {
 
   private val collectorRegistry: CollectorRegistry = new CollectorRegistry()
 
-  override def register[Collector <: SimpleCollector[_], Builder <: SimpleCollector.Builder[Builder, Collector]](
-      collectorBuilder: Builder
-  ): F[Collector] = MonadThrow[F].catchNonFatal(collectorBuilder register collectorRegistry)
+  override def register(collector: MetricsCollector with PrometheusCollector): F[Unit] =
+    MonadThrow[F].catchNonFatal(collectorRegistry register collector.wrappedCollector)
 
   override def maybeCollectorRegistry: Option[CollectorRegistry] = Some(collectorRegistry)
 

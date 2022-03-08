@@ -21,17 +21,17 @@ package io.renku.tokenrepository.repository.association
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import eu.timepit.refined.types.numeric
+import io.renku.db.SessionResource
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.AccessToken
 import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokenRemoverImpl}
+import io.renku.tokenrepository.repository.fetching.{PersistedTokensFinder, PersistedTokensFinderImpl}
 import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 import org.typelevel.log4cats.Logger
-import io.renku.tokenrepository.repository.fetching.PersistedTokensFinderImpl
-import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
+
 import scala.util.control.NonFatal
-import eu.timepit.refined.types.numeric
 
 private trait TokenAssociator[F[_]] {
   def associate(projectId: Id, token: AccessToken): F[Unit]
@@ -95,7 +95,7 @@ private object TokenAssociator {
 
   def apply[F[_]: Async: Logger](
       sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[TokenAssociator[F]] = for {
     pathFinder        <- ProjectPathFinder[F]
     accessTokenCrypto <- AccessTokenCrypto[F]()

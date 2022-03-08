@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.subscriptions.cleanup
 
-import cats.{MonadThrow, Parallel}
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{MonadThrow, Parallel}
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.{ExecutionDate, TypeSerializers}
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
+import io.renku.eventlog.{ExecutionDate, TypeSerializers}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events._
@@ -41,7 +41,7 @@ import java.time.Instant
 private class CleanUpEventFinderImpl[F[_]: Async: Parallel: SessionResource](
     awaitingDeletionGauge: LabeledGauge[F, projects.Path],
     deletingGauge:         LabeledGauge[F, projects.Path],
-    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:      LabeledHistogram[F],
     now:                   () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, CleanUpEvent]
@@ -117,7 +117,7 @@ private object CleanUpEventFinder {
   def apply[F[_]: Async: Parallel: SessionResource](
       awatingDeletionGauge: LabeledGauge[F, projects.Path],
       deletingGauge:        LabeledGauge[F, projects.Path],
-      queriesExecTimes:     LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:     LabeledHistogram[F]
   ): F[EventFinder[F, CleanUpEvent]] = MonadThrow[F].catchNonFatal {
     new CleanUpEventFinderImpl(awatingDeletionGauge, deletingGauge, queriesExecTimes)
   }

@@ -34,7 +34,7 @@ private trait EventDetailsFinder[F[_]] {
 
 private class EventDetailsFinderImpl[F[_]: MonadCancelThrow](
     sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
     with EventDetailsFinder[F]
     with TypeSerializers {
@@ -60,7 +60,7 @@ private class EventDetailsFinderImpl[F[_]: MonadCancelThrow](
 private object EventDetailsFinder {
   def apply[F[_]: MonadCancelThrow](
       sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventDetailsFinder[F]] = MonadThrow[F].catchNonFatal {
     new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
   }
