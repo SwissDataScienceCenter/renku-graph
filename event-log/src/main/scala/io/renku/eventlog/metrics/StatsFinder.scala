@@ -26,7 +26,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.db.implicits._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
 import io.renku.events.CategoryName
@@ -48,15 +49,14 @@ trait StatsFinder[F[_]] {
   def countEvents(statuses: Set[EventStatus], maybeLimit: Option[Int Refined Positive] = None): F[Map[Path, Long]]
 }
 
-class StatsFinderImpl[F[_]: Async](
-    sessionResource:  SessionResource[F, EventLogDB],
+class StatsFinderImpl[F[_]: Async: SessionResource](
     queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with StatsFinder[F]
     with SubscriptionTypeSerializers {
 
-  override def countEventsByCategoryName(): F[Map[CategoryName, Long]] = sessionResource.useK {
+  override def countEventsByCategoryName(): F[Map[CategoryName, Long]] = SessionResource[F].useK {
     measureExecutionTime(countEventsPerCategoryName).map(_.toMap)
   }
 
@@ -141,7 +141,7 @@ class StatsFinderImpl[F[_]: Async](
       .build(_.toList)
   }
 
-  override def statuses(): F[Map[EventStatus, Long]] = sessionResource.useK {
+  override def statuses(): F[Map[EventStatus, Long]] = SessionResource[F].useK {
     measureExecutionTime(findStatuses)
       .map(_.toMap)
       .map(addMissingStatues)
@@ -165,7 +165,7 @@ class StatsFinderImpl[F[_]: Async](
     NonEmptyList.fromList(statuses.toList) match {
       case None => Map.empty[Path, Long].pure[F]
       case Some(statusesList) =>
-        sessionResource.useK {
+        SessionResource[F].useK {
           measureExecutionTime(countProjectsEvents(statusesList, maybeLimit))
             .map(_.toMap)
         }
@@ -222,11 +222,6 @@ class StatsFinderImpl[F[_]: Async](
 }
 
 object StatsFinder {
-
-  def apply[F[_]: MonadThrow: Async](
-      sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[StatsFinder[F]] = MonadThrow[F].catchNonFatal {
-    new StatsFinderImpl(sessionResource, queriesExecTimes)
-  }
+  def apply[F[_]: MonadThrow: Async: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[StatsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new StatsFinderImpl(queriesExecTimes))
 }

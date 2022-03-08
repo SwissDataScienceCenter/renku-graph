@@ -98,6 +98,8 @@ class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
 
 object ExecutionTimeRecorder {
 
+  def apply[F[_]](implicit etr: ExecutionTimeRecorder[F]): ExecutionTimeRecorder[F] = etr
+
   def apply[F[_]: Sync: Logger](
       config:         Config = ConfigFactory.load(),
       maybeHistogram: Option[Histogram[F]] = None

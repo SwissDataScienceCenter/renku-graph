@@ -20,15 +20,14 @@ package io.renku.eventlog.processingstatus
 
 import cats.MonadThrow
 import cats.data.OptionT
-import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.RefType.applyRef
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.db.implicits._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.EventLogDB
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects.Id
@@ -42,17 +41,15 @@ trait ProcessingStatusFinder[F[_]] {
   def fetchStatus(projectId: Id): OptionT[F, ProcessingStatus]
 }
 
-class ProcessingStatusFinderImpl[F[_]: MonadCancelThrow: Async](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient(Some(queriesExecTimes))
+class ProcessingStatusFinderImpl[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F])
+    extends DbClient(Some(queriesExecTimes))
     with ProcessingStatusFinder[F] {
 
   import eu.timepit.refined.auto._
   import io.renku.eventlog.TypeSerializers._
 
   override def fetchStatus(projectId: Id): OptionT[F, ProcessingStatus] = OptionT {
-    sessionResource.useK(measureExecutionTime(latestBatchStatues(projectId))) >>= toProcessingStatus
+    SessionResource[F].useK(measureExecutionTime(latestBatchStatues(projectId))) >>= toProcessingStatus
   }
 
   private def latestBatchStatues(projectId: Id) = SqlStatement[F](name = "processing status")
@@ -84,12 +81,10 @@ class ProcessingStatusFinderImpl[F[_]: MonadCancelThrow: Async](
 }
 
 object ProcessingStatusFinder {
-  def apply[F[_]: MonadCancelThrow: Async](
-      sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[ProcessingStatusFinder[F]] = MonadThrow[F].catchNonFatal {
-    new ProcessingStatusFinderImpl(sessionResource, queriesExecTimes)
-  }
+  def apply[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[ProcessingStatusFinder[F]] =
+    MonadThrow[F].catchNonFatal {
+      new ProcessingStatusFinderImpl(queriesExecTimes)
+    }
 }
 
 import io.renku.eventlog.processingstatus.ProcessingStatus._

@@ -22,7 +22,8 @@ import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel}
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.{Criteria, EventInfo, StatusProcessingTime}
 import io.renku.graph.model.events.{EventId, EventStatus}
@@ -36,10 +37,8 @@ private trait EventsFinder[F[_]] {
   def findEvents(request: EventsEndpoint.Criteria): F[PagingResponse[EventInfo]]
 }
 
-private class EventsFinderImpl[F[_]: Async: NonEmptyParallel](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient[F](Some(queriesExecTimes))
+private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](queriesExecTimes: LabeledHistogram[F])
+    extends DbClient[F](Some(queriesExecTimes))
     with EventsFinder[F]
     with Paging[EventInfo] {
 
@@ -57,7 +56,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel](
   private def createFinder(criteria: EventsEndpoint.Criteria) =
     new PagedResultsFinder[F, EventInfo] with TypeSerializers {
 
-      override def findResults(paging: PagingRequest): F[List[EventInfo]] = sessionResource.useK {
+      override def findResults(paging: PagingRequest): F[List[EventInfo]] = SessionResource[F].useK {
         for {
           infos               <- findInfos()
           withProcessingTimes <- infos.map(addProcessingTimes()).sequence
@@ -210,7 +209,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel](
           query(status)
       }
 
-      override def findTotal(): F[Total] = sessionResource.useK {
+      override def findTotal(): F[Total] = SessionResource[F].useK {
         val query = countEventQuery(criteria)
         measureExecutionTime {
           SqlStatement[F](name = "find event infos total")
@@ -227,9 +226,8 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel](
 }
 
 private object EventsFinder {
-  def apply[F[_]: Async: NonEmptyParallel](sessionResource: SessionResource[F, EventLogDB],
-                                           queriesExecTimes: LabeledHistogram[F]
-  ): F[EventsFinder[F]] = MonadThrow[F].catchNonFatal(
-    new EventsFinderImpl(sessionResource, queriesExecTimes)
-  )
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventsFinder[F]] =
+    MonadThrow[F].catchNonFatal(
+      new EventsFinderImpl(queriesExecTimes)
+    )
 }

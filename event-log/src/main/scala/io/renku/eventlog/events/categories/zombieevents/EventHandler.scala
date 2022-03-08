@@ -18,14 +18,13 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
+import cats.Show
 import cats.data.EitherT.fromEither
-import cats.effect.Concurrent
+import cats.effect.Async
 import cats.effect.kernel.Spawn
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure}
-import io.renku.db.SessionResource
-import io.renku.eventlog._
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
@@ -37,7 +36,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
+private class EventHandler[F[_]: Async: Logger](
     override val categoryName:          CategoryName,
     zombieStatusCleaner:                ZombieStatusCleaner[F],
     awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
@@ -112,15 +111,14 @@ private class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Spawn: Concurrent: Logger](
-      sessionResource:                    SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: SessionResource: Logger](
       queriesExecTimes:                   LabeledHistogram[F],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
       underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
   ): F[EventHandler[F]] = for {
-    zombieStatusCleaner <- ZombieStatusCleaner(sessionResource, queriesExecTimes)
+    zombieStatusCleaner <- ZombieStatusCleaner(queriesExecTimes)
   } yield new EventHandler[F](categoryName,
                               zombieStatusCleaner,
                               awaitingTriplesGenerationGauge,

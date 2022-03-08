@@ -23,10 +23,10 @@ import cats.effect.{Async, Spawn}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow, Show}
 import io.circe.DecodingFailure
-import io.renku.db.SessionResource
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.EventMessage
 import io.renku.eventlog.events.categories.statuschange.DBUpdater.EventUpdaterFactory
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
-import io.renku.eventlog.{EventLogDB, EventMessage}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.renku.events.consumers._
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
@@ -110,8 +110,7 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry](
 
 private object EventHandler {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      sessionResource:                    SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
       eventsQueue:                        StatusChangeEventsQueue[F],
       queriesExecTimes:                   LabeledHistogram[F],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
@@ -131,7 +130,7 @@ private object EventHandler {
                                                 deletingGauge
                        )
                      )
-    statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](sessionResource, gaugesUpdater))
+    statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](gaugesUpdater))
     _ <- registerHandlers(eventsQueue, statusChanger, queriesExecTimes, awaitingDeletionGauge, deletingGauge)
   } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queriesExecTimes)
 

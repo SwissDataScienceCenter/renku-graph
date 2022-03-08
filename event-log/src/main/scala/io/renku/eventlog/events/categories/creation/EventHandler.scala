@@ -19,11 +19,11 @@
 package io.renku.eventlog.events.categories.creation
 
 import cats.data.EitherT.fromEither
-import cats.effect.{Concurrent, MonadCancelThrow}
+import cats.effect.Concurrent
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.{ACursor, Decoder, DecodingFailure}
-import io.renku.db.SessionResource
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
@@ -98,10 +98,10 @@ private class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: MonadCancelThrow: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                                        waitingEventsGauge: LabeledGauge[F, projects.Path],
-                                                        queriesExecTimes:   LabeledHistogram[F]
+  def apply[F[_]: Concurrent: Logger: SessionResource](
+      waitingEventsGauge: LabeledGauge[F, projects.Path],
+      queriesExecTimes:   LabeledHistogram[F]
   ): F[EventHandler[F]] = for {
-    eventPersister <- EventPersister(sessionResource, waitingEventsGauge, queriesExecTimes)
+    eventPersister <- EventPersister(waitingEventsGauge, queriesExecTimes)
   } yield new EventHandler[F](categoryName, eventPersister)
 }

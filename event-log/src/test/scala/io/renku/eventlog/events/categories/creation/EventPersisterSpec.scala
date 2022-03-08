@@ -312,7 +312,7 @@ class EventPersisterSpec
     val currentTime        = mockFunction[Instant]
     val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
     val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val persister          = new EventPersisterImpl(sessionResource, waitingEventsGauge, queriesExecTimes, currentTime)
+    val persister          = new EventPersisterImpl(waitingEventsGauge, queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now)

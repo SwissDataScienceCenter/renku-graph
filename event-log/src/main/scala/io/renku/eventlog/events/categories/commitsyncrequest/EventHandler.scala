@@ -23,8 +23,7 @@ import cats.data.EitherT.fromEither
 import cats.effect.Concurrent
 import cats.syntax.all._
 import io.circe.Decoder
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
@@ -67,9 +66,8 @@ private class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Concurrent: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                      queriesExecTimes: LabeledHistogram[F]
-  ): F[EventHandler[F]] = for {
-    commitSyncForcer <- CommitSyncForcer(sessionResource, queriesExecTimes)
-  } yield new EventHandler[F](categoryName, commitSyncForcer)
+  def apply[F[_]: Concurrent: SessionResource: Logger](queriesExecTimes: LabeledHistogram[F]): F[EventHandler[F]] =
+    for {
+      commitSyncForcer <- CommitSyncForcer(queriesExecTimes)
+    } yield new EventHandler[F](categoryName, commitSyncForcer)
 }

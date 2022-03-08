@@ -19,10 +19,9 @@
 package io.renku.eventlog.processingstatus
 
 import cats.MonadThrow
-import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Async
 import cats.syntax.all._
-import io.renku.db.SessionResource
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.metrics.LabeledHistogram
@@ -87,12 +86,9 @@ class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
 
 object ProcessingStatusEndpoint {
 
-  import io.renku.eventlog.EventLogDB
-
-  def apply[F[_]: MonadCancelThrow: Async: Logger](
-      sessionResource:  SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: SessionResource: Logger](
       queriesExecTimes: LabeledHistogram[F]
   ): F[ProcessingStatusEndpoint[F]] = for {
-    statusFinder <- ProcessingStatusFinder(sessionResource, queriesExecTimes)
+    statusFinder <- ProcessingStatusFinder(queriesExecTimes)
   } yield new ProcessingStatusEndpointImpl[F](statusFinder)
 }

@@ -23,8 +23,9 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.{ExecutionDate, TypeSerializers}
 import io.renku.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
@@ -39,15 +40,14 @@ private trait ZombieStatusCleaner[F[_]] {
   def cleanZombieStatus(event: ZombieEvent): F[UpdateResult]
 }
 
-private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
+private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource](
     queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with ZombieStatusCleaner[F]
     with TypeSerializers {
 
-  override def cleanZombieStatus(event: ZombieEvent): F[UpdateResult] = sessionResource.useK {
+  override def cleanZombieStatus(event: ZombieEvent): F[UpdateResult] = SessionResource[F].useK {
     cleanEventualDeliveries(event.eventId) >> updateEventStatus(event)
   }
 
@@ -92,10 +92,6 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow](
 }
 
 private object ZombieStatusCleaner {
-
-  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
-                                    queriesExecTimes: LabeledHistogram[F]
-  ): F[ZombieStatusCleaner[F]] = MonadThrow[F].catchNonFatal(
-    new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes)
-  )
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[ZombieStatusCleaner[F]] =
+    MonadThrow[F].catchNonFatal(new ZombieStatusCleanerImpl(queriesExecTimes))
 }

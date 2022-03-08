@@ -23,7 +23,8 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.auto._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.categories.creation.EventPersister.Result
@@ -41,8 +42,7 @@ private trait EventPersister[F[_]] {
   def storeNewEvent(event: Event): F[Result]
 }
 
-private class EventPersisterImpl[F[_]: MonadCancelThrow](
-    sessionResource:    SessionResource[F, EventLogDB],
+private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
     waitingEventsGauge: LabeledGauge[F, projects.Path],
     queriesExecTimes:   LabeledHistogram[F],
     now:                () => Instant = () => Instant.now
@@ -53,7 +53,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
   import applicative._
   import io.renku.eventlog.TypeSerializers._
 
-  override def storeNewEvent(event: Event): F[Result] = sessionResource.useWithTransactionK[Result] {
+  override def storeNewEvent(event: Event): F[Result] = SessionResource[F].useWithTransactionK[Result] {
     Kleisli { case (transaction, session) =>
       for {
         sp <- transaction.savepoint
@@ -196,12 +196,11 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
 }
 
 private object EventPersister {
-  def apply[F[_]: MonadCancelThrow](
-      sessionResource:    SessionResource[F, EventLogDB],
+  def apply[F[_]: MonadCancelThrow: SessionResource](
       waitingEventsGauge: LabeledGauge[F, projects.Path],
       queriesExecTimes:   LabeledHistogram[F]
   ): F[EventPersisterImpl[F]] = MonadThrow[F].catchNonFatal {
-    new EventPersisterImpl[F](sessionResource, waitingEventsGauge, queriesExecTimes)
+    new EventPersisterImpl[F](waitingEventsGauge, queriesExecTimes)
   }
 
   sealed trait Result extends Product with Serializable

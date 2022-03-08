@@ -63,8 +63,8 @@ object Microservice extends IOMicroservice {
           isMigrating                 <- Ref.of[IO, Boolean](true)
           dbInitializer               <- DbInitializer[IO](isMigrating)
           queriesExecTimes            <- QueriesExecutionTimes[IO]
-          eventsQueue                 <- StatusChangeEventsQueue[IO](sessionResource, queriesExecTimes)
-          statsFinder                 <- StatsFinder(sessionResource, queriesExecTimes)
+          eventsQueue                 <- StatusChangeEventsQueue[IO](queriesExecTimes)
+          statsFinder                 <- StatsFinder(queriesExecTimes)
           eventLogMetrics             <- EventLogMetrics(statsFinder)
           awaitingGenerationGauge     <- AwaitingGenerationGauge(statsFinder)
           awaitingTransformationGauge <- AwaitingTransformationGauge(statsFinder)
@@ -83,25 +83,18 @@ object Microservice extends IOMicroservice {
                                      MetricsConfigProvider()
                                    )
           creationSubscription <-
-            events.categories.creation.SubscriptionFactory(sessionResource, awaitingGenerationGauge, queriesExecTimes)
+            events.categories.creation.SubscriptionFactory(awaitingGenerationGauge, queriesExecTimes)
           zombieEventsSubscription <- events.categories.zombieevents.SubscriptionFactory(
-                                        sessionResource,
                                         awaitingGenerationGauge,
                                         underTriplesGenerationGauge,
                                         awaitingTransformationGauge,
                                         underTransformationGauge,
                                         queriesExecTimes
                                       )
-          commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(
-                                             sessionResource,
-                                             queriesExecTimes
-                                           )
-          globalCommitSyncRequestSubscription <- events.categories.globalcommitsyncrequest.SubscriptionFactory(
-                                                   sessionResource,
-                                                   queriesExecTimes
-                                                 )
+          commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(queriesExecTimes)
+          globalCommitSyncRequestSubscription <-
+            events.categories.globalcommitsyncrequest.SubscriptionFactory(queriesExecTimes)
           statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
-                                             sessionResource,
                                              eventsQueue,
                                              awaitingGenerationGauge,
                                              underTriplesGenerationGauge,
@@ -120,7 +113,7 @@ object Microservice extends IOMicroservice {
                                     )
           serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
           eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
-          processingStatusEndpoint <- ProcessingStatusEndpoint(sessionResource, queriesExecTimes)
+          processingStatusEndpoint <- ProcessingStatusEndpoint(queriesExecTimes)
           eventProducersRegistry <- EventProducersRegistry(
                                       awaitingGenerationGauge,
                                       underTriplesGenerationGauge,
@@ -131,8 +124,8 @@ object Microservice extends IOMicroservice {
                                       queriesExecTimes
                                     )
           subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
-          eventDetailsEndpoint  <- EventDetailsEndpoint(sessionResource, queriesExecTimes)
-          eventsEndpoint        <- EventsEndpoint(sessionResource, queriesExecTimes)
+          eventDetailsEndpoint  <- EventDetailsEndpoint(queriesExecTimes)
+          eventsEndpoint        <- EventsEndpoint(queriesExecTimes)
           microserviceRoutes = new MicroserviceRoutes[IO](
                                  eventEndpoint,
                                  eventsEndpoint,
