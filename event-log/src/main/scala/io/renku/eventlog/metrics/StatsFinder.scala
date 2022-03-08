@@ -77,7 +77,7 @@ class StatsFinderImpl[F[_]: Async: SessionResource](
               JOIN subscription_category_sync_time sync_time
                 ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
               WHERE
-                   (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 minute')
+                   (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '5 minutes')
                 OR (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
                 OR (($eventDateEncoder - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
               GROUP BY sync_time.category_name

@@ -53,7 +53,7 @@ class StatsFinderSpec
       // MEMBER_SYNC specific
       val compoundId1 = compoundEventIds.generateOne
       val eventDate1  = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
-      val lastSynced1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofSeconds(61)))
+      val lastSynced1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(6)))
       upsertProject(compoundId1, projectPaths.generateOne, eventDate1)
       upsertLastSynced(compoundId1.projectId, membersync.categoryName, lastSynced1)
 
