@@ -42,7 +42,7 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
         (metricsRegistry
           .register(_: MetricsCollector with PrometheusCollector))
           .expects(*)
-          .returning(().pure[Try])
+          .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[Try])
 
         val labelName = nonBlankStrings().generateOne
 
@@ -57,7 +57,7 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
         .expects(*)
-        .returning(().pure[Try])
+        .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[Try])
 
       val labelName          = nonBlankStrings().generateOne
       val Success(histogram) = Histogram[Try](name, help, labelName, Seq(.1, 1))
@@ -88,7 +88,7 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
         (metricsRegistry
           .register(_: MetricsCollector with PrometheusCollector))
           .expects(*)
-          .returning(().pure[Try])
+          .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[Try])
 
         val Success(histogram) = Histogram[Try](name, help, Seq(.1, 1))
 
@@ -101,7 +101,7 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
         .expects(*)
-        .returning(().pure[Try])
+        .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[Try])
 
       val Success(histogram) = Histogram[Try](name, help, Seq(.1, .5, 1))
 

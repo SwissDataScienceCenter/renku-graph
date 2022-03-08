@@ -45,7 +45,7 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockF
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
         .expects(where[MetricsCollector with PrometheusCollector](_.wrappedCollector.isInstanceOf[LibGauge]))
-        .returning(().pure[IO])
+        .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[IO])
 
       val gauge = UnderTriplesGenerationGauge(statsFinder).unsafeRunSync()
 
@@ -58,7 +58,7 @@ class UnderTriplesGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockF
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
         .expects(*)
-        .returning(().pure[IO])
+        .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[IO])
 
       val processingEvents = processingEventsGen.generateOne
       (statsFinder.countEvents _)

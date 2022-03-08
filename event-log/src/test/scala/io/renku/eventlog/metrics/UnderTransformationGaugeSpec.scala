@@ -45,7 +45,7 @@ class UnderTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockFact
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
         .expects(where[MetricsCollector with PrometheusCollector](_.wrappedCollector.isInstanceOf[LibGauge]))
-        .returning(().pure[IO])
+        .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[IO])
 
       val gauge = UnderTransformationGauge(statsFinder).unsafeRunSync()
 
@@ -58,7 +58,7 @@ class UnderTransformationGaugeSpec extends AnyWordSpec with IOSpec with MockFact
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
         .expects(*)
-        .returning(().pure[IO])
+        .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[IO])
 
       val underTransformationEvents = underTransformation.generateOne
       (statsFinder.countEvents _)

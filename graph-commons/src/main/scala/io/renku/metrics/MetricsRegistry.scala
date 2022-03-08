@@ -28,7 +28,7 @@ import scala.util.control.NonFatal
 
 trait MetricsRegistry[F[_]] {
 
-  def register(collector: MetricsCollector with PrometheusCollector): F[Unit]
+  def register[C <: MetricsCollector with PrometheusCollector](collector: C): F[C]
 
   def maybeCollectorRegistry: Option[CollectorRegistry]
 }
@@ -54,7 +54,7 @@ object MetricsRegistry {
 
   class DisabledMetricsRegistry[F[_]: MonadThrow] extends MetricsRegistry[F] {
 
-    override def register(collector: MetricsCollector with PrometheusCollector): F[Unit] = ().pure[F]
+    override def register[C <: MetricsCollector with PrometheusCollector](collector: C): F[C] = collector.pure[F]
 
     override lazy val maybeCollectorRegistry: Option[CollectorRegistry] = None
   }
@@ -63,14 +63,16 @@ object MetricsRegistry {
 
     import EnabledMetricsRegistry._
 
-    private val wrappersRegistrationLeger: Ref[F, Set[String]] = Ref.unsafe[F, Set[String]](Set.empty)
+    private val wrappersRegistrationLeger: Ref[F, Map[String, MetricsCollector]] =
+      Ref.unsafe[F, Map[String, MetricsCollector]](Map.empty)
 
-    override def register(collector: MetricsCollector with PrometheusCollector): F[Unit] =
-      wrappersRegistrationLeger.update {
-        case leger if leger contains collector.name => leger
+    override def register[C <: MetricsCollector with PrometheusCollector](collector: C): F[C] =
+      wrappersRegistrationLeger.modify {
+        case leger if leger contains collector.name =>
+          leger -> leger(collector.name).asInstanceOf[C]
         case leger =>
           registry register collector.wrappedCollector
-          leger + collector.name
+          (leger + (collector.name -> collector)) -> collector
       }
 
     override lazy val maybeCollectorRegistry: Option[CollectorRegistry] = Some(registry)

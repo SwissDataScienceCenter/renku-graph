@@ -107,7 +107,7 @@ object Gauge {
         .create()
     )
 
-    MetricsRegistry[F].register(gauge).map(_ => gauge)
+    MetricsRegistry[F].register(gauge).widen
   }
 
   def apply[F[_]: MonadThrow: MetricsRegistry, LabelValue](
@@ -134,6 +134,6 @@ object Gauge {
       resetDataFetch
     )
 
-    MetricsRegistry[F].register(gauge).map(_ => gauge)
+    MetricsRegistry[F].register(gauge).widen
   }
 }

@@ -29,8 +29,11 @@ class TestMetricsRegistry[F[_]: MonadThrow] extends MetricsRegistry[F] {
 
   private val collectorRegistry: CollectorRegistry = new CollectorRegistry()
 
-  override def register(collector: MetricsCollector with PrometheusCollector): F[Unit] =
-    MonadThrow[F].catchNonFatal(collectorRegistry register collector.wrappedCollector)
+  override def register[C <: MetricsCollector with PrometheusCollector](collector: C): F[C] =
+    MonadThrow[F].catchNonFatal {
+      collectorRegistry register collector.wrappedCollector
+      collector
+    }
 
   override def maybeCollectorRegistry: Option[CollectorRegistry] = Some(collectorRegistry)
 

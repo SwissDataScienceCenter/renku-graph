@@ -45,7 +45,7 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockFacto
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
         .expects(where[MetricsCollector with PrometheusCollector](_.wrappedCollector.isInstanceOf[LibGauge]))
-        .returning(().pure[IO])
+        .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[IO])
 
       val gauge = AwaitingGenerationGauge(statsFinder).unsafeRunSync()
 
@@ -58,7 +58,7 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with IOSpec with MockFacto
       (metricsRegistry
         .register(_: MetricsCollector with PrometheusCollector))
         .expects(*)
-        .returning(().pure[IO])
+        .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[IO])
 
       val waitingEvents = waitingEventsGen.generateOne
       (statsFinder.countEvents _)

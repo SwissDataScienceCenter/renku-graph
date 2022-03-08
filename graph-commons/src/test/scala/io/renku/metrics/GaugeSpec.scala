@@ -247,7 +247,7 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
         (metricsRegistry
           .register(_: MetricsCollector with PrometheusCollector))
           .expects(*)
-          .returning(().pure[Try])
+          .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[Try])
 
         val Success(gauge) = Gauge[Try](name, help)
 
@@ -265,7 +265,7 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
         (metricsRegistry
           .register(_: MetricsCollector with PrometheusCollector))
           .expects(*)
-          .returning(().pure[Try])
+          .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[Try])
 
         val labelName = nonBlankStrings().generateOne
 

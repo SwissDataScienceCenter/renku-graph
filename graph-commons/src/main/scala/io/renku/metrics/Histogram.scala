@@ -89,7 +89,7 @@ object Histogram {
         .create()
     )
 
-    MetricsRegistry[F].register(histogram).map(_ => histogram)
+    MetricsRegistry[F].register(histogram).widen
   }
 
   def apply[F[_]: MonadThrow: MetricsRegistry](
@@ -109,6 +109,6 @@ object Histogram {
         .create()
     )
 
-    MetricsRegistry[F].register(histogram).map(_ => histogram)
+    MetricsRegistry[F].register(histogram).widen
   }
 }
