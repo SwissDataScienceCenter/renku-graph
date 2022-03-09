@@ -20,9 +20,8 @@ package io.renku.tokenrepository.repository.init
 
 import cats.data.Kleisli
 import cats.effect._
-import cats.effect.kernel.Temporal
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.LabeledHistogram
@@ -40,7 +39,7 @@ private trait ProjectPathAdder[F[_]] {
   def run(): F[Unit]
 }
 
-private class ProjectPathAdderImpl[F[_]: Spawn: MonadCancelThrow: Logger](
+private class ProjectPathAdderImpl[F[_]: Spawn: Logger](
     sessionResource:   SessionResource[F, ProjectsTokensDB],
     accessTokenCrypto: AccessTokenCrypto[F],
     pathFinder:        ProjectPathFinder[F],
@@ -92,7 +91,7 @@ private class ProjectPathAdderImpl[F[_]: Spawn: MonadCancelThrow: Logger](
 
   private def findEntryWithoutPath: Kleisli[F, Session[F], Option[(Id, EncryptedAccessToken)]] = {
     val query: Query[Void, (Id, EncryptedAccessToken)] =
-      sql"select project_id, token from projects_tokens where project_path IS NULL limit 1;"
+      sql"SELECT project_id, token FROM projects_tokens WHERE project_path IS NULL LIMIT 1;"
         .query(projectIdDecoder ~ encryptedAccessTokenDecoder)
         .map { case id ~ token => (id, token) }
     Kleisli(_.option(query))
@@ -133,9 +132,9 @@ private class ProjectPathAdderImpl[F[_]: Spawn: MonadCancelThrow: Logger](
 
 private object ProjectPathAdder {
 
-  def apply[F[_]: Async: Temporal: Spawn: MonadCancelThrow: Logger](
+  def apply[F[_]: Async: Logger](
       sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[ProjectPathAdder[F]] = for {
     accessTokenCrypto <- AccessTokenCrypto[F]()
     pathFinder        <- ProjectPathFinder[F]

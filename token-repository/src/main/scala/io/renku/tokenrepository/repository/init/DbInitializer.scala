@@ -18,63 +18,52 @@
 
 package io.renku.tokenrepository.repository.init
 
-import cats.data.Kleisli
+import DbInitializer.Runnable
 import cats.effect._
-import cats.effect.kernel.Temporal
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.{ProjectsTokensDB, init}
+import io.renku.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
 trait DbInitializer[F[_]] {
   def run(): F[Unit]
 }
 
-class DbInitializerImpl[F[_]: MonadCancelThrow: Logger](
-    projectPathAdder:         ProjectPathAdder[F],
-    duplicateProjectsRemover: DuplicateProjectsRemover[F],
-    sessionResource:          SessionResource[F, ProjectsTokensDB]
+class DbInitializerImpl[F[_]: Async: Logger](migrators: List[Runnable[F, Unit]],
+                                             retrySleepDuration: FiniteDuration = 20 seconds
 ) extends DbInitializer[F] {
-
-  import skunk._
-  import skunk.implicits._
 
   override def run(): F[Unit] = {
     for {
-      _ <- createTable
-      _ <- projectPathAdder.run()
-      _ <- duplicateProjectsRemover.run()
+      _ <- migrators.map(_.run()).sequence
       _ <- Logger[F].info("Projects Tokens database initialization success")
     } yield ()
-  } recoverWith logging
+  } recoverWith logAndRetry
 
-  private def createTable: F[Unit] =
-    sessionResource.useK {
-      val query: Command[Void] =
-        sql"""CREATE TABLE IF NOT EXISTS projects_tokens(
-                project_id int4 PRIMARY KEY,
-                token VARCHAR NOT NULL
-              );""".command
-      Kleisli[F, Session[F], Unit](session => session.execute(query).void)
-    }
-
-  private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F]
-      .error(exception)("Projects Tokens database initialization failure")
-      .flatMap(_ => MonadCancelThrow[F].raiseError(exception))
+  private def logAndRetry: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
+    for {
+      _ <- Temporal[F] sleep retrySleepDuration
+      _ <- Logger[F].error(exception)(s"Projects Tokens database initialization failed")
+      _ <- run()
+    } yield ()
   }
 }
 
 object DbInitializer {
 
-  def apply[F[_]: Async: Temporal: Spawn: MonadCancelThrow: Logger](
+  def apply[F[_]: Async: Logger](
       sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[DbInitializer[F]] = for {
-    pathAdder <- ProjectPathAdder[F](sessionResource, queriesExecTimes)
-    duplicateProjectsRemover = init.DuplicateProjectsRemover[F](sessionResource)
-  } yield new DbInitializerImpl[F](pathAdder, duplicateProjectsRemover, sessionResource)
+    tableCreator             <- ProjectsTokensTableCreator[F](sessionResource).pure[F]
+    pathAdder                <- ProjectPathAdder[F](sessionResource, queriesExecTimes)
+    duplicateProjectsRemover <- DuplicateProjectsRemover[F](sessionResource).pure[F]
+  } yield new DbInitializerImpl[F](List[Runnable[F, Unit]](tableCreator, pathAdder, duplicateProjectsRemover))
+
+  private[init] type Runnable[F[_], R] = { def run(): F[R] }
 }

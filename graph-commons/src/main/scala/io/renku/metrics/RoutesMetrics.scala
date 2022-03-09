@@ -24,12 +24,12 @@ import org.http4s.HttpRoutes
 import org.http4s.metrics.prometheus.{Prometheus, PrometheusExportService}
 import org.http4s.server.middleware.{Metrics => ServerMetrics}
 
-class RoutesMetrics[F[_]: Sync](metricsRegistry: MetricsRegistry) {
+class RoutesMetrics[F[_]: Sync: MetricsRegistry] {
 
   implicit class RoutesOps(routes: HttpRoutes[F]) {
 
     def withMetrics: Resource[F, HttpRoutes[F]] =
-      metricsRegistry.maybeCollectorRegistry match {
+      MetricsRegistry[F].maybeCollectorRegistry match {
         case Some(collectorRegistry) =>
           Prometheus.metricsOps[F](collectorRegistry, "server").map { metrics =>
             PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[F](

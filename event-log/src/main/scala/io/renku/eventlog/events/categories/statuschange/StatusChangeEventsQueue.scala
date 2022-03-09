@@ -24,8 +24,8 @@ import cats.effect.{Async, Ref, Temporal}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.{Decoder, Encoder}
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.EventLogDB
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
@@ -55,17 +55,15 @@ object StatusChangeEventsQueue {
     implicit def show[E]: Show[EventType[E]] = Show.show(_.value)
   }
 
-  def apply[F[_]: Async: Logger](
-      sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: Async: Logger: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[StatusChangeEventsQueue[F]] = MonadThrow[F].catchNonFatal {
-    new StatusChangeEventsQueueImpl[F](sessionResource, queriesExecTimes)
+    new StatusChangeEventsQueueImpl[F](queriesExecTimes)
   }
 }
 
-private class StatusChangeEventsQueueImpl[F[_]: Async: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                                               queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
-) extends DbClient[F](Some(queriesExecTimes))
+private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource](queriesExecTimes: LabeledHistogram[F])
+    extends DbClient[F](Some(queriesExecTimes))
     with StatusChangeEventsQueue[F] {
 
   import eu.timepit.refined.auto._
@@ -117,7 +115,7 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger](sessionResource: 
       case Some(stringPayload) => process(stringPayload, handler) >> dequeueType(handler)
     }
 
-  private def dequeueEvent[E <: StatusChangeEvent](handler: HandlerDef[E]) = sessionResource.useK {
+  private def dequeueEvent[E <: StatusChangeEvent](handler: HandlerDef[E]) = SessionResource[F].useK {
     findEvent[E](handler.eventType) >>= {
       case None                     => Kleisli.pure(Option.empty[String])
       case Some((eventId, payload)) => deleteEvent(eventId) map (if (_) payload.some else None)

@@ -20,7 +20,7 @@ package io.renku.eventlog.events.categories
 package statuschange
 
 import cats.Show
-import cats.effect.IO
+import cats.effect.{Deferred, IO}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Encoder
@@ -31,21 +31,20 @@ import io.renku.eventlog.events.categories.statuschange.Generators._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.json.JsonOps._
+import io.renku.metrics.{MetricsRegistry, TestLabeledHistogram, TestMetricsRegistry}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.events.consumers.Project
-import io.renku.json.JsonOps._
-
 
 class EventHandlerSpec
     extends AnyWordSpec
@@ -62,34 +61,32 @@ class EventHandlerSpec
         Gen
           .const(AllEventsToNew)
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
         toTriplesGeneratedEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event =>
-            EventRequestContent.WithPayload[ZippedEventPayload](event._1.asJson, event._1.payload) -> event._2
-          ),
+          .map(toRequestContent(e => EventRequestContent.WithPayload[ZippedEventPayload](e.asJson, e.payload))),
         toTripleStoreEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
         toFailureEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
         rollbackToNewEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
         rollbackToTriplesGeneratedEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
         toAwaitingDeletionEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
         rollbackToAwaitingDeletionEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2),
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
         projectEventToNewEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(event => EventRequestContent.NoPayload(event._1.asJson) -> event._2)
-      ).map(_.generateOne) foreach { case (eventRequestContent, eventAsString) =>
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson)))
+      ).map(_.generateOne) foreach { case (event, eventRequestContent, waitForUpdate, eventAsString) =>
         handler
           .createHandlingProcess(eventRequestContent)
           .unsafeRunSync()
@@ -97,18 +94,17 @@ class EventHandlerSpec
           .value
           .unsafeRunSync() shouldBe Right(Accepted)
 
-        eventually {
-          logger.loggedOnly(Info(s"$categoryName: $eventAsString -> Processed"),
-                            Info(s"$categoryName: $eventAsString -> $Accepted")
-          )
-        }
+        waitForUpdate.get.unsafeRunSync()
+
+        if (event.silent) logger.expectNoLogs()
+        else logger.loggedOnly(Info(s"$categoryName: $eventAsString -> $Accepted"))
         logger.reset()
       }
     }
 
     s"log an error if the events updater fails" in new TestCase {
       val exception = exceptions.generateOne
-      val (event, eventAsString) = toTripleStoreEvents
+      val (event, _, eventAsString) = toTripleStoreEvents
         .map(stubUpdateStatuses(updateResult = exception.raiseError[IO, Unit]))
         .generateOne
 
@@ -147,18 +143,35 @@ class EventHandlerSpec
 
   private trait TestCase {
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    implicit val logger:          TestLogger[IO]      = TestLogger[IO]()
+    implicit val metricsRegistry: MetricsRegistry[IO] = TestMetricsRegistry[IO]
     val statusChanger       = mock[StatusChanger[IO]]
     val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
     val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
     val queryExec           = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val handler = new EventHandler[IO](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queryExec)
 
-    def stubUpdateStatuses[E <: StatusChangeEvent](updateResult: IO[Unit])(implicit show: Show[E]): E => (E, String) =
+    def stubUpdateStatuses[E <: StatusChangeEvent](
+        updateResult: IO[Unit]
+    )(implicit show:  Show[E]): E => (E, Deferred[IO, Unit], String) =
       event => {
-        (statusChanger.updateStatuses[E](_: E)(_: DBUpdater[IO, E])).expects(event, *).returning(updateResult)
-        (event, event.show)
+        val waitForUpdate = Deferred.unsafe[IO, Unit]
+        (statusChanger
+          .updateStatuses[E](_: E)(_: DBUpdater[IO, E]))
+          .expects(event, *)
+          .onCall(_ =>
+            updateResult
+              .flatTap(_ => waitForUpdate.complete(()))
+              .recoverWith(_ => waitForUpdate.complete(()).void >> updateResult)
+          )
+        (event, waitForUpdate, event.show)
       }
+
+    def toRequestContent[E <: StatusChangeEvent](
+        f: E => EventRequestContent
+    ): ((E, Deferred[IO, Unit], String)) => (E, EventRequestContent, Deferred[IO, Unit], String) = {
+      case (event, waitForUpdate, eventShow) => (event, f(event), waitForUpdate, eventShow)
+    }
   }
 
   private implicit def eventEncoder[E <: StatusChangeEvent]: Encoder[E] = Encoder.instance[E] {
@@ -240,5 +253,4 @@ class EventHandlerSpec
       "newStatus":    "NEW"
     }"""
   }
-
 }

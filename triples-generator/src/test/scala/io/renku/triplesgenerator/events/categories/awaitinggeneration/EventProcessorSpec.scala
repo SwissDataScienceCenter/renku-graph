@@ -18,12 +18,9 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration
 
-import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
-import cats.effect.IO
 import cats.syntax.all._
-import io.prometheus.client.Histogram
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -37,27 +34,23 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.jsonld.JsonLD
 import io.renku.logging.TestExecutionTimeRecorder
-import io.renku.metrics.MetricsRegistry
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.events.categories.EventStatusUpdater
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater.ExecutionDelay
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.eventsProcessingTimesBuilder
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
-import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
+import io.renku.triplesgenerator.generators.ErrorGenerators.{authRecoverableErrors, logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Assertion
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
-import scala.jdk.CollectionConverters._
 import scala.util.Try
 
-class CommitEventProcessorSpec
+class EventProcessorSpec
     extends AnyWordSpec
     with IOSpec
     with MockFactory
@@ -81,18 +74,16 @@ class CommitEventProcessorSpec
       eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
       logSummary(commitEvent)
-
-      verifyMetricsCollected()
     }
 
-    "succeed if event fails during triples generation" in new TestCase {
+    "succeed if event fails during triples generation with a ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
         .returning(maybeAccessToken.pure[Try])
 
-      val exception = exceptions.generateOne
+      val exception = nonRecoverableMalformedRepoErrors.generateOne
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commitEvent, maybeAccessToken)
@@ -102,17 +93,38 @@ class CommitEventProcessorSpec
 
       eventProcessor.process(commitEvent) shouldBe ().pure[Try]
 
-      logError(commitEvent, exception)
+      logger.expectNoLogs()
     }
 
-    s"succeed and mark event with RecoverableFailure if finding triples fails with $LogWorthyRecoverableError" in new TestCase {
+    "log an error and succeed " +
+      "if event fails during triples generation with a non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
+
+        val commitEvent = commitEvents.generateOne
+
+        givenFetchingAccessToken(forProjectPath = commitEvent.project.path)
+          .returning(maybeAccessToken.pure[Try])
+
+        val exception = exceptions.generateOne
+        (triplesFinder
+          .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
+          .expects(commitEvent, maybeAccessToken)
+          .returning(EitherT.liftF(exception.raiseError[Try, JsonLD]))
+
+        expectEventMarkedAsNonRecoverableFailure(commitEvent, exception)
+
+        eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+
+        logError(commitEvent, exception)
+      }
+
+    "mark event as RecoverableFailure and log an error if finding triples fails with LogWorthyRecoverableError" in new TestCase {
 
       val commitEvent = commitEvents.generateOne
 
       givenFetchingAccessToken(commitEvent.project.path)
         .returning(maybeAccessToken.pure[Try])
 
-      val exception = processingRecoverableErrors.generateOne
+      val exception = logWorthyRecoverableErrors.generateOne
       (triplesFinder
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commitEvent, maybeAccessToken)
@@ -124,6 +136,27 @@ class CommitEventProcessorSpec
 
       logError(commitEvent, exception, exception.getMessage)
     }
+
+    "mark event as RecoverableFailure and refrain from loggin an error " +
+      "if finding triples fails with AuthRecoverableError" in new TestCase {
+
+        val commitEvent = commitEvents.generateOne
+
+        givenFetchingAccessToken(commitEvent.project.path)
+          .returning(maybeAccessToken.pure[Try])
+
+        val exception = authRecoverableErrors.generateOne
+        (triplesFinder
+          .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
+          .expects(commitEvent, maybeAccessToken)
+          .returning(leftT[Try, JsonLD](exception))
+
+        expectEventMarkedAsRecoverableFailure(commitEvent, exception)
+
+        eventProcessor.process(commitEvent) shouldBe ().pure[Try]
+
+        logger.expectNoLogs()
+      }
 
     s"put event into status $New if finding access token fails" in new TestCase {
 
@@ -143,32 +176,6 @@ class CommitEventProcessorSpec
     }
   }
 
-  "eventsProcessingTimes histogram" should {
-
-    "have 'triples_generation_processing_times' name" in {
-      eventsProcessingTimes.startTimer().observeDuration()
-
-      eventsProcessingTimes.collect().asScala.headOption.map(_.name) shouldBe Some(
-        "triples_generation_processing_times"
-      )
-    }
-
-    "be registered in the Metrics Registry" in {
-
-      val metricsRegistry = mock[MetricsRegistry]
-
-      (metricsRegistry
-        .register[IO, Histogram, Histogram.Builder](_: Histogram.Builder)(_: MonadThrow[IO]))
-        .expects(eventsProcessingTimesBuilder, MonadThrow[IO])
-        .returning(IO.pure(eventsProcessingTimes))
-
-      implicit val logger: TestLogger[IO] = TestLogger[IO]()
-      CommitEventProcessor[IO](metricsRegistry).unsafeRunSync()
-    }
-  }
-
-  private lazy val eventsProcessingTimes = eventsProcessingTimesBuilder.create()
-
   private trait TestCase {
 
     val maybeAccessToken = Gen.option(accessTokens).generateOne
@@ -177,9 +184,9 @@ class CommitEventProcessorSpec
     val accessTokenFinder       = mock[AccessTokenFinder[Try]]
     val triplesFinder           = mock[TriplesGenerator[Try]]
     val eventStatusUpdater      = mock[EventStatusUpdater[Try]]
-    val allEventsTimeRecorder   = TestExecutionTimeRecorder[Try](Option(eventsProcessingTimes))
+    val allEventsTimeRecorder   = TestExecutionTimeRecorder[Try](maybeHistogram = None)
     val singleEventTimeRecorder = TestExecutionTimeRecorder[Try](maybeHistogram = None)
-    val eventProcessor = new CommitEventProcessor(
+    val eventProcessor = new EventProcessorImpl(
       accessTokenFinder,
       triplesFinder,
       eventStatusUpdater,
@@ -207,8 +214,8 @@ class CommitEventProcessorSpec
 
     def expectEventMarkedAsRecoverableFailure(commit: CommitEvent, exception: ProcessingRecoverableError) = {
       val executionDelay = exception match {
-        case _: AuthRecoverableError      => ExecutionDelay(Duration.ofHours(1))
-        case _: LogWorthyRecoverableError => ExecutionDelay(Duration.ofMinutes(5))
+        case _: AuthRecoverableError      => ExecutionDelay(Duration ofHours 1)
+        case _: LogWorthyRecoverableError => ExecutionDelay(Duration ofMinutes 15)
       }
       (eventStatusUpdater
         .toFailure(_: CompoundEventId, _: Path, _: FailureStatus, _: Throwable, _: ExecutionDelay))
@@ -247,17 +254,10 @@ class CommitEventProcessorSpec
       Info(s"${commonLogMessage(commit)} processed in ${allEventsTimeRecorder.elapsedTime}ms")
     )
 
-    def logError(commit: CommitEvent, exception: Exception, message: String = "failed"): Assertion =
+    def logError(commit: CommitEvent, exception: Exception, message: String = "failed") =
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
 
     def commonLogMessage(event: CommitEvent): String =
       s"$categoryName: Commit Event ${event.compoundEventId}, ${event.project.path}"
-
-    def verifyMetricsCollected() =
-      eventsProcessingTimes
-        .collect()
-        .asScala
-        .flatMap(_.samples.asScala.map(_.name))
-        .exists(_ startsWith "triples_generation_processing_times") shouldBe true
   }
 }

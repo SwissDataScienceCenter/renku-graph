@@ -44,7 +44,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeEncoders
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
 import org.scalacheck.Gen

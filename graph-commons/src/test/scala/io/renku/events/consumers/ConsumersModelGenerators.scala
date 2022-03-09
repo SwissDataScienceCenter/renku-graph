@@ -18,21 +18,10 @@
 
 package io.renku.events.consumers
 
-import io.renku.events.EventRequestContent
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{jsons, nonEmptyStrings}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import org.scalacheck.Gen
 
 object ConsumersModelGenerators {
-
-  implicit val eventRequestContents: Gen[EventRequestContent] = for {
-    event        <- jsons
-    maybePayload <- nonEmptyStrings().toGeneratorOfOptions
-  } yield maybePayload match {
-    case Some(payload) => EventRequestContent.WithPayload(event, payload)
-    case None          => EventRequestContent.NoPayload(event)
-  }
 
   implicit lazy val consumerProjects: Gen[Project] = for {
     projectId <- projectIds

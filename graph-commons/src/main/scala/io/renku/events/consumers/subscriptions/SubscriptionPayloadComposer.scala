@@ -25,7 +25,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.CategoryName
 import io.renku.microservices._
 
 trait SubscriptionPayloadComposer[F[_]] {

@@ -19,13 +19,16 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.Async
-import cats.{MonadThrow, Show}
+import cats.syntax.all._
+import cats.{Applicative, Show}
 import io.renku.control.Throttler
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.graph.model.events.CategoryName
+import io.renku.graph.metrics.SentEventsGauge
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException}
+import io.renku.metrics.{LabeledGauge, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -37,6 +40,7 @@ private trait EventsSender[F[_], CategoryEvent] {
 private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
     categoryName:           CategoryName,
     categoryEventEncoder:   EventEncoder[CategoryEvent],
+    sentEventsGauge:        LabeledGauge[F, CategoryName],
     retryInterval:          FiniteDuration = 1 second,
     requestTimeoutOverride: Option[Duration] = None
 ) extends RestClient[F, EventsSender[F, CategoryEvent]](Throttler.noThrottling,
@@ -44,8 +48,9 @@ private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
                                                         requestTimeoutOverride = requestTimeoutOverride
     )
     with EventsSender[F, CategoryEvent] {
-
+  private val applicative = Applicative[F]
   import SendingResult._
+  import applicative.whenA
   import cats.syntax.all._
   import org.http4s.Method.POST
   import org.http4s.Status._
@@ -53,10 +58,10 @@ private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
 
   override def sendEvent(subscriberUrl: SubscriberUrl, event: CategoryEvent): F[SendingResult] = {
     for {
-      uri <- validateUri(subscriberUrl.value)
-      sendingResult <-
-        send(request(POST, uri).withParts(categoryEventEncoder.encodeParts(event)))(mapResponse)
-    } yield sendingResult
+      uri    <- validateUri(subscriberUrl.value)
+      result <- send(request(POST, uri).withParts(categoryEventEncoder.encodeParts(event)))(mapResponse)
+      _      <- whenA(result == Delivered)(sentEventsGauge increment categoryName)
+    } yield result
   } recoverWith exceptionToSendingResult(subscriberUrl, event)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[SendingResult]] = {
@@ -79,12 +84,13 @@ private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
 }
 
 private object EventsSender {
-  def apply[F[_]: Async: Logger, CategoryEvent](
+  def apply[F[_]: Async: Logger: MetricsRegistry, CategoryEvent](
       categoryName:         CategoryName,
       categoryEventEncoder: EventEncoder[CategoryEvent]
-  ): F[EventsSender[F, CategoryEvent]] = MonadThrow[F].catchNonFatal {
-    new EventsSenderImpl(categoryName, categoryEventEncoder)
-  }
+  ): F[EventsSender[F, CategoryEvent]] =
+    SentEventsGauge[F]
+      .map(sentEventsGauge => new EventsSenderImpl(categoryName, categoryEventEncoder, sentEventsGauge))
+      .widen[EventsSender[F, CategoryEvent]]
 
   sealed trait SendingResult extends Product with Serializable
   object SendingResult {

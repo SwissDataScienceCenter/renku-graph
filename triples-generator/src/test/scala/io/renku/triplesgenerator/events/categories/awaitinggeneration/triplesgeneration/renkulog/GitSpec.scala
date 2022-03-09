@@ -20,16 +20,15 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesge
 
 import ammonite.ops.{Bytes, CommandResult, Path, ShelloutException}
 import cats.effect.IO
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.config.ServiceUrl
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors.LogWorthyRecoverableError
-import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitImpl, RepositoryPath}
+import io.renku.triplesgenerator.events.categories.ProcessingNonRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
+import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,24 +46,39 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
       git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Right(())
     }
 
-    val recoverableFailureMessagesToCheck = Set[NonBlank](
+    Set[NonBlank](
+      "fatal: could not read Username for",
+      "fatal: Authentication failed for"
+    ) foreach { failure =>
+      s"return AuthRecoverableError if command fails with a message '$failure'" in new TestCase {
+
+        val errorMessage = sentenceContaining(failure).generateOne.value
+        val commandResultException = ShelloutException {
+          CommandResult(
+            exitCode = 1,
+            chunks = Seq(Left(new Bytes(errorMessage.getBytes())))
+          )
+        }
+        cloneCommand
+          .expects(repositoryUrl, destDirectory, workDirectory)
+          .throwing(commandResultException)
+
+        git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Left(
+          AuthRecoverableError(s"git clone failed with: ${commandResultException.result.toString}")
+        )
+      }
+    }
+
+    Set[NonBlank](
       "SSL_ERROR_SYSCALL",
-      "fatal: the remote end hung up unexpectedly",
-      Refined.unsafeApply(
-        s"fatal: unable to access 'https://renkulab.io/gitlab/${projectPaths.generateOne}.git/': The requested URL returned error: 502"
-      ),
+      "The requested URL returned error: 502",
       "The requested URL returned error: 503",
-      "The requested URL returned error: 504",
-      "Error in the HTTP2 framing layer",
-      "HTTP/2 stream 3 was not closed cleanly before end of the underlying stream",
       "Could not resolve host: renkulab.io",
       "Failed to connect to renkulab.io port 443: Host is unreachable"
-    )
+    ) foreach { error =>
+      s"return LogWorthyRecoverableError if command fails with a message containing '$error'" in new TestCase {
 
-    recoverableFailureMessagesToCheck foreach { recoverableError =>
-      s"return $LogWorthyRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
-
-        val errorMessage = sentenceContaining(recoverableError).generateOne.value
+        val errorMessage = sentenceContaining(error).generateOne.value
         val commandResultException = ShelloutException {
           CommandResult(
             exitCode = 1,
@@ -80,6 +94,33 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
             s"git clone failed with: ${commandResultException.result.toString}"
           )
         )
+      }
+    }
+
+    Set[NonBlank](
+      "fatal: the remote end hung up unexpectedly",
+      "The requested URL returned error: 504",
+      "Error in the HTTP2 framing layer",
+      "remote: The project you were looking for could not be found or you don't have permission to view it."
+    ) foreach { error =>
+      s"return ProcessingNonRecoverableError.MalformedRepository if command fails with a message containing '$error'" in new TestCase {
+
+        val errorMessage = sentenceContaining(error).generateOne.value
+        val commandResultException = ShelloutException {
+          CommandResult(
+            exitCode = 1,
+            chunks = Seq(Left(new Bytes(errorMessage.getBytes())))
+          )
+        }
+        cloneCommand
+          .expects(repositoryUrl, destDirectory, workDirectory)
+          .throwing(commandResultException)
+
+        val failure = intercept[ProcessingNonRecoverableError.MalformedRepository] {
+          git.clone(repositoryUrl, workDirectory).value.unsafeRunSync()
+        }
+
+        failure.getMessage shouldBe s"git clone failed with: ${commandResultException.result.toString}"
       }
     }
 

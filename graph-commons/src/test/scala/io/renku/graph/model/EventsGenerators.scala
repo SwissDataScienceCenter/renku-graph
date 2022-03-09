@@ -29,7 +29,6 @@ import java.time.Duration
 
 object EventsGenerators {
 
-  implicit val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
   implicit val commitIds:      Gen[CommitId]      = shas map CommitId.apply
   implicit val commitMessages: Gen[CommitMessage] = nonEmptyStrings() map CommitMessage.apply
   implicit val committedDates: Gen[CommittedDate] = timestampsNotInTheFuture map CommittedDate.apply

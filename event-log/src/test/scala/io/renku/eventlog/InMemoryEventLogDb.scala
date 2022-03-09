@@ -22,7 +22,7 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import com.dimafeng.testcontainers._
-import io.renku.db.SessionResource
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
@@ -43,7 +43,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
     password = dbConfig.pass.value
   )
 
-  lazy val sessionResource: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
+  implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
     Session.single(
       host = container.host,
       port = container.container.getMappedPort(dbConfig.port.value),

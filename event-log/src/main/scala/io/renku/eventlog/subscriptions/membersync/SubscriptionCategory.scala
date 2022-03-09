@@ -20,22 +20,22 @@ package io.renku.eventlog.subscriptions.membersync
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.eventlog.subscriptions.membersync.MemberSyncEventEncoder.encodeEvent
-import io.renku.eventlog.{EventLogDB, subscriptions}
-import io.renku.metrics.LabeledHistogram
+import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply[F[_]: Async: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                 queriesExecTimes:  LabeledHistogram[F, SqlStatement.Name],
-                                 subscriberTracker: SubscriberTracker[F]
+  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
+      queriesExecTimes:  LabeledHistogram[F],
+      subscriberTracker: SubscriberTracker[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers      <- Subscribers(categoryName, subscriberTracker)
-    eventsFinder     <- MemberSyncEventFinder(sessionResource, queriesExecTimes)
+    eventsFinder     <- MemberSyncEventFinder(queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[F, MemberSyncEvent](categoryName)
     eventDelivery    <- EventDelivery.noOp[F, MemberSyncEvent]
     eventsDistributor <- EventsDistributor(categoryName,

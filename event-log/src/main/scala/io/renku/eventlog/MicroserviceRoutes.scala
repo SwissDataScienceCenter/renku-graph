@@ -18,7 +18,7 @@
 
 package io.renku.eventlog
 
-import cats.data.ValidatedNel
+import cats.data.{Validated, ValidatedNel}
 import cats.effect.Resource
 import cats.effect.kernel.{Ref, Sync}
 import cats.syntax.all._
@@ -54,6 +54,7 @@ private class MicroserviceRoutes[F[_]: Sync](
 ) extends Http4sDsl[F] {
 
   import EventStatusParameter._
+  import EventsEndpoint.Criteria.Sorting.sort
   import ProjectIdParameter._
   import ProjectPathParameter._
   import eventDetailsEndpoint._
@@ -67,13 +68,13 @@ private class MicroserviceRoutes[F[_]: Sync](
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case GET             -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& page(page) +& perPage(perPage) => respond503IfMigrating(maybeFindEvents(validatedProjectPath, status, page, perPage))
-    case request @ POST  -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
-    case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
-    case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => respond503IfMigrating(maybeFindProcessingStatus(maybeProjectId))
-    case           GET   -> Root / "ping"                                              => Ok("pong")
-    case           GET   -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
-    case request @ POST  -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
+    case request @ GET  -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& page(page) +& perPage(perPage) +& sort(sortBy) => respond503IfMigrating(maybeFindEvents(validatedProjectPath, status, page, perPage, sortBy, request))
+    case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
+    case           GET  -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
+    case           GET  -> Root / "processing-status" :? `project-id`(maybeProjectId) => respond503IfMigrating(maybeFindProcessingStatus(maybeProjectId))
+    case           GET  -> Root / "ping"                                              => Ok("pong")
+    case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
+    case request @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
   }.withMetrics
   // format: on
 
@@ -128,19 +129,32 @@ private class MicroserviceRoutes[F[_]: Sync](
   private def maybeFindEvents(maybeProjectPath: Option[ValidatedNel[ParseFailure, projects.Path]],
                               maybeStatus:      Option[ValidatedNel[ParseFailure, EventStatus]],
                               maybePage:        Option[ValidatedNel[ParseFailure, Page]],
-                              maybePerPage:     Option[ValidatedNel[ParseFailure, PerPage]]
-  ): F[Response[F]] = (maybeProjectPath, maybeStatus) match {
-    case (None, None) => resourceNotFound
-    case (Some(validatedPath), maybeStatus) =>
-      (validatedPath, maybeStatus.sequence, PagingRequest(maybePage, maybePerPage))
-        .mapN(EventsEndpoint.Request.ProjectEvents)
-        .map(findEvents)
-        .fold(toBadRequest, identity)
-    case (None, Some(validatedStatus)) =>
-      (validatedStatus, PagingRequest(maybePage, maybePerPage))
-        .mapN(EventsEndpoint.Request.EventsWithStatus)
-        .map(findEvents)
-        .fold(toBadRequest, identity)
+                              maybePerPage:     Option[ValidatedNel[ParseFailure, PerPage]],
+                              maybeSortBy:      Option[ValidatedNel[ParseFailure, EventsEndpoint.Criteria.Sorting.By]],
+                              request:          Request[F]
+  ): F[Response[F]] = {
+    import EventsEndpoint.Criteria._
+
+    (maybeProjectPath, maybeStatus) match {
+      case (None, None) => resourceNotFound
+      case (Some(validatedPath), maybeStatus) =>
+        (
+          validatedPath,
+          maybeStatus.sequence,
+          maybeSortBy getOrElse Validated.validNel(EventsEndpoint.Criteria.Sorting.default),
+          PagingRequest(maybePage, maybePerPage)
+        ).mapN { case (path, maybeStatus, sorting, paging) =>
+          findEvents(EventsEndpoint.Criteria(Filters.ProjectEvents(path, maybeStatus), sorting, paging), request)
+        }.fold(toBadRequest, identity)
+      case (None, Some(validatedStatus)) =>
+        (
+          validatedStatus,
+          maybeSortBy getOrElse Validated.validNel(EventsEndpoint.Criteria.Sorting.default),
+          PagingRequest(maybePage, maybePerPage)
+        ).mapN { case (status, sorting, paging) =>
+          findEvents(EventsEndpoint.Criteria(Filters.EventsWithStatus(status), sorting, paging), request)
+        }.fold(toBadRequest, identity)
+    }
   }
 
   private def maybeFindProcessingStatus(

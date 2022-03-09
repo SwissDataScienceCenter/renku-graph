@@ -25,12 +25,13 @@ import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
+import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, timestamps}
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
@@ -52,7 +53,7 @@ class StatsFinderSpec
       // MEMBER_SYNC specific
       val compoundId1 = compoundEventIds.generateOne
       val eventDate1  = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
-      val lastSynced1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofSeconds(61)))
+      val lastSynced1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(6)))
       upsertProject(compoundId1, projectPaths.generateOne, eventDate1)
       upsertLastSynced(compoundId1.projectId, membersync.categoryName, lastSynced1)
 
@@ -242,7 +243,7 @@ class StatsFinderSpec
   }
 
   private lazy val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-  private lazy val stats            = new StatsFinderImpl(sessionResource, queriesExecTimes)
+  private lazy val stats            = new StatsFinderImpl(queriesExecTimes)
 
   private def store: ((Path, EventId, EventStatus, EventDate)) => Unit = {
     case (projectPath, eventId, status, eventDate) =>

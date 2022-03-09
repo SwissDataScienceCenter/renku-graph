@@ -26,7 +26,9 @@ import io.renku.commiteventservice.events.categories.common.Generators.commitInf
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
 import io.renku.commiteventservice.events.categories.common._
 import io.renku.events.consumers.Project
-import io.renku.generators.CommonGraphGenerators.personalAccessTokens
+import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{batchDates, commitIds}
@@ -46,8 +48,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.{Clock, ZoneId, ZoneOffset}
 import scala.util.{Failure, Success, Try}
-import io.renku.events.EventRequestContent
-import io.renku.events.producers.EventSender
 
 class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
@@ -538,8 +538,13 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
       val exception = exceptions.generateOne
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
-        .expects(withRequestContent(event.project), s"$categoryName - Triggering Global Commit Sync Failed")
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+        .expects(
+          withRequestContent(event.project),
+          EventSender.EventContext(CategoryName("GLOBAL_COMMIT_SYNC_REQUEST"),
+                                   s"$categoryName - Triggering Global Commit Sync Failed"
+          )
+        )
         .returning(exception.raiseError[Try, Unit])
 
       commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
@@ -573,8 +578,8 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
   private trait TestCase {
 
-    implicit val maybeAccessToken = personalAccessTokens.generateOption
-    val batchDate                 = batchDates.generateOne
+    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
+    val batchDate = batchDates.generateOne
 
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
@@ -630,13 +635,18 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
     def givenGlobalCommitSyncRequestIsSent(project: Project) =
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
-        .expects(withRequestContent(project), s"$categoryName - Triggering Global Commit Sync Failed")
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+        .expects(
+          withRequestContent(project),
+          EventSender.EventContext(CategoryName("GLOBAL_COMMIT_SYNC_REQUEST"),
+                                   s"$categoryName - Triggering Global Commit Sync Failed"
+          )
+        )
         .returning(Success(()))
 
     def withRequestContent(project: Project) =
       EventRequestContent.NoPayload(
-        json"""{ "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST" ,"project":{ "id": ${project.id.value}, "path":${project.path.value} }}"""
+        json"""{"categoryName": "GLOBAL_COMMIT_SYNC_REQUEST" ,"project":{ "id": ${project.id.value}, "path":${project.path.value}}}"""
       )
   }
 

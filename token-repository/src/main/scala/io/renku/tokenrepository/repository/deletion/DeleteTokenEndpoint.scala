@@ -21,7 +21,7 @@ package io.renku.tokenrepository.repository.deletion
 import cats.MonadThrow
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SessionResource
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
@@ -58,7 +58,7 @@ class DeleteTokenEndpointImpl[F[_]: MonadThrow: Logger](
 object DeleteTokenEndpoint {
   def apply[F[_]: MonadCancelThrow: Logger](
       sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[DeleteTokenEndpoint[F]] = MonadThrow[F].catchNonFatal {
     new DeleteTokenEndpointImpl[F](new TokenRemoverImpl[F](sessionResource, queriesExecTimes))
   }

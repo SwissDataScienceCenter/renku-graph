@@ -28,8 +28,6 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-import scala.language.reflectiveCalls
-
 trait InMemoryEventLogDbSpec
     extends DbSpec
     with EventLogDbMigrations

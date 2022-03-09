@@ -232,9 +232,9 @@ object Generators {
       .choose(Instant.EPOCH.toEpochMilli, now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
-  def timestampsNotInTheFuture(butOlderThan: Instant): Gen[Instant] =
+  def timestampsNotInTheFuture(butYoungerThan: Instant): Gen[Instant] =
     Gen
-      .choose(butOlderThan.toEpochMilli, now().toEpochMilli)
+      .choose((butYoungerThan plusMillis 1).toEpochMilli, now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   val timestampsInTheFuture: Gen[Instant] =

@@ -23,6 +23,7 @@ import cats.implicits.{catsSyntaxApplicativeErrorId, catsSyntaxApplicativeId}
 import cats.syntax.all._
 import io.renku.eventlog.subscriptions.Generators._
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.testtools.IOSpec

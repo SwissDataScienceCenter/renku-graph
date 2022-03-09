@@ -27,8 +27,8 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class TimestampZoneAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: TimestampZoneAdderImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: TimestampZoneAdderImpl[IO] => false
     case _ => true
   }
 
@@ -82,7 +82,7 @@ class TimestampZoneAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec wit
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableRefactor = new TimestampZoneAdderImpl[IO](sessionResource)
+    val tableRefactor = new TimestampZoneAdderImpl[IO]
   }
 
   private lazy val timestampType   = "timestamp without time zone"

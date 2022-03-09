@@ -18,11 +18,11 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.{NonEmptyParallel, Parallel, Show}
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.effect._
 import cats.syntax.all._
+import cats.{NonEmptyParallel, Parallel, Show}
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -31,9 +31,9 @@ import io.renku.control.Throttler
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
-import io.renku.events.{EventRequestContent, consumers}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.SchemaVersion
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventBody, ZippedEventPayload}
+import io.renku.graph.model.events.{CompoundEventId, EventBody, ZippedEventPayload}
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -93,15 +93,14 @@ private[events] object EventHandler {
   import ConfigLoader.find
   import eu.timepit.refined.pureconfig._
 
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
-      metricsRegistry:       MetricsRegistry,
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
       gitLabThrottler:       Throttler[F, GitLab],
       timeRecorder:          SparqlQueryTimeRecorder[F],
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
     generationProcesses        <- find[F, Int Refined Positive]("transformation-processes-number", config)
-    eventProcessor             <- EventProcessor(metricsRegistry, gitLabThrottler, timeRecorder)
+    eventProcessor             <- EventProcessor(gitLabThrottler, timeRecorder)
     concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
   } yield new EventHandler[F](categoryName,
                               EventBodyDeserializer[F],

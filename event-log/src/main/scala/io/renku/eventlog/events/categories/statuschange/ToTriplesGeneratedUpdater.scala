@@ -40,7 +40,7 @@ import java.time.Instant
 
 private class ToTriplesGeneratedUpdater[F[_]: Async](
     deliveryInfoRemover: DeliveryInfoRemover[F],
-    queriesExecTimes:    LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:    LabeledHistogram[F],
     now:                 () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[F, ToTriplesGenerated] {
@@ -49,13 +49,13 @@ private class ToTriplesGeneratedUpdater[F[_]: Async](
 
   import deliveryInfoRemover._
 
+  override def onRollback(event: ToTriplesGenerated) = deleteDelivery(event.eventId)
+
   override def updateDB(event: ToTriplesGenerated): UpdateResult[F] =
     deleteDelivery(event.eventId) >> updateStatus(event) >>= {
       case results if results.statusCounts.isEmpty => Kleisli.pure(results)
       case results => updateDependentData(event).map(_ combine results).widen[DBUpdateResults]
     }
-
-  override def onRollback(event: ToTriplesGenerated) = deleteDelivery(event.eventId)
 
   private def updateDependentData(event: ToTriplesGenerated) = for {
     _                  <- updatePayload(event)

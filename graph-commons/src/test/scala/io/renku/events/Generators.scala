@@ -20,13 +20,15 @@ package io.renku.events
 
 import io.renku.events
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{jsons, nonEmptyStrings}
+import io.renku.generators.Generators.{jsons, nonBlankStrings, nonEmptyStrings}
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
 object Generators {
+
+  val categoryNames: Gen[CategoryName] = nonBlankStrings() map (value => CategoryName(value.value))
 
   final case class ZippedContentTinyType(value: Array[Byte]) extends ByteArrayTinyType with ZippedContent
 
@@ -45,5 +47,11 @@ object Generators {
   }
 
   implicit val eventRequestContentNoPayloads: Gen[EventRequestContent.NoPayload] =
-    jsons.map(events.EventRequestContent.NoPayload)
+    jsons map events.EventRequestContent.NoPayload
+
+  implicit val eventRequestContentWithZippedPayloads
+      : Gen[EventRequestContent.WithPayload[ByteArrayTinyType with ZippedContent]] = for {
+    event   <- jsons
+    payload <- zippedContents
+  } yield events.EventRequestContent.WithPayload(event, payload)
 }

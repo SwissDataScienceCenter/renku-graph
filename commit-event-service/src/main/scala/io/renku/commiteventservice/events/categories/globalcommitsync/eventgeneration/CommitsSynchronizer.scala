@@ -34,6 +34,7 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -167,8 +168,8 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
 }
 
 private[globalcommitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabClient: GitLabClient[F],
-                                                   executionTimeRecorder: ExecutionTimeRecorder[F]
+  def apply[F[_]: Async: NonEmptyParallel: Logger: MetricsRegistry](gitLabClient: GitLabClient[F],
+                                                                    executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[CommitsSynchronizer[F]] = for {
     accessTokenFinder         <- AccessTokenFinder[F]
     gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabClient)

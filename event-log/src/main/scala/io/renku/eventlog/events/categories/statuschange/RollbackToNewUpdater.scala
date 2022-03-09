@@ -37,7 +37,7 @@ import skunk.~
 import java.time.Instant
 
 private class RollbackToNewUpdater[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[F, RollbackToNew] {
@@ -60,6 +60,7 @@ private class RollbackToNewUpdater[F[_]: MonadCancelThrow](
             .ForProjects(event.projectPath, Map(GeneratingTriples -> -1, New -> 1))
             .pure[F]
             .widen[DBUpdateResults]
+        case Completion.Update(0) => DBUpdateResults.ForProjects.empty.pure[F].widen[DBUpdateResults]
         case _ =>
           new Exception(s"Could not rollback event ${event.eventId} to status $New")
             .raiseError[F, DBUpdateResults]

@@ -140,9 +140,33 @@ class ToTriplesStoreUpdaterSpec
 
       findFullEvent(CompoundEventId(event2._1, projectId)).map(_._2) shouldBe TriplesGenerated.some
     }
+
+    (EventStatus.all - TransformingTriples) foreach { invalidStatus =>
+      s"do nothing if event in $invalidStatus" in new TestCase {
+        val latestEventDate = eventDates.generateOne
+        val eventId         = addEvent(invalidStatus, latestEventDate)._1
+        val ancestorEventId = addEvent(
+          TransformingTriples,
+          timestamps(max = latestEventDate.value.minusSeconds(1)).generateAs(EventDate)
+        )._1
+
+        val statusChangeEvent =
+          ToTriplesStore(CompoundEventId(eventId, projectId), projectPath, eventProcessingTimes.generateOne)
+
+        (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
+
+        sessionResource
+          .useK(dbUpdater updateDB statusChangeEvent)
+          .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+
+        findFullEvent(CompoundEventId(eventId, projectId)).map(_._2)         shouldBe invalidStatus.some
+        findFullEvent(CompoundEventId(ancestorEventId, projectId)).map(_._2) shouldBe TransformingTriples.some
+      }
+    }
   }
 
   "onRollback" should {
+
     "clean the delivery info for the event" in new TestCase {
       val event = ToTriplesStore(compoundEventIds.generateOne, projectPath, eventProcessingTimes.generateOne)
 

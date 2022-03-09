@@ -22,9 +22,122 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 20,
-  "iteration": 1643700322048,
+  "iteration": 1646674926927,
   "links": [],
   "panels": [
+    {
+      "aliasColors": {
+        "Generation Failure Rate": "dark-red"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "decimals": null,
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "links": []
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "hiddenSeries": false,
+      "id": 19,
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "hideZero": true,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "sideWidth": 430,
+        "sort": "current",
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "paceLength": 10,
+      "percentage": false,
+      "pluginVersion": "8.1.6",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum by (category_mame)(rate(sent_events_count{kubernetes_namespace=\"${env_namespace}\"}[5m]))",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "{{category_name}}",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Events throughput by type",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:411",
+          "decimals": null,
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:412",
+          "decimals": 3,
+          "format": "percentunit",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
     {
       "aliasColors": {
         "Generation Failure Rate": "dark-red"
@@ -46,7 +159,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 5
       },
       "hiddenSeries": false,
       "id": 2,
@@ -180,7 +293,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 12
       },
       "hiddenSeries": false,
       "id": 7,
@@ -289,7 +402,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 17
       },
       "hiddenSeries": false,
       "id": 8,
@@ -398,7 +511,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 22
       },
       "hiddenSeries": false,
       "id": 20,
@@ -507,7 +620,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 27
       },
       "hiddenSeries": false,
       "id": 21,
@@ -615,7 +728,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 32
       },
       "hiddenSeries": false,
       "id": 24,
@@ -724,7 +837,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 37
       },
       "hiddenSeries": false,
       "id": 25,
@@ -835,10 +948,10 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 42
       },
       "hiddenSeries": false,
-      "id": 19,
+      "id": 26,
       "legend": {
         "alignAsTable": true,
         "avg": false,
@@ -943,7 +1056,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 47
       },
       "hiddenSeries": false,
       "id": 6,
@@ -1092,7 +1205,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 53
       },
       "hiddenSeries": false,
       "id": 9,
@@ -1201,7 +1314,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 58
       },
       "hiddenSeries": false,
       "id": 10,
@@ -1309,7 +1422,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 58
+        "y": 63
       },
       "hiddenSeries": false,
       "id": 4,
@@ -1431,7 +1544,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 64
+        "y": 69
       },
       "hiddenSeries": false,
       "id": 23,
@@ -1544,8 +1657,8 @@
         "allValue": null,
         "current": {
           "selected": false,
-          "text": "tasko-renku",
-          "value": "tasko-renku"
+          "text": "renku-kg-dev",
+          "value": "renku-kg-dev"
         },
         "datasource": "Prometheus",
         "definition": "server_request_count_total",
@@ -1573,9 +1686,9 @@
       {
         "allValue": null,
         "current": {
-          "selected": false,
-          "text": "andrea",
-          "value": "andrea"
+          "selected": true,
+          "text": "renku-kg-dev",
+          "value": "renku-kg-dev"
         },
         "datasource": null,
         "definition": "server_request_count_total",

@@ -26,10 +26,12 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.db.implicits._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
-import io.renku.graph.model.events.{CategoryName, EventStatus, LastSyncedDate}
+import io.renku.events.CategoryName
+import io.renku.graph.model.events.{EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects.Path
 import io.renku.metrics.LabeledHistogram
 import skunk._
@@ -47,15 +49,14 @@ trait StatsFinder[F[_]] {
   def countEvents(statuses: Set[EventStatus], maybeLimit: Option[Int Refined Positive] = None): F[Map[Path, Long]]
 }
 
-class StatsFinderImpl[F[_]: Async](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+class StatsFinderImpl[F[_]: Async: SessionResource](
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with StatsFinder[F]
     with SubscriptionTypeSerializers {
 
-  override def countEventsByCategoryName(): F[Map[CategoryName, Long]] = sessionResource.useK {
+  override def countEventsByCategoryName(): F[Map[CategoryName, Long]] = SessionResource[F].useK {
     measureExecutionTime(countEventsPerCategoryName).map(_.toMap)
   }
 
@@ -76,7 +77,7 @@ class StatsFinderImpl[F[_]: Async](
               JOIN subscription_category_sync_time sync_time
                 ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
               WHERE
-                   (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 minute')
+                   (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '5 minutes')
                 OR (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
                 OR (($eventDateEncoder - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
               GROUP BY sync_time.category_name
@@ -140,7 +141,7 @@ class StatsFinderImpl[F[_]: Async](
       .build(_.toList)
   }
 
-  override def statuses(): F[Map[EventStatus, Long]] = sessionResource.useK {
+  override def statuses(): F[Map[EventStatus, Long]] = SessionResource[F].useK {
     measureExecutionTime(findStatuses)
       .map(_.toMap)
       .map(addMissingStatues)
@@ -164,7 +165,7 @@ class StatsFinderImpl[F[_]: Async](
     NonEmptyList.fromList(statuses.toList) match {
       case None => Map.empty[Path, Long].pure[F]
       case Some(statusesList) =>
-        sessionResource.useK {
+        SessionResource[F].useK {
           measureExecutionTime(countProjectsEvents(statusesList, maybeLimit))
             .map(_.toMap)
         }
@@ -221,11 +222,6 @@ class StatsFinderImpl[F[_]: Async](
 }
 
 object StatsFinder {
-
-  def apply[F[_]: MonadThrow: Async](
-      sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
-  ): F[StatsFinder[F]] = MonadThrow[F].catchNonFatal {
-    new StatsFinderImpl(sessionResource, queriesExecTimes)
-  }
+  def apply[F[_]: MonadThrow: Async: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[StatsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new StatsFinderImpl(queriesExecTimes))
 }

@@ -20,8 +20,9 @@ package io.renku.eventlog.eventdetails
 
 import cats.MonadThrow
 import cats.effect.MonadCancelThrow
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.TypeSerializers
 import io.renku.graph.model.events.{CompoundEventId, EventBody, EventDetails, EventId}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
@@ -32,17 +33,15 @@ private trait EventDetailsFinder[F[_]] {
   def findDetails(eventId: CompoundEventId): F[Option[EventDetails]]
 }
 
-private class EventDetailsFinderImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
-) extends DbClient[F](Some(queriesExecTimes))
+private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
+    extends DbClient[F](Some(queriesExecTimes))
     with EventDetailsFinder[F]
     with TypeSerializers {
 
   import eu.timepit.refined.auto._
 
   override def findDetails(eventId: CompoundEventId): F[Option[EventDetails]] =
-    sessionResource.useK(measureExecutionTime(find(eventId)))
+    SessionResource[F].useK(measureExecutionTime(find(eventId)))
 
   private def find(eventId: CompoundEventId) =
     SqlStatement[F](name = "find event details")
@@ -58,10 +57,8 @@ private class EventDetailsFinderImpl[F[_]: MonadCancelThrow](
 }
 
 private object EventDetailsFinder {
-  def apply[F[_]: MonadCancelThrow](
-      sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
-  ): F[EventDetailsFinder[F]] = MonadThrow[F].catchNonFatal {
-    new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
-  }
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventDetailsFinder[F]] =
+    MonadThrow[F].catchNonFatal {
+      new EventDetailsFinderImpl(queriesExecTimes)
+    }
 }

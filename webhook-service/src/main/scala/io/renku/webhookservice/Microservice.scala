@@ -32,24 +32,24 @@ object Microservice extends IOMicroservice {
 
   private implicit val logger: ApplicationLogger.type = ApplicationLogger
 
-  override def run(args: List[String]): IO[ExitCode] = for {
-    certificateLoader     <- CertificateLoader[IO]
-    sentryInitializer     <- SentryInitializer[IO]
-    gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-    gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-    executionTimeRecorder <- ExecutionTimeRecorder[IO]()
-    metricsRegistry       <- MetricsRegistry[IO]()
-    microserviceRoutes <-
-      MicroserviceRoutes(metricsRegistry, gitLabThrottler, executionTimeRecorder)
-    exitcode <- microserviceRoutes.routes.use { routes =>
-                  val httpServer = HttpServer[IO](serverPort = 9001, routes)
-                  new MicroserviceRunner(
-                    certificateLoader,
-                    sentryInitializer,
-                    httpServer
-                  ).run()
-                }
-  } yield exitcode
+  override def run(args: List[String]): IO[ExitCode] = MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
+    for {
+      certificateLoader     <- CertificateLoader[IO]
+      sentryInitializer     <- SentryInitializer[IO]
+      gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+      gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+      executionTimeRecorder <- ExecutionTimeRecorder[IO]()
+      microserviceRoutes    <- MicroserviceRoutes(gitLabThrottler, executionTimeRecorder)
+      exitcode <- microserviceRoutes.routes.use { routes =>
+                    val httpServer = HttpServer[IO](serverPort = 9001, routes)
+                    new MicroserviceRunner(
+                      certificateLoader,
+                      sentryInitializer,
+                      httpServer
+                    ).run()
+                  }
+    } yield exitcode
+  }
 }
 
 class MicroserviceRunner(certificateLoader: CertificateLoader[IO],

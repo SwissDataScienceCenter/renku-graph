@@ -27,7 +27,7 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.jsonld.JsonLD
 import io.renku.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQueryTimeRecorder}
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
 import org.typelevel.log4cats.Logger
 

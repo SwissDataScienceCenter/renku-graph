@@ -39,18 +39,20 @@ object Microservice extends IOMicroservice {
 
   private implicit val logger: Logger[IO] = ApplicationLogger
 
-  override def run(args: List[String]): IO[ExitCode] = for {
-    certificateLoader  <- CertificateLoader[IO]
-    sentryInitializer  <- SentryInitializer[IO]
-    metricsRegistry    <- MetricsRegistry[IO]()
-    sparqlTimeRecorder <- SparqlQueryTimeRecorder[IO](metricsRegistry)
-    kgMetrics          <- KGMetrics(metricsRegistry, sparqlTimeRecorder)
-    microserviceRoutes <- MicroserviceRoutes(metricsRegistry, sparqlTimeRecorder)
-    exicode <- microserviceRoutes.routes.use { routes =>
-                 val httpServer = HttpServer[IO](serverPort = 9004, routes)
-                 new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run()
-               }
-  } yield exicode
+  override def run(args: List[String]): IO[ExitCode] =
+    MetricsRegistry[IO]().flatMap { implicit metricsRegistry =>
+      for {
+        certificateLoader  <- CertificateLoader[IO]
+        sentryInitializer  <- SentryInitializer[IO]
+        sparqlTimeRecorder <- SparqlQueryTimeRecorder[IO]
+        kgMetrics          <- KGMetrics(sparqlTimeRecorder)
+        microserviceRoutes <- MicroserviceRoutes(sparqlTimeRecorder)
+        exicode <- microserviceRoutes.routes.use { routes =>
+                     val httpServer = HttpServer[IO](serverPort = 9004, routes)
+                     new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run()
+                   }
+      } yield exicode
+    }
 }
 
 private class MicroserviceRunner(

@@ -26,11 +26,40 @@ import io.prometheus.client.{Histogram => LibHistogram}
 
 import scala.jdk.CollectionConverters._
 
-trait Histogram[F[_]] {
-  protected def histogram: LibHistogram
+sealed trait Histogram[F[_]] extends MetricsCollector
 
-  lazy val name: String = histogram.describe().asScala.head.name
-  lazy val help: String = histogram.describe().asScala.head.help
+trait SingleValueHistogram[F[_]] extends Histogram[F] {
+  def startTimer(): F[Histogram.Timer[F]]
+}
+
+class SingleValueHistogramImpl[F[_]: MonadThrow] private[metrics] (val wrappedCollector: LibHistogram)
+    extends SingleValueHistogram[F]
+    with PrometheusCollector {
+
+  type Collector = LibHistogram
+  override lazy val name: String = wrappedCollector.describe().asScala.head.name
+  override lazy val help: String = wrappedCollector.describe().asScala.head.help
+
+  override def startTimer(): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
+    new Histogram.TimerImpl(wrappedCollector.startTimer())
+  }
+}
+
+trait LabeledHistogram[F[_]] extends Histogram[F] {
+  def startTimer(labelValue: String): F[Histogram.Timer[F]]
+}
+
+class LabeledHistogramImpl[F[_]: MonadThrow] private[metrics] (val wrappedCollector: LibHistogram)
+    extends LabeledHistogram[F]
+    with PrometheusCollector {
+
+  type Collector = LibHistogram
+  override lazy val name: String = wrappedCollector.describe().asScala.head.name
+  override lazy val help: String = wrappedCollector.describe().asScala.head.help
+
+  override def startTimer(labelValue: String): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
+    new Histogram.TimerImpl(wrappedCollector.labels(labelValue).startTimer())
+  }
 }
 
 object Histogram {
@@ -38,41 +67,48 @@ object Histogram {
   trait Timer[F[_]] {
     def observeDuration: F[Double]
   }
+
   final class TimerImpl[F[_]: MonadThrow] private[metrics] (timer: LibHistogram.Timer) extends Timer[F] {
     def observeDuration: F[Double] = MonadThrow[F].catchNonFatal {
       timer.observeDuration()
     }
   }
 
-  def apply[F[_]: MonadThrow, LabelValue](
-      name:          String Refined NonEmpty,
-      help:          String Refined NonEmpty,
-      labelName:     String Refined NonEmpty,
-      buckets:       Seq[Double]
-  )(metricsRegistry: MetricsRegistry): F[LabeledHistogram[F, LabelValue]] = {
+  def apply[F[_]: MonadThrow: MetricsRegistry](
+      name:    String Refined NonEmpty,
+      help:    String Refined NonEmpty,
+      buckets: Seq[Double]
+  ): F[SingleValueHistogram[F]] = {
 
-    val builder = LibHistogram
-      .build()
-      .name(name.value)
-      .help(help.value)
-      .labelNames(labelName.value)
-      .buckets(buckets: _*)
+    val histogram = new SingleValueHistogramImpl[F](
+      LibHistogram
+        .build()
+        .name(name.value)
+        .help(help.value)
+        .buckets(buckets: _*)
+        .create()
+    )
 
-    for {
-      histogram <- metricsRegistry register [F, LibHistogram, LibHistogram.Builder] builder
-    } yield new LabeledHistogramImpl[F, LabelValue](histogram)
+    MetricsRegistry[F].register(histogram).widen
   }
-}
 
-trait LabeledHistogram[F[_], LabelValue] extends Histogram[F] {
-  def startTimer(labelValue: LabelValue): F[Histogram.Timer[F]]
-}
+  def apply[F[_]: MonadThrow: MetricsRegistry](
+      name:      String Refined NonEmpty,
+      help:      String Refined NonEmpty,
+      labelName: String Refined NonEmpty,
+      buckets:   Seq[Double]
+  ): F[LabeledHistogram[F]] = {
 
-class LabeledHistogramImpl[F[_]: MonadThrow, LabelValue] private[metrics] (
-    protected val histogram: LibHistogram
-) extends LabeledHistogram[F, LabelValue] {
+    val histogram = new LabeledHistogramImpl[F](
+      LibHistogram
+        .build()
+        .name(name.value)
+        .help(help.value)
+        .labelNames(labelName.value)
+        .buckets(buckets: _*)
+        .create()
+    )
 
-  override def startTimer(labelValue: LabelValue): F[Histogram.Timer[F]] = MonadThrow[F].catchNonFatal {
-    new Histogram.TimerImpl(histogram.labels(labelValue.toString).startTimer())
+    MetricsRegistry[F].register(histogram).widen
   }
 }

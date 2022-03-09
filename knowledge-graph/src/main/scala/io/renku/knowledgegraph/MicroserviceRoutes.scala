@@ -25,8 +25,9 @@ import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.{RateLimit, Throttler}
-import io.renku.graph.http.server.security.{Authorizer, DatasetIdRecordsFinder, GitLabAuthenticator, ProjectPathRecordsFinder}
+import io.renku.graph.http.server.security._
 import io.renku.graph.model
+import io.renku.http.client.GitLabClient
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.PagingRequest.Decoders._
@@ -60,6 +61,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 ) extends Http4sDsl[F] {
 
   import datasetEndpoint._
+  import datasetIdAuthorizer.{authorize => authorizeDatasetId}
   import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.query
   import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
   import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
@@ -67,7 +69,6 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import projectDatasetsEndpoint._
   import projectEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
-  import datasetIdAuthorizer.{authorize => authorizeDatasetId}
   import queryEndpoint._
   import routesMetrics._
 
@@ -140,15 +141,18 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
 private object MicroserviceRoutes {
 
-  def apply(
-      metricsRegistry:         MetricsRegistry,
-      sparqlTimeRecorder:      SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, runtime: IORuntime, logger: Logger[IO]): IO[MicroserviceRoutes[IO]] =
+  def apply(sparqlTimeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:         ExecutionContext,
+      runtime:                  IORuntime,
+      logger:                   Logger[IO],
+      metricsRegistry:          MetricsRegistry[IO]
+  ): IO[MicroserviceRoutes[IO]] =
     for {
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
+      gitLabClient            <- GitLabClient(gitLabThrottler)
       queryEndpoint           <- QueryEndpoint(sparqlTimeRecorder)
-      projectEndpoint         <- ProjectEndpoint[IO](gitLabThrottler, sparqlTimeRecorder)
+      projectEndpoint         <- ProjectEndpoint[IO](gitLabClient, sparqlTimeRecorder)
       projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO](sparqlTimeRecorder)
       datasetEndpoint         <- DatasetEndpoint[IO](sparqlTimeRecorder)
       datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO](sparqlTimeRecorder)
@@ -164,6 +168,6 @@ private object MicroserviceRoutes {
                                    authMiddleware,
                                    projectPathAuthorizer,
                                    datasetIdAuthorizer,
-                                   new RoutesMetrics[IO](metricsRegistry)
+                                   new RoutesMetrics[IO]
     )
 }

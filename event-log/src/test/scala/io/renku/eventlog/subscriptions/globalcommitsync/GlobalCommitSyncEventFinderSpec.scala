@@ -225,8 +225,7 @@ class GlobalCommitSyncEventFinderSpec
     val lastSyncedDateUpdater = mock[LastSyncedDateUpdater[IO]]
     val currentTime           = mockFunction[Instant]
     val now                   = Instant.now()
-    val finder = new GlobalCommitSyncEventFinderImpl(sessionResource,
-                                                     lastSyncedDateUpdater,
+    val finder = new GlobalCommitSyncEventFinderImpl(lastSyncedDateUpdater,
                                                      TestLabeledHistogram[SqlStatement.Name]("query_id"),
                                                      currentTime
     )

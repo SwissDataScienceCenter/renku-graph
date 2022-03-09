@@ -26,11 +26,13 @@ import io.renku.db.SqlStatement.Name
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
+import io.renku.events.CategoryName
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.lastSyncedDates
-import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
@@ -50,6 +52,7 @@ class LastSyncedDateUpdaterSpec
     with should.Matchers {
 
   "run" should {
+
     "delete the current last synced date if the argument is None" in new TestCase {
       val oldLastSyncedDate = lastSyncedDates.generateOne
       upsertLastSynced(project.id, categoryName, oldLastSyncedDate)
@@ -59,7 +62,6 @@ class LastSyncedDateUpdaterSpec
       updater.run(project.id, None).unsafeRunSync() shouldBe Completion.Delete(1)
 
       getLastSyncedDate(project) shouldBe None
-
     }
 
     "update the previous last synced date" in new TestCase {
@@ -86,11 +88,17 @@ class LastSyncedDateUpdaterSpec
 
       getLastSyncedDate(project) shouldBe newLastSyncedDate.some
     }
+
+    "do nothing if project with the given id does not exist" in new TestCase {
+      updater
+        .run(projectIds.generateOne, lastSyncedDates.generateSome)
+        .unsafeRunSync() shouldBe Completion.Insert(0)
+    }
   }
 
   private trait TestCase {
     val project = consumerProjects.generateOne
-    val updater = new LastSyncedDateUpdateImpl[IO](sessionResource, TestLabeledHistogram[Name]("query_id"))
+    val updater = new LastSyncedDateUpdateImpl[IO](TestLabeledHistogram[Name]("query_id"))
 
     upsertProject(project.id, project.path, eventDates.generateOne)
   }

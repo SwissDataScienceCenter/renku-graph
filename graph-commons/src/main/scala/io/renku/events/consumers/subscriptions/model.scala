@@ -22,7 +22,7 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.CategoryName
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import io.renku.tinytypes.constraints.{NonBlank, Url}
 import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder

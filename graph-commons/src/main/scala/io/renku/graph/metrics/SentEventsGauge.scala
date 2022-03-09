@@ -16,16 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog
+package io.renku.graph.metrics
 
 import cats.MonadThrow
 import eu.timepit.refined.auto._
-import io.renku.db.DBConfigProvider
+import io.renku.events.CategoryName
+import io.renku.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 
-sealed trait EventLogDB
+object SentEventsGauge {
 
-class EventLogDbConfigProvider[F[_]: MonadThrow](
-) extends DBConfigProvider[F, EventLogDB](
-      namespace = "event-log",
-      dbName = "event_log"
+  def apply[F[_]: MonadThrow: MetricsRegistry]: F[LabeledGauge[F, CategoryName]] =
+    Gauge[F, CategoryName](
+      name = "sent_events_count",
+      help = "Number of sent Events",
+      labelName = "category_mame"
     )
+}

@@ -34,7 +34,7 @@ import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabApiUrl, projects, users}
 import io.renku.http.client.{AccessToken, RestClient}
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
 import org.http4s.Method.GET
 import org.http4s.dsl.io.{NotFound, Ok}

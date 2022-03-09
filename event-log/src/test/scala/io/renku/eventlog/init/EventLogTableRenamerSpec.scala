@@ -30,8 +30,8 @@ import skunk.implicits._
 
 class EventLogTableRenamerSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: EventLogTableRenamerImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: EventLogTableRenamerImpl[IO] => false
     case _ => true
   }
 
@@ -96,7 +96,7 @@ class EventLogTableRenamerSpec extends AnyWordSpec with IOSpec with DbInitSpec w
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableRenamer = new EventLogTableRenamerImpl[IO](sessionResource)
+    val tableRenamer = new EventLogTableRenamerImpl[IO]
   }
 
   private def createEventLogTable(): Unit = execute[Unit] {

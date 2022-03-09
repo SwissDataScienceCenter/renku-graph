@@ -22,10 +22,12 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.renku.events.CategoryName
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.events.{CategoryName, EventStatus}
+import io.renku.graph.model.events.EventStatus
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.metrics.{LabeledGauge, SingleValueGauge}
@@ -116,6 +118,7 @@ class EventLogMetricsSpec
       val categoryNameValues = new ConcurrentHashMap[CategoryName, Double]()
 
       override lazy val name = "category name gauge"
+      override lazy val help = "category name gauge help"
 
       override def set(labelValue: (CategoryName, Double)) = labelValue match {
         case (categoryName, value) => categoryNameValues.put(categoryName, value).pure[IO].void
@@ -126,13 +129,10 @@ class EventLogMetricsSpec
       override def decrement(labelValue: CategoryName)        = fail("Spec shouldn't be calling that")
       override def reset()                                    = fail("Spec shouldn't be calling that")
       override def clear()                                    = categoryNameValues.clear().pure[IO]
-      protected override def gauge                            = fail("Spec shouldn't be calling that")
     }
 
     lazy val statusesGauge = new LabeledGauge[IO, EventStatus] {
       val statusValues = new ConcurrentHashMap[EventStatus, Double]()
-
-      override lazy val name = "status gauge"
 
       override def set(labelValue: (EventStatus, Double)) = labelValue match {
         case (status, value) => statusValues.put(status, value).pure[IO].void
@@ -143,13 +143,17 @@ class EventLogMetricsSpec
       override def decrement(labelValue: EventStatus)        = fail("Spec shouldn't be calling that")
       override def reset()                                   = fail("Spec shouldn't be calling that")
       override def clear()                                   = statusValues.clear().pure[IO]
-      protected override def gauge                           = fail("Spec shouldn't be calling that")
+
+      override val name = "status gauge"
+      override val help = "statuses help"
     }
 
     lazy val totalGauge = new SingleValueGauge[IO] {
       val values                      = new ConcurrentLinkedQueue[Double]()
       override def set(value: Double) = values.add(value).pure[IO].void
-      protected override def gauge    = fail("Spec shouldn't be calling that")
+
+      override val name = "total"
+      override val help = "total help"
     }
   }
 

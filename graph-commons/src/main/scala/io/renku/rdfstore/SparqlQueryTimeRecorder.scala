@@ -20,30 +20,24 @@ package io.renku.rdfstore
 
 import cats.effect.Sync
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.collection.NonEmpty
-import io.prometheus.client.Histogram
 import io.renku.logging.ExecutionTimeRecorder
+import io.renku.metrics.Histogram
 import org.typelevel.log4cats.Logger
 
 class SparqlQueryTimeRecorder[F[_]](val instance: ExecutionTimeRecorder[F])
 
 object SparqlQueryTimeRecorder {
 
-  private val QueryExecutionTimeLabel: String Refined NonEmpty = "query_id"
-  private lazy val queriesExecutionTimesHistogram =
-    Histogram
-      .build()
-      .name("sparql_execution_times")
-      .labelNames(QueryExecutionTimeLabel.value)
-      .help("Sparql execution times")
-      .buckets(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
-
   import io.renku.metrics.MetricsRegistry
 
-  def apply[F[_]: Sync: Logger](metricsRegistry: MetricsRegistry): F[SparqlQueryTimeRecorder[F]] = for {
-    histogram             <- metricsRegistry.register[F, Histogram, Histogram.Builder](queriesExecutionTimesHistogram)
+  def apply[F[_]: Sync: Logger: MetricsRegistry]: F[SparqlQueryTimeRecorder[F]] = for {
+    histogram <- Histogram[F](
+                   name = "sparql_execution_times",
+                   help = "Sparql execution times",
+                   labelName = "query_id",
+                   buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
+                 )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
   } yield new SparqlQueryTimeRecorder(executionTimeRecorder)
 }

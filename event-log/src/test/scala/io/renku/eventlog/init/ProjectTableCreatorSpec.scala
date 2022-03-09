@@ -40,8 +40,8 @@ import java.time.ZoneOffset
 
 class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: ProjectTableCreatorImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: ProjectTableCreatorImpl[IO] => false
     case _ => true
   }
 
@@ -124,7 +124,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec wi
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new ProjectTableCreatorImpl[IO](sessionResource)
+    val tableCreator = new ProjectTableCreatorImpl[IO]
   }
 
   private def fetchProjectData: List[(Id, Path, EventDate)] = execute {

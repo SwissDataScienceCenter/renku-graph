@@ -18,11 +18,11 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.{MonadThrow, Semigroup}
 import cats.data.OptionT
+import cats.{MonadThrow, Semigroup}
 import io.circe.Json
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.CategoryName
 
 private trait SubscriptionCategory[F[_]] {
 

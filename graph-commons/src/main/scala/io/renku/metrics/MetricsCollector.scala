@@ -16,22 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.interpreters
+package io.renku.metrics
 
-import cats.MonadThrow
-import io.prometheus.client.{CollectorRegistry, SimpleCollector}
-import io.renku.metrics.MetricsRegistry
+trait MetricsCollector {
+  val name: String
+  val help: String
+}
 
-object TestMetricsRegistry extends MetricsRegistry {
+trait PrometheusCollector {
+  self: MetricsCollector =>
 
-  private val collectorRegistry: CollectorRegistry = new CollectorRegistry()
-
-  override def register[F[_]: MonadThrow,
-                        Collector <: SimpleCollector[_],
-                        Builder <: SimpleCollector.Builder[Builder, Collector]
-  ](collectorBuilder: Builder): F[Collector] = MonadThrow[F].catchNonFatal(collectorBuilder register collectorRegistry)
-
-  override def maybeCollectorRegistry: Option[CollectorRegistry] = Some(collectorRegistry)
-
-  def clear(): Unit = collectorRegistry.clear()
+  type Collector <: io.prometheus.client.Collector
+  val wrappedCollector: Collector
 }

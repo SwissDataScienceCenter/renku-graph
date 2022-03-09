@@ -24,7 +24,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects.Id
 import io.renku.http.client.{AccessToken, GitLabClient}
-import org.http4s.Status.NotFound
+import org.http4s.Status.{Forbidden, NotFound}
 import org.http4s.circe.jsonOf
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{EntityDecoder, Status}
@@ -32,11 +32,9 @@ import org.typelevel.log4cats.Logger
 
 private[categories] trait CommitInfoFinder[F[_]] {
   def findCommitInfo(
-      projectId: Id,
-      commitId:  CommitId
-  )(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): F[CommitInfo]
+      projectId:               Id,
+      commitId:                CommitId
+  )(implicit maybeAccessToken: Option[AccessToken]): F[CommitInfo]
 
   def getMaybeCommitInfo(projectId: Id, commitId: CommitId)(implicit
       maybeAccessToken:             Option[AccessToken]
@@ -73,16 +71,16 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](gi
   private def mapToCommitOrThrow(projectId: Id,
                                  commitId:  CommitId
   ): PartialFunction[(Status, Request[F], Response[F]), F[CommitInfo]] = {
-    case (Ok, _, response)    => response.as[CommitInfo]
-    case (Unauthorized, _, _) => findCommitInfo(projectId, commitId)(maybeAccessToken = None)
+    case (Ok, _, response)                => response.as[CommitInfo]
+    case (Unauthorized | Forbidden, _, _) => findCommitInfo(projectId, commitId)(maybeAccessToken = None)
   }
 
   private def mapToMaybeCommit(projectId: Id,
                                commitId:  CommitId
   ): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
-    case (Ok, _, response)    => response.as[CommitInfo].map(Some(_))
-    case (NotFound, _, _)     => Option.empty[CommitInfo].pure[F]
-    case (Unauthorized, _, _) => getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None)
+    case (Ok, _, response)                => response.as[CommitInfo].map(Some(_))
+    case (NotFound, _, _)                 => Option.empty[CommitInfo].pure[F]
+    case (Unauthorized | Forbidden, _, _) => getMaybeCommitInfo(projectId, commitId)(maybeAccessToken = None)
   }
 
   private implicit val commitInfoEntityDecoder: EntityDecoder[F, CommitInfo] = jsonOf[F, CommitInfo]

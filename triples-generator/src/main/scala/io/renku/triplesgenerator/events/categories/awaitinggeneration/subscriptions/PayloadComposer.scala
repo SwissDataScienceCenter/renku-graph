@@ -23,8 +23,8 @@ import cats.data.Kleisli
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
+import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, SubscriptionPayloadComposer}
-import io.renku.graph.model.events.CategoryName
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber

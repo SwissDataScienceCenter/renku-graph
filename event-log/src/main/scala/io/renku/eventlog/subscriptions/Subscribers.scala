@@ -21,8 +21,8 @@ package io.renku.eventlog.subscriptions
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
 
 private trait Subscribers[F[_]] {

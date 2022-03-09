@@ -23,7 +23,7 @@ import cats.effect.Async
 import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.CategoryName
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration

@@ -22,24 +22,24 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Show}
 import io.circe.{Encoder, Json}
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
+import io.renku.eventlog.events.EventsEndpoint.Criteria._
 import io.renku.eventlog.events.EventsEndpoint.EventInfo
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.http.rest.paging.PagingRequest
-import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import io.renku.metrics.LabeledHistogram
-import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 trait EventsEndpoint[F[_]] {
-  def findEvents(request: EventsEndpoint.Request): F[Response[F]]
+  def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]]
 }
 
 class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F], eventLogUrl: EventLogUrl)
@@ -48,40 +48,66 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
 
   import io.renku.http.ErrorMessage._
 
-  override def findEvents(request: EventsEndpoint.Request): F[Response[F]] =
+  override def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]] =
     eventsFinder
-      .findEvents(request)
-      .map(_.toHttpResponse[F, EventLogUrl](requestedUrl(request), EventLogUrl, EventInfo.infoEncoder))
+      .findEvents(criteria)
+      .map(_.toHttpResponse[F, EventLogUrl](resourceUrl(request), EventLogUrl, EventInfo.infoEncoder))
       .recoverWith(httpResponse(request))
 
-  private def httpResponse(
-      request: EventsEndpoint.Request
-  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(show"Finding events for project '$request' failed")
-    InternalServerError(ErrorMessage(exception))
-  }
+  private def resourceUrl(request: Request[F]) = EventLogUrl(show"$eventLogUrl${request.uri}")
 
-  private def requestedUrl(request: EventsEndpoint.Request): EventLogUrl = request match {
-    case EventsEndpoint.Request.ProjectEvents(path, Some(status), paging) =>
-      (eventLogUrl / "events") ? ("project-path" -> path.show) & ("status" -> status) & (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
-    case EventsEndpoint.Request.ProjectEvents(path, None, paging) =>
-      (eventLogUrl / "events") ? ("project-path" -> path.show) & (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
-    case EventsEndpoint.Request.EventsWithStatus(status, paging) =>
-      (eventLogUrl / "events") ? ("status" -> status) & (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage)
+  private def httpResponse(request: Request[F]): PartialFunction[Throwable, F[Response[F]]] = {
+    case NonFatal(exception) =>
+      Logger[F].error(exception)(show"Finding events for '${request.uri}' failed")
+      InternalServerError(ErrorMessage(exception))
   }
 }
 
 object EventsEndpoint {
 
-  def apply[F[_]: Async: NonEmptyParallel: Logger](sessionResource: SessionResource[F, EventLogDB],
-                                                   queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventsEndpoint[F]] = for {
-    eventsFinder <- EventsFinder(sessionResource, queriesExecTimes)
+    eventsFinder <- EventsFinder(queriesExecTimes)
     eventlogUrl  <- EventLogUrl()
   } yield new EventsEndpointImpl(eventsFinder, eventlogUrl)
 
-  sealed trait Request {
-    val pagingRequest: PagingRequest
+  final case class Criteria(
+      filters: Criteria.Filters,
+      sorting: Criteria.Sorting.By = Sorting.default,
+      paging:  PagingRequest = PagingRequest.default
+  )
+
+  object Criteria {
+
+    sealed trait Filters
+
+    object Filters {
+      final case class ProjectEvents(projectPath: projects.Path, maybeStatus: Option[EventStatus]) extends Filters
+      final case class EventsWithStatus(status: EventStatus)                                       extends Filters
+    }
+
+    object Sorting extends io.renku.http.rest.SortBy {
+      import io.renku.http.rest.SortBy.Direction
+
+      type PropertyType = SortProperty
+
+      sealed trait SortProperty extends Property
+
+      final case object EventDate extends Property("eventDate") with SortProperty
+
+      lazy val default: Sorting.By = Sorting.By(EventDate, Direction.Desc)
+
+      override lazy val properties: Set[SortProperty] = Set(EventDate)
+    }
+  }
+
+  implicit val show: Show[Criteria] = Show.show {
+    _.filters match {
+      case Filters.ProjectEvents(path, Some(status)) => show"project-path: $path; status: $status"
+      case Filters.ProjectEvents(path, None)         => show"project-path: $path"
+      case Filters.EventsWithStatus(status)          => show"status: $status"
+    }
   }
 
   final case class EventInfo(eventId:         EventId,
@@ -94,21 +120,6 @@ object EventsEndpoint {
   )
 
   final case class StatusProcessingTime(status: EventStatus, processingTime: EventProcessingTime)
-
-  object Request {
-    final case class ProjectEvents(projectPath:   projects.Path,
-                                   maybeStatus:   Option[EventStatus],
-                                   pagingRequest: PagingRequest
-    ) extends Request
-
-    final case class EventsWithStatus(status: EventStatus, pagingRequest: PagingRequest) extends Request
-
-    implicit val show: Show[Request] = Show.show {
-      case EventsEndpoint.Request.ProjectEvents(path, Some(status), _) => show"project-path: $path; status: $status"
-      case EventsEndpoint.Request.ProjectEvents(path, None, _)         => show"project-path: $path"
-      case EventsEndpoint.Request.EventsWithStatus(status, _)          => show"status: $status"
-    }
-  }
 
   object EventInfo {
 

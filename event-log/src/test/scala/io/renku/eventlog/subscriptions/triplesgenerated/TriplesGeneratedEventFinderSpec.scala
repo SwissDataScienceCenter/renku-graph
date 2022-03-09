@@ -387,14 +387,12 @@ private class TriplesGeneratedEventFinderSpec
 
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      val eventLogFind = new TriplesGeneratedEventFinderImpl(
-        sessionResource,
-        awaitingTransformationGauge,
-        underTransformationGauge,
-        queriesExecTimes,
-        currentTime,
-        projectsFetchingLimit = 5,
-        projectPrioritisation = projectPrioritisation
+      val eventLogFind = new TriplesGeneratedEventFinderImpl(awaitingTransformationGauge,
+                                                             underTransformationGauge,
+                                                             queriesExecTimes,
+                                                             currentTime,
+                                                             projectsFetchingLimit = 5,
+                                                             projectPrioritisation = projectPrioritisation
       )
 
       val events = readyStatuses
@@ -468,14 +466,12 @@ private class TriplesGeneratedEventFinderSpec
   }
 
   private trait TestCase extends TestCaseCommons {
-    val finder = new TriplesGeneratedEventFinderImpl(
-      sessionResource,
-      awaitingTransformationGauge,
-      underTransformationGauge,
-      queriesExecTimes,
-      currentTime,
-      projectsFetchingLimit = 1,
-      projectPrioritisation = projectPrioritisation
+    val finder = new TriplesGeneratedEventFinderImpl(awaitingTransformationGauge,
+                                                     underTransformationGauge,
+                                                     queriesExecTimes,
+                                                     currentTime,
+                                                     projectsFetchingLimit = 1,
+                                                     projectPrioritisation = projectPrioritisation
     )
   }
 
