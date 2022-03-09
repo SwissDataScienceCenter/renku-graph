@@ -62,15 +62,10 @@ class ToAwaitingDeletionUpdaterSpec
       findEvent(CompoundEventId(eventId, projectId)).map(_._2) shouldBe Some(AwaitingDeletion)
     }
 
-    "fail if there's no event specified in the event" in new TestCase {
-
-      val eventId = compoundEventIds.generateOne
-
-      intercept[Exception] {
-        sessionResource
-          .useK(dbUpdater updateDB ToAwaitingDeletion(eventId, projectPaths.generateOne))
-          .unsafeRunSync()
-      }.getMessage shouldBe s"Could not update event $eventId to status $AwaitingDeletion: event not found"
+    "do nothing if there's no event specified in the event" in new TestCase {
+      sessionResource
+        .useK(dbUpdater updateDB ToAwaitingDeletion(compoundEventIds.generateOne, projectPaths.generateOne))
+        .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
     }
   }
 

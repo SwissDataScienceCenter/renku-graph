@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.statuschange.projectCleaner
+package io.renku.eventlog.events.categories.statuschange
+package projectCleaner
 
+import cats.Applicative
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
@@ -29,6 +31,7 @@ import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.Session
+import skunk.data.Completion
 import skunk.implicits.toStringOps
 
 import scala.util.control.NonFatal
@@ -38,23 +41,25 @@ private[statuschange] trait ProjectCleaner[F[_]] {
 }
 
 private[statuschange] object ProjectCleaner {
-  def apply[F[_]: Async: Logger](queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]): F[ProjectCleaner[F]] = for {
+  def apply[F[_]: Async: Logger](queriesExecTimes: LabeledHistogram[F]): F[ProjectCleaner[F]] = for {
     projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]()
   } yield new ProjectCleanerImpl[F](projectWebhookAndTokenRemover, queriesExecTimes)
 }
 
 private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
     projectWebhookAndTokenRemover: ProjectWebhookAndTokenRemover[F],
-    queriesExecTimes:              LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes:              LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with ProjectCleaner[F] {
-
+  private val applicative = Applicative[F]
+  import applicative._
   import projectWebhookAndTokenRemover._
 
   override def cleanUp(project: Project): Kleisli[F, Session[F], Unit] = for {
-    _ <- removeProjectSubscriptionSyncTimes(project)
-    _ <- removeProject(project)
-    _ <- Kleisli.liftF[F, Session[F], Unit](removeWebhookAndToken(project)) recoverWith logError(project)
+    _       <- removeProjectSubscriptionSyncTimes(project)
+    removed <- removeProject(project)
+    _       <- Kleisli.liftF[F, Session[F], Unit](removeWebhookAndToken(project)) recoverWith logError(project)
+    _       <- Kleisli.liftF(whenA(removed)(Logger[F].info(show"$categoryName: $project removed")))
   } yield ()
 
   private def logError(project: Project): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = {
@@ -65,7 +70,8 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
   private def removeProjectSubscriptionSyncTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - subscription_time removal")
       .command[projects.Id](
-        sql"""DELETE FROM subscription_category_sync_time WHERE project_id = $projectIdEncoder""".command
+        sql"""DELETE FROM subscription_category_sync_time 
+              WHERE project_id = $projectIdEncoder""".command
       )
       .arguments(project.id)
       .build
@@ -75,11 +81,14 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
   private def removeProject(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - remove project")
       .command[projects.Id](
-        sql"""DELETE FROM project WHERE project_id = $projectIdEncoder""".command
+        sql"""DELETE FROM project 
+              WHERE project_id = $projectIdEncoder""".command
       )
       .arguments(project.id)
       .build
-      .void
+      .mapResult {
+        case Completion.Delete(1) => true
+        case _                    => false
+      }
   }
-
 }

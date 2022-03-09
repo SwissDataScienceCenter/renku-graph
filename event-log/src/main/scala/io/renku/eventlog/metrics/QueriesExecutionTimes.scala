@@ -18,18 +18,16 @@
 
 package io.renku.eventlog.metrics
 
-import cats.effect.IO
+import cats.MonadThrow
 import eu.timepit.refined.auto._
-import io.renku.db.SqlStatement
 import io.renku.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
 
 object QueriesExecutionTimes {
 
-  def apply(metricsRegistry: MetricsRegistry): IO[LabeledHistogram[IO, SqlStatement.Name]] =
-    Histogram[IO, SqlStatement.Name](
-      name = "event_log_queries_execution_times",
-      help = "Event Log queries execution times",
-      labelName = "query_id",
-      buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
-    )(metricsRegistry)
+  def apply[F[_]: MonadThrow: MetricsRegistry]: F[LabeledHistogram[F]] = Histogram[F](
+    name = "event_log_queries_execution_times",
+    help = "Event Log queries execution times",
+    labelName = "query_id",
+    buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
+  )
 }

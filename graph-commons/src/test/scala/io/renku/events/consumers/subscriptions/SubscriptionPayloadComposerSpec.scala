@@ -20,10 +20,10 @@ package io.renku.events.consumers.subscriptions
 
 import cats.syntax.all._
 import io.circe.literal._
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.EventsGenerators.categoryNames
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

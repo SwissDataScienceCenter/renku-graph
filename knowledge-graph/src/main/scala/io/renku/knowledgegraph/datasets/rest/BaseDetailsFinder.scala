@@ -102,7 +102,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger](
     Prefixes.of(schema -> "schema"),
     s"""|SELECT DISTINCT ?keyword
         |WHERE {
-        |  ?datasetId schema:identifier "$identifier" ;
+        |  ?datasetId schema:identifier '$identifier' ;
         |             schema:keywords ?keyword .
         |}
         |ORDER BY ASC(?keyword)
@@ -117,12 +117,13 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger](
     Prefixes.of(schema -> "schema"),
     s"""|SELECT DISTINCT ?contentUrl
         |WHERE {
-        |    ?datasetId schema:identifier "$identifier" ;
+        |    ?datasetId schema:identifier '$identifier' ;
         |               schema:image ?imageId .
         |    ?imageId a schema:ImageObject;
         |             schema:contentUrl ?contentUrl ;
         |             schema:position ?position .
-        |}ORDER BY ASC(?position)
+        |}
+        |ORDER BY ASC(?position)
         |""".stripMargin
   )
 

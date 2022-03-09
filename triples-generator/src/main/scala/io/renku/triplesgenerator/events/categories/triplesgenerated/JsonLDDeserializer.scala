@@ -31,7 +31,7 @@ import io.renku.graph.model.entities.Project.GitLabProjectInfo
 import io.renku.graph.model.entities._
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLDDecoder.decodeList
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo.ProjectInfoFinder
 import org.typelevel.log4cats.Logger
 
@@ -64,7 +64,8 @@ private class JsonLDDeserializerImpl[F[_]: MonadThrow](
   ) = findProjectInfo(event.project.path) semiflatMap {
     case Some(projectInfo) => projectInfo.pure[F]
     case None =>
-      new IllegalStateException(s"No project ${event.project.show} found in GitLab")
+      ProcessingNonRecoverableError
+        .MalformedRepository(show"${event.project} not found in GitLab")
         .raiseError[F, GitLabProjectInfo]
   }
 
@@ -75,21 +76,27 @@ private class JsonLDDeserializerImpl[F[_]: MonadThrow](
         project <- projects match {
                      case project :: Nil => project.pure[F]
                      case other =>
-                       new IllegalStateException(
-                         show"${other.size} Project entities found in the JsonLD for ${event.project}"
-                       ).raiseError[F, Project]
+                       ProcessingNonRecoverableError
+                         .MalformedRepository(
+                           show"${other.size} Project entities found in the JsonLD for ${event.project}"
+                         )
+                         .raiseError[F, Project]
                    }
         _ <- whenA(event.project.path.value.toLowerCase() != project.path.value.toLowerCase())(
-               new IllegalStateException(
-                 show"Event for project ${event.project} contains payload for project ${project.path}"
-               ).raiseError[F, Unit]
+               ProcessingNonRecoverableError
+                 .MalformedRepository(
+                   show"Event for project ${event.project} contains payload for project ${project.path}"
+                 )
+                 .raiseError[F, Unit]
              )
       } yield project
     }
 
-  private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => F[T] = err =>
-    new IllegalStateException(show"Finding Project entity in the JsonLD for ${event.project} failed", err)
-      .raiseError[F, T]
+  private def raiseError[T](event: TriplesGeneratedEvent): DecodingFailure => F[T] = failure =>
+    new ProcessingNonRecoverableError.MalformedRepository(
+      show"Finding Project entity in the JsonLD for ${event.project} failed",
+      failure
+    ).raiseError[F, T]
 }
 
 private object JsonLDDeserializer {

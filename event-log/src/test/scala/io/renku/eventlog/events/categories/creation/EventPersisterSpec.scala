@@ -223,7 +223,7 @@ class EventPersisterSpec
 
     }
 
-    "add a *skipped* event if there is no event with the given id for the given project " in new TestCase {
+    "add a *SKIPPED* event if there is no event with the given id for the given project " in new TestCase {
       val skippedEvent = skippedEvents.generateOne
 
       // storeNewEvent 1
@@ -312,7 +312,7 @@ class EventPersisterSpec
     val currentTime        = mockFunction[Instant]
     val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
     val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val persister          = new EventPersisterImpl(sessionResource, waitingEventsGauge, queriesExecTimes, currentTime)
+    val persister          = new EventPersisterImpl(waitingEventsGauge, queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now)

@@ -27,30 +27,27 @@ trait EventLogDbMigrations {
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 
-  protected type Migration = { def run(): IO[Unit] }
+  protected[init] lazy val eventLogTableCreator:           DbMigrator[IO] = EventLogTableCreator[IO]
+  protected[init] lazy val projectPathAdder:               DbMigrator[IO] = ProjectPathAdder[IO]
+  protected[init] lazy val batchDateAdder:                 DbMigrator[IO] = BatchDateAdder[IO]
+  protected[init] lazy val projectTableCreator:            DbMigrator[IO] = ProjectTableCreator[IO]
+  protected[init] lazy val projectPathRemover:             DbMigrator[IO] = ProjectPathRemover[IO]
+  protected[init] lazy val eventLogTableRenamer:           DbMigrator[IO] = EventLogTableRenamer[IO]
+  protected[init] lazy val eventStatusRenamer:             DbMigrator[IO] = EventStatusRenamer[IO]
+  protected[init] lazy val eventPayloadTableCreator:       DbMigrator[IO] = EventPayloadTableCreator[IO]
+  protected[init] lazy val eventPayloadSchemaVersionAdder: DbMigrator[IO] = EventPayloadSchemaVersionAdder[IO]
+  protected[init] lazy val subscriptionCategorySyncTimeTableCreator: DbMigrator[IO] =
+    SubscriptionCategorySyncTimeTableCreator[IO]
+  protected[init] lazy val statusesProcessingTimeTableCreator: DbMigrator[IO] =
+    StatusesProcessingTimeTableCreator[IO]
+  protected[init] lazy val subscriberTableCreator:         DbMigrator[IO] = SubscriberTableCreator[IO]
+  protected[init] lazy val eventDeliveryTableCreator:      DbMigrator[IO] = EventDeliveryTableCreator[IO]
+  protected[init] lazy val timestampZoneAdder:             DbMigrator[IO] = TimestampZoneAdder[IO]
+  protected[init] lazy val payloadTypeChanger:             DbMigrator[IO] = PayloadTypeChanger[IO]
+  protected[init] lazy val statusChangeEventsTableCreator: DbMigrator[IO] = StatusChangeEventsTableCreator[IO]
+  protected[init] lazy val eventDeliveryEventTypeAdder:    DbMigrator[IO] = EventDeliveryEventTypeAdder[IO]
 
-  protected lazy val eventLogTableCreator:     Migration = EventLogTableCreator(sessionResource)
-  protected lazy val projectPathAdder:         Migration = ProjectPathAdder(sessionResource)
-  protected lazy val batchDateAdder:           Migration = BatchDateAdder(sessionResource)
-  protected lazy val projectTableCreator:      Migration = ProjectTableCreator(sessionResource)
-  protected lazy val projectPathRemover:       Migration = ProjectPathRemover(sessionResource)
-  protected lazy val eventLogTableRenamer:     Migration = EventLogTableRenamer(sessionResource)
-  protected lazy val eventStatusRenamer:       Migration = EventStatusRenamer(sessionResource)
-  protected lazy val eventPayloadTableCreator: Migration = EventPayloadTableCreator(sessionResource)
-  protected lazy val eventPayloadSchemaVersionAdder: Migration =
-    EventPayloadSchemaVersionAdder(sessionResource)
-  protected lazy val subscriptionCategorySyncTimeTableCreator: Migration =
-    SubscriptionCategorySyncTimeTableCreator(sessionResource)
-  protected lazy val statusesProcessingTimeTableCreator: Migration =
-    StatusesProcessingTimeTableCreator(sessionResource)
-  protected lazy val subscriberTableCreator:         Migration = SubscriberTableCreator(sessionResource)
-  protected lazy val eventDeliveryTableCreator:      Migration = EventDeliveryTableCreator(sessionResource)
-  protected lazy val timestampZoneAdder:             Migration = TimestampZoneAdder(sessionResource)
-  protected lazy val payloadTypeChanger:             Migration = PayloadTypeChanger(sessionResource)
-  protected lazy val statusChangeEventsTableCreator: Migration = StatusChangeEventsTableCreator(sessionResource)
-  protected lazy val eventDeliveryEventTypeAdder:    Migration = EventDeliveryEventTypeAdder(sessionResource)
-
-  protected lazy val allMigrations: List[Migration] = List(
+  protected[init] lazy val allMigrations: List[DbMigrator[IO]] = List(
     eventLogTableCreator,
     projectPathAdder,
     batchDateAdder,

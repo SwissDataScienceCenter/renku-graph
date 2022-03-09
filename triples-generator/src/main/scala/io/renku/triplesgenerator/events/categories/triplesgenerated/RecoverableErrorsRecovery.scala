@@ -20,8 +20,9 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnauthorizedException, UnexpectedResponseException}
-import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, LogWorthyRecoverableError, ProcessingRecoverableError}
+import io.renku.http.client.RestClientError._
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import org.http4s.Status.{Forbidden, Unauthorized}
 
 private trait RecoverableErrorsRecovery {

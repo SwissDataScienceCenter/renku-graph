@@ -23,7 +23,8 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
 import io.renku.generators.Generators.Implicits._
@@ -31,7 +32,6 @@ import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events
 import io.renku.graph.model.events.EventStatus._
 import io.renku.http.client.RestClient._
 import io.renku.testtools.IOSpec
@@ -63,9 +63,9 @@ class EventStatusUpdaterSpec
         .returning(zippedPayload.value.pure[IO])
 
       (eventSender
-        .sendEvent(_: EventRequestContent.WithPayload[ByteArrayTinyType with ZippedContent], _: String)(
-          _: PartEncoder[ByteArrayTinyType with ZippedContent]
-        ))
+        .sendEvent(_: EventRequestContent.WithPayload[ByteArrayTinyType with ZippedContent],
+                   _: EventSender.EventContext
+        )(_: PartEncoder[ByteArrayTinyType with ZippedContent]))
         .expects(
           EventRequestContent.WithPayload[ByteArrayTinyType with ZippedContent](
             event = json"""{
@@ -80,7 +80,9 @@ class EventStatusUpdaterSpec
             }""",
             payload = zippedPayload
           ),
-          s"$categoryName: Change event status as $TriplesGenerated failed",
+          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                   s"$categoryName: Change event status as $TriplesGenerated failed"
+          ),
           ZipPartEncoder
         )
         .returning(IO.unit)
@@ -97,7 +99,7 @@ class EventStatusUpdaterSpec
       val processingTime = eventProcessingTimes.generateOne
 
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(
           EventRequestContent.NoPayload(
             json"""{
@@ -111,7 +113,9 @@ class EventStatusUpdaterSpec
               "processingTime": ${processingTime.value}
             }"""
           ),
-          s"$categoryName: Change event status as $TriplesStore failed"
+          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                   s"$categoryName: Change event status as $TriplesStore failed"
+          )
         )
         .returning(IO.unit)
 
@@ -125,7 +129,7 @@ class EventStatusUpdaterSpec
 
     s"send a ToNew status change event" in new TestCase {
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(
           EventRequestContent.NoPayload(
             json"""{
@@ -138,7 +142,9 @@ class EventStatusUpdaterSpec
               "newStatus": ${New.value}
             }"""
           ),
-          s"$categoryName: Change event status as $New failed"
+          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                   s"$categoryName: Change event status as $New failed"
+          )
         )
         .returning(IO.unit)
 
@@ -147,7 +153,7 @@ class EventStatusUpdaterSpec
 
     s"send a ToTriplesGenerated status change event" in new TestCase {
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(
           EventRequestContent.NoPayload(
             json"""{
@@ -160,7 +166,9 @@ class EventStatusUpdaterSpec
               "newStatus": $TriplesGenerated
             }"""
           ),
-          s"$categoryName: Change event status as $TriplesGenerated failed"
+          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                   s"$categoryName: Change event status as $TriplesGenerated failed"
+          )
         )
         .returning(IO.unit)
 
@@ -175,7 +183,7 @@ class EventStatusUpdaterSpec
         s"send a To$eventStatus status change event " in new TestCase {
           val exception = exceptions.generateOne
           (eventSender
-            .sendEvent(_: EventRequestContent.NoPayload, _: String))
+            .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
             .expects(
               EventRequestContent.NoPayload(
                 json"""{
@@ -189,7 +197,9 @@ class EventStatusUpdaterSpec
                   "newStatus": $eventStatus 
                 }"""
               ),
-              s"$categoryName: Change event status as $eventStatus failed"
+              EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                       s"$categoryName: Change event status as $eventStatus failed"
+              )
             )
             .returning(IO.unit)
 
@@ -202,7 +212,7 @@ class EventStatusUpdaterSpec
 
     s"send a projectToNew status change event" in new TestCase {
       (eventSender
-        .sendEvent(_: EventRequestContent.NoPayload, _: String))
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
         .expects(
           EventRequestContent.NoPayload(
             json"""{
@@ -214,7 +224,9 @@ class EventStatusUpdaterSpec
               "newStatus": ${New.value}
             }"""
           ),
-          s"$categoryName: Change project events status as $New failed"
+          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                   s"$categoryName: Change project events status as $New failed"
+          )
         )
         .returning(IO.unit)
 
@@ -225,9 +237,9 @@ class EventStatusUpdaterSpec
     val eventId     = compoundEventIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val categoryName: events.CategoryName = categoryNames.generateOne
-    val eventSender = mock[EventSender[IO]]
-    val zip         = mock[Zip]
-    val updater     = new EventStatusUpdaterImpl[IO](eventSender, categoryName, zip)
+    val categoryName = categoryNames.generateOne
+    val eventSender  = mock[EventSender[IO]]
+    val zip          = mock[Zip]
+    val updater      = new EventStatusUpdaterImpl[IO](eventSender, categoryName, zip)
   }
 }

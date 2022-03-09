@@ -40,7 +40,7 @@ private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: Logger](
       for {
         _ <- lastSyncUpdater run (event.project.id, event.maybeLastSyncedDate)
         _ <- Logger[F].error(exception)(
-               s"$categoryName: $event, url = $url -> ${event.project.show} ${event.maybeLastSyncedDate}"
+               show"$categoryName: $event, url = $url -> ${event.project} ${event.maybeLastSyncedDate}"
              )
       } yield ()
   }

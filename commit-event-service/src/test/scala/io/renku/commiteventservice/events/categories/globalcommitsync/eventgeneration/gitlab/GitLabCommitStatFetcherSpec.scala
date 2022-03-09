@@ -78,17 +78,6 @@ class GitLabCommitStatFetcherSpec
       }
     }
 
-    "return None if the gitlab API returns a NotFound" in new TestCase {
-      val maybeLatestCommit = commitIds.generateOption
-      (gitLabCommitFetcher
-        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
-        .expects(projectId, maybeAccessToken)
-        .returning(maybeLatestCommit.pure[IO])
-
-      mapResponse(Status.NotFound, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe None
-
-    }
-
     "return None if the gitlab API returns no statistics" in new TestCase {
       val maybeLatestCommit = commitIds.generateOption
       (gitLabCommitFetcher
@@ -106,14 +95,16 @@ class GitLabCommitStatFetcherSpec
       gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
     }
 
-    "return None if the gitlab API returns a Unauthorized" in new TestCase {
-      val maybeLatestCommit = commitIds.generateOption
-      (gitLabCommitFetcher
-        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
-        .expects(projectId, maybeAccessToken)
-        .returning(maybeLatestCommit.pure[IO])
+    Status.NotFound :: Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
+      s"return None if the gitlab API returns a $status" in new TestCase {
+        val maybeLatestCommit = commitIds.generateOption
+        (gitLabCommitFetcher
+          .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
+          .expects(projectId, maybeAccessToken)
+          .returning(maybeLatestCommit.pure[IO])
 
-      mapResponse(Status.Unauthorized, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe None
+        mapResponse(status, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe None
+      }
     }
   }
 

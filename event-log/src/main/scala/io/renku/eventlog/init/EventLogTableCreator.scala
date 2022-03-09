@@ -20,8 +20,8 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
-import io.renku.db.SessionResource
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.TypeSerializers
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus.GenerationRecoverableFailure
 import org.typelevel.log4cats.Logger
@@ -29,26 +29,20 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait EventLogTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventLogTableCreator[F[_]] extends DbMigrator[F]
 
 private object EventLogTableCreator {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): EventLogTableCreator[F] =
-    new EventLogTableCreatorImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: EventLogTableCreator[F] = new EventLogTableCreatorImpl[F]
 }
 
-private class EventLogTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends EventLogTableCreator[F]
+private class EventLogTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends EventLogTableCreator[F]
     with EventTableCheck
     with TypeSerializers {
 
   import cats.syntax.all._
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     whenEventTableExists(
       Kleisli.liftF(Logger[F] info "'event_log' table creation skipped"),
       otherwise = checkTableExists flatMap {

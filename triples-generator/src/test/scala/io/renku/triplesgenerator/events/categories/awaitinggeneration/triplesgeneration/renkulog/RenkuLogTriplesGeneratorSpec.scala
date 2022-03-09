@@ -38,9 +38,11 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, Property}
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, categoryName}
+import io.renku.triplesgenerator.generators.ErrorGenerators.nonRecoverableMalformedRepoErrors
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -153,6 +155,21 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         (git
           .`reset --hard`(_: RepositoryPath))
           .expects(repositoryDirectory)
+          .returning(IO.unit)
+
+        (git
+          .`rm --cached`(_: RepositoryPath))
+          .expects(repositoryDirectory)
+          .returning(IO.unit)
+
+        (git
+          .`add -A`(_: RepositoryPath))
+          .expects(repositoryDirectory)
+          .returning(IO.unit)
+
+        (git
+          .commit(_: String)(_: RepositoryPath))
+          .expects("fixing dirty repo problem", repositoryDirectory)
           .returning(IO.unit)
 
         (renku
@@ -270,7 +287,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         }.asRight
       }
 
-    s"return $LogWorthyRecoverableError if 'renku graph export' returns one" in new TestCase {
+    "return LogWorthyRecoverableError if 'renku graph export' returns one" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -315,7 +332,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       triplesGenerator.generateTriples(commitEvent).value.unsafeRunSync() shouldBe Left(error)
     }
 
-    s"return $LogWorthyRecoverableError if cloning the repo returns such error" in new TestCase {
+    "return LogWorthyRecoverableError if cloning the repo returns such error" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -599,7 +616,51 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       actual.getCause   shouldBe exception
     }
 
-    "fail if calling 'renku migrate' fails" in new TestCase {
+    "fail if calling 'renku migrate' fails with ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
+
+      (file
+        .mkdir(_: Path))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
+
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
+
+      (git
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
+        .returning(rightT[IO, ProcessingRecoverableError](()))
+
+      (git
+        .checkout(_: CommitId)(_: RepositoryPath))
+        .expects(commitId, repositoryDirectory)
+        .returning(IO.unit)
+
+      (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
+      (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
+
+      val exception = nonRecoverableMalformedRepoErrors.generateOne
+      (renku
+        .migrate(_: CommitEvent)(_: RepositoryPath))
+        .expects(commitEvent, repositoryDirectory)
+        .returning(IO.raiseError(exception))
+
+      (file
+        .deleteDirectory(_: Path))
+        .expects(repositoryDirectory.value)
+        .returning(IO.unit)
+        .atLeastOnce()
+
+      val actual = intercept[ProcessingNonRecoverableError.MalformedRepository] {
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
+      }
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} ${exception.message}"
+      actual.getCause   shouldBe exception.cause
+    }
+
+    "fail if calling 'renku migrate' fails with non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
       (file
         .mkdir(_: Path))
@@ -643,7 +704,56 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       actual.getCause   shouldBe exception
     }
 
-    "fail if calling 'renku graph export' fails" in new TestCase {
+    "fail if calling 'renku graph export' fails with ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
+
+      (file
+        .mkdir(_: Path))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
+
+      (gitLabRepoUrlFinder
+        .findRepositoryUrl(_: projects.Path)(_: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(IO.pure(gitRepositoryUrl))
+
+      (git
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
+        .returning(rightT[IO, ProcessingRecoverableError](()))
+
+      (git
+        .checkout(_: CommitId)(_: RepositoryPath))
+        .expects(commitId, repositoryDirectory)
+        .returning(IO.unit)
+
+      (file.exists(_: Path)).expects(renkuRepoFilePath).returning(true.pure[IO])
+      (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
+
+      (renku
+        .migrate(_: CommitEvent)(_: RepositoryPath))
+        .expects(commitEvent, repositoryDirectory)
+        .returning(IO.unit)
+
+      val exception = nonRecoverableMalformedRepoErrors.generateOne
+      (renku
+        .graphExport(_: RepositoryPath))
+        .expects(repositoryDirectory)
+        .returning(EitherT.right[ProcessingRecoverableError](exception.raiseError[IO, JsonLD]))
+
+      (file
+        .deleteDirectory(_: Path))
+        .expects(repositoryDirectory.value)
+        .returning(IO.unit)
+        .atLeastOnce()
+
+      val actual = intercept[ProcessingNonRecoverableError.MalformedRepository] {
+        triplesGenerator.generateTriples(commitEvent)(maybeAccessToken).value.unsafeRunSync()
+      }
+      actual.getMessage shouldBe s"${commonLogMessage(commitEvent)} ${exception.message}"
+      actual.getCause   shouldBe exception.cause
+    }
+
+    "fail if calling 'renku graph export' fails with non-ProcessingNonRecoverableError.MalformedRepository" in new TestCase {
 
       (file
         .mkdir(_: Path))

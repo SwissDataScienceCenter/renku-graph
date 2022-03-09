@@ -21,8 +21,8 @@ package io.renku.eventlog.subscriptions
 import cats.MonadThrow
 import io.circe.{Decoder, Json}
 import io.renku.eventlog.subscriptions.SubscriptionRequestDeserializer.PayloadFactory
+import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import io.renku.graph.model.events.CategoryName
 
 private trait SubscriptionRequestDeserializer[F[_], SubscriptionInfoType <: SubscriptionInfo] {
   def deserialize(payload: Json): F[Option[SubscriptionInfoType]]

@@ -24,8 +24,9 @@ import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.subscriptions.eventdelivery.EventDelivery
+import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.graph.model.events.CategoryName
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -113,7 +114,7 @@ private object EventsDistributor {
   private val NoEventSleep: FiniteDuration = 1 seconds
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
-  def apply[F[_]: Async: Logger, CategoryEvent](
+  def apply[F[_]: Async: Logger: MetricsRegistry, CategoryEvent](
       categoryName:             CategoryName,
       subscribers:              Subscribers[F],
       eventsFinder:             EventFinder[F, CategoryEvent],

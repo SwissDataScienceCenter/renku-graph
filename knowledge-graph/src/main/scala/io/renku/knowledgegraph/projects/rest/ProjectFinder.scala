@@ -22,11 +22,10 @@ import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects.Path
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder._
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.model._
 import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
@@ -53,7 +52,7 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel](
     ((OptionT(findInKG(path, maybeAuthUser)), findInGitLab(path)) parMapN (merge(path, _, _))).value
 
   private def findInGitLab(path: Path) =
-    OptionT(findAccessToken(path)) >>= { implicit accessToken => findProjectInGitLab(path) }
+    OptionT(findAccessToken(path)) >>= { implicit accessToken => OptionT(findProjectInGitLab(path)) }
 
   private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) = Project(
     id = gitLabProject.id,
@@ -93,12 +92,11 @@ private object ProjectFinder {
 
   import io.renku.rdfstore.SparqlQueryTimeRecorder
 
-  def apply[F[_]: Async: Parallel: Logger](
-      gitLabThrottler: Throttler[F, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[F]
+  def apply[F[_]: Async: Parallel: Logger](gitLabClient: GitLabClient[F],
+                                           timeRecorder: SparqlQueryTimeRecorder[F]
   ): F[ProjectFinder[F]] = for {
     kgProjectFinder     <- KGProjectFinder[F](timeRecorder)
-    gitLabProjectFinder <- GitLabProjectFinder[F](gitLabThrottler)
+    gitLabProjectFinder <- GitLabProjectFinder[F](gitLabClient)
     accessTokenFinder   <- AccessTokenFinder[F]
   } yield new ProjectFinderImpl(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
 }

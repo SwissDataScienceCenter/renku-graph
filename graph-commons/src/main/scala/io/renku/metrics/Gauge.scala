@@ -26,12 +26,7 @@ import io.prometheus.client.{Gauge => LibGauge}
 
 import scala.jdk.CollectionConverters._
 
-trait Gauge[F[_]] {
-  protected def gauge: LibGauge
-
-  lazy val name: String = gauge.describe().asScala.head.name
-  lazy val help: String = gauge.describe().asScala.head.help
-}
+trait Gauge[F[_]] extends MetricsCollector
 
 trait SingleValueGauge[F[_]] extends Gauge[F] {
   def set(value: Double): F[Unit]
@@ -46,40 +41,47 @@ trait LabeledGauge[F[_], LabelValue] extends Gauge[F] {
   def clear(): F[Unit]
 }
 
-class SingleValueGaugeImpl[F[_]: MonadThrow] private[metrics] (protected val gauge: LibGauge)
-    extends SingleValueGauge[F] {
-  override def set(value: Double): F[Unit] = MonadThrow[F].catchNonFatal(gauge.set(value))
+class SingleValueGaugeImpl[F[_]: MonadThrow] private[metrics] (val wrappedCollector: LibGauge)
+    extends SingleValueGauge[F]
+    with PrometheusCollector {
+
+  type Collector = LibGauge
+  override lazy val name: String = wrappedCollector.describe().asScala.head.name
+  override lazy val help: String = wrappedCollector.describe().asScala.head.help
+
+  override def set(value: Double): F[Unit] = MonadThrow[F].catchNonFatal(wrappedCollector set value)
 }
 
 class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue] private[metrics] (
-    protected val gauge: LibGauge,
-    resetDataFetch:      () => F[Map[LabelValue, Double]]
-) extends LabeledGauge[F, LabelValue] {
+    val wrappedCollector: LibGauge,
+    resetDataFetch:       () => F[Map[LabelValue, Double]]
+) extends LabeledGauge[F, LabelValue]
+    with PrometheusCollector {
 
-  override def set(labelValueAndValue: (LabelValue, Double)): F[Unit] =
-    MonadThrow[F].catchNonFatal {
-      val (labelValue, value) = labelValueAndValue
-      gauge.labels(labelValue.toString).set(value)
-    }
+  type Collector = LibGauge
+  override lazy val name: String = wrappedCollector.describe().asScala.head.name
+  override lazy val help: String = wrappedCollector.describe().asScala.head.help
 
-  override def update(labelValueAndValue: (LabelValue, Double)): F[Unit] =
-    MonadThrow[F].catchNonFatal {
-      val (labelValue, value) = labelValueAndValue
-      val child               = gauge.labels(labelValue.toString)
-      child.set(child.get() + value)
-    }
+  override def set(labelValueAndValue: (LabelValue, Double)): F[Unit] = MonadThrow[F].catchNonFatal {
+    val (labelValue, value) = labelValueAndValue
+    wrappedCollector.labels(labelValue.toString).set(value)
+  }
 
-  override def increment(labelValue: LabelValue): F[Unit] =
-    MonadThrow[F].catchNonFatal {
-      gauge.labels(labelValue.toString).inc()
-    }
+  override def update(labelValueAndValue: (LabelValue, Double)): F[Unit] = MonadThrow[F].catchNonFatal {
+    val (labelValue, value) = labelValueAndValue
+    val child               = wrappedCollector.labels(labelValue.toString)
+    child.set(child.get() + value)
+  }
 
-  override def decrement(labelValue: LabelValue): F[Unit] =
-    MonadThrow[F].catchNonFatal {
-      if (gauge.labels(labelValue.toString).get() != 0)
-        gauge.labels(labelValue.toString).dec()
-      else ()
-    }
+  override def increment(labelValue: LabelValue): F[Unit] = MonadThrow[F].catchNonFatal {
+    wrappedCollector.labels(labelValue.toString).inc()
+  }
+
+  override def decrement(labelValue: LabelValue): F[Unit] = MonadThrow[F].catchNonFatal {
+    if (wrappedCollector.labels(labelValue.toString).get() != 0)
+      wrappedCollector.labels(labelValue.toString).dec()
+    else ()
+  }
 
   override def reset(): F[Unit] = for {
     newValues <- resetDataFetch()
@@ -87,48 +89,51 @@ class LabeledGaugeImpl[F[_]: MonadThrow, LabelValue] private[metrics] (
     _         <- MonadThrow[F].catchNonFatal(newValues foreach set)
   } yield ()
 
-  override def clear(): F[Unit] = MonadThrow[F].catchNonFatal(gauge.clear())
+  override def clear(): F[Unit] = MonadThrow[F].catchNonFatal(wrappedCollector.clear())
 }
 
 object Gauge {
 
-  def apply[F[_]: MonadThrow](
-      name:          String Refined NonEmpty,
-      help:          String Refined NonEmpty
-  )(metricsRegistry: MetricsRegistry): F[SingleValueGauge[F]] = {
+  def apply[F[_]: MonadThrow: MetricsRegistry](
+      name: String Refined NonEmpty,
+      help: String Refined NonEmpty
+  ): F[SingleValueGauge[F]] = {
 
-    val gaugeBuilder = LibGauge
-      .build()
-      .name(name.value)
-      .help(help.value)
+    val gauge = new SingleValueGaugeImpl[F](
+      LibGauge
+        .build()
+        .name(name.value)
+        .help(help.value)
+        .create()
+    )
 
-    for {
-      gauge <- metricsRegistry register [F, LibGauge, LibGauge.Builder] gaugeBuilder
-    } yield new SingleValueGaugeImpl[F](gauge)
+    MetricsRegistry[F].register(gauge).widen
   }
 
-  def apply[F[_]: MonadThrow, LabelValue](
-      name:          String Refined NonEmpty,
-      help:          String Refined NonEmpty,
-      labelName:     String Refined NonEmpty
-  )(metricsRegistry: MetricsRegistry): F[LabeledGauge[F, LabelValue]] =
-    this(name, help, labelName, () => Map.empty[LabelValue, Double].pure[F])(metricsRegistry)
+  def apply[F[_]: MonadThrow: MetricsRegistry, LabelValue](
+      name:      String Refined NonEmpty,
+      help:      String Refined NonEmpty,
+      labelName: String Refined NonEmpty
+  ): F[LabeledGauge[F, LabelValue]] =
+    this(name, help, labelName, () => Map.empty[LabelValue, Double].pure[F])
 
-  def apply[F[_]: MonadThrow, LabelValue](
+  def apply[F[_]: MonadThrow: MetricsRegistry, LabelValue](
       name:           String Refined NonEmpty,
       help:           String Refined NonEmpty,
       labelName:      String Refined NonEmpty,
       resetDataFetch: () => F[Map[LabelValue, Double]]
-  )(metricsRegistry:  MetricsRegistry): F[LabeledGauge[F, LabelValue]] = {
+  ): F[LabeledGauge[F, LabelValue]] = {
 
-    val gaugeBuilder = LibGauge
-      .build()
-      .name(name.value)
-      .help(help.value)
-      .labelNames(labelName.value)
+    val gauge = new LabeledGaugeImpl[F, LabelValue](
+      LibGauge
+        .build()
+        .name(name.value)
+        .help(help.value)
+        .labelNames(labelName.value)
+        .create(),
+      resetDataFetch
+    )
 
-    for {
-      gauge <- metricsRegistry register [F, LibGauge, LibGauge.Builder] gaugeBuilder
-    } yield new LabeledGaugeImpl[F, LabelValue](gauge, resetDataFetch)
+    MetricsRegistry[F].register(gauge).widen
   }
 }

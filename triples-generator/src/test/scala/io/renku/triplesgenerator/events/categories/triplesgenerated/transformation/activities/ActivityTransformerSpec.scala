@@ -26,7 +26,7 @@ import io.renku.graph.model.GraphModelGenerators.personResourceIds
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{activities, entities, persons}
 import io.renku.rdfstore.SparqlQuery
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
 import org.scalamock.scalatest.MockFactory

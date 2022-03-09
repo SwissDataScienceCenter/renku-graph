@@ -40,7 +40,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-class EventStatusRenamerImplSpec
+class EventStatusRenamerSpec
     extends AnyWordSpec
     with IOSpec
     with DbInitSpec
@@ -48,8 +48,8 @@ class EventStatusRenamerImplSpec
     with EventLogDataProvisioning
     with EventDataFetching {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: EventStatusRenamerImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: EventStatusRenamerImpl[IO] => false
     case _ => true
   }
 
@@ -110,7 +110,7 @@ class EventStatusRenamerImplSpec
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventStatusRenamer = new EventStatusRenamerImpl[IO](sessionResource)
+    val eventStatusRenamer = new EventStatusRenamerImpl[IO]
   }
 
   private def store(event: Event, withStatus: String): Unit = {

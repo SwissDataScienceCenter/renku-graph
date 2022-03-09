@@ -27,7 +27,7 @@ import io.renku.graph.webhookservice.WebhookServiceUrl
 import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.EntityDecoder
 import org.http4s.Method.DELETE
-import org.http4s.Status.{NoContent, NotFound, Ok}
+import org.http4s.Status.{Forbidden, NoContent, NotFound, Ok, Unauthorized}
 import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
@@ -49,9 +49,10 @@ private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](accessToken
 ) extends RestClient[F, ProjectWebhookAndTokenRemover[F]](Throttler.noThrottling[F])
     with ProjectWebhookAndTokenRemover[F] {
 
+  import AccessTokenFinder.projectIdToPath
+
   override def removeWebhookAndToken(project: Project): F[Unit] =
-    accessTokenFinder
-      .findAccessToken(project.id)(AccessTokenFinder.projectIdToPath) flatMap {
+    accessTokenFinder.findAccessToken(project.id) >>= {
       case Some(token) => removeProjectWebhook(project, token) >> removeProjectTokens(project)
       case None        => ().pure[F]
     }
@@ -69,9 +70,9 @@ private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](accessToken
   private implicit val tokenEntityDecoder: EntityDecoder[F, AccessToken] = jsonOf[F, AccessToken]
 
   private def mapWebhookResponse(project: Project): ResponseMapping[Unit] = {
-    case (Ok | NotFound, _, _) => ().pure[F]
+    case (Ok | NotFound | Unauthorized | Forbidden, _, _) => ().pure[F]
     case (status, _, _) =>
-      new Exception(s"Removing project webhook failed with status: $status for project: ${project.show}")
+      new Exception(show"Removing project webhook failed with status: $status for project: $project")
         .raiseError[F, Unit]
   }
 

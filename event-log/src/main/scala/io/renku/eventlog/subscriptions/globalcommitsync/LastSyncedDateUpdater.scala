@@ -19,64 +19,68 @@
 package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.MonadThrow
+import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.EventLogDB
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.SubscriptionTypeSerializers
-import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.events.CategoryName
+import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits.{toIdOps, toStringOps}
-import skunk.~
+import skunk.{SqlState, ~}
 
 private trait LastSyncedDateUpdater[F[_]] {
   def run(projectId: projects.Id, maybeLastSyncDate: Option[LastSyncedDate]): F[Completion]
 }
 
 private object LastSyncedDateUpdater {
-  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
-                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: MonadCancelThrow: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[LastSyncedDateUpdater[F]] = MonadThrow[F].catchNonFatal(
-    new LastSyncedDateUpdateImpl[F](sessionResource, queriesExecTimes)
+    new LastSyncedDateUpdateImpl[F](queriesExecTimes)
   )
 }
 
-private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow: SessionResource](
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with LastSyncedDateUpdater[F]
     with SubscriptionTypeSerializers {
 
-  override def run(
-      projectId:         projects.Id,
-      maybeLastSyncDate: Option[LastSyncedDate]
-  ): F[Completion] = sessionResource.useK {
-    measureExecutionTime {
+  override def run(projectId: projects.Id, maybeLastSyncDate: Option[LastSyncedDate]): F[Completion] =
+    SessionResource[F].useK {
       maybeLastSyncDate match {
-        case Some(lastSyncedDate) =>
-          SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-            .command[projects.Id ~ CategoryName ~ LastSyncedDate](
-              sql"""INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-                VALUES ( $projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
-                ON CONFLICT (project_id, category_name)
-                DO UPDATE SET last_synced = EXCLUDED.last_synced
-            """.command
-            )
-            .arguments(projectId ~ categoryName ~ lastSyncedDate)
-            .build
-        case None =>
-          SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
-            .command[projects.Id ~ CategoryName](
-              sql"""DELETE  FROM subscription_category_sync_time
-                WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
-            """.command
-            )
-            .arguments(projectId ~ categoryName)
-            .build
+        case Some(lastSyncedDate) => insert(projectId, lastSyncedDate)
+        case None                 => deleteLastSyncDate(projectId)
       }
     }
+
+  private def insert(projectId: projects.Id, lastSyncedDate: LastSyncedDate) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
+      .command[projects.Id ~ CategoryName ~ LastSyncedDate](
+        sql"""INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
+              VALUES ( $projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
+              ON CONFLICT (project_id, category_name)
+              DO UPDATE SET last_synced = EXCLUDED.last_synced
+            """.command
+      )
+      .arguments(projectId ~ categoryName ~ lastSyncedDate)
+      .build
+  } recoverWith { case SqlState.ForeignKeyViolation(_) => Kleisli.pure(Completion.Insert(0)) }
+
+  private def deleteLastSyncDate(projectId: projects.Id) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced"))
+      .command[projects.Id ~ CategoryName](
+        sql"""DELETE FROM subscription_category_sync_time
+              WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
+            """.command
+      )
+      .arguments(projectId ~ categoryName)
+      .build
   }
 }

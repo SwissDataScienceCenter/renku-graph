@@ -23,6 +23,7 @@ import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -109,6 +110,6 @@ class CommitSyncForcerSpec
 
   private trait TestCase {
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val forcer           = new CommitSyncForcerImpl(sessionResource, queriesExecTimes)
+    val forcer           = new CommitSyncForcerImpl(queriesExecTimes)
   }
 }

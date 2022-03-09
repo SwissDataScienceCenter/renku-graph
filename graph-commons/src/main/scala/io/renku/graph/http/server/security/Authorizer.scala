@@ -25,7 +25,7 @@ import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityRecord, SecurityRecordFinder}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.projects.Visibility.{Internal, Public}
+import io.renku.graph.model.projects.Visibility._
 import io.renku.graph.model.persons.GitLabId
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
@@ -62,14 +62,19 @@ private class AuthorizerImpl[F[_]: MonadThrow, Key](securityRecordsFinder: Secur
   private def validate(authContext: AuthContext[Key],
                        records:     List[SecurityRecord]
   ): EitherT[F, EndpointSecurityException, AuthContext[Key]] = EitherT.fromEither[F] {
-    records.foldLeft(authContext.asRight[EndpointSecurityException]) {
-      case (left @ Left(_), _)                                              => left
-      case (Right(ctx), (Public, path, _))                                  => (ctx addAllowedProject path).asRight
-      case (Right(ctx), (Internal, path, _)) if ctx.maybeAuthUser.isDefined => (ctx addAllowedProject path).asRight
-      case (Right(ctx), (_, path, projectMembers))
-          if (projectMembers intersect authContext.maybeAuthUser.map(_.id).toSet).nonEmpty =>
-        (ctx addAllowedProject path).asRight
-      case _ => AuthorizationFailure.asLeft
+    findAllowedProjects(authContext)(records) match {
+      case allowed if allowed.isEmpty => AuthorizationFailure.asLeft
+      case allowed                    => authContext.copy(allowedProjects = allowed).asRight
     }
   }
+
+  private def findAllowedProjects(authContext: AuthContext[Key]): List[SecurityRecord] => Set[projects.Path] =
+    _.foldLeft(Set.empty[projects.Path]) {
+      case (allowed, (Public, path, _))                                          => allowed + path
+      case (allowed, (Internal, path, _)) if authContext.maybeAuthUser.isDefined => allowed + path
+      case (allowed, (Private, path, members))
+          if (members intersect authContext.maybeAuthUser.map(_.id).toSet).nonEmpty =>
+        allowed + path
+      case (allowed, _) => allowed
+    }
 }

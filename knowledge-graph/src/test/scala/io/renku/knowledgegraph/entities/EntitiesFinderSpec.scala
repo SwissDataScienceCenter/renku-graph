@@ -401,7 +401,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
           activityEntities(
             planEntities().modify(
               replacePlanDateCreated(to =
-                timestampsNotInTheFuture(butOlderThan = dateAsInstant.plus(Duration ofDays 1))
+                timestampsNotInTheFuture(butYoungerThan = dateAsInstant.plus(Duration ofDays 1))
                   .generateAs(plans.DateCreated)
               )
             )
@@ -417,7 +417,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
           datasetEntities(provenanceInternal).modify(
             provenanceLens[Dataset.Provenance.Internal].modify(
               _.copy(date =
-                timestampsNotInTheFuture(butOlderThan = dateAsInstant.plus(Duration ofDays 1))
+                timestampsNotInTheFuture(butYoungerThan = dateAsInstant.plus(Duration ofDays 1))
                   .generateAs(datasets.DateCreated)
               )
             )

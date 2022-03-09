@@ -21,11 +21,10 @@ package io.renku.db
 import cats.Monad
 import cats.data.Kleisli
 import cats.syntax.all._
-import io.renku.db.SqlStatement.Name
 import io.renku.metrics.LabeledHistogram
 import skunk.Session
 
-abstract class DbClient[F[_]: Monad](maybeHistogram: Option[LabeledHistogram[F, Name]]) {
+abstract class DbClient[F[_]: Monad](maybeHistogram: Option[LabeledHistogram[F]]) {
 
   protected def measureExecutionTime[ResultType](
       query: SqlStatement[F, ResultType]
@@ -34,7 +33,7 @@ abstract class DbClient[F[_]: Monad](maybeHistogram: Option[LabeledHistogram[F, 
       case None => query.queryExecution.run(session)
       case Some(histogram) =>
         for {
-          timer  <- histogram.startTimer(query.name)
+          timer  <- histogram.startTimer(query.name.value)
           result <- query.queryExecution.run(session)
           _      <- timer.observeDuration
         } yield result

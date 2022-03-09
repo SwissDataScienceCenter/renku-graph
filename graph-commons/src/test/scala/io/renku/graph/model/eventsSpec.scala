@@ -38,18 +38,23 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
   "EventStatus" should {
 
     val scenarios = Table(
-      "String Value"                           -> "Expected EventStatus",
-      "NEW"                                    -> New,
-      "GENERATING_TRIPLES"                     -> GeneratingTriples,
-      "TRIPLES_STORE"                          -> TriplesStore,
-      "TRANSFORMING_TRIPLES"                   -> TransformingTriples,
-      "SKIPPED"                                -> Skipped,
-      "GENERATION_RECOVERABLE_FAILURE"         -> GenerationRecoverableFailure,
-      "GENERATION_NON_RECOVERABLE_FAILURE"     -> GenerationNonRecoverableFailure,
-      "TRANSFORMATION_RECOVERABLE_FAILURE"     -> TransformationRecoverableFailure,
-      "TRANSFORMATION_NON_RECOVERABLE_FAILURE" -> TransformationNonRecoverableFailure,
-      "AWAITING_DELETION"                      -> AwaitingDeletion,
-      "DELETING"                               -> Deleting
+      "String Value" -> "Expected EventStatus",
+      EventStatus.all.toList.map {
+        case New                             => "NEW"                                -> New
+        case Skipped                         => "SKIPPED"                            -> Skipped
+        case GeneratingTriples               => "GENERATING_TRIPLES"                 -> GeneratingTriples
+        case GenerationRecoverableFailure    => "GENERATION_RECOVERABLE_FAILURE"     -> GenerationRecoverableFailure
+        case GenerationNonRecoverableFailure => "GENERATION_NON_RECOVERABLE_FAILURE" -> GenerationNonRecoverableFailure
+        case TriplesGenerated                => "TRIPLES_GENERATED"                  -> TriplesGenerated
+        case TransformingTriples             => "TRANSFORMING_TRIPLES"               -> TransformingTriples
+        case TransformationRecoverableFailure =>
+          "TRANSFORMATION_RECOVERABLE_FAILURE" -> TransformationRecoverableFailure
+        case TransformationNonRecoverableFailure =>
+          "TRANSFORMATION_NON_RECOVERABLE_FAILURE" -> TransformationNonRecoverableFailure
+        case TriplesStore     => "TRIPLES_STORE"     -> TriplesStore
+        case AwaitingDeletion => "AWAITING_DELETION" -> AwaitingDeletion
+        case Deleting         => "DELETING"          -> Deleting
+      }: _*
     )
 
     forAll(scenarios) { (stringValue, expectedStatus) =>

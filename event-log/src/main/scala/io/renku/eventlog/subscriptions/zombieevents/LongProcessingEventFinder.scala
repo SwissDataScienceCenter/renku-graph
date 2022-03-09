@@ -24,9 +24,10 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.implicits._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventFinder
-import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
+import io.renku.eventlog.{ExecutionDate, TypeSerializers}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import io.renku.graph.model.projects
@@ -38,16 +39,15 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class LongProcessingEventFinder[F[_]: Async](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+private class LongProcessingEventFinder[F[_]: Async: SessionResource](
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
 
-  override def popEvent(): F[Option[ZombieEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[ZombieEvent]] = SessionResource[F].useK {
     findPotentialZombies >>= lookForZombie >>= markEventTaken
   }
 
@@ -165,10 +165,9 @@ private class LongProcessingEventFinder[F[_]: Async](
 
 private object LongProcessingEventFinder {
 
-  def apply[F[_]: Async](
-      sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: Async: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
-    new LongProcessingEventFinder(sessionResource, queriesExecTimes)
+    new LongProcessingEventFinder(queriesExecTimes)
   }
 }

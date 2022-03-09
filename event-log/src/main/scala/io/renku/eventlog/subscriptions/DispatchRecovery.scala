@@ -20,8 +20,8 @@ package io.renku.eventlog.subscriptions
 
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
+import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.graph.model.events.CategoryName
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal

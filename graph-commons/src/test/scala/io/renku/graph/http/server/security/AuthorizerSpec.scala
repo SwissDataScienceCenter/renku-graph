@@ -18,7 +18,7 @@
 
 package io.renku.graph.http.server.security
 
-import cats.data.EitherT
+import cats.data.EitherT.{leftT, rightT}
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
@@ -37,7 +37,7 @@ import scala.util.Try
 
 class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  "authorize" should {
+  "authorize - public projects" should {
 
     "succeed if found SecurityRecord is for a public project and there's no auth user" in new TestCase {
       val projectPath = projectPaths.generateOne
@@ -45,7 +45,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(key)
         .returning(List((Visibility.Public, projectPath, Set.empty[GitLabId])).pure[Try])
 
-      authorizer.authorize(key, maybeAuthUser = None) shouldBe EitherT.rightT[Try, EndpointSecurityException](
+      authorizer.authorize(key, maybeAuthUser = None) shouldBe rightT[Try, EndpointSecurityException](
         AuthContext[Key](None, key, Set(projectPath))
       )
     }
@@ -58,7 +58,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(key)
         .returning(List((Visibility.Public, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try])
 
-      authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
+      authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
         AuthContext[Key](Some(authUser), key, Set(projectPath))
       )
     }
@@ -71,10 +71,13 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(key)
         .returning(List((Visibility.Public, projectPath, personGitLabIds.generateSet())).pure[Try])
 
-      authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
+      authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
         AuthContext[Key](Some(authUser), key, Set(projectPath))
       )
     }
+  }
+
+  "authorize - non-public projects" should {
 
     Visibility.Internal :: Visibility.Private :: Nil foreach { visibility =>
       s"fail if found SecurityRecord is for a $visibility project and there's no auth user" in new TestCase {
@@ -83,7 +86,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
           .expects(key)
           .returning(List((visibility, projectPath, Set.empty[GitLabId])).pure[Try])
 
-        authorizer.authorize(key, maybeAuthUser = None) shouldBe EitherT.leftT[Try, Unit](AuthorizationFailure)
+        authorizer.authorize(key, maybeAuthUser = None) shouldBe leftT[Try, Unit](AuthorizationFailure)
       }
     }
 
@@ -96,7 +99,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
           .expects(key)
           .returning(List((visibility, projectPath, personGitLabIds.generateSet() + authUser.id)).pure[Try])
 
-        authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
+        authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
           AuthContext[Key](Some(authUser), key, Set(projectPath))
         )
       }
@@ -110,7 +113,7 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(key)
         .returning(List((Visibility.Internal, projectPath, personGitLabIds.generateSet())).pure[Try])
 
-      authorizer.authorize(key, authUser.some) shouldBe EitherT.rightT[Try, EndpointSecurityException](
+      authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
         AuthContext[Key](Some(authUser), key, Set(projectPath))
       )
     }
@@ -123,16 +126,75 @@ class AuthorizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(key)
         .returning(List((Visibility.Private, projectPath, personGitLabIds.generateSet())).pure[Try])
 
-      authorizer.authorize(key, authUser.some) shouldBe EitherT.leftT[Try, Unit](AuthorizationFailure)
+      authorizer.authorize(key, authUser.some) shouldBe leftT[Try, Unit](AuthorizationFailure)
     }
 
-    "succeed with no allowed projects if there's no project with the given id" in new TestCase {
+    "fail if there's no project with the given id" in new TestCase {
       val authUser = authUsers.generateOne
 
       securityRecordsFinder.expects(key).returning(Nil.pure[Try])
 
-      authorizer.authorize(key, Some(authUser)) shouldBe EitherT.rightT[Try, EndpointSecurityException](
-        AuthContext[Key](Some(authUser), key, Set.empty)
+      authorizer.authorize(key, Some(authUser)) shouldBe leftT[Try, Unit](AuthorizationFailure)
+    }
+  }
+
+  "authorize - auth records for projects with mixed visibility" should {
+
+    "succeed with public projects only if there's no auth user" in new TestCase {
+      val publicProject = projectPaths.generateOne
+      securityRecordsFinder
+        .expects(key)
+        .returning(
+          List(
+            (Visibility.Public, publicProject, personGitLabIds.generateSet()),
+            (Visibility.Internal, projectPaths.generateOne, personGitLabIds.generateSet()),
+            (Visibility.Private, projectPaths.generateOne, personGitLabIds.generateSet())
+          ).pure[Try]
+        )
+
+      authorizer.authorize(key, maybeAuthUser = None) shouldBe rightT[Try, EndpointSecurityException](
+        AuthContext[Key](maybeAuthUser = None, key, Set(publicProject))
+      )
+    }
+
+    "succeed with public and internal projects only if there's an auth user without explicit access for the private projects" in new TestCase {
+      val authUser = authUsers.generateOne
+
+      val publicProject   = projectPaths.generateOne
+      val internalProject = projectPaths.generateOne
+      securityRecordsFinder
+        .expects(key)
+        .returning(
+          List(
+            (Visibility.Public, publicProject, personGitLabIds.generateSet()),
+            (Visibility.Internal, internalProject, personGitLabIds.generateSet()),
+            (Visibility.Private, projectPaths.generateOne, personGitLabIds.generateSet())
+          ).pure[Try]
+        )
+
+      authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
+        AuthContext[Key](authUser.some, key, Set(publicProject, internalProject))
+      )
+    }
+
+    "succeed with public, internal and private projects if there's an auth user with explicit access for the private projects" in new TestCase {
+      val authUser = authUsers.generateOne
+
+      val publicProject   = projectPaths.generateOne
+      val internalProject = projectPaths.generateOne
+      val privateProject  = projectPaths.generateOne
+      securityRecordsFinder
+        .expects(key)
+        .returning(
+          List(
+            (Visibility.Public, publicProject, personGitLabIds.generateSet()),
+            (Visibility.Internal, internalProject, personGitLabIds.generateSet()),
+            (Visibility.Private, privateProject, personGitLabIds.generateSet() + authUser.id)
+          ).pure[Try]
+        )
+
+      authorizer.authorize(key, authUser.some) shouldBe rightT[Try, EndpointSecurityException](
+        AuthContext[Key](authUser.some, key, Set(publicProject, internalProject, privateProject))
       )
     }
   }

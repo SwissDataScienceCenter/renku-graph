@@ -37,7 +37,6 @@ import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import skunk.data.Completion
 
 import java.time.{Duration, Instant}
 
@@ -195,9 +194,10 @@ class ToFailureUpdaterSpec
       }
 
     EventStatus.all.diff(Set(GeneratingTriples, TransformingTriples)) foreach { invalidStatus =>
-      s"fail if the given event is in $invalidStatus" in new TestCase {
+      s"do nothing if the given event is in $invalidStatus" in new TestCase {
 
-        val eventId = addEvent(compoundEventIds.generateOne.copy(projectId = projectId), invalidStatus)
+        val latestEventDate = eventDates.generateOne
+        val eventId = addEvent(compoundEventIds.generateOne.copy(projectId = projectId), invalidStatus, latestEventDate)
         val message = eventMessages.generateOne
 
         Set(
@@ -208,12 +208,18 @@ class ToFailureUpdaterSpec
         ) foreach { statusChangeEvent =>
           (deliveryInfoRemover.deleteDelivery _).expects(statusChangeEvent.eventId).returning(Kleisli.pure(()))
 
-          intercept[Exception] {
-            sessionResource.useK(dbUpdater.updateDB(statusChangeEvent)).unsafeRunSync()
-          }.getMessage shouldBe s"Could not update event $eventId to status ${statusChangeEvent.newStatus}: ${Completion
-            .Update(0)}"
+          val ancestorEventId = addEvent(
+            compoundEventIds.generateOne.copy(projectId = projectId),
+            TriplesGenerated,
+            timestamps(max = latestEventDate.value.minusSeconds(1)).generateAs(EventDate)
+          )
 
-          findEvent(eventId).map(_._2) shouldBe Some(invalidStatus)
+          sessionResource
+            .useK(dbUpdater.updateDB(statusChangeEvent))
+            .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
+
+          findEvent(eventId).map(_._2)         shouldBe Some(invalidStatus)
+          findEvent(ancestorEventId).map(_._2) shouldBe Some(TriplesGenerated)
         }
       }
     }

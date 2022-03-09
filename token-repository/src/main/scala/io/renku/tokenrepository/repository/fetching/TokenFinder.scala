@@ -22,11 +22,14 @@ import cats.MonadThrow
 import cats.data.OptionT
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.{SessionResource, SqlStatement}
+import eu.timepit.refined.types.numeric
+import io.renku.db.SessionResource
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.AccessToken
 import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
+
+import scala.util.control.NonFatal
 
 private trait TokenFinder[F[_]] {
   def findToken(projectPath: Path): OptionT[F, AccessToken]
@@ -35,30 +38,50 @@ private trait TokenFinder[F[_]] {
 
 private class TokenFinderImpl[F[_]: MonadThrow](
     tokenInRepoFinder: PersistedTokensFinder[F],
-    accessTokenCrypto: AccessTokenCrypto[F]
+    accessTokenCrypto: AccessTokenCrypto[F],
+    maxRetries:        numeric.NonNegInt
 ) extends TokenFinder[F] {
 
   import accessTokenCrypto._
 
   override def findToken(projectPath: Path): OptionT[F, AccessToken] = for {
     encryptedToken <- tokenInRepoFinder.findToken(projectPath)
-    accessToken    <- OptionT.liftF(decrypt(encryptedToken))
+    accessToken <-
+      OptionT.liftF(decrypt(encryptedToken)) recoverWith retry(() => tokenInRepoFinder.findToken(projectPath))
   } yield accessToken
 
   override def findToken(projectId: Id): OptionT[F, AccessToken] = for {
     encryptedToken <- tokenInRepoFinder.findToken(projectId)
-    accessToken    <- OptionT.liftF(decrypt(encryptedToken))
+    accessToken <-
+      OptionT.liftF(decrypt(encryptedToken)) recoverWith retry(() => tokenInRepoFinder.findToken(projectId))
   } yield accessToken
+
+  private def retry(fetchToken:      () => OptionT[F, AccessTokenCrypto.EncryptedAccessToken],
+                    numberOfRetries: Int = 0
+  ): PartialFunction[Throwable, OptionT[F, AccessToken]] = { case NonFatal(exception) =>
+    if (numberOfRetries < maxRetries.value) {
+      for {
+        encryptedToken <- fetchToken()
+        accessToken    <- OptionT.liftF(decrypt(encryptedToken)) recoverWith retry(fetchToken, numberOfRetries + 1)
+      } yield accessToken
+    } else {
+      OptionT.liftF(exception.raiseError[F, AccessToken])
+    }
+  }
 }
 
 private object TokenFinder {
+
+  private val maxRetries = numeric.NonNegInt.unsafeFrom(3)
+
   def apply[F[_]: MonadCancelThrow](
       sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[TokenFinder[F]] = for {
     accessTokenCrypto <- AccessTokenCrypto[F]()
   } yield new TokenFinderImpl[F](
     new PersistedTokensFinderImpl[F](sessionResource, queriesExecTimes),
-    accessTokenCrypto
+    accessTokenCrypto,
+    maxRetries
   )
 }

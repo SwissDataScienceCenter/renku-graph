@@ -31,8 +31,9 @@ import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.events.categories.Errors.{LogWorthyRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
+import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -97,13 +98,10 @@ private object Commands {
       newDir
     }
 
-    override def deleteDirectory(repositoryDirectory: Path): F[Unit] = MonadThrow[F]
-      .catchNonFatal {
-        ops.rm ! repositoryDirectory
-      }
-      .recoverWith { case NonFatal(ex) =>
-        Logger[F].error(ex)("Error when deleting repo directory")
-      }
+    override def deleteDirectory(repositoryDirectory: Path): F[Unit] =
+      MonadThrow[F]
+        .catchNonFatal(ops.rm ! repositoryDirectory)
+        .recoverWith { case NonFatal(ex) => Logger[F].error(ex)("Error when deleting repo directory") }
 
     override def exists(fileName: Path): F[Boolean] = MonadThrow[F].catchNonFatal {
       ops.exists(fileName)
@@ -113,6 +111,9 @@ private object Commands {
   trait Git[F[_]] {
     def checkout(commitId:                           CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit]
     def `reset --hard`(implicit repositoryDirectory: RepositoryPath): F[Unit]
+    def `rm --cached`(implicit repositoryDirectory:  RepositoryPath): F[Unit]
+    def `add -A`(implicit repositoryDirectory:       RepositoryPath): F[Unit]
+    def commit(message:                              String)(implicit repositoryDirectory:   RepositoryPath): F[Unit]
     def clone(
         repositoryUrl:                       ServiceUrl,
         workDirectory:                       Path
@@ -141,6 +142,18 @@ private object Commands {
       %%("git", "reset", "--hard")(repositoryDirectory.value)
     }.void
 
+    override def `rm --cached`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
+      %%("git", "rm", "--cached", ".")(repositoryDirectory.value)
+    }.void
+
+    override def `add -A`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
+      %%("git", "add", "-A")(repositoryDirectory.value)
+    }.void
+
+    override def commit(message: String)(implicit repoDir: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
+      %%("git", "commit", "-m", message)(repoDir.value)
+    }.void
+
     override def clone(
         repositoryUrl:               ServiceUrl,
         workDirectory:               Path
@@ -163,27 +176,42 @@ private object Commands {
       %%("git", "status")(repositoryDirectory.value).out.string
     }
 
-    private val recoverableErrors = Set(
+    private val authRecoverableErrors = Set(
+      "fatal: Authentication failed for",
+      "fatal: could not read Username for"
+    )
+    private val nonAuthRecoverableErrors = Set(
       "SSL_ERROR_SYSCALL",
-      "the remote end hung up unexpectedly",
       "The requested URL returned error: 502",
       "The requested URL returned error: 503",
-      "The requested URL returned error: 504",
-      "Error in the HTTP2 framing layer",
-      "HTTP/2 stream 3 was not closed cleanly before end of the underlying stream",
       "Could not resolve host:",
       "Host is unreachable"
+    )
+    private val malformedRepositoryErrors = Set(
+      "the remote end hung up unexpectedly",
+      "The requested URL returned error: 504",
+      "Error in the HTTP2 framing layer",
+      "remote: The project you were looking for could not be found or you don't have permission to view it."
     )
     private lazy val relevantError: PartialFunction[Throwable, F[Either[ProcessingRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"
 
-        MonadThrow[F].catchNonFatal(result.toString()) flatMap {
-          case out if recoverableErrors exists out.contains =>
+        MonadThrow[F].catchNonFatal(result.toString()) >>= {
+          case out if authRecoverableErrors exists out.contains =>
+            AuthRecoverableError(errorMessage(result.toString()))
+              .asLeft[Unit]
+              .leftWiden[ProcessingRecoverableError]
+              .pure[F]
+          case out if nonAuthRecoverableErrors exists out.contains =>
             LogWorthyRecoverableError(errorMessage(result.toString()))
               .asLeft[Unit]
               .leftWiden[ProcessingRecoverableError]
               .pure[F]
+          case out if malformedRepositoryErrors exists out.contains =>
+            ProcessingNonRecoverableError
+              .MalformedRepository(errorMessage(result.toString()))
+              .raiseError[F, Either[ProcessingRecoverableError, Unit]]
           case _ =>
             new Exception(errorMessage(result.toString())).raiseError[F, Either[ProcessingRecoverableError, Unit]]
         }
@@ -200,17 +228,18 @@ private object Commands {
   }
 
   class RenkuImpl[F[_]: Async](
-      renkuExport: Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict")(_)
+      renkuMigrate: Path => CommandResult = %%("renku", "migrate", "--preserve-identifiers")(_),
+      renkuExport:  Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict")(_)
   ) extends Renku[F] {
 
     import cats.syntax.all._
 
-    override def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): F[Unit] =
+    override def migrate(commitEvent: CommitEvent)(implicit directory: RepositoryPath): F[Unit] =
       MonadThrow[F]
-        .catchNonFatal(%%("renku", "migrate", "--preserve-identifiers")(destinationDirectory.value))
+        .catchNonFatal(renkuMigrate(directory.value))
         .void
         .recoverWith { case NonFatal(exception) =>
-          new Exception(
+          new ProcessingNonRecoverableError.MalformedRepository(
             s"'renku migrate' failed for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id}",
             exception
           ).raiseError[F, Unit]
@@ -223,9 +252,13 @@ private object Commands {
             triplesAsString <- MonadThrow[F].catchNonFatal(renkuExport(directory.value).out.string.trim)
             wrappedTriples  <- MonadThrow[F].fromEither(parse(triplesAsString))
           } yield wrappedTriples.asRight[ProcessingRecoverableError]
-        }.recoverWith {
+        } recoverWith {
           case ShelloutException(result) if result.exitCode == 137 =>
             LogWorthyRecoverableError("Not enough memory").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
+          case NonFatal(exception) =>
+            ProcessingNonRecoverableError
+              .MalformedRepository("'renku graph export' failed", exception)
+              .raiseError[F, Either[ProcessingRecoverableError, JsonLD]]
         }
       }
   }

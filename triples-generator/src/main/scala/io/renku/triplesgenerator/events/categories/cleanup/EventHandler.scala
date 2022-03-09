@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.cleanup
 
+import cats.effect.kernel.Deferred
 import cats.effect.{Async, Concurrent, Spawn}
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
@@ -25,11 +26,10 @@ import eu.timepit.refined.api.Refined
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
-import io.renku.events.{EventRequestContent, consumers}
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
-import cats.effect.kernel.Deferred
 
 private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName:  CategoryName,
@@ -66,7 +66,7 @@ object EventHandler {
 
   private val singleProcess = 1
 
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[F],
       subscriptionMechanism:   SubscriptionMechanism[F]
   ): F[EventHandler[F]] = for {

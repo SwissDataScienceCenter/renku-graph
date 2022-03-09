@@ -20,31 +20,26 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait EventPayloadTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventPayloadTableCreator[F[_]] extends DbMigrator[F]
 
 private object EventPayloadTableCreator {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): EventPayloadTableCreator[F] = new EventPayloadTableCreatorImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: EventPayloadTableCreator[F] =
+    new EventPayloadTableCreatorImpl[F]
 }
 
-private class EventPayloadTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends EventPayloadTableCreator[F]
+private class EventPayloadTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends EventPayloadTableCreator[F]
     with EventTableCheck {
 
   import cats.syntax.all._
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     whenEventTableExists(
       checkTableExists flatMap {
         case true  => Kleisli.liftF(Logger[F] info "'event_payload' table exists")

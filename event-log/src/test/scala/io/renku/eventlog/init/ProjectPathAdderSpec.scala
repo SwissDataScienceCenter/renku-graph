@@ -49,8 +49,8 @@ class ProjectPathAdderSpec
     with Eventually
     with IntegrationPatience {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: ProjectPathAdderImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: ProjectPathAdderImpl[IO] => false
     case _ => true
   }
 
@@ -105,7 +105,7 @@ class ProjectPathAdderSpec
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val projectPathAdder = new ProjectPathAdderImpl[IO](sessionResource)
+    val projectPathAdder = new ProjectPathAdderImpl[IO]
   }
 
   private def checkColumnExists: Boolean = sessionResource

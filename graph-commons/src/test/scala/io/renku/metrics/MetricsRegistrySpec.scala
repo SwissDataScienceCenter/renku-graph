@@ -18,83 +18,135 @@
 
 package io.renku.metrics
 
+import cats.effect.IO
 import com.typesafe.config.ConfigFactory
 import io.prometheus.client.{Gauge => LibGauge}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.metrics.MetricsRegistry.{DisabledMetricsRegistry, EnabledMetricsRegistry}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
-import scala.util.{Success, Try}
+import scala.util.Try
 
 class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
 
   "apply" should {
 
     "return a disabled Metrics Registry if the 'metrics.enabled' flag is set to false" in {
-      val Success(registry) = MetricsRegistry[Try](
+      val registry = MetricsRegistry[IO](
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> false).asJava).asJava)
-      )
+      ).unsafeRunSync()
 
-      registry shouldBe a[DisabledMetricsRegistry.type]
+      registry.getClass shouldBe classOf[DisabledMetricsRegistry[Try]]
     }
 
     "return an enabled Metrics Registry if the 'metrics.enabled' flag is set to true" in {
-      val Success(registry) = MetricsRegistry[Try](
+      val registry = MetricsRegistry[IO](
         ConfigFactory.parseMap(Map("metrics" -> Map("enabled" -> true).asJava).asJava)
-      )
+      ).unsafeRunSync()
 
-      registry shouldBe a[EnabledMetricsRegistry.type]
+      registry.getClass shouldBe classOf[EnabledMetricsRegistry[Try]]
     }
 
     "return an enabled Metrics Registry if there is no value for the 'metrics.enabled' flag" in {
-      val Success(registry) = MetricsRegistry[Try](ConfigFactory.empty())
-      registry shouldBe a[EnabledMetricsRegistry.type]
+      val registry = MetricsRegistry[IO](ConfigFactory.empty()).unsafeRunSync()
+      registry.getClass shouldBe classOf[EnabledMetricsRegistry[Try]]
     }
   }
 
   "EnabledMetricsRegistry.register" should {
 
-    "register the given collector in the collector registry" in {
-      val gaugeName = "gauge_name"
+    "register the given collector in the collector registry " +
+      "and returns the registered object" in {
 
-      val Success(gauge) = EnabledMetricsRegistry
-        .register[Try, LibGauge, LibGauge.Builder](
-          LibGauge
+        val registry = new EnabledMetricsRegistry[IO]
+
+        val gaugeName = nonEmptyStrings().generateOne
+        val metricsCollector = new MetricsCollector with PrometheusCollector {
+          override type Collector = LibGauge
+          override val wrappedCollector: LibGauge = LibGauge
             .build()
             .name(gaugeName)
             .help("some gauge info")
             .labelNames("label")
-        )
+            .create()
+          override val name: String = wrappedCollector.describe().asScala.head.name
+          override val help: String = wrappedCollector.describe().asScala.head.help
+        }
 
-      gauge.labels("lbl").set(2)
+        val registered = registry.register(metricsCollector).unsafeRunSync()
 
-      EnabledMetricsRegistry.maybeCollectorRegistry.flatMap(
-        _.metricFamilySamples().asScala
-          .find(_.name == gaugeName)
-          .map(_.samples.asScala.map(_.value).toList)
-      ) shouldBe Some(List(2))
+        registered shouldBe metricsCollector
+
+        registry.maybeCollectorRegistry.flatMap(
+          _.metricFamilySamples().asScala
+            .find(_.name == gaugeName)
+            .map(_.samples.asScala.map(_.value).toList)
+        ) shouldBe Some(List())
+      }
+
+    "return the already registered collector if another one with the same name is being registered" in {
+
+      val registry = new EnabledMetricsRegistry[IO]
+
+      val gaugeName = nonEmptyStrings().generateOne
+      val initialMetricsCollector = new MetricsCollector with PrometheusCollector {
+        override type Collector = LibGauge
+        override val wrappedCollector: LibGauge = LibGauge
+          .build()
+          .name(gaugeName)
+          .help("some gauge info")
+          .labelNames("label")
+          .create()
+        override val name: String = wrappedCollector.describe().asScala.head.name
+        override val help: String = wrappedCollector.describe().asScala.head.help
+      }
+
+      val registered = registry.register(initialMetricsCollector).unsafeRunSync()
+
+      registered shouldBe initialMetricsCollector
+
+      val sameNameMetricsCollector = new MetricsCollector with PrometheusCollector {
+        override type Collector = LibGauge
+        override val wrappedCollector: LibGauge = LibGauge
+          .build()
+          .name(gaugeName)
+          .help("different name")
+          .labelNames("label")
+          .create()
+        override val name: String = wrappedCollector.describe().asScala.head.name
+        override val help: String = wrappedCollector.describe().asScala.head.help
+      }
+
+      registry.register(sameNameMetricsCollector).unsafeRunSync() shouldBe initialMetricsCollector
     }
   }
 
   "DisabledMetricsRegistry.register" should {
 
     "not register the given collector in any registry" in {
+
+      val registry = new DisabledMetricsRegistry[Try]
+
       val gaugeName = "gauge_name"
+      val metricsCollector = new MetricsCollector with PrometheusCollector {
+        override type Collector = LibGauge
+        override val wrappedCollector: LibGauge = LibGauge
+          .build()
+          .name(gaugeName)
+          .help("some gauge info")
+          .labelNames("label")
+          .create()
+        override val name: String = wrappedCollector.describe().asScala.head.name
+        override val help: String = wrappedCollector.describe().asScala.head.help
+      }
 
-      val Success(gauge) = DisabledMetricsRegistry
-        .register[Try, LibGauge, LibGauge.Builder](
-          LibGauge
-            .build()
-            .name(gaugeName)
-            .help("some gauge info")
-            .labelNames("label")
-        )
+      registry register metricsCollector
 
-      gauge.labels("lbl").set(2)
-
-      DisabledMetricsRegistry.maybeCollectorRegistry shouldBe None
+      registry.maybeCollectorRegistry shouldBe None
     }
   }
 }

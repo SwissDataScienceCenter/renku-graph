@@ -28,7 +28,7 @@ import skunk.implicits._
 
 class EventLogTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override val migrationsToRun: List[Migration] = Nil
+  protected[init] override val migrationsToRun: List[DbMigrator[IO]] = Nil
 
   "run" should {
 
@@ -90,6 +90,6 @@ class EventLogTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec w
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new EventLogTableCreatorImpl[IO](sessionResource)
+    val tableCreator = new EventLogTableCreatorImpl[IO]
   }
 }

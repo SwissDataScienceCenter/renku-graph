@@ -28,6 +28,7 @@ import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.persons
+import io.renku.http.client.GitLabClient
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.PagingRequest.Decoders._
@@ -208,18 +209,21 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
 private object MicroserviceRoutes {
 
-  def apply(
-      metricsRegistry:         MetricsRegistry,
-      sparqlTimeRecorder:      SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, runtime: IORuntime, logger: Logger[IO]): IO[MicroserviceRoutes[IO]] =
+  def apply(sparqlTimeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext:         ExecutionContext,
+      runtime:                  IORuntime,
+      logger:                   Logger[IO],
+      metricsRegistry:          MetricsRegistry[IO]
+  ): IO[MicroserviceRoutes[IO]] =
     for {
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
       datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO](sparqlTimeRecorder)
       datasetEndpoint         <- DatasetEndpoint[IO](sparqlTimeRecorder)
       entitiesEndpoint        <- entities.Endpoint(sparqlTimeRecorder)
+      gitLabClient            <- GitLabClient(gitLabThrottler)
       queryEndpoint           <- QueryEndpoint(sparqlTimeRecorder)
-      projectEndpoint         <- ProjectEndpoint[IO](gitLabThrottler, sparqlTimeRecorder)
+      projectEndpoint         <- ProjectEndpoint[IO](gitLabClient, sparqlTimeRecorder)
       projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO](sparqlTimeRecorder)
       authenticator           <- GitLabAuthenticator(gitLabThrottler)
       authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
@@ -234,6 +238,6 @@ private object MicroserviceRoutes {
                                    authMiddleware,
                                    projectPathAuthorizer,
                                    datasetIdAuthorizer,
-                                   new RoutesMetrics[IO](metricsRegistry)
+                                   new RoutesMetrics[IO]
     )
 }

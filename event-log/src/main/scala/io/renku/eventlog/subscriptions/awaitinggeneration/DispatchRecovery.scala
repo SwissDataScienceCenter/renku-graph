@@ -19,15 +19,16 @@
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.MonadThrow
-import cats.effect.{Async, Temporal}
+import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.{EventMessage, subscriptions}
-import io.renku.events.EventRequestContent
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, New}
+import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
@@ -51,7 +52,9 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
           "newStatus": $New
         }"""
       ),
-      errorMessage = s"${SubscriptionCategory.name}: Marking event as $New failed"
+      EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                               errorMessage = s"${SubscriptionCategory.name}: Marking event as $New failed"
+      )
     )
 
   override def recover(
@@ -71,12 +74,14 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
       }"""
     )
     val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $GenerationNonRecoverableFailure"
-    eventSender.sendEvent(requestContent, errorMessage) >> Logger[F].error(exception)(errorMessage)
+    eventSender.sendEvent(requestContent,
+                          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), errorMessage)
+    ) >> Logger[F].error(exception)(errorMessage)
   }
 }
 
 private object DispatchRecovery {
-  def apply[F[_]: Async: Temporal: Logger]: F[DispatchRecovery[F, AwaitingGenerationEvent]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[DispatchRecovery[F, AwaitingGenerationEvent]] = for {
     eventSender <- EventSender[F]
   } yield new DispatchRecoveryImpl[F](eventSender)
 }

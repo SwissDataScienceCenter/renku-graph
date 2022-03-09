@@ -34,7 +34,7 @@ private[repository] trait TokenRemover[F[_]] {
 
 private[repository] class TokenRemoverImpl[F[_]: MonadCancelThrow](
     sessionResource:  SessionResource[F, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
     with TokenRemover[F]
     with TokenRepositoryTypeSerializers {

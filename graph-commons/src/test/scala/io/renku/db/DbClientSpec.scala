@@ -22,7 +22,6 @@ import cats.data.Kleisli
 import cats.effect.{IO, Resource}
 import com.dimafeng.testcontainers.{ForAllTestContainer, PostgreSQLContainer}
 import eu.timepit.refined.auto._
-import io.renku.db.SqlStatement.Name
 import io.renku.db.TestDbConfig.newDbConfig
 import io.renku.metrics.{LabeledHistogram, TestLabeledHistogram}
 import io.renku.testtools.IOSpec
@@ -60,7 +59,7 @@ class DbClientSpec extends AnyWordSpec with IOSpec with should.Matchers with Con
   }
 }
 
-private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) extends DbClient(maybeHistogram) {
+private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO]]) extends DbClient(maybeHistogram) {
   val queryName: SqlStatement.Name = "some_id"
 
   private def query(expected: Int) = SqlStatement[IO, Int](Kleisli { session =>

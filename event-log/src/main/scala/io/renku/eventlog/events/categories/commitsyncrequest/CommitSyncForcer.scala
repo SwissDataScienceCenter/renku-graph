@@ -23,10 +23,11 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, commitsync}
-import io.renku.eventlog.{EventDate, EventLogDB, TypeSerializers}
-import io.renku.graph.model.events.CategoryName
+import io.renku.eventlog.{EventDate, TypeSerializers}
+import io.renku.events.CategoryName
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk._
@@ -39,16 +40,14 @@ private trait CommitSyncForcer[F[_]] {
   def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit]
 }
 
-private class CommitSyncForcerImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
-) extends DbClient(Some(queriesExecTimes))
+private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
+    extends DbClient(Some(queriesExecTimes))
     with CommitSyncForcer[F]
     with TypeSerializers
     with SubscriptionTypeSerializers {
 
   override def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit] =
-    sessionResource.useK {
+    SessionResource[F].useK {
       deleteLastSyncedDate(projectId) flatMap {
         case true  => upsertProject(projectId, projectPath).void
         case false => Kleisli.pure(())
@@ -84,10 +83,6 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow](
 }
 
 private object CommitSyncForcer {
-
-  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
-                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
-  ): F[CommitSyncForcer[F]] = MonadThrow[F].catchNonFatal {
-    new CommitSyncForcerImpl(sessionResource, queriesExecTimes)
-  }
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[CommitSyncForcer[F]] =
+    MonadThrow[F].catchNonFatal(new CommitSyncForcerImpl(queriesExecTimes))
 }

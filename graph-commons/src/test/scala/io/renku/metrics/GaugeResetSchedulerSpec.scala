@@ -102,7 +102,16 @@ class GaugeResetSchedulerSpec
 
     (metricsConfigProvider.getInterval _).expects().returning(interval.pure[IO]).once()
 
-    class TestLabeledGauge extends LabeledGauge[IO, Double] {
+    class TestLabeledGauge extends LabeledGauge[IO, Double] with PrometheusCollector {
+
+      override val name: String = "gauge"
+      override val help: String = "help"
+
+      type Collector = LibGauge
+      override lazy val wrappedCollector: LibGauge = LibGauge
+        .build()
+        .name(name)
+        .create()
 
       val givenResetMethodToReturn = new ConcurrentLinkedQueue[IO[Unit]]()
       val resetCallsCount          = new AtomicInteger(0)
@@ -125,11 +134,6 @@ class GaugeResetSchedulerSpec
 
       override def decrement(labelValue: Double): IO[Unit] =
         fail("Spec shouldn't be calling that")
-
-      protected override lazy val gauge: LibGauge = LibGauge
-        .build()
-        .name("gauge")
-        .create()
     }
   }
 }

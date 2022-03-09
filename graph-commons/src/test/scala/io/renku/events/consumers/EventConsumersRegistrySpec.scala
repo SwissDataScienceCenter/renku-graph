@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.events.consumers
+package io.renku.events
+package consumers
 
-import ConsumersModelGenerators._
+import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult._

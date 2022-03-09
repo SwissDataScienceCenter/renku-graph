@@ -18,23 +18,29 @@
 
 package io.renku.tokenrepository.repository.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
+import io.renku.graph.model.projects.{Id, Path}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
+import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.codec.all.{int4, varchar}
+import skunk.implicits._
+import skunk.{Command, Session, ~}
 
-class DuplicateProjectsRemoverSpec
-    extends AnyWordSpec
-    with IOSpec
-    with InMemoryProjectsTokensDbSpec
-    with should.Matchers {
+class DuplicateProjectsRemoverSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+
+  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
+    case _: DuplicateProjectsRemoverImpl[_] => false
+    case _ => true
+  }
 
   "run" should {
 
@@ -69,4 +75,19 @@ class DuplicateProjectsRemoverSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val deduplicator = new DuplicateProjectsRemoverImpl[IO](sessionResource)
   }
+
+  protected def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =
+    execute {
+      Kleisli[IO, Session[IO], Unit] { session =>
+        val query: Command[Int ~ String ~ String] =
+          sql"""insert into 
+                projects_tokens (project_id, project_path, token) 
+                values ($int4, $varchar, $varchar)
+         """.command
+        session
+          .prepare(query)
+          .use(_.execute(projectId.value ~ projectPath.value ~ encryptedToken.value))
+          .map(assureInserted)
+      }
+    }
 }
