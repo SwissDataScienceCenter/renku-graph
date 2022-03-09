@@ -187,22 +187,19 @@ class DatasetsSearchEndpointSpec
 
     private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
       Encoder.instance[(Set[DatasetCreator], Date)] {
-        case (creators, DatePublished(date)) =>
-          json"""{
+        case (creators, DatePublished(date)) => json"""{
           "creator": $creators,
           "datePublished": $date
         }"""
-        case (creators, _) =>
-          json"""{
+        case (creators, _) => json"""{
           "creator": $creators
         }"""
       }
 
     private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
-      case DatasetCreator(maybeEmail, name, _) =>
-        json"""{
-          "name": $name
-        }""" addIfDefined ("email" -> maybeEmail)
+      case DatasetCreator(maybeEmail, name, _) => json"""{
+        "name": $name
+      }""" addIfDefined ("email" -> maybeEmail)
     }
 
     private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =

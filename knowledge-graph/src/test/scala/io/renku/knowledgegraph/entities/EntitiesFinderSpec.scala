@@ -764,7 +764,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
         .results shouldBe List(dsAndPublicProject.to[model.Entity.Dataset])
     }
 
-    "favour dataset on internal projects over projects if exist" in new TestCase {
+    "favour dataset on internal projects over private projects if exist" in new TestCase {
       val externalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne

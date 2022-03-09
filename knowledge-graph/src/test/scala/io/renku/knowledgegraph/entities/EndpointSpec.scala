@@ -21,16 +21,19 @@ package io.renku.knowledgegraph.entities
 import Endpoint._
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.Decoder._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses, renkuResourcesUrls, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators.gitLabUrls
 import io.renku.graph.model._
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.rest.Links
+import io.renku.http.rest.Links.Rel
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
@@ -55,15 +58,17 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
   "GET /entities" should {
 
     "respond with OK and the found entities" in new TestCase {
-      val results = pagingResponses(modelEntities).generateOne
-      (finder.findEntities _).expects(criteria).returning(results.pure[IO])
+      forAll(pagingResponses(modelEntities)) { results =>
+        (finder.findEntities _).expects(criteria).returning(results.pure[IO])
 
-      val response = endpoint.`GET /entities`(criteria, request).unsafeRunSync()
+        val response = endpoint.`GET /entities`(criteria, request).unsafeRunSync()
 
-      response.status        shouldBe Ok
-      response.contentType   shouldBe Some(`Content-Type`(application.json))
-      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](results)
-      response.as[List[model.Entity]].unsafeRunSync() shouldBe results.results
+        response.status        shouldBe Ok
+        response.contentType   shouldBe Some(`Content-Type`(application.json))
+        response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](results)
+        implicit val decoder: Decoder[model.Entity] = entitiesDecoder(possibleEntities = results.results)
+        response.as[List[model.Entity]].unsafeRunSync() shouldBe results.results
+      }
     }
 
     "respond with OK with an empty list if no entities found" in new TestCase {
@@ -75,6 +80,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       response.status        shouldBe Ok
       response.contentType   shouldBe Some(`Content-Type`(application.json))
       response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](results)
+      implicit val decoder: Decoder[model.Entity] = entitiesDecoder(possibleEntities = results.results)
       response.as[List[model.Entity]].unsafeRunSync() shouldBe Nil
     }
 
@@ -106,7 +112,6 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
         Endpoint.Criteria.Filters.EntityType.from(name) shouldBe t.asRight
       }
     }
-
   }
 
   private lazy val renkuResourcesUrl = renkuResourcesUrls.generateOne
@@ -116,10 +121,10 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     val request  = Request[IO](GET, Uri.fromString(relativePaths().generateOne).fold(throw _, identity))
 
     implicit val renkuResourceUrl: renku.ResourceUrl = renkuResourcesUrl / request.uri.show
-
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    implicit val logger:           TestLogger[IO]    = TestLogger[IO]()
+    implicit val gitLabUrl:        GitLabUrl         = gitLabUrls.generateOne
     val finder   = mock[EntitiesFinder[IO]]
-    val endpoint = new EndpointImpl[IO](finder, renkuResourcesUrl)
+    val endpoint = new EndpointImpl[IO](finder, renkuResourcesUrl, gitLabUrl)
   }
 
   private lazy val criterias: Gen[Criteria] = for {
@@ -129,10 +134,33 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     maybeAuthUser <- authUsers.toGeneratorOfOptions
   } yield Criteria(Filters(maybeQuery), sortingBy, paging, maybeAuthUser)
 
-  private implicit lazy val httpEntityDecoder: EntityDecoder[IO, List[model.Entity]] = jsonOf[IO, List[model.Entity]]
+  private implicit def httpEntityDecoder(implicit
+      decoder: Decoder[model.Entity]
+  ): EntityDecoder[IO, List[model.Entity]] = jsonOf[IO, List[model.Entity]]
 
-  private implicit lazy val entitiesDecoder: Decoder[model.Entity] = cursor => {
+  private def entitiesDecoder(
+      possibleEntities: List[model.Entity]
+  )(implicit gitLabUrl: GitLabUrl): Decoder[model.Entity] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._
+
+    def imagesDecoder(projectPath: projects.Path): Decoder[datasets.ImageUri] = Decoder.instance { cursor =>
+      cursor.downField("location").as[datasets.ImageUri] >>= {
+        case uri: datasets.ImageUri.Relative =>
+          cursor._links >>= {
+            _.get(Rel("view")) match {
+              case Some(link) if link.href.value == s"$gitLabUrl/$projectPath/raw/master/$uri" => uri.asRight
+              case maybeLink => DecodingFailure(s"'$maybeLink' is not expected absolute DS image view link", Nil).asLeft
+            }
+          }
+        case uri: datasets.ImageUri.Absolute =>
+          cursor._links >>= {
+            _.get(Rel("view")) match {
+              case Some(link) if link.href.value == uri.show => uri.asRight
+              case maybeLink => DecodingFailure(s"'$maybeLink' is not expected relative DS image view link", Nil).asLeft
+            }
+          }
+      }
+    }
 
     cursor.downField("type").as[Endpoint.Criteria.Filters.EntityType] >>= {
       case Endpoint.Criteria.Filters.EntityType.Project =>
@@ -176,6 +204,13 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                           .lastOption
                           .toRight(DecodingFailure("Invalid dataset-details link", Nil))
                           .map(datasets.Identifier)
+          projectPath <- possibleEntities.collect {
+                           case ds: model.Entity.Dataset if ds.identifier == identifier => ds.exemplarProjectPath
+                         } match {
+                           case path :: Nil => path.asRight
+                           case _ => DecodingFailure(s"DS $identifier doesn't exist in possible results", Nil).asLeft
+                         }
+          images <- cursor.downField("images").as(decodeList(imagesDecoder(projectPath)))
           _ <- {
             val expected = renkuResourcesUrl / "datasets" / identifier
             Either.cond(dsDetailsLink.href.value == expected.show,
@@ -183,7 +218,17 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                         DecodingFailure(s"$dsDetailsLink not equal $expected", Nil)
             )
           }
-        } yield model.Entity.Dataset(score, identifier, name, visibility, date, creators, keywords, maybeDesc)
+        } yield model.Entity.Dataset(score,
+                                     identifier,
+                                     name,
+                                     visibility,
+                                     date,
+                                     creators,
+                                     keywords,
+                                     maybeDesc,
+                                     images,
+                                     projectPath
+        )
       case Endpoint.Criteria.Filters.EntityType.Workflow =>
         for {
           score      <- cursor.downField("matchingScore").as[MatchingScore]

@@ -23,7 +23,10 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.config.renku
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.model.datasets.ImageUri
+import io.renku.graph.model.{GitLabUrl, persons, projects}
+import io.renku.http.rest.Links.Href
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
@@ -161,11 +164,14 @@ object Endpoint {
   def apply[F[_]: Async: NonEmptyParallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[Endpoint[F]] = for {
     entitiesFinder    <- EntitiesFinder(timeRecorder)
     renkuResourcesUrl <- renku.ResourcesUrl()
-  } yield new EndpointImpl(entitiesFinder, renkuResourcesUrl)
+    gitLabUrl         <- GitLabUrlLoader[F]()
+  } yield new EndpointImpl(entitiesFinder, renkuResourcesUrl, gitLabUrl)
 }
 
-private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F], renkuResourcesUrl: renku.ResourcesUrl)
-    extends Http4sDsl[F]
+private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
+                                                renkuResourcesUrl: renku.ResourcesUrl,
+                                                gitLabUrl:         GitLabUrl
+) extends Http4sDsl[F]
     with Endpoint[F] {
 
   import io.circe.literal._
@@ -194,15 +200,15 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F], renku
     Encoder.instance {
       case project: model.Entity.Project =>
         json"""{
-        "type":          ${Criteria.Filters.EntityType.Project.value},
-        "matchingScore": ${project.matchingScore},
-        "name":          ${project.name},
-        "path":          ${project.path},
-        "namespace":     ${project.path.toNamespaces.mkString("/")},
-        "visibility":    ${project.visibility},
-        "date":          ${project.date},
-        "keywords":      ${project.keywords}
-      }"""
+          "type":          ${Criteria.Filters.EntityType.Project.value},
+          "matchingScore": ${project.matchingScore},
+          "name":          ${project.name},
+          "path":          ${project.path},
+          "namespace":     ${project.path.toNamespaces.mkString("/")},
+          "visibility":    ${project.visibility},
+          "date":          ${project.date},
+          "keywords":      ${project.keywords}
+        }"""
           .addIfDefined("creator" -> project.maybeCreator)
           .addIfDefined("description" -> project.maybeDescription)
           .deepMerge(
@@ -212,14 +218,15 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F], renku
           )
       case ds: model.Entity.Dataset =>
         json"""{
-        "type":          ${Criteria.Filters.EntityType.Dataset.value},
-        "matchingScore": ${ds.matchingScore},
-        "name":          ${ds.name},
-        "visibility":    ${ds.visibility},
-        "date":          ${ds.date},
-        "creators":      ${ds.creators},
-        "keywords":      ${ds.keywords}
-      }"""
+          "type":          ${Criteria.Filters.EntityType.Dataset.value},
+          "matchingScore": ${ds.matchingScore},
+          "name":          ${ds.name},
+          "visibility":    ${ds.visibility},
+          "date":          ${ds.date},
+          "creators":      ${ds.creators},
+          "keywords":      ${ds.keywords},
+          "images":        ${ds.images -> ds.exemplarProjectPath}
+        }"""
           .addIfDefined("description" -> ds.maybeDescription)
           .deepMerge(
             _links(
@@ -228,20 +235,36 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F], renku
           )
       case workflow: model.Entity.Workflow =>
         json"""{
-        "type":          ${Criteria.Filters.EntityType.Workflow.value},
-        "matchingScore": ${workflow.matchingScore},
-        "name":          ${workflow.name},
-        "visibility":    ${workflow.visibility},
-        "date":          ${workflow.date},
-        "keywords":      ${workflow.keywords}
-      }"""
+          "type":          ${Criteria.Filters.EntityType.Workflow.value},
+          "matchingScore": ${workflow.matchingScore},
+          "name":          ${workflow.name},
+          "visibility":    ${workflow.visibility},
+          "date":          ${workflow.date},
+          "keywords":      ${workflow.keywords}
+        }"""
           .addIfDefined("description" -> workflow.maybeDescription)
       case person: model.Entity.Person =>
         json"""{
-        "type":          ${Criteria.Filters.EntityType.Person.value},
-        "matchingScore": ${person.matchingScore},
-        "name":          ${person.name}
-      }"""
+          "type":          ${Criteria.Filters.EntityType.Person.value},
+          "matchingScore": ${person.matchingScore},
+          "name":          ${person.name}
+        }"""
+    }
+
+  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
+    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+      Json.arr(imageUris.map {
+        case uri: ImageUri.Relative =>
+          json"""{
+            "location": $uri
+          }""" deepMerge _links(
+            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+          )
+        case uri: ImageUri.Absolute =>
+          json"""{
+            "location": $uri
+          }""" deepMerge _links(Link(Rel("view") -> Href(uri.show)))
+      }: _*)
     }
 
   private implicit lazy val responseEntityEncoder: EntityEncoder[F, Json] = jsonEncoderOf[F, Json]

@@ -69,7 +69,9 @@ package object entities {
       dataset.provenance.date,
       dataset.provenance.creators.map(_.name).toList.sorted,
       dataset.additionalInfo.keywords.sorted,
-      dataset.additionalInfo.maybeDescription
+      dataset.additionalInfo.maybeDescription,
+      dataset.additionalInfo.images,
+      exemplarProjectPath = project.path
     )
   }
 

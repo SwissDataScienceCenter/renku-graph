@@ -55,14 +55,16 @@ object model {
     }
 
     final case class Dataset(
-        matchingScore:    MatchingScore,
-        identifier:       datasets.Identifier,
-        name:             datasets.Name,
-        visibility:       projects.Visibility,
-        date:             datasets.Date,
-        creators:         List[persons.Name],
-        keywords:         List[datasets.Keyword],
-        maybeDescription: Option[datasets.Description]
+        matchingScore:       MatchingScore,
+        identifier:          datasets.Identifier,
+        name:                datasets.Name,
+        visibility:          projects.Visibility,
+        date:                datasets.Date,
+        creators:            List[persons.Name],
+        keywords:            List[datasets.Keyword],
+        maybeDescription:    Option[datasets.Description],
+        images:              List[datasets.ImageUri],
+        exemplarProjectPath: projects.Path
     ) extends Entity {
       override type Name = datasets.Name
       override type Date = datasets.Date
