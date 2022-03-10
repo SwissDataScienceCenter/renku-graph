@@ -17,6 +17,7 @@
  */
 
 package io.renku.knowledgegraph.entities
+package finder
 
 import Endpoint.Criteria
 import Endpoint.Criteria.Filters
@@ -33,11 +34,11 @@ import io.renku.tinytypes.{From, TinyType}
 import model._
 import org.typelevel.log4cats.Logger
 
-private trait EntitiesFinder[F[_]] {
+private[entities] trait EntitiesFinder[F[_]] {
   def findEntities(criteria: Criteria): F[PagingResponse[Entity]]
 }
 
-private object EntitiesFinder {
+private[entities] object EntitiesFinder {
   def apply[F[_]: Async: NonEmptyParallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[EntitiesFinder[F]] =
     RdfStoreConfig[F]().map(new EntitiesFinderImpl(_, timeRecorder))
 }
@@ -67,8 +68,8 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     name = "cross-entity search",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema", text -> "text", xsd -> "xsd"),
     s"""|SELECT ?entityType ?matchingScore ?path ?identifier ?name ?visibility ?date 
-        |  ?maybeCreatorName ?maybeDescription ?keywords ?images ?projectsAndVisibilities 
-        |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames ?wkId
+        |  ?maybeCreatorName ?maybeDescription ?keywords ?images ?idsPathsVisibilities ?sameAs
+        |  ?maybeDateCreated ?maybeDatePublished ?creatorsNames ?wkId ?visibilities
         |WHERE {
         |  ${subqueries(criteria).mkString(" UNION ")}
         |}
@@ -126,18 +127,17 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
   private def maybeDatasetsQuery(criteria: Criteria) = (criteria.filters whenRequesting EntityType.Dataset) {
     import criteria._
     s"""|{
-        |  SELECT ?entityType ?matchingScore ?identifier ?name ?projectsAndVisibilities
+        |  SELECT ?entityType ?matchingScore ?name ?idsPathsVisibilities ?sameAs
         |    ?maybeDateCreated ?maybeDatePublished ?date
         |    ?creatorsNames ?maybeDescription ?keywords ?images 
-        |    (SAMPLE(?projectPath) AS ?path)
         |  WHERE {
         |    {
-        |      SELECT ?sameAs ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date
+        |      SELECT ?sameAs ?name ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date
         |        (GROUP_CONCAT(DISTINCT ?creatorName; separator=',') AS ?creatorsNames)
-        |        (GROUP_CONCAT(DISTINCT ?projectAndVisibility; separator=',') AS ?projectsAndVisibilities)
+        |        (GROUP_CONCAT(DISTINCT ?idPathVisibility; separator=',') AS ?idsPathsVisibilities)
         |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
-        |        (GROUP_CONCAT(?encodedImageUrl; separator='|') AS ?images)
-        |        (SAMPLE(?dsId) AS ?dsIdSample) (GROUP_CONCAT(DISTINCT ?dsId; separator='|') AS ?dsIds)
+        |        (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+        |        ?maybeDescription
         |      WHERE {
         |        {
         |          SELECT ?sameAs ?dsId ?projectId ?matchingScore
@@ -176,7 +176,9 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |        FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
         |        ?projectId renku:projectVisibility ?visibility;
         |                   renku:projectPath ?projectPath.
-        |        BIND (CONCAT(STR(?projectPath), STR(':'), STR(?visibility)) AS ?projectAndVisibility)
+        |        ?dsId schema:identifier ?identifier;
+        |              renku:slug ?name.
+        |        BIND (CONCAT(STR(?identifier), STR(':'), STR(?projectPath), STR(':'), STR(?visibility)) AS ?idPathVisibility)
         |        ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
         |        ${filters.maybeOnVisibility("?visibility")}
         |        OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
@@ -185,6 +187,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |        BIND (IF (BOUND(?maybeDateCreated), ?maybeDateCreated, ?maybeDatePublished) AS ?date)
         |        ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
         |        OPTIONAL { ?dsId schema:keywords ?keyword }
+        |        OPTIONAL { ?dsId schema:description ?maybeDescription }
         |        OPTIONAL {
         |          ?dsId schema:image ?imageId .
         |          ?imageId schema:position ?imagePosition ;
@@ -192,14 +195,10 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         |          BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
         |        }
         |      }
-        |      GROUP BY ?sameAs ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date
+        |      GROUP BY ?sameAs ?name ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date ?maybeDescription
         |    }
         |    ${filters.maybeOnCreatorsNames("?creatorsNames")}
         |    BIND ('dataset' AS ?entityType)
-        |    BIND (IF (CONTAINS(STR(?dsIds), STR(?sameAs)), ?sameAs, ?dsIdSample) AS ?dsId)
-        |    ?dsId schema:identifier ?identifier;
-        |          renku:slug ?name.
-        |    OPTIONAL { ?dsId schema:description ?maybeDescription }
         |  }
         |}""".stripMargin
   }
@@ -362,13 +361,16 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
         .map(_.getOrElse(List.empty))
 
-    lazy val toListOfPathAndVisibilities
-        : Option[String] => Decoder.Result[NonEmptyList[(projects.Path, projects.Visibility)]] =
+    lazy val toListOfIdsPathsAndVisibilities
+        : Option[String] => Decoder.Result[NonEmptyList[(datasets.Identifier, projects.Path, projects.Visibility)]] =
       _.map(
-        _.split("\\|")
+        _.split(",")
           .map(_.trim)
-          .map { case s"$projectPath:$visibility" =>
-            (projects.Path.from(projectPath) -> projects.Visibility.from(visibility)).mapN(_ -> _)
+          .map { case s"$identifier:$projectPath:$visibility" =>
+            (datasets.Identifier.from(identifier),
+             projects.Path.from(projectPath),
+             projects.Visibility.from(visibility)
+            ).mapN((_, _, _))
           }
           .toList
           .sequence
@@ -377,7 +379,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
             case head :: tail => NonEmptyList.of(head, tail: _*).some
             case Nil          => None
           }
-      ).getOrElse(Option.empty[NonEmptyList[(projects.Path, projects.Visibility)]].asRight)
+      ).getOrElse(Option.empty[NonEmptyList[(datasets.Identifier, projects.Path, projects.Visibility)]].asRight)
         .flatMap {
           case Some(tuples) => tuples.asRight
           case None         => DecodingFailure("DS's project path and visibility not found", Nil).asLeft
@@ -387,7 +389,7 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
         ttFactory: TTF
     ): Option[String] => Decoder.Result[List[TT]] =
       _.map(
-        _.split("\\|")
+        _.split(",")
           .map(_.trim)
           .map { case s"$position:$url" => ttFactory.from(url).map(tt => position.toIntOption.getOrElse(0) -> tt) }
           .toList
@@ -396,12 +398,20 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
           .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
       ).getOrElse(Nil.asRight)
 
-    lazy val selectBroaderVisibilityTuple
-        : NonEmptyList[(projects.Path, projects.Visibility)] => (projects.Path, projects.Visibility) = list =>
-      list
-        .find(_._2 == projects.Visibility.Public)
-        .orElse(list.find(_._2 == projects.Visibility.Internal))
-        .getOrElse(list.head)
+    def selectBroaderVisibilityTuple(
+        or: datasets.SameAs
+    ): NonEmptyList[(datasets.Identifier, projects.Path, projects.Visibility)] => (datasets.Identifier,
+                                                                                   projects.Path,
+                                                                                   projects.Visibility
+    ) = tuples =>
+      tuples
+        .find { case (identifier, _, _) => or.show contains identifier.show }
+        .getOrElse {
+          tuples
+            .find(_._3 == projects.Visibility.Public)
+            .orElse(tuples.find(_._3 == projects.Visibility.Internal))
+            .getOrElse(tuples.head)
+        }
 
     lazy val selectBroaderVisibility: List[projects.Visibility] => projects.Visibility = list =>
       list
@@ -437,14 +447,14 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
     implicit val datasetDecoder: Decoder[Entity.Dataset] = { cursor =>
       for {
         matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-        identifier    <- cursor.downField("identifier").downField("value").as[datasets.Identifier]
         name          <- cursor.downField("name").downField("value").as[datasets.Name]
-        pathAndVisibility <- cursor
-                               .downField("projectsAndVisibilities")
-                               .downField("value")
-                               .as[Option[String]]
-                               .flatMap(toListOfPathAndVisibilities)
-                               .map(selectBroaderVisibilityTuple)
+        sameAs        <- cursor.downField("sameAs").downField("value").as[datasets.SameAs]
+        idPathAndVisibility <- cursor
+                                 .downField("idsPathsVisibilities")
+                                 .downField("value")
+                                 .as[Option[String]]
+                                 .flatMap(toListOfIdsPathsAndVisibilities)
+                                 .map(selectBroaderVisibilityTuple(or = sameAs))
         maybeDateCreated <- cursor.downField("maybeDateCreated").downField("value").as[Option[datasets.DateCreated]]
         maybeDatePublished <-
           cursor.downField("maybeDatePublished").downField("value").as[Option[datasets.DatePublished]]
@@ -468,15 +478,15 @@ private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
                     .as[Option[String]]
                     .flatMap(toListOfImageUris[datasets.ImageUri, datasets.ImageUri.type](datasets.ImageUri))
       } yield Entity.Dataset(matchingScore,
-                             identifier,
+                             idPathAndVisibility._1,
                              name,
-                             pathAndVisibility._2,
+                             idPathAndVisibility._3,
                              date,
                              creators,
                              keywords,
                              maybeDesc,
                              images,
-                             pathAndVisibility._1
+                             idPathAndVisibility._2
       )
     }
 

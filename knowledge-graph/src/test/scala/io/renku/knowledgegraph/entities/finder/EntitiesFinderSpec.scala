@@ -17,6 +17,7 @@
  */
 
 package io.renku.knowledgegraph.entities
+package finder
 
 import Endpoint._
 import Criteria.Filters._
@@ -632,9 +633,7 @@ class EntitiesFinderSpec extends AnyWordSpec with should.Matchers with InMemoryR
       finder
         .findEntities(Criteria(Filters(maybeEntityType = Filters.EntityType.Dataset.some)))
         .unsafeRunSync()
-        .results shouldBe List(
-        originalDSAndProject.to[model.Entity.Dataset]
-      ).sortBy(_.name.value)
+        .results shouldBe List(originalDSAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
     }
 
     "de-duplicate datasets having equal sameAs - case of an Exported DS" in new TestCase {

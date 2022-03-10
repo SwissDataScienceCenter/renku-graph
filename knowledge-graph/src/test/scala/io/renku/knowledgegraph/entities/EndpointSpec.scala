@@ -39,6 +39,7 @@ import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
+import io.renku.knowledgegraph.entities.finder.EntitiesFinder
 import io.renku.knowledgegraph.entities.model.MatchingScore
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
