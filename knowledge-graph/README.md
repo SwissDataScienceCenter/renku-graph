@@ -143,44 +143,38 @@ Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 
 Filtering:
 * `query` - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
-* `type` - to filter by entity type; allowed values: `project`, `dataset`, `workflow`, and `user`
-* `person` - to filter by person (creator for projects and datasets); the filter would require person's name
+* `type` - to filter by entity type; allowed values: `project`, `dataset`, `workflow`, and `person`
+* `creator` - to filter by creator; the filter would require creator's name
 * `visibility` - to filter by visibility (restricted vs. public); allowed values: `public`, `internal`, `private`
 * `date` - to filter by entity's creation date
-* `projectTemplate` no info in KG yet
-* ~~group~~ no info in KG yet
-* ~~modifyDate~~ no info in KG yet
 
-**NOTE:** at least one filter must be specified
+**NOTE:** all query parameters have to be url-encoded.
 
 When the `query` parameter is given, the match is done on the following fields:
-* entity type
 * name/title
 * namespace (for the project entity)
 * creator (note: workflows has no creator for now)
-* keyword/~~tag~~ (keywords for datasets, at the moment we don't have info about project's tags in KG)
+* keyword
 * description
-* ~~readme~~ (KG does not keep content of README files, yet)
 
 Sorting:
+* `matchingScore` - to sort by match score
 * `name` - to sort by entity name - **default when no `query` parameter is given**
-* `score` - to sort by match score (lucene text-matching score, see https://jena.apache.org/documentation/query/text-query.html)
 * `date` - to sort by entity creation date
-* ~~by entity modify date~~ (there's no info about modification date in KG)
 
 **NOTE:** the sorting has to be requested by giving the `sort` query parameter with the property name and sorting order (`asc` or `desc`). The default order is ascending so `sort`=`name` means the same as `sort`=`name:asc`.
 
 **Paging:**
 * the `page` query parameter is optional and defaults to `1`.
-* the `per_page` query parameter is optional and defaults to `20`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
 
 **Response**
 
-| Status                     | Description                                                       |
-|----------------------------|-------------------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
-| BAD_REQUEST (400)          | If there are no filters or filters with illegal values            |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
+| Status                     | Description                                    |
+|----------------------------|------------------------------------------------|
+| OK (200)                   | If results are found; `[]` if nothing is found |
+| BAD_REQUEST (400)          | If illegal values for query parameters are given |
+| INTERNAL SERVER ERROR (500)| Otherwise                                      |
 
 Response headers:
 
@@ -194,7 +188,7 @@ Response headers:
 | `Prev-Page`   | The index of the previous page (optional)                                             |
 | `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
-Assuming the total is `30` and the URL is `https://renku/knowledge-graph/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links will be added to the response:
+Assuming the total is `30` and the URL is `https://renku/knowledge-graph/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links are added to the response:
 
 ```
 Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
@@ -209,11 +203,17 @@ Response body example:
 [
   {
     "type": "project",
+    "matchingScore": 1.0055376,
     "name": "name",
+    "path": "group/subgroup/name",
     "namespace": "group/subgroup",
     "visibility": "public",
     "date": "2012-11-15T10:00:00.000Z",
     "creator": "Jan Kowalski",
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
     "description": "desc",
     "_links": [
       {
@@ -224,6 +224,7 @@ Response body example:
   },
   {
     "type": "dataset",
+    "matchingScore": 3.364836,
     "name": "name",
     "visibility": "public",
     "date": "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
@@ -236,6 +237,17 @@ Response body example:
       "keyword2"
     ],
     "description": "desc",
+    "images": [
+      {
+        "location": "image.png",
+        "_links":[
+          {
+            "rel":  "view",
+            "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+          }
+        ]
+      }
+    ],
     "_links": [
       {
         "rel": "details",
@@ -245,8 +257,10 @@ Response body example:
   },
   {
     "type": "workflow",
+    "matchingScore": 5.364836,
     "name": "name",
     "visibility": "public",
+    "date": "2012-11-15T10:00:00.000Z",
     "keywords": [
       "keyword1",
       "keyword2"
@@ -256,6 +270,7 @@ Response body example:
   },
   {
     "type": "person",
+    "matchingScore": 4.364836,
     "name": "name",
     "_links": []
   }
