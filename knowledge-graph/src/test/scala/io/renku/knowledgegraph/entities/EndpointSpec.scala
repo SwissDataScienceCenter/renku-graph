@@ -119,9 +119,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
   private trait TestCase {
     val criteria = criterias.generateOne
-    val request  = Request[IO](GET, Uri.fromString(relativePaths().generateOne).fold(throw _, identity))
+    val request  = Request[IO](GET, Uri.fromString(s"/${relativePaths().generateOne}").fold(throw _, identity))
 
-    implicit val renkuResourceUrl: renku.ResourceUrl = renkuResourcesUrl / request.uri.show
+    implicit val renkuResourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuResourcesUrl${request.uri}")
     implicit val logger:           TestLogger[IO]    = TestLogger[IO]()
     implicit val gitLabUrl:        GitLabUrl         = gitLabUrls.generateOne
     val finder   = mock[EntitiesFinder[IO]]

@@ -191,7 +191,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
     finder.findEntities(criteria) map toHttpResponse(request) recoverWith httpResult
 
   private def toHttpResponse(request: Request[F])(response: PagingResponse[model.Entity]): Response[F] = {
-    implicit val resourceUrl: renku.ResourceUrl = renkuResourcesUrl / request.uri.show
+    implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuResourcesUrl${request.uri}")
     Response[F](Status.Ok)
       .withEntity(response.results.asJson)
       .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
