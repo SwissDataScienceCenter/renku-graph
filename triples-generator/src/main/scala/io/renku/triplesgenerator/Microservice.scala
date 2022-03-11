@@ -32,12 +32,11 @@ import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
-import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
+import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.config.{TriplesGeneration, VersionCompatibilityConfig}
-import io.renku.triplesgenerator.events.EventEndpoint
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import io.renku.triplesgenerator.reprovisioning.{ReProvisioning, ReProvisioningStatus}
 import org.typelevel.log4cats.Logger
@@ -82,10 +81,9 @@ object Microservice extends IOMicroservice {
                                   )
         reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, sparqlTimeRecorder)
         reProvisioning          <- ReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder)
-        eventProcessingEndpoint <- EventEndpoint(eventConsumersRegistry, reProvisioningStatus)
         serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-        microserviceRoutes =
-          new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO], config.some).routes
+        microserviceRoutes <-
+          MicroserviceRoutes[IO](eventConsumersRegistry, reProvisioningStatus, config.some).map(_.routes)
         exitCode <- microserviceRoutes.use { routes =>
                       new MicroserviceRunner[IO](
                         serviceReadinessChecker,

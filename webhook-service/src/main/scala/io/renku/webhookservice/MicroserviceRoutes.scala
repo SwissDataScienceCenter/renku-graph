@@ -27,6 +27,7 @@ import io.renku.graph.http.server.binders.ProjectId
 import io.renku.graph.http.server.security.GitLabAuthenticator
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.version
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.webhookservice.crypto.HookTokenCrypto
@@ -47,14 +48,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     hookDeletionEndpoint:     HookDeletionEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     authMiddleware:           AuthMiddleware[F, AuthUser],
-    routesMetrics:            RoutesMetrics[F]
+    routesMetrics:            RoutesMetrics[F],
+    versionRoutes:            version.Routes[F]
 )(implicit clock:             Clock[F])
     extends Http4sDsl[F] {
 
   import hookCreationEndpoint._
+  import hookDeletionEndpoint._
   import hookEventEndpoint._
   import hookValidationEndpoint._
-  import hookDeletionEndpoint._
   import org.http4s.HttpRoutes
   import processingStatusEndpoint._
   import routesMetrics._
@@ -75,7 +77,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   }
   // format: on
 
-  lazy val routes: Resource[F, HttpRoutes[F]] = (nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
+  lazy val routes: Resource[F, HttpRoutes[F]] =
+    (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 }
 
 private object MicroserviceRoutes {
@@ -97,6 +100,7 @@ private object MicroserviceRoutes {
     hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl, gitLabThrottler)
     authenticator          <- GitLabAuthenticator(gitLabThrottler)
     authMiddleware         <- Authentication.middleware(authenticator)
+    versionRoutes          <- version.Routes[F]
   } yield new MicroserviceRoutes[F](
     hookEventEndpoint,
     hookCreatorEndpoint,
@@ -104,6 +108,7 @@ private object MicroserviceRoutes {
     hookDeletionEndpoint,
     processingStatusEndpoint,
     authMiddleware,
-    new RoutesMetrics[F]
+    new RoutesMetrics[F],
+    versionRoutes
   )
 }

@@ -27,12 +27,9 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
-import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEventsQueue
-import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
-import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions._
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
@@ -111,9 +108,7 @@ object Microservice extends IOMicroservice {
                                       statusChangeEventSubscription,
                                       globalCommitSyncRequestSubscription
                                     )
-          serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
-          eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
-          processingStatusEndpoint <- ProcessingStatusEndpoint(queriesExecTimes)
+          serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
           eventProducersRegistry <- EventProducersRegistry(
                                       awaitingGenerationGauge,
                                       underTriplesGenerationGauge,
@@ -123,18 +118,12 @@ object Microservice extends IOMicroservice {
                                       deletingGauge,
                                       queriesExecTimes
                                     )
-          subscriptionsEndpoint <- SubscriptionsEndpoint(eventProducersRegistry)
-          eventDetailsEndpoint  <- EventDetailsEndpoint(queriesExecTimes)
-          eventsEndpoint        <- EventsEndpoint(queriesExecTimes)
-          microserviceRoutes = new MicroserviceRoutes[IO](
-                                 eventEndpoint,
-                                 eventsEndpoint,
-                                 processingStatusEndpoint,
-                                 subscriptionsEndpoint,
-                                 eventDetailsEndpoint,
-                                 new RoutesMetrics[IO],
-                                 isMigrating
-                               ).routes
+          microserviceRoutes <- MicroserviceRoutes[IO](
+                                  eventConsumersRegistry,
+                                  queriesExecTimes,
+                                  eventProducersRegistry,
+                                  isMigrating
+                                ).map(_.routes)
           exitCode <- microserviceRoutes.use { routes =>
                         new MicroserviceRunner(serviceReadinessChecker,
                                                certificateLoader,

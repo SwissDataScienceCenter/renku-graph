@@ -26,7 +26,7 @@ import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
-import io.renku.generators.CommonGraphGenerators.{pages, perPages, sortingDirections}
+import io.renku.generators.CommonGraphGenerators.{httpStatuses, pages, perPages, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
@@ -35,6 +35,7 @@ import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.EndpointTester._
+import io.renku.http.server.version
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
@@ -192,6 +193,12 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "GET /version" should {
+    "return response from the version endpoint" in new TestCase {
+      routes.call(Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
+    }
+  }
+
   "GET /processing-status?project-id=:id" should {
 
     s"find processing status and return it with $Ok" in new TestCase with IsNotMigrating {
@@ -246,23 +253,18 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "all endpoints except ping" should {
+  "all endpoints except /ping and /version" should {
 
     s"return $ServiceUnavailable if migration is happening" in new TestCase {
       (() => isMigrating.get)
         .expects()
         .returning(true.pure[IO])
 
-      val projectPath = projectPaths.generateOne
-
-      val request = Request[IO](method = GET, uri"/events".withQueryParam("project-path", projectPath.value))
-
+      val request = Request[IO](GET, uri"/events".withQueryParam("project-path", projectPaths.generateOne.value))
       routes.call(request).status shouldBe ServiceUnavailable
 
-      val response = routes.call(Request(GET, uri"/ping"))
-
-      response.status       shouldBe Ok
-      response.body[String] shouldBe "pong"
+      routes.call(Request(GET, uri"/ping")).status    shouldBe Ok
+      routes.call(Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
     }
   }
 
@@ -274,6 +276,7 @@ class MicroserviceRoutesSpec
     val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
     val isMigrating              = mock[Ref[IO, Boolean]]
+    val versionRoutes            = mock[version.Routes[IO]]
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
       eventsEndpoint,
@@ -281,8 +284,18 @@ class MicroserviceRoutesSpec
       subscriptionsEndpoint,
       eventDetailsEndpoint,
       routesMetrics,
-      isMigrating
+      isMigrating,
+      versionRoutes
     ).routes.map(_.or(notAvailableResponse))
+
+    val versionEndpointResponse = Response[IO](httpStatuses.generateOne)
+    (versionRoutes.apply _)
+      .expects()
+      .returning {
+        import org.http4s.dsl.io.{GET => _, _}
+        HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
+      }
+      .atLeastOnce()
   }
 
   private trait IsNotMigrating {

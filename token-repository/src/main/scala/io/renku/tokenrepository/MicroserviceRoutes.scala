@@ -19,19 +19,25 @@
 package io.renku.tokenrepository
 
 import cats.MonadThrow
-import cats.effect.{Clock, Resource}
+import cats.effect.{Async, Clock, Resource}
+import cats.syntax.all._
+import io.renku.db.SessionResource
 import io.renku.graph.http.server.binders.{ProjectId, ProjectPath}
-import io.renku.metrics.RoutesMetrics
+import io.renku.http.server.version
+import io.renku.metrics.{LabeledHistogram, MetricsRegistry, RoutesMetrics}
+import io.renku.tokenrepository.repository.ProjectsTokensDB
 import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
 import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 private class MicroserviceRoutes[F[_]: MonadThrow](
     fetchTokenEndpoint:     FetchTokenEndpoint[F],
     associateTokenEndpoint: AssociateTokenEndpoint[F],
     deleteTokenEndpoint:    DeleteTokenEndpoint[F],
-    routesMetrics:          RoutesMetrics[F]
+    routesMetrics:          RoutesMetrics[F],
+    versionRoutes:          version.Routes[F]
 )(implicit clock:           Clock[F])
     extends Http4sDsl[F] {
 
@@ -48,6 +54,23 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     case           GET    -> Root / "projects" / ProjectPath(projectPath) / "tokens" => fetchToken(projectPath)
     case request @ PUT    -> Root / "projects" / ProjectId(projectId) / "tokens"     => associateToken(projectId, request)
     case           DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => deleteToken(projectId)
-  }.withMetrics
+  }.withMetrics.map(_ <+> versionRoutes())
   // format: on
+}
+
+private object MicroserviceRoutes {
+  def apply[F[_]: Async: Logger: MetricsRegistry](
+      sessionResource:  SessionResource[F, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[MicroserviceRoutes[F]] = for {
+    fetchTokenEndpoint     <- FetchTokenEndpoint(sessionResource, queriesExecTimes)
+    associateTokenEndpoint <- AssociateTokenEndpoint(sessionResource, queriesExecTimes)
+    deleteTokenEndpoint    <- DeleteTokenEndpoint(sessionResource, queriesExecTimes)
+    versionRoutes          <- version.Routes[F]
+  } yield new MicroserviceRoutes(fetchTokenEndpoint,
+                                 associateTokenEndpoint,
+                                 deleteTokenEndpoint,
+                                 new RoutesMetrics[F],
+                                 versionRoutes
+  )
 }

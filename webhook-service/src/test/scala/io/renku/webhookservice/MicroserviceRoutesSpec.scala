@@ -20,18 +20,21 @@ package io.renku.webhookservice
 
 import cats.data.OptionT
 import cats.effect.IO
-import io.renku.generators.CommonGraphGenerators.authUsers
+import cats.syntax.all._
+import io.renku.generators.CommonGraphGenerators.{authUsers, httpStatuses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.version
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
 import io.renku.webhookservice.hookcreation.HookCreationEndpoint
 import io.renku.webhookservice.hookdeletion.HookDeletionEndpoint
 import io.renku.webhookservice.hookvalidation.HookValidationEndpoint
+import org.http4s.Method.GET
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.implicits._
@@ -80,9 +83,7 @@ class MicroserviceRoutesSpec
         .expects(request)
         .returning(IO.pure(Response[IO](responseStatus)))
 
-      val response = routes.call(request)
-
-      response.status shouldBe responseStatus
+      routes.call(request).status shouldBe responseStatus
     }
     "define a DELETE webhooks/events endpoint returning response from the endpoint" in new TestCase {
 
@@ -94,9 +95,7 @@ class MicroserviceRoutesSpec
         .expects(projectId, authUser)
         .returning(IO.pure(Response[IO](responseStatus)))
 
-      val response = routes.call(request)
-
-      response.status shouldBe responseStatus
+      routes.call(request).status shouldBe responseStatus
     }
 
     "define a GET projects/:id/events/status endpoint returning response from the endpoint" in new TestCase {
@@ -109,9 +108,7 @@ class MicroserviceRoutesSpec
         .expects(projectId)
         .returning(IO.pure(Response[IO](responseStatus)))
 
-      val response = routes.call(request)
-
-      response.status shouldBe responseStatus
+      routes.call(request).status shouldBe responseStatus
     }
 
     s"define a GET projects/:id/events/status endpoint returning $NotFound when no :id path parameter given" in new TestCase {
@@ -128,8 +125,7 @@ class MicroserviceRoutesSpec
         .expects(projectId, authUser)
         .returning(IO.pure(Response[IO](responseStatus)))
 
-      val response = routes.call(request)
-      response.status shouldBe responseStatus
+      routes.call(request).status shouldBe responseStatus
     }
 
     s"define a POST projects/:id/webhooks endpoint returning $Unauthorized when user is not authorized" in new TestCase {
@@ -151,9 +147,7 @@ class MicroserviceRoutesSpec
         .expects(projectId, authUser)
         .returning(IO.pure(Response[IO](responseStatus)))
 
-      val response = routes.call(request)
-
-      response.status shouldBe responseStatus
+      routes.call(request).status shouldBe responseStatus
     }
 
     s"define a POST projects/:id/webhooks/validation endpoint returning $Unauthorized when user is not authorized" in new TestCase {
@@ -163,6 +157,12 @@ class MicroserviceRoutesSpec
       val request   = Request[IO](Method.POST, uri"/projects" / projectId.toString / "webhooks" / "validation")
 
       routes.call(request).status shouldBe Unauthorized
+    }
+  }
+
+  "GET /version" should {
+    "return response from the version endpoint" in new TestCase {
+      (routes call Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
     }
   }
 
@@ -176,6 +176,7 @@ class MicroserviceRoutesSpec
     val hookValidationEndpoint   = mock[HookValidationEndpoint[IO]]
     val processingStatusEndpoint = mock[ProcessingStatusEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
+    val versionRoutes            = mock[version.Routes[IO]]
     lazy val routes = new MicroserviceRoutes[IO](
       hookEventEndpoint,
       hookCreationEndpoint,
@@ -183,7 +184,16 @@ class MicroserviceRoutesSpec
       hookDeletionEndpoint,
       processingStatusEndpoint,
       givenAuthMiddleware(returning = authenticationResponse),
-      routesMetrics
+      routesMetrics,
+      versionRoutes
     ).routes.map(_.or(notAvailableResponse))
+
+    val versionEndpointResponse = Response[IO](httpStatuses.generateOne)
+    (versionRoutes.apply _)
+      .expects()
+      .returning {
+        import org.http4s.dsl.io.{GET => _, _}
+        HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
+      }
   }
 }
