@@ -25,7 +25,6 @@ import skunk._
 
 package object init {
 
-  def execute[F[_]: MonadCancelThrow](
-      sql: Command[Void]
-  ): Kleisli[F, Session[F], Unit] = Kleisli(session => session.execute(sql).void)
+  def execute[F[_]: MonadCancelThrow](sql: Command[Void]): Kleisli[F, Session[F], Unit] =
+    Kleisli(_.execute(sql).void)
 }

@@ -268,6 +268,6 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
     val projectPath = projectPaths.generateOne
 
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val eventsFinder     = new EventsFinderImpl[IO](sessionResource, queriesExecTimes)
+    val eventsFinder     = new EventsFinderImpl[IO](queriesExecTimes)
   }
 }

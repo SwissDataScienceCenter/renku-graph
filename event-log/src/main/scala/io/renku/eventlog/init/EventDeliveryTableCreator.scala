@@ -20,24 +20,20 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all.bool
 import skunk.implicits._
 
-private trait EventDeliveryTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait EventDeliveryTableCreator[F[_]] extends DbMigrator[F]
 
-private class EventDeliveryTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends EventDeliveryTableCreator[F] {
+private class EventDeliveryTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends EventDeliveryTableCreator[F] {
 
   import cats.syntax.all._
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     checkTableExists >>= {
       case true  => Kleisli.liftF(Logger[F] info "'event_delivery' table exists")
       case false => createTable()
@@ -76,7 +72,6 @@ private class EventDeliveryTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
 }
 
 private object EventDeliveryTableCreator {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): EventDeliveryTableCreator[F] = new EventDeliveryTableCreatorImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: EventDeliveryTableCreator[F] =
+    new EventDeliveryTableCreatorImpl[F]
 }

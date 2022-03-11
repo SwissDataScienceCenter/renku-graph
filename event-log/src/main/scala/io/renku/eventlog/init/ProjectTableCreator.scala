@@ -20,31 +20,25 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-private trait ProjectTableCreator[F[_]] {
-  def run(): F[Unit]
-}
+private trait ProjectTableCreator[F[_]] extends DbMigrator[F]
 
 private object ProjectTableCreator {
-  def apply[F[_]: MonadCancelThrow: Logger](
-      sessionResource: SessionResource[F, EventLogDB]
-  ): ProjectTableCreator[F] = new ProjectTableCreatorImpl(sessionResource)
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: ProjectTableCreator[F] = new ProjectTableCreatorImpl[F]
 }
 
-private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger](
-    sessionResource: SessionResource[F, EventLogDB]
-) extends ProjectTableCreator[F]
+private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
+    extends ProjectTableCreator[F]
     with EventTableCheck {
 
   import cats.syntax.all._
 
-  override def run(): F[Unit] = sessionResource.useK {
+  override def run(): F[Unit] = SessionResource[F].useK {
     whenEventTableExists(
       Kleisli.liftF(Logger[F] info "'project' table creation skipped"),
       otherwise = checkTableExists >>= {

@@ -56,6 +56,6 @@ class EventDetailsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventL
     val eventBody = eventBodies.generateOne
 
     val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val eventDetailsFinder = new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
+    val eventDetailsFinder = new EventDetailsFinderImpl(queriesExecTimes)
   }
 }

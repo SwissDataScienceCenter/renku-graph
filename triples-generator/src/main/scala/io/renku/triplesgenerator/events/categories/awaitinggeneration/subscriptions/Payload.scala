@@ -18,8 +18,8 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.subscriptions
 
+import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import io.renku.graph.model.events.CategoryName
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 
 private final case class Payload(categoryName: CategoryName, subscriber: Subscriber)

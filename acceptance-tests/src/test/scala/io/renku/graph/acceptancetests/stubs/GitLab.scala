@@ -41,7 +41,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.Id
 import io.renku.graph.model.testentities.{Parent, Person, Project}
-import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, users}
+import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, persons}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -73,7 +73,7 @@ trait GitLab {
   }
 
   def `GET <gitlabApi>/user returning OK`(
-      userGitLabId:       users.GitLabId = userGitLabIds.generateOne
+      userGitLabId:       persons.GitLabId = personGitLabIds.generateOne
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get("/api/v4/user").withAccessTokenInHeader
@@ -102,7 +102,7 @@ trait GitLab {
     stubFor {
       val (authorId, authorName) = maybeAuthor
         .flatMap(p => p.maybeGitLabId.map(_ -> p.name))
-        .getOrElse(userGitLabIds.generateOne -> userNames.generateOne)
+        .getOrElse(personGitLabIds.generateOne -> personNames.generateOne)
       val jsonContent = Json.fromValues(commitIds.toList.map { commitId =>
         json"""{
               "project_id": ${project.id.value},
@@ -224,9 +224,9 @@ trait GitLab {
     json"""{
         "id":              ${commitId.value},
         "author_name":     ${nonEmptyStrings().generateOne},
-        "author_email":    ${userEmails.generateOne.value},
+        "author_email":    ${personEmails.generateOne.value},
         "committer_name":  ${nonEmptyStrings().generateOne},
-        "committer_email": ${userEmails.generateOne.value},
+        "committer_email": ${personEmails.generateOne.value},
         "message":         ${nonEmptyStrings().generateOne},
         "committed_date":  ${theMostRecentEventDate.toString}
       }  
@@ -237,9 +237,9 @@ trait GitLab {
     json"""{
         "id":              ${commitId.value},
         "author_name":     ${nonEmptyStrings().generateOne},
-        "author_email":    ${userEmails.generateOne.value},
+        "author_email":    ${personEmails.generateOne.value},
         "committer_name":  ${nonEmptyStrings().generateOne},
-        "committer_email": ${userEmails.generateOne.value},
+        "committer_email": ${personEmails.generateOne.value},
         "message":         ${nonEmptyStrings().generateOne},
         "committed_date":  ${theMostRecentEventDate.toString},
         "parent_ids":      []
@@ -257,9 +257,9 @@ trait GitLab {
         .willReturn(okJson(json"""{
           "id":              ${commitId.value},
           "author_name":     ${nonEmptyStrings().generateOne},
-          "author_email":    ${userEmails.generateOne.value},
+          "author_email":    ${personEmails.generateOne.value},
           "committer_name":  ${nonEmptyStrings().generateOne},
-          "committer_email": ${userEmails.generateOne.value},
+          "committer_email": ${personEmails.generateOne.value},
           "message":         ${nonEmptyStrings().generateOne},
           "committed_date":  ${theMostRecentEventDate.toString},
           "parent_ids":      ${parentIds.map(_.value).toList}
@@ -270,9 +270,9 @@ trait GitLab {
         .willReturn(okJson(json"""{
           "id":              ${commitId.value},
           "author_name":     ${nonEmptyStrings().generateOne},
-          "author_email":    ${userEmails.generateOne.value},
+          "author_email":    ${personEmails.generateOne.value},
           "committer_name":  ${nonEmptyStrings().generateOne},
-          "committer_email": ${userEmails.generateOne.value},
+          "committer_email": ${personEmails.generateOne.value},
           "message":         ${nonEmptyStrings().generateOne},
           "committed_date":  ${theMostRecentEventDate.toString},
           "parent_ids":      ${parentIds.map(_.value).toList}
@@ -416,7 +416,7 @@ trait GitLab {
 
   def `GET <gitlabApi>/projects/:path AND :id returning NOT_FOUND`(
       project:            data.Project
-  )(implicit accessToken: AccessToken) = {
+  )(implicit accessToken: AccessToken): StubMapping = {
     stubFor {
       get(urlPathEqualTo(s"/api/v4/projects/${urlEncode(project.path.value)}")).withAccessTokenInHeader
         .willReturn(notFound())

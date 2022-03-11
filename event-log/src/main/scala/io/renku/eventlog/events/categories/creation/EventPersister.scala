@@ -23,7 +23,8 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.auto._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.categories.creation.EventPersister.Result
@@ -41,10 +42,9 @@ private trait EventPersister[F[_]] {
   def storeNewEvent(event: Event): F[Result]
 }
 
-private class EventPersisterImpl[F[_]: MonadCancelThrow](
-    sessionResource:    SessionResource[F, EventLogDB],
+private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
     waitingEventsGauge: LabeledGauge[F, projects.Path],
-    queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:   LabeledHistogram[F],
     now:                () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventPersister[F] {
@@ -53,7 +53,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
   import applicative._
   import io.renku.eventlog.TypeSerializers._
 
-  override def storeNewEvent(event: Event): F[Result] = sessionResource.useWithTransactionK[Result] {
+  override def storeNewEvent(event: Event): F[Result] = SessionResource[F].useWithTransactionK[Result] {
     Kleisli { case (transaction, session) =>
       for {
         sp <- transaction.savepoint
@@ -127,10 +127,8 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
       .select[projects.Id, BatchDate](
         sql"""SELECT batch_date
               FROM event
-              WHERE project_id = $projectIdEncoder AND #${`status IN`(New,
-                                                                      GenerationRecoverableFailure,
-                                                                      GeneratingTriples
-        )}
+              WHERE project_id = $projectIdEncoder 
+                AND #${`status IN`(New, GenerationRecoverableFailure, GeneratingTriples)}
               ORDER BY batch_date DESC
               LIMIT 1
           """.query(batchDateDecoder)
@@ -148,7 +146,9 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
             EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
           ](
             sql"""INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
-                VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
+                  VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
+                  ON CONFLICT (event_id, project_id)
+                  DO UPDATE SET event_date = EXCLUDED.event_date
               """.command
           )
           .arguments(id ~ project.id ~ status ~ createdDate ~ executionDate ~ date ~ batchDate ~ body)
@@ -162,9 +162,10 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
           .command[
             EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody ~ EventMessage
           ](
-            sql"""INSERT INTO
-                  event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
+            sql"""INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
                   VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder, $eventMessageEncoder)
+                  ON CONFLICT (event_id, project_id)
+                  DO UPDATE SET event_date = EXCLUDED.event_date
               """.command
           )
           .arguments(id ~ project.id ~ Skipped ~ createdDate ~ executionDate ~ date ~ batchDate ~ body ~ message)
@@ -177,8 +178,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
     SqlStatement(name = "new - upsert project")
       .command[projects.Id ~ projects.Path ~ EventDate](
         sql"""
-            INSERT INTO
-            project (project_id, project_path, latest_event_date)
+            INSERT INTO project (project_id, project_path, latest_event_date)
             VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
             ON CONFLICT (project_id)
             DO 
@@ -196,12 +196,11 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow](
 }
 
 private object EventPersister {
-  def apply[F[_]: MonadCancelThrow](
-      sessionResource:    SessionResource[F, EventLogDB],
+  def apply[F[_]: MonadCancelThrow: SessionResource](
       waitingEventsGauge: LabeledGauge[F, projects.Path],
-      queriesExecTimes:   LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:   LabeledHistogram[F]
   ): F[EventPersisterImpl[F]] = MonadThrow[F].catchNonFatal {
-    new EventPersisterImpl[F](sessionResource, waitingEventsGauge, queriesExecTimes)
+    new EventPersisterImpl[F](waitingEventsGauge, queriesExecTimes)
   }
 
   sealed trait Result extends Product with Serializable

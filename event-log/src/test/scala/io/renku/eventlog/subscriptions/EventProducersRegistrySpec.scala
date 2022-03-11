@@ -23,9 +23,9 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.eventlog.subscriptions.EventProducersRegistry._
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
+import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.events.CategoryName
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

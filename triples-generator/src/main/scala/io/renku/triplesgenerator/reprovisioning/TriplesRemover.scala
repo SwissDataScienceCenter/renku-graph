@@ -28,6 +28,8 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration._
+
 private trait TriplesRemover[F[_]] {
   def removeAllTriples(): F[Unit]
 }
@@ -35,8 +37,14 @@ private trait TriplesRemover[F[_]] {
 private class TriplesRemoverImpl[F[_]: Async: Logger](
     removalBatchSize: Long Refined Positive,
     rdfStoreConfig:   RdfStoreConfig,
-    timeRecorder:     SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    timeRecorder:     SparqlQueryTimeRecorder[F],
+    idleTimeout:      Duration = 10 minutes,
+    requestTimeout:   Duration = 10 minutes
+) extends RdfStoreClientImpl(rdfStoreConfig,
+                             timeRecorder,
+                             idleTimeoutOverride = idleTimeout.some,
+                             requestTimeoutOverride = requestTimeout.some
+    )
     with TriplesRemover[F] {
 
   import eu.timepit.refined.auto._

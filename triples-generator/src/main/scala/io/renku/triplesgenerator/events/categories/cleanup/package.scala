@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories
 
-import io.renku.graph.model.events.CategoryName
+import io.renku.events.CategoryName
 
 package object cleanup {
   val categoryName: CategoryName = CategoryName("CLEAN_UP")

@@ -24,11 +24,8 @@ import io.renku.graph.model.commandParameters.Position
 import io.renku.graph.model.entityModel.Location
 import io.renku.graph.model.plans._
 import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import io.renku.graph.model.testentities.Plan._
-import io.renku.tinytypes._
-import io.renku.tinytypes.constraints._
 
-case class Plan(id:                        Id,
+case class Plan(id:                        Identifier,
                 name:                      Name,
                 maybeDescription:          Option[Description],
                 maybeCommand:              Option[Command],
@@ -48,6 +45,7 @@ case class Plan(id:                        Id,
 
 object Plan {
 
+  import io.renku.generators.Generators.Implicits._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
@@ -57,7 +55,7 @@ object Plan {
       dateCreated:               DateCreated,
       commandParameterFactories: List[Position => Plan => CommandParameterBase]
   ): Plan = Plan(
-    Id.generate,
+    planIdentifiers.generateOne,
     name,
     maybeDescription = None,
     maybeCommand,
@@ -104,12 +102,5 @@ object Plan {
     JsonLDEncoder.instance(_.to[entities.Plan].asJsonLD)
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[R] =
-    EntityIdEncoder.instance(plan => EntityId of renkuBaseUrl / "plans" / plan.id)
-
-  final class Id private (val value: String) extends AnyVal with StringTinyType
-  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID {
-    def generate: Id = Id {
-      java.util.UUID.randomUUID.toString
-    }
-  }
+    EntityIdEncoder.instance(plan => ResourceId(plan.id).asEntityId)
 }

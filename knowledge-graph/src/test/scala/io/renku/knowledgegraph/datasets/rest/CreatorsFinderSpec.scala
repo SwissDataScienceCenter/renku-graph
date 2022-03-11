@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.datasets.rest
 import io.circe.literal._
 import io.renku.generators.Generators.blankStrings
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.users.{Email, Name}
+import io.renku.graph.model.persons.{Email, Name}
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -34,7 +34,7 @@ class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
   "dataset creator decoder" should {
 
     "decode result-set with a blank affiliation to a DatasetCreator object" in {
-      forAll(userEmails, userNames, blankStrings()) { (email, name, affiliation) =>
+      forAll(personEmails, personNames, blankStrings()) { (email, name, affiliation) =>
         resultSet(email, name, affiliation).as[List[DatasetCreator]] shouldBe Right {
           List(DatasetCreator(Some(email), name, None))
         }
@@ -42,7 +42,7 @@ class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
     }
 
     "decode result-set with a non-blank affiliation to a DatasetCreator object" in {
-      forAll(userEmails, userNames, userAffiliations) { (email, name, affiliation) =>
+      forAll(personEmails, personNames, personAffiliations) { (email, name, affiliation) =>
         resultSet(email, name, affiliation.toString).as[List[DatasetCreator]] shouldBe Right {
           List(DatasetCreator(Some(email), name, Some(affiliation)))
         }

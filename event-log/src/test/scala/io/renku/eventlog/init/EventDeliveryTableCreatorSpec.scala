@@ -28,8 +28,8 @@ import skunk.implicits._
 
 class EventDeliveryTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: EventDeliveryTableCreatorImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: EventDeliveryTableCreatorImpl[IO] => false
     case _ => true
   }
 
@@ -67,6 +67,6 @@ class EventDeliveryTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitS
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new EventDeliveryTableCreatorImpl[IO](sessionResource)
+    val tableCreator = new EventDeliveryTableCreatorImpl[IO]
   }
 }

@@ -19,8 +19,8 @@
 package io.renku.eventlog.subscriptions
 
 import cats.syntax.all._
-import io.renku.eventlog.subscriptions.Generators.categoryNames
 import io.renku.eventlog.subscriptions.TestCategoryEvent.testCategoryEvents
+import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions

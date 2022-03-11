@@ -26,18 +26,18 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
-import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
+import skunk.data.Completion
 import skunk.implicits._
 import skunk.~
 
 import java.time.Instant
-import skunk.data.Completion
 
 private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[F, RollbackToAwaitingDeletion] {
@@ -47,8 +47,7 @@ private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
       .command[EventStatus ~ ExecutionDate ~ projects.Id ~ EventStatus](
         sql"""UPDATE event evt
               SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
-              WHERE project_id = $projectIdEncoder
-                  AND status = $eventStatusEncoder
+              WHERE project_id = $projectIdEncoder AND status = $eventStatusEncoder
               """.command
       )
       .arguments(AwaitingDeletion ~ ExecutionDate(now()) ~ event.project.id ~ Deleting)
@@ -62,8 +61,7 @@ private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow](
         case _ =>
           new Exception(
             s"Could not update $Deleting events for project ${event.project.path} to status $AwaitingDeletion"
-          )
-            .raiseError[F, DBUpdateResults]
+          ).raiseError[F, DBUpdateResults]
       }
   }
 

@@ -23,10 +23,11 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.EventLogDB
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.SubscriptionTypeSerializers
-import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.events.CategoryName
+import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
@@ -38,22 +39,21 @@ private trait LastSyncedDateUpdater[F[_]] {
 }
 
 private object LastSyncedDateUpdater {
-  def apply[F[_]: MonadCancelThrow](sessionResource: SessionResource[F, EventLogDB],
-                                    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: MonadCancelThrow: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[LastSyncedDateUpdater[F]] = MonadThrow[F].catchNonFatal(
-    new LastSyncedDateUpdateImpl[F](sessionResource, queriesExecTimes)
+    new LastSyncedDateUpdateImpl[F](queriesExecTimes)
   )
 }
 
-private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow: SessionResource](
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with LastSyncedDateUpdater[F]
     with SubscriptionTypeSerializers {
 
   override def run(projectId: projects.Id, maybeLastSyncDate: Option[LastSyncedDate]): F[Completion] =
-    sessionResource.useK {
+    SessionResource[F].useK {
       maybeLastSyncDate match {
         case Some(lastSyncedDate) => insert(projectId, lastSyncedDate)
         case None                 => deleteLastSyncDate(projectId)

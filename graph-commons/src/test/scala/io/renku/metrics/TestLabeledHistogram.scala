@@ -20,49 +20,50 @@ package io.renku.metrics
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Histogram => LibHistogram}
 import org.scalatest.Assertions.fail
 
-class TestLabeledHistogram[LabelValue](
-    protected val histogram: LibHistogram
-) extends LabeledHistogram[IO, LabelValue] {
+import scala.jdk.CollectionConverters._
+
+class TestLabeledHistogram(val wrappedCollector: LibHistogram) extends LabeledHistogram[IO] {
 
   import MetricsTools._
 
-  def verifyExecutionTimeMeasured(forLabelValue: LabelValue, other: LabelValue*): Unit =
-    (forLabelValue +: other).map(_.toString) diff histogram.collectAllSamples.map(_._2) match {
+  override lazy val name: String = wrappedCollector.describe().asScala.head.name
+  override lazy val help: String = wrappedCollector.describe().asScala.head.help
+
+  def verifyExecutionTimeMeasured(forLabelValue: String, other: String*): Unit =
+    (forLabelValue +: other) diff wrappedCollector.collectAllSamples.map(_._2) match {
       case Nil     => ()
       case missing => fail(s"Execution time was not measured for '${missing.mkString(", ")}'")
     }
 
-  def verifyExecutionTimeMeasured(forLabelValues: NonEmptyList[LabelValue]): Unit =
+  def verifyExecutionTimeMeasured(forLabelValues: NonEmptyList[String]): Unit =
     verifyExecutionTimeMeasured(forLabelValues.head, forLabelValues.tail: _*)
 
   def verifyNoInteractions(): Unit = {
-    if (histogram.collectAllSamples.nonEmpty)
+    if (wrappedCollector.collectAllSamples.nonEmpty)
       fail(
         "Expected no interaction with histogram but " +
-          s"execution time was measured for ${histogram.collectAllSamples.map(_._2).toSet.mkString(",")}"
+          s"execution time was measured for ${wrappedCollector.collectAllSamples.map(_._2).toSet.mkString(",")}"
       )
     ()
   }
 
-  override def startTimer(labelValue: LabelValue): IO[Histogram.Timer[IO]] = IO {
-    new Histogram.TimerImpl(histogram.labels(labelValue.toString).startTimer())
+  override def startTimer(labelValue: String): IO[Histogram.Timer[IO]] = IO {
+    new Histogram.TimerImpl(wrappedCollector.labels(labelValue).startTimer())
   }
 }
 
 object TestLabeledHistogram {
 
-  def apply[LabelValue](labelName: String Refined NonEmpty): TestLabeledHistogram[LabelValue] =
-    new TestLabeledHistogram[LabelValue](
+  def apply[LabelValue](labelName: String): TestLabeledHistogram =
+    new TestLabeledHistogram(
       LibHistogram
         .build()
         .name("test_metrics")
         .help("test metrics help")
-        .labelNames(labelName.value)
+        .labelNames(labelName)
         .buckets(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1)
         .create()
     )

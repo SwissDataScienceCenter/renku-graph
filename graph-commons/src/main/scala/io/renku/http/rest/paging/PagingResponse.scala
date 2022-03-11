@@ -32,6 +32,9 @@ final class PagingResponse[Result] private (val results: List[Result], val pagin
 
 object PagingResponse {
 
+  def empty[Result](pagingRequest: PagingRequest): PagingResponse[Result] =
+    new PagingResponse[Result](Nil, new PagingInfo(pagingRequest, Total(0)))
+
   def from[F[_]: MonadThrow, Result](
       results:       List[Result],
       pagingRequest: PagingRequest,
@@ -81,8 +84,7 @@ object PagingResponse {
         .withEntity(response.results.asJson)
         .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
 
-    private implicit def resultsEntityEncoder[F[_]](implicit
-        encoder: Encoder[Result]
-    ): EntityEncoder[F, Json] = jsonEncoderOf[F, Json]
+    private implicit def resultsEntityEncoder[F[_]](implicit encoder: Encoder[Result]): EntityEncoder[F, Json] =
+      jsonEncoderOf[F, Json]
   }
 }

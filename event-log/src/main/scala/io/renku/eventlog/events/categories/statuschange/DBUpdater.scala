@@ -22,10 +22,9 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.effect.kernel.Async
 import cats.syntax.all._
-import io.renku.db.SqlStatement
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.{AllEventsToNew, _}
 import io.renku.graph.model.events.EventStatus.{FailureStatus, ProcessingStatus}
-import io.renku.metrics.LabeledHistogram
+import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 import skunk.Session
 
@@ -37,7 +36,7 @@ private trait DBUpdater[F[_], E <: StatusChangeEvent] {
 private object DBUpdater {
 
   type EventUpdaterFactory[F[_], E <: StatusChangeEvent] =
-    (StatusChangeEventsQueue[F], DeliveryInfoRemover[F], LabeledHistogram[F, SqlStatement.Name]) => F[DBUpdater[F, E]]
+    (StatusChangeEventsQueue[F], DeliveryInfoRemover[F], LabeledHistogram[F]) => F[DBUpdater[F, E]]
 
   implicit def factoryToTriplesGeneratorUpdater[F[_]: Async]: EventUpdaterFactory[F, ToTriplesGenerated] =
     (_, infoRemover, execTimes) =>
@@ -69,6 +68,7 @@ private object DBUpdater {
   implicit def factoryToProjectEventsNewHandler[F[_]: Async: Logger]: EventUpdaterFactory[F, ProjectEventsToNew] =
     (eventsQueue, _, _) => new ProjectEventsToNewHandler[F](eventsQueue).pure[F].widen[DBUpdater[F, ProjectEventsToNew]]
 
-  implicit def factoryToAllEventsNewUpdater[F[_]: Async: Logger]: EventUpdaterFactory[F, AllEventsToNew] =
+  implicit def factoryToAllEventsNewUpdater[F[_]: Async: Logger: MetricsRegistry]
+      : EventUpdaterFactory[F, AllEventsToNew] =
     (_, _, execTimes) => AllEventsToNewUpdater(execTimes).widen[DBUpdater[F, AllEventsToNew]]
 }

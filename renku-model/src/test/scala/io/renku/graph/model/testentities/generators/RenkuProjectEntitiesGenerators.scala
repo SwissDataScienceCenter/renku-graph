@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonNegativeInts, positiveInts}
-import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates, projectDescriptions, projectIds, projectKeywords, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, userEmails, userGitLabIds, userNames, usernames}
+import io.renku.graph.model.GraphModelGenerators.{cliVersions, personEmails, personGitLabIds, personNames, projectCreatedDates, projectDescriptions, projectIds, projectKeywords, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, usernames}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects.{ForksCount, Visibility}
@@ -130,14 +130,14 @@ trait RenkuProjectEntitiesGenerators {
   )
 
   implicit lazy val projectMembersNoEmail: Gen[ProjectMemberNoEmail] = for {
-    name     <- userNames
+    name     <- personNames
     username <- usernames
-    gitLabId <- userGitLabIds
+    gitLabId <- personGitLabIds
   } yield ProjectMemberNoEmail(name, username, gitLabId)
 
   implicit lazy val projectMembersWithEmail: Gen[ProjectMemberWithEmail] = for {
     memberNoEmail <- projectMembersNoEmail
-    email         <- userEmails
+    email         <- personEmails
   } yield memberNoEmail add email
 
   lazy val projectMembers: Gen[ProjectMember] = Gen.oneOf(projectMembersNoEmail, projectMembersWithEmail)

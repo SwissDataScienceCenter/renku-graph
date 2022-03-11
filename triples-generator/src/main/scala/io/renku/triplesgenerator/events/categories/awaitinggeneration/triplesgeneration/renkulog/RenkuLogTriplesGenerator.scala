@@ -18,23 +18,24 @@
 
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT._
 import cats.effect.Async
 import cats.effect.implicits._
 import cats.syntax.all._
-import cats.{Applicative, MonadThrow}
 import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import io.renku.graph.model.{RenkuBaseUrl, entities, projects}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.{JsonLD, Property}
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl, RepositoryPath}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, logMessageCommon}
+import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
 
 import java.security.SecureRandom
+import scala.util.control.NonFatal
 
 private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[renkulog] (
     gitRepoUrlFinder:    GitLabRepoUrlFinder[F],
@@ -45,10 +46,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
 )(implicit renkuBaseUrl: RenkuBaseUrl)
     extends TriplesGenerator[F] {
 
-  private val applicative = Applicative[F]
-
   import ammonite.ops.{Path, root}
-  import applicative._
   import file._
   import gitRepoUrlFinder._
   import io.renku.jsonld.syntax._
@@ -92,14 +90,20 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
 
   private def cleanUpRepository()(implicit repoDirectory: RepositoryPath): F[Unit] = {
     val gitAttributeFilePath = repoDirectory.value / gitAttributeFileName
-    file.exists(gitAttributeFilePath) >>= {
+    (file exists gitAttributeFilePath) >>= {
       case false => MonadThrow[F].unit
       case true =>
-        for {
-          repoDirty <- git.status.map(status => !status.contains("nothing to commit"))
-          _         <- whenA(repoDirty)(git.rm(gitAttributeFilePath))
-          _         <- whenA(repoDirty)(git.`reset --hard`)
-        } yield ()
+        git.status.map(status => !status.contains("nothing to commit")) >>= {
+          case true =>
+            for {
+              _ <- git.rm(gitAttributeFilePath)
+              _ <- git.`reset --hard`
+              _ <- git.`rm --cached`
+              _ <- git.`add -A`
+              _ <- git commit "fixing dirty repo problem"
+            } yield ()
+          case false => MonadThrow[F].unit
+        }
     }
   }
 
@@ -137,18 +141,23 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
   private def meaningfulError(
       commitEvent:      CommitEvent,
       maybeAccessToken: Option[AccessToken]
-  ): PartialFunction[Throwable, F[Either[ProcessingRecoverableError, JsonLD]]] = { case exception =>
-    (Option(exception.getMessage) -> maybeAccessToken)
-      .mapN { (message, token) =>
-        if (message contains token.value)
-          new Exception(
-            s"${logMessageCommon(commitEvent)} triples generation failed: ${message.replaceAll(token.value, token.toString)}"
-          )
-        else
-          new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception)
-      }
-      .getOrElse(new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception))
-      .raiseError[F, Either[ProcessingRecoverableError, JsonLD]]
+  ): PartialFunction[Throwable, F[Either[ProcessingRecoverableError, JsonLD]]] = {
+    case ProcessingNonRecoverableError.MalformedRepository(message, cause) =>
+      ProcessingNonRecoverableError
+        .MalformedRepository(s"${logMessageCommon(commitEvent)} $message", cause)
+        .raiseError[F, Either[ProcessingRecoverableError, JsonLD]]
+    case NonFatal(exception) =>
+      (Option(exception.getMessage) -> maybeAccessToken)
+        .mapN { (message, token) =>
+          if (message contains token.value)
+            new Exception(
+              s"${logMessageCommon(commitEvent)} triples generation failed: ${message.replaceAll(token.value, token.toString)}"
+            )
+          else
+            new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception)
+        }
+        .getOrElse(new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception))
+        .raiseError[F, Either[ProcessingRecoverableError, JsonLD]]
   }
 }
 

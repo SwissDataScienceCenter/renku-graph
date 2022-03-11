@@ -32,6 +32,7 @@ import io.renku.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthU
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.testtools.IOSpec
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
@@ -160,21 +161,21 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   ) {
 
     import io.circe.Decoder._
+    import io.renku.graph.model.Schemas._
 
     def runQuery(query: String): IO[List[Map[String, String]]] =
       queryExpecting[List[Map[String, String]]] {
-        SparqlQuery(
+        SparqlQuery.of(
           name = "test query",
-          Set(
-            "PREFIX prov: <http://www.w3.org/ns/prov#>",
-            "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-            "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-            "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-            "PREFIX wfdesc: <http://purl.org/wf4ever/wfdesc#>",
-            "PREFIX wf: <http://www.w3.org/2005/01/wf/flow#>",
-            "PREFIX wfprov: <http://purl.org/wf4ever/wfprov#>",
-            "PREFIX foaf: <http://xmlns.com/foaf/0.1/>",
-            "PREFIX schema: <http://schema.org/>"
+          Prefixes.of(
+            prov   -> "prov",
+            rdf    -> "rdf",
+            rdfs   -> "rdfs",
+            renku  -> "renku",
+            wfdesc -> "wfdesc",
+            wfprov -> "wfprov",
+            schema -> "schema",
+            xsd    -> "xsd"
           ),
           query
         )

@@ -73,11 +73,10 @@ object Generators {
   def sentences(minWords: Int Refined Positive = 1, maxWords: Int Refined Positive = 10): Gen[NonBlank] =
     nonEmptyStringsList(minWords, maxWords) map (_.mkString(" ")) map Refined.unsafeApply
 
-  def sentenceContaining(phrase: NonBlank): Gen[NonBlank] =
-    for {
-      prefix <- nonEmptyStrings()
-      suffix <- nonEmptyStrings()
-    } yield Refined.unsafeApply(s"$prefix $phrase $suffix")
+  def sentenceContaining(phrase: NonBlank): Gen[String] = for {
+    prefix <- nonEmptyStrings()
+    suffix <- nonEmptyStrings()
+  } yield s"$prefix $phrase $suffix"
 
   def blankStrings(maxLength: Int Refined NonNegative = 10): Gen[String] =
     for {
@@ -142,6 +141,8 @@ object Generators {
 
   def positiveLongs(max: Long = 1000): Gen[Long Refined Positive] =
     choose(1L, max) map Refined.unsafeApply
+
+  def nonNegativeFloats(max: Float = 1000): Gen[Float Refined NonNegative] = choose(0, max) map Refined.unsafeApply
 
   def nonNegativeDoubles(max: Double = 1000d): Gen[Double Refined NonNegative] = choose(0d, max) map Refined.unsafeApply
 
@@ -232,9 +233,9 @@ object Generators {
       .choose(Instant.EPOCH.toEpochMilli, now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
-  def timestampsNotInTheFuture(butOlderThan: Instant): Gen[Instant] =
+  def timestampsNotInTheFuture(butYoungerThan: Instant): Gen[Instant] =
     Gen
-      .choose(butOlderThan.toEpochMilli, now().toEpochMilli)
+      .choose((butYoungerThan plusMillis 1).toEpochMilli, now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   val timestampsInTheFuture: Gen[Instant] =

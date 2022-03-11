@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.prometheus.client.Histogram
+import eu.timepit.refined.auto._
 import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
 import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -30,11 +30,11 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.metrics.MetricsRegistry
-import io.renku.triplesgenerator.events.categories.Errors.{AuthRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.events.categories.EventStatusUpdater
+import io.renku.metrics.{Histogram, MetricsRegistry}
 import io.renku.triplesgenerator.events.categories.EventStatusUpdater._
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
+import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
 
 import java.time.Duration
@@ -44,7 +44,7 @@ private trait EventProcessor[F[_]] {
   def process(event: CommitEvent): F[Unit]
 }
 
-private class CommitEventProcessor[F[_]: MonadThrow: Logger](
+private class EventProcessorImpl[F[_]: MonadThrow: Logger](
     accessTokenFinder:       AccessTokenFinder[F],
     triplesGenerator:        TriplesGenerator[F],
     statusUpdater:           EventStatusUpdater[F],
@@ -106,8 +106,8 @@ private class CommitEventProcessor[F[_]: MonadThrow: Logger](
           EventStatus.GenerationRecoverableFailure,
           cause,
           executionDelay = cause match {
-            case _: AuthRecoverableError => ExecutionDelay(Duration.ofHours(1))
-            case _ => ExecutionDelay(Duration.ofMinutes(5))
+            case _: AuthRecoverableError => ExecutionDelay(Duration ofHours 1)
+            case _ => ExecutionDelay(Duration ofMinutes 15)
           }
         )
       case NonRecoverableError(commit, cause) =>
@@ -128,20 +128,25 @@ private class CommitEventProcessor[F[_]: MonadThrow: Logger](
       )
   }
 
-  private def toRecoverableError(
-      commit: CommitEvent
-  ): ProcessingRecoverableError => F[TriplesGenerationResult] = { error =>
-    Logger[F]
-      .error(error)(s"${logMessageCommon(commit)} ${error.getMessage}")
-      .map(_ => RecoverableError(commit, error): TriplesGenerationResult)
+  private def toRecoverableError(commit: CommitEvent): ProcessingRecoverableError => F[TriplesGenerationResult] = {
+    case error: LogWorthyRecoverableError =>
+      Logger[F]
+        .error(error)(s"${logMessageCommon(commit)} ${error.getMessage}")
+        .map(_ => RecoverableError(commit, error))
+        .widen[TriplesGenerationResult]
+    case error => RecoverableError(commit, error).pure[F].widen[TriplesGenerationResult]
   }
 
   private def toNonRecoverableFailure(
       commit: CommitEvent
-  ): PartialFunction[Throwable, F[TriplesGenerationResult]] = { case NonFatal(exception) =>
-    Logger[F]
-      .error(exception)(s"${logMessageCommon(commit)} failed")
-      .map(_ => NonRecoverableError(commit, exception): TriplesGenerationResult)
+  ): PartialFunction[Throwable, F[TriplesGenerationResult]] = {
+    case exception: ProcessingNonRecoverableError.MalformedRepository =>
+      NonRecoverableError(commit, exception).pure[F].widen[TriplesGenerationResult]
+    case NonFatal(exception) =>
+      Logger[F]
+        .error(exception)(s"${logMessageCommon(commit)} failed")
+        .map(_ => NonRecoverableError(commit, exception))
+        .widen[TriplesGenerationResult]
   }
 
   private def logSummary: ((ElapsedTime, TriplesGenerationResult)) => F[Unit] = {
@@ -179,24 +184,21 @@ private class CommitEventProcessor[F[_]: MonadThrow: Logger](
   }
 }
 
-private object CommitEventProcessor {
+private object EventProcessor {
 
-  private[events] lazy val eventsProcessingTimesBuilder =
-    Histogram
-      .build()
-      .name("triples_generation_processing_times")
-      .help("Triples generation processing times")
-      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000,
-               50000000, 100000000, 500000000)
-
-  def apply[F[_]: Async: Logger](metricsRegistry: MetricsRegistry): F[CommitEventProcessor[F]] = for {
-    triplesGenerator        <- TriplesGenerator()
-    accessTokenFinder       <- AccessTokenFinder[F]
-    eventStatusUpdater      <- EventStatusUpdater(categoryName)
-    eventsProcessingTimes   <- metricsRegistry.register[F, Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
-    allEventsTimeRecorder   <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[EventProcessor[F]] = for {
+    triplesGenerator   <- TriplesGenerator()
+    accessTokenFinder  <- AccessTokenFinder[F]
+    eventStatusUpdater <- EventStatusUpdater(categoryName)
+    histogram <- Histogram[F](
+                   name = "triples_generation_processing_times",
+                   help = "Triples generation processing times",
+                   buckets = Seq(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000,
+                                 5000000, 10000000, 50000000, 100000000, 500000000)
+                 )
+    allEventsTimeRecorder   <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
     singleEventTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
-  } yield new CommitEventProcessor(
+  } yield new EventProcessorImpl(
     accessTokenFinder,
     triplesGenerator,
     eventStatusUpdater,

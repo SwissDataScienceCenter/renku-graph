@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.subscriptions
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
 import io.renku.tinytypes.json.TinyTypeEncoders
@@ -32,6 +32,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 import io.renku.graph.model.events.EventStatus._
+import io.renku.metrics.MetricsRegistry
 
 private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
     eventSender: EventSender[F]
@@ -41,8 +42,10 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
   override def returnToQueue(event: CleanUpEvent): F[Unit] =
     eventSender.sendEvent(
       sendEventPayload(event),
-      errorMessage =
+      EventSender.EventContext(
+        CategoryName("EVENTS_STATUS_CHANGE"),
         s"${SubscriptionCategory.name}: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
+      )
     )
 
   override def recover(
@@ -50,7 +53,9 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
       event: CleanUpEvent
   ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $AwaitingDeletion"
-    eventSender.sendEvent(sendEventPayload(event), errorMessage) >> Logger[F].error(exception)(errorMessage)
+    eventSender.sendEvent(sendEventPayload(event),
+                          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), errorMessage)
+    ) >> Logger[F].error(exception)(errorMessage)
   }
 
   private def sendEventPayload(event: CleanUpEvent) =
@@ -68,7 +73,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
 }
 
 private object DispatchRecovery {
-  def apply[F[_]: Async: Logger]: F[DispatchRecovery[F, CleanUpEvent]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[DispatchRecovery[F, CleanUpEvent]] = for {
     eventSender <- EventSender[F]
   } yield new DispatchRecoveryImpl[F](eventSender)
 }

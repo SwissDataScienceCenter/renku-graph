@@ -233,4 +233,17 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       json.hcursor.downField("@id").as[String] shouldBe Right(derivedFrom.toString)
     }
   }
+
+  "Date" should {
+
+    "provide encoder if it's a DateCreated" in {
+      val date: DateCreated = datasetCreatedDates().generateOne
+      date.asInstanceOf[Date].asJson shouldBe date.value.asJson
+    }
+
+    "provide encoder if it's a DatePublished" in {
+      val date: DatePublished = datasetPublishedDates().generateOne
+      date.asInstanceOf[Date].asJson shouldBe date.value.asJson
+    }
+  }
 }

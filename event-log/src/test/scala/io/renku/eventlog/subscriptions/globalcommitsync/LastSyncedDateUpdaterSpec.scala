@@ -26,12 +26,13 @@ import io.renku.db.SqlStatement.Name
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
+import io.renku.events.CategoryName
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.lastSyncedDates
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.graph.model.events.{CategoryName, LastSyncedDate}
+import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
@@ -97,7 +98,7 @@ class LastSyncedDateUpdaterSpec
 
   private trait TestCase {
     val project = consumerProjects.generateOne
-    val updater = new LastSyncedDateUpdateImpl[IO](sessionResource, TestLabeledHistogram[Name]("query_id"))
+    val updater = new LastSyncedDateUpdateImpl[IO](TestLabeledHistogram[Name]("query_id"))
 
     upsertProject(project.id, project.path, eventDates.generateOne)
   }

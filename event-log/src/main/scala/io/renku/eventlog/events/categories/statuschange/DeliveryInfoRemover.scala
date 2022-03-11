@@ -35,14 +35,14 @@ private trait DeliveryInfoRemover[F[_]] {
 
 private object DeliveryInfoRemover {
   def apply[F[_]: MonadCancelThrow](
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes: LabeledHistogram[F]
   ): F[DeliveryInfoRemover[F]] = MonadThrow[F].catchNonFatal {
     new DeliveryInfoRemoverImpl[F](queriesExecTimes)
   }
 }
 
 private class DeliveryInfoRemoverImpl[F[_]: MonadCancelThrow](
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with DeliveryInfoRemover[F]
     with TypeSerializers {

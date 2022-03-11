@@ -68,7 +68,7 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
           .expects(projectPath)
           .returning(membersInKG.pure[Try])
 
-        val missingMembersWithIds = Set(gitLabMemberMissingInKG -> userResourceIds.generateOption)
+        val missingMembersWithIds = Set(gitLabMemberMissingInKG -> personResourceIds.generateOption)
         (kGPersonFinder
           .findPersonIds(_: Set[GitLabProjectMember]))
           .expects(Set(gitLabMemberMissingInKG))

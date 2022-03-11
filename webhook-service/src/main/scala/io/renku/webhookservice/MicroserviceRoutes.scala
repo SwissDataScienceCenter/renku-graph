@@ -79,8 +79,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: Logger](
-      metricsRegistry:       MetricsRegistry,
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[MicroserviceRoutes[F]] = for {
@@ -105,6 +104,6 @@ private object MicroserviceRoutes {
     hookDeletionEndpoint,
     processingStatusEndpoint,
     authMiddleware,
-    new RoutesMetrics[F](metricsRegistry)
+    new RoutesMetrics[F]
   )
 }

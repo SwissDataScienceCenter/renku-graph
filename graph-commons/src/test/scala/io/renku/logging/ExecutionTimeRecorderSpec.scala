@@ -24,13 +24,13 @@ import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.prometheus.client.Histogram
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.metrics.{Histogram, LabeledHistogram, SingleValueHistogram}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen.finiteDuration
 import org.scalamock.scalatest.MockFactory
@@ -59,7 +59,7 @@ class ExecutionTimeRecorderSpec
 
       val actualElapsedTime -> actualOut = executionTimeRecorder.measureExecutionTime[String](block()).unsafeRunSync()
 
-      actualElapsedTime should be > elapsedTime
+      actualElapsedTime should be >= elapsedTime
       actualOut       shouldBe blockOut
     }
 
@@ -76,7 +76,11 @@ class ExecutionTimeRecorderSpec
     }
 
     "made the given histogram to collect process' execution time - case without a label" in new TestCase {
-      val histogram                      = Histogram.build("metric", "help").create()
+      val histogram      = mock[SingleValueHistogram[IO]]
+      val histogramTimer = mock[Histogram.Timer[IO]]
+      (histogram.startTimer _).expects().returning(histogramTimer.pure[IO])
+      (() => histogramTimer.observeDuration).expects().returning(nonNegativeDoubles().generateOne.value.pure[IO])
+
       override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
@@ -88,15 +92,15 @@ class ExecutionTimeRecorderSpec
           Temporal[IO].delayBy(block(), blockExecutionTime millis)
         }
         .unsafeRunSync()
-
-      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
-      sample.value                should be >= blockExecutionTime.toDouble / 1000
-      sample.labelNames.asScala shouldBe empty
     }
 
     "made the given histogram to collect process' execution time - case with a label" in new TestCase {
       val label: String Refined NonEmpty = "label"
-      val histogram                      = Histogram.build("metric", "help").labelNames(label.value).create()
+      val histogram      = mock[LabeledHistogram[IO]]
+      val histogramTimer = mock[Histogram.Timer[IO]]
+      (histogram.startTimer _).expects(label.value).returning(histogramTimer.pure[IO])
+      (() => histogramTimer.observeDuration).expects().returning(nonNegativeDoubles().generateOne.value.pure[IO])
+
       override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
@@ -109,16 +113,18 @@ class ExecutionTimeRecorderSpec
           Some(label)
         )
         .unsafeRunSync()
-
-      val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
-      sample.value              should be >= blockExecutionTime.toDouble / 1000
-      sample.labelNames.asScala should contain only label.value
     }
 
     "log an error when collecting process' execution time fails due to histogram misconfiguration" in new TestCase {
-      val label: String Refined NonEmpty = "label"
-      val histogramName                  = "metric"
-      val histogram                      = Histogram.build(histogramName, "help").labelNames(label.value).create()
+      val histogram = new LabeledHistogram[IO] {
+        override val name = "metric"
+        override val help = "help"
+        override def startTimer(labelValue: String) = {
+          labelValue shouldBe "label"
+          mock[Histogram.Timer[IO]].pure[IO]
+        }
+      }
+
       override val executionTimeRecorder = new ExecutionTimeRecorderImpl(loggingThreshold, Some(histogram))
 
       val blockOut = nonEmptyStrings().generateOne
@@ -131,9 +137,7 @@ class ExecutionTimeRecorderSpec
         }
         .unsafeRunSync()
 
-      histogram.collect().asScala.flatMap(_.samples.asScala).lastOption shouldBe None
-
-      logger.loggedOnly(Error(s"$histogramName histogram labels not configured correctly"))
+      logger.loggedOnly(Error(s"No label sent for a Labeled Histogram ${histogram.name}"))
     }
   }
 

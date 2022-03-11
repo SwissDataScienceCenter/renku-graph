@@ -21,33 +21,35 @@ package io.renku.eventlog.events.categories.statuschange
 import cats.data.EitherT
 import cats.effect.{Async, Spawn}
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
+import cats.{Applicative, MonadThrow, Show}
 import io.circe.DecodingFailure
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.EventMessage
 import io.renku.eventlog.events.categories.statuschange.DBUpdater.EventUpdaterFactory
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent._
-import io.renku.eventlog.{EventLogDB, EventMessage}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.renku.events.consumers._
-import io.renku.events.{EventRequestContent, consumers}
+import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 import java.time.{Duration => JDuration}
 import scala.util.control.NonFatal
 
-private class EventHandler[F[_]: Async: Logger](
+private class EventHandler[F[_]: Async: Logger: MetricsRegistry](
     override val categoryName: CategoryName,
     eventsQueue:               StatusChangeEventsQueue[F],
     statusChanger:             StatusChanger[F],
     deliveryInfoRemover:       DeliveryInfoRemover[F],
-    queriesExecTimes:          LabeledHistogram[F, SqlStatement.Name]
+    queriesExecTimes:          LabeledHistogram[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
+  private val applicative = Applicative[F]
   import EventHandler._
+  import applicative.whenA
 
   override def createHandlingProcess(
       request: EventRequestContent
@@ -91,24 +93,26 @@ private class EventHandler[F[_]: Async: Logger](
     Spawn[F]
       .start(executeUpdate(event))
       .map(_ => Accepted)
-      .flatTap(Logger[F].log(event.show))
+      .flatTap(logAccepted(event))
 
   private def executeUpdate[E <: StatusChangeEvent](
       event:                 E
-  )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = (for {
-    factory <- updaterFactory(eventsQueue, deliveryInfoRemover, queriesExecTimes)
-    result <- statusChanger
-                .updateStatuses(event)(factory)
-                .flatTap(_ => Logger[F].logInfo(event, "Processed"))
-  } yield result) recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
+  )(implicit updaterFactory: EventUpdaterFactory[F, E], show: Show[E]) = {
+    for {
+      factory <- updaterFactory(eventsQueue, deliveryInfoRemover, queriesExecTimes)
+      result  <- statusChanger.updateStatuses(event)(factory)
+    } yield result
+  } recoverWith { case NonFatal(e) => Logger[F].logError(event, e) >> e.raiseError[F, Unit] }
+
+  private def logAccepted[E <: StatusChangeEvent](event: E)(implicit show: Show[E]): Accepted => F[Unit] =
+    accepted => whenA(!event.silent)(Logger[F].log(event.show)(accepted))
 }
 
 private object EventHandler {
 
-  def apply[F[_]: Async: Logger](
-      sessionResource:                    SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
       eventsQueue:                        StatusChangeEventsQueue[F],
-      queriesExecTimes:                   LabeledHistogram[F, SqlStatement.Name],
+      queriesExecTimes:                   LabeledHistogram[F],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
@@ -126,13 +130,13 @@ private object EventHandler {
                                                 deletingGauge
                        )
                      )
-    statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](sessionResource, gaugesUpdater))
+    statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](gaugesUpdater))
     _ <- registerHandlers(eventsQueue, statusChanger, queriesExecTimes, awaitingDeletionGauge, deletingGauge)
   } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queriesExecTimes)
 
   private def registerHandlers[F[_]: Async: Logger](eventsQueue: StatusChangeEventsQueue[F],
                                                     statusChanger:         StatusChanger[F],
-                                                    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
+                                                    queriesExecTimes:      LabeledHistogram[F],
                                                     awaitingDeletionGauge: LabeledGauge[F, projects.Path],
                                                     deletingGauge:         LabeledGauge[F, projects.Path]
   ) = for {

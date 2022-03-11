@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.users.GitLabId
+import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.{datasets, projects}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -75,14 +75,14 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger](
       for {
         visibility <- cursor.downField("visibility").downField("value").as[Visibility]
         path       <- cursor.downField("path").downField("value").as[projects.Path]
-        maybeUserId <- cursor
-                         .downField("memberGitLabIds")
-                         .downField("value")
-                         .as[Option[String]]
-                         .map(_.map(_.split(",").toList).getOrElse(List.empty))
-                         .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
-                         .map(_.toSet)
-      } yield (visibility, path, maybeUserId)
+        userIds <- cursor
+                     .downField("memberGitLabIds")
+                     .downField("value")
+                     .as[Option[String]]
+                     .map(_.map(_.split(",").toList).getOrElse(List.empty))
+                     .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
+                     .map(_.toSet)
+      } yield (visibility, path, userIds)
     }
 
     _.downField("results").downField("bindings").as(decodeList(recordDecoder))

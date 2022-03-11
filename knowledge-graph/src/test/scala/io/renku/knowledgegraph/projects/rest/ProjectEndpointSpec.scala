@@ -28,7 +28,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.SchemaVersion
 import io.renku.graph.model.projects._
-import io.renku.graph.model.users.{Email, Name => UserName}
+import io.renku.graph.model.persons.{Email, Name => UserName}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.{Href, Rel}

@@ -22,7 +22,7 @@ import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonEmptyStrings, positiveInts}
-import io.renku.graph.model.GraphModelGenerators.userEmails
+import io.renku.graph.model.GraphModelGenerators.personEmails
 import io.renku.graph.model.events.CommitId
 
 object GitLab {
@@ -31,7 +31,7 @@ object GitLab {
     "after":         ${commitId.value},
     "user_id":       ${positiveInts().generateOne.value}, 
     "user_username": ${nonEmptyStrings().generateOne},
-    "user_email":    ${userEmails.generateOne.value},
+    "user_email":    ${personEmails.generateOne.value},
     "project": {
       "id":                  ${project.id.value},
       "path_with_namespace": ${project.path.value}

@@ -26,7 +26,7 @@ import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import io.renku.graph.model.entities.Project
 import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Queries}
 import org.typelevel.log4cats.Logger

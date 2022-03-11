@@ -22,16 +22,16 @@ import cats.data.NonEmptyList
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities.Person
-import io.renku.graph.model.users
+import io.renku.graph.model.persons
 
 trait ModelImplicits {
 
   implicit class PersonOps(person: Person) {
 
-    def asMember(): (users.GitLabId, users.Username, users.Name) =
-      (person.maybeGitLabId getOrElse userGitLabIds.generateOne, usernames.generateOne, person.name)
+    def asMember(): (persons.GitLabId, persons.Username, persons.Name) =
+      (person.maybeGitLabId getOrElse personGitLabIds.generateOne, usernames.generateOne, person.name)
 
-    def asMembersList(): NonEmptyList[(users.GitLabId, users.Username, users.Name)] =
+    def asMembersList(): NonEmptyList[(persons.GitLabId, persons.Username, persons.Name)] =
       NonEmptyList.of(person.asMember())
   }
 }

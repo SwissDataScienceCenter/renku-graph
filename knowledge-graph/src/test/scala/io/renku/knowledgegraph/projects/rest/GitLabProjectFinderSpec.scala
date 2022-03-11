@@ -109,7 +109,7 @@ class GitLabProjectFinderSpec
 
     def uri(path: model.projects.Path) = uri"projects" / path.show withQueryParam ("statistics", "true")
 
-    val endpointName:         String Refined NonEmpty = "project"
+    val endpointName:         String Refined NonEmpty = "single project"
     implicit val accessToken: AccessToken             = accessTokens.generateOne
 
     val mapResponse: ResponseMappingF[IO, Option[GitLabProject]] =

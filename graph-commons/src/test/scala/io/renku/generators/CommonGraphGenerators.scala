@@ -30,7 +30,7 @@ import io.renku.crypto.AesCrypto
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GraphModelGenerators.{projectPaths, userGitLabIds}
+import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, projectPaths}
 import io.renku.graph.model.Schemas
 import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.http.client.RestClientError._
@@ -150,11 +150,12 @@ object CommonGraphGenerators {
   } yield Link(rel, href)
   implicit val linksObjects: Gen[Links] = nonEmptyList(linkObjects) map Links.apply
 
-  lazy val directions = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
+  implicit lazy val sortingDirections: Gen[SortBy.Direction] = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
+
   def sortBys[T <: SortBy](sortBy: T): Gen[T#By] =
     for {
       property  <- Gen.oneOf(sortBy.properties.toList)
-      direction <- directions
+      direction <- sortingDirections
     } yield sortBy.By(property, direction)
 
   object TestSort extends SortBy {
@@ -168,23 +169,23 @@ object CommonGraphGenerators {
 
   def testSortBys: Gen[TestSort.By] = sortBys(TestSort)
 
-  implicit val pages:    Gen[paging.model.Page]    = positiveInts(max = 100) map (_.value) map paging.model.Page.apply
-  implicit val perPages: Gen[paging.model.PerPage] = positiveInts(max = 20) map (_.value) map paging.model.PerPage.apply
+  implicit val pages: Gen[paging.model.Page] = positiveInts(max = 100) map (_.value) map paging.model.Page.apply
+  implicit val perPages: Gen[paging.model.PerPage] =
+    positiveInts(max = paging.model.PerPage.max.value).map(v => paging.model.PerPage(v.value))
   implicit val pagingRequests: Gen[PagingRequest] = for {
     page    <- pages
     perPage <- perPages
   } yield PagingRequest(page, perPage)
   implicit val totals: Gen[paging.model.Total] = nonNegativeInts() map (_.value) map paging.model.Total.apply
 
-  def pagingResponses[Result](resultsGen: Gen[Result]): Gen[PagingResponse[Result]] =
-    for {
-      page    <- pages
-      perPage <- perPages
-      results <- listOf(resultsGen, maxElements = Refined.unsafeApply(perPage.value))
-      total = Total((page.value - 1) * perPage.value + results.size)
-    } yield PagingResponse
-      .from[Try, Result](results, PagingRequest(page, perPage), total)
-      .fold(throw _, identity)
+  def pagingResponses[Result](resultsGen: Gen[Result]): Gen[PagingResponse[Result]] = for {
+    page    <- pages
+    perPage <- perPages
+    results <- listOf(resultsGen, maxElements = Refined.unsafeApply(perPage.value))
+    total = Total((page.value - 1) * perPage.value + results.size)
+  } yield PagingResponse
+    .from[Try, Result](results, PagingRequest(page, perPage), total)
+    .fold(throw _, identity)
 
   implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls() map FusekiBaseUrl.apply
 
@@ -203,7 +204,7 @@ object CommonGraphGenerators {
     SparqlQuery.Prefix("wfdesc", Schemas.wfdesc),
     SparqlQuery.Prefix("rdf", Schemas.rdf),
     SparqlQuery.Prefix("rdfs", Schemas.rdfs),
-    SparqlQuery.Prefix("xmlSchema", Schemas.xml),
+    SparqlQuery.Prefix("xsd", Schemas.xsd),
     SparqlQuery.Prefix("schema", Schemas.schema),
     SparqlQuery.Prefix("renku", Schemas.renku)
   )
@@ -252,7 +253,7 @@ object CommonGraphGenerators {
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
 
   implicit val authUsers: Gen[AuthUser] = for {
-    gitLabId    <- userGitLabIds
+    gitLabId    <- personGitLabIds
     accessToken <- accessTokens
   } yield AuthUser(gitLabId, accessToken)
 

@@ -23,11 +23,14 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventDate
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
-import io.renku.eventlog.{EventDate, EventLogDB}
+import io.renku.events.CategoryName
+import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk._
@@ -36,15 +39,14 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name],
+private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource](
+    queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, CommitSyncEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): F[Option[CommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
+  override def popEvent(): F[Option[CommitSyncEvent]] = SessionResource[F].useK(findEventAndMarkTaken)
 
   private def findEventAndMarkTaken = findEvent >>= {
     case Some((event, maybeSyncDate, Some(eventStatus))) if eventStatus == AwaitingDeletion =>
@@ -95,7 +97,9 @@ private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow](
             eventIdDecoder.opt ~ eventStatusDecoder.opt ~ projectDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
           )
           .map {
-            case Some(eventId) ~ maybeEventStatus ~ project ~ maybeLastSyncDate ~ latestEventDate =>
+            case Some(eventId: EventId) ~
+                (maybeEventStatus: Option[EventStatus]) ~
+                (project: Project) ~ (maybeLastSyncDate: Option[LastSyncedDate]) ~ (latestEventDate: EventDate) =>
               (FullCommitSyncEvent(CompoundEventId(eventId, project.id),
                                    project.path,
                                    maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
@@ -103,7 +107,7 @@ private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow](
                maybeLastSyncDate,
                maybeEventStatus
               )
-            case None ~ _ ~ project ~ maybeLastSyncDate ~ _ =>
+            case None ~ _ ~ (project: Project) ~ (maybeLastSyncDate: Option[LastSyncedDate]) ~ _ =>
               (MinimalCommitSyncEvent(project), maybeLastSyncDate, None)
           }
       )
@@ -122,33 +126,31 @@ private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow](
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(event)
     else insertLastSyncedDate(event)
 
-  private def updateLastSyncedDate(event: CommitSyncEvent) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-        .command[LastSyncedDate ~ projects.Id ~ CategoryName](
-          sql"""UPDATE subscription_category_sync_time
+  private def updateLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
+      .command[LastSyncedDate ~ projects.Id ~ CategoryName](
+        sql"""UPDATE subscription_category_sync_time
                   SET last_synced = $lastSyncedDateEncoder
                   WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
             """.command
-        )
-        .arguments(LastSyncedDate(now()) ~ event.projectId ~ categoryName)
-        .build
-    }
+      )
+      .arguments(LastSyncedDate(now()) ~ event.projectId ~ categoryName)
+      .build
+  }
 
-  private def insertLastSyncedDate(event: CommitSyncEvent) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
-        .command[projects.Id ~ CategoryName ~ LastSyncedDate](
-          sql"""INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
+  private def insertLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
+      .command[projects.Id ~ CategoryName ~ LastSyncedDate](
+        sql"""INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
                 VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
                 ON CONFLICT (project_id, category_name)
                 DO UPDATE
                   SET last_synced = EXCLUDED.last_synced
             """.command
-        )
-        .arguments(event.projectId ~ categoryName ~ LastSyncedDate(now()))
-        .build
-    }
+      )
+      .arguments(event.projectId ~ categoryName ~ LastSyncedDate(now()))
+      .build
+  }
 
   private implicit class SyncEventOps(commitSyncEvent: CommitSyncEvent) {
     lazy val projectId: projects.Id = commitSyncEvent match {
@@ -164,10 +166,9 @@ private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow](
 }
 
 private object CommitSyncEventFinder {
-  def apply[F[_]: MonadCancelThrow](
-      sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: MonadCancelThrow: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, CommitSyncEvent]] = MonadThrow[F].catchNonFatal {
-    new CommitSyncEventFinderImpl(sessionResource, queriesExecTimes)
+    new CommitSyncEventFinderImpl(queriesExecTimes)
   }
 }

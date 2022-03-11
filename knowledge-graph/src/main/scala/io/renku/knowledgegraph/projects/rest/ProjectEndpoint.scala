@@ -29,6 +29,7 @@ import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.json.JsonOps._
+import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsEndpoint
 import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.knowledgegraph.projects.model._
 import io.renku.logging.ExecutionTimeRecorder
@@ -96,8 +97,8 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
       "permissions":${project.permissions},
       "statistics": ${project.statistics}
     }""" deepMerge _links(
-      Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
-      Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
+      Link(Rel.Self        -> ProjectEndpoint.href(renkuResourcesUrl, project.path)),
+      Link(Rel("datasets") -> ProjectDatasetsEndpoint.href(renkuResourcesUrl, project.path))
     ).addIfDefined("description" -> project.maybeDescription)
       .addIfDefined("version" -> project.maybeVersion)
   }
@@ -182,4 +183,7 @@ object ProjectEndpoint {
     renkuResourceUrl,
     executionTimeRecorder
   )
+
+  def href(renkuResourcesUrl: renku.ResourcesUrl, projectPath: projects.Path): Href =
+    Href(renkuResourcesUrl / "projects" / projectPath)
 }

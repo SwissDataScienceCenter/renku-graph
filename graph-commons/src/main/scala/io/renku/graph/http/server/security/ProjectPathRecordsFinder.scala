@@ -25,7 +25,7 @@ import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityR
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.projects.Visibility._
-import io.renku.graph.model.users.GitLabId
+import io.renku.graph.model.persons.GitLabId
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger

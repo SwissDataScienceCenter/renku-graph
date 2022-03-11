@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.datasets
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
-import io.renku.graph.model.users.{Affiliation, Email, Name => UserName}
+import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 
 object model {
 

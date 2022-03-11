@@ -21,8 +21,7 @@ package io.renku.eventlog.events.categories.statuschange
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import io.renku.db.SessionResource
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.EventLogDB.SessionResource
 import skunk.Transaction
 
 import scala.util.control.NonFatal
@@ -31,15 +30,13 @@ private trait StatusChanger[F[_]] {
   def updateStatuses[E <: StatusChangeEvent](event: E)(implicit dbUpdater: DBUpdater[F, E]): F[Unit]
 }
 
-private class StatusChangerImpl[F[_]: MonadCancelThrow](
-    sessionResource: SessionResource[F, EventLogDB],
-    gaugesUpdater:   GaugesUpdater[F]
-) extends StatusChanger[F] {
+private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesUpdater: GaugesUpdater[F])
+    extends StatusChanger[F] {
 
   import gaugesUpdater._
 
   override def updateStatuses[E <: StatusChangeEvent](event: E)(implicit dbUpdater: DBUpdater[F, E]): F[Unit] =
-    sessionResource.useWithTransactionK {
+    SessionResource[F].useWithTransactionK {
       Kleisli { case (transaction, session) =>
         {
           for {
@@ -57,7 +54,7 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow](
     Kleisli.liftF {
       for {
         _ <- transaction.rollback(savepoint)
-        _ <- sessionResource.useK(dbUpdater onRollback event)
+        _ <- SessionResource[F].useK(dbUpdater onRollback event)
         _ <- err.raiseError[F, DBUpdateResults]
       } yield DBUpdateResults.ForProjects.empty
     }

@@ -30,7 +30,10 @@ object model {
 
   final class PerPage private (val value: Int) extends AnyVal with IntTinyType
   implicit object PerPage extends TinyTypeFactory[PerPage](new PerPage(_)) with PositiveInt {
-    val default: PerPage = PerPage(20)
+    addConstraint(_ <= max.value, v => s"'$v' not a valid $typeName value. Max value is ${PerPage.max}")
+
+    lazy val default: PerPage = PerPage(20)
+    lazy val max:     PerPage = new PerPage(100)
   }
 
   final class Total private (val value: Int) extends AnyVal with IntTinyType

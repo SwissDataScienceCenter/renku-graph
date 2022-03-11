@@ -18,11 +18,11 @@
 
 package io.renku.eventlog.events.categories.statuschange
 
-import cats.effect.{IO, Ref}
+import cats.effect.{Async, IO, Ref}
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.syntax._
-import io.renku.db.{SessionResource, SqlStatement}
+import io.renku.db.SqlStatement
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.categories.statuschange.Generators.projectEventToNewEvents
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
@@ -114,7 +114,7 @@ class StatusChangeEventsQueueSpec
     }
 
     "continue if there are general problems with dequeueing" in {
-      val failingSessionResource = new SessionResource[IO, EventLogDB](
+      val failingSessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
         Session.single[IO](
           host = container.host,
           port = positiveInts().generateOne.value,
@@ -123,9 +123,9 @@ class StatusChangeEventsQueueSpec
           password = Some(nonEmptyStrings().generateOne)
         )
       )
-      implicit val logger: TestLogger[IO] = TestLogger[IO]()
+      val logger: TestLogger[IO] = TestLogger[IO]()
       val queryExec = TestLabeledHistogram[SqlStatement.Name]("query_id")
-      val queue     = new StatusChangeEventsQueueImpl[IO](failingSessionResource, queryExec)
+      val queue = new StatusChangeEventsQueueImpl[IO](queryExec)(implicitly[Async[IO]], logger, failingSessionResource)
 
       val handler: ProjectEventsToNew => IO[Unit] = _ => ().pure[IO]
       queue.register(handler).unsafeRunSync()
@@ -148,6 +148,6 @@ class StatusChangeEventsQueueSpec
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val queryExec = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val queue     = new StatusChangeEventsQueueImpl[IO](sessionResource, queryExec)
+    val queue     = new StatusChangeEventsQueueImpl[IO](queryExec)
   }
 }

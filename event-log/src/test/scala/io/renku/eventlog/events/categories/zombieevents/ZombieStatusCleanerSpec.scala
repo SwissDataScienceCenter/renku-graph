@@ -79,12 +79,12 @@ class ZombieStatusCleanerSpec
         addZombieEvent(GeneratingTriples)
         upsertEventDeliveryInfo(eventId)
 
-        findEvent(eventId)          shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
+        findEvent(eventId)               shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
         findAllEventDeliveries.map(_._1) shouldBe List(eventId)
 
         updater.cleanZombieStatus(GeneratingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
-        findEvent(eventId)          shouldBe (ExecutionDate(now), New, None).some
+        findEvent(eventId)               shouldBe (ExecutionDate(now), New, None).some
         findAllEventDeliveries.map(_._1) shouldBe Nil
 
         queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
@@ -96,12 +96,12 @@ class ZombieStatusCleanerSpec
         addZombieEvent(TransformingTriples)
         upsertEventDeliveryInfo(eventId)
 
-        findEvent(eventId)          shouldBe (executionDate, TransformingTriples, Some(zombieMessage)).some
+        findEvent(eventId)               shouldBe (executionDate, TransformingTriples, Some(zombieMessage)).some
         findAllEventDeliveries.map(_._1) shouldBe List(eventId)
 
         updater.cleanZombieStatus(TransformingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
-        findEvent(eventId)          shouldBe (ExecutionDate(now), TriplesGenerated, None).some
+        findEvent(eventId)               shouldBe (ExecutionDate(now), TriplesGenerated, None).some
         findAllEventDeliveries.map(_._1) shouldBe Nil
 
         queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
@@ -128,7 +128,7 @@ class ZombieStatusCleanerSpec
   private trait TestCase {
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val updater          = new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes, currentTime)
+    val updater          = new ZombieStatusCleanerImpl(queriesExecTimes, currentTime)
 
     val eventId       = compoundEventIds.generateOne
     val projectPath   = projectPaths.generateOne

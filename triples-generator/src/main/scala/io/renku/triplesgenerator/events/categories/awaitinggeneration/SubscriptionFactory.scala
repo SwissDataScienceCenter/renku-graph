@@ -26,10 +26,8 @@ import io.renku.triplesgenerator.events.categories.awaitinggeneration.subscripti
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: Async: Logger](
-      metricsRegistry: MetricsRegistry
-  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism[F](categoryName, payloadsComposerFactory)
-    handler               <- EventHandler(metricsRegistry, subscriptionMechanism)
+    handler               <- EventHandler(subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

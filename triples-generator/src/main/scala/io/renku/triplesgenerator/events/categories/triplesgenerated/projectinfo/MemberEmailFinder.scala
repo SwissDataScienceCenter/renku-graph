@@ -32,9 +32,9 @@ import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.{GitLabApiUrl, projects, users}
+import io.renku.graph.model.{GitLabApiUrl, persons, projects}
 import io.renku.http.client.{AccessToken, RestClient}
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
 import org.http4s.Method.GET
 import org.http4s.dsl.io.{NotFound, Ok}
@@ -101,7 +101,7 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
     }
 
   private def addEmailOrCheckNextPage(member:     ProjectMemberNoEmail,
-                                      maybeEmail: Option[users.Email],
+                                      maybeEmail: Option[persons.Email],
                                       project:    Project,
                                       paging:     PagingInfo
   )(implicit maybeAccessToken:                    Option[AccessToken]) = maybeEmail match {
@@ -127,9 +127,9 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
 
   private def matchEmailFromCommits(events:  List[PushEvent],
                                     project: Project,
-                                    maybeEmail: EitherT[F, ProcessingRecoverableError, Option[users.Email]] =
-                                      rightT[F, ProcessingRecoverableError](Option.empty[users.Email])
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[users.Email]] =
+                                    maybeEmail: EitherT[F, ProcessingRecoverableError, Option[persons.Email]] =
+                                      rightT[F, ProcessingRecoverableError](Option.empty[persons.Email])
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[F, ProcessingRecoverableError, Option[persons.Email]] =
     maybeEmail >>= {
       case someEmail @ Some(_) => rightT[F, ProcessingRecoverableError](someEmail)
       case none =>
@@ -163,8 +163,8 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
         projectId  <- cursor.downField("project_id").as[projects.Id]
         commitFrom <- cursor.downField("push_data").downField("commit_from").as[Option[CommitId]]
         commitTo   <- cursor.downField("push_data").downField("commit_to").as[Option[CommitId]]
-        authorId   <- cursor.downField("author").downField("id").as[users.GitLabId]
-        authorName <- cursor.downField("author").downField("name").as[users.Name]
+        authorId   <- cursor.downField("author").downField("id").as[persons.GitLabId]
+        authorName <- cursor.downField("author").downField("name").as[persons.Name]
       } yield (commitTo orElse commitFrom).map(PushEvent(projectId, _, authorId, authorName))
 
     jsonOf[F, List[Option[PushEvent]]].map(_.flatten)
@@ -172,8 +172,8 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
 
   private case class PushEvent(projectId:  projects.Id,
                                commitId:   CommitId,
-                               authorId:   users.GitLabId,
-                               authorName: users.Name
+                               authorId:   persons.GitLabId,
+                               authorName: persons.Name
   )
 
   private case class PagingInfo(maybeNextPage: Option[Int], maybeTotalPages: Option[Int]) {

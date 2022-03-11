@@ -22,6 +22,7 @@ import cats.data.Kleisli
 import io.circe.Json
 import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog.subscriptions.eventdelivery._
+import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
@@ -29,7 +30,7 @@ import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
-import io.renku.graph.model.events.{BatchDate, CategoryName, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, LastSyncedDate, ZippedEventPayload}
+import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, LastSyncedDate, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.microservices.MicroserviceBaseUrl
@@ -46,12 +47,13 @@ trait EventLogDataProvisioning {
   protected def storeGeneratedEvent(status:      EventStatus,
                                     eventDate:   EventDate,
                                     projectId:   projects.Id,
-                                    projectPath: projects.Path
+                                    projectPath: projects.Path,
+                                    message:     Option[EventMessage] = None
   ): (EventId, EventStatus, Option[EventMessage], Option[ZippedEventPayload], List[EventProcessingTime]) = {
     val eventId = CompoundEventId(eventIds.generateOne, projectId)
     val maybeMessage = status match {
-      case _: EventStatus.FailureStatus => eventMessages.generateSome
-      case _ => eventMessages.generateOption
+      case _: EventStatus.FailureStatus => message orElse eventMessages.generateSome
+      case _ => message orElse eventMessages.generateOption
     }
     val maybePayload = status match {
       case TriplesGenerated | TransformingTriples | TriplesStore => zippedEventPayloads.generateSome

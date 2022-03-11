@@ -33,7 +33,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status
-import org.http4s.Status.{InternalServerError, Unauthorized}
+import org.http4s.Status.{Forbidden, InternalServerError, NotFound, ServiceUnavailable, Unauthorized}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,7 +47,7 @@ class ProjectWebhookAndTokenRemoverSpec
 
   "removeWebhookAndToken" should {
 
-    "remove the token and the web hook of the specified project" in new TestCase {
+    "remove the token and the webhook of the specified project" in new TestCase {
       (accesTokenFinder
         .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
         .expects(project.id, AccessTokenFinder.projectIdToPath)
@@ -63,6 +63,28 @@ class ProjectWebhookAndTokenRemoverSpec
       }
 
       webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync() shouldBe ()
+    }
+
+    NotFound :: Unauthorized :: Forbidden :: Nil foreach { status =>
+      s"remove the token even if the webhook removal returned $status" in new TestCase {
+        (accesTokenFinder
+          .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+          .expects(project.id, AccessTokenFinder.projectIdToPath)
+          .returns(accessToken.some.pure[IO])
+        stubFor {
+          delete(s"/projects/${project.id}/webhooks")
+            .withAccessToken(accessToken.some)
+            .willReturn(aResponse().withStatus(status.code))
+        }
+        stubFor {
+          delete(s"/projects/${project.id}/tokens")
+            .willReturn(noContent())
+        }
+
+        webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync() shouldBe ()
+
+        logger.expectNoLogs()
+      }
     }
 
     "do nothing when the tokenFinder returns no token for the project" in new TestCase {
@@ -93,11 +115,11 @@ class ProjectWebhookAndTokenRemoverSpec
       stubFor {
         delete(s"/projects/${project.id}/webhooks")
           .withAccessToken(accessToken.some)
-          .willReturn(unauthorized())
+          .willReturn(serviceUnavailable())
       }
       intercept[Exception] {
         webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync()
-      }.getMessage shouldBe s"DELETE $webhookServiceUrl/projects/${project.id}/webhooks returned ${Status.Unauthorized}; error: Removing project webhook failed with status: $Unauthorized for project: ${project.show}"
+      }.getMessage shouldBe s"DELETE $webhookServiceUrl/projects/${project.id}/webhooks returned $ServiceUnavailable; error: Removing project webhook failed with status: $ServiceUnavailable for project: ${project.show}"
     }
 
     "fail when the token deletion fails" in new TestCase {

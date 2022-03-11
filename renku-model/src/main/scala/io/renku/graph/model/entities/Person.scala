@@ -21,7 +21,7 @@ package io.renku.graph.model.entities
 import cats.data.ValidatedNel
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.users.{Affiliation, Email, GitLabId, Name, ResourceId}
+import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, ResourceId}
 import io.renku.graph.model.{GitLabApiUrl, RenkuBaseUrl}
 import io.renku.jsonld._
 

@@ -32,8 +32,8 @@ class SubscriptionCategorySyncTimeTableCreatorSpec
     with DbInitSpec
     with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: SubscriptionCategorySyncTimeTableCreatorImpl[_] => false
+  protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = allMigrations.takeWhile {
+    case _: SubscriptionCategorySyncTimeTableCreatorImpl[IO] => false
     case _ => true
   }
 
@@ -74,6 +74,6 @@ class SubscriptionCategorySyncTimeTableCreatorSpec
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tableCreator = new SubscriptionCategorySyncTimeTableCreatorImpl[IO](sessionResource)
+    val tableCreator = new SubscriptionCategorySyncTimeTableCreatorImpl[IO]
   }
 }

@@ -23,9 +23,10 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventFinder
-import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
+import io.renku.eventlog.{ExecutionDate, TypeSerializers}
 import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import io.renku.graph.model.projects
@@ -38,15 +39,14 @@ import skunk.implicits._
 import java.time.Duration
 import java.time.Instant.now
 
-private class LostZombieEventFinder[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, EventLogDB],
-    queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource](
+    queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
 
-  override def popEvent(): F[Option[ZombieEvent]] = sessionResource.useK {
+  override def popEvent(): F[Option[ZombieEvent]] = SessionResource[F].useK {
     findEvent >>= markEventTaken
   }
   private val maxDurationForEvent = EventProcessingTime(Duration.ofMinutes(5))
@@ -82,35 +82,33 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow](
     case false => None
   }
 
-  private def updateExecutionDate(eventId: CompoundEventId) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - update execution date"))
-        .command[ExecutionDate ~ EventId ~ projects.Id ~ String](
-          sql"""UPDATE event
+  private def updateExecutionDate(eventId: CompoundEventId) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - update execution date"))
+      .command[ExecutionDate ~ EventId ~ projects.Id ~ String](
+        sql"""UPDATE event
                   SET execution_date = $executionDateEncoder
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text
             """.command
-        )
-        .arguments(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage)
-        .build
-        .flatMapResult {
-          case Completion.Update(1) => true.pure[F]
-          case Completion.Update(0) => false.pure[F]
-          case completion =>
-            new Exception(
-              s"${categoryName.value.toLowerCase} - lze - update execution date failed with status $completion"
-            ).raiseError[F, Boolean]
-        }
-    }
+      )
+      .arguments(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage)
+      .build
+      .flatMapResult {
+        case Completion.Update(1) => true.pure[F]
+        case Completion.Update(0) => false.pure[F]
+        case completion =>
+          new Exception(
+            s"${categoryName.value.toLowerCase} - lze - update execution date failed with status $completion"
+          ).raiseError[F, Boolean]
+      }
+  }
 
   override val processName: ZombieEventProcess = ZombieEventProcess("lze")
 }
 
 private object LostZombieEventFinder {
-  def apply[F[_]: MonadCancelThrow](
-      sessionResource:  SessionResource[F, EventLogDB],
-      queriesExecTimes: LabeledHistogram[F, SqlStatement.Name]
+  def apply[F[_]: MonadCancelThrow: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, ZombieEvent]] = MonadThrow[F].catchNonFatal {
-    new LostZombieEventFinder(sessionResource, queriesExecTimes)
+    new LostZombieEventFinder(queriesExecTimes)
   }
 }

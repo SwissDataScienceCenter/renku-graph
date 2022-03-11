@@ -23,9 +23,9 @@ import cats.data.EitherT._
 import cats.syntax.all._
 import cats.{Monad, MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.events.EventRequestContent
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.EventSchedulingResult._
-import io.renku.graph.model.events.{CategoryName, CompoundEventId, EventId}
+import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
 import org.typelevel.log4cats.Logger
 
@@ -92,14 +92,11 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad](processesLimiter: Con
 
     def log[EventInfo](
         eventInfo: EventInfo
-    )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): F[Unit] =
-      result match {
-        case Accepted =>
-          logger.info(show"$categoryName: $eventInfo -> $result")
-        case error @ SchedulingError(exception) =>
-          logger.error(exception)(show"$categoryName: $eventInfo -> $error")
-        case _ => ME.unit
-      }
+    )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): F[Unit] = result match {
+      case Accepted                           => logger.info(show"$categoryName: $eventInfo -> $result")
+      case error @ SchedulingError(exception) => logger.error(exception)(show"$categoryName: $eventInfo -> $error")
+      case _                                  => ME.unit
+    }
 
     def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit
         show:                         Show[EventInfo]

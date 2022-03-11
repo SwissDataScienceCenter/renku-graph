@@ -18,9 +18,10 @@
 
 package io.renku.graph.model
 
+import cats.syntax.all._
 import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
-import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank, NonNegativeInt, Url}
-import io.renku.tinytypes.{InstantTinyType, IntTinyType, StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes._
+import io.renku.tinytypes.constraints._
 
 import java.time.Instant
 
@@ -31,10 +32,23 @@ object plans {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLdOps[ResourceId] {
+
+    def apply(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): ResourceId =
+      ResourceId((renkuBaseUrl / "plans" / identifier).value)
+
+    private val identifierExtractor = "^.*\\/plans\\/(.*)$".r
+    implicit lazy val toIdentifier: TinyTypeConverter[ResourceId, Identifier] = {
+      case ResourceId(identifierExtractor(id)) => Identifier(id).asRight
+      case unknown => new IllegalArgumentException(s"'$unknown' cannot be converted to a plans.Identifier").asLeft
+    }
+  }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
+
+  final class Identifier private (val value: String) extends AnyVal with StringTinyType
+  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description

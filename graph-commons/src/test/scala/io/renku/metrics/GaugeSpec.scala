@@ -18,8 +18,8 @@
 
 package io.renku.metrics
 
+import cats.MonadThrow
 import cats.syntax.all._
-import cats.{MonadError, MonadThrow}
 import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -245,13 +245,11 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
       "and return an instance of the SingleValueGauge" in new TestCase {
 
         (metricsRegistry
-          .register[Try, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
-          .expects(*, *)
-          .onCall { (builder: LibGauge.Builder, _: MonadError[Try, Throwable]) =>
-            builder.create().pure[Try]
-          }
+          .register(_: MetricsCollector with PrometheusCollector))
+          .expects(*)
+          .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[Try])
 
-        val Success(gauge) = Gauge[Try](name, help)(metricsRegistry)
+        val Success(gauge) = Gauge[Try](name, help)
 
         gauge.isInstanceOf[SingleValueGauge[Try]] shouldBe true
         gauge.name                                shouldBe name.value
@@ -265,15 +263,13 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
       "and return an instance of the LabeledGauge" in new TestCase {
 
         (metricsRegistry
-          .register[Try, LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
-          .expects(*, *)
-          .onCall { (builder: LibGauge.Builder, _: MonadError[Try, Throwable]) =>
-            builder.create().pure[Try]
-          }
+          .register(_: MetricsCollector with PrometheusCollector))
+          .expects(*)
+          .onCall((c: MetricsCollector with PrometheusCollector) => c.pure[Try])
 
         val labelName = nonBlankStrings().generateOne
 
-        val Success(gauge) = Gauge[Try, String](name, help, labelName)(metricsRegistry)
+        val Success(gauge) = Gauge[Try, String](name, help, labelName)
 
         gauge.isInstanceOf[LabeledGauge[Try, String]] shouldBe true
         gauge.name                                    shouldBe name.value
@@ -285,6 +281,6 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
     val name = nonBlankStrings().generateOne
     val help = sentences().generateOne
 
-    val metricsRegistry = mock[MetricsRegistry]
+    implicit val metricsRegistry: MetricsRegistry[Try] = mock[MetricsRegistry[Try]]
   }
 }

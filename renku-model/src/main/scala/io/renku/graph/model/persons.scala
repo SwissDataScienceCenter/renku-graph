@@ -24,7 +24,7 @@ import io.renku.graph.model.views.{EntityIdJsonLdOps, RdfResource, TinyTypeJsonL
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt}
 
-object users {
+object persons {
 
   sealed trait ResourceId extends Any with StringTinyType
   implicit object ResourceId
@@ -40,39 +40,39 @@ object users {
       message = (v: String) => s"$v is not a valid $typeName"
     )
 
-    final class GitLabIdBased private[users] (val value: String) extends AnyVal with ResourceId
+    final class GitLabIdBased private[persons] (val value: String) extends AnyVal with ResourceId
     object GitLabIdBased
         extends TinyTypeFactory[GitLabIdBased](new GitLabIdBased(_))
         with EntityIdJsonLdOps[GitLabIdBased]
         with Constraints[String]
         with NonBlank {
-      private[users] val validator = "^http(s)?://.*/persons/(\\d+)$"
+      private[persons] val validator = "^http(s)?://.*/persons/(\\d+)$"
       addConstraint(
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
       )
     }
 
-    final class EmailBased private[users] (val value: String) extends AnyVal with ResourceId
+    final class EmailBased private[persons] (val value: String) extends AnyVal with ResourceId
     object EmailBased
         extends TinyTypeFactory[EmailBased](new EmailBased(_))
         with EntityIdJsonLdOps[EmailBased]
         with Constraints[String]
         with NonBlank {
-      private[users] val validator = "^mailto:(.*)@.*$"
+      private[persons] val validator = "^mailto:(.*)@.*$"
       addConstraint(
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
       )
     }
 
-    final class NameBased private[users] (val value: String) extends AnyVal with ResourceId
+    final class NameBased private[persons] (val value: String) extends AnyVal with ResourceId
     object NameBased
         extends TinyTypeFactory[NameBased](new NameBased(_))
         with EntityIdJsonLdOps[NameBased]
         with Constraints[String]
         with NonBlank {
-      private[users] val validator = "^http(s)?://.*/persons/.+$"
+      private[persons] val validator = "^http(s)?://.*/persons/.+$"
       addConstraint(
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
@@ -130,7 +130,7 @@ object users {
     )
 
     implicit class EmailOps(email: Email) {
-      lazy val extractName: users.Name = users.Name(email.value.split('@').head)
+      lazy val extractName: persons.Name = persons.Name(email.value.split('@').head)
     }
   }
 

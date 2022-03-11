@@ -23,14 +23,15 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{Id, MonadThrow}
 import eu.timepit.refined.api.Refined
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
-import io.renku.eventlog.EventLogDB
+import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEventFinder.syncInterval
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
+import io.renku.events.CategoryName
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
-import io.renku.graph.model.events.{CategoryName, CommitId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events.{CommitId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk._
@@ -39,10 +40,9 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
-    sessionResource:       SessionResource[F, EventLogDB],
+private class GlobalCommitSyncEventFinderImpl[F[_]: Async: SessionResource](
     lastSyncedDateUpdater: LastSyncedDateUpdater[F],
-    queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name],
+    queriesExecTimes:      LabeledHistogram[F],
     now:                   () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, GlobalCommitSyncEvent]
@@ -50,7 +50,7 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
 
   import skunk.codec.all.int8
 
-  override def popEvent(): F[Option[GlobalCommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
+  override def popEvent(): F[Option[GlobalCommitSyncEvent]] = SessionResource[F].useK(findEventAndMarkTaken)
 
   private def findEventAndMarkTaken = findProject >>= updateLastSyncDate >>= findCommitsInfo
 
@@ -132,11 +132,10 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async](
 private object GlobalCommitSyncEventFinder {
   val syncInterval = Duration.ofDays(7)
 
-  def apply[F[_]: Async](
-      sessionResource:       SessionResource[F, EventLogDB],
+  def apply[F[_]: Async: SessionResource](
       lastSyncedDateUpdater: LastSyncedDateUpdater[F],
-      queriesExecTimes:      LabeledHistogram[F, SqlStatement.Name]
+      queriesExecTimes:      LabeledHistogram[F]
   ): F[EventFinder[F, GlobalCommitSyncEvent]] = MonadThrow[F].catchNonFatal(
-    new GlobalCommitSyncEventFinderImpl(sessionResource, lastSyncedDateUpdater, queriesExecTimes)
+    new GlobalCommitSyncEventFinderImpl(lastSyncedDateUpdater, queriesExecTimes)
   )
 }

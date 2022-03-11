@@ -46,31 +46,32 @@ object Microservice extends IOMicroservice {
 
   private def runMicroservice(
       sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]
-  ) = sessionPoolResource.use { sessionResource =>
-    for {
-      certificateLoader      <- CertificateLoader[IO]
-      sentryInitializer      <- SentryInitializer[IO]
-      metricsRegistry        <- MetricsRegistry[IO]()
-      queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
-      fetchTokenEndpoint     <- FetchTokenEndpoint(sessionResource, queriesExecTimes)
-      associateTokenEndpoint <- AssociateTokenEndpoint(sessionResource, queriesExecTimes)
-      dbInitializer          <- DbInitializer(sessionResource, queriesExecTimes)
-      deleteTokenEndpoint    <- DeleteTokenEndpoint(sessionResource, queriesExecTimes)
-      microserviceRoutes = new MicroserviceRoutes[IO](
-                             fetchTokenEndpoint,
-                             associateTokenEndpoint,
-                             deleteTokenEndpoint,
-                             new RoutesMetrics[IO](metricsRegistry)
-                           ).routes
-      exitcode <- microserviceRoutes.use { routes =>
-                    new MicroserviceRunner(
-                      certificateLoader,
-                      sentryInitializer,
-                      dbInitializer,
-                      HttpServer[IO](serverPort = 9003, routes)
-                    ).run()
-                  }
-    } yield exitcode
+  ) = sessionPoolResource.use { implicit sessionResource =>
+    MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
+      for {
+        certificateLoader      <- CertificateLoader[IO]
+        sentryInitializer      <- SentryInitializer[IO]
+        queriesExecTimes       <- QueriesExecutionTimes[IO]
+        fetchTokenEndpoint     <- FetchTokenEndpoint(sessionResource, queriesExecTimes)
+        associateTokenEndpoint <- AssociateTokenEndpoint(sessionResource, queriesExecTimes)
+        dbInitializer          <- DbInitializer(sessionResource, queriesExecTimes)
+        deleteTokenEndpoint    <- DeleteTokenEndpoint(sessionResource, queriesExecTimes)
+        microserviceRoutes = new MicroserviceRoutes[IO](
+                               fetchTokenEndpoint,
+                               associateTokenEndpoint,
+                               deleteTokenEndpoint,
+                               new RoutesMetrics[IO]
+                             ).routes
+        exitcode <- microserviceRoutes.use { routes =>
+                      new MicroserviceRunner(
+                        certificateLoader,
+                        sentryInitializer,
+                        dbInitializer,
+                        HttpServer[IO](serverPort = 9003, routes)
+                      ).run()
+                    }
+      } yield exitcode
+    }
   }
 }
 

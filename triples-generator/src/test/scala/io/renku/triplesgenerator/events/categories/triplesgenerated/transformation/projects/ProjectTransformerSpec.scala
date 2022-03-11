@@ -25,7 +25,7 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.projects.KGProjectFinder.KGProjectInfo

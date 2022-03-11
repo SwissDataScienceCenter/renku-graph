@@ -21,7 +21,7 @@ package io.renku.commiteventservice.events.categories.commitsync.eventgeneration
 import io.renku.commiteventservice.events.categories.common.{Author, Committer}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.users.Email
+import io.renku.graph.model.persons.Email
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

@@ -33,6 +33,7 @@ import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.knowledgegraph.datasets.model._
+import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.Response
@@ -110,8 +111,8 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
         ("images" -> (dataset.images, dataset.project).asJson).some
       ).flatten: _*
     ) deepMerge _links(
-      Rel.Self -> Href(renkuResourcesUrl / "datasets" / dataset.id),
-      Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
+      Rel.Self -> DatasetEndpoint.href(renkuResourcesUrl, dataset.id),
+      Rel("initial-version") -> DatasetEndpoint.href(renkuResourcesUrl, dataset.versions.initial.value)
     )
   }
   // format: on
@@ -149,9 +150,7 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
     json"""{
       "path": ${project.path},
       "name": ${project.name}
-    }""" deepMerge _links(
-      Link(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / project.path))
-    )
+    }""" deepMerge _links(Link(Rel("project-details") -> ProjectEndpoint.href(renkuResourcesUrl, project.path)))
   }
 
   private implicit lazy val versionsEncoder: Encoder[DatasetVersions] = Encoder.instance[DatasetVersions] { versions =>
@@ -189,4 +188,7 @@ object DatasetEndpoint {
     gitLabUrl             <- GitLabUrlLoader[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
   } yield new DatasetEndpointImpl[F](datasetFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder)
+
+  def href(renkuResourcesUrl: renku.ResourcesUrl, identifier: Identifier): Href =
+    Href(renkuResourcesUrl / "datasets" / identifier)
 }

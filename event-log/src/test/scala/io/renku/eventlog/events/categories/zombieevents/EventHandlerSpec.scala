@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories
 package zombieevents
 
-import cats.effect.IO
+import cats.effect.{Deferred, IO}
 import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.literal._
@@ -51,7 +51,7 @@ class EventHandlerSpec
 
   "handle" should {
 
-    List(Updated, NotUpdated) foreach { result =>
+    Updated :: NotUpdated :: Nil foreach { result =>
       s"decode an event with the $GeneratingTriples status from the request, " +
         "schedule event update " +
         s"and return $Accepted if the event status cleaning returned $result" in new TestCase {
@@ -64,9 +64,18 @@ class EventHandlerSpec
             .expects(event)
             .returning(result.pure[IO])
 
+          val waitForGaugeIncrement = Deferred.unsafe[IO, Unit]
+          val waitForGaugeDecrement = Deferred.unsafe[IO, Unit]
           if (result == Updated) {
-            (awaitingTriplesGenerationGauge.increment _).expects(event.projectPath).returning(IO.unit)
-            (underTriplesGenerationGauge.decrement _).expects(event.projectPath).returning(IO.unit)
+            (awaitingTriplesGenerationGauge.increment _)
+              .expects(event.projectPath)
+              .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeIncrement.complete(())))
+            (underTriplesGenerationGauge.decrement _)
+              .expects(event.projectPath)
+              .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeDecrement.complete(())))
+          } else {
+            waitForGaugeIncrement.complete(()).unsafeRunSync()
+            waitForGaugeDecrement.complete(()).unsafeRunSync()
           }
 
           handler
@@ -76,16 +85,13 @@ class EventHandlerSpec
             .value
             .unsafeRunSync() shouldBe Right(Accepted)
 
-          eventually {
-            logger.loggedOnly(
-              Info(
-                s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
-              ),
-              Info(
-                s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $result"
-              )
+          (waitForGaugeIncrement.get >> waitForGaugeDecrement.get).unsafeRunSync()
+
+          logger.loggedOnly(
+            Info(
+              s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
             )
-          }
+          )
         }
 
       s"decode an event  with the $TransformingTriples status from the request, " +
@@ -100,9 +106,18 @@ class EventHandlerSpec
             .expects(event)
             .returning(result.pure[IO])
 
+          val waitForGaugeIncrement = Deferred.unsafe[IO, Unit]
+          val waitForGaugeDecrement = Deferred.unsafe[IO, Unit]
           if (result == Updated) {
-            (awaitingTriplesTransformationGauge.increment _).expects(event.projectPath).returning(IO.unit)
-            (underTriplesTransformationGauge.decrement _).expects(event.projectPath).returning(IO.unit)
+            (awaitingTriplesTransformationGauge.increment _)
+              .expects(event.projectPath)
+              .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeIncrement.complete(())))
+            (underTriplesTransformationGauge.decrement _)
+              .expects(event.projectPath)
+              .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeDecrement.complete(())))
+          } else {
+            waitForGaugeIncrement.complete(()).unsafeRunSync()
+            waitForGaugeDecrement.complete(()).unsafeRunSync()
           }
 
           handler
@@ -110,20 +125,14 @@ class EventHandlerSpec
             .unsafeRunSync()
             .process
             .value
-            .unsafeRunSync() shouldBe Right(
-            Accepted
-          )
+            .unsafeRunSync() shouldBe Right(Accepted)
 
-          eventually {
-            logger.loggedOnly(
-              Info(
-                s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
-              ),
-              Info(
-                s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $result"
-              )
+          (waitForGaugeIncrement.get >> waitForGaugeDecrement.get).unsafeRunSync()
+          logger.loggedOnly(
+            Info(
+              s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
             )
-          }
+          )
         }
     }
 

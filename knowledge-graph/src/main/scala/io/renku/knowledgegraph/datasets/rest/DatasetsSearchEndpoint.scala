@@ -126,7 +126,7 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
         "images": ${images -> exemplarProjectPath}
       }"""
         .addIfDefined("description" -> maybeDescription)
-        .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))
+        .deepMerge(_links(Link(Rel("details") -> DatasetEndpoint.href(renkuResourcesUrl, id))))
   }
 
   private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
@@ -207,12 +207,9 @@ object DatasetsSearchEndpoint {
 
     sealed trait SearchProperty extends Property
 
-    final case object TitleProperty extends Property("title") with SearchProperty
-
-    final case object DateProperty extends Property("date") with SearchProperty
-
+    final case object TitleProperty         extends Property("title") with SearchProperty
+    final case object DateProperty          extends Property("date") with SearchProperty
     final case object DatePublishedProperty extends Property("datePublished") with SearchProperty
-
     final case object ProjectsCountProperty extends Property("projectsCount") with SearchProperty
 
     override lazy val properties: Set[SearchProperty] = Set(

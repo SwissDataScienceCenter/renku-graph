@@ -19,6 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.data.Kleisli
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.eventlog.InMemoryEventLogDb
 import io.renku.testtools.IOSpec
@@ -27,12 +28,10 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-import scala.language.reflectiveCalls
-
 trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with BeforeAndAfter {
   self: Suite with IOSpec =>
 
-  protected val migrationsToRun: List[Migration]
+  protected[init] val migrationsToRun: List[DbMigrator[IO]]
 
   before {
     findAllTables() foreach dropTable

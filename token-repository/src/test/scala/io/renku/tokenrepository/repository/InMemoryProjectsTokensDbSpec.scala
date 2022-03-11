@@ -21,24 +21,29 @@ package io.renku.tokenrepository.repository
 import AccessTokenCrypto.EncryptedAccessToken
 import cats.data.Kleisli
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.db.DbSpec
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.repository.init.DbMigrations
 import org.scalatest.TestSuite
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
 import skunk.implicits._
 
-trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb {
+import scala.language.reflectiveCalls
+
+trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb with DbMigrations {
   self: TestSuite with IOSpec =>
 
-  protected def initDb(): Unit = createTable()
+  protected def initDb(): Unit =
+    allMigrations.map(_.run()).sequence.void.unsafeRunSync()
 
   protected def prepareDbForTest(): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
       val query: Command[skunk.Void] = sql"TRUNCATE TABLE projects_tokens".command
-      session.execute(query).map(_ => ())
+      session.execute(query).void
     }
   }
 

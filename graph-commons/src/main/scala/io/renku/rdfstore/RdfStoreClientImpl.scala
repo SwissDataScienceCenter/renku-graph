@@ -43,7 +43,8 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger](
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeoutOverride:    Option[Duration] = None,
-    requestTimeoutOverride: Option[Duration] = None
+    requestTimeoutOverride: Option[Duration] = None,
+    printQueries:           Boolean = false
 ) extends RestClient(Throttler.noThrottling,
                      Some(timeRecorder.instance),
                      retryInterval,
@@ -124,9 +125,12 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger](
       decoder: Decoder[ResultType]
   ): Response[F] => F[ResultType] = _.as[ResultType](MonadThrow[F], jsonOf[F, ResultType])
 
-  private def toEntity(queryType: RdfQueryType, query: SparqlQuery): String = queryType match {
-    case _: RdfQuery => s"query=${urlEncode(query.toString)}"
-    case _ => s"update=${urlEncode(query.toString)}"
+  private def toEntity(queryType: RdfQueryType, query: SparqlQuery): String = {
+    if (printQueries) println(query)
+    queryType match {
+      case _: RdfQuery => s"query=${urlEncode(query.toString)}"
+      case _ => s"update=${urlEncode(query.toString)}"
+    }
   }
 
   private def path(queryType: RdfQueryType): String = queryType match {

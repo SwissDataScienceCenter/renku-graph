@@ -23,15 +23,13 @@ import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.prometheus.client.Histogram
 import io.renku.config.ConfigLoader.find
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
+import io.renku.metrics.{Histogram, LabeledHistogram, SingleValueHistogram}
 import io.renku.tinytypes.{LongTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import scala.util.Try
 
 abstract class ExecutionTimeRecorder[F[_]: Logger](threshold: ElapsedTime) {
 
@@ -64,40 +62,47 @@ abstract class ExecutionTimeRecorder[F[_]: Logger](threshold: ElapsedTime) {
     (condition lift blockOut) foreach (message => Logger[F].warn(s"$message in ${elapsedTime}ms"))
 }
 
-class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](threshold: ElapsedTime, maybeHistogram: Option[Histogram])
-    extends ExecutionTimeRecorder[F](threshold) {
+class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
+    threshold:      ElapsedTime,
+    maybeHistogram: Option[Histogram[F]]
+) extends ExecutionTimeRecorder[F](threshold) {
 
   override def measureExecutionTime[BlockOut](block:               => F[BlockOut],
                                               maybeHistogramLabel: Option[String Refined NonEmpty] = None
-  ): F[(ElapsedTime, BlockOut)] =
-    Clock[F]
-      .timed {
-        for {
-          maybeHistogramTimer <- Sync[F].blocking(startTimer(maybeHistogramLabel))
-          result              <- block
-          _                   <- Sync[F].blocking(maybeHistogramTimer.map(_.observeDuration()))
-        } yield result
+  ): F[(ElapsedTime, BlockOut)] = Clock[F]
+    .timed {
+      maybeHistogram match {
+        case None => block
+        case Some(histogram) =>
+          for {
+            maybeTimer <- maybeStartTimer(histogram, maybeHistogramLabel)
+            result     <- block
+            _          <- maybeTimer.map(_.observeDuration.void).getOrElse(().pure[F])
+          } yield result
       }
-      .map { case (elapsedTime, result) => ElapsedTime(elapsedTime) -> result }
-
-  private def startTimer(maybeHistogramLabel: Option[String Refined NonEmpty]) = maybeHistogram >>= { histogram =>
-    Try {
-      maybeHistogramLabel
-        .map(label => histogram.labels(label.value).startTimer())
-        .getOrElse(histogram.startTimer())
-    }.toOption.orElse {
-      val histogramName = histogram.describe().asScala.headOption.map(_.name).getOrElse("Execution Time Recorder")
-      Logger[F].error(s"$histogramName histogram labels not configured correctly")
-      None
     }
-  }
+    .map { case (elapsedTime, result) => ElapsedTime(elapsedTime) -> result }
+
+  private def maybeStartTimer(histogram: Histogram[F], maybeHistogramLabel: Option[String Refined NonEmpty]) =
+    histogram -> maybeHistogramLabel match {
+      case (h: SingleValueHistogram[F], None)    => h.startTimer().map(_.some)
+      case (h: LabeledHistogram[F], Some(label)) => h.startTimer(label.value).map(_.some)
+      case (h: SingleValueHistogram[F], Some(label)) =>
+        Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}")
+        None.pure[F]
+      case (h: LabeledHistogram[F], None) =>
+        Logger[F].error(s"No label sent for a Labeled Histogram ${h.name}")
+        None.pure[F]
+    }
 }
 
 object ExecutionTimeRecorder {
 
+  def apply[F[_]](implicit etr: ExecutionTimeRecorder[F]): ExecutionTimeRecorder[F] = etr
+
   def apply[F[_]: Sync: Logger](
       config:         Config = ConfigFactory.load(),
-      maybeHistogram: Option[Histogram] = None
+      maybeHistogram: Option[Histogram[F]] = None
   ): F[ExecutionTimeRecorder[F]] = for {
     duration <- find[F, FiniteDuration]("logging.elapsed-time-threshold", config)
   } yield new ExecutionTimeRecorderImpl(ElapsedTime(duration), maybeHistogram)

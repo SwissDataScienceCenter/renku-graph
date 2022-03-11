@@ -23,11 +23,11 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.userNames
+import io.renku.graph.model.GraphModelGenerators.personNames
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{ProjectWithQueries, Queries}
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators._
@@ -174,7 +174,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .to[entities.RenkuProject.WithoutParent]
         .copy(
           maybeCreator = person.some,
-          members = Set(person.copy(name = userNames.generateOne))
+          members = Set(person.copy(name = personNames.generateOne))
         )
       step1Transformation
         .expects(originalProject)

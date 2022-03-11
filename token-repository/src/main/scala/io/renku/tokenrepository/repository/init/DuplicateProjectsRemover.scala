@@ -51,16 +51,17 @@ private class DuplicateProjectsRemoverImpl[F[_]: MonadCancelThrow: Logger](
   private def deduplicateProjects(): Kleisli[F, Session[F], Unit] = {
 
     val query: Command[skunk.Void] =
-      sql"""DELETE FROM projects_tokens WHERE project_id IN (
-                                       SELECT project_id
-                                       FROM projects_tokens pt
-                                       JOIN (
-                                         SELECT project_path, MAX(distinct project_id) AS id_to_stay
-                                         FROM projects_tokens
-                                         GROUP BY project_path
-                                         HAVING COUNT(distinct project_id) > 1
-                                       ) pr_to_stay ON pr_to_stay.project_path = pt.project_path AND pr_to_stay.id_to_stay <> pt.project_id
-                                     )""".command
+      sql"""DELETE FROM projects_tokens 
+            WHERE project_id IN (
+              SELECT project_id
+              FROM projects_tokens pt
+              JOIN (
+                SELECT project_path, MAX(distinct project_id) AS id_to_stay
+                FROM projects_tokens
+                GROUP BY project_path
+                HAVING COUNT(distinct project_id) > 1
+              ) pr_to_stay ON pr_to_stay.project_path = pt.project_path AND pr_to_stay.id_to_stay <> pt.project_id
+            )""".command
     Kleisli(_.execute(query).void)
   }
 }
