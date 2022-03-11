@@ -19,7 +19,7 @@
 package io.renku.http.rest
 
 import cats.syntax.all._
-import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
+import org.http4s.dsl.io.OptionalValidatingQueryParamDecoderMatcher
 import org.http4s.{ParseFailure, QueryParamDecoder}
 import cats.Show
 
@@ -76,12 +76,12 @@ object SortBy {
 
   object Direction {
 
-    final case object Asc extends Direction("asc") {
+    final case object Asc extends Direction("ASC") {
       implicit lazy val ascShow: Show[Asc] = Show.show(asc => show"${asc.name}")
     }
     type Asc = Asc.type
 
-    final case object Desc extends Direction("desc") {
+    final case object Desc extends Direction("DESC") {
       implicit lazy val descShow: Show[Desc] = Show.show(desc => show"${desc.name}")
     }
     type Desc = Desc.type

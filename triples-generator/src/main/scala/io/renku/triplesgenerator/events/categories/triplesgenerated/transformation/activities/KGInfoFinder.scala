@@ -25,14 +25,14 @@ import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{activities, users}
+import io.renku.graph.model.{activities, persons}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGInfoFinder[F[_]] {
-  def findActivityAuthor(resourceId:         activities.ResourceId): F[Option[users.ResourceId]]
-  def findAssociationPersonAgent(resourceId: activities.ResourceId): F[Option[users.ResourceId]]
+  def findActivityAuthor(resourceId:         activities.ResourceId): F[Option[persons.ResourceId]]
+  def findAssociationPersonAgent(resourceId: activities.ResourceId): F[Option[persons.ResourceId]]
 }
 
 private object KGInfoFinder {
@@ -46,12 +46,12 @@ private class KGInfoFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConf
 ) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
     with KGInfoFinder[F] {
 
-  override def findActivityAuthor(resourceId: activities.ResourceId): F[Option[users.ResourceId]] =
-    queryExpecting[Set[users.ResourceId]](using = queryFindingAuthor(resourceId))
+  override def findActivityAuthor(resourceId: activities.ResourceId): F[Option[persons.ResourceId]] =
+    queryExpecting[Set[persons.ResourceId]](using = queryFindingAuthor(resourceId))
       .flatMap(toOption(resourceId, "author ResourceId"))
 
-  override def findAssociationPersonAgent(resourceId: activities.ResourceId): F[Option[users.ResourceId]] =
-    queryExpecting[Set[users.ResourceId]](using = queryFindingPersonAgent(resourceId))
+  override def findAssociationPersonAgent(resourceId: activities.ResourceId): F[Option[persons.ResourceId]] =
+    queryExpecting[Set[persons.ResourceId]](using = queryFindingPersonAgent(resourceId))
       .flatMap(toOption(resourceId, "person agent ResourceId"))
 
   private def queryFindingAuthor(resourceId: activities.ResourceId) = SparqlQuery.of(
@@ -78,11 +78,11 @@ private class KGInfoFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConf
         |""".stripMargin
   )
 
-  private implicit val authorsDecoder: Decoder[Set[users.ResourceId]] = {
+  private implicit val authorsDecoder: Decoder[Set[persons.ResourceId]] = {
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    val authorId: Decoder[users.ResourceId] =
-      _.downField("personId").downField("value").as[users.ResourceId]
+    val authorId: Decoder[persons.ResourceId] =
+      _.downField("personId").downField("value").as[persons.ResourceId]
 
     _.downField("results").downField("bindings").as(decodeList(authorId)).map(_.toSet)
   }

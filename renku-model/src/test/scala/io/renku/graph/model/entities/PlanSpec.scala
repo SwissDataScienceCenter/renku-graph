@@ -63,7 +63,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     paramFactories           <- parameterFactoryLists
     successCodes             <- planSuccessCodes.toGeneratorOfList()
   } yield Plan(
-    Plan.Id.generate,
+    planIdentifiers.generateOne,
     name,
     maybeDescription,
     maybeCommand,

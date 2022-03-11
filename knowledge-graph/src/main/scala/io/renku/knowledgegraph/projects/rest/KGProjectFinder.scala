@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.projects.rest
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects._
-import io.renku.graph.model.{SchemaVersion, users}
+import io.renku.graph.model.{SchemaVersion, persons}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder._
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -107,7 +107,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
     import Decoder._
     import io.circe.DecodingFailure
     import io.renku.graph.model.projects._
-    import io.renku.graph.model.users
+    import io.renku.graph.model.persons
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     val toSetOfKeywords: Option[String] => Decoder.Result[Set[Keyword]] =
@@ -122,16 +122,16 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](
         dateCreated       <- cursor.downField("dateCreated").downField("value").as[DateCreated]
         maybeDescription  <- cursor.downField("maybeDescription").downField("value").as[Option[Description]]
         keywords          <- cursor.downField("keywords").downField("value").as[Option[String]].flatMap(toSetOfKeywords)
-        maybeCreatorName  <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
-        maybeCreatorEmail <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[users.Email]]
+        maybeCreatorName  <- cursor.downField("maybeCreatorName").downField("value").as[Option[persons.Name]]
+        maybeCreatorEmail <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[persons.Email]]
         maybeParentId     <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
         maybeParentName   <- cursor.downField("maybeParentName").downField("value").as[Option[Name]]
         maybeParentDateCreated <- cursor.downField("maybeParentDateCreated").downField("value").as[Option[DateCreated]]
-        maybeParentCreatorName <- cursor.downField("maybeParentCreatorName").downField("value").as[Option[users.Name]]
+        maybeParentCreatorName <- cursor.downField("maybeParentCreatorName").downField("value").as[Option[persons.Name]]
         maybeParentCreatorEmail <- cursor
                                      .downField("maybeParentCreatorEmail")
                                      .downField("value")
-                                     .as[Option[users.Email]]
+                                     .as[Option[persons.Email]]
         maybeVersion <- cursor.downField("maybeSchemaVersion").downField("value").as[Option[SchemaVersion]]
       } yield KGProject(
         path,
@@ -181,7 +181,7 @@ private object KGProjectFinder {
 
   final case class KGParent(resourceId: ResourceId, name: Name, created: ProjectCreation)
 
-  final case class ProjectCreator(maybeEmail: Option[users.Email], name: users.Name)
+  final case class ProjectCreator(maybeEmail: Option[persons.Email], name: persons.Name)
 
   def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGProjectFinder[F]] = for {
     config <- RdfStoreConfig[F]()

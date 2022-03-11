@@ -23,7 +23,7 @@ import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.UrlEncoder._
-import io.renku.http.rest.SortBy.Direction.Desc
+import io.renku.http.rest.SortBy.Direction._
 import org.http4s.ParseFailure
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -50,7 +50,7 @@ class SortBySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
       val Left(exception) = TestSort.from(s"${TestSort.Name}:invalid")
 
       exception            shouldBe an[IllegalArgumentException]
-      exception.getMessage shouldBe s"'invalid' is neither 'asc' nor 'desc'"
+      exception.getMessage shouldBe s"'invalid' is neither '$Asc' nor '$Desc'"
     }
 
     "return Left for a invalid sort" in {

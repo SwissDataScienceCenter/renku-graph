@@ -23,7 +23,7 @@ import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.datasets.{ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
-import io.renku.graph.model.users
+import io.renku.graph.model.persons
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -51,7 +51,7 @@ private trait UpdatesCreator {
   ): List[SparqlQuery]
 
   def queriesUnlinkingCreators(dataset:      Dataset[Dataset.Provenance],
-                               creatorsInKG: Set[users.ResourceId]
+                               creatorsInKG: Set[persons.ResourceId]
   ): List[SparqlQuery]
 }
 
@@ -89,7 +89,7 @@ private object UpdatesCreator extends UpdatesCreator {
   }
 
   override def queriesUnlinkingCreators(dataset:      Dataset[Dataset.Provenance],
-                                        creatorsInKG: Set[users.ResourceId]
+                                        creatorsInKG: Set[persons.ResourceId]
   ): List[SparqlQuery] = {
     val dsCreators = dataset.provenance.creators.map(_.resourceId)
     Option

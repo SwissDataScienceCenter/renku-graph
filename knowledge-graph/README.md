@@ -6,15 +6,16 @@ This is a microservice which provides API for the Graph DB.
 
 | Method  | Path                                                                    | Description                                                    |
 |---------|-------------------------------------------------------------------------|----------------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets```                                         | Returns datasets.                                              |
+|  GET    | ```/knowledge-graph/datasets```                                         | Returns datasets filtered by the given predicates.             |
 |  GET    | ```/knowledge-graph/datasets/:id```                                     | Returns details of the dataset with the given `id`             |
+|  GET    | ```/knowledge-graph/entities```                                         | Returns entities filtered by the given predicates`             |
 |  GET    | ```/knowledge-graph/graphql```                                          | Returns GraphQL endpoint schema                                |
 |  POST   | ```/knowledge-graph/graphql```                                          | GraphQL query endpoint                                         |
 |  GET    | ```/knowledge-graph/projects/:namespace/:name```                        | Returns details of the project with the given `namespace/name` |
 |  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```               | Returns datasets of the project with the given `path`          |
 |  GET    | ```/ping```                                                             | To check if service is healthy                                 |
 
-#### GET /knowledge-graph/datasets?query=\<phrase\>&sort=\<property\>:asc|desc&page=\<page\>&per_page=\<per_page\>
+#### GET /knowledge-graph/datasets
 
 Finds datasets which `title`, `description`, `keywords`, or creator `name` matches the given `phrase` or returns all the
 datasets if no `query` parameter is given.
@@ -133,6 +134,146 @@ Response body example:
          }
       ]
    }
+]
+```
+
+#### GET /knowledge-graph/entities
+
+Allows finding `projects`, `datasets`, `workflows`, and `persons`.
+
+Filtering:
+* `query` - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
+* `type` - to filter by entity type; allowed values: `project`, `dataset`, `workflow`, and `person`
+* `creator` - to filter by creator; the filter would require creator's name
+* `visibility` - to filter by visibility (restricted vs. public); allowed values: `public`, `internal`, `private`
+* `date` - to filter by entity's creation date
+
+**NOTE:** all query parameters have to be url-encoded.
+
+When the `query` parameter is given, the match is done on the following fields:
+* name/title
+* namespace (for the project entity)
+* creator (note: workflows has no creator for now)
+* keyword
+* description
+
+Sorting:
+* `matchingScore` - to sort by match score
+* `name` - to sort by entity name - **default when no `query` parameter is given**
+* `date` - to sort by entity creation date
+
+**NOTE:** the sorting has to be requested by giving the `sort` query parameter with the property name and sorting order (`asc` or `desc`). The default order is ascending so `sort`=`name` means the same as `sort`=`name:asc`.
+
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
+
+**Response**
+
+| Status                     | Description                                    |
+|----------------------------|------------------------------------------------|
+| OK (200)                   | If results are found; `[]` if nothing is found |
+| BAD_REQUEST (400)          | If illegal values for query parameters are given |
+| INTERNAL SERVER ERROR (500)| Otherwise                                      |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
+
+Assuming the total is `30` and the URL is `https://renku/knowledge-graph/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links are added to the response:
+
+```
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
+```
+
+Response body example:
+
+```json
+[
+  {
+    "type": "project",
+    "matchingScore": 1.0055376,
+    "name": "name",
+    "path": "group/subgroup/name",
+    "namespace": "group/subgroup",
+    "visibility": "public",
+    "date": "2012-11-15T10:00:00.000Z",
+    "creator": "Jan Kowalski",
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
+    "description": "desc",
+    "_links": [
+      {
+        "rel": "details",
+        "href": "http://t:5511/projects/group/subgroup/name"
+      }
+    ]
+  },
+  {
+    "type": "dataset",
+    "matchingScore": 3.364836,
+    "name": "name",
+    "visibility": "public",
+    "date": "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
+    "creators": [
+      "Jan Kowalski",
+      "Zoe"
+    ],
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
+    "description": "desc",
+    "images": [
+      {
+        "location": "image.png",
+        "_links":[
+          {
+            "rel":  "view",
+            "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+          }
+        ]
+      }
+    ],
+    "_links": [
+      {
+        "rel": "details",
+        "href": "http://t:5511/datasets/122334344"
+      }
+    ]
+  },
+  {
+    "type": "workflow",
+    "matchingScore": 5.364836,
+    "name": "name",
+    "visibility": "public",
+    "date": "2012-11-15T10:00:00.000Z",
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
+    "description": "desc",
+    "_links": []
+  },
+  {
+    "type": "person",
+    "matchingScore": 4.364836,
+    "name": "name",
+    "_links": []
+  }
 ]
 ```
 

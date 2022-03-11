@@ -28,7 +28,7 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.{GitLabApiUrl, projects, users}
+import io.renku.graph.model.{GitLabApiUrl, persons, projects}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, RestClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
@@ -41,7 +41,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 private trait CommitAuthorFinder[F[_]] {
   def findCommitAuthor(projectPath: projects.Path, commitId: CommitId)(implicit
       maybeAccessToken:             Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, Option[(users.Name, users.Email)]]
+  ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]]
 }
 
 private object CommitAuthorFinder {
@@ -69,11 +69,11 @@ private class CommitAuthorFinderImpl[F[_]: Async: Logger](
 
   override def findCommitAuthor(path: projects.Path, commitId: CommitId)(implicit
       maybeAccessToken:               Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, Option[(users.Name, users.Email)]] = EitherT {
+  ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]] = EitherT {
     {
       for {
         projectsUri <- validateUri(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/repository/commits/$commitId")
-        maybeAuthor <- send(secureRequest(GET, projectsUri))(mapTo[(users.Name, users.Email)])
+        maybeAuthor <- send(secureRequest(GET, projectsUri))(mapTo[(persons.Name, persons.Email)])
       } yield maybeAuthor
     }.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)
   }
@@ -85,17 +85,17 @@ private class CommitAuthorFinderImpl[F[_]: Async: Logger](
     case (NotFound, _, _)  => Option.empty[OUT].pure[F]
   }
 
-  private implicit lazy val authorDecoder: EntityDecoder[F, (users.Name, users.Email)] = {
+  private implicit lazy val authorDecoder: EntityDecoder[F, (persons.Name, persons.Email)] = {
     import io.renku.tinytypes.json.TinyTypeDecoders._
     import org.http4s.circe.jsonOf
 
-    implicit val decoder: Decoder[(users.Name, users.Email)] = cursor =>
+    implicit val decoder: Decoder[(persons.Name, persons.Email)] = cursor =>
       (
-        cursor.downField("author_name").as[users.Name],
-        cursor.downField("author_email").as[users.Email]
+        cursor.downField("author_name").as[persons.Name],
+        cursor.downField("author_email").as[persons.Email]
       ).mapN(_ -> _)
 
-    jsonOf[F, (users.Name, users.Email)]
+    jsonOf[F, (persons.Name, persons.Email)]
   }
 
   private def noAuthor[OUT]: PartialFunction[Throwable, F[Option[OUT]]] = { case _: InvalidMessageBodyFailure =>

@@ -35,7 +35,7 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.Path
-import io.renku.graph.model.{GitLabUrl, users}
+import io.renku.graph.model.{GitLabUrl, persons}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder._
 import io.renku.interpreters.TestLogger
@@ -62,7 +62,7 @@ class CommitAuthorFinderSpec
   "findCommitAuthor" should {
 
     "return commit author's name and email if found" in new TestCase {
-      forAll { (authorName: users.Name, authorEmail: users.Email) =>
+      forAll { (authorName: persons.Name, authorEmail: persons.Email) =>
         `/api/v4/projects/:id/repository/commits/:sha`(projectPath, commitId) returning okJson(
           (authorName -> authorEmail).asJson.noSpaces
         )
@@ -95,7 +95,7 @@ class CommitAuthorFinderSpec
     "return None if commit author email invalid" in new TestCase {
       `/api/v4/projects/:id/repository/commits/:sha`(projectPath, commitId) returning okJson {
         json"""{
-          "author_name":  ${userNames.generateOne},
+          "author_name":  ${personNames.generateOne},
           "author_email": ${nonBlankStrings().generateOne.value}
         }""".noSpaces
       }
@@ -140,7 +140,7 @@ class CommitAuthorFinderSpec
     )
   }
 
-  private implicit lazy val authorEncoder: Encoder[(users.Name, users.Email)] = Encoder.instance {
+  private implicit lazy val authorEncoder: Encoder[(persons.Name, persons.Email)] = Encoder.instance {
     case (authorName, authorEmail) => json"""{
       "author_name":  $authorName,
       "author_email": $authorEmail

@@ -35,11 +35,8 @@ object renku {
 
     private implicit val configReader: ConfigReader[ResourcesUrl] = urlTinyTypeReader(this)
 
-    def apply[F[_]: MonadThrow](
-        config: Config = ConfigFactory.load()
-    ): F[ResourcesUrl] =
+    def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[ResourcesUrl] =
       find[F, ResourcesUrl]("services.renku.resources-url", config)
-
   }
 
   class ResourceUrl private (val value: String) extends AnyVal with UrlTinyType

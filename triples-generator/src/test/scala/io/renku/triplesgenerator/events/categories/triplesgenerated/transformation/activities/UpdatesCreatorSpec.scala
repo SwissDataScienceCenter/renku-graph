@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
-import GraphModelGenerators.userResourceIds
+import GraphModelGenerators.personResourceIds
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.InMemoryRdfStore
@@ -120,7 +120,7 @@ class UpdatesCreatorSpec
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
 
       UpdatesCreator
-        .queriesUnlinkingAgent(activity, maybeKgAgent = userResourceIds.generateOne.some) shouldBe Nil
+        .queriesUnlinkingAgent(activity, maybeKgAgent = personResourceIds.generateOne.some) shouldBe Nil
     }
 
     "prepare no queries if there's no Person agent in KG" in {
@@ -146,7 +146,7 @@ class UpdatesCreatorSpec
     }
   }
 
-  private def findAuthors(resourceId: activities.ResourceId): Set[users.ResourceId] =
+  private def findAuthors(resourceId: activities.ResourceId): Set[persons.ResourceId] =
     runQuery(s"""|SELECT ?personId
                  |WHERE {
                  |  ${resourceId.showAs[RdfResource]} a prov:Activity;
@@ -155,12 +155,12 @@ class UpdatesCreatorSpec
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
-      .map(row => users.ResourceId.from(row("personId")))
+      .map(row => persons.ResourceId.from(row("personId")))
       .sequence
       .fold(throw _, identity)
       .toSet
 
-  private def findPersonAgents(resourceId: associations.ResourceId): Set[users.ResourceId] =
+  private def findPersonAgents(resourceId: associations.ResourceId): Set[persons.ResourceId] =
     runQuery(s"""|SELECT ?agentId
                  |WHERE {
                  |  ${resourceId.showAs[RdfResource]} a prov:Association;
@@ -169,13 +169,13 @@ class UpdatesCreatorSpec
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
-      .map(row => users.ResourceId.from(row("agentId")))
+      .map(row => persons.ResourceId.from(row("agentId")))
       .sequence
       .fold(throw _, identity)
       .toSet
 
   private implicit class AssociationOps(association: entities.Association) {
-    lazy val maybePersonAgentResourceId: Option[users.ResourceId] = association match {
+    lazy val maybePersonAgentResourceId: Option[persons.ResourceId] = association match {
       case assoc: entities.Association.WithPersonAgent => assoc.agent.resourceId.some
       case _ => None
     }

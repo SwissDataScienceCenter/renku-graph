@@ -90,7 +90,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
         (git
           .status(_: RepositoryPath))
           .expects(repositoryDirectory)
-          .returning(sentenceContaining("nothing to commit").generateOne.value.pure[IO])
+          .returning(sentenceContaining("nothing to commit").generateOne.pure[IO])
 
         (renku
           .migrate(_: CommitEvent)(_: RepositoryPath))

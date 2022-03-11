@@ -19,7 +19,7 @@
 package io.renku.commiteventservice.events.categories.common
 
 import io.renku.graph.model.events._
-import io.renku.graph.model.users.{Email, Name}
+import io.renku.graph.model.persons.{Email, Name}
 
 private[categories] case class CommitInfo(
     id:            CommitId,

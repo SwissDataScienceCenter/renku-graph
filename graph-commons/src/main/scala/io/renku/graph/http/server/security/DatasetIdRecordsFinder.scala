@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.users.GitLabId
+import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.{datasets, projects}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._

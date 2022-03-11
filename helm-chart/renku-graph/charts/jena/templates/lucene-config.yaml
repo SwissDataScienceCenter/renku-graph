@@ -51,5 +51,6 @@ data:
         [ text:field "name" ; text:predicate <http://schema.org/name> ]
         [ text:field "description" ; text:predicate <http://schema.org/description> ]
         [ text:field "slug" ; text:predicate <https://swissdatasciencecenter.github.io/renku-ontology#slug> ]
+        [ text:field "projectNamespaces" ; text:predicate <https://swissdatasciencecenter.github.io/renku-ontology#projectNamespaces> ]
         [ text:field "keywords" ; text:predicate <http://schema.org/keywords> ]
       ) .

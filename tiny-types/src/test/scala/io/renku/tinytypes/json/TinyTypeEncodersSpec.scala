@@ -73,6 +73,14 @@ class TinyTypeEncodersSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
+  "floatEncoder" should {
+
+    "encode FloatTinyType to Json" in {
+      val value = Arbitrary.arbFloat.arbitrary.generateOne
+      Some(FloatTestType(value).asJson) shouldBe Json.fromFloat(value)
+    }
+  }
+
   "localDateEncoder" should {
 
     "encode LocalDateTinyType to Json" in {

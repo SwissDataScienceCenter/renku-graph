@@ -25,7 +25,7 @@ import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import io.renku.graph.model.projects.ResourceId
-import io.renku.graph.model.users.GitLabId
+import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.rdfstore.SparqlQuery
@@ -34,7 +34,7 @@ import io.renku.rdfstore.SparqlQuery.Prefixes
 private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl) {
 
   def insertion(projectPath: projects.Path,
-                members:     Set[(GitLabProjectMember, Option[users.ResourceId])]
+                members:     Set[(GitLabProjectMember, Option[persons.ResourceId])]
   ): List[SparqlQuery] = {
     val (queriesForNewPersons, queriesForExistingPersons) =
       (separateUsersNotYetInKG.pure[List] ap members.toList).separate
@@ -88,11 +88,11 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
     membersCreations ::: linksCreations
   }
 
-  private def generateResourceId(gitLabId: GitLabId): users.ResourceId =
-    users.ResourceId(gitLabId)(renkuBaseUrl)
+  private def generateResourceId(gitLabId: GitLabId): persons.ResourceId =
+    persons.ResourceId(gitLabId)(renkuBaseUrl)
 
   private def createMemberLinks(projectPath:        projects.Path,
-                                membersAlreadyInKG: List[(GitLabProjectMember, users.ResourceId)]
+                                membersAlreadyInKG: List[(GitLabProjectMember, persons.ResourceId)]
   ): List[SparqlQuery] =
     membersAlreadyInKG.map { case (_, resourceId) => generateLinkTriple(projectPath, resourceId) }.map { linkTriple =>
       SparqlQuery.of(
@@ -105,10 +105,10 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
       )
     }
 
-  private def generateLinkTriple(projectPath: projects.Path, memberResourceId: users.ResourceId) =
+  private def generateLinkTriple(projectPath: projects.Path, memberResourceId: persons.ResourceId) =
     s"${ResourceId(projectPath)(renkuBaseUrl).showAs[RdfResource]} schema:member ${memberResourceId.showAs[RdfResource]}."
 
-  private lazy val generatePersonTriples: ((users.ResourceId, GitLabProjectMember)) => String = {
+  private lazy val generatePersonTriples: ((persons.ResourceId, GitLabProjectMember)) => String = {
     case (resourceId, member) =>
       val creatorResource = resourceId.showAs[RdfResource]
       val sameAsId        = entities.Person.toSameAsEntityId(member.gitLabId)(gitLabApiUrl).show
@@ -122,8 +122,8 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
   }
 
   private lazy val separateUsersNotYetInKG: (
-      (GitLabProjectMember, Option[users.ResourceId])
-  ) => Either[GitLabProjectMember, (GitLabProjectMember, users.ResourceId)] = {
+      (GitLabProjectMember, Option[persons.ResourceId])
+  ) => Either[GitLabProjectMember, (GitLabProjectMember, persons.ResourceId)] = {
     case (member, Some(resourceId)) => Right(member -> resourceId)
     case (member, None)             => Left(member)
   }

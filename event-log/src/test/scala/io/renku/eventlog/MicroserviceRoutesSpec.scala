@@ -26,7 +26,7 @@ import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
-import io.renku.generators.CommonGraphGenerators.{directions, pages, perPages}
+import io.renku.generators.CommonGraphGenerators.{pages, perPages, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
@@ -80,7 +80,7 @@ class MicroserviceRoutesSpec
         eventStatuses
           .map(status => uri"/events" +? ("status" -> status.value) -> Criteria(Filters.EventsWithStatus(status)))
           .generateOne,
-        (eventStatuses -> directions).mapN { (status, dir) =>
+        (eventStatuses -> sortingDirections).mapN { (status, dir) =>
           uri"/events" +? ("status" -> status.value) +? ("sort" -> s"eventDate:$dir") -> Criteria(
             Filters.EventsWithStatus(status),
             Sorting.By(EventDate, dir)

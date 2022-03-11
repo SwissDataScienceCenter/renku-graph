@@ -69,7 +69,7 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
 
   "perPage" should {
 
-    "decode a valid per_page query parameter" in {
+    "decode a valid per_page values" in {
       forAll { perPage: PerPage =>
         Map("per_page" -> Seq(perPage.toString)) match {
           case PagingRequest.Decoders.perPage(actual) => actual shouldBe Some(Validated.validNel(perPage))
@@ -77,21 +77,31 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
       }
     }
 
-    "fail to decode a non-int per_page query parameter" in {
+    "fail to decode a non-int values" in {
       Map("per_page" -> Seq("abc")) match {
         case PagingRequest.Decoders.perPage(actual) =>
-          actual shouldBe Some(Validated.invalidNel {
-            ParseFailure("'abc' not a valid PerPage number", "")
-          })
+          actual shouldBe Validated.invalidNel {
+            ParseFailure("'abc' not a valid PerPage value", "")
+          }.some
       }
     }
 
-    "fail to decode a non-positive per_page query parameter" in {
+    "fail to decode a non-positive values" in {
       Map("per_page" -> Seq("0")) match {
         case PagingRequest.Decoders.perPage(actual) =>
-          actual shouldBe Some(Validated.invalidNel {
-            ParseFailure("'0' not a valid PerPage number", "")
-          })
+          actual shouldBe Validated.invalidNel {
+            ParseFailure("'0' not a valid PerPage value", "")
+          }.some
+      }
+    }
+
+    s"fail to decode values > ${PerPage.max}" in {
+      val overPerPageMax = ints(min = PerPage.max.value + 1).generateOne
+      Map("per_page" -> Seq(overPerPageMax.toString)) match {
+        case PagingRequest.Decoders.perPage(actual) =>
+          actual shouldBe Validated.invalidNel {
+            ParseFailure(s"'$overPerPageMax' not a valid PerPage value. Max value is ${PerPage.max}", "")
+          }.some
       }
     }
 

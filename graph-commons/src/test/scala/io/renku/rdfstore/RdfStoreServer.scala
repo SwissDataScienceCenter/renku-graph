@@ -72,6 +72,7 @@ class RdfStoreServer(
       definition.setPrimaryPredicate(NodeFactory.createURI((schema / "name").show))
       definition.set("description", NodeFactory.createURI((schema / "description").show))
       definition.set("slug", NodeFactory.createURI((renku / "slug").show))
+      definition.set("projectNamespaces", NodeFactory.createURI((renku / "projectNamespaces").show))
       definition.set("keywords", NodeFactory.createURI((schema / "keywords").show))
       definition
     }

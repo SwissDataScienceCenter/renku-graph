@@ -25,10 +25,9 @@ import scala.util.Try
 object binders {
 
   object ProjectId {
-    def unapply(value: String): Option[projects.Id] =
-      Try {
-        projects.Id(value.toInt)
-      }.toOption
+    def unapply(value: String): Option[projects.Id] = Try {
+      projects.Id(value.toInt)
+    }.toOption
   }
 
   object ProjectPath {

@@ -22,6 +22,7 @@ import cats.effect._
 import cats.syntax.all._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
+import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -30,14 +31,19 @@ import io.renku.interpreters.TestLogger
 import io.renku.microservices.ServiceReadinessChecker
 import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.concurrent.duration._
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
     with IOSpec
     with MockedRunnableCollaborators
     with MockFactory
+    with Eventually
+    with IntegrationPatience
     with should.Matchers {
 
   "run" should {
@@ -49,10 +55,13 @@ class MicroserviceRunnerSpec
         given(certificateLoader).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
         (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-        given(eventConsumersRegistry).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
         runner.run().unsafeRunSync() shouldBe ExitCode.Success
+
+        eventually {
+          eventConsumersRegistry.counter.get.unsafeRunSync() should be > 1
+        }
       }
 
     "fail if certificate loading fails" in new TestCase {
@@ -81,7 +90,6 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(eventConsumersRegistry).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
 
@@ -90,10 +98,11 @@ class MicroserviceRunnerSpec
 
     "return Success ExitCode even if Event Consumers Registry initialisation fails" in new TestCase {
 
+      override val eventConsumersRegistry = new EventsConsumersRegistryStub(exceptions.generateSome)
+
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
@@ -105,7 +114,7 @@ class MicroserviceRunnerSpec
     val serviceReadinessChecker = mock[ServiceReadinessChecker[IO]]
     val certificateLoader       = mock[CertificateLoader[IO]]
     val sentryInitializer       = mock[SentryInitializer[IO]]
-    val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
+    val eventConsumersRegistry  = new EventsConsumersRegistryStub()
     val httpServer              = mock[HttpServer[IO]]
     val runner = new MicroserviceRunner(serviceReadinessChecker,
                                         certificateLoader,
@@ -113,5 +122,16 @@ class MicroserviceRunnerSpec
                                         eventConsumersRegistry,
                                         httpServer
     )
+  }
+
+  private class EventsConsumersRegistryStub(maybeFail: Option[Exception] = None) extends EventConsumersRegistry[IO] {
+    val counter = Ref.unsafe[IO, Int](0)
+
+    override def run(): IO[Unit] = maybeFail.map(_.raiseError[IO, Unit]).getOrElse(keepGoing.foreverM)
+
+    private def keepGoing = Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
+
+    override def handle(requestContent: EventRequestContent) = fail("Shouldn't be called")
+    override def renewAllSubscriptions()                     = fail("Shouldn't be called")
   }
 }

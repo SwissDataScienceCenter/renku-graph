@@ -209,8 +209,8 @@ object ProjectJsonLDDecoder {
   private def toPerson(projectMember: ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person =
     projectMember match {
       case ProjectMemberNoEmail(name, _, gitLabId) =>
-        Person.WithGitLabId(users.ResourceId(gitLabId), gitLabId, name, maybeEmail = None, maybeAffiliation = None)
+        Person.WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, maybeEmail = None, maybeAffiliation = None)
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        Person.WithGitLabId(users.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
+        Person.WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
     }
 }

@@ -57,6 +57,11 @@ object TinyTypeDecoders {
       tinyTypeFactory.from(value).leftMap(_.getMessage)
     }
 
+  implicit def floatDecoder[TT <: FloatTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    decodeFloat.emap { value =>
+      tinyTypeFactory.from(value).leftMap(_.getMessage)
+    }
+
   implicit def localDateDecoder[TT <: LocalDateTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
     decodeString.emap { value =>
       Either

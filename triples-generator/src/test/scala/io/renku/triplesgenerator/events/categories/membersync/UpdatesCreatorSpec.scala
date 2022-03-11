@@ -23,9 +23,9 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.users.{Email, GitLabId}
+import io.renku.graph.model.persons.{Email, GitLabId}
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{projects, users}
+import io.renku.graph.model.{persons, projects}
 import io.renku.jsonld.syntax._
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
@@ -92,12 +92,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       val member = gitLabProjectMembers.generateOne
       val queries = updatesCreator.insertion(
         project.path,
-        Set(member -> Option.empty[users.ResourceId])
+        Set(member -> Option.empty[persons.ResourceId])
       )
 
       queries.map(runUpdate).sequence.unsafeRunSync()
 
-      findMembersEmails(project.path) shouldBe Set(member.gitLabId -> Option.empty[users.Email])
+      findMembersEmails(project.path) shouldBe Set(member.gitLabId -> Option.empty[persons.Email])
     }
 
     "prepare queries to insert the project and then the members when neither exists in KG" in {
@@ -109,13 +109,13 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       val member = gitLabProjectMembers.generateOne
       val queries = updatesCreator.insertion(
         projectPath,
-        Set(member -> Option.empty[users.ResourceId])
+        Set(member -> Option.empty[persons.ResourceId])
       )
 
       queries.map(runUpdate).sequence.unsafeRunSync()
 
       findMembersEmails(projectPath) shouldBe Set(
-        member.gitLabId -> Option.empty[users.Email]
+        member.gitLabId -> Option.empty[persons.Email]
       )
     }
 
