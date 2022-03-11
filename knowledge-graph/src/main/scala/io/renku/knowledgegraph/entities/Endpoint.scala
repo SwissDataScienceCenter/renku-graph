@@ -23,9 +23,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.config.renku
-import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import io.renku.graph.model.datasets.ImageUri
-import io.renku.graph.model.{GitLabUrl, persons, projects}
+import io.renku.graph.model.{GitLabUrl, RenkuBaseUrl, persons, projects}
 import io.renku.http.rest.Links.Href
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
@@ -164,12 +164,14 @@ object Endpoint {
 
   def apply[F[_]: Async: NonEmptyParallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[Endpoint[F]] = for {
     entitiesFinder    <- EntitiesFinder(timeRecorder)
+    renkuBaseUrl      <- RenkuBaseUrlLoader()
     renkuResourcesUrl <- renku.ResourcesUrl()
     gitLabUrl         <- GitLabUrlLoader[F]()
-  } yield new EndpointImpl(entitiesFinder, renkuResourcesUrl, gitLabUrl)
+  } yield new EndpointImpl(entitiesFinder, renkuBaseUrl, renkuResourcesUrl, gitLabUrl)
 }
 
 private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
+                                                renkuBaseUrl:      RenkuBaseUrl,
                                                 renkuResourcesUrl: renku.ResourcesUrl,
                                                 gitLabUrl:         GitLabUrl
 ) extends Http4sDsl[F]
@@ -191,7 +193,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
     finder.findEntities(criteria) map toHttpResponse(request) recoverWith httpResult
 
   private def toHttpResponse(request: Request[F])(response: PagingResponse[model.Entity]): Response[F] = {
-    implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuResourcesUrl${request.uri}")
+    implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuBaseUrl${request.uri}")
     Response[F](Status.Ok)
       .withEntity(response.results.asJson)
       .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
