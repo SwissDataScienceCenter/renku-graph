@@ -27,15 +27,13 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.util.Try
-
 class CommitEventSerializerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "serialiseToJsonString" should {
 
     "return a single line json if serialization was successful" in new TestCase {
       forAll { commitEvent: CommitEvent =>
-        serializer.serialiseToJsonString(commitEvent).map(parse) shouldBe json(
+        parse(serializer.serialiseToJsonString(commitEvent)) shouldBe json(
           "id"            -> Json.fromString(commitEvent.id.value),
           "message"       -> Json.fromString(commitEvent.message.value),
           "committedDate" -> Json.fromString(commitEvent.committedDate.toString),
@@ -46,15 +44,15 @@ class CommitEventSerializerSpec extends AnyWordSpec with ScalaCheckPropertyCheck
             "id"   -> Json.fromInt(commitEvent.project.id.value),
             "path" -> Json.fromString(commitEvent.project.path.value)
           )
-        )
+        ).asRight
       }
     }
   }
 
   private trait TestCase {
-    val serializer = new CommitEventSerializer[Try]()
+    val serializer = CommitEventSerializer
 
-    def json(fields: (String, Json)*) = Right(Json.obj(fields: _*)).pure[Try]
+    def json(fields: (String, Json)*) = Json.obj(fields: _*)
   }
 
   private implicit class PersonOps(person: Person) {

@@ -20,12 +20,15 @@ package io.renku.commiteventservice.events.categories.common
 
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.circe.literal._
 import io.renku.commiteventservice.events.categories.commitsync.categoryName
 import io.renku.commiteventservice.events.categories.common.CommitEvent._
 import io.renku.commiteventservice.events.categories.common.Generators._
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
+import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.events._
@@ -41,44 +44,57 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
 
   "storeCommitsInEventLog" should {
 
-    "transform the Commit into commit events and store them in the Event Log" in new TestCase {
+    "transform the given commit into creation event and send it to event-log" in new TestCase {
 
-      val commitEvent = commitEventFrom(startCommit, project).generateOne
+      val event = commitEventFrom(startCommit, project).generateOne
 
-      (commitEventSender
-        .send(_: CommitEvent))
-        .expects(commitEvent)
+      val serializedBody = jsons.generateOne.noSpaces
+      (eventSerializer.serialiseToJsonString _).expects(event).returning(serializedBody)
+
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+        .expects(
+          requestContent(event -> serializedBody),
+          EventSender.EventContext(CategoryName("CREATION"), failedStoring(startCommit, event.project))
+        )
         .returning(().pure[Try])
 
-      commitToEventLog.storeCommitInEventLog(project, startCommit, batchDate) shouldBe Success(
-        Created
-      )
+      commitToEventLog.storeCommitInEventLog(project, startCommit, batchDate) shouldBe Created.pure[Try]
     }
 
-    "transform the Start Commit into a SkippedCommitEvent if the commit event message is 'renku migrate'" in new TestCase {
+    "transform the Start Commit into a SkippedCommitEvent if the commit event message contains 'renku migrate'" in new TestCase {
 
-      val skippedCommit = startCommit.copy(message = CommitMessage(sentenceContaining("renku migrate").generateOne))
-      val commitEvent =
-        skippedCommitEventFrom(skippedCommit, project).generateOne
+      val migrationCommit = startCommit.copy(message = CommitMessage(sentenceContaining("renku migrate").generateOne))
+      val event           = skippedCommitEventFrom(migrationCommit, project).generateOne
 
-      (commitEventSender
-        .send(_: CommitEvent))
-        .expects(commitEvent)
+      val serializedBody = jsons.generateOne.noSpaces
+      (eventSerializer.serialiseToJsonString _).expects(event).returning(serializedBody)
+
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+        .expects(
+          requestContent(event -> serializedBody),
+          EventSender.EventContext(CategoryName("CREATION"), failedStoring(startCommit, event.project))
+        )
         .returning(().pure[Try])
 
-      commitToEventLog.storeCommitInEventLog(project, skippedCommit, batchDate) shouldBe Success(
-        Created
-      )
+      commitToEventLog.storeCommitInEventLog(project, migrationCommit, batchDate) shouldBe Created.pure[Try]
     }
 
     "return a Failed status if sending the event fails" in new TestCase {
 
-      val commitEvent = commitEventFrom(startCommit, project).generateOne
+      val event = commitEventFrom(startCommit, project).generateOne
 
-      val exception = exceptions.generateOne
-      (commitEventSender
-        .send(_: CommitEvent))
-        .expects(commitEvent)
+      val exception      = exceptions.generateOne
+      val serializedBody = jsons.generateOne.noSpaces
+      (eventSerializer.serialiseToJsonString _).expects(event).returning(serializedBody)
+
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+        .expects(
+          requestContent(event -> serializedBody),
+          EventSender.EventContext(CategoryName("CREATION"), failedStoring(startCommit, event.project))
+        )
         .returning(exception.raiseError[Try, Unit])
 
       commitToEventLog.storeCommitInEventLog(project, startCommit, batchDate) shouldBe
@@ -92,15 +108,13 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
     val batchDate   = BatchDate(Instant.now)
     val project     = consumerProjects.generateOne
 
-    val commitEventSender = mock[CommitEventSender[Try]]
+    val eventSender     = mock[EventSender[Try]]
+    val eventSerializer = mock[CommitEventSerializer]
 
-    val commitToEventLog = new CommitToEventLogImpl[Try](
-      commitEventSender
-    )
+    val commitToEventLog = new CommitToEventLogImpl[Try](eventSender, eventSerializer)
 
-    def failedStoring(startCommit: CommitInfo, project: Project): String =
-      s"$categoryName: id = ${startCommit.id}, projectId = ${project.id}, projectPath = ${project.path} -> " +
-        "storing in the event log failed"
+    def failedStoring(commit: CommitInfo, project: Project): String =
+      show"$categoryName: creating event id = ${commit.id}, $project in event-log failed"
 
     def commitEventFrom(commitInfo: CommitInfo, project: Project): Gen[CommitEvent] = NewCommitEvent(
       id = commitInfo.id,
@@ -122,6 +136,36 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
       parents = commitInfo.parents,
       project = project,
       batchDate = batchDate
+    )
+
+    def requestContent(eventAndBody: (CommitEvent, EventBody)) = EventRequestContent.NoPayload(
+      eventAndBody match {
+        case (event: NewCommitEvent, body) => json"""{
+            "categoryName": "CREATION", 
+            "id":        ${event.id.value},
+            "project": {
+              "id":      ${event.project.id.value},
+              "path":    ${event.project.path.value}
+            },
+            "date":      ${event.committedDate.value},
+            "batchDate": ${event.batchDate.value},
+            "body":      ${body.value},
+            "status":    ${event.status.value}
+          }"""
+        case (event: SkippedCommitEvent, body) => json"""{
+            "categoryName": "CREATION",
+            "id":        ${event.id.value},
+            "project": {
+              "id":      ${event.project.id.value},
+              "path":    ${event.project.path.value}
+            },
+            "date":      ${event.committedDate.value},
+            "batchDate": ${event.batchDate.value},
+            "body":      ${body.value},
+            "status":    ${event.status.value},
+            "message":   ${event.message.value}
+          }"""
+      }
     )
   }
 }

@@ -18,16 +18,17 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import cats.MonadThrow
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 
-import scala.util.Try
+private trait CommitEventSerializer {
+  def serialiseToJsonString(commitEvent: CommitEvent): String
+}
 
-private class CommitEventSerializer[F[_]: MonadThrow] {
+private object CommitEventSerializer extends CommitEventSerializer {
 
-  def serialiseToJsonString(commitEvent: CommitEvent): F[String] =
-    MonadThrow[F].fromTry(Try(toJson(commitEvent).noSpaces))
+  override def serialiseToJsonString(commitEvent: CommitEvent): String =
+    toJson(commitEvent).noSpaces
 
   private def toJson(commitEvent: CommitEvent): Json = json"""{
     "id":            ${commitEvent.id.value},
@@ -44,11 +45,11 @@ private class CommitEventSerializer[F[_]: MonadThrow] {
 
   private implicit def personEncoder[E <: Person]: Encoder[E] = Encoder.instance[E] {
     case person: Person.WithEmail => json"""{
-        "username": ${person.name.value},
-        "email"   : ${person.email.value}
-      }"""
+      "username": ${person.name.value},
+      "email"   : ${person.email.value}
+    }"""
     case person: Person => json"""{
-        "username": ${person.name.value}
-      }"""
+      "username": ${person.name.value}
+    }"""
   }
 }
