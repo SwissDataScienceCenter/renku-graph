@@ -45,6 +45,7 @@ trait RdfStoreProvisioning
     with AcceptanceTestPatience
     with should.Matchers {
   self: GraphServices =>
+
   def `data in the RDF store`(
       project:            data.Project,
       commitId:           CommitId = commitIds.generateOne
@@ -65,6 +66,7 @@ trait RdfStoreProvisioning
 
       sleep((3 second).toMillis)
     }
+
     `wait for events to be processed`(project.id)
   }
 

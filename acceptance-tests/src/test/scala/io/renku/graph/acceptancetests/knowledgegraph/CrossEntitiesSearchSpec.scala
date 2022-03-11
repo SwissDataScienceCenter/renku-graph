@@ -49,7 +49,7 @@ class CrossEntitiesSearchSpec
 
     val testEntitiesProject = renkuProjectEntities(visibilityPublic)
       .withActivities(activityEntities(planEntities()))
-      .withDatasets(datasetEntities(provenanceNonModified))
+      .withDatasets(datasetEntities(provenanceInternal))
       .generateOne
     val project = dataProjects(testEntitiesProject).generateOne
 
