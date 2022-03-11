@@ -169,8 +169,9 @@ object CommonGraphGenerators {
 
   def testSortBys: Gen[TestSort.By] = sortBys(TestSort)
 
-  implicit val pages:    Gen[paging.model.Page]    = positiveInts(max = 100) map (_.value) map paging.model.Page.apply
-  implicit val perPages: Gen[paging.model.PerPage] = positiveInts(max = 20) map (_.value) map paging.model.PerPage.apply
+  implicit val pages: Gen[paging.model.Page] = positiveInts(max = 100) map (_.value) map paging.model.Page.apply
+  implicit val perPages: Gen[paging.model.PerPage] =
+    positiveInts(max = paging.model.PerPage.max.value).map(v => paging.model.PerPage(v.value))
   implicit val pagingRequests: Gen[PagingRequest] = for {
     page    <- pages
     perPage <- perPages

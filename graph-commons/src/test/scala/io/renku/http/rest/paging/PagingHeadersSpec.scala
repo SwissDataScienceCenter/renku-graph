@@ -18,6 +18,7 @@
 
 package io.renku.http.rest.paging
 
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -139,8 +140,8 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     s"generate $Total, $TotalPages, $PerPage, $Page and $Link headers " +
       "if there's no results" in {
 
-        val perPage = positiveInts().map(_.value).generateAs(model.PerPage)
-        val page    = positiveInts().map(_.value).generateAs(model.Page)
+        val perPage = perPages.generateOne
+        val page    = pages.generateOne
         val response = PagingResponse
           .from[Try, NonBlank](Nil, PagingRequest(page, perPage), model.Total(0))
           .fold(throw _, identity)
@@ -150,12 +151,11 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
         PagingHeaders.from(response) should contain theSameElementsAs Set(
           Header.Raw(ci"Total", "0"),
           Header.Raw(ci"Total-Pages", "0"),
-          Header.Raw(ci"Per-Page", perPage.toString),
-          Header.Raw(ci"Page", page.toString),
+          Header.Raw(ci"Per-Page", perPage.show),
+          Header.Raw(ci"Page", page.show),
           Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> first.value)}>; rel="first""""),
           Header.Raw(ci"Link", s"""<${resourceUrl ? (pageParamName -> 1)}>; rel="last"""")
         )
-
       }
   }
 
