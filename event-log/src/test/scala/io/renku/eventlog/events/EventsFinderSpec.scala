@@ -73,7 +73,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       )
 
       val pagedResults = eventsFinder
-        .findEvents(Criteria(Filters.ProjectEvents(projectPath, None)))
+        .findEvents(Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None)))
         .unsafeRunSync()
 
       pagedResults.pagingInfo.total.value   shouldBe infos.size
@@ -103,7 +103,9 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
       val pagingRequest: PagingRequest = PagingRequest(Page(2), PerPage(1))
       val pagedResults = eventsFinder
-        .findEvents(Criteria(Filters.ProjectEvents(projectPath, None), paging = pagingRequest))
+        .findEvents(
+          Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None), paging = pagingRequest)
+        )
         .unsafeRunSync()
 
       pagedResults.pagingInfo.total.value   shouldBe infos.size
@@ -134,7 +136,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val pagingRequest = PagingRequest(Page(1), PerPage(3))
       val pagedResults = eventsFinder
         .findEvents(
-          Criteria(Filters.ProjectEvents(projectPath, None),
+          Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None),
                    Sorting.By(Sorting.EventDate, SortBy.Direction.Asc),
                    pagingRequest
           )
@@ -147,7 +149,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
       val ascPagedResults = eventsFinder
         .findEvents(
-          Criteria(Filters.ProjectEvents(projectPath, None),
+          Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None),
                    Sorting.By(Sorting.EventDate, SortBy.Direction.Desc),
                    pagingRequest
           )
@@ -159,7 +161,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       ascPagedResults.results                  shouldBe infos.sortBy(_.eventDate).reverse.take(3)
     }
 
-    "return the List of events of the project with the given path and the given the status filter" in new TestCase {
+    "return the List of events of the project with the given path and status filter" in new TestCase {
       val projectId = projectIds.generateOne
       val infos     = eventInfos(fixed(projectPath)).generateList(minElements = 3, maxElements = 10)
 
@@ -181,7 +183,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
       val eventStatusFilter = Random.shuffle(infos.map(_.status)).head
       val pagedResults = eventsFinder
-        .findEvents(Criteria(Filters.ProjectEvents(projectPath, eventStatusFilter.some)))
+        .findEvents(Criteria(Filters.ProjectEvents(projectPath, eventStatusFilter.some, maybeDates = None)))
         .unsafeRunSync()
 
       val expectedResult = infos.filter(_.status == eventStatusFilter)
@@ -190,7 +192,77 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
     }
 
-    "return the List of events of all projects matching the given the status filter" in new TestCase {
+    "return the List of events of the project with the given path and since filters" in new TestCase {
+      val projectId = projectIds.generateOne
+      val infos     = eventInfos(fixed(projectPath)).generateList(minElements = 3, maxElements = 10)
+
+      infos foreach { info =>
+        val eventId = CompoundEventId(info.eventId, projectId)
+        storeEvent(
+          eventId,
+          info.status,
+          info.executionDate,
+          info.eventDate,
+          eventBodies.generateOne,
+          projectPath = info.projectPath,
+          maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
+        )
+      }
+
+      val sinceFilter = Random.shuffle(infos.map(_.eventDate)).head
+      val pagedResults = eventsFinder
+        .findEvents(
+          Criteria(
+            Filters.ProjectEvents(projectPath, maybeStatus = None, Filters.EventsSince(sinceFilter).some)
+          )
+        )
+        .unsafeRunSync()
+
+      val expectedResult = infos.filter(_.eventDate.value.compareTo(sinceFilter.value) >= 0)
+      pagedResults.pagingInfo.total.value   shouldBe expectedResult.size
+      pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
+    }
+
+    "return the List of events of the project with the given path and until filters" in new TestCase {
+      val projectId = projectIds.generateOne
+      val infos     = eventInfos(fixed(projectPath)).generateList(minElements = 3, maxElements = 10)
+
+      infos foreach { info =>
+        val eventId = CompoundEventId(info.eventId, projectId)
+        storeEvent(
+          eventId,
+          info.status,
+          info.executionDate,
+          info.eventDate,
+          eventBodies.generateOne,
+          projectPath = info.projectPath,
+          maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
+        )
+      }
+
+      val untilFilter = Random.shuffle(infos.map(_.eventDate)).head
+      val pagedResults = eventsFinder
+        .findEvents(
+          Criteria(
+            Filters.ProjectEvents(projectPath, maybeStatus = None, Filters.EventsUntil(untilFilter).some)
+          )
+        )
+        .unsafeRunSync()
+
+      val expectedResult = infos.filter(_.eventDate.value.compareTo(untilFilter.value) <= 0)
+      pagedResults.pagingInfo.total.value   shouldBe expectedResult.size
+      pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
+    }
+
+    "return the List of events of all projects matching the given status filter" in new TestCase {
 
       val infos = eventInfos().generateList(minElements = 3, maxElements = 10)
 
@@ -212,12 +284,177 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
       val eventStatusFilter = Random.shuffle(infos.map(_.status)).head
 
-      val expectedResult = infos.filter(_.status == eventStatusFilter)
-
       val pagedResults = eventsFinder
-        .findEvents(Criteria(Filters.EventsWithStatus(eventStatusFilter)))
+        .findEvents(Criteria(Filters.EventsWithStatus(eventStatusFilter, maybeDates = None)))
         .unsafeRunSync()
 
+      val expectedResult = infos.filter(_.status == eventStatusFilter)
+      pagedResults.pagingInfo.total.value   shouldBe expectedResult.size
+      pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
+    }
+
+    "return the List of events of all projects matching the given status and since filters" in new TestCase {
+
+      val status = eventStatuses.generateOne
+      val infos  = eventInfos().generateFixedSizeList(ofSize = 3).map(_.copy(status = status))
+
+      infos foreach { info =>
+        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        storeEvent(
+          eventId,
+          info.status,
+          info.executionDate,
+          info.eventDate,
+          eventBodies.generateOne,
+          projectPath = info.projectPath,
+          maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
+        )
+      }
+
+      val _ :: mid :: youngest :: Nil = infos.sortBy(_.eventDate.value)
+
+      val pagedResults = eventsFinder
+        .findEvents(
+          Criteria(Filters.EventsWithStatus(status, Filters.EventsSince(mid.eventDate).some))
+        )
+        .unsafeRunSync()
+
+      val expectedResult = List(mid, youngest)
+      pagedResults.pagingInfo.total.value   shouldBe expectedResult.size
+      pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
+    }
+
+    "return the List of events of all projects matching the given status and until filters" in new TestCase {
+
+      val status = eventStatuses.generateOne
+      val infos  = eventInfos().generateFixedSizeList(ofSize = 3).map(_.copy(status = status))
+
+      infos foreach { info =>
+        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        storeEvent(
+          eventId,
+          info.status,
+          info.executionDate,
+          info.eventDate,
+          eventBodies.generateOne,
+          projectPath = info.projectPath,
+          maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
+        )
+      }
+
+      val oldest :: mid :: _ :: Nil = infos.sortBy(_.eventDate.value)
+
+      val pagedResults = eventsFinder
+        .findEvents(
+          Criteria(Filters.EventsWithStatus(status, Filters.EventsUntil(mid.eventDate).some))
+        )
+        .unsafeRunSync()
+
+      val expectedResult = List(oldest, mid)
+      pagedResults.pagingInfo.total.value   shouldBe expectedResult.size
+      pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
+    }
+
+    "return the List of events of all projects matching the given since filter" in new TestCase {
+
+      val infos = eventInfos().generateList(minElements = 3, maxElements = 10)
+
+      infos foreach { info =>
+        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        storeEvent(
+          eventId,
+          info.status,
+          info.executionDate,
+          info.eventDate,
+          eventBodies.generateOne,
+          projectPath = info.projectPath,
+          maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
+        )
+      }
+
+      val sinceFilter = Random.shuffle(infos.map(_.eventDate)).head
+
+      val pagedResults = eventsFinder
+        .findEvents(Criteria(Filters.EventsSince(sinceFilter)))
+        .unsafeRunSync()
+
+      val expectedResult = infos.filter(_.eventDate.value.compareTo(sinceFilter.value) >= 0)
+      pagedResults.pagingInfo.total.value   shouldBe expectedResult.size
+      pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
+    }
+
+    "return the List of events of all projects matching the given until filter" in new TestCase {
+
+      val infos = eventInfos().generateList(minElements = 3, maxElements = 10)
+
+      infos foreach { info =>
+        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        storeEvent(
+          eventId,
+          info.status,
+          info.executionDate,
+          info.eventDate,
+          eventBodies.generateOne,
+          projectPath = info.projectPath,
+          maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
+        )
+      }
+
+      val untilFilter = Random.shuffle(infos.map(_.eventDate)).head
+
+      val pagedResults = eventsFinder
+        .findEvents(Criteria(Filters.EventsUntil(untilFilter)))
+        .unsafeRunSync()
+
+      val expectedResult = infos.filter(_.eventDate.value.compareTo(untilFilter.value) <= 0)
+      pagedResults.pagingInfo.total.value   shouldBe expectedResult.size
+      pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
+      pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
+    }
+
+    "return the List of events of all projects matching the given since and until filters" in new TestCase {
+
+      val infos = eventInfos().generateList(minElements = 3, maxElements = 10)
+
+      infos foreach { info =>
+        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        storeEvent(
+          eventId,
+          info.status,
+          info.executionDate,
+          info.eventDate,
+          eventBodies.generateOne,
+          projectPath = info.projectPath,
+          maybeMessage = info.maybeMessage
+        )
+        info.processingTimes.foreach(processingTime =>
+          upsertProcessingTime(eventId, processingTime.status, processingTime.processingTime)
+        )
+      }
+
+      val filter = Random.shuffle(infos.map(_.eventDate)).head
+
+      val pagedResults = eventsFinder
+        .findEvents(Criteria(Filters.EventsSinceAndUntil(Filters.EventsSince(filter), Filters.EventsUntil(filter))))
+        .unsafeRunSync()
+
+      val expectedResult = infos.filter(_.eventDate == filter)
       pagedResults.pagingInfo.total.value   shouldBe expectedResult.size
       pagedResults.pagingInfo.pagingRequest shouldBe PagingRequest.default
       pagedResults.results                  shouldBe expectedResult.sortBy(_.eventDate).reverse
@@ -248,7 +485,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val pagedResults = eventsFinder
-        .findEvents(Criteria(Filters.EventsWithStatus(eventStatus), paging = pagingRequest))
+        .findEvents(Criteria(Filters.EventsWithStatus(eventStatus, maybeDates = None), paging = pagingRequest))
         .unsafeRunSync()
 
       pagedResults.pagingInfo.total.value   shouldBe 2
@@ -258,7 +495,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return an empty List if there's no project with the given path" in new TestCase {
       eventsFinder
-        .findEvents(Criteria(Filters.ProjectEvents(projectPath, None)))
+        .findEvents(Criteria(Filters.ProjectEvents(projectPath, maybeStatus = None, maybeDates = None)))
         .unsafeRunSync()
         .results shouldBe Nil
     }
