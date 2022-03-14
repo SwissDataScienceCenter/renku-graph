@@ -96,7 +96,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
         git.status.map(status => !status.contains("nothing to commit")) >>= {
           case true =>
             for {
-              _ <- git.rm(gitAttributeFilePath)
+              _ <- git rm gitAttributeFilePath
               _ <- git.`reset --hard`
               _ <- git.`rm --cached`
               _ <- git.`add -A`

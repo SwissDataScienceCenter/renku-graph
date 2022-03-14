@@ -143,7 +143,7 @@ private object Commands {
     }.void
 
     override def `rm --cached`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
-      %%("git", "rm", "--cached", ".")(repositoryDirectory.value)
+      %%("git", "rm", "-r", "--cached", ".")(repositoryDirectory.value)
     }.void
 
     override def `add -A`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
