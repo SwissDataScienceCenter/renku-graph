@@ -131,16 +131,14 @@ private object EventHandler {
                        )
                      )
     statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](gaugesUpdater))
-    _ <- registerHandlers(eventsQueue, statusChanger, queriesExecTimes, awaitingDeletionGauge, deletingGauge)
+    _             <- registerHandlers(eventsQueue, statusChanger, queriesExecTimes)
   } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queriesExecTimes)
 
   private def registerHandlers[F[_]: Async: Logger](eventsQueue: StatusChangeEventsQueue[F],
-                                                    statusChanger:         StatusChanger[F],
-                                                    queriesExecTimes:      LabeledHistogram[F],
-                                                    awaitingDeletionGauge: LabeledGauge[F, projects.Path],
-                                                    deletingGauge:         LabeledGauge[F, projects.Path]
+                                                    statusChanger:    StatusChanger[F],
+                                                    queriesExecTimes: LabeledHistogram[F]
   ) = for {
-    projectsToNewUpdater <- ProjectEventsToNewUpdater(queriesExecTimes, awaitingDeletionGauge, deletingGauge)
+    projectsToNewUpdater <- ProjectEventsToNewUpdater(queriesExecTimes)
     _ <- eventsQueue.register[ProjectEventsToNew](statusChanger.updateStatuses(_)(projectsToNewUpdater))
   } yield ()
 
