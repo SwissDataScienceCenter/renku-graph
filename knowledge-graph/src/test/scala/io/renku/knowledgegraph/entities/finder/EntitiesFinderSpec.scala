@@ -386,9 +386,9 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
   "findEntities - with date filter" should {
 
     "return entities with matching date only" in new TestCase {
-      val date = Filters.Date(dateParams.generateOne.value.minusDays(1))
+      val date = Filters.Date(dateParams.generateOne.value minusDays 1)
       val dateAsInstant = Instant
-        .from(date.value.atStartOfDay(ZoneOffset.UTC))
+        .from(date.value atStartOfDay ZoneOffset.UTC)
         .plusSeconds(positiveInts(60 * 60 * 24 - 1).generateOne.value)
 
       val matchingDS ::~ _ ::~ project = renkuProjectEntities(visibilityPublic)
@@ -423,7 +423,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .generateOne
       val plan :: _ = project.plans.toList
 
-      loadToStore(project, projectEntities(visibilityPublic).generateOne)
+      loadToStore(project)
 
       finder
         .findEntities(Criteria(Filters(maybeDate = date.some)))
