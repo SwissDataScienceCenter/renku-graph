@@ -31,9 +31,9 @@ import io.renku.eventlog.events.categories.statuschange.projectCleaner.ProjectCl
 import io.renku.eventlog.{EventDate, ExecutionDate}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus
-import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, New, Skipped}
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, Skipped}
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
 import skunk.implicits._
@@ -45,21 +45,16 @@ import scala.util.control.NonFatal
 private trait ProjectEventsToNewUpdater[F[_]] extends DBUpdater[F, ProjectEventsToNew]
 
 private object ProjectEventsToNewUpdater {
-  def apply[F[_]: Async: Logger](
-      queriesExecTimes:      LabeledHistogram[F],
-      awaitingDeletionGauge: LabeledGauge[F, projects.Path],
-      deletingEventGauge:    LabeledGauge[F, projects.Path]
-  ): F[DBUpdater[F, ProjectEventsToNew]] = ProjectCleaner[F](queriesExecTimes).map(
-    new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes, awaitingDeletionGauge, deletingEventGauge)
-  )
+  def apply[F[_]: Async: Logger](queriesExecTimes: LabeledHistogram[F]): F[DBUpdater[F, ProjectEventsToNew]] =
+    ProjectCleaner[F](queriesExecTimes).map(
+      new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes)
+    )
 }
 
 private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
-    projectCleaner:        ProjectCleaner[F],
-    queriesExecTimes:      LabeledHistogram[F],
-    awaitingDeletionGauge: LabeledGauge[F, projects.Path],
-    deletingEventGauge:    LabeledGauge[F, projects.Path],
-    now:                   () => Instant = () => Instant.now
+    projectCleaner:   ProjectCleaner[F],
+    queriesExecTimes: LabeledHistogram[F],
+    now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with ProjectEventsToNewUpdater[F] {
 
@@ -70,10 +65,9 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
     _                        <- removeProjectDeliveryInfo(event.project)
     removedAwaitingDeletions <- removeProjectEvents(event.project, AwaitingDeletion)
     removedDeletingEvents    <- removeProjectEvents(event.project, Deleting)
-    maybeLatestEventDate     <- getLatestEventDate(event.project)
+    maybeLatestEventDate     <- findLatestEventDate(event.project)
     _                        <- updateLatestEventDate(event.project)(maybeLatestEventDate)
     _                        <- cleanUpProjectIfGone(event.project)(maybeLatestEventDate)
-    _                        <- updateGauges(event.project, removedAwaitingDeletions, removedDeletingEvents)
   } yield DBUpdateResults.ForProjects(event.project.path,
                                       eventCountsByStatus(statuses, removedAwaitingDeletions, removedDeletingEvents)
   )
@@ -103,7 +97,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
                 SELECT event_id, project_id, status 
                 FROM event
                 WHERE project_id = $projectIdEncoder 
-                  AND #${`status IN`(EventStatus.all diff Set(Skipped, AwaitingDeletion, Deleting))}
+                  AND #${`status IN`(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))}
                 FOR UPDATE
               ) old_evt
               WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
@@ -156,19 +150,26 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
 
   private def removeProjectDeliveryInfo(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - delivery removal")
-      .command[projects.Id](
+      .command[projects.Id ~ projects.Id](
         sql"""DELETE FROM event_delivery 
-              WHERE project_id = $projectIdEncoder""".command
+              WHERE project_id = $projectIdEncoder
+                AND event_id NOT IN (
+                  SELECT e.event_id
+                  FROM event e
+                  WHERE e.project_id = $projectIdEncoder
+                    AND e.status = '#${GeneratingTriples.value}'
+                )""".command
       )
-      .arguments(project.id)
+      .arguments(project.id ~ project.id)
       .build
       .void
   }
 
-  private def getLatestEventDate(project: Project) = measureExecutionTime {
+  private def findLatestEventDate(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - get latest event date")
       .select[projects.Id, EventDate](
-        sql"""SELECT event_date FROM event 
+        sql"""SELECT event_date
+              FROM event 
               WHERE project_id = $projectIdEncoder 
               ORDER BY event_date DESC
               LIMIT 1""".query(eventDateDecoder)
@@ -177,24 +178,15 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
       .build(_.option)
   }
 
-  private def updateGauges(project: Project, awaitingDeletions: Int, deletings: Int): Kleisli[F, Session[F], Unit] =
-    Kleisli.liftF {
-      (
-        awaitingDeletionGauge.update(project.path -> -awaitingDeletions.toDouble),
-        deletingEventGauge.update(project.path    -> -deletings.toDouble)
-      ) mapN { case (_, _) => () }
-    }
-
   private def updateLatestEventDate(project: Project): Option[EventDate] => Kleisli[F, Session[F], Unit] = {
     case Some(eventDate) =>
       measureExecutionTime {
         SqlStatement(name = "project_to_new - set latest event date")
-          .command[EventDate ~ projects.Id](
-            sql"""UPDATE project
-              SET latest_event_date = $eventDateEncoder
-              WHERE project_id = $projectIdEncoder
-              """.command
-          )
+          .command[EventDate ~ projects.Id](sql"""
+            UPDATE project
+            SET latest_event_date = $eventDateEncoder
+            WHERE project_id = $projectIdEncoder
+            """.command)
           .arguments(eventDate ~ project.id)
           .build
           .void
