@@ -36,7 +36,6 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
-import io.renku.http.rest.paging.model.Total
 import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
@@ -86,9 +85,7 @@ class DatasetsSearchEndpointSpec
     }
 
     "respond with OK and an empty JSON array when no matching datasets found" in new TestCase {
-      val pagingResponse = PagingResponse
-        .from[IO, DatasetSearchResult](Nil, pagingRequest, Total(0))
-        .unsafeRunSync()
+      val pagingResponse = PagingResponse.empty[DatasetSearchResult](pagingRequest)
       (datasetsFinder.findDatasets _)
         .expects(maybePhrase, sort, pagingRequest, maybeAuthUser)
         .returning(pagingResponse.pure[IO])
@@ -190,22 +187,19 @@ class DatasetsSearchEndpointSpec
 
     private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
       Encoder.instance[(Set[DatasetCreator], Date)] {
-        case (creators, DatePublished(date)) =>
-          json"""{
+        case (creators, DatePublished(date)) => json"""{
           "creator": $creators,
           "datePublished": $date
         }"""
-        case (creators, _) =>
-          json"""{
+        case (creators, _) => json"""{
           "creator": $creators
         }"""
       }
 
     private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
-      case DatasetCreator(maybeEmail, name, _) =>
-        json"""{
-          "name": $name
-        }""" addIfDefined ("email" -> maybeEmail)
+      case DatasetCreator(maybeEmail, name, _) => json"""{
+        "name": $name
+      }""" addIfDefined ("email" -> maybeEmail)
     }
 
     private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =

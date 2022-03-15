@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, SameAs, TopmostSameAs}
-import io.renku.graph.model.users
+import io.renku.graph.model.persons
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -32,7 +32,7 @@ import org.typelevel.log4cats.Logger
 private trait KGDatasetInfoFinder[F[_]] {
   def findParentTopmostSameAs(idSameAs: InternalSameAs)(implicit ev: InternalSameAs.type): F[Option[TopmostSameAs]]
   def findTopmostSameAs(resourceId:     ResourceId)(implicit ev:     ResourceId.type):     F[Option[TopmostSameAs]]
-  def findDatasetCreators(resourceId:   ResourceId): F[Set[users.ResourceId]]
+  def findDatasetCreators(resourceId:   ResourceId): F[Set[persons.ResourceId]]
 }
 
 private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
@@ -84,8 +84,8 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
   private implicit val topmostSameAsInfo: SameAs => String     = _ => "topmostSameAs"
   private implicit val resourceIdInfo:    ResourceId => String = _ => "resourceId"
 
-  def findDatasetCreators(resourceId: ResourceId): F[Set[users.ResourceId]] =
-    queryExpecting[Set[users.ResourceId]](using = queryFindingCreators(resourceId))
+  def findDatasetCreators(resourceId: ResourceId): F[Set[persons.ResourceId]] =
+    queryExpecting[Set[persons.ResourceId]](using = queryFindingCreators(resourceId))
 
   private def queryFindingCreators(resourceId: ResourceId) = SparqlQuery.of(
     name = "transformation - find ds creators",
@@ -98,9 +98,9 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
         |""".stripMargin
   )
 
-  private implicit val creatorsDecoder: Decoder[Set[users.ResourceId]] = {
-    val creatorId: Decoder[users.ResourceId] =
-      _.downField("personId").downField("value").as[users.ResourceId]
+  private implicit val creatorsDecoder: Decoder[Set[persons.ResourceId]] = {
+    val creatorId: Decoder[persons.ResourceId] =
+      _.downField("personId").downField("value").as[persons.ResourceId]
     _.downField("results").downField("bindings").as(decodeList(creatorId)).map(_.toSet)
   }
 }

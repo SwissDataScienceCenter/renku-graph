@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.users.{Email, ResourceId}
+import io.renku.graph.model.persons.{Email, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.tinytypes.constraints.NonBlank
@@ -100,36 +100,36 @@ class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
 
   "apply(GitLabId)" should {
     "generate 'renkuBaseUrl/persons/gitLabId' ResourceId" in {
-      val gitLabId = userGitLabIds.generateOne
+      val gitLabId = personGitLabIds.generateOne
       ResourceId(gitLabId).show shouldBe (renkuBaseUrl / "persons" / gitLabId).show
     }
   }
 
   "apply(Email)" should {
     "generate 'mailto:email' ResourceId" in {
-      val email = userEmails.generateOne
+      val email = personEmails.generateOne
       ResourceId(email).show shouldBe show"mailto:$email"
     }
   }
 
   "apply(Name)" should {
     "generate 'renkuBaseUrl/persons/name' ResourceId" in {
-      val name = userNames.generateOne
+      val name = personNames.generateOne
       ResourceId(name).show shouldBe (renkuBaseUrl / "persons" / name).show
     }
   }
 
   "from(String)" should {
     "return ResourceId.GitLabIdBased for strings matching the url" in {
-      val resourceId = userGitLabResourceId.generateOne
+      val resourceId = personGitLabResourceId.generateOne
       ResourceId.from(resourceId.show) shouldBe resourceId.asRight
     }
     "return ResourceId.EmailBased for strings matching the url" in {
-      val resourceId = userEmailResourceId.generateOne
+      val resourceId = personEmailResourceId.generateOne
       ResourceId.from(resourceId.show) shouldBe resourceId.asRight
     }
     "return ResourceId.NameBased for strings matching the url" in {
-      val resourceId = userNameResourceId.generateOne
+      val resourceId = personNameResourceId.generateOne
       ResourceId.from(resourceId.show) shouldBe resourceId.asRight
     }
     "fail for an unrecognised urls" in {
@@ -144,7 +144,7 @@ class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
   "showAs[RdfResource]" should {
 
     "wrap the ResourceId in <> if the id doesn't contain email" in {
-      forAll(Gen.oneOf(userGitLabResourceId, userNameResourceId).widen[users.ResourceId]) { resourceId =>
+      forAll(Gen.oneOf(personGitLabResourceId, personNameResourceId).widen[persons.ResourceId]) { resourceId =>
         resourceId.showAs[RdfResource] shouldBe s"<${sparqlEncode(resourceId.show)}>"
       }
     }
@@ -162,12 +162,12 @@ class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
 
 class GitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  import users.GitLabId
+  import persons.GitLabId
 
   "parse" should {
 
     "return a GitLabId for valid id in String" in {
-      forAll(userGitLabIds) { gitLabId =>
+      forAll(personGitLabIds) { gitLabId =>
         GitLabId.parse(gitLabId.toString) shouldBe Right(gitLabId)
       }
     }

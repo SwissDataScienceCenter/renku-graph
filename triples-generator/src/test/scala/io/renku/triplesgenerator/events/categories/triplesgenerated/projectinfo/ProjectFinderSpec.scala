@@ -36,7 +36,7 @@ import io.renku.graph.model.entities.Project.GitLabProjectInfo
 import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.{GitLabUrl, projects, users}
+import io.renku.graph.model.{GitLabUrl, persons, projects}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder._
 import io.renku.interpreters.TestLogger
@@ -206,7 +206,7 @@ class ProjectFinderSpec
     }
   }
 
-  private def `/api/v4/users`(creatorId: users.GitLabId)(implicit maybeAccessToken: Option[AccessToken]) = new {
+  private def `/api/v4/users`(creatorId: persons.GitLabId)(implicit maybeAccessToken: Option[AccessToken]) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
       get(s"/api/v4/users/$creatorId")
         .withAccessToken(maybeAccessToken)

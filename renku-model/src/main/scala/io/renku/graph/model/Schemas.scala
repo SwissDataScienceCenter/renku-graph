@@ -29,9 +29,9 @@ trait Schemas {
   val text:   Schema = Schema.from("http://jena.apache.org/text", separator = "#")
   val wfdesc: Schema = Schema.from("http://purl.org/wf4ever/wfdesc", separator = "#")
   val wfprov: Schema = Schema.from("http://purl.org/wf4ever/wfprov", separator = "#")
-  val xml:    Schema = Schema.from("http://www.w3.org/2001/XMLSchema", separator = "#")
+  val xsd:    Schema = Schema.from("http://www.w3.org/2001/XMLSchema", separator = "#")
 
-  val all: Set[Schema] = Set(prov, rdf, rdfs, renku, schema, text, wfdesc, wfprov, xml)
+  val all: Set[Schema] = Set(prov, rdf, rdfs, renku, schema, text, wfdesc, wfprov, xsd)
 }
 
 object Schemas extends Schemas

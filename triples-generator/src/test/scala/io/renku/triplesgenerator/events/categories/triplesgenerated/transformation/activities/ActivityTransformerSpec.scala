@@ -22,9 +22,9 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.GraphModelGenerators.userResourceIds
+import io.renku.graph.model.GraphModelGenerators.personResourceIds
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{activities, entities, users}
+import io.renku.graph.model.{activities, entities, persons}
 import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
@@ -65,7 +65,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
 
         val exception = recoverableClientErrors.generateOne
         findingActivityAuthorFor(project.activities.head.resourceId,
-                                 returning = exception.raiseError[Try, Option[users.ResourceId]]
+                                 returning = exception.raiseError[Try, Option[persons.ResourceId]]
         )
 
         val step = transformer.createTransformationStep
@@ -87,7 +87,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
 
         val exception = recoverableClientErrors.generateOne
         findingAssociationPersonAgentFor(project.activities.head.resourceId,
-                                         returning = exception.raiseError[Try, Option[users.ResourceId]]
+                                         returning = exception.raiseError[Try, Option[persons.ResourceId]]
         )
 
         val step = transformer.createTransformationStep
@@ -107,7 +107,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
 
         val exception = exceptions.generateOne
         findingActivityAuthorFor(project.activities.head.resourceId,
-                                 returning = exception.raiseError[Try, Option[users.ResourceId]]
+                                 returning = exception.raiseError[Try, Option[persons.ResourceId]]
         )
 
         transformer.createTransformationStep.run(project).value shouldBe
@@ -125,7 +125,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
 
         val exception = exceptions.generateOne
         findingAssociationPersonAgentFor(project.activities.head.resourceId,
-                                         returning = exception.raiseError[Try, Option[users.ResourceId]]
+                                         returning = exception.raiseError[Try, Option[persons.ResourceId]]
         )
 
         transformer.createTransformationStep.run(project).value shouldBe
@@ -139,7 +139,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
     val transformer    = new ActivityTransformerImpl[Try](kgInfoFinder, updatesCreator)
 
     def givenAuthorUnlinking(activity: entities.Activity): List[SparqlQuery] = {
-      val maybeCreatorInKG = userResourceIds.generateOption
+      val maybeCreatorInKG = personResourceIds.generateOption
       findingActivityAuthorFor(activity.resourceId, returning = maybeCreatorInKG.pure[Try])
 
       val unlinkingQueries = sparqlQueries.generateList()
@@ -149,7 +149,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
     }
 
     def givenAgentUnlinking(activity: entities.Activity): List[SparqlQuery] = {
-      val maybePersonAgentInKG = userResourceIds.generateOption
+      val maybePersonAgentInKG = personResourceIds.generateOption
       findingAssociationPersonAgentFor(activity.resourceId, returning = maybePersonAgentInKG.pure[Try])
 
       val unlinkingQueries = sparqlQueries.generateList()
@@ -158,13 +158,15 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
       unlinkingQueries
     }
 
-    def findingActivityAuthorFor(resourceId: activities.ResourceId, returning: Try[Option[users.ResourceId]]) =
+    def findingActivityAuthorFor(resourceId: activities.ResourceId, returning: Try[Option[persons.ResourceId]]) =
       (kgInfoFinder
         .findActivityAuthor(_: activities.ResourceId))
         .expects(resourceId)
         .returning(returning)
 
-    def findingAssociationPersonAgentFor(resourceId: activities.ResourceId, returning: Try[Option[users.ResourceId]]) =
+    def findingAssociationPersonAgentFor(resourceId: activities.ResourceId,
+                                         returning:  Try[Option[persons.ResourceId]]
+    ) =
       (kgInfoFinder
         .findAssociationPersonAgent(_: activities.ResourceId))
         .expects(resourceId)
@@ -172,19 +174,19 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
 
     def prepareQueriesUnlinkingCreator(
         activity:      entities.Activity,
-        maybeKgAuthor: Option[users.ResourceId],
+        maybeKgAuthor: Option[persons.ResourceId],
         returning:     List[SparqlQuery]
     ) = (updatesCreator
-      .queriesUnlinkingAuthor(_: entities.Activity, _: Option[users.ResourceId]))
+      .queriesUnlinkingAuthor(_: entities.Activity, _: Option[persons.ResourceId]))
       .expects(activity, maybeKgAuthor)
       .returning(returning)
 
     def prepareQueriesUnlinkingAgent(
         activity:      entities.Activity,
-        maybeKgAuthor: Option[users.ResourceId],
+        maybeKgAuthor: Option[persons.ResourceId],
         returning:     List[SparqlQuery]
     ) = (updatesCreator
-      .queriesUnlinkingAgent(_: entities.Activity, _: Option[users.ResourceId]))
+      .queriesUnlinkingAgent(_: entities.Activity, _: Option[persons.ResourceId]))
       .expects(activity, maybeKgAuthor)
       .returning(returning)
   }

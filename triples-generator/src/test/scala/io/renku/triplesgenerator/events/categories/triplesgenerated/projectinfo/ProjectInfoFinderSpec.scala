@@ -26,7 +26,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.GraphModelGenerators.{projectPaths, userNames}
+import io.renku.graph.model.GraphModelGenerators.{personNames, projectPaths}
 import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects
@@ -164,7 +164,7 @@ class ProjectInfoFinderSpec
 
     "deduplicate members/creator if there are two members with the same GitLabId but different name - email exists case" in new TestCase {
       val sameMemberName1 = projectMembersNoEmail.generateOne
-      val sameMemberName2 = sameMemberName1.copy(name = userNames.generateOne)
+      val sameMemberName2 = sameMemberName1.copy(name = personNames.generateOne)
       val members         = Set(sameMemberName1, sameMemberName2).map(_.asInstanceOf[ProjectMember])
       val info            = gitLabProjectInfos.generateOne.copy(maybeCreator = None, members = members)
 
@@ -196,7 +196,7 @@ class ProjectInfoFinderSpec
 
     "deduplicate members/creator if there are two members with the same GitLabId but different name - no email case" in new TestCase {
       val sameMemberName1 = projectMembersNoEmail.generateOne
-      val sameMemberName2 = sameMemberName1.copy(name = userNames.generateOne)
+      val sameMemberName2 = sameMemberName1.copy(name = personNames.generateOne)
       val members         = Set(sameMemberName1, sameMemberName2).map(_.asInstanceOf[ProjectMember])
       val info            = gitLabProjectInfos.generateOne.copy(maybeCreator = None, members = members)
 

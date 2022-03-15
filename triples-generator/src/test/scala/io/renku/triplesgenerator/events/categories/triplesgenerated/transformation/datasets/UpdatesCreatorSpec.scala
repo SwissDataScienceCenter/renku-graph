@@ -24,7 +24,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{datasets, entities, users}
+import io.renku.graph.model.{datasets, entities, persons}
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -406,7 +406,7 @@ class UpdatesCreatorSpec
     (resourceId, sameAs, maybeTopmostSameAs)
   }
 
-  private def findCreators(resourceId: datasets.ResourceId): Set[users.ResourceId] =
+  private def findCreators(resourceId: datasets.ResourceId): Set[persons.ResourceId] =
     runQuery(s"""|SELECT ?personId
                  |WHERE {
                  |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
@@ -414,7 +414,7 @@ class UpdatesCreatorSpec
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
-      .map(row => users.ResourceId.from(row("personId")))
+      .map(row => persons.ResourceId.from(row("personId")))
       .sequence
       .fold(throw _, identity)
       .toSet

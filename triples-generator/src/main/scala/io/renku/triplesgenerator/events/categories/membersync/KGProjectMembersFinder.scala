@@ -23,9 +23,9 @@ import cats.syntax.all._
 import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.projects.{Path, ResourceId}
-import io.renku.graph.model.users.GitLabId
+import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{RenkuBaseUrl, projects, users}
+import io.renku.graph.model.{RenkuBaseUrl, persons, projects}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -53,7 +53,7 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger](
 
     val member: Decoder[KGProjectMember] = { cursor =>
       for {
-        memberId <- cursor.downField("memberId").downField("value").as[users.ResourceId]
+        memberId <- cursor.downField("memberId").downField("value").as[persons.ResourceId]
         gitLabId <- cursor.downField("gitLabId").downField("value").as[GitLabId]
       } yield KGProjectMember(memberId, gitLabId)
     }
@@ -83,4 +83,4 @@ private object KGProjectMembersFinder {
   } yield new KGProjectMembersFinderImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder)
 }
 
-private final case class KGProjectMember(resourceId: users.ResourceId, gitLabId: users.GitLabId)
+private final case class KGProjectMember(resourceId: persons.ResourceId, gitLabId: persons.GitLabId)

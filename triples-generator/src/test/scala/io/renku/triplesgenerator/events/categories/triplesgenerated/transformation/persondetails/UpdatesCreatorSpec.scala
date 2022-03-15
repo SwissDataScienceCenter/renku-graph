@@ -38,12 +38,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       "in case all of them were changed" in {
 
         val Some(kgPerson) = personEntities(withGitLabId, withEmail)
-          .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+          .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
           .generateOne
           .toMaybe[entities.Person.WithGitLabId]
-        val mergedPerson = kgPerson.copy(name = userNames.generateOne,
-                                         maybeEmail = userEmails.generateSome,
-                                         maybeAffiliation = userAffiliations.generateSome
+        val mergedPerson = kgPerson.copy(name = personNames.generateOne,
+                                         maybeEmail = personEmails.generateSome,
+                                         maybeAffiliation = personAffiliations.generateSome
         )
 
         loadToStore(kgPerson)
@@ -68,7 +68,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       "in case they are removed" in {
 
         val Some(kgPerson) = personEntities(withGitLabId, withEmail)
-          .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+          .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
           .generateOne
           .toMaybe[entities.Person.WithGitLabId]
         val mergedPerson = kgPerson.copy(maybeEmail = None, maybeAffiliation = None)
@@ -96,7 +96,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
     "generate no queries when person's name, email and affiliation are the same" in {
 
       val kgPerson = personEntities(withGitLabId, withEmail)
-        .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+        .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
         .generateOne
         .to[entities.Person]
 
@@ -109,12 +109,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
     "generate queries which delete person's duplicate name, email and/or affiliation" in {
 
       val Some(person) = personEntities(withGitLabId, withEmail)
-        .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+        .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
         .generateOne
         .toMaybe[entities.Person.WithGitLabId]
-      val duplicatePerson = person.copy(name = userNames.generateOne,
-                                        maybeEmail = userEmails.generateSome,
-                                        maybeAffiliation = userAffiliations.generateSome
+      val duplicatePerson = person.copy(name = personNames.generateOne,
+                                        maybeEmail = personEmails.generateSome,
+                                        maybeAffiliation = personAffiliations.generateSome
       )
 
       loadToStore(person, duplicatePerson)
@@ -147,7 +147,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
     "generate queries which do nothing if there are no duplicates" in {
 
       val Some(person) = personEntities(withGitLabId, withEmail)
-        .map(_.copy(maybeAffiliation = userAffiliations.generateSome))
+        .map(_.copy(maybeAffiliation = personAffiliations.generateSome))
         .generateOne
         .toMaybe[entities.Person.WithGitLabId]
 

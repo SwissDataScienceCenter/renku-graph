@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel}
 import io.renku.db.{DbClient, SqlStatement}
+import io.renku.eventlog
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.{Criteria, EventInfo, StatusProcessingTime}
@@ -76,11 +77,51 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
         AND prj.project_path = $projectPathEncoder 
       """
 
+      private val whereEventDate: Option[Criteria.FiltersOnDate] => AppliedFragment = {
+        case Some(Criteria.Filters.EventsSince(since)) =>
+          val fragment: Fragment[eventlog.EventDate] = sql"""
+            WHERE evt.event_date >= $eventDateEncoder
+          """
+          fragment(since)
+        case Some(Criteria.Filters.EventsUntil(until)) =>
+          val fragment: Fragment[eventlog.EventDate] = sql"""
+            WHERE evt.event_date <= $eventDateEncoder
+          """
+          fragment(until)
+        case Some(Criteria.Filters.EventsSinceAndUntil(since, until)) =>
+          val fragment: Fragment[(eventlog.EventDate ~ eventlog.EventDate)] = sql"""
+            WHERE evt.event_date >= $eventDateEncoder
+              AND evt.event_date <= $eventDateEncoder
+          """
+          fragment(since.eventDate ~ until.eventDate)
+        case None => AppliedFragment.empty
+      }
+
+      private val andEventDate: Option[Criteria.FiltersOnDate] => AppliedFragment = {
+        case Some(Criteria.Filters.EventsSince(since)) =>
+          val fragment: Fragment[eventlog.EventDate] = sql"""
+            AND evt.event_date >= $eventDateEncoder
+          """
+          fragment(since)
+        case Some(Criteria.Filters.EventsUntil(until)) =>
+          val fragment: Fragment[eventlog.EventDate] = sql"""
+            AND evt.event_date <= $eventDateEncoder
+          """
+          fragment(until)
+        case Some(Criteria.Filters.EventsSinceAndUntil(since, until)) =>
+          val fragment: Fragment[eventlog.EventDate ~ eventlog.EventDate] = sql"""
+            AND evt.event_date >= $eventDateEncoder
+            AND evt.event_date <= $eventDateEncoder
+          """
+          fragment(since.eventDate ~ until.eventDate)
+        case None => AppliedFragment.empty
+      }
+
       private val joinProcessingTime: Fragment[Void] = sql"""
         LEFT JOIN status_processing_time times ON evt.event_id = times.event_id AND evt.project_id = times.project_id
       """
 
-      private val statusFilter: Fragment[EventStatus] = sql"""
+      private val whereStatus: Fragment[EventStatus] = sql"""
         WHERE evt.status = $eventStatusEncoder
       """
 
@@ -100,28 +141,39 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
       """
 
       private def selectEventInfoQuery: EventsEndpoint.Criteria => AppliedFragment = {
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath, None), sorting, paging) =>
+        case Criteria(Criteria.Filters.ProjectEvents(projectPath, None, maybeDates), sorting, paging) =>
           selectEventInfo(Void) |+|
             joinProject(Void) |+|
             filterByProject(projectPath) |+|
             joinProcessingTime(Void) |+|
+            whereEventDate(maybeDates) |+|
             groupBy(Void) |+|
             orderBy(sorting)(Void) |+|
             paginate(((paging.page.value - 1) * paging.perPage.value) ~ paging.perPage)
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath, Some(status)), sorting, paging) =>
+        case Criteria(Criteria.Filters.ProjectEvents(projectPath, Some(status), maybeDates), sorting, paging) =>
           selectEventInfo(Void) |+|
             joinProject(Void) |+|
             filterByProject(projectPath) |+|
             joinProcessingTime(Void) |+|
-            statusFilter(status) |+|
+            whereStatus(status) |+|
+            andEventDate(maybeDates) |+|
             groupBy(Void) |+|
             orderBy(sorting)(Void) |+|
             paginate(((paging.page.value - 1) * paging.perPage.value) ~ paging.perPage)
-        case Criteria(Criteria.Filters.EventsWithStatus(status), sorting, paging) =>
+        case Criteria(Criteria.Filters.EventsWithStatus(status, maybeDates), sorting, paging) =>
           selectEventInfo(Void) |+|
             joinProject(Void) |+|
             joinProcessingTime(Void) |+|
-            statusFilter(status) |+|
+            whereStatus(status) |+|
+            andEventDate(maybeDates) |+|
+            groupBy(Void) |+|
+            orderBy(sorting)(Void) |+|
+            paginate(((paging.page.value - 1) * paging.perPage.value) ~ paging.perPage)
+        case Criteria(dates: Criteria.FiltersOnDate, sorting, paging) =>
+          selectEventInfo(Void) |+|
+            joinProject(Void) |+|
+            joinProcessingTime(Void) |+|
+            whereEventDate(dates.some) |+|
             groupBy(Void) |+|
             orderBy(sorting)(Void) |+|
             paginate(((paging.page.value - 1) * paging.perPage.value) ~ paging.perPage)
@@ -182,31 +234,34 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
       }
 
       private def countEventQuery: EventsEndpoint.Criteria => AppliedFragment = {
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath, None), _, _) =>
+        case Criteria(Criteria.Filters.ProjectEvents(projectPath, None, maybeDates), _, _) =>
           val query: Fragment[projects.Path] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)
              FROM event evt
              JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
            """
-          query(projectPath)
-        case Criteria(Criteria.Filters.ProjectEvents(projectPath, Some(status)), _, _) =>
+          query(projectPath) |+| whereEventDate(maybeDates)
+        case Criteria(Criteria.Filters.ProjectEvents(projectPath, Some(status), maybeDates), _, _) =>
           val query: Fragment[projects.Path ~ EventStatus] = sql"""
              SELECT COUNT(DISTINCT evt.event_id)
              FROM event evt
              JOIN project prj ON evt.project_id = prj.project_id AND prj.project_path = $projectPathEncoder
              WHERE evt.status = $eventStatusEncoder
            """
-          query(projectPath ~ status)
-        case Criteria(Criteria.Filters.EventsWithStatus(status), _, _) =>
+          query(projectPath ~ status) |+| andEventDate(maybeDates)
+        case Criteria(Criteria.Filters.EventsWithStatus(status, maybeDates), _, _) =>
           val query: Fragment[EventStatus] = sql"""
-             SELECT COUNT(*)
-             FROM (
-                SELECT evt.event_id, evt.project_id FROM event evt
-                WHERE evt.status = $eventStatusEncoder
-                GROUP BY evt.event_id, evt.project_id
-             ) event
+             SELECT COUNT(DISTINCT(evt.event_id, evt.project_id)) 
+             FROM event evt
+             WHERE evt.status = $eventStatusEncoder
            """
-          query(status)
+          query(status) |+| andEventDate(maybeDates)
+        case Criteria(dates: Criteria.FiltersOnDate, _, _) =>
+          val query: Fragment[Void] = sql"""
+             SELECT COUNT(DISTINCT(evt.event_id, evt.project_id)) 
+             FROM event evt
+           """
+          query(Void) |+| whereEventDate(dates.some)
       }
 
       override def findTotal(): F[Total] = SessionResource[F].useK {
@@ -227,7 +282,5 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
 
 private object EventsFinder {
   def apply[F[_]: Async: NonEmptyParallel: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventsFinder[F]] =
-    MonadThrow[F].catchNonFatal(
-      new EventsFinderImpl(queriesExecTimes)
-    )
+    MonadThrow[F].catchNonFatal(new EventsFinderImpl(queriesExecTimes))
 }

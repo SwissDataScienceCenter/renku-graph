@@ -22,19 +22,19 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.entities.{Activity, Association}
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{entities, users}
+import io.renku.graph.model.{entities, persons}
 import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
-  def queriesUnlinkingAuthor(activity: entities.Activity, maybeKgAuthor: Option[users.ResourceId]): List[SparqlQuery]
-  def queriesUnlinkingAgent(activity:  entities.Activity, maybeKgAuthor: Option[users.ResourceId]): List[SparqlQuery]
+  def queriesUnlinkingAuthor(activity: entities.Activity, maybeKgAuthor: Option[persons.ResourceId]): List[SparqlQuery]
+  def queriesUnlinkingAgent(activity:  entities.Activity, maybeKgAuthor: Option[persons.ResourceId]): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
 
   override def queriesUnlinkingAuthor(activity:      Activity,
-                                      maybeKgAuthor: Option[users.ResourceId]
+                                      maybeKgAuthor: Option[persons.ResourceId]
   ): List[SparqlQuery] = {
     val activityAuthor = activity.author.resourceId
     Option
@@ -56,7 +56,7 @@ private object UpdatesCreator extends UpdatesCreator {
       .toList
   }
 
-  override def queriesUnlinkingAgent(activity: Activity, maybeKgAgent: Option[users.ResourceId]): List[SparqlQuery] =
+  override def queriesUnlinkingAgent(activity: Activity, maybeKgAgent: Option[persons.ResourceId]): List[SparqlQuery] =
     activity.association match {
       case _:     Association.WithRenkuAgent => List.empty
       case assoc: Association.WithPersonAgent =>

@@ -54,17 +54,18 @@ object PagingRequest {
 
     private implicit val perPageParameterDecoder: QueryParamDecoder[PerPage] =
       value =>
-        Either
-          .catchOnly[NumberFormatException](value.value.toInt)
-          .flatMap(PerPage.from)
-          .leftMap(_ => new IllegalArgumentException(perPage.errorMessage(value.value)))
-          .leftMap(_.getMessage)
-          .leftMap(ParseFailure(_, ""))
-          .toValidatedNel
+        value.value.toIntOption match {
+          case None                  => ParseFailure(perPage.errorMessage(value.value), "").invalidNel[PerPage]
+          case Some(int) if int <= 0 => ParseFailure(perPage.errorMessage(value.value), "").invalidNel[PerPage]
+          case Some(int) if int > PerPage.max.value =>
+            ParseFailure(s"'$int' not a valid PerPage value. Max value is ${PerPage.max}", "").invalidNel[PerPage]
+          case Some(int) =>
+            PerPage.from(int).leftMap(_ => ParseFailure(perPage.errorMessage(value.value), "")).toValidatedNel
+        }
 
     object perPage extends OptionalValidatingQueryParamDecoderMatcher[PerPage]("per_page") {
       val parameterName:               String = "per_page"
-      def errorMessage(value: String): String = s"'$value' not a valid PerPage number"
+      def errorMessage(value: String): String = s"'$value' not a valid PerPage value"
     }
   }
 }

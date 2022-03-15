@@ -25,7 +25,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person.{entityTypes, gitLabIdEncoder}
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, users}
+import io.renku.graph.model.{entities, persons}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
@@ -39,13 +39,13 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
     "use the Person resourceId if there's no GitLabId" in {
       val person = personEntities(withoutGitLabId).generateOne.to[entities.Person]
-      person.asJsonLD.cursor.downEntityId.as[users.ResourceId] shouldBe person.resourceId.asRight
+      person.asJsonLD.cursor.downEntityId.as[persons.ResourceId] shouldBe person.resourceId.asRight
     }
 
     "use the resourceId based on person's GitLabId if it exists" in {
-      val gitLabId = userGitLabIds.generateOne
+      val gitLabId = personGitLabIds.generateOne
       forAll(personEntities().map(_.copy(maybeGitLabId = gitLabId.some))) { person =>
-        person.asJsonLD.cursor.downEntityId.as[users.ResourceId] shouldBe users.ResourceId(gitLabId).asRight
+        person.asJsonLD.cursor.downEntityId.as[persons.ResourceId] shouldBe persons.ResourceId(gitLabId).asRight
       }
     }
   }
@@ -59,9 +59,9 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
     }
 
     "turn JsonLD Person entity with multiple names" in {
-      val resourceId = userNameResourceId.generateOne
-      val firstName  = userNames.generateOne
-      val secondName = userNames.generateOne
+      val resourceId = personNameResourceId.generateOne
+      val firstName  = personNames.generateOne
+      val secondName = personNames.generateOne
       val jsonLDPerson = JsonLD.entity(
         resourceId.asEntityId,
         entityTypes,
@@ -74,10 +74,10 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
     }
 
     "take the last Affiliation in case of multiple for a Person" in {
-      val resourceId   = userNameResourceId.generateOne
-      val name         = userNames.generateOne
-      val affiliation1 = userAffiliations.generateOne
-      val affiliation2 = userAffiliations.generateOne
+      val resourceId   = personNameResourceId.generateOne
+      val name         = personNames.generateOne
+      val affiliation1 = personAffiliations.generateOne
+      val affiliation2 = personAffiliations.generateOne
       val jsonLDPerson = JsonLD.entity(
         resourceId.asEntityId,
         entityTypes,
@@ -89,11 +89,11 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
     }
 
     "fail if there's no name for a Person" in {
-      val resourceId = userResourceIds.generateOne
+      val resourceId = personResourceIds.generateOne
       val jsonLDPerson = JsonLD.entity(
         resourceId.asEntityId,
         entityTypes,
-        schema / "email" -> userEmails.generateOne.asJsonLD
+        schema / "email" -> personEmails.generateOne.asJsonLD
       )
 
       val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
@@ -102,14 +102,14 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
     }
 
     "fail if person's ResourceId does not match the GitLabId based ResourceId if GitLabId given" in {
-      forAll(Gen.oneOf(userEmailResourceId, userNameResourceId).widen[users.ResourceId],
-             userGitLabIds,
-             userEmails.toGeneratorOfOptions
+      forAll(Gen.oneOf(personEmailResourceId, personNameResourceId).widen[persons.ResourceId],
+             personGitLabIds,
+             personEmails.toGeneratorOfOptions
       ) { (invalidResourceId, gitLabId, maybeEmail) =>
         val jsonLDPerson = JsonLD.entity(
           invalidResourceId.asEntityId,
           entityTypes,
-          schema / "name"   -> userNames.generateOne.asJsonLD,
+          schema / "name"   -> personNames.generateOne.asJsonLD,
           schema / "email"  -> maybeEmail.asJsonLD,
           schema / "sameAs" -> gitLabId.asJsonLD(gitLabIdEncoder)
         )
@@ -121,34 +121,34 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
     }
 
     "fail if person's ResourceId does not match the Email based ResourceId if no GitLabId but Email given" in {
-      forAll(Gen.oneOf(userGitLabResourceId, userNameResourceId).widen[users.ResourceId], userEmails) {
+      forAll(Gen.oneOf(personGitLabResourceId, personNameResourceId).widen[persons.ResourceId], personEmails) {
         (invalidResourceId, email) =>
           val jsonLDPerson = JsonLD.entity(
             invalidResourceId.asEntityId,
             entityTypes,
-            schema / "name"  -> userNames.generateOne.asJsonLD,
+            schema / "name"  -> personNames.generateOne.asJsonLD,
             schema / "email" -> email.asJsonLD
           )
 
           val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
           failure shouldBe a[DecodingFailure]
           failure.message shouldBe show"Invalid Person with $invalidResourceId, " +
-            show"gitLabId = ${Option.empty[users.GitLabId]}, email = ${email.some}"
+            show"gitLabId = ${Option.empty[persons.GitLabId]}, email = ${email.some}"
       }
     }
 
     "fail if person's ResourceId does not match the Name based ResourceId if no GitLabId and Email given" in {
-      forAll(Gen.oneOf(userGitLabResourceId, userEmailResourceId).widen[users.ResourceId]) { invalidResourceId =>
+      forAll(Gen.oneOf(personGitLabResourceId, personEmailResourceId).widen[persons.ResourceId]) { invalidResourceId =>
         val jsonLDPerson = JsonLD.entity(
           invalidResourceId.asEntityId,
           entityTypes,
-          schema / "name" -> userNames.generateOne.asJsonLD
+          schema / "name" -> personNames.generateOne.asJsonLD
         )
 
         val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
         failure shouldBe a[DecodingFailure]
         failure.message shouldBe show"Invalid Person with $invalidResourceId, " +
-          show"gitLabId = ${Option.empty[users.GitLabId]}, email = ${Option.empty[users.Email]}"
+          show"gitLabId = ${Option.empty[persons.GitLabId]}, email = ${Option.empty[persons.Email]}"
       }
     }
   }

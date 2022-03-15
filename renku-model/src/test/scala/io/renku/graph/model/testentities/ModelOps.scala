@@ -38,12 +38,12 @@ import io.renku.jsonld.syntax._
 trait ModelOps extends Dataset.ProvenanceOps {
 
   implicit class PersonOps(person: Person) {
-    lazy val resourceId: users.ResourceId = person.maybeGitLabId match {
-      case Some(gitLabId) => users.ResourceId(gitLabId)
+    lazy val resourceId: persons.ResourceId = person.maybeGitLabId match {
+      case Some(gitLabId) => persons.ResourceId(gitLabId)
       case None =>
         person.maybeEmail match {
-          case Some(email) => users.ResourceId(email)
-          case None        => users.ResourceId(person.name)
+          case Some(email) => persons.ResourceId(email)
+          case None        => persons.ResourceId(person.name)
         }
     }
 
@@ -278,29 +278,22 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def makeNameContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
-      dataset.copy(
-        identification = dataset.identification.copy(name =
-          sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
-        )
-      )
+      replaceDSName(to = sentenceContaining(nonEmptyPhrase).map(Name.apply).generateOne)(dataset)
     }
 
     def makeTitleContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
       dataset.copy(
-        identification = dataset.identification.copy(title =
-          sentenceContaining(nonEmptyPhrase).map(_.value).map(Title.apply).generateOne
-        )
+        identification =
+          dataset.identification.copy(title = sentenceContaining(nonEmptyPhrase).map(Title.apply).generateOne)
       )
     }
 
-    def makeCreatorNameContaining(phrase: String)(implicit provenanceUpdater: (users.Name, P) => P): Dataset[P] = {
+    def makeCreatorNameContaining(phrase: String)(implicit provenanceUpdater: (persons.Name, P) => P): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
       dataset.copy(
         provenance =
-          provenanceUpdater(sentenceContaining(nonEmptyPhrase).map(_.value).map(users.Name.apply).generateOne,
-                            dataset.provenance
-          )
+          provenanceUpdater(sentenceContaining(nonEmptyPhrase).map(persons.Name.apply).generateOne, dataset.provenance)
       )
     }
 
@@ -310,11 +303,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
 
     def makeDescContaining(phrase: String): Dataset[P] =
-      dataset.copy(additionalInfo =
-        dataset.additionalInfo.copy(maybeDescription =
-          sentenceContaining(Refined.unsafeApply(phrase)).map(_.value).map(Description.apply).generateSome
-        )
-      )
+      replaceDSDesc(to = sentenceContaining(Refined.unsafeApply(phrase)).map(Description.apply).generateSome)(dataset)
   }
 
   type ProvenanceImportFactory[OldProvenance <: Dataset.Provenance, NewProvenance <: Dataset.Provenance] =
@@ -400,32 +389,32 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
 
   implicit val creatorUsernameUpdaterInternal
-      : (users.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal = { case (userName, prov) =>
+      : (persons.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal = { case (userName, prov) =>
     prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 
   implicit val creatorUsernameUpdaterImportedInternalAncestorInternal
-      : (users.Name,
+      : (persons.Name,
          Dataset.Provenance.ImportedInternalAncestorInternal
       ) => Dataset.Provenance.ImportedInternalAncestorInternal = { case (userName, prov) =>
     prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 
   implicit val creatorUsernameUpdaterImportedInternalAncestorExternal
-      : (users.Name,
+      : (persons.Name,
          Dataset.Provenance.ImportedInternalAncestorExternal
       ) => Dataset.Provenance.ImportedInternalAncestorExternal = { case (userName, prov) =>
     prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 
   implicit val creatorUsernameUpdaterImportedExternal
-      : (users.Name, Dataset.Provenance.ImportedExternal) => Dataset.Provenance.ImportedExternal = {
+      : (persons.Name, Dataset.Provenance.ImportedExternal) => Dataset.Provenance.ImportedExternal = {
     case (userName, prov) =>
       prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 
   implicit val creatorUsernameUpdaterModified
-      : (users.Name, Dataset.Provenance.Modified) => Dataset.Provenance.Modified = { case (userName, prov) =>
+      : (persons.Name, Dataset.Provenance.Modified) => Dataset.Provenance.Modified = { case (userName, prov) =>
     prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
   }
 

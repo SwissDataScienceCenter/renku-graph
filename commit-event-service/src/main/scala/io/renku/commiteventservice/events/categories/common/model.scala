@@ -22,8 +22,8 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{New, Skipped}
 import io.renku.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects.{Id, Path, Visibility}
-import io.renku.graph.model.users.Email
-import io.renku.graph.model.{projects, users}
+import io.renku.graph.model.persons.Email
+import io.renku.graph.model.{persons, projects}
 
 private[categories] final case class ProjectInfo(
     id:         Id,
@@ -80,7 +80,7 @@ private[categories] object CommitEvent {
 }
 
 private[categories] sealed trait Person extends Product with Serializable {
-  def name: users.Name
+  def name: persons.Name
 }
 
 private[categories] object Person {
@@ -104,20 +104,20 @@ import io.renku.commiteventservice.events.categories.common.Person._
 
 private[categories] sealed trait Author extends Person
 private[categories] object Author {
-  final case class FullAuthor(name: users.Name, email: Email) extends Author with WithEmail
-  final case class AuthorWithName(name: users.Name)           extends Author
+  final case class FullAuthor(name: persons.Name, email: Email) extends Author with WithEmail
+  final case class AuthorWithName(name: persons.Name)           extends Author
 
-  def apply(username: users.Name, email: Email): Author = FullAuthor(username, email)
-  def withName(username: users.Name):            Author = AuthorWithName(username)
-  def withEmail(email: Email):                   Author = FullAuthor(email.extractName, email)
+  def apply(username: persons.Name, email: Email): Author = FullAuthor(username, email)
+  def withName(username: persons.Name):            Author = AuthorWithName(username)
+  def withEmail(email: Email):                     Author = FullAuthor(email.extractName, email)
 }
 
 private[categories] sealed trait Committer extends Person
 private[categories] object Committer {
-  final case class FullCommitter(name: users.Name, email: Email) extends Committer with WithEmail
-  final case class CommitterWithName(name: users.Name)           extends Committer
+  final case class FullCommitter(name: persons.Name, email: Email) extends Committer with WithEmail
+  final case class CommitterWithName(name: persons.Name)           extends Committer
 
-  def apply(username: users.Name, email: Email): Committer = FullCommitter(username, email)
-  def withName(username: users.Name):            Committer = CommitterWithName(username)
-  def withEmail(email: Email):                   Committer = FullCommitter(email.extractName, email)
+  def apply(username: persons.Name, email: Email): Committer = FullCommitter(username, email)
+  def withName(username: persons.Name):            Committer = CommitterWithName(username)
+  def withEmail(email: Email):                     Committer = FullCommitter(email.extractName, email)
 }

@@ -21,8 +21,8 @@ package io.renku.triplesgenerator.events.categories.membersync
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.Schemas.schema
-import io.renku.graph.model.users
-import io.renku.graph.model.users.{GitLabId, ResourceId}
+import io.renku.graph.model.persons
+import io.renku.graph.model.persons.{GitLabId, ResourceId}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -68,8 +68,8 @@ private class KGPersonFinderImpl[F[_]: Async: Logger](
 
     val tuples: Decoder[(GitLabId, ResourceId)] = { cursor =>
       for {
-        personId <- cursor.downField("personId").downField("value").as[users.ResourceId]
-        gitLabId <- cursor.downField("gitLabId").downField("value").as[users.GitLabId]
+        personId <- cursor.downField("personId").downField("value").as[persons.ResourceId]
+        gitLabId <- cursor.downField("gitLabId").downField("value").as[persons.GitLabId]
       } yield gitLabId -> personId
     }
 

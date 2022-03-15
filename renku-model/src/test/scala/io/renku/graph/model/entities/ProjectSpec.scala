@@ -46,7 +46,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   "ProjectMember.add" should {
     "add the given email to the Project without an email" in {
       val member = projectMembersNoEmail.generateOne
-      val email  = userEmails.generateOne
+      val email  = personEmails.generateOne
 
       (member add email) shouldBe ProjectMember.ProjectMemberWithEmail(member.name,
                                                                        member.username,
@@ -234,7 +234,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
       val Left(error) = JsonLD
         .arr(jsonLD,
-             JsonLD.entity(userResourceIds.generateOne.asEntityId,
+             JsonLD.entity(personResourceIds.generateOne.asEntityId,
                            entities.Person.entityTypes,
                            Map.empty[Property, JsonLD]
              )
@@ -803,19 +803,19 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     lazy val toPerson: entities.Person = gitLabPerson match {
       case ProjectMemberNoEmail(name, _, gitLabId) =>
-        entities.Person.WithGitLabId(users.ResourceId(gitLabId),
+        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
                                      gitLabId,
                                      name,
                                      maybeEmail = None,
                                      maybeAffiliation = None
         )
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        entities.Person.WithGitLabId(users.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
+        entities.Person.WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
     }
 
     private def nameFromUsernameOrName(member: ProjectMember) =
       if (Random.nextBoolean()) member.name
-      else users.Name(member.username.value)
+      else persons.Name(member.username.value)
   }
 
   private def activityWith(author: entities.Person): projects.DateCreated => entities.Activity = dateCreated =>

@@ -61,11 +61,11 @@ class GitLabAuthenticatorImpl[F[_]: Async: Temporal: Logger](
 
   private def decoder(accessToken: AccessToken): EntityDecoder[F, AuthUser] = {
 
-    import io.renku.graph.model.users
+    import io.renku.graph.model.persons
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     implicit lazy val userDecoder: Decoder[AuthUser] = { cursor =>
-      cursor.downField("id").as[users.GitLabId].map(AuthUser(_, accessToken))
+      cursor.downField("id").as[persons.GitLabId].map(AuthUser(_, accessToken))
     }
 
     jsonOf[F, AuthUser]

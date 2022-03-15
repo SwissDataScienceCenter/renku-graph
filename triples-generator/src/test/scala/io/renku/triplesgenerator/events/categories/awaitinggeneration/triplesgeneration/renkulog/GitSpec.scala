@@ -52,7 +52,7 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
     ) foreach { failure =>
       s"return AuthRecoverableError if command fails with a message '$failure'" in new TestCase {
 
-        val errorMessage = sentenceContaining(failure).generateOne.value
+        val errorMessage = sentenceContaining(failure).generateOne
         val commandResultException = ShelloutException {
           CommandResult(
             exitCode = 1,
@@ -77,8 +77,7 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
       "Failed to connect to renkulab.io port 443: Host is unreachable"
     ) foreach { error =>
       s"return LogWorthyRecoverableError if command fails with a message containing '$error'" in new TestCase {
-
-        val errorMessage = sentenceContaining(error).generateOne.value
+        val errorMessage = sentenceContaining(error).generateOne
         val commandResultException = ShelloutException {
           CommandResult(
             exitCode = 1,
@@ -105,7 +104,7 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
     ) foreach { error =>
       s"return ProcessingNonRecoverableError.MalformedRepository if command fails with a message containing '$error'" in new TestCase {
 
-        val errorMessage = sentenceContaining(error).generateOne.value
+        val errorMessage = sentenceContaining(error).generateOne
         val commandResultException = ShelloutException {
           CommandResult(
             exitCode = 1,

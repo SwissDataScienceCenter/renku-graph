@@ -23,7 +23,7 @@ import io.renku.commiteventservice.events.categories.common.CommitEvent.{NewComm
 import io.renku.events.consumers.ConsumersModelGenerators._
 import io.renku.generators.Generators.listOf
 import io.renku.graph.model.EventsGenerators.{batchDates, commitIds, commitMessages, committedDates}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities, userEmails, userNames}
+import io.renku.graph.model.GraphModelGenerators.{personEmails, personNames, projectIds, projectPaths, projectVisibilities}
 import io.renku.graph.model.events.CommitId
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
@@ -73,20 +73,20 @@ private[categories] object Generators {
   } yield SkippedCommitEvent(commitId, project, message, committedDate, author, committer, parentsIds, batchDate)
 
   implicit lazy val authors: Gen[Author] = Gen.oneOf(
-    userNames map Author.withName,
-    userEmails map Author.withEmail,
+    personNames map Author.withName,
+    personEmails map Author.withEmail,
     for {
-      username <- userNames
-      email    <- userEmails
+      username <- personNames
+      email    <- personEmails
     } yield Author(username, email)
   )
 
   implicit lazy val committers: Gen[Committer] = Gen.oneOf(
-    userNames map Committer.withName,
-    userEmails map Committer.withEmail,
+    personNames map Committer.withName,
+    personEmails map Committer.withEmail,
     for {
-      username <- userNames
-      email    <- userEmails
+      username <- personNames
+      email    <- personEmails
     } yield Committer(username, email)
   )
 

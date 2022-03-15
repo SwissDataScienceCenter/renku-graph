@@ -27,7 +27,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.GraphModelGenerators.userGitLabIds
+import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security._
 import io.renku.http.server.security.model.AuthUser
@@ -48,7 +48,7 @@ class GitLabAuthenticatorSpec extends AnyWordSpec with IOSpec with should.Matche
     "use the given access token to call GitLab's GET /user endpoint " +
       "and return authorized user if GitLab responds with OK" in new TestCase {
 
-        val userId = userGitLabIds.generateOne
+        val userId = personGitLabIds.generateOne
         `/api/v4/user`(accessToken.toHeader).returning(okJson(json"""{"id": ${userId.value}}""".noSpaces))
 
         authenticator.authenticate(accessToken).unsafeRunSync() shouldBe Right(AuthUser(userId, accessToken))

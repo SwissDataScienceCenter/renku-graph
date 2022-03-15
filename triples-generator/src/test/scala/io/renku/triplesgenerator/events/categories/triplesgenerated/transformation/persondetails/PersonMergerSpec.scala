@@ -37,7 +37,7 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
 
     "fail if both objects have different ResourceIds" in {
       val model = personEntities(withGitLabId).generateOne.to[entities.Person]
-      val kg    = model.add(userGitLabIds.generateOne)
+      val kg    = model.add(personGitLabIds.generateOne)
 
       val Failure(error) = merge[Try](model, kg)
 
@@ -49,9 +49,9 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
       forAll(personEntities(withGitLabId) map (_.toMaybe[entities.Person.WithGitLabId])) {
         case Some(model) =>
           val kg = model.copy(
-            name = userNames.generateOne,
-            maybeEmail = userEmails.generateOption,
-            maybeAffiliation = userAffiliations.generateOption
+            name = personNames.generateOne,
+            maybeEmail = personEmails.generateOption,
+            maybeAffiliation = personAffiliations.generateOption
           )
 
           merge[Try](model, kg) shouldBe model
@@ -68,8 +68,8 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
       forAll(personEntities(withoutGitLabId, withEmail) map (_.toMaybe[entities.Person.WithEmail])) {
         case Some(model) =>
           val kg = model.copy(
-            name = userNames.generateOne,
-            maybeAffiliation = userAffiliations.generateOption
+            name = personNames.generateOne,
+            maybeAffiliation = personAffiliations.generateOption
           )
 
           merge[Try](model, kg) shouldBe model
@@ -85,8 +85,8 @@ class PersonMergerSpec extends AnyWordSpec with should.Matchers with ScalaCheckP
       forAll(personEntities(withoutGitLabId, withoutEmail) map (_.toMaybe[entities.Person.WithNameOnly])) {
         case Some(model) =>
           val kg = model.copy(
-            name = userNames.generateOne,
-            maybeAffiliation = userAffiliations.generateOption
+            name = personNames.generateOne,
+            maybeAffiliation = personAffiliations.generateOption
           )
 
           merge[Try](model, kg) shouldBe model

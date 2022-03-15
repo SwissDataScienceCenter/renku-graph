@@ -260,8 +260,14 @@ trait DatasetEntitiesGenerators {
       projectCreationDate => factory(projectCreationDate).map(f)
   }
 
+  implicit def identificationLens[P <: Dataset.Provenance]: Lens[Dataset[P], Identification] =
+    Lens[Dataset[P], Identification](_.identification)(identification => ds => ds.copy(identification = identification))
+
   implicit def provenanceLens[P <: Dataset.Provenance]: Lens[Dataset[P], P] =
     Lens[Dataset[P], P](_.provenance)(prov => ds => ds.copy(provenance = prov))
+
+  implicit def additionalInfoLens[P <: Dataset.Provenance]: Lens[Dataset[P], AdditionalInfo] =
+    Lens[Dataset[P], AdditionalInfo](_.additionalInfo)(additionalInfo => ds => ds.copy(additionalInfo = additionalInfo))
 
   implicit def creatorsLens[P <: Dataset.Provenance]: Lens[P, Set[Person]] =
     Lens[P, Set[Person]](_.creators) { creators =>
@@ -273,6 +279,17 @@ trait DatasetEntitiesGenerators {
         case p: Provenance.Modified                         => p.copy(creators = creators).asInstanceOf[P]
       }
     }
+
+  def removeCreators[P <: Dataset.Provenance](): P => P = creatorsLens.modify(_ => Set.empty)
+
+  def replaceDSName[P <: Dataset.Provenance](to: datasets.Name): Dataset[P] => Dataset[P] =
+    identificationLens[P].modify(_.copy(name = to))
+
+  def replaceDSKeywords[P <: Dataset.Provenance](to: List[datasets.Keyword]): Dataset[P] => Dataset[P] =
+    additionalInfoLens[P].modify(_.copy(keywords = to))
+
+  def replaceDSDesc[P <: Dataset.Provenance](to: Option[datasets.Description]): Dataset[P] => Dataset[P] =
+    additionalInfoLens[P].modify(_.copy(maybeDescription = to))
 
   implicit lazy val internalProvenanceDateLens: Lens[Dataset.Provenance.Internal, InstantTinyType] =
     Lens[Dataset.Provenance.Internal, InstantTinyType](_.date) { max =>
