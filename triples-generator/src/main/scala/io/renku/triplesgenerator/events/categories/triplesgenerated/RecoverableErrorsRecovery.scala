@@ -21,9 +21,10 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.http.client.RestClientError._
+import io.renku.triplesgenerator.events.categories.ProcessingNonRecoverableError._
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
-import org.http4s.Status.{Forbidden, Unauthorized}
+import org.http4s.Status.{Forbidden, InternalServerError, Unauthorized}
 
 private trait RecoverableErrorsRecovery {
 
@@ -45,6 +46,9 @@ private trait RecoverableErrorsRecovery {
         .asLeft[OUT]
         .leftWiden[ProcessingRecoverableError]
         .pure[F]
+    case exception @ UnexpectedResponseException(InternalServerError, _) =>
+      MalformedRepository(composeFullMessage(maybeMessage, exception), exception.getCause)
+        .raiseError[F, Either[ProcessingRecoverableError, OUT]]
     case exception @ UnexpectedResponseException(_, _) =>
       LogWorthyRecoverableError(composeFullMessage(maybeMessage, exception), exception.getCause)
         .asLeft[OUT]
