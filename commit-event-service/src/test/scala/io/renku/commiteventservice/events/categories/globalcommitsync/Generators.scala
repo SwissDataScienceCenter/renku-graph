@@ -22,7 +22,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.auto._
 import io.renku.commiteventservice.events.categories.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
-import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.{PageResult, ProjectCommitStats}
+import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.{DateCondition, PageResult, ProjectCommitStats}
 import io.renku.events.consumers.Project
 import io.renku.generators.CommonGraphGenerators.pages
 import io.renku.generators.Generators.Implicits._
@@ -60,4 +60,8 @@ private object Generators {
       maybeCommitId <- commitIdGen
       commitCount   <- nonNegativeInts(9999999)
     } yield ProjectCommitStats(maybeCommitId, CommitsCount(commitCount.value))
+
+  implicit val untilDateConditions: Gen[DateCondition.Until] = timestamps.map(DateCondition.Until).generateOne
+  implicit val sinceDateConditions: Gen[DateCondition.Since] = timestamps.map(DateCondition.Since).generateOne
+  implicit val dateConditions:      Gen[DateCondition]       = Gen.oneOf(untilDateConditions, sinceDateConditions)
 }

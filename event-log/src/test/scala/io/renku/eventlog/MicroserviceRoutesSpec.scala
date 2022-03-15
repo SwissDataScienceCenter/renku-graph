@@ -18,6 +18,8 @@
 
 package io.renku.eventlog
 
+import EventContentGenerators._
+import cats.Show
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.circe.Json
@@ -38,8 +40,10 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
+import io.renku.tinytypes.InstantTinyType
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, POST}
+import org.http4s.QueryParamEncoder._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -69,32 +73,86 @@ class MicroserviceRoutesSpec
         "uri" -> "criteria",
         projectPaths
           .map(path =>
-            uri"/events" +? ("project-path" -> path.value) -> Criteria(Filters.ProjectEvents(path, maybeStatus = None))
+            uri"/events" +? ("project-path" -> path.value) -> Criteria(
+              Filters.ProjectEvents(path, maybeStatus = None, maybeDates = None)
+            )
           )
           .generateOne,
         (projectPaths -> eventStatuses).mapN { case (path, status) =>
           uri"/events" +? ("project-path" -> path.value) +? ("status" -> status.value) -> Criteria(
-            Filters.ProjectEvents(path, Some(status))
+            Filters.ProjectEvents(path, Some(status), maybeDates = None)
+          )
+        }.generateOne,
+        (projectPaths -> eventDates).mapN { case (path, since) =>
+          uri"/events" +? ("project-path" -> path.value) +? ("since" -> since) -> Criteria(
+            Filters.ProjectEvents(path, None, Filters.EventsSince(since).some)
+          )
+        }.generateOne,
+        (projectPaths -> eventDates).mapN { case (path, until) =>
+          uri"/events" +? ("project-path" -> path.value) +? ("until" -> until) -> Criteria(
+            Filters.ProjectEvents(path, None, Filters.EventsUntil(until).some)
+          )
+        }.generateOne,
+        (projectPaths, eventDates, eventDates).mapN { case (path, since, until) =>
+          uri"/events" +? ("project-path" -> path.value) +? ("since" -> since) +? ("until" -> until) -> Criteria(
+            Filters.ProjectEvents(
+              path,
+              maybeStatus = None,
+              Filters.EventsSinceAndUntil(Filters.EventsSince(since), Filters.EventsUntil(until)).some
+            )
           )
         }.generateOne,
         eventStatuses
-          .map(status => uri"/events" +? ("status" -> status.value) -> Criteria(Filters.EventsWithStatus(status)))
+          .map(status =>
+            uri"/events" +? ("status" -> status.value) -> Criteria(Filters.EventsWithStatus(status, maybeDates = None))
+          )
+          .generateOne,
+        (eventStatuses -> eventDates).mapN { case (status, since) =>
+          uri"/events" +? ("status" -> status.value) +? ("since" -> since) -> Criteria(
+            Filters.EventsWithStatus(status, Filters.EventsSince(since).some)
+          )
+        }.generateOne,
+        (eventStatuses -> eventDates).mapN { case (status, until) =>
+          uri"/events" +? ("status" -> status.value) +? ("until" -> until) -> Criteria(
+            Filters.EventsWithStatus(status, Filters.EventsUntil(until).some)
+          )
+        }.generateOne,
+        (eventStatuses, eventDates, eventDates).mapN { case (status, since, until) =>
+          uri"/events" +? ("status" -> status.value) +? ("since" -> since) +? ("until" -> until) -> Criteria(
+            Filters.EventsWithStatus(
+              status,
+              Filters.EventsSinceAndUntil(Filters.EventsSince(since), Filters.EventsUntil(until)).some
+            )
+          )
+        }.generateOne,
+        eventDates
+          .map(since => uri"/events" +? ("since" -> since) -> Criteria(Filters.EventsSince(since)))
+          .generateOne,
+        eventDates
+          .map(until => uri"/events" +? ("until" -> until) -> Criteria(Filters.EventsUntil(until)))
+          .generateOne,
+        (eventDates, eventDates)
+          .mapN((since, until) =>
+            uri"/events" +? ("since" -> since) +? ("until" -> until) -> Criteria(
+              Filters.EventsSinceAndUntil(Filters.EventsSince(since), Filters.EventsUntil(until))
+            )
+          )
           .generateOne,
         (eventStatuses -> sortingDirections).mapN { (status, dir) =>
           uri"/events" +? ("status" -> status.value) +? ("sort" -> s"eventDate:$dir") -> Criteria(
-            Filters.EventsWithStatus(status),
+            Filters.EventsWithStatus(status, maybeDates = None),
             Sorting.By(EventDate, dir)
           )
         }.generateOne,
         (eventStatuses -> pages).mapN { (status, page) =>
           uri"/events" +? ("status" -> status.value) +? ("page" -> page.show) -> Criteria(
-            Filters.EventsWithStatus(status),
+            Filters.EventsWithStatus(status, maybeDates = None),
             paging = PagingRequest.default.copy(page = page)
           )
         }.generateOne,
         (eventStatuses -> perPages).mapN { (status, perPage) =>
           uri"/events" +? ("status" -> status.value) +? ("per_page" -> perPage.show) -> Criteria(
-            Filters.EventsWithStatus(status),
+            Filters.EventsWithStatus(status, maybeDates = None),
             paging = PagingRequest.default.copy(perPage = perPage)
           )
         }.generateOne
@@ -123,6 +181,8 @@ class MicroserviceRoutesSpec
       uri"/events"
         .withQueryParam("status", eventStatuses.generateOne.show)
         .withQueryParam("sort", nonEmptyStrings().generateOne),
+      uri"/events".withQueryParam("since", nonEmptyStrings().generateOne),
+      uri"/events".withQueryParam("until", nonEmptyStrings().generateOne),
       uri"/events"
         .withQueryParam("status", eventStatuses.generateOne.show)
         .withQueryParam("page", nonEmptyStrings().generateOne),
@@ -284,6 +344,10 @@ class MicroserviceRoutesSpec
       isMigrating
     ).routes.map(_.or(notAvailableResponse))
   }
+
+  private implicit def instantQueryParamEncoder[TT <: InstantTinyType](implicit
+      show: Show[TT]
+  ): QueryParamEncoder[TT] = fromShow(show)
 
   private trait IsNotMigrating {
     self: TestCase =>

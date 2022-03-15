@@ -43,7 +43,7 @@ private[globalcommitsync] trait GitLabCommitFetcher[F[_]] {
       maybeAccessToken:                  Option[AccessToken]
   ): F[Option[CommitId]]
 
-  def fetchGitLabCommits(projectId: projects.Id, pageRequest: PagingRequest)(implicit
+  def fetchGitLabCommits(projectId: projects.Id, dateCondition: DateCondition, pageRequest: PagingRequest)(implicit
       maybeAccessToken:             Option[AccessToken]
   ): F[PageResult]
 }
@@ -64,23 +64,25 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
 
   override def fetchGitLabCommits(
       projectId:               projects.Id,
+      dateCondition:           DateCondition,
       pageRequest:             PagingRequest
   )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = send(
     GET,
     uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
       "page"     -> pageRequest.page.show,
-      "per_page" -> pageRequest.perPage.show,
-      "order"    -> "topo"
-    ),
+      "per_page" -> pageRequest.perPage.show
+    ) + dateCondition.asQueryParameter,
     "commits"
-  )(mapCommitsPage(projectId, pageRequest))
+  )(mapCommitsPage(projectId, dateCondition, pageRequest))
 
-  private def mapCommitsPage(projectId:   projects.Id,
-                             pageRequest: PagingRequest
+  private def mapCommitsPage(projectId:     projects.Id,
+                             dateCondition: DateCondition,
+                             pageRequest:   PagingRequest
   ): PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {
     case (Ok, _, response) => (response.as[List[CommitId]] -> maybeNextPage(response)).mapN(PageResult(_, _))
     case (NotFound, _, _)  => PageResult.empty.pure[F]
-    case (Unauthorized | Forbidden, _, _) => fetchGitLabCommits(projectId, pageRequest)(maybeAccessToken = None)
+    case (Unauthorized | Forbidden, _, _) =>
+      fetchGitLabCommits(projectId, dateCondition, pageRequest)(maybeAccessToken = None)
   }
 
   private def mapLatestCommit(
