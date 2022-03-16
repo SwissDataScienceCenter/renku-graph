@@ -28,8 +28,6 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityEncoder, Response, Status}
 import pureconfig.ConfigReader
 
-import java.io.File
-
 private trait Endpoint[F[_]] {
   def `GET /version`: F[Response[F]]
 }
@@ -39,7 +37,7 @@ private object Endpoint {
 }
 
 private class EndpointImpl[F[_]: Async](config: Config = ConfigFactory.load(),
-                                        versionConfig: Config = ConfigFactory.parseFile(new File("version.conf"))
+                                        versionConfig: Config = ConfigFactory.load("version.conf")
 ) extends Http4sDsl[F]
     with Endpoint[F] {
   import ConfigLoader._
