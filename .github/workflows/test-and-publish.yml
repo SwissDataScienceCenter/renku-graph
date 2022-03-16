@@ -112,8 +112,8 @@ jobs:
           CHART_PATH: helm-chart/renku-graph
           CHART_NAME: renku-graph
           GITHUB_TOKEN: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
       - name: Wait for chart to be available
         run: sleep 120
       - name: Update component version
