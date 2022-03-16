@@ -20,7 +20,6 @@ package io.renku.eventlog.subscriptions.globalcommitsync
 
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
@@ -44,6 +43,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import skunk.data.Completion
 
 import java.time.temporal.ChronoUnit
+import java.time.temporal.ChronoUnit.HOURS
 import java.time.{Duration, Instant}
 import scala.util.Random
 
@@ -54,7 +54,6 @@ class GlobalCommitSyncEventFinderSpec
     with SubscriptionDataProvisioning
     with MockFactory
     with should.Matchers {
-  import GlobalCommitSyncEventFinder._
 
   "popEvent" should {
 
@@ -85,7 +84,7 @@ class GlobalCommitSyncEventFinderSpec
 
     "return an event with all commits " +
       s"when the project hasn't been synced yet " + // i.e. new project
-      "and contains an event where the event_date is *MORE* than a week ago " +
+      "and contains an event where the event_date is *MORE* than the syncFrequency ago " +
       "and the project's latest event is the most recent of all ready-to-sync projects" in new TestCase {
 
         currentTime.expects().returning(now)
@@ -114,7 +113,7 @@ class GlobalCommitSyncEventFinderSpec
       }
 
     "return None " +
-      s"when all projects were synced less than a week ago" in new TestCase {
+      s"when all projects were synced less than the syncFrequency ago" in new TestCase {
         currentTime.expects().returning(now)
 
         finder.popEvent().unsafeRunSync() shouldBe None
@@ -134,7 +133,7 @@ class GlobalCommitSyncEventFinderSpec
       }
 
     "return an event with all commit ids for the project" +
-      s"where the project hasn't been synced in the past week" +
+      s"where the project hasn't been synced in less than the syncFrequency" +
       s"and the project's latest event is the most recent of all ready-to-sync projects" in new TestCase {
         currentTime.expects().returning(now)
 
@@ -170,7 +169,7 @@ class GlobalCommitSyncEventFinderSpec
       }
 
     "return an event with all commit ids for the project which are *NOT* AWAITING_DELETION or DELETING" +
-      s"where the project hasn't been synced in the past week" +
+      s"where the project hasn't been synced in less than the syncFrequency" +
       s"and the project's latest event is the most recent of all ready-to-sync projects" in new TestCase {
 
         currentTime.expects().returning(now)
@@ -222,11 +221,13 @@ class GlobalCommitSyncEventFinderSpec
   }
 
   private trait TestCase {
+    val syncFrequency         = Duration ofDays 7
     val lastSyncedDateUpdater = mock[LastSyncedDateUpdater[IO]]
     val currentTime           = mockFunction[Instant]
     val now                   = Instant.now()
     val finder = new GlobalCommitSyncEventFinderImpl(lastSyncedDateUpdater,
                                                      TestLabeledHistogram[SqlStatement.Name]("query_id"),
+                                                     syncFrequency,
                                                      currentTime
     )
 
@@ -236,6 +237,12 @@ class GlobalCommitSyncEventFinderSpec
         .expects(project.id, LastSyncedDate(now).some)
         .returning(Completion.Insert(1).pure[IO])
     }
+
+    def genLastSynced(moreThanAWeekAgo: Boolean) =
+      if (moreThanAWeekAgo)
+        relativeTimestamps(moreThanAgo = syncFrequency.plus(2, HOURS)).generateAs(LastSyncedDate)
+      else
+        relativeTimestamps(lessThanAgo = syncFrequency.minus(2, HOURS)).generateAs(LastSyncedDate)
   }
 
   private def genCommitIdAndDate(olderThanAWeek: Boolean = Random.nextBoolean(),
@@ -248,10 +255,6 @@ class GlobalCommitSyncEventFinderSpec
   }
 
   private def genCompoundEventId(projectId: projects.Id) = compoundEventIds.generateOne.copy(projectId = projectId)
-
-  private def genLastSynced(moreThanAWeekAgo: Boolean) = if (moreThanAWeekAgo)
-    relativeTimestamps(moreThanAgo = syncInterval.plus(2, ChronoUnit.HOURS)).generateAs(LastSyncedDate)
-  else relativeTimestamps(lessThanAgo = syncInterval.minus(2, ChronoUnit.HOURS)).generateAs(LastSyncedDate)
 
   private def addEvent(
       eventId:     CompoundEventId,
