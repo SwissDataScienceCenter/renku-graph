@@ -21,13 +21,15 @@ All endpoints (except for `/ping` and `/metrics`) will return 503 while the data
 
 Returns information about the selected events.
 
-| Query Parameter | Mandatory | Default        | Description                                                        |
-|-----------------|-----------|----------------|--------------------------------------------------------------------|
-| project-path    | No        | -              | Url-encoded non-blank project path                                 |
-| status          | No        | -              | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED`             |
-| page            | No        | 1              | Page number                                                        |
-| per_page        | No        | 20             | Number of items per page                                           |
-| sort            | No        | eventDate:DESC | Sorting; allowed properties: `eventDate`, directions: `ASC`, `DESC`|
+| Query Parameter | Mandatory | Default        | Description                                                                           |
+|-----------------|-----------|----------------|---------------------------------------------------------------------------------------|
+| project-path    | No        | -              | Url-encoded non-blank project path                                                    |
+| status          | No        | -              | Event status e.g. `TRIPLES_STORE`, `TRIPLES_GENERATED`                                |
+| since           | No        | -              | To find events after or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ` |
+| until           | No        | -              | To find events before or on this date; ISO 8601 format required `YYYY-MM-DDTHH:MM:SSZ`|
+| page            | No        | 1              | Page number                                                                           |
+| per_page        | No        | 20             | Number of items per page                                                              |
+| sort            | No        | eventDate:DESC | Sorting; allowed properties: `eventDate`, directions: `ASC`, `DESC`                   |
 
 NOTES:
 

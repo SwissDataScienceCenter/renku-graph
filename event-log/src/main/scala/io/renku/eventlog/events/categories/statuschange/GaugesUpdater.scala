@@ -43,8 +43,8 @@ private class GaugesUpdaterImpl[F[_]: Applicative](
     case DBUpdateResults.ForProjects(projectsAndCounts) =>
       projectsAndCounts
         .map { case (projectPath, changedStatusCounts) =>
-          def sum(of: EventStatus*): Double =
-            changedStatusCounts.view.filterKeys(of.contains).values.sum
+          def sum(of: EventStatus*): Double = changedStatusCounts.view.filterKeys(of.contains).values.sum
+
           List(
             awaitingGenerationGauge.update(projectPath     -> sum(New, GenerationRecoverableFailure)),
             underTriplesGenerationGauge.update(projectPath -> sum(GeneratingTriples)),

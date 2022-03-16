@@ -30,9 +30,9 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
-import skunk.Session
 import skunk.data.Completion
 import skunk.implicits.toStringOps
+import skunk.{Session, SqlState}
 
 import scala.util.control.NonFatal
 
@@ -55,12 +55,14 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
   import applicative._
   import projectWebhookAndTokenRemover._
 
-  override def cleanUp(project: Project): Kleisli[F, Session[F], Unit] = for {
-    _       <- removeProjectSubscriptionSyncTimes(project)
-    removed <- removeProject(project)
-    _       <- Kleisli.liftF[F, Session[F], Unit](removeWebhookAndToken(project)) recoverWith logError(project)
-    _       <- Kleisli.liftF(whenA(removed)(Logger[F].info(show"$categoryName: $project removed")))
-  } yield ()
+  override def cleanUp(project: Project): Kleisli[F, Session[F], Unit] = {
+    for {
+      _       <- removeProjectSubscriptionSyncTimes(project)
+      removed <- removeProject(project)
+      _       <- Kleisli.liftF[F, Session[F], Unit](removeWebhookAndToken(project)) recoverWith logError(project)
+      _       <- Kleisli.liftF(whenA(removed)(Logger[F].info(show"$categoryName: $project removed")))
+    } yield ()
+  } recoverWith logWarnAndRetry(project)
 
   private def logError(project: Project): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = {
     case NonFatal(error) =>
@@ -90,5 +92,12 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
         case Completion.Delete(1) => true
         case _                    => false
       }
+  }
+
+  private def logWarnAndRetry(project: Project): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = {
+    case SqlState.ForeignKeyViolation(ex) =>
+      Kleisli.liftF[F, Session[F], Unit](
+        Logger[F].warn(ex)(show"$categoryName: $project removal failed - retrying")
+      ) >> cleanUp(project)
   }
 }

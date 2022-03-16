@@ -25,8 +25,10 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.RestClientError
+import io.renku.http.client.RestClientError.UnexpectedResponseException
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
+import org.http4s.Status.{BadGateway, GatewayTimeout, ServiceUnavailable}
 import org.scalacheck.Gen
 
 private[triplesgenerated] object Generators {
@@ -45,5 +47,12 @@ private[triplesgenerated] object Generators {
   } yield Queries(pre, post)
 
   lazy val recoverableClientErrors: Gen[RestClientError] =
-    Gen.oneOf(clientExceptions, connectivityExceptions, unexpectedResponseExceptions)
+    Gen.oneOf(
+      clientExceptions,
+      connectivityExceptions,
+      for {
+        status  <- Gen.oneOf(BadGateway, ServiceUnavailable, GatewayTimeout)
+        message <- nonBlankStrings()
+      } yield UnexpectedResponseException(status, message.value)
+    )
 }

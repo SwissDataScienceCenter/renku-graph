@@ -105,16 +105,16 @@ trait GitLab {
         .getOrElse(personGitLabIds.generateOne -> personNames.generateOne)
       val jsonContent = Json.fromValues(commitIds.toList.map { commitId =>
         json"""{
-              "project_id": ${project.id.value},
-              "push_data": {
-                "commit_from": ${Json.Null},
-                "commit_to":   ${commitId.value}
-              },
-              "author": {
-                "id":   ${authorId.value},
-                "name": ${authorName.value}
-              }
-            }"""
+          "project_id": ${project.id.value},
+          "push_data": {
+            "commit_from": ${Json.Null},
+            "commit_to":   ${commitId.value}
+          },
+          "author": {
+            "id":   ${authorId.value},
+            "name": ${authorName.value}
+          }
+        }"""
       })
       get(s"/api/v4/projects/${project.id}/events?action=pushed&page=1").withAccessTokenInHeader
         .willReturn(okJson(jsonContent.noSpaces))
@@ -190,7 +190,7 @@ trait GitLab {
         .withAccessTokenInHeader
     }
     stubFor {
-      get(s"/api/v4/projects/$projectId/repository/commits?page=1&per_page=50&order=topo")
+      get(urlMatching(s"/api/v4/projects/$projectId/repository/commits\\?page=1&per_page=50&since=.*"))
         .willReturn(okJson(commitIds.map(commitAsJson(_, theMostRecentEventDate)).asJson.noSpaces))
         .withAccessTokenInHeader
     }
@@ -211,7 +211,7 @@ trait GitLab {
         .withAccessTokenInHeader
     }
     stubFor {
-      get(s"/api/v4/projects/$projectId/repository/commits?page=1&per_page=50")
+      get(urlMatching(s"/api/v4/projects/$projectId/repository/commits\\?page=1&per_page=50&since=.*"))
         .willReturn(notFound())
         .withAccessTokenInHeader
     }
