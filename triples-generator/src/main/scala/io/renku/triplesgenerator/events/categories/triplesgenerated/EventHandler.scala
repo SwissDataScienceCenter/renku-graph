@@ -34,6 +34,7 @@ import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProce
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.SchemaVersion
 import io.renku.graph.model.events.{CompoundEventId, EventBody, ZippedEventPayload}
+import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -94,11 +95,12 @@ private[events] object EventHandler {
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
       gitLabThrottler:       Throttler[F, GitLab],
       timeRecorder:          SparqlQueryTimeRecorder[F],
+      gitLabClient:          GitLabClient[F],
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
     generationProcesses        <- find[F, Int Refined Positive]("transformation-processes-number", config)
-    eventProcessor             <- EventProcessor(gitLabThrottler, timeRecorder)
+    eventProcessor             <- EventProcessor(gitLabThrottler, timeRecorder, gitLabClient)
     concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
   } yield new EventHandler[F](categoryName,
                               EventBodyDeserializer[F],

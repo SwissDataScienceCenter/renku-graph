@@ -21,22 +21,16 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
+import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.{GitLabApiUrl, persons, projects}
-import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.graph.model.{persons, projects}
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{EntityDecoder, InvalidMessageBodyFailure, Request, Response, Status}
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private trait CommitAuthorFinder[F[_]] {
   def findCommitAuthor(projectPath: projects.Path, commitId: CommitId)(implicit
@@ -45,24 +39,15 @@ private trait CommitAuthorFinder[F[_]] {
 }
 
 private object CommitAuthorFinder {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[CommitAuthorFinder[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new CommitAuthorFinderImpl(gitLabUrl.apiV4, gitLabThrottler)
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[CommitAuthorFinder[F]] = new CommitAuthorFinderImpl(
+    gitLabClient
+  ).pure[F].widen
 }
 
 private class CommitAuthorFinderImpl[F[_]: Async: Logger](
-    gitLabApiUrl:           GitLabApiUrl,
-    gitLabThrottler:        Throttler[F, GitLab],
-    recoveryStrategy:       RecoverableErrorsRecovery = RecoverableErrorsRecovery,
-    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(gitLabThrottler,
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
-    )
-    with CommitAuthorFinder[F] {
+    gitLabClient:     GitLabClient[F],
+    recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
+) extends CommitAuthorFinder[F] {
 
   import org.http4s.Method.GET
   import org.http4s.dsl.io.{NotFound, Ok}
@@ -70,12 +55,12 @@ private class CommitAuthorFinderImpl[F[_]: Async: Logger](
   override def findCommitAuthor(path: projects.Path, commitId: CommitId)(implicit
       maybeAccessToken:               Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]] = EitherT {
-    {
-      for {
-        projectsUri <- validateUri(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/repository/commits/$commitId")
-        maybeAuthor <- send(secureRequest(GET, projectsUri))(mapTo[(persons.Name, persons.Email)])
-      } yield maybeAuthor
-    }.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)
+    gitLabClient
+      .send(GET, uri"projects" / path.value / "repository" / "commits" / commitId.show, "commit")(
+        mapTo[(persons.Name, persons.Email)]
+      )
+      .map(_.asRight[ProcessingRecoverableError])
+      .recoverWith(recoveryStrategy.maybeRecoverableError)
   }
 
   private def mapTo[OUT](implicit

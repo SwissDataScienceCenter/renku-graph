@@ -33,10 +33,10 @@ import io.renku.generators.Generators.Implicits._
 trait GitLabClientTools[F[_]] {
   self: MockFactory =>
 
-  def captureMapping[FinderType, ResultType](finder: FinderType, gitLabClient: GitLabClient[F])(
-      findingMethod:                                 FinderType => ResultType,
-      resultGenerator:                               Gen[ResultType]
-  )(implicit applicative:                            Applicative[F]): ResponseMappingF[F, ResultType] = {
+  def captureMapping[FinderType, ResultType, A](finder: FinderType, gitLabClient: GitLabClient[F])(
+      findingMethod:                                    FinderType => A,
+      resultGenerator:                                  Gen[ResultType]
+  )(implicit applicative:                               Applicative[F]): ResponseMappingF[F, ResultType] = {
     val responseMapping = CaptureOne[ResponseMappingF[F, ResultType]]()
 
     (gitLabClient

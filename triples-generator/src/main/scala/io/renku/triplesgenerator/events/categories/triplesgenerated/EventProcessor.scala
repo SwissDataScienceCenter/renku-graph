@@ -26,7 +26,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
@@ -212,7 +212,8 @@ private object EventProcessor {
 
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
       gitLabThrottler: Throttler[F, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[F]
+      timeRecorder:    SparqlQueryTimeRecorder[F],
+      gitLabClient:    GitLabClient[F]
   ): F[EventProcessor[F]] = for {
     uploader           <- TransformationStepsRunner(timeRecorder)
     accessTokenFinder  <- AccessTokenFinder[F]
@@ -225,7 +226,7 @@ private object EventProcessor {
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
-    jsonLDDeserializer    <- JsonLDDeserializer(gitLabThrottler)
+    jsonLDDeserializer    <- JsonLDDeserializer(gitLabThrottler, gitLabClient)
   } yield new EventProcessorImpl(
     accessTokenFinder,
     triplesCurator,

@@ -27,7 +27,7 @@ import io.renku.control.Throttler
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 
@@ -39,11 +39,12 @@ private[triplesgenerated] trait ProjectInfoFinder[F[_]] {
 
 private[triplesgenerated] object ProjectInfoFinder {
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
+      gitLabThrottler: Throttler[F, GitLab],
+      gitLabClient:    GitLabClient[F]
   ): F[ProjectInfoFinder[F]] = for {
     projectFinder     <- ProjectFinder[F](gitLabThrottler)
     membersFinder     <- ProjectMembersFinder[F](gitLabThrottler)
-    memberEmailFinder <- MemberEmailFinder[F](gitLabThrottler)
+    memberEmailFinder <- MemberEmailFinder[F](gitLabClient, gitLabThrottler)
   } yield new ProjectInfoFinderImpl(projectFinder, membersFinder, memberEmailFinder)
 }
 
