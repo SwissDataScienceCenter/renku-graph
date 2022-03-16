@@ -98,7 +98,7 @@ jobs:
             ~/.ivy2
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
-      - name: Write version to Chart.yaml
+      - name: Write version to Chart.yaml and version.conf files
         run: |
           sudo rm -rf .git/index.lock
           sbt writeVersionToChart

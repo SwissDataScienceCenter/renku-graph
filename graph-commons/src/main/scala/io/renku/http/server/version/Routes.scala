@@ -16,25 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.metrics
+package io.renku.http.server.version
 
-import cats.effect.{Resource, Sync}
+import cats.MonadThrow
+import cats.effect.Async
 import cats.syntax.all._
 import org.http4s.HttpRoutes
-import org.http4s.metrics.prometheus.{Prometheus, PrometheusExportService}
-import org.http4s.server.middleware.{Metrics => ServerMetrics}
+import org.http4s.dsl.Http4sDsl
 
-class RoutesMetrics[F[_]: Sync: MetricsRegistry] {
+trait Routes[F[_]] {
+  def apply(): HttpRoutes[F]
+}
 
-  implicit class RoutesOps(routes: HttpRoutes[F]) {
+class RoutesImpl[F[_]: MonadThrow](endpoint: Endpoint[F]) extends Http4sDsl[F] with Routes[F] {
+  import endpoint._
+  override def apply(): HttpRoutes[F] = HttpRoutes.of[F] { case GET -> Root / "version" => `GET /version` }
+}
 
-    def withMetrics: Resource[F, HttpRoutes[F]] =
-      MetricsRegistry[F].maybeCollectorRegistry match {
-        case Some(collectorRegistry) =>
-          Prometheus.metricsOps[F](collectorRegistry, "server").map { metrics =>
-            PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[F](metrics)(routes)
-          }
-        case _ => Resource.eval(Sync[F].pure(routes))
-      }
-  }
+object Routes {
+  def apply[F[_]: Async]: F[Routes[F]] = Endpoint[F].map(new RoutesImpl(_))
 }

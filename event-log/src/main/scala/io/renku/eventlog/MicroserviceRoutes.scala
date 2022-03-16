@@ -18,15 +18,18 @@
 
 package io.renku.eventlog
 
+import cats.NonEmptyParallel
 import cats.data.{Validated, ValidatedNel}
-import cats.effect.Resource
 import cats.effect.kernel.{Ref, Sync}
+import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import io.circe.literal.JsonStringContext
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
-import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
+import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
+import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders._
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.graph.model.projects
@@ -36,10 +39,12 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.QueryParameterTools.{resourceNotFound, toBadRequest}
-import io.renku.metrics.RoutesMetrics
+import io.renku.http.server.version
+import io.renku.metrics.{LabeledHistogram, MetricsRegistry, RoutesMetrics}
 import org.http4s._
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 import scala.util.Try
@@ -51,7 +56,8 @@ private class MicroserviceRoutes[F[_]: Sync](
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     eventDetailsEndpoint:     EventDetailsEndpoint[F],
     routesMetrics:            RoutesMetrics[F],
-    isMigrating:              Ref[F, Boolean]
+    isMigrating:              Ref[F, Boolean],
+    versionRoutes:            version.Routes[F]
 ) extends Http4sDsl[F] {
 
   import EventStatusParameter._
@@ -76,7 +82,7 @@ private class MicroserviceRoutes[F[_]: Sync](
     case           GET  -> Root / "ping"                                              => Ok("pong")
     case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
     case request @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
-  }.withMetrics
+  }.withMetrics.map(_  <+> versionRoutes())
   // format: on
 
   def respond503IfMigrating(otherwise: => F[Response[F]]): F[Response[F]] = isMigrating.get.flatMap {
@@ -207,4 +213,28 @@ private class MicroserviceRoutes[F[_]: Sync](
         findProcessingStatus
       )
   }
+}
+
+private object MicroserviceRoutes {
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger: MetricsRegistry](
+      consumersRegistry:      EventConsumersRegistry[F],
+      queriesExecTimes:       LabeledHistogram[F],
+      eventProducersRegistry: EventProducersRegistry[F],
+      isMigrating:            Ref[F, Boolean]
+  ): F[MicroserviceRoutes[F]] = for {
+    eventEndpoint            <- EventEndpoint[F](consumersRegistry)
+    eventsEndpoint           <- EventsEndpoint(queriesExecTimes)
+    processingStatusEndpoint <- ProcessingStatusEndpoint(queriesExecTimes)
+    subscriptionsEndpoint    <- SubscriptionsEndpoint(eventProducersRegistry)
+    eventDetailsEndpoint     <- EventDetailsEndpoint(queriesExecTimes)
+    versionRoutes            <- version.Routes[F]
+  } yield new MicroserviceRoutes(eventEndpoint,
+                                 eventsEndpoint,
+                                 processingStatusEndpoint,
+                                 subscriptionsEndpoint,
+                                 eventDetailsEndpoint,
+                                 new RoutesMetrics[F],
+                                 isMigrating,
+                                 versionRoutes
+  )
 }

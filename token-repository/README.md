@@ -4,12 +4,25 @@ This is a microservice which provides CRUD operations for `projectId` -> `access
 
 ## API
 
-| Method  | Path                               | Description                                        |
-|---------|------------------------------------|----------------------------------------------------|
-|  GET    | ```/ping```                        | To check if service is healthy                     |
-|  GET    | ```/projects/:id/tokens```         | Fetches an access token for the project id or path |
-|  PUT    | ```/projects/:id/tokens```         | Associates the given token and project id          |
-|  DELETE | ```/projects/:id/tokens```         | Deletes the token and project id association       |
+| Method | Path                       | Description                                        |
+|--------|----------------------------|----------------------------------------------------|
+| GET    | ```/metrics```             | Serves Prometheus metrics                          |
+| GET    | ```/ping```                | To check if service is healthy                     |
+| GET    | ```/projects/:id/tokens``` | Fetches an access token for the project id or path |
+| PUT    | ```/projects/:id/tokens``` | Associates the given token and project id          |
+| DELETE | ```/projects/:id/tokens``` | Deletes the token and project id association       |
+| GET    | ```/version```             | Returns info about service version                 |
+
+#### GET /metrics
+
+Serves Prometheus metrics.
+
+**Response**
+
+| Status                     | Description          |
+|----------------------------|----------------------|
+| OK (200)                   | If metrics are found |
+| INTERNAL SERVER ERROR (500)| Otherwise            |
 
 #### GET /ping
 
@@ -82,6 +95,30 @@ Deletes the association of a token and a project id. The deletion is successful 
 |----------------------------|--------------------------------------------------------|
 | NO_CONTENT (204)           | When deletion was successful                           |
 | INTERNAL SERVER ERROR (500)| When there were problems with deleting the association |
+
+#### GET /version
+
+Returns info about service version
+
+**Response**
+
+| Status                     | Description            |
+|----------------------------|------------------------|
+| OK (200)                   | If version is returned |
+| INTERNAL SERVER ERROR (500)| Otherwise              |
+
+Response body example:
+
+```json
+{
+  "name": "token-repository",
+  "versions": [
+    {
+      "version": "2.3.0"
+    }
+  ]
+}
+```
 
 ## Trying out
 

@@ -20,11 +20,14 @@ package io.renku.triplesgenerator
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.generators.CommonGraphGenerators.httpStatuses
+import io.renku.generators.Generators.Implicits._
 import io.renku.http.server.EndpointTester._
+import io.renku.http.server.version
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.EventEndpoint
-import org.http4s.Method.POST
+import org.http4s.Method.{GET, POST}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.implicits._
@@ -57,19 +60,32 @@ class MicroserviceRoutesSpec extends AnyWordSpec with IOSpec with MockFactory wi
     }
 
     "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
-      val response = routes.call(
-        Request(Method.GET, uri"/metrics")
-      )
+      val response = routes.call(Request(Method.GET, uri"/metrics"))
 
       response.status     shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
   }
 
-  private trait TestCase {
+  "GET /version" should {
+    "return response from the version endpoint" in new TestCase {
+      (routes call Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
+    }
+  }
 
+  private trait TestCase {
     val eventEndpoint = mock[EventEndpoint[IO]]
     val routesMetrics = TestRoutesMetrics()
-    val routes        = new MicroserviceRoutes[IO](eventEndpoint, routesMetrics).routes.map(_.or(notAvailableResponse))
+    val versionRoutes = mock[version.Routes[IO]]
+    val routes =
+      new MicroserviceRoutes[IO](eventEndpoint, routesMetrics, versionRoutes).routes.map(_.or(notAvailableResponse))
+
+    val versionEndpointResponse = Response[IO](httpStatuses.generateOne)
+    (versionRoutes.apply _)
+      .expects()
+      .returning {
+        import org.http4s.dsl.io.{GET => _, _}
+        HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
+      }
   }
 }

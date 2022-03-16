@@ -230,26 +230,44 @@ lazy val commonSettings = Seq(
 import sbtrelease.Vcs
 
 lazy val writeVersionToChart = taskKey[Unit]("Write release version to Chart.yaml")
+writeVersionToChart := writeVersion(version => s"version: $version",
+                                    streams.value.log,
+                                    root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
+)
 
-writeVersionToChart := {
-  val version = readTag
+lazy val writeVersionToVersionConf = taskKey[Unit]("Write release version to version.conf files")
+writeVersionToVersionConf := writeVersion(
+  version => s"""version = "$version"""",
+  streams.value.log,
+  eventLog.base / "src" / "main" / "resources" / "version.conf",
+  tokenRepository.base / "src" / "main" / "resources" / "version.conf",
+  webhookService.base / "src" / "main" / "resources" / "version.conf",
+  commitEventService.base / "src" / "main" / "resources" / "version.conf",
+  triplesGenerator.base / "src" / "main" / "resources" / "version.conf",
+  knowledgeGraph.base / "src" / "main" / "resources" / "version.conf"
+)
 
-  val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
-
-  val fileLines = IO.readLines(chartFile)
-  val updatedLines = fileLines.map {
-    case line if line.startsWith("version:") => s"version: $version"
-    case line                                => line
-  }
-  IO.writeLines(chartFile, updatedLines)
+def writeVersion(createLine: String => String, log: Logger, to: File*): Unit = {
+  val versionLine = createLine(readTag)
+  to foreach write(versionLine, log)
 }
 
-def readTag: String = {
-  val tag = Vcs
+def write(versionLine: String, log: Logger)(file: File): Unit = {
+
+  val fileLines = IO.readLines(file)
+
+  val updatedLines = fileLines.map {
+    case line if line.startsWith("version") => versionLine
+    case line                               => line
+  }
+
+  IO.writeLines(file, updatedLines)
+
+  log.info(s"'$versionLine' written to $file")
+}
+
+def readTag: String =
+  Vcs
     .detect(root.base)
     .map(_.cmd("describe", "--tags").!!.trim)
     .getOrElse(sys.error("Release Tag cannot be checked"))
-
-  if (tag.matches("\\d+\\.\\d+\\.\\d+")) tag
-  else sys.error("Current commit is not tagged")
-}

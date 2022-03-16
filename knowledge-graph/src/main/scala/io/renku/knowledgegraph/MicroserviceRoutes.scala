@@ -36,6 +36,7 @@ import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
@@ -59,7 +60,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
     projectPathAuthorizer:   Authorizer[F, model.projects.Path],
     datasetIdAuthorizer:     Authorizer[F, model.datasets.Identifier],
-    routesMetrics:           RoutesMetrics[F]
+    routesMetrics:           RoutesMetrics[F],
+    versionRoutes:           version.Routes[F]
 ) extends Http4sDsl[F] {
 
   import datasetEndpoint._
@@ -73,7 +75,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import routesMetrics._
 
   lazy val routes: Resource[F, HttpRoutes[F]] =
-    (nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
+    (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
     `GET /dataset routes` <+> `GET /entities routes` <+> otherAuthRoutes
@@ -229,6 +231,7 @@ private object MicroserviceRoutes {
       authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
       projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO](sparqlTimeRecorder))
       datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO](sparqlTimeRecorder))
+      versionRoutes           <- version.Routes[IO]
     } yield new MicroserviceRoutes(datasetsSearchEndpoint,
                                    datasetEndpoint,
                                    entitiesEndpoint,
@@ -238,6 +241,7 @@ private object MicroserviceRoutes {
                                    authMiddleware,
                                    projectPathAuthorizer,
                                    datasetIdAuthorizer,
-                                   new RoutesMetrics[IO]
+                                   new RoutesMetrics[IO],
+                                   versionRoutes
     )
 }
