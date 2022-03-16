@@ -7,15 +7,28 @@ This microservice:
 
 ## API
 
-| Method | Path                                      | Description                                           |
-|--------|-------------------------------------------|-------------------------------------------------------|
-|  GET   | ```/ping```                               | To check if service is healthy                        |
-|  GET   | ```/projects/:id/events/status```         | Gives info about processing progress of recent events |
-|  POST  | ```/projects/:id/webhooks```              | Creates a webhook for a project in GitLab             |
-| DELETE | ```/projects/:id/webhooks```              | Deletes a webhook for a project in Gitlab             |
-|  POST  | ```/projects/:id/webhooks/validation```   | Validates the project's webhook                       |
-|  POST  | ```/webhooks/events```                    | Consumes push events sent from GitLab                 |
-     
+| Method | Path                                    | Description                                           |
+|--------|-----------------------------------------|-------------------------------------------------------|
+| GET    | ```/metrics```                          | Serves Prometheus metrics                             |
+| GET    | ```/ping```                             | To check if service is healthy                        |
+| GET    | ```/projects/:id/events/status```       | Gives info about processing progress of recent events |
+| POST   | ```/projects/:id/webhooks```            | Creates a webhook for a project in GitLab             |
+| DELETE | ```/projects/:id/webhooks```            | Deletes a webhook for a project in Gitlab             |
+| POST   | ```/projects/:id/webhooks/validation``` | Validates the project's webhook                       |
+| GET    | ```/version```                          | Returns info about service version                    |
+| POST   | ```/webhooks/events```                  | Consumes push events sent from GitLab                 |
+
+#### GET /metrics
+
+Serves Prometheus metrics.
+
+**Response**
+
+| Status                     | Description          |
+|----------------------------|----------------------|
+| OK (200)                   | If metrics are found |
+| INTERNAL SERVER ERROR (500)| Otherwise            |
+
 #### GET /ping
 
 Verifies service health.
@@ -124,6 +137,30 @@ The endpoint requires an authorization token passed in the request header as:
 | NOT_FOUND (404)            | When the hook either does not exists or there's no Personal Access Token available for it. If the hook exists but there's no PAT for it, the hook will be removed |
 | UNAUTHORIZED (401)         | When there is neither `PRIVATE-TOKEN` nor `AUTHORIZATION: BEARER` in the header or it's invalid                                                                   |
 | INTERNAL SERVER ERROR (500)| When there are problems with validating the hook presence                                                                                                         |
+
+#### GET /version
+
+Returns info about service version
+
+**Response**
+
+| Status                     | Description            |
+|----------------------------|------------------------|
+| OK (200)                   | If version is returned |
+| INTERNAL SERVER ERROR (500)| Otherwise              |
+
+Response body example:
+
+```json
+{
+  "name": "webhook-service",
+  "versions": [
+    {
+      "version": "2.3.0"
+    }
+  ]
+}
+```
 
 #### POST /webhooks/events
 

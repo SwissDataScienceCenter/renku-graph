@@ -9,10 +9,12 @@ This is a microservice which:
 
 ## API
 
-| Method | Path                            | Description                             |
-|--------|---------------------------------|-----------------------------------------|
-| POST   | ```/events```                   | To send an event for processing         |
-| GET    | ```/ping```                     | To check if service is healthy          |
+| Method | Path             | Description                        |
+|--------|------------------|------------------------------------|
+| POST   | ```/events```    | To send an event for processing    |
+| GET    | ```/metrics```   | Serves Prometheus metrics          |
+| GET    | ```/ping```      | To check if service is healthy     |
+| GET    | ```/version```   | Returns info about service version |
 
 #### POST /events
 
@@ -116,6 +118,17 @@ Accepts an event as multipart requests.
 | TOO_MANY_REQUESTS (429)    | When server is busy dealing with other requests and cannot take any more now |
 | INTERNAL SERVER ERROR (500)| When there are problems with event creation                                  |
 
+#### GET /metrics
+
+Serves Prometheus metrics.
+
+**Response**
+
+| Status                     | Description          |
+|----------------------------|----------------------|
+| OK (200)                   | If metrics are found |
+| INTERNAL SERVER ERROR (500)| Otherwise            |
+
 #### GET /ping
 
 Verifies service health.
@@ -126,6 +139,30 @@ Verifies service health.
 |----------------------------|-------------------------|
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
+
+#### GET /version
+
+Returns info about service version
+
+**Response**
+
+| Status                     | Description            |
+|----------------------------|------------------------|
+| OK (200)                   | If version is returned |
+| INTERNAL SERVER ERROR (500)| Otherwise              |
+
+Response body example:
+
+```json
+{
+  "name": "triples-generator",
+  "versions": [
+    {
+      "version": "2.3.0"
+    }
+  ]
+}
+```
 
 ### Trying out
 

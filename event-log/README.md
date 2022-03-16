@@ -6,14 +6,15 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 | Method | Path                                    | Description                                                    |
 |--------|-----------------------------------------|----------------------------------------------------------------|
-|  GET   | ```/events```                           | Returns info about events                                      |
-|  GET   | ```/events/:event-id/:project-id```     | Returns info about event with the given `id` and `project-id`  |
-|  POST  | ```/events```                           | Sends an event for processing                                  |
-|  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
-|  GET   | ```/ping```                             | Verifies service health                                        |
-|  GET   | ```/migration-status```                 | Returns whether or not DB is currently migrating                                        |
-|  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
-|  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
+| GET    | ```/events```                           | Returns info about events                                      |
+| GET    | ```/events/:event-id/:project-id```     | Returns info about event with the given `id` and `project-id`  |
+| POST   | ```/events```                           | Sends an event for processing                                  |
+| GET    | ```/metrics```                          | Returns Prometheus metrics of the service                      |
+| GET    | ```/migration-status```                 | Returns whether or not DB is currently migrating               |
+| GET    | ```/ping```                             | Verifies service health                                        |
+| GET    | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
+| POST   | ```/subscriptions```                    | Adds a subscription for events                                 |
+| GET    | ```/version```                          | Returns info about service version |
 
 All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is migrating.
 
@@ -369,7 +370,7 @@ Forces issuing a commit sync event for the given project
 
 ### GET /metrics
 
-To fetch various Prometheus metrics of the service.
+To fetch Prometheus metrics of the service.
 
 **Response**
 
@@ -378,27 +379,16 @@ To fetch various Prometheus metrics of the service.
 | OK (200)                   | Containing the metrics |
 | INTERNAL SERVER ERROR (500)| Otherwise              |
 
-### GET /ping
-
-Verifies service health.
-
-**Response**
-
-| Status                     | Description           |
-|----------------------------|-----------------------|
-| OK (200)                   | If service is healthy |
-| INTERNAL SERVER ERROR (500)| Otherwise             |
-
 ### GET /migration-status
 
 Verifies service health.
 
 **Response**
 
-| Status                     | Description           |
-|----------------------------|-----------------------|
-| OK (200)                   | Containing JSON with migration status (true/false)
-| INTERNAL SERVER ERROR (500)| Otherwise |
+| Status                     | Description                                         |
+|----------------------------|-----------------------------------------------------|
+| OK (200)                   | Containing JSON with migration status (true/false)  |
+| INTERNAL SERVER ERROR (500)| Otherwise                                           |
 
 Response body example:
 
@@ -665,6 +655,30 @@ or
 | BAD_REQUEST (400)          | When there payload is invalid e.g. no `statuses` are different than `NEW` and `RECOVERABLE_FAILURE` |
 | INTERNAL SERVER ERROR (500)| When there were problems with processing the request                                                |
 | SERVICE UNAVAILABLE ERROR (503)| When a migration is running |
+
+#### GET /version
+
+Returns info about service version
+
+**Response**
+
+| Status                     | Description            |
+|----------------------------|------------------------|
+| OK (200)                   | If version is returned |
+| INTERNAL SERVER ERROR (500)| Otherwise              |
+
+Response body example:
+
+```json
+{
+  "name": "event-log",
+  "versions": [
+    {
+      "version": "2.3.0"
+    }
+  ]
+}
+```
 
 ## DB schema
 
