@@ -47,7 +47,7 @@ private class EventHandler[F[_]: Concurrent: Logger](
       fromEither[F](
         request.event.as[(projects.Id, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
       )
-    result <- forceGlobalCommitSync(event._1, event._2).toRightT
+    result <- moveGlobalCommitSync(event._1, event._2).toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(event))
                 .leftSemiflatTap(Logger[F].log(event))

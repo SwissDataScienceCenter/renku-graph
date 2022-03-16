@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.subscriptions.globalcommitsync
 
+import cats.Id
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{Id, MonadThrow}
+import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
-import io.renku.eventlog.subscriptions.globalcommitsync.GlobalCommitSyncEventFinder.syncInterval
 import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import io.renku.events.CategoryName
 import io.renku.events.consumers.Project
@@ -43,6 +43,7 @@ import java.time.{Duration, Instant}
 private class GlobalCommitSyncEventFinderImpl[F[_]: Async: SessionResource](
     lastSyncedDateUpdater: LastSyncedDateUpdater[F],
     queriesExecTimes:      LabeledHistogram[F],
+    syncFrequency:         Duration,
     now:                   () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[F, GlobalCommitSyncEvent]
@@ -78,8 +79,8 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async: SessionResource](
               LEFT JOIN subscription_category_sync_time sync_time
                 ON proj.project_id = sync_time.project_id AND sync_time.category_name = $categoryNameEncoder
               WHERE
-                sync_time.last_synced IS NULL 
-                OR  (($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '#${syncInterval.toDays.toString} days')
+                sync_time.last_synced IS NULL
+                OR  (($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '#${syncFrequency.toDays.toString} days')
               ORDER BY proj.latest_event_date DESC
               LIMIT 1"""
           .query(projectDecoder ~ lastSyncedDateDecoder.opt)
@@ -88,21 +89,21 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async: SessionResource](
       .arguments(categoryName ~ LastSyncedDate(now()))
       .build(_.option)
   }
+
   private val deletionStatus = Set(AwaitingDeletion, Deleting)
+
   private def findCommitsInfo
       : Option[(Project, Option[LastSyncedDate])] => Kleisli[F, Session[F], Option[GlobalCommitSyncEvent]] = {
     case Some((project, maybeLastSyncedDate)) =>
       measureExecutionTime {
         SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find commits"))
-          .select[projects.Id ~ projects.Id, (Long, Option[CommitId])](
-            sql"""
-                   SELECT
-                     (SELECT COUNT(event_id) FROM event 
-                       WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)}) AS count,
-                     (SELECT event_id FROM event 
-                       WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)} ORDER BY event_date DESC LIMIT 1) AS latest
-                 """.query(int8 ~ commitIdDecoder.opt)
-          )
+          .select[projects.Id ~ projects.Id, (Long, Option[CommitId])](sql"""
+            SELECT
+              (SELECT COUNT(event_id) FROM event 
+                WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)}) AS count,
+              (SELECT event_id FROM event 
+                WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)} ORDER BY event_date DESC LIMIT 1) AS latest
+            """.query(int8 ~ commitIdDecoder.opt))
           .arguments(project.id ~ project.id)
           .build[Id](_.unique)
           .mapResult(toEvent(project, maybeLastSyncedDate))
@@ -130,12 +131,17 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async: SessionResource](
 }
 
 private object GlobalCommitSyncEventFinder {
-  val syncInterval = Duration.ofDays(7)
+
+  import io.renku.config.ConfigLoader._
+
+  import scala.concurrent.duration.FiniteDuration
 
   def apply[F[_]: Async: SessionResource](
       lastSyncedDateUpdater: LastSyncedDateUpdater[F],
-      queriesExecTimes:      LabeledHistogram[F]
-  ): F[EventFinder[F, GlobalCommitSyncEvent]] = MonadThrow[F].catchNonFatal(
-    new GlobalCommitSyncEventFinderImpl(lastSyncedDateUpdater, queriesExecTimes)
-  )
+      queriesExecTimes:      LabeledHistogram[F],
+      config:                Config = ConfigFactory.load()
+  ): F[EventFinder[F, GlobalCommitSyncEvent]] = for {
+    configFrequency <- find[F, FiniteDuration]("global-commit-sync-frequency", config)
+    syncFrequency   <- Duration.ofDays(configFrequency.toDays).pure[F]
+  } yield new GlobalCommitSyncEventFinderImpl(lastSyncedDateUpdater, queriesExecTimes, syncFrequency)
 }
