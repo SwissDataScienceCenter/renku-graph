@@ -741,13 +741,6 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | event_type VARCHAR   NOT NULL    |
 | payload    TEXT      NOT NULL    |
 
-| status_change_events_queue       |
-|----------------------------------|
-| id         SERIAL    PRIMARY KEY |
-| date       TIMESTAMP NOT NULL    |
-| event_type VARCHAR   NOT NULL    |
-| payload    TEXT      NOT NULL    |
-
 ## Trying out
 
 The event-log is a part of multi-module sbt project thus it has to be built from the root level.
