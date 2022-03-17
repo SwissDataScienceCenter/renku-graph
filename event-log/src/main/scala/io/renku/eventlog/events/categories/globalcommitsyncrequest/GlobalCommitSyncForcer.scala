@@ -41,7 +41,8 @@ private trait GlobalCommitSyncForcer[F[_]] {
 }
 
 private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F],
-                                                                                  syncFrequency: Duration,
+                                                                                  syncFrequency:  Duration,
+                                                                                  delayOnRequest: Duration,
                                                                                   now: () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with GlobalCommitSyncForcer[F]
@@ -50,27 +51,26 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource
 
   override def moveGlobalCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit] =
     SessionResource[F].useK {
-      scheduleGlobalSync(projectId, in = Duration ofMinutes 5) >>= {
+      scheduleGlobalSync(projectId) >>= {
         case true  => upsertProject(projectId, projectPath)
         case false => Kleisli.pure(())
       }
     }
 
-  private def scheduleGlobalSync(projectId: projects.Id, in: Duration) =
-    measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - move last_synced"))
-        .command[LastSyncedDate ~ projects.Id](sql"""
+  private def scheduleGlobalSync(projectId: projects.Id) = measureExecutionTime {
+    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - move last_synced"))
+      .command[LastSyncedDate ~ projects.Id](sql"""
             UPDATE subscription_category_sync_time
             SET last_synced = $lastSyncedDateEncoder
             WHERE project_id = $projectIdEncoder AND category_name = '#${globalcommitsync.categoryName.show}'
           """.command)
-        .arguments(LastSyncedDate(now().minus(syncFrequency).plus(in)), projectId)
-        .build
-        .mapResult {
-          case Completion.Update(0) => true
-          case _                    => false
-        }
-    }
+      .arguments(LastSyncedDate(now().minus(syncFrequency).plus(delayOnRequest)), projectId)
+      .build
+      .mapResult {
+        case Completion.Update(0) => true
+        case _                    => false
+      }
+  }
 
   private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project"))
@@ -95,7 +95,9 @@ private object GlobalCommitSyncForcer {
       queriesExecTimes: LabeledHistogram[F],
       config:           Config = ConfigFactory.load()
   ): F[GlobalCommitSyncForcer[F]] = for {
-    configFrequency <- find[F, FiniteDuration]("global-commit-sync-frequency", config)
-    syncFrequency   <- Duration.ofDays(configFrequency.toDays).pure[F]
-  } yield new GlobalCommitSyncForcerImpl(queriesExecTimes, syncFrequency)
+    configFrequency      <- find[F, FiniteDuration]("global-commit-sync-frequency", config)
+    syncFrequency        <- Duration.ofDays(configFrequency.toDays).pure[F]
+    configDelayOnRequest <- find[F, FiniteDuration]("global-commit-sync-delay-on-request", config)
+    delayOnRequest       <- Duration.ofDays(configDelayOnRequest.toDays).pure[F]
+  } yield new GlobalCommitSyncForcerImpl(queriesExecTimes, syncFrequency, delayOnRequest)
 }

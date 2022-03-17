@@ -49,7 +49,7 @@ class GlobalCommitSyncForcerSpec
   "moveGlobalCommitSync" should {
 
     "schedule the next the GLOBAL_COMMIT_SYNC event for the project " +
-      "in 5 minutes (7 days - 5 mins) " +
+      "in delayOnRequest (syncFrequence - delayOnRequest) " +
       "if the row in the subscription_category_sync_time exists" in new TestCase {
 
         val projectId   = projectIds.generateOne
@@ -69,7 +69,7 @@ class GlobalCommitSyncForcerSpec
         forcer.moveGlobalCommitSync(projectId, projectPath).unsafeRunSync() shouldBe ()
 
         findSyncTime(projectId, globalcommitsync.categoryName) shouldBe LastSyncedDate(
-          now.minus(syncFrequency).plus(Duration ofMinutes 5)
+          now.minus(syncFrequency).plus(delayOnRequest)
         ).some
         findSyncTime(projectId, otherCategoryName) shouldBe otherCategorySyncDate.some
 
@@ -116,11 +116,12 @@ class GlobalCommitSyncForcerSpec
   }
 
   private trait TestCase {
-    val syncFrequency = Duration ofDays 7
-    val currentTime   = mockFunction[Instant]
-    val now           = Instant.now()
+    val syncFrequency  = Duration ofDays 7
+    val delayOnRequest = Duration ofMinutes 5
+    val currentTime    = mockFunction[Instant]
+    val now            = Instant.now()
     currentTime.expects().returning(now)
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val forcer           = new GlobalCommitSyncForcerImpl(queriesExecTimes, syncFrequency, currentTime)
+    val forcer           = new GlobalCommitSyncForcerImpl(queriesExecTimes, syncFrequency, delayOnRequest, currentTime)
   }
 }
