@@ -64,12 +64,10 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         givenLatestCommitIsFound(latestCommitInfo, event.project.id)
         commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
-        logger.loggedOnly(
-          Info(s"${logMessageCommon(event)} -> event skipped in ${executionTimeRecorder.elapsedTime}ms")
-        )
+        logger.expectNoLogs()
       }
 
-    "succeed if the latest event in the Event Log  is already in EventLog and log the event as Existed" in new TestCase {
+    "succeed if the latest event in the Event Log is already in EventLog and log the event as Existed" in new TestCase {
 
       val event            = fullCommitSyncEvents.generateOne
       val latestCommitInfo = commitInfos.generateOne.copy(parents = commitIds.generateNonEmptyList().toList)
@@ -87,7 +85,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
       commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
       logger.loggedOnly(
-        logNoNewEvents(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
         logSummary(latestCommitInfo.id,
                    event.project,
                    executionTimeRecorder.elapsedTime,
@@ -115,7 +112,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         commitsSynchronizer.synchronizeEvents(event) shouldBe ().pure[Try]
 
         logger.loggedOnly(
-          logEventSkipped(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
           logSummary(latestCommitInfo.id,
                      event.project,
                      executionTimeRecorder.elapsedTime,
@@ -151,7 +147,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
       logger.loggedOnly(
         logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
-        logNoNewEvents(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
         logSummary(latestCommitInfo.id,
                    event.project,
                    executionTimeRecorder.elapsedTime,
@@ -551,7 +546,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
       logger.loggedOnly(
         logNewEventFound(latestCommitInfo.id, event.project, executionTimeRecorder.elapsedTime),
-        logNoNewEvents(parentCommit.id, event.project, executionTimeRecorder.elapsedTime),
         logSummary(latestCommitInfo.id,
                    event.project,
                    executionTimeRecorder.elapsedTime,
@@ -663,14 +657,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
   )
   private def logEventFoundForDeletion(commitId: CommitId, project: Project, elapsedTime: ElapsedTime) = Info(
     s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> events found for deletion in ${elapsedTime}ms"
-  )
-
-  private def logNoNewEvents(commitId: CommitId, project: Project, elapsedTime: ElapsedTime) = Info(
-    s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> no new events found in ${elapsedTime}ms"
-  )
-
-  private def logEventSkipped(commitId: CommitId, project: Project, elapsedTime: ElapsedTime) = Info(
-    s"$categoryName: id = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> event skipped in ${elapsedTime}ms"
   )
 
   private def logErrorSynchronization(commitId:    CommitId,

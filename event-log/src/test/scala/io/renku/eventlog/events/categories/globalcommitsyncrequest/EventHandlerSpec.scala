@@ -54,7 +54,7 @@ class EventHandlerSpec
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
-        (globalCommitSyncForcer.forceGlobalCommitSync _)
+        (globalCommitSyncForcer.moveGlobalCommitSync _)
           .expects(projectId, projectPath)
           .returning(().pure[IO])
 
@@ -82,7 +82,7 @@ class EventHandlerSpec
       val projectPath = projectPaths.generateOne
 
       val exception = exceptions.generateOne
-      (globalCommitSyncForcer.forceGlobalCommitSync _)
+      (globalCommitSyncForcer.moveGlobalCommitSync _)
         .expects(projectId, projectPath)
         .returning(exception.raiseError[IO, Unit])
 

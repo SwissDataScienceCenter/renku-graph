@@ -4,16 +4,18 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method  | Path                                                                    | Description                                                    |
-|---------|-------------------------------------------------------------------------|----------------------------------------------------------------|
-|  GET    | ```/knowledge-graph/datasets```                                         | Returns datasets filtered by the given predicates.             |
-|  GET    | ```/knowledge-graph/datasets/:id```                                     | Returns details of the dataset with the given `id`             |
-|  GET    | ```/knowledge-graph/entities```                                         | Returns entities filtered by the given predicates`             |
-|  GET    | ```/knowledge-graph/graphql```                                          | Returns GraphQL endpoint schema                                |
-|  POST   | ```/knowledge-graph/graphql```                                          | GraphQL query endpoint                                         |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name```                        | Returns details of the project with the given `namespace/name` |
-|  GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```               | Returns datasets of the project with the given `path`          |
-|  GET    | ```/ping```                                                             | To check if service is healthy                                 |
+| Method |  Path                                                     | Description                                                    |
+|--------|-----------------------------------------------------------|----------------------------------------------------------------|
+| GET    | ```/knowledge-graph/datasets```                           | Returns datasets filtered by the given predicates.             |
+| GET    | ```/knowledge-graph/datasets/:id```                       | Returns details of the dataset with the given `id`             |
+| GET    | ```/knowledge-graph/entities```                           | Returns entities filtered by the given predicates`             |
+| GET    | ```/knowledge-graph/graphql```                            | Returns GraphQL endpoint schema                                |
+| POST   | ```/knowledge-graph/graphql```                            | GraphQL query endpoint                                         |
+| GET    | ```/knowledge-graph/projects/:namespace/:name```          | Returns details of the project with the given `namespace/name` |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets``` | Returns datasets of the project with the given `path`          |
+| GET    | ```/metrics```                                            | Serves Prometheus metrics                                      |
+| GET    | ```/ping```                                               | To check if service is healthy                                 |
+| GET    | ```/version```                                            | Returns info about service version                             |
 
 #### GET /knowledge-graph/datasets
 
@@ -403,6 +405,12 @@ Returns Knowledge Graph GraphQL endpoint schema.
 | OK (200)                   | Schema of the GraphQL endpoint |
 | INTERNAL SERVER ERROR (500)| Otherwise                      |
 
+**A curl command example**
+
+```
+curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/knowledge-graph/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
+```
+
 #### POST /knowledge-graph/graphql
 
 Endpoint to perform GraphQL queries on the Knowledge Graph data.
@@ -640,6 +648,17 @@ Response body example:
 ]
 ```
 
+#### GET /metrics
+
+Serves Prometheus metrics.
+
+**Response**
+
+| Status                     | Description          |
+|----------------------------|----------------------|
+| OK (200)                   | If metrics are found |
+| INTERNAL SERVER ERROR (500)| Otherwise            |
+
 #### GET /ping
 
 Verifies service health.
@@ -651,10 +670,28 @@ Verifies service health.
 | OK (200)                   | If service is healthy   |
 | INTERNAL SERVER ERROR (500)| Otherwise               |
 
-**A curl command example**
+#### GET /version
 
-```
-curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/knowledge-graph/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
+Returns info about service version
+
+**Response**
+
+| Status                     | Description            |
+|----------------------------|------------------------|
+| OK (200)                   | If version is returned |
+| INTERNAL SERVER ERROR (500)| Otherwise              |
+
+Response body example:
+
+```json
+{
+  "name": "commit-event-service",
+  "versions": [
+    {
+      "version": "2.3.0"
+    }
+  ]
+}
 ```
 
 ## Trying out

@@ -18,29 +18,29 @@
 
 package io.renku.graph.acceptancetests.knowledgegraph
 
-import io.circe.literal._
+import eu.timepit.refined.auto._
+import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.acceptancetests.data.{Project, _}
+import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.events
 import io.renku.graph.model.testentities.RenkuProject._
-import io.renku.jsonld.syntax._
-import io.renku.graph.acceptancetests.data.{Project, _}
-import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
+import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
+import io.renku.http.rest.Links
+import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
+import io.renku.jsonld.syntax._
+import io.renku.webhookservice.model
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import eu.timepit.refined.auto._
-import io.circe.Json
-import io.renku.http.rest.Links
-import io.renku.webhookservice.model
+
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
-import io.renku.graph.acceptancetests.db.EventLog
-import io.renku.graph.model.events
 
 class ProjectReProvisioningSpec
     extends AnyFeatureSpec
@@ -73,7 +73,6 @@ class ProjectReProvisioningSpec
       AssertProjectDataIsCorrect(project, project.entitiesProject)
 
       When("the commit history changes")
-
 
       val newCommits  = commitIds.generateNonEmptyList(minElements = 3)
       val newEntities = generateNewActivitiesAndDataset(project.entitiesProject)
