@@ -18,20 +18,16 @@
 
 package io.renku.webhookservice
 
-import cats.effect.IO
-import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
-import com.github.tomakehurst.wiremock.stubbing.Scenario
-import eu.timepit.refined.auto._
+import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.config.EventLogUrl
+import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
 import io.renku.webhookservice.WebhookServiceGenerators._
 import io.renku.webhookservice.model.CommitSyncRequest
 import org.http4s.Status._
@@ -39,149 +35,53 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.duration._
+import scala.util.Try
 
-class CommitSyncRequestSenderSpec
-    extends AnyWordSpec
-    with MockFactory
-    with ExternalServiceStubbing
-    with should.Matchers
-    with IOSpec {
+class CommitSyncRequestSenderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "send" should {
 
     s"succeed when delivering the event to the Event Log got $Accepted" in new TestCase {
 
-      stubFor {
-        post("/events")
-          .withMultipartRequestBody(
-            aMultipart("event").withBody(equalToJson(syncRequest.asJson.spaces2))
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+        .expects(
+          EventRequestContent.NoPayload(syncRequest.asJson),
+          EventSender.EventContext(CategoryName("COMMIT_SYNC_REQUEST"),
+                                   show"$processName - sending COMMIT_SYNC_REQUEST for ${syncRequest.project} failed"
           )
-          .willReturn(aResponse().withStatus(Accepted.code))
-      }
-
-      eventSender.sendCommitSyncRequest(syncRequest).unsafeRunSync() shouldBe ()
-
-      logger.loggedOnly(
-        Info(
-          s"CommitSyncRequest sent for projectId = ${syncRequest.project.id}, projectPath = ${syncRequest.project.path}"
         )
-      )
+        .returning(().pure[Try])
+
+      requestSender.sendCommitSyncRequest(syncRequest, processName) shouldBe ().pure[Try]
+
+      logger.loggedOnly(Info(show"$processName - COMMIT_SYNC_REQUEST sent for ${syncRequest.project}"))
     }
 
-    s"fail when delivering the event to the Event Log got $BadRequest" in new TestCase {
-
-      val status = BadRequest
-      stubFor {
-        post("/events")
-          .withMultipartRequestBody(
-            aMultipart("event").withBody(equalToJson(syncRequest.asJson.spaces2))
+    "fail when sending the event fails" in new TestCase {
+      val exception = exceptions.generateOne
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
+        .expects(
+          EventRequestContent.NoPayload(syncRequest.asJson),
+          EventSender.EventContext(CategoryName("COMMIT_SYNC_REQUEST"),
+                                   show"$processName - sending COMMIT_SYNC_REQUEST for ${syncRequest.project} failed"
           )
-          .willReturn(aResponse().withStatus(BadRequest.code))
-      }
+        )
+        .returning(exception.raiseError[Try, Unit])
 
-      intercept[Exception] {
-        eventSender.sendCommitSyncRequest(syncRequest).unsafeRunSync()
-      }.getMessage shouldBe s"POST $eventLogUrl/events returned $status; body: "
-    }
-
-    Set(BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
-      s"retry if remote responds with status such as $errorStatus" in new TestCase {
-
-        val postRequest = post("/events").inScenario("Retry")
-
-        stubFor {
-          postRequest
-            .whenScenarioStateIs(Scenario.STARTED)
-            .willSetStateTo("Error")
-            .willReturn(aResponse().withStatus(errorStatus.code))
-        }
-
-        stubFor {
-          postRequest
-            .whenScenarioStateIs("Error")
-            .willSetStateTo("Successful")
-            .willReturn(aResponse().withStatus(errorStatus.code))
-        }
-
-        stubFor {
-          postRequest
-            .whenScenarioStateIs("Successful")
-            .willReturn(aResponse().withStatus(Accepted.code))
-        }
-
-        eventSender.sendCommitSyncRequest(syncRequest).unsafeRunSync() shouldBe ()
-      }
-    }
-
-    "retry if remote is not reachable" in new TestCase {
-
-      val postRequest = post("/events").inScenario("Retry")
-
-      stubFor {
-        postRequest
-          .whenScenarioStateIs(Scenario.STARTED)
-          .willSetStateTo("Error")
-          .willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER))
-      }
-
-      stubFor {
-        postRequest
-          .whenScenarioStateIs("Error")
-          .willSetStateTo("Successful")
-          .willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER))
-      }
-
-      stubFor {
-        postRequest
-          .whenScenarioStateIs("Successful")
-          .willReturn(aResponse().withStatus(Accepted.code))
-      }
-
-      eventSender.sendCommitSyncRequest(syncRequest).unsafeRunSync() shouldBe ()
-    }
-
-    "retry in case of client exception" in new TestCase {
-
-      val postRequest = post("/events").inScenario("Retry")
-
-      stubFor {
-        postRequest
-          .whenScenarioStateIs(Scenario.STARTED)
-          .willSetStateTo("Error")
-          .willReturn(aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt))
-      }
-
-      stubFor {
-        postRequest
-          .whenScenarioStateIs("Error")
-          .willSetStateTo("Successful")
-          .willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER))
-      }
-
-      stubFor {
-        postRequest
-          .whenScenarioStateIs("Successful")
-          .willReturn(aResponse().withStatus(Accepted.code))
-      }
-
-      eventSender.sendCommitSyncRequest(syncRequest).unsafeRunSync() shouldBe ()
+      requestSender.sendCommitSyncRequest(syncRequest, processName) shouldBe exception.raiseError[Try, Unit]
     }
   }
 
   private trait TestCase {
 
+    val processName = nonEmptyStrings().generateOne
     val syncRequest = commitSyncRequests.generateOne
 
-    val eventLogUrl     = EventLogUrl(externalServiceBaseUrl)
-    implicit val logger = TestLogger[IO]()
-    val requestTimeout  = 2 seconds
-    val eventSender = new CommitSyncRequestSenderImpl[IO](eventLogUrl,
-                                                          500 millis,
-                                                          retryInterval = 100 millis,
-                                                          maxRetries = 1,
-                                                          requestTimeoutOverride = Some(requestTimeout)
-    )
+    val eventSender = mock[EventSender[Try]]
+    implicit val logger: TestLogger[Try] = TestLogger[Try]()
+    val requestSender = new CommitSyncRequestSenderImpl[Try](eventSender)
   }
 
   private implicit lazy val eventEncoder: Encoder[CommitSyncRequest] = Encoder.instance[CommitSyncRequest] { event =>

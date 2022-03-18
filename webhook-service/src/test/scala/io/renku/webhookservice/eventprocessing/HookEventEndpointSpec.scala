@@ -55,8 +55,8 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
       (commitSyncRequestSender
-        .sendCommitSyncRequest(_: CommitSyncRequest))
-        .expects(syncRequest)
+        .sendCommitSyncRequest(_: CommitSyncRequest, _: String))
+        .expects(syncRequest, "HookEvent")
         .returning(().pure[IO])
 
       expectDecryptionOf(serializedHookToken, returning = HookToken(syncRequest.project.id))
