@@ -98,6 +98,6 @@ private object GlobalCommitSyncForcer {
     configFrequency      <- find[F, FiniteDuration]("global-commit-sync-frequency", config)
     syncFrequency        <- Duration.ofDays(configFrequency.toDays).pure[F]
     configDelayOnRequest <- find[F, FiniteDuration]("global-commit-sync-delay-on-request", config)
-    delayOnRequest       <- Duration.ofDays(configDelayOnRequest.toDays).pure[F]
+    delayOnRequest       <- Duration.ofMinutes(configDelayOnRequest.toMinutes).pure[F]
   } yield new GlobalCommitSyncForcerImpl(queriesExecTimes, syncFrequency, delayOnRequest)
 }

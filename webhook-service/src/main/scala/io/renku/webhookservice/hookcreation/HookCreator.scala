@@ -25,6 +25,7 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken
+import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
@@ -69,7 +70,7 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
       _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
       _                   <- right(associate(projectId, accessToken))
-      _                   <- right(Spawn[F].start(sendCommitSyncRequest(CommitSyncRequest(projectInfo.toProject))))
+      _ <- right(Spawn[F].start(sendCommitSyncRequest(CommitSyncRequest(projectInfo.toProject), "HookCreation")))
     } yield ()
   }.fold[CreationResult](_ => HookExisted, _ => HookCreated) recoverWith loggingError(projectId)
 
@@ -102,7 +103,7 @@ private object HookCreator {
 
   case class HookAlreadyCreated(projectId: Id, projectHookUrl: ProjectHookUrl)
 
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       projectHookUrl:  ProjectHookUrl,
       gitLabThrottler: Throttler[F, GitLab],
       hookTokenCrypto: HookTokenCrypto[F]
