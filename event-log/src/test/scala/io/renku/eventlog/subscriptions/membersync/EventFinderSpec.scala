@@ -19,7 +19,6 @@
 package io.renku.eventlog.subscriptions
 package membersync
 
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
@@ -36,7 +35,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
 
-class MemberSyncEventFinderSpec
+class EventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -148,6 +147,6 @@ class MemberSyncEventFinderSpec
 
   private trait TestCase {
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val finder           = new MemberSyncEventFinderImpl(queriesExecTimes)
+    val finder           = new EventFinderImpl(queriesExecTimes)
   }
 }

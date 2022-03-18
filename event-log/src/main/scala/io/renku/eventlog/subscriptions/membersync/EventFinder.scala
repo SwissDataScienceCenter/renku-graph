@@ -37,7 +37,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource](
+private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource](
     queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
@@ -62,18 +62,18 @@ private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource]
               (projects.Id, Option[LastSyncedDate], MemberSyncEvent)
       ](
         sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_path
-                  FROM project proj
-                  LEFT JOIN subscription_category_sync_time sync_time
-                    ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
-                  WHERE
-                    sync_time.last_synced IS NULL
-                    OR (
-                         (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '5 minutes')
-                      OR (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
-                      OR (($eventDateEncoder - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
-                    )
-                  ORDER BY proj.latest_event_date DESC
-                  LIMIT 1
+              FROM project proj
+              LEFT JOIN subscription_category_sync_time sync_time
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
+              WHERE
+                sync_time.last_synced IS NULL
+                OR (
+                     (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '5 minutes')
+                  OR (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
+                  OR (($eventDateEncoder - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
+                )
+              ORDER BY proj.latest_event_date DESC
+              LIMIT 1
       """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectPathDecoder)
           .map { case id ~ maybeDate ~ path => (id, maybeDate, MemberSyncEvent(path)) }
       )
@@ -83,47 +83,45 @@ private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource]
 
   private def setSyncDate(projectId:       projects.Id,
                           maybeSyncedDate: Option[LastSyncedDate]
-  ): Kleisli[F, Session[F], Boolean] =
+  ): Kleisli[F, Session[F], Boolean] = {
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(projectId)
     else insertLastSyncedDate(projectId)
+  } recoverWith falseForForeignKeyViolation
 
   private def updateLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-      .command[LastSyncedDate ~ projects.Id ~ CategoryName](sql"""UPDATE subscription_category_sync_time
-                  SET last_synced = $lastSyncedDateEncoder
-                  WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
-            """.command)
+      .command[LastSyncedDate ~ projects.Id ~ CategoryName](sql"""
+        UPDATE subscription_category_sync_time
+        SET last_synced = $lastSyncedDateEncoder
+        WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
+        """.command)
       .arguments(LastSyncedDate(now()) ~ projectId ~ categoryName)
       .build
       .flatMapResult {
         case Completion.Update(1) => true.pure[F]
         case Completion.Update(0) => false.pure[F]
         case completion =>
-          new Exception(
-            s"${categoryName.value.toLowerCase} - update last_synced failed with completion code $completion"
-          ).raiseError[F, Boolean]
+          new Exception(s"${categoryName.show} - update last_synced failed with completion code $completion")
+            .raiseError[F, Boolean]
       }
   }
 
   private def insertLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
-      .command[projects.Id ~ CategoryName ~ LastSyncedDate](
-        sql"""
-            INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-            VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
-            ON CONFLICT (project_id, category_name)
-            DO UPDATE SET last_synced = EXCLUDED.last_synced
-            """.command
-      )
+      .command[projects.Id ~ CategoryName ~ LastSyncedDate](sql"""
+        INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
+        VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
+        ON CONFLICT (project_id, category_name)
+        DO UPDATE SET last_synced = EXCLUDED.last_synced
+        """.command)
       .arguments(projectId ~ categoryName ~ LastSyncedDate(now()))
       .build
       .flatMapResult {
         case Completion.Insert(1) => true.pure[F]
         case Completion.Insert(0) => false.pure[F]
         case completion =>
-          new Exception(
-            s"${categoryName.value.toLowerCase} - insert last_synced failed with completion code $completion"
-          ).raiseError[F, Boolean]
+          new Exception(s"${categoryName.show} - insert last_synced failed with completion code $completion")
+            .raiseError[F, Boolean]
       }
   }
 
@@ -131,12 +129,16 @@ private class MemberSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource]
     case true  => Some(event)
     case false => None
   }
+
+  private lazy val falseForForeignKeyViolation: PartialFunction[Throwable, Kleisli[F, Session[F], Boolean]] = {
+    case SqlState.ForeignKeyViolation(_) => Kleisli.pure(false)
+  }
 }
 
-private object MemberSyncEventFinder {
+private object EventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, MemberSyncEvent]] = MonadThrow[F].catchNonFatal {
-    new MemberSyncEventFinderImpl(queriesExecTimes)
+    new EventFinderImpl(queriesExecTimes)
   }
 }

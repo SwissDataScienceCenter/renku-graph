@@ -35,12 +35,12 @@ private[subscriptions] object SubscriptionCategory {
       subscriberTracker: SubscriberTracker[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers      <- Subscribers(categoryName, subscriberTracker)
-    eventsFinder     <- MemberSyncEventFinder(queriesExecTimes)
+    eventFinder      <- EventFinder(queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[F, MemberSyncEvent](categoryName)
     eventDelivery    <- EventDelivery.noOp[F, MemberSyncEvent]
     eventsDistributor <- EventsDistributor(categoryName,
                                            subscribers,
-                                           eventsFinder,
+                                           eventFinder,
                                            eventDelivery,
                                            EventEncoder(encodeEvent),
                                            dispatchRecovery
