@@ -21,8 +21,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 7,
-  "iteration": 1647946934289,
+  "id": 73,
+  "iteration": 1647948406417,
   "links": [],
   "panels": [
     {
@@ -755,13 +755,7 @@
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:87",
-          "alias": "/.*\\ req\\/sec/",
-          "yaxis": 2
-        }
-      ],
+      "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
@@ -810,7 +804,7 @@
           "logBase": 1,
           "max": null,
           "min": null,
-          "show": true
+          "show": false
         }
       ],
       "yaxis": {
@@ -865,13 +859,7 @@
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "$$hashKey": "object:87",
-          "alias": "/.*\\ req\\/sec/",
-          "yaxis": 2
-        }
-      ],
+      "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
@@ -906,7 +894,7 @@
       "yaxes": [
         {
           "$$hashKey": "object:94",
-          "format": "s",
+          "format": "short",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -920,7 +908,7 @@
           "logBase": 1,
           "max": null,
           "min": null,
-          "show": true
+          "show": false
         }
       ],
       "yaxis": {
@@ -970,7 +958,7 @@
       {
         "allValue": null,
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "renku",
           "value": "renku"
         },
@@ -1016,5 +1004,5 @@
   "timezone": "",
   "title": "Graph Services response times",
   "uid": "uXfdBVsZk",
-  "version": 19
+  "version": 3
 }
