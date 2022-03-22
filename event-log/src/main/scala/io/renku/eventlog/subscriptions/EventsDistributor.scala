@@ -38,7 +38,7 @@ private trait EventsDistributor[F[_]] {
 
 private class EventsDistributorImpl[F[_]: MonadThrow: Temporal: Logger, CategoryEvent](
     categoryName:                 CategoryName,
-    subscribers:                  Subscribers[F],
+    subscribers:                  Subscribers[F, _],
     eventsFinder:                 EventFinder[F, CategoryEvent],
     eventsSender:                 EventsSender[F, CategoryEvent],
     eventDelivery:                EventDelivery[F, CategoryEvent],
@@ -116,7 +116,7 @@ private object EventsDistributor {
 
   def apply[F[_]: Async: Logger: MetricsRegistry, CategoryEvent](
       categoryName:             CategoryName,
-      subscribers:              Subscribers[F],
+      subscribers:              Subscribers[F, _],
       eventsFinder:             EventFinder[F, CategoryEvent],
       eventDelivery:            EventDelivery[F, CategoryEvent],
       categoryEventEncoder:     EventEncoder[CategoryEvent],

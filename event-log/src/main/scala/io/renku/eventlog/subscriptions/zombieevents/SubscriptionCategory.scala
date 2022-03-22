@@ -32,11 +32,10 @@ import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
-      queriesExecTimes:  LabeledHistogram[F],
-      subscriberTracker: SubscriberTracker[F]
+  def apply[F[_]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers      <- Subscribers(categoryName, subscriberTracker)
+    subscribers      <- UrlAndIdSubscribers[F](categoryName)
     eventsFinder     <- ZombieEventFinder(queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[F, ZombieEvent](categoryName)
     eventDelivery    <- EventDelivery.noOp[F, ZombieEvent]
@@ -59,4 +58,4 @@ private[subscriptions] object SubscriptionCategory {
 private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
                                                subscriberId:  SubscriberId,
                                                maybeCapacity: Option[Capacity]
-) extends subscriptions.SubscriptionInfo
+) extends subscriptions.UrlAndIdSubscriptionInfo

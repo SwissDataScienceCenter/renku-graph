@@ -18,6 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.Show
+import cats.syntax.all._
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.positiveInts
@@ -27,10 +29,27 @@ private object Generators {
 
   val capacities: Gen[Capacity] = positiveInts() map (v => Capacity(v.value))
 
+  final case class TestUrlAndIdSubscriptionInfo(subscriberUrl: SubscriberUrl,
+                                                subscriberId:  SubscriberId,
+                                                maybeCapacity: Option[Capacity]
+  ) extends UrlAndIdSubscriptionInfo
+
   final case class TestSubscriptionInfo(subscriberUrl: SubscriberUrl,
                                         subscriberId:  SubscriberId,
                                         maybeCapacity: Option[Capacity]
   ) extends SubscriptionInfo
+
+  object TestSubscriptionInfo {
+    implicit val show: Show[TestSubscriptionInfo] = Show.show { info =>
+      show"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId}${info.maybeCapacity}"
+    }
+  }
+
+  implicit val urlAndIdSubscriptionInfos: Gen[TestUrlAndIdSubscriptionInfo] = for {
+    url           <- subscriberUrls
+    id            <- subscriberIds
+    maybeCapacity <- capacities.toGeneratorOfOptions
+  } yield TestUrlAndIdSubscriptionInfo(url, id, maybeCapacity)
 
   implicit val subscriptionInfos: Gen[TestSubscriptionInfo] = for {
     url           <- subscriberUrls

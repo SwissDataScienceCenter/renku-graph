@@ -407,7 +407,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
   private trait TestCase {
 
     val categoryName             = categoryNames.generateOne
-    val subscribers              = mock[Subscribers[IO]]
+    val subscribers              = mock[Subscribers[IO, SubscriptionInfo]]
     val eventsFinder             = mock[EventFinder[IO, TestCategoryEvent]]
     val eventsSender             = mock[EventsSender[IO, TestCategoryEvent]]
     val eventDelivery            = mock[EventDelivery[IO, TestCategoryEvent]]

@@ -30,11 +30,10 @@ import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
-      queriesExecTimes:  LabeledHistogram[F],
-      subscriberTracker: SubscriberTracker[F]
+  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers           <- Subscribers(categoryName, subscriberTracker)
+    subscribers           <- UrlAndIdSubscribers(categoryName)
     lastSyncedDateUpdater <- LastSyncedDateUpdater(queriesExecTimes)
     eventsFinder          <- GlobalCommitSyncEventFinder(lastSyncedDateUpdater, queriesExecTimes)
     dispatchRecovery      <- DispatchRecovery(lastSyncedDateUpdater)

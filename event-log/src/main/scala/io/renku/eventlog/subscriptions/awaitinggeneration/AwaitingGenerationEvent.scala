@@ -26,8 +26,9 @@ import io.renku.graph.model.projects
 private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody)
 
 private object AwaitingGenerationEvent {
-  implicit lazy val show: Show[AwaitingGenerationEvent] =
-    Show.show(event => show"${event.id}, projectPath = ${event.projectPath}")
+  implicit lazy val show: Show[AwaitingGenerationEvent] = Show.show { event =>
+    show"${event.id}, projectPath = ${event.projectPath}"
+  }
 }
 
 private object AwaitingGenerationEventEncoder {
@@ -35,15 +36,13 @@ private object AwaitingGenerationEventEncoder {
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  def encodeEvent(event: AwaitingGenerationEvent): Json =
-    json"""{
-    "categoryName": ${SubscriptionCategory.name.value},
+  def encodeEvent(event: AwaitingGenerationEvent): Json = json"""{
+    "categoryName": ${SubscriptionCategory.categoryName.value},
     "id":           ${event.id.id.value},
     "project": {
       "id":         ${event.id.projectId.value}
     }
   }"""
 
-  def encodePayload(event: AwaitingGenerationEvent): String =
-    event.body.value
+  def encodePayload(event: AwaitingGenerationEvent): String = event.body.value
 }

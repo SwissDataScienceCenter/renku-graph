@@ -54,10 +54,11 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
 
       (eventSender
         .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
-        .expects(eventRequestContent,
-                 EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                                          s"${SubscriptionCategory.name}: Marking event as $New failed"
-                 )
+        .expects(
+          eventRequestContent,
+          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                   s"${SubscriptionCategory.categoryName}: Marking event as $New failed"
+          )
         )
         .returning(().pure[Try])
 
@@ -89,7 +90,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
           eventRequestContent,
           EventSender.EventContext(
             CategoryName("EVENTS_STATUS_CHANGE"),
-            s"${SubscriptionCategory.name}: $event, url = $subscriber -> $GenerationNonRecoverableFailure"
+            s"${SubscriptionCategory.categoryName}: $event, url = $subscriber -> $GenerationNonRecoverableFailure"
           )
         )
         .returning(().pure[Try])
@@ -97,7 +98,9 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
       dispatchRecovery.recover(subscriber, event)(exception) shouldBe ().pure[Try]
 
       logger.loggedOnly(
-        Error(s"${SubscriptionCategory.name}: $event, url = $subscriber -> $GenerationNonRecoverableFailure", exception)
+        Error(s"${SubscriptionCategory.categoryName}: $event, url = $subscriber -> $GenerationNonRecoverableFailure",
+              exception
+        )
       )
     }
   }

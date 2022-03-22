@@ -35,7 +35,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
 
-class SubscriberTrackerSpec
+class UrlAndIdSubscriberTrackerSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -76,7 +76,7 @@ class SubscriberTrackerSpec
     "insert a new row in the subscriber table " +
       "if the subscriber exists but the source_url is different" in new TestCase {
         val otherSource  = microserviceBaseUrls.generateOne
-        val otherTracker = new SubscriberTrackerImpl(queriesExecTimes, otherSource)
+        val otherTracker = new UrlAndIdSubscriberTrackerImpl(queriesExecTimes, otherSource)
         (otherTracker add subscriptionInfo).unsafeRunSync() shouldBe true
 
         findSubscriber(subscriptionInfo.subscriberUrl, otherSource) shouldBe Some(
@@ -144,10 +144,10 @@ class SubscriberTrackerSpec
   }
 
   private trait TestCase {
-    val subscriptionInfo = subscriptionInfos.generateOne
+    val subscriptionInfo = urlAndIdSubscriptionInfos.generateOne
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val sourceUrl        = microserviceBaseUrls.generateOne
-    val tracker          = new SubscriberTrackerImpl(queriesExecTimes, sourceUrl)
+    val tracker          = new UrlAndIdSubscriberTrackerImpl(queriesExecTimes, sourceUrl)
   }
 
   private def findSubscriber(subscriberUrl: SubscriberUrl,
@@ -156,8 +156,8 @@ class SubscriberTrackerSpec
     Kleisli { session =>
       val query: Query[SubscriberUrl ~ MicroserviceBaseUrl, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] =
         sql"""SELECT delivery_id, delivery_url, source_url
-            FROM subscriber
-            WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder"""
+              FROM subscriber
+              WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder"""
           .query(subscriberIdDecoder ~ subscriberUrlDecoder ~ microserviceBaseUrlDecoder)
           .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
             (subscriberId, subscriberUrl, microserviceBaseUrl)
@@ -170,8 +170,7 @@ class SubscriberTrackerSpec
     execute[Unit] {
       Kleisli { session =>
         val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl] =
-          sql"""INSERT INTO
-                subscriber (delivery_id, delivery_url, source_url)
+          sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
                 VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
           """.command
         session

@@ -76,7 +76,7 @@ private class TriplesGeneratedEventFinderImpl[F[_]: Async: SessionResource](
 
   private def findProjectsWithEventsInQueue = measureExecutionTime {
     SqlStatement(
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
+      name = Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find projects")
     ).select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
       sql"""
         SELECT p.project_id, p.project_path, p.latest_event_date,
@@ -106,7 +106,7 @@ private class TriplesGeneratedEventFinderImpl[F[_]: Async: SessionResource](
 
   private def findNewestEvent(idAndPath: ProjectIds) = measureExecutionTime {
     val executionDate = ExecutionDate(now())
-    SqlStatement(name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest"))
+    SqlStatement(name = Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find oldest"))
       .select[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, TriplesGeneratedEvent](sql"""
          SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt_payload.payload
          FROM (
@@ -156,7 +156,7 @@ private class TriplesGeneratedEventFinderImpl[F[_]: Async: SessionResource](
   }
 
   private def updateStatus(commitEventId: CompoundEventId) =
-    SqlStatement(name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status"))
+    SqlStatement(name = Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - update status"))
       .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
         sql"""UPDATE event
               SET status = $eventStatusEncoder, execution_date = $executionDateEncoder

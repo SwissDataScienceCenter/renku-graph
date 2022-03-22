@@ -16,13 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.globalcommitsync
+package io.renku.eventlog.subscriptions
 
-import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.Capacity
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import cats.MonadThrow
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.events.CategoryName
+import org.typelevel.log4cats.Logger
 
-private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
-                                               subscriberId:  SubscriberId,
-                                               maybeCapacity: Option[Capacity]
-) extends subscriptions.UrlAndIdSubscriptionInfo
+private object UrlAndIdSubscribers {
+
+  type UrlAndIdSubscribers[F[_]] = Subscribers[F, UrlAndIdSubscriptionInfo]
+
+  def apply[F[_]](implicit subscribers: UrlAndIdSubscribers[F]): UrlAndIdSubscribers[F] = subscribers
+
+  def apply[F[_]: Async: UrlAndIdSubscriberTracker: Logger](
+      categoryName: CategoryName
+  ): F[UrlAndIdSubscribers[F]] = for {
+    subscribersRegistry <- SubscribersRegistry[F](categoryName)
+    subscribers         <- MonadThrow[F].catchNonFatal(new SubscribersImpl(categoryName, subscribersRegistry))
+  } yield subscribers
+}

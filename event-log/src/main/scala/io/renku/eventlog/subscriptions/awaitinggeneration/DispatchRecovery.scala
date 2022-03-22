@@ -53,7 +53,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         }"""
       ),
       EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                               errorMessage = s"${SubscriptionCategory.name}: Marking event as $New failed"
+                               errorMessage = s"${SubscriptionCategory.categoryName}: Marking event as $New failed"
       )
     )
 
@@ -73,7 +73,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         "newStatus": $GenerationNonRecoverableFailure
       }"""
     )
-    val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $GenerationNonRecoverableFailure"
+    val errorMessage = s"${SubscriptionCategory.categoryName}: $event, url = $url -> $GenerationNonRecoverableFailure"
     eventSender.sendEvent(requestContent,
                           EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), errorMessage)
     ) >> Logger[F].error(exception)(errorMessage)

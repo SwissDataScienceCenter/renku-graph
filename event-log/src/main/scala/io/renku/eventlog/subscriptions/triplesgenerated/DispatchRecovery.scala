@@ -50,7 +50,8 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         "newStatus": $TriplesGenerated
       }"""),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                             errorMessage = s"${SubscriptionCategory.name}: Marking event as $TriplesGenerated failed"
+                             errorMessage =
+                               s"${SubscriptionCategory.categoryName}: Marking event as $TriplesGenerated failed"
     )
   )
 
@@ -70,10 +71,11 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         "message":   ${EventMessage(exception)} }"""),
       EventSender.EventContext(
         CategoryName("EVENTS_STATUS_CHANGE"),
-        errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
+        errorMessage =
+          s"${SubscriptionCategory.categoryName}: $event, url = $url -> $TransformationNonRecoverableFailure"
       )
     ) >> Logger[F].error(exception)(
-      s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
+      s"${SubscriptionCategory.categoryName}: $event, url = $url -> $TransformationNonRecoverableFailure"
     )
   }
 }

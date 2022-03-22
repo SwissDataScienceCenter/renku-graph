@@ -38,7 +38,7 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
 
     "return subscription info if the categoryName, subscriber URL and subscriber id are valid " +
       "and there's no capacity" in new TestCase {
-        val subscriptionCategoryPayload = subscriptionInfos.generateOne.copy(maybeCapacity = None)
+        val subscriptionCategoryPayload = urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = None)
 
         val payload = json"""{
           "categoryName":  ${categoryName.value},
@@ -53,16 +53,16 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
 
     "return subscription info if the categoryName, subscriber URL, subscriber Id, and capacity are given and valid" in new TestCase {
       val capacity                    = capacities.generateOne
-      val subscriptionCategoryPayload = subscriptionInfos.generateOne.copy(maybeCapacity = capacity.some)
+      val subscriptionCategoryPayload = urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = capacity.some)
 
       val payload = json"""{
-          "categoryName":  ${categoryName.value},
-          "subscriber": {
-            "url":      ${subscriptionCategoryPayload.subscriberUrl.value},
-            "id":       ${subscriptionCategoryPayload.subscriberId.value},
-            "capacity": ${capacity.value}
-          }
-        }"""
+        "categoryName":  ${categoryName.value},
+        "subscriber": {
+          "url":      ${subscriptionCategoryPayload.subscriberUrl.value},
+          "id":       ${subscriptionCategoryPayload.subscriberId.value},
+          "capacity": ${capacity.value}
+        }
+      }"""
 
       deserializer.deserialize(payload) shouldBe Success(Some(subscriptionCategoryPayload))
     }

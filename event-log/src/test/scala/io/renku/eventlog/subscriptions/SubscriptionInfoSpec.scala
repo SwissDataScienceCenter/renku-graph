@@ -33,7 +33,7 @@ class SubscriptionInfoSpec extends AnyWordSpec with should.Matchers with ScalaCh
     "return true if both infos have the same subscriberUrls" in {
       val subscriberUrl = subscriberUrls.generateOne
       val id            = subscriberIds.generateOne
-      forAll(subscriptionInfos, subscriptionInfos) { (info1, info2) =>
+      forAll(urlAndIdSubscriptionInfos, urlAndIdSubscriptionInfos) { (info1, info2) =>
         info1.copy(
           subscriberUrl = subscriberUrl,
           subscriberId = id
@@ -43,7 +43,7 @@ class SubscriptionInfoSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
     "return true if both infos have the same subscriberUrls but different ids" in {
       val subscriberUrl = subscriberUrls.generateOne
-      val info          = subscriptionInfos.generateOne
+      val info          = urlAndIdSubscriptionInfos.generateOne
       info.copy(
         subscriberUrl = subscriberUrl,
         subscriberId = subscriberIds.generateOne
@@ -56,7 +56,7 @@ class SubscriptionInfoSpec extends AnyWordSpec with should.Matchers with ScalaCh
     "return false if both infos have different subscriberUrls" in {
       val subscriberUrl1 = subscriberUrls.generateOne
       val subscriberUrl2 = subscriberUrls.generateOne
-      val info           = subscriptionInfos.generateOne
+      val info           = urlAndIdSubscriptionInfos.generateOne
       info.copy(subscriberUrl1) should not be info.copy(subscriberUrl2)
     }
   }
@@ -64,13 +64,13 @@ class SubscriptionInfoSpec extends AnyWordSpec with should.Matchers with ScalaCh
   "show" should {
 
     "return only the url if no capacity is present" in {
-      val info = subscriptionInfos.generateOne.copy(maybeCapacity = None)
+      val info = urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = None)
       info.show shouldBe s"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId}"
     }
 
     "return the url with capacity when it's present" in {
       val capacity = capacities.generateOne
-      val info     = subscriptionInfos.generateOne.copy(maybeCapacity = Some(capacity))
+      val info     = urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = Some(capacity))
       info.show shouldBe s"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId} with capacity $capacity"
     }
   }
