@@ -684,17 +684,17 @@ Response body example:
 
 Event-log uses relational database as an internal storage. The DB has the following schema:
 
-| event                                |
-|--------------------------------------|
-| event_id   VARCHAR    PK    NOT NULL |
-| project_id INT4       PK FK NOT NULL |
-| status     VARCHAR          NOT NULL |
-| created_date TIMESTAMPTZ    NOT NULL |
-| execution_date TIMESTAMPTZ  NOT NULL |
-| event_date TIMESTAMPTZ      NOT NULL |
-| batch_date TIMESTAMPTZ      NOT NULL |
-| event_body TEXT             NOT NULL |
-| message TEXT                         |
+| event                                     |
+|-------------------------------------------|
+| event_id       VARCHAR     PK    NOT NULL |
+| project_id     INT4        PK FK NOT NULL |
+| status         VARCHAR           NOT NULL |
+| created_date   TIMESTAMPTZ       NOT NULL |
+| execution_date TIMESTAMPTZ       NOT NULL |
+| event_date     TIMESTAMPTZ       NOT NULL |
+| batch_date     TIMESTAMPTZ       NOT NULL |
+| event_body     TEXT              NOT NULL |
+| message        TEXT                       |
 
 | project                                   |
 |-------------------------------------------|
@@ -702,17 +702,17 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | project_path      VARCHAR        NOT NULL |
 | latest_event_date TIMESTAMPTZ    NOT NULL |
 
-| event_payload                        |
-|--------------------------------------|
-| event_id   VARCHAR    PK FK NOT NULL |
-| project_id INT4       PK FK NOT NULL |
-| payload    BYTEA            NOT NULL |
+| event_payload                    |
+|----------------------------------|
+| event_id   VARCHAR PK FK NOT NULL |
+| project_id INT4    PK FK NOT NULL |
+| payload    BYTEA         NOT NULL |
 
-| subscription_category_sync_time       |
-|---------------------------------------|
-| project_id     INT4  PK FK   NOT NULL |
-| category_name  TEXT  PK      NOT NULL |
-| last_synced    TIMESTAMPTZ   NOT NULL |
+| subscription_category_sync_time           |
+|-------------------------------------------|
+| project_id     INT4        PK FK NOT NULL |
+| category_name  TEXT        PK    NOT NULL |
+| last_synced    TIMESTAMPTZ       NOT NULL |
 
 | status_processing_time                    |
 |-------------------------------------------|
@@ -734,12 +734,19 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | delivery_id   VARCHAR(19)        NOT NULL |
 | event_type_id VARCHAR         UK NULL     | 
 
-| status_change_events_queue       |
-|----------------------------------|
-| id         SERIAL    PRIMARY KEY |
-| date       TIMESTAMP NOT NULL    |
-| event_type VARCHAR   NOT NULL    |
-| payload    TEXT      NOT NULL    |
+| status_change_events_queue         |
+|------------------------------------|
+| id         SERIAL      PK NOT NULL |
+| date       TIMESTAMPTZ    NOT NULL |
+| event_type VARCHAR        NOT NULL |
+| payload    TEXT           NOT NULL |
+
+| ts_migration                        |
+|-------------------------------------|
+| tg_version  VARCHAR     PK NOT NULL |
+| tg_url      VARCHAR     PK NOT NULL |
+| status      VARCHAR        NOT NULL |
+| change_date TIMESTAMPTZ    NOT NULL |
 
 ## Trying out
 

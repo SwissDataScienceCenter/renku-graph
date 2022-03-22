@@ -58,14 +58,6 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   def verifyTrue(sql: Command[Void]): Unit = execute[Unit](Kleisli(session => session.execute(sql).void))
 
-  def verifyIndexExists(tableName: String, indexName: String): Boolean = execute[Boolean](Kleisli { session =>
-    val query: Query[String ~ String, Boolean] =
-      sql"""SELECT EXISTS(SELECT indexname FROM pg_indexes WHERE tablename = $varchar AND indexname = $varchar)"""
-        .query(bool)
-
-    session.prepare(query).use(_.unique(tableName ~ indexName)).recover(_ => false)
-  })
-
   def verify(table: String, column: String, hasType: String): Boolean = execute[Boolean] {
     Kleisli { session =>
       val query: Query[String ~ String, String] =
@@ -105,6 +97,21 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
       session
         .prepare(query)
         .use(_.unique(table ~ constraintName))
+        .recover { case _ => false }
+    }
+  }
+
+  def verifyIndexExists(table: String, indexName: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] =
+        sql"""SELECT EXISTS (
+                 SELECT * 
+                 FROM pg_indexes 
+                 WHERE tablename = $varchar AND indexname = $varchar                            
+               )""".query(bool)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ indexName))
         .recover { case _ => false }
     }
   }
