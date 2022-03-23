@@ -694,7 +694,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | event_date     TIMESTAMPTZ       NOT NULL |
 | batch_date     TIMESTAMPTZ       NOT NULL |
 | event_body     TEXT              NOT NULL |
-| message        TEXT                       |
+| message        VARCHAR                    |
 
 | project                                   |
 |-------------------------------------------|
@@ -741,12 +741,13 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | event_type VARCHAR        NOT NULL |
 | payload    TEXT           NOT NULL |
 
-| ts_migration                        |
-|-------------------------------------|
-| tg_version  VARCHAR     PK NOT NULL |
-| tg_url      VARCHAR     PK NOT NULL |
-| status      VARCHAR        NOT NULL |
-| change_date TIMESTAMPTZ    NOT NULL |
+| ts_migration                                |
+|---------------------------------------------|
+| subscriber_version  VARCHAR     PK NOT NULL |
+| subscriber_url      VARCHAR     PK NOT NULL |
+| status              VARCHAR        NOT NULL |
+| change_date         TIMESTAMPTZ    NOT NULL |
+| message             TEXT                    |
 
 ## Trying out
 

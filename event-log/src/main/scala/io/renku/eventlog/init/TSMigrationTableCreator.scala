@@ -53,8 +53,8 @@ private class TSMigrationTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sessio
 
   private def createTable(): Kleisli[F, Session[F], Unit] = for {
     _ <- execute(createTableSql)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_tg_version ON ts_migration(tg_version)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_tg_url ON ts_migration(tg_url)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_subscriber_version ON ts_migration(subscriber_version)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_subscriber_url ON ts_migration(subscriber_url)".command)
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON ts_migration(status)".command)
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_change_date ON ts_migration(change_date)".command)
     _ <- Kleisli.liftF(Logger[F] info "'ts_migration' table created")
@@ -62,11 +62,12 @@ private class TSMigrationTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sessio
 
   private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS ts_migration(
-      tg_version   VARCHAR                  NOT NULL,
-      tg_url       VARCHAR                  NOT NULL,
-      status       VARCHAR                  NOT NULL,
-      change_date  TIMESTAMP WITH TIME ZONE NOT NULL,
-      PRIMARY KEY (tg_version, tg_url)
+      subscriber_version   VARCHAR                  NOT NULL,
+      subscriber_url       VARCHAR                  NOT NULL,
+      status               VARCHAR                  NOT NULL,
+      change_date          TIMESTAMP WITH TIME ZONE NOT NULL,
+      message              TEXT                     NOT NULL,
+      PRIMARY KEY (subscriber_version, subscriber_url)
     );
   """.command
 }

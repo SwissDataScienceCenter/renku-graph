@@ -57,8 +57,8 @@ class TSMigrationTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpe
 
       tableExists("ts_migration") shouldBe true
 
-      verifyIndexExists("ts_migration", "idx_tg_version")
-      verifyIndexExists("ts_migration", "idx_tg_url")
+      verifyIndexExists("ts_migration", "idx_subscriber_version")
+      verifyIndexExists("ts_migration", "idx_subscriber_url")
       verifyIndexExists("ts_migration", "idx_status")
       verifyIndexExists("ts_migration", "idx_change_date")
 
