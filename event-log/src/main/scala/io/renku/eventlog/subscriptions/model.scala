@@ -46,7 +46,7 @@ private trait UrlAndIdSubscriptionInfo extends SubscriptionInfo {
   override val maybeCapacity: Option[Capacity]
 
   override def equals(obj: Any): Boolean = obj match {
-    case info: SubscriptionInfo => info.subscriberUrl == subscriberUrl
+    case info: UrlAndIdSubscriptionInfo => info.subscriberUrl == subscriberUrl
     case _ => false
   }
 

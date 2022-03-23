@@ -26,7 +26,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class SubscriptionInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class UrlAndIdSubscriptionInfoSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "equal" should {
 
