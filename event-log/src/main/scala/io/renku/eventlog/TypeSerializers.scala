@@ -18,10 +18,10 @@
 
 package io.renku.eventlog
 
+import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.events.consumers.Project
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import io.renku.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
-import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
@@ -51,29 +51,25 @@ trait TypeSerializers {
   val eventBodyEncoder: Encoder[EventBody] = text.values.contramap(_.value)
 
   val createdDateDecoder: Decoder[CreatedDate] = timestamptz.map(timestamp => CreatedDate(timestamp.toInstant))
-  val createdDateEncoder: Encoder[CreatedDate] =
-    timestamptz.values.contramap((b: CreatedDate) =>
-      OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
-    )
+  val createdDateEncoder: Encoder[CreatedDate] = timestamptz.values.contramap((b: CreatedDate) =>
+    OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+  )
 
   val executionDateDecoder: Decoder[ExecutionDate] =
     timestamptz.map(timestamp => ExecutionDate(timestamp.toInstant))
-  val executionDateEncoder: Encoder[ExecutionDate] =
-    timestamptz.values.contramap((b: ExecutionDate) =>
-      OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
-    )
+  val executionDateEncoder: Encoder[ExecutionDate] = timestamptz.values.contramap((b: ExecutionDate) =>
+    OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+  )
 
   val eventDateDecoder: Decoder[EventDate] = timestamptz.map(timestamp => EventDate(timestamp.toInstant))
-  val eventDateEncoder: Encoder[EventDate] =
-    timestamptz.values.contramap((b: EventDate) =>
-      OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
-    )
+  val eventDateEncoder: Encoder[EventDate] = timestamptz.values.contramap((b: EventDate) =>
+    OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+  )
 
   val batchDateDecoder: Decoder[BatchDate] = timestamptz.map(timestamp => BatchDate(timestamp.toInstant))
-  val batchDateEncoder: Encoder[BatchDate] =
-    timestamptz.values.contramap((b: BatchDate) =>
-      OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
-    )
+  val batchDateEncoder: Encoder[BatchDate] = timestamptz.values.contramap((b: BatchDate) =>
+    OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
+  )
 
   val eventMessageDecoder: Decoder[EventMessage] = varchar.map(EventMessage.apply)
   val eventMessageEncoder: Encoder[EventMessage] = varchar.values.contramap(_.value)
@@ -86,8 +82,10 @@ trait TypeSerializers {
 
   val eventStatusDecoder: Decoder[EventStatus] = varchar.map(EventStatus.apply)
   val eventStatusEncoder: Encoder[EventStatus] = varchar.values.contramap(_.value)
+
   val eventProcessingStatusEncoder: Encoder[EventStatus.ProcessingStatus] =
     eventStatusEncoder.contramap((s: EventStatus.ProcessingStatus) => s: EventStatus)
+
   val eventFailureStatusEncoder: Encoder[EventStatus.FailureStatus] =
     eventStatusEncoder.contramap((s: EventStatus.FailureStatus) => s: EventStatus)
 
@@ -116,5 +114,4 @@ trait TypeSerializers {
   val microserviceUrlEncoder: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
 
   val perPageEncoder: Encoder[PerPage] = int4.values.contramap(_.value)
-
 }
