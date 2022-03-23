@@ -40,7 +40,7 @@ private sealed trait MigrationStatus extends StringTinyType with Product with Se
 
 private object MigrationStatus extends TinyTypeFactory[MigrationStatus](MigrationStatusInstantiator) {
 
-  val all: Set[MigrationStatus] = Set(New, Done)
+  val all: Set[MigrationStatus] = Set(New, Sent, Done, NonRecoverableFailure, RecoverableFailure)
 
   type New = New.type
   final case object New extends MigrationStatus {

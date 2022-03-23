@@ -42,6 +42,7 @@ import io.renku.http.rest.{Links, SortBy, paging}
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.version.ServiceVersion
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
@@ -114,6 +115,14 @@ object CommonGraphGenerators {
 
   implicit val microserviceIdentifiers: Gen[MicroserviceIdentifier] =
     Gen.uuid map (_ => MicroserviceIdentifier.generate)
+
+  implicit val serviceVersions: Gen[ServiceVersion] = for {
+    major         <- positiveInts(999)
+    minor         <- positiveInts(999)
+    bugfix        <- positiveInts(999)
+    commitsNumber <- positiveInts(999)
+    commitPart    <- shas.toGeneratorOfOptions.map(_.map(_.take(8)).map(sha => s"-$commitsNumber-g$sha").getOrElse(""))
+  } yield ServiceVersion(s"$major.$minor.$bugfix$commitPart")
 
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
     url  <- httpUrls()

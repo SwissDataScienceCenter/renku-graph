@@ -66,7 +66,7 @@ private class TSMigrationTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sessio
       subscriber_url       VARCHAR                  NOT NULL,
       status               VARCHAR                  NOT NULL,
       change_date          TIMESTAMP WITH TIME ZONE NOT NULL,
-      message              TEXT                     NOT NULL,
+      message              TEXT,
       PRIMARY KEY (subscriber_version, subscriber_url)
     );
   """.command

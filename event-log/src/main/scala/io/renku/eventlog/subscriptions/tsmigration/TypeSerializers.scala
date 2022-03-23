@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.tsmigration
 
 import io.renku.http.server.version.ServiceVersion
-import skunk.codec.all.{timestamptz, varchar}
+import skunk.codec.all.{text, timestamptz, varchar}
 import skunk.{Decoder, Encoder}
 
 import java.time.{OffsetDateTime, ZoneOffset}
@@ -39,6 +39,6 @@ private trait TypeSerializers extends io.renku.eventlog.TypeSerializers {
     OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
   )
 
-  val migrationMessageDecoder: Decoder[MigrationMessage] = varchar.map(MigrationMessage.apply)
-  val migrationMessageEncoder: Encoder[MigrationMessage] = varchar.values.contramap(_.value)
+  val migrationMessageDecoder: Decoder[MigrationMessage] = text.map(MigrationMessage.apply)
+  val migrationMessageEncoder: Encoder[MigrationMessage] = text.values.contramap(_.value)
 }
