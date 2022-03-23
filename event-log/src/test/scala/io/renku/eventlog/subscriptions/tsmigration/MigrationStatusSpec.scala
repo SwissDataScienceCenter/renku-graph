@@ -18,6 +18,8 @@
 
 package io.renku.eventlog.subscriptions.tsmigration
 
+import Generators._
+import cats.syntax.all._
 import io.circe.Json
 import io.renku.data.ErrorMessage
 import io.renku.generators.Generators.Implicits._
@@ -28,6 +30,17 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
+
+class MigratorSubscriptionInfoSpec extends AnyWordSpec with should.Matchers {
+
+  "show" should {
+
+    "return a String representation with the url, id and version" in {
+      val info = migratorSubscriptionInfos.generateOne
+      info.show shouldBe s"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId}, version = ${info.subscriberVersion}"
+    }
+  }
+}
 
 class MigrationStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
   import MigrationStatus._

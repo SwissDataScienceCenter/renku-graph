@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions.tsmigration
 
+import cats.Show
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.data.ErrorMessage
@@ -34,6 +35,13 @@ private final case class MigratorSubscriptionInfo(subscriberUrl:     SubscriberU
                                                   subscriberVersion: ServiceVersion
 ) extends SubscriptionInfo {
   override val maybeCapacity: Option[Capacity] = None
+}
+
+private object MigratorSubscriptionInfo {
+  implicit lazy val show: Show[MigratorSubscriptionInfo] = Show.show { info =>
+    import info._
+    show"subscriber = $subscriberUrl, id = $subscriberId, version = $subscriberVersion"
+  }
 }
 
 private sealed trait MigrationStatus extends StringTinyType with Product with Serializable

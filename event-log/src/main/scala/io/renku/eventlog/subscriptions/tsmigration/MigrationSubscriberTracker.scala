@@ -36,7 +36,8 @@ import skunk.{Session, SqlState, ~}
 import java.time.Instant
 
 private class MigrationSubscriberTracker[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F],
-                                                                                  now: () => Instant
+                                                                                  now: () => Instant = () =>
+                                                                                    Instant.now()
 ) extends DbClient(Some(queriesExecTimes))
     with SubscriberTracker[F, MigratorSubscriptionInfo]
     with TypeSerializers {
@@ -99,5 +100,13 @@ private class MigrationSubscriberTracker[F[_]: MonadCancelThrow: SessionResource
 
   private lazy val falseForForeignKeyViolation: PartialFunction[Throwable, Kleisli[F, Session[F], Boolean]] = {
     case SqlState.ForeignKeyViolation(_) => Kleisli.pure(false)
+  }
+}
+
+private object MigrationSubscriberTracker {
+  def apply[F[_]: MonadCancelThrow: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[MigrationSubscriberTracker[F]] = MonadCancelThrow[F].catchNonFatal {
+    new MigrationSubscriberTracker(queriesExecTimes)
   }
 }
