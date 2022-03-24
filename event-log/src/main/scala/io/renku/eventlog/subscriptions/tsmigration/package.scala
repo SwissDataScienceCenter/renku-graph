@@ -21,5 +21,5 @@ package io.renku.eventlog.subscriptions
 import io.renku.events.CategoryName
 
 package object tsmigration {
-  val categoryName: CategoryName = CategoryName("TS_MIGRATION")
+  val categoryName: CategoryName = CategoryName("TS_MIGRATION_REQUEST")
 }

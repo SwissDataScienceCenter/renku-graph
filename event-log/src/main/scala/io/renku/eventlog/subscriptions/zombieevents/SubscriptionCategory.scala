@@ -47,7 +47,7 @@ private[subscriptions] object SubscriptionCategory {
                                            dispatchRecovery
                          )
     deserializer <-
-      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
+      UrlAndIdSubscriptionDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
   } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](categoryName,
                                                                        subscribers,
                                                                        eventsDistributor,

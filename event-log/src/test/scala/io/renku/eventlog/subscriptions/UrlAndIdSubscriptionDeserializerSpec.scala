@@ -32,7 +32,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+private class UrlAndIdSubscriptionDeserializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "deserialize" should {
 
@@ -87,7 +87,7 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
 
   private trait TestCase {
     val categoryName = categoryNames.generateOne
-    val Success(deserializer) = SubscriptionRequestDeserializer[Try, TestSubscriptionInfo](
+    val Success(deserializer) = UrlAndIdSubscriptionDeserializer[Try, TestSubscriptionInfo](
       categoryName,
       TestSubscriptionInfo.apply
     )

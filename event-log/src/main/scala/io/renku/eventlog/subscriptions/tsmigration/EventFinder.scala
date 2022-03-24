@@ -18,9 +18,11 @@
 
 package io.renku.eventlog.subscriptions.tsmigration
 
+import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions
@@ -29,7 +31,6 @@ import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
 import skunk._
-import io.renku.db.implicits._
 import skunk.data.Completion
 import skunk.implicits._
 
@@ -124,4 +125,10 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
 private object EventFinder {
   val SentStatusTimeout        = Duration ofHours 1
   val RecoverableStatusTimeout = Duration ofMinutes 2
+
+  def apply[F[_]: Async: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[subscriptions.EventFinder[F, MigrationRequestEvent]] = MonadThrow[F].catchNonFatal {
+    new EventFinder[F](queriesExecTimes)
+  }
 }
