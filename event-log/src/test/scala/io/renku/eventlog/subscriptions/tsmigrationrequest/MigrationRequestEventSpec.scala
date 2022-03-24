@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigration
+package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.syntax.all._
 import io.circe.literal._

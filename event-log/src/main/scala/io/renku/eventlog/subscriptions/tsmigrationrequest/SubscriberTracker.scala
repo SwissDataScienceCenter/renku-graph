@@ -17,7 +17,7 @@
  */
 
 package io.renku.eventlog.subscriptions
-package tsmigration
+package tsmigrationrequest
 
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
@@ -26,7 +26,7 @@ import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.tsmigration.MigrationStatus.Done
+import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus.Done
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram

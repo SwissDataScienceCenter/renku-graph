@@ -16,21 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigration
+package io.renku.eventlog.subscriptions
 
-import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
-import io.renku.generators.CommonGraphGenerators.serviceVersions
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.timestampsNotInTheFuture
-import org.scalacheck.Gen
+import io.renku.events.CategoryName
 
-private object Generators {
-
-  implicit val migratorSubscriptionInfos: Gen[MigratorSubscriptionInfo] = for {
-    url     <- subscriberUrls
-    id      <- subscriberIds
-    version <- serviceVersions
-  } yield MigratorSubscriptionInfo(url, id, version)
-
-  implicit val changeDates: Gen[ChangeDate] = timestampsNotInTheFuture.toGeneratorOf(ChangeDate)
+package object tsmigrationrequest {
+  val categoryName: CategoryName = CategoryName("TS_MIGRATION_REQUEST")
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigration
+package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import io.renku.http.server.version.ServiceVersion
 import skunk.codec.all.{text, timestamptz, varchar}

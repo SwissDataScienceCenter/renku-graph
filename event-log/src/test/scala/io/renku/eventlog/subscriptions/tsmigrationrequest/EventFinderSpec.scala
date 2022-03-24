@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigration
+package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import Generators._
 import TypeSerializers._
@@ -25,7 +25,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.subscriptions.tsmigration.MigrationStatus._
+import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus._
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._

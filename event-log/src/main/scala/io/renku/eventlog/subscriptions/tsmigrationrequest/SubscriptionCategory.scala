@@ -17,7 +17,7 @@
  */
 
 package io.renku.eventlog.subscriptions
-package tsmigration
+package tsmigrationrequest
 
 import cats.effect.Async
 import cats.syntax.all._

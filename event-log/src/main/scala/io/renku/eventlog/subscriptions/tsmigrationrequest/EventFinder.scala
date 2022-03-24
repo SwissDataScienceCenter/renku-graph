@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigration
+package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.MonadThrow
 import cats.data.Kleisli
@@ -26,7 +26,7 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.tsmigration.MigrationStatus._
+import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus._
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
