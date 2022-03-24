@@ -39,7 +39,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-class MigrationSubscriberTrackerSpec
+class SubscriberTrackerSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -176,7 +176,7 @@ class MigrationSubscriberTrackerSpec
 
     private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val currentTime              = mockFunction[Instant]
-    val tracker                  = new MigrationSubscriberTracker[IO](queriesExecTimes, currentTime)
+    val tracker                  = new SubscriberTracker[IO](queriesExecTimes, currentTime)
 
     currentTime.expects().returning(now).anyNumberOfTimes()
   }

@@ -31,7 +31,7 @@ private object MigrationSubscribers {
 
   def apply[F[_]](implicit subscribers: MigrationSubscribers[F]): MigrationSubscribers[F] = subscribers
 
-  def apply[F[_]: Async: MigrationSubscriberTracker: Logger](
+  def apply[F[_]: Async: SubscriberTracker: Logger](
       categoryName: CategoryName
   ): F[MigrationSubscribers[F]] = for {
     subscribersRegistry <- SubscribersRegistry[F](categoryName)

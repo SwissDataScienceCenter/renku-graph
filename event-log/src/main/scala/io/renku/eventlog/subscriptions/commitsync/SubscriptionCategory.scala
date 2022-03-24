@@ -34,7 +34,7 @@ private[subscriptions] object SubscriptionCategory {
       queriesExecTimes: LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers      <- UrlAndIdSubscribers[F](categoryName)
-    eventsFinder     <- CommitSyncEventFinder(queriesExecTimes)
+    eventsFinder     <- EventFinder(queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[F, CommitSyncEvent](categoryName)
     eventDelivery    <- EventDelivery.noOp[F, CommitSyncEvent]
     eventsDistributor <- EventsDistributor(categoryName,

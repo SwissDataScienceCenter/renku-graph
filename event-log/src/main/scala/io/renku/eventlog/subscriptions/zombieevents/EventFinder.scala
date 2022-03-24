@@ -23,18 +23,18 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.subscriptions.EventFinder
+import io.renku.eventlog.subscriptions
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private class ZombieEventFinder[F[_]: MonadThrow: Logger](
-    longProcessingEventsFinder: EventFinder[F, ZombieEvent],
-    lostSubscriberEventFinder:  EventFinder[F, ZombieEvent],
+private class EventFinder[F[_]: MonadThrow: Logger](
+    longProcessingEventsFinder: subscriptions.EventFinder[F, ZombieEvent],
+    lostSubscriberEventFinder:  subscriptions.EventFinder[F, ZombieEvent],
     zombieNodesCleaner:         ZombieNodesCleaner[F],
-    lostZombieEventFinder:      EventFinder[F, ZombieEvent]
-) extends EventFinder[F, ZombieEvent] {
+    lostZombieEventFinder:      subscriptions.EventFinder[F, ZombieEvent]
+) extends subscriptions.EventFinder[F, ZombieEvent] {
 
   override def popEvent(): F[Option[ZombieEvent]] = for {
     _ <- zombieNodesCleaner.removeZombieNodes() recoverWith logError
@@ -49,19 +49,19 @@ private class ZombieEventFinder[F[_]: MonadThrow: Logger](
   }
 }
 
-private object ZombieEventFinder {
+private object EventFinder {
 
   def apply[F[_]: Async: Parallel: SessionResource: Logger](
       queriesExecTimes: LabeledHistogram[F]
-  ): F[EventFinder[F, ZombieEvent]] = for {
+  ): F[subscriptions.EventFinder[F, ZombieEvent]] = for {
     longProcessingEventFinder <- LongProcessingEventFinder(queriesExecTimes)
     lostSubscriberEventFinder <- LostSubscriberEventFinder(queriesExecTimes)
     zombieNodesCleaner        <- ZombieNodesCleaner(queriesExecTimes)
     lostZombieEventFinder     <- LostZombieEventFinder(queriesExecTimes)
-  } yield new ZombieEventFinder[F](longProcessingEventFinder,
-                                   lostSubscriberEventFinder,
-                                   zombieNodesCleaner,
-                                   lostZombieEventFinder
+  } yield new EventFinder[F](longProcessingEventFinder,
+                             lostSubscriberEventFinder,
+                             zombieNodesCleaner,
+                             lostZombieEventFinder
   )
 }
 

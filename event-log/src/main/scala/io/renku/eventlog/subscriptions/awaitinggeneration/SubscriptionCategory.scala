@@ -42,7 +42,7 @@ private[subscriptions] object SubscriptionCategory {
   ): F[subscriptions.SubscriptionCategory[F]] = UrlAndIdSubscribers[F](categoryName)
     .flatMap { implicit subscribers =>
       for {
-        eventFetcher <- AwaitingGenerationEventFinder(awaitingGenerationGauge, underGenerationGauge, queriesExecTimes)
+        eventFetcher     <- EventFinder(awaitingGenerationGauge, underGenerationGauge, queriesExecTimes)
         dispatchRecovery <- DispatchRecovery[F]
         eventDelivery <- eventdelivery.EventDelivery[F, AwaitingGenerationEvent](
                            eventDeliveryIdExtractor =

@@ -36,7 +36,7 @@ private[subscriptions] object SubscriptionCategory {
       queriesExecTimes: LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers      <- UrlAndIdSubscribers[F](categoryName)
-    eventsFinder     <- ZombieEventFinder(queriesExecTimes)
+    eventsFinder     <- EventFinder(queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[F, ZombieEvent](categoryName)
     eventDelivery    <- EventDelivery.noOp[F, ZombieEvent]
     eventsDistributor <- EventsDistributor(categoryName,

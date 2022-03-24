@@ -44,7 +44,7 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class TriplesGeneratedEventFinderImpl[F[_]: Async: SessionResource](
+private class EventFinderImpl[F[_]: Async: SessionResource](
     awaitingTransformationGauge: LabeledGauge[F, projects.Path],
     underTransformationGauge:    LabeledGauge[F, projects.Path],
     queriesExecTimes:            LabeledHistogram[F],
@@ -188,7 +188,7 @@ private class TriplesGeneratedEventFinderImpl[F[_]: Async: SessionResource](
     } getOrElse ().pure[F]
 }
 
-private object TriplesGeneratedEventFinder {
+private object EventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
@@ -196,11 +196,11 @@ private object TriplesGeneratedEventFinder {
                                           underTransformationGauge: LabeledGauge[F, projects.Path],
                                           queriesExecTimes:         LabeledHistogram[F]
   ): F[EventFinder[F, TriplesGeneratedEvent]] = MonadThrow[F].catchNonFatal {
-    new TriplesGeneratedEventFinderImpl(awaitingTransformationGauge,
-                                        underTransformationGauge,
-                                        queriesExecTimes,
-                                        projectsFetchingLimit = ProjectsFetchingLimit,
-                                        projectPrioritisation = new ProjectPrioritisation()
+    new EventFinderImpl(awaitingTransformationGauge,
+                        underTransformationGauge,
+                        queriesExecTimes,
+                        projectsFetchingLimit = ProjectsFetchingLimit,
+                        projectPrioritisation = new ProjectPrioritisation()
     )
   }
 }

@@ -35,7 +35,7 @@ private[subscriptions] object SubscriptionCategory {
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers           <- UrlAndIdSubscribers(categoryName)
     lastSyncedDateUpdater <- LastSyncedDateUpdater(queriesExecTimes)
-    eventsFinder          <- GlobalCommitSyncEventFinder(lastSyncedDateUpdater, queriesExecTimes)
+    eventsFinder          <- EventFinder(lastSyncedDateUpdater, queriesExecTimes)
     dispatchRecovery      <- DispatchRecovery(lastSyncedDateUpdater)
     eventDelivery         <- EventDelivery.noOp[F, GlobalCommitSyncEvent]
     eventsDistributor <- EventsDistributor(categoryName,

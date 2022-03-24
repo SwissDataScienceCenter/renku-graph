@@ -38,8 +38,8 @@ private[subscriptions] object SubscriptionCategory {
       underTransformationGauge:    LabeledGauge[F, projects.Path],
       queriesExecTimes:            LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers  <- UrlAndIdSubscribers[F](categoryName)
-    eventFetcher <- TriplesGeneratedEventFinder(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
+    subscribers      <- UrlAndIdSubscribers[F](categoryName)
+    eventFetcher     <- EventFinder(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
     dispatchRecovery <- DispatchRecovery[F]
     eventDelivery <- EventDelivery[F, TriplesGeneratedEvent](
                        eventDeliveryIdExtractor = (event: TriplesGeneratedEvent) => CompoundEventDeliveryId(event.id),

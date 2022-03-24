@@ -46,7 +46,7 @@ private[subscriptions] object SubscriptionCategory {
                        queriesExecTimes
                      )
     dispatchRecovery <- DispatchRecovery[F]
-    eventFinder      <- CleanUpEventFinder(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
+    eventFinder      <- EventFinder(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
     eventsDistributor <-
       EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)
     deserializer <-

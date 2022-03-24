@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions
 package awaitinggeneration
 
 import cats.data.Kleisli
-import cats.effect.{Async, MonadCancelThrow}
+import cats.effect.Async
 import cats.syntax.all._
 import cats.{Id, Parallel}
 import eu.timepit.refined.api.Refined
@@ -45,7 +45,7 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: Parallel: SessionResource](
+private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
     waitingEventsGauge:    LabeledGauge[F, projects.Path],
     underProcessingGauge:  LabeledGauge[F, projects.Path],
     queriesExecTimes:      LabeledHistogram[F],
@@ -205,20 +205,20 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
     (compoundEventIdDecoder ~ projectPathDecoder ~ eventBodyDecoder).gmap[AwaitingGenerationEvent]
 }
 
-private object AwaitingGenerationEventFinder {
+private object EventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 20
 
-  def apply[F[_]: MonadCancelThrow: Async: Parallel: UrlAndIdSubscribers: SessionResource](
+  def apply[F[_]: Async: Parallel: UrlAndIdSubscribers: SessionResource](
       waitingEventsGauge:   LabeledGauge[F, projects.Path],
       underProcessingGauge: LabeledGauge[F, projects.Path],
       queriesExecTimes:     LabeledHistogram[F]
   ): F[subscriptions.EventFinder[F, AwaitingGenerationEvent]] = for {
     projectPrioritisation <- ProjectPrioritisation[F]
-  } yield new AwaitingGenerationEventFinderImpl(waitingEventsGauge,
-                                                underProcessingGauge,
-                                                queriesExecTimes,
-                                                projectsFetchingLimit = ProjectsFetchingLimit,
-                                                projectPrioritisation = projectPrioritisation
+  } yield new EventFinderImpl(waitingEventsGauge,
+                              underProcessingGauge,
+                              queriesExecTimes,
+                              projectsFetchingLimit = ProjectsFetchingLimit,
+                              projectPrioritisation = projectPrioritisation
   )
 }
