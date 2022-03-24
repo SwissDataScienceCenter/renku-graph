@@ -104,6 +104,9 @@ private class SubscriberTracker[F[_]: MonadCancelThrow: SessionResource](queries
 }
 
 private object SubscriberTracker {
+
+  type Type[F[_]] = subscriptions.SubscriberTracker[F, MigratorSubscriptionInfo]
+
   def apply[F[_]: MonadCancelThrow: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
   ): F[SubscriberTracker[F]] = MonadCancelThrow[F].catchNonFatal {
