@@ -46,7 +46,7 @@ private class SubscriptionCategoryImpl[F[_]: MonadThrow, SI <: SubscriptionInfo]
     override val name: CategoryName,
     subscribers:       Subscribers[F, SI],
     eventsDistributor: EventsDistributor[F],
-    deserializer:      SubscriptionRequestDeserializer[F, SI]
+    deserializer:      SubscriptionPayloadDeserializer[F, SI]
 ) extends SubscriptionCategory[F] {
 
   override def run(): F[Unit] = eventsDistributor.run()

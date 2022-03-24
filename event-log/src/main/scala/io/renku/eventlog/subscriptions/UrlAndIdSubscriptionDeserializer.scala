@@ -31,7 +31,7 @@ private object UrlAndIdSubscriptionDeserializer {
   def apply[F[_]: MonadThrow, SI <: SubscriptionInfo](
       categoryName:   CategoryName,
       payloadFactory: PayloadFactory[SI]
-  ): F[SubscriptionRequestDeserializer[F, SI]] = MonadThrow[F].catchNonFatal {
+  ): F[SubscriptionPayloadDeserializer[F, SI]] = MonadThrow[F].catchNonFatal {
     new UrlAndIdSubscriptionDeserializerImpl(categoryName, payloadFactory)
   }
 }
@@ -39,7 +39,7 @@ private object UrlAndIdSubscriptionDeserializer {
 private class UrlAndIdSubscriptionDeserializerImpl[F[_]: MonadThrow, SI <: SubscriptionInfo](
     categoryName:   CategoryName,
     payloadFactory: PayloadFactory[SI]
-) extends SubscriptionRequestDeserializer[F, SI] {
+) extends SubscriptionPayloadDeserializer[F, SI] {
 
   import cats.syntax.all._
 

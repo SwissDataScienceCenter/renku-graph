@@ -20,6 +20,6 @@ package io.renku.eventlog.subscriptions
 
 import io.circe.Json
 
-private trait SubscriptionRequestDeserializer[F[_], SI <: SubscriptionInfo] {
+private trait SubscriptionPayloadDeserializer[F[_], SI <: SubscriptionInfo] {
   def deserialize(payload: Json): F[Option[SI]]
 }

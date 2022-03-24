@@ -102,7 +102,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
     val testCategoryName  = categoryNames.generateOne
     val subscribers       = mock[Subscribers[IO, TestSubscriptionInfo]]
     val eventsDistributor = mock[EventsDistributor[IO]]
-    val deserializer      = mock[SubscriptionRequestDeserializer[IO, TestSubscriptionInfo]]
+    val deserializer      = mock[SubscriptionPayloadDeserializer[IO, TestSubscriptionInfo]]
     val subscriptionCategory = new SubscriptionCategoryImpl[IO, TestSubscriptionInfo](
       testCategoryName,
       subscribers,
