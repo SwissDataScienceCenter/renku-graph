@@ -117,12 +117,10 @@ object CommonGraphGenerators {
     Gen.uuid map (_ => MicroserviceIdentifier.generate)
 
   implicit val serviceVersions: Gen[ServiceVersion] = for {
-    major         <- positiveInts(999)
-    minor         <- positiveInts(999)
-    bugfix        <- positiveInts(999)
+    version       <- semanticVersions
     commitsNumber <- positiveInts(999)
     commitPart    <- shas.toGeneratorOfOptions.map(_.map(_.take(8)).map(sha => s"-$commitsNumber-g$sha").getOrElse(""))
-  } yield ServiceVersion(s"$major.$minor.$bugfix$commitPart")
+  } yield ServiceVersion(s"$version$commitPart")
 
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
     url  <- httpUrls()
