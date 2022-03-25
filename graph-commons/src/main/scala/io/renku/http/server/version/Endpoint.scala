@@ -20,27 +20,24 @@ package io.renku.http.server.version
 
 import cats.effect.Async
 import cats.syntax.all._
-import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.config.ConfigLoader
-import io.renku.tinytypes.constraints.NonBlank
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityEncoder, Response, Status}
-import pureconfig.ConfigReader
 
 private trait Endpoint[F[_]] {
   def `GET /version`: F[Response[F]]
 }
 
 private object Endpoint {
-  def apply[F[_]: Async]: F[Endpoint[F]] = new EndpointImpl[F].pure[F].widen[Endpoint[F]]
+  def apply[F[_]: Async]: F[Endpoint[F]] = for {
+    serviceName    <- ServiceName.readFromConfig[F]()
+    serviceVersion <- ServiceVersion.readFromConfig[F]()
+  } yield new EndpointImpl[F](serviceName, serviceVersion)
 }
 
-private class EndpointImpl[F[_]: Async](config: Config = ConfigFactory.load(),
-                                        versionConfig: Config = ConfigFactory.load("version.conf")
-) extends Http4sDsl[F]
+private class EndpointImpl[F[_]: Async](serviceName: ServiceName, serviceVersion: ServiceVersion)
+    extends Http4sDsl[F]
     with Endpoint[F] {
-  import ConfigLoader._
+
   import io.circe.literal._
   import io.circe.syntax._
   import io.circe.{Encoder, Json}
@@ -48,15 +45,10 @@ private class EndpointImpl[F[_]: Async](config: Config = ConfigFactory.load(),
 
   private type ServiceInfo = (ServiceName, ServiceVersion)
 
-  override def `GET /version`: F[Response[F]] = for {
-    serviceInfo <- readConfigs
-    response    <- Response[F](Status.Ok).withEntity(serviceInfo.asJson).pure[F]
-  } yield response
-
-  private def readConfigs: F[ServiceInfo] = for {
-    serviceName    <- find[F, ServiceName]("service-name", config)
-    serviceVersion <- find[F, ServiceVersion]("version", versionConfig)
-  } yield serviceName -> serviceVersion
+  override def `GET /version`: F[Response[F]] =
+    Response[F](Status.Ok)
+      .withEntity((serviceName -> serviceVersion).asJson)
+      .pure[F]
 
   private implicit lazy val encoder: Encoder[ServiceInfo] = Encoder { case (serviceName, serviceVersion) =>
     json"""{
@@ -70,20 +62,4 @@ private class EndpointImpl[F[_]: Async](config: Config = ConfigFactory.load(),
   }
 
   private implicit lazy val responseEntityEncoder: EntityEncoder[F, Json] = jsonEncoderOf[F, Json]
-}
-
-final class ServiceName private (val value: String) extends AnyVal with StringTinyType
-object ServiceName extends TinyTypeFactory[ServiceName](new ServiceName(_)) with NonBlank {
-  import ConfigLoader._
-  implicit val reader: ConfigReader[ServiceName] = stringTinyTypeReader(ServiceName)
-}
-
-final class ServiceVersion private (val value: String) extends AnyVal with StringTinyType
-object ServiceVersion extends TinyTypeFactory[ServiceVersion](new ServiceVersion(_)) with NonBlank {
-  import ConfigLoader._
-  import io.circe.Decoder
-  import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
-
-  implicit val reader:  ConfigReader[ServiceVersion] = stringTinyTypeReader(ServiceVersion)
-  implicit val decoder: Decoder[ServiceVersion]      = stringDecoder(ServiceVersion)
 }
