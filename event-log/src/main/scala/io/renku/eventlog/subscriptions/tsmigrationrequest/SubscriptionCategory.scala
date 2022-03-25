@@ -36,7 +36,7 @@ private[subscriptions] object SubscriptionCategory {
       for {
         subscribers      <- Subscribers[F, MigratorSubscriptionInfo, SubscriberTracker.Type[F]](categoryName)
         eventFinder      <- EventFinder[F](queriesExecTimes)
-        dispatchRecovery <- LoggingDispatchRecovery[F, MigrationRequestEvent](categoryName)
+        dispatchRecovery <- DispatchRecovery[F](queriesExecTimes)
         eventDelivery    <- EventDelivery.noOp[F, MigrationRequestEvent]
         distributor <- EventsDistributor[F, MigrationRequestEvent](
                          categoryName,

@@ -19,25 +19,20 @@
 package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import Generators._
-import TypeSerializers._
-import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus._
-import io.renku.events.consumers.subscriptions.{SubscriberUrl, subscriberUrls}
+import io.renku.events.consumers.subscriptions.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import skunk.implicits._
-import skunk.{Command, Query, ~}
 
 import java.time.Instant.now
 import java.time.{Duration, Instant}
@@ -46,6 +41,7 @@ class EventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
+    with TsMigrationTableProvisioning
     with MockFactory
     with should.Matchers {
 
@@ -243,35 +239,6 @@ class EventFinderSpec
     val finder           = new EventFinder[IO](queriesExecTimes, currentTime)
 
     currentTime.expects().returning(now).anyNumberOfTimes()
-  }
-
-  private def insertSubscriptionRecord(url:        SubscriberUrl,
-                                       version:    ServiceVersion,
-                                       status:     MigrationStatus,
-                                       changeDate: ChangeDate
-  ): Unit = execute[Unit] {
-    Kleisli { session =>
-      val query: Command[ServiceVersion ~ SubscriberUrl ~ MigrationStatus ~ ChangeDate] = sql"""
-        INSERT INTO ts_migration (subscriber_version, subscriber_url, status, change_date)
-        VALUES ($serviceVersionEncoder, $subscriberUrlEncoder, $migrationStatusEncoder, $changeDateEncoder)
-        """.command
-      session
-        .prepare(query)
-        .use(_.execute(version ~ url ~ status ~ changeDate))
-        .void
-    }
-  }
-
-  private def findRows(url: SubscriberUrl, version: ServiceVersion): (MigrationStatus, ChangeDate) = execute {
-    Kleisli { session =>
-      val query: Query[SubscriberUrl ~ ServiceVersion, (MigrationStatus, ChangeDate)] =
-        sql"""SELECT status, change_date
-              FROM ts_migration
-              WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
-          .query(migrationStatusDecoder ~ changeDateDecoder)
-          .map { case status ~ changeDate => status -> changeDate }
-      session.prepare(query).use(_.unique(url ~ version))
-    }
   }
 
   private def dateAfter(date: ChangeDate) =
