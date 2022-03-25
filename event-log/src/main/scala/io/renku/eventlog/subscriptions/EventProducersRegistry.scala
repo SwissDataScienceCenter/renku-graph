@@ -79,15 +79,17 @@ object EventProducersRegistry {
         triplesgenerated.SubscriptionCategory(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
       cleanUpEventCategory <- cleanup.SubscriptionCategory(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
       zombieEventsCategory <- zombieevents.SubscriptionCategory(queriesExecTimes)
+      tsMigrationCategory  <- tsmigrationrequest.SubscriptionCategory(queriesExecTimes)
     } yield new EventProducersRegistryImpl(
-      Set[SubscriptionCategory[F]](
+      Set(
         awaitingGenerationCategory,
         memberSyncCategory,
         commitSyncCategory,
         globalCommitSyncCategory,
         triplesGeneratedCategory,
         cleanUpEventCategory,
-        zombieEventsCategory
+        zombieEventsCategory,
+        tsMigrationCategory
       )
     )
   }
