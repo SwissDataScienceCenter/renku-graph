@@ -24,7 +24,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private trait ProjectEventsFinder[F[_]] {
-  def find(project:     Project, nextPage: Int)(implicit
+  def find(project:     Project, page: Int)(implicit
       maybeAccessToken: Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)]
 }
@@ -42,13 +42,13 @@ private class ProjectEventsFinderImpl[F[_]: Async: Logger](
                      requestTimeoutOverride = requestTimeoutOverride
     )
     with ProjectEventsFinder[F] {
-  override def find(project: Project, nextPage: Int)(implicit
+  override def find(project: Project, page: Int)(implicit
       maybeAccessToken:      Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)] =
     EitherT {
       {
         for {
-          uri             <- validateUri(s"$gitLabApiUrl/projects/${project.id}/events?action=pushed&page=$nextPage")
+          uri             <- validateUri(s"$gitLabApiUrl/projects/${project.id}/events?action=pushed&page=$page")
           eventsAndPaging <- send(secureRequest(GET, uri))(mapResponse)
         } yield eventsAndPaging
       }.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)

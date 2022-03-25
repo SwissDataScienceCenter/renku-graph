@@ -3,7 +3,8 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 import cats.effect.IO
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
-import com.github.tomakehurst.wiremock.client.WireMock.{get, okJson, stubFor}
+import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import eu.timepit.refined.auto._
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps
@@ -11,6 +12,7 @@ import io.circe.{Encoder, Json}
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames, projectIds, projectPaths}
 import io.renku.graph.model.entities.Project.ProjectMember
@@ -22,6 +24,8 @@ import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeEncoders
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
+import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -83,7 +87,37 @@ class ProjectEventsFinderSpec
       ).asRight
     }
 
+    "return the page of the results requested" in new TestCase {
+
+      val events = pushEvents.generateNonEmptyList().toList
+      val page   = nonNegativeInts().generateOne
+
+      `/api/v4/projects/:id/events?action=pushed`(project.id, page) returning okJson(events.asJson.noSpaces)
+
+      finder.find(project, page).value.unsafeRunSync() shouldBe (events.map(_.asNormalPushEvent),
+                                                                 PagingInfo(None, None)
+      ).asRight
+    }
+
+    Set(
+      "connection problem" -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
+      "client problem"     -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt),
+      "BadGateway"         -> aResponse().withStatus(BadGateway.code),
+      "ServiceUnavailable" -> aResponse().withStatus(ServiceUnavailable.code),
+      "Forbidden"          -> aResponse().withStatus(Forbidden.code),
+      "Unauthorized"       -> aResponse().withStatus(Unauthorized.code)
+    ) foreach { case (problemName, response) =>
+      s"return a Recoverable Failure for $problemName when fetching member's events" in new TestCase {
+        `/api/v4/projects/:id/events?action=pushed`(project.id, maybeNextPage = 2.some) returning response
+
+        val Left(failure) = finder.find(project, 1).value.unsafeRunSync()
+        failure shouldBe a[ProcessingRecoverableError]
+      }
+    }
+
   }
+
+  private lazy val requestTimeout = 2 seconds
 
   private trait TestCase {
     val project = Project(projectIds.generateOne, projectPaths.generateOne)
