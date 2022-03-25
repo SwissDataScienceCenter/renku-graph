@@ -19,7 +19,6 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.IO
-import cats.implicits.{catsSyntaxApplicativeErrorId, catsSyntaxApplicativeId}
 import cats.syntax.all._
 import io.renku.eventlog.subscriptions.Generators._
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
@@ -100,13 +99,11 @@ class SubscriptionCategorySpec extends AnyWordSpec with IOSpec with MockFactory 
   }
 
   private trait TestCase {
-    val eventsDistributor = mock[EventsDistributor[IO]]
-    val subscribers       = mock[Subscribers[IO]]
     val testCategoryName  = categoryNames.generateOne
-
-    val deserializer = mock[SubscriptionRequestDeserializer[IO, SubscriptionInfo]]
-
-    val subscriptionCategory = new SubscriptionCategoryImpl[IO, SubscriptionInfo](
+    val subscribers       = mock[Subscribers[IO, TestSubscriptionInfo]]
+    val eventsDistributor = mock[EventsDistributor[IO]]
+    val deserializer      = mock[SubscriptionPayloadDeserializer[IO, TestSubscriptionInfo]]
+    val subscriptionCategory = new SubscriptionCategoryImpl[IO, TestSubscriptionInfo](
       testCategoryName,
       subscribers,
       eventsDistributor,

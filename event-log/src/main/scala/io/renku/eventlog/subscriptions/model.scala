@@ -33,22 +33,29 @@ private final class Capacity private (val value: Int) extends AnyVal with IntTin
 private object Capacity extends TinyTypeFactory[Capacity](new Capacity(_)) with NonNegativeInt {
   implicit val decoder: Decoder[Capacity] = intDecoder(Capacity)
 }
+
 private trait SubscriptionInfo extends Product with Serializable {
   val subscriberUrl: SubscriberUrl
   val subscriberId:  SubscriberId
   val maybeCapacity: Option[Capacity]
+}
+
+private trait UrlAndIdSubscriptionInfo extends SubscriptionInfo {
+  override val subscriberUrl: SubscriberUrl
+  override val subscriberId:  SubscriberId
+  override val maybeCapacity: Option[Capacity]
 
   override def equals(obj: Any): Boolean = obj match {
-    case info: SubscriptionInfo => info.subscriberUrl == subscriberUrl
+    case info: UrlAndIdSubscriptionInfo => info.subscriberUrl == subscriberUrl
     case _ => false
   }
 
   override def hashCode(): Int = subscriberUrl.hashCode()
 }
 
-private object SubscriptionInfo {
+private object UrlAndIdSubscriptionInfo {
 
-  implicit def showInfo[T <: SubscriptionInfo]: Show[T] =
+  implicit def show[T <: UrlAndIdSubscriptionInfo]: Show[T] =
     Show.show(info => show"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId}${info.maybeCapacity}")
 
   private implicit lazy val showCapacity: Show[Option[Capacity]] =

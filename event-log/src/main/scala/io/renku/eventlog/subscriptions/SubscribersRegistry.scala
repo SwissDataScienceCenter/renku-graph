@@ -133,12 +133,8 @@ private class SubscribersRegistryImpl[F[_]: MonadThrow: Temporal: Logger](
     (checkupTime.value compareTo now()) <= 0
   }
 
-  private def bringToAvailable(subscribers: List[SubscriptionInfo]): F[List[Unit]] = subscribers.map { subscription =>
-    for {
-      wasAdded <- add(subscription)
-      _        <- whenA(wasAdded)(Logger[F].debug(show"$categoryName: $subscription taken from busy state"))
-    } yield ()
-  }.sequence
+  private def bringToAvailable(subscribers: List[SubscriptionInfo]): F[Unit] =
+    subscribers.map(add).sequence.void
 
   private def find(subscriberUrl: SubscriberUrl, in: ConcurrentHashMap[SubscriptionInfo, _]): Option[SubscriptionInfo] =
     in.asScala

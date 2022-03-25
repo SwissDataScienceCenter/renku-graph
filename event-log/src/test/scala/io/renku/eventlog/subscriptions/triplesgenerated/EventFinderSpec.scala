@@ -43,7 +43,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
-private class TriplesGeneratedEventFinderSpec
+private class EventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -330,7 +330,7 @@ private class TriplesGeneratedEventFinderSpec
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
-        val (event1Id, _, event1Date, _, eventPayload1) = createEvent(
+        val (_, _, event1Date, _, _) = createEvent(
           status = TriplesGenerated,
           eventDate = timestamps(max = Instant.now().minusSeconds(5)).generateAs(EventDate),
           projectId = projectId,
@@ -345,7 +345,7 @@ private class TriplesGeneratedEventFinderSpec
           projectPath = projectPath
         )
 
-        val (_, _, event3Date, _, _) = createEvent(
+        createEvent(
           status = TriplesGenerated,
           eventDate = EventDate(event2Date.value plusSeconds 1),
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
@@ -387,12 +387,12 @@ private class TriplesGeneratedEventFinderSpec
 
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      val eventLogFind = new TriplesGeneratedEventFinderImpl(awaitingTransformationGauge,
-                                                             underTransformationGauge,
-                                                             queriesExecTimes,
-                                                             currentTime,
-                                                             projectsFetchingLimit = 5,
-                                                             projectPrioritisation = projectPrioritisation
+      val eventLogFind = new EventFinderImpl(awaitingTransformationGauge,
+                                             underTransformationGauge,
+                                             queriesExecTimes,
+                                             currentTime,
+                                             projectsFetchingLimit = 5,
+                                             projectPrioritisation = projectPrioritisation
       )
 
       val events = readyStatuses
@@ -466,12 +466,12 @@ private class TriplesGeneratedEventFinderSpec
   }
 
   private trait TestCase extends TestCaseCommons {
-    val finder = new TriplesGeneratedEventFinderImpl(awaitingTransformationGauge,
-                                                     underTransformationGauge,
-                                                     queriesExecTimes,
-                                                     currentTime,
-                                                     projectsFetchingLimit = 1,
-                                                     projectPrioritisation = projectPrioritisation
+    val finder = new EventFinderImpl(awaitingTransformationGauge,
+                                     underTransformationGauge,
+                                     queriesExecTimes,
+                                     currentTime,
+                                     projectsFetchingLimit = 1,
+                                     projectPrioritisation = projectPrioritisation
     )
   }
 

@@ -191,7 +191,7 @@ class CommitsSynchronizerSpec
         commitsSynchronizer.synchronizeEvents(event).unsafeRunSync()
       } shouldBe exception
 
-      logger.loggedOnly(Error(show"$categoryName - failed to sync commits for project ${event.project}", exception))
+      logger.loggedOnly(Error(show"$categoryName: failed to sync commits for project ${event.project}", exception))
     }
 
     "delete all commits in EL if the project in GL is removed" in new TestCase {

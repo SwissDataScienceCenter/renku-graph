@@ -26,45 +26,44 @@ import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+private class UrlAndIdSubscriptionDeserializerSpec extends AnyWordSpec with should.Matchers {
 
   "deserialize" should {
 
     "return subscription info if the categoryName, subscriber URL and subscriber id are valid " +
       "and there's no capacity" in new TestCase {
-        val subscriptionCategoryPayload = subscriptionInfos.generateOne.copy(maybeCapacity = None)
+        val subscriptionPayload = subscriptionInfos.generateOne.copy(maybeCapacity = None)
 
         val payload = json"""{
           "categoryName":  ${categoryName.value},
           "subscriber": {
-            "url": ${subscriptionCategoryPayload.subscriberUrl.value},
-            "id":  ${subscriptionCategoryPayload.subscriberId.value}
+            "url": ${subscriptionPayload.subscriberUrl.value},
+            "id":  ${subscriptionPayload.subscriberId.value}
           }
         }"""
 
-        deserializer.deserialize(payload) shouldBe Success(Some(subscriptionCategoryPayload))
+        deserializer.deserialize(payload) shouldBe Some(subscriptionPayload).pure[Try]
       }
 
     "return subscription info if the categoryName, subscriber URL, subscriber Id, and capacity are given and valid" in new TestCase {
-      val capacity                    = capacities.generateOne
-      val subscriptionCategoryPayload = subscriptionInfos.generateOne.copy(maybeCapacity = capacity.some)
+      val capacity            = capacities.generateOne
+      val subscriptionPayload = subscriptionInfos.generateOne.copy(maybeCapacity = capacity.some)
 
       val payload = json"""{
-          "categoryName":  ${categoryName.value},
-          "subscriber": {
-            "url":      ${subscriptionCategoryPayload.subscriberUrl.value},
-            "id":       ${subscriptionCategoryPayload.subscriberId.value},
-            "capacity": ${capacity.value}
-          }
-        }"""
+        "categoryName":  ${categoryName.value},
+        "subscriber": {
+          "url":      ${subscriptionPayload.subscriberUrl.value},
+          "id":       ${subscriptionPayload.subscriberId.value},
+          "capacity": ${capacity.value}
+        }
+      }"""
 
-      deserializer.deserialize(payload) shouldBe Success(Some(subscriptionCategoryPayload))
+      deserializer.deserialize(payload) shouldBe Some(subscriptionPayload).pure[Try]
     }
 
     "return None if the payload does not contain a valid categoryName" in new TestCase {
@@ -87,7 +86,7 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
 
   private trait TestCase {
     val categoryName = categoryNames.generateOne
-    val Success(deserializer) = SubscriptionRequestDeserializer[Try, TestSubscriptionInfo](
+    val deserializer = new UrlAndIdSubscriptionDeserializerImpl[Try, TestSubscriptionInfo](
       categoryName,
       TestSubscriptionInfo.apply
     )

@@ -81,5 +81,9 @@ object ServiceName extends TinyTypeFactory[ServiceName](new ServiceName(_)) with
 final class ServiceVersion private (val value: String) extends AnyVal with StringTinyType
 object ServiceVersion extends TinyTypeFactory[ServiceVersion](new ServiceVersion(_)) with NonBlank {
   import ConfigLoader._
-  implicit val reader: ConfigReader[ServiceVersion] = stringTinyTypeReader(ServiceVersion)
+  import io.circe.Decoder
+  import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
+
+  implicit val reader:  ConfigReader[ServiceVersion] = stringTinyTypeReader(ServiceVersion)
+  implicit val decoder: Decoder[ServiceVersion]      = stringDecoder(ServiceVersion)
 }

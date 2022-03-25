@@ -40,7 +40,7 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class GlobalCommitSyncEventFinderImpl[F[_]: Async: SessionResource](
+private class EventFinderImpl[F[_]: Async: SessionResource](
     lastSyncedDateUpdater: LastSyncedDateUpdater[F],
     queriesExecTimes:      LabeledHistogram[F],
     syncFrequency:         Duration,
@@ -130,7 +130,7 @@ private class GlobalCommitSyncEventFinderImpl[F[_]: Async: SessionResource](
   }
 }
 
-private object GlobalCommitSyncEventFinder {
+private object EventFinder {
 
   import io.renku.config.ConfigLoader._
 
@@ -143,5 +143,5 @@ private object GlobalCommitSyncEventFinder {
   ): F[EventFinder[F, GlobalCommitSyncEvent]] = for {
     configFrequency <- find[F, FiniteDuration]("global-commit-sync-frequency", config)
     syncFrequency   <- Duration.ofDays(configFrequency.toDays).pure[F]
-  } yield new GlobalCommitSyncEventFinderImpl(lastSyncedDateUpdater, queriesExecTimes, syncFrequency)
+  } yield new EventFinderImpl(lastSyncedDateUpdater, queriesExecTimes, syncFrequency)
 }

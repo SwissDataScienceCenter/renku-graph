@@ -161,9 +161,10 @@ class SubscribersSpec extends AnyWordSpec with IOSpec with MockFactory with shou
     val subscriptionInfo = subscriptionInfos.generateOne
     val subscriberUrl    = subscriptionInfo.subscriberUrl
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val subscribersRegistry = mock[SubscribersRegistry[IO]]
-    val subscriberTracker   = mock[SubscriberTracker[IO]]
-    val subscribers         = new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker)
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    implicit val subscriberTracker: SubscriberTracker[IO, TestSubscriptionInfo] =
+      mock[SubscriberTracker[IO, TestSubscriptionInfo]]
+    val subscribers = new SubscribersImpl(categoryName, subscribersRegistry)
   }
 }

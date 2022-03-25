@@ -96,7 +96,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
           givenSending(event, to = subscriber, got = TemporarilyUnavailable)
           givenDispatchRecoveryExists(subscriber, event)
           expectMarkedBusy(subscriber)
-          expectEventReturnedToTheQueue(event, got = ().pure[IO])
+          expectEventReturnedToTheQueue(event, reason = TemporarilyUnavailable, got = ().pure[IO])
 
           givenThereIs(freeSubscriber = otherSubscriber)
           givenEventFinder(returns = Some(event))
@@ -130,14 +130,14 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
           givenSending(event, to = subscriber, got = Misdelivered)
           givenDispatchRecoveryExists(subscriber, event)
           expectRemoval(subscriber)
-          expectEventReturnedToTheQueue(event = event, got = ().pure[IO])
+          expectEventReturnedToTheQueue(event, reason = Misdelivered, got = ().pure[IO])
 
           givenThereIs(freeSubscriber = otherSubscriber)
           givenEventFinder(returns = Some(event))
           givenSending(event, to = otherSubscriber, got = Misdelivered)
           givenDispatchRecoveryExists(otherSubscriber, event)
           expectRemoval(otherSubscriber)
-          expectEventReturnedToTheQueue(event = event, got = ().pure[IO])
+          expectEventReturnedToTheQueue(event, reason = Misdelivered, got = ().pure[IO])
 
           givenThereIs(freeSubscriber = yetAnotherSubscriber)
           givenEventFinder(returns = Some(event))
@@ -312,7 +312,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
         (subscribers.markBusy _)
           .expects(subscriber)
           .returning(exception.raiseError[IO, Unit])
-        expectEventReturnedToTheQueue(event, got = ().pure[IO])
+        expectEventReturnedToTheQueue(event, reason = TemporarilyUnavailable, got = ().pure[IO])
 
         givenThereIs(freeSubscriber = subscriber)
         givenEventFinder(returns = Some(event))
@@ -347,7 +347,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
         (subscribers.delete _)
           .expects(subscriber)
           .returning(exception.raiseError[IO, Unit])
-        expectEventReturnedToTheQueue(event, got = ().pure[IO])
+        expectEventReturnedToTheQueue(event, reason = Misdelivered, got = ().pure[IO])
 
         givenThereIs(freeSubscriber = otherSubscriber)
         givenEventFinder(returns = Some(event))
@@ -381,7 +381,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
         givenSending(event, to = subscriber, got = Misdelivered)
         givenDispatchRecoveryExists(subscriber, event)
         expectRemoval(subscriber)
-        expectEventReturnedToTheQueue(event = event, got = backToTheQueueException.raiseError[IO, Unit])
+        expectEventReturnedToTheQueue(event, reason = Misdelivered, got = backToTheQueueException.raiseError[IO, Unit])
 
         givenThereIs(freeSubscriber = otherSubscriber)
         givenEventFinder(returns = Some(event))
@@ -407,7 +407,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
   private trait TestCase {
 
     val categoryName             = categoryNames.generateOne
-    val subscribers              = mock[Subscribers[IO]]
+    val subscribers              = mock[Subscribers[IO, SubscriptionInfo]]
     val eventsFinder             = mock[EventFinder[IO, TestCategoryEvent]]
     val eventsSender             = mock[EventsSender[IO, TestCategoryEvent]]
     val eventDelivery            = mock[EventDelivery[IO, TestCategoryEvent]]
@@ -437,9 +437,9 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
       .expects(subscriber, event)
       .returning(returning)
 
-    def expectEventReturnedToTheQueue(event: TestCategoryEvent, got: IO[Unit]) =
+    def expectEventReturnedToTheQueue(event: TestCategoryEvent, reason: SendingResult, got: IO[Unit]) =
       (dispatchRecovery.returnToQueue _)
-        .expects(event)
+        .expects(event, reason)
         .returning(got)
 
     def givenNoMoreEvents() =

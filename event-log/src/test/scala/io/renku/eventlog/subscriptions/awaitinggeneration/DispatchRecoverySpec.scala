@@ -21,6 +21,7 @@ package io.renku.eventlog.subscriptions.awaitinggeneration
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.EventMessage
+import io.renku.eventlog.subscriptions.Generators.sendingResults
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions._
 import io.renku.events.producers.EventSender
@@ -54,14 +55,15 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
 
       (eventSender
         .sendEvent(_: EventRequestContent.NoPayload, _: EventSender.EventContext))
-        .expects(eventRequestContent,
-                 EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                                          s"${SubscriptionCategory.name}: Marking event as $New failed"
-                 )
+        .expects(
+          eventRequestContent,
+          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                   s"${SubscriptionCategory.categoryName}: Marking event as $New failed"
+          )
         )
         .returning(().pure[Try])
 
-      dispatchRecovery.returnToQueue(event) shouldBe ().pure[Try]
+      dispatchRecovery.returnToQueue(event, sendingResults.generateOne) shouldBe ().pure[Try]
     }
   }
 
@@ -89,7 +91,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
           eventRequestContent,
           EventSender.EventContext(
             CategoryName("EVENTS_STATUS_CHANGE"),
-            s"${SubscriptionCategory.name}: $event, url = $subscriber -> $GenerationNonRecoverableFailure"
+            s"${SubscriptionCategory.categoryName}: $event, url = $subscriber -> $GenerationNonRecoverableFailure"
           )
         )
         .returning(().pure[Try])
@@ -97,7 +99,9 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
       dispatchRecovery.recover(subscriber, event)(exception) shouldBe ().pure[Try]
 
       logger.loggedOnly(
-        Error(s"${SubscriptionCategory.name}: $event, url = $subscriber -> $GenerationNonRecoverableFailure", exception)
+        Error(s"${SubscriptionCategory.categoryName}: $event, url = $subscriber -> $GenerationNonRecoverableFailure",
+              exception
+        )
       )
     }
   }

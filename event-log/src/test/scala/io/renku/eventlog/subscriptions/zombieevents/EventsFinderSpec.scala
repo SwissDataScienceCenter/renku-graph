@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.syntax.all._
-import io.renku.eventlog.subscriptions.EventFinder
+import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.zombieevents.Generators.zombieEvents
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -31,7 +31,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class ZombieEventsFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventsFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "popEvent" should {
 
@@ -82,15 +82,15 @@ class ZombieEventsFinderSpec extends AnyWordSpec with MockFactory with should.Ma
   }
 
   private trait TestCase {
-    val longProcessingEventsFinder = mock[EventFinder[Try, ZombieEvent]]
-    val lostSubscriberEventsFinder = mock[EventFinder[Try, ZombieEvent]]
+    val longProcessingEventsFinder = mock[subscriptions.EventFinder[Try, ZombieEvent]]
+    val lostSubscriberEventsFinder = mock[subscriptions.EventFinder[Try, ZombieEvent]]
     val zombieNodesCleaner         = mock[ZombieNodesCleaner[Try]]
-    val lostZombieEventsFinder     = mock[EventFinder[Try, ZombieEvent]]
+    val lostZombieEventsFinder     = mock[subscriptions.EventFinder[Try, ZombieEvent]]
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val zombieEventFinder = new ZombieEventFinder[Try](longProcessingEventsFinder,
-                                                       lostSubscriberEventsFinder,
-                                                       zombieNodesCleaner,
-                                                       lostZombieEventsFinder
+    val zombieEventFinder = new EventFinder[Try](longProcessingEventsFinder,
+                                                 lostSubscriberEventsFinder,
+                                                 zombieNodesCleaner,
+                                                 lostZombieEventsFinder
     )
   }
 }

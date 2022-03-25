@@ -25,11 +25,8 @@ import io.renku.eventlog.subscriptions.SubscriptionCategory._
 import io.renku.events.CategoryName
 
 private trait SubscriptionCategory[F[_]] {
-
-  def name: CategoryName
-
+  val name: CategoryName
   def run(): F[Unit]
-
   def register(payload: Json): F[RegistrationResult]
 }
 
@@ -45,11 +42,11 @@ private[subscriptions] object SubscriptionCategory {
   }
 }
 
-private class SubscriptionCategoryImpl[F[_]: MonadThrow, SubscriptionInfoType <: SubscriptionInfo](
-    val name:          CategoryName,
-    subscribers:       Subscribers[F],
+private class SubscriptionCategoryImpl[F[_]: MonadThrow, SI <: SubscriptionInfo](
+    override val name: CategoryName,
+    subscribers:       Subscribers[F, SI],
     eventsDistributor: EventsDistributor[F],
-    deserializer:      SubscriptionRequestDeserializer[F, SubscriptionInfoType]
+    deserializer:      SubscriptionPayloadDeserializer[F, SI]
 ) extends SubscriptionCategory[F] {
 
   override def run(): F[Unit] = eventsDistributor.run()

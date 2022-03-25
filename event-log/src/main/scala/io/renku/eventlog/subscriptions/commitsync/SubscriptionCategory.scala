@@ -30,12 +30,11 @@ import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
-      queriesExecTimes:  LabeledHistogram[F],
-      subscriberTracker: SubscriberTracker[F]
+  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers      <- Subscribers(categoryName, subscriberTracker)
-    eventsFinder     <- CommitSyncEventFinder(queriesExecTimes)
+    subscribers      <- UrlAndIdSubscribers[F](categoryName)
+    eventsFinder     <- EventFinder(queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[F, CommitSyncEvent](categoryName)
     eventDelivery    <- EventDelivery.noOp[F, CommitSyncEvent]
     eventsDistributor <- EventsDistributor(categoryName,
@@ -46,7 +45,7 @@ private[subscriptions] object SubscriptionCategory {
                                            dispatchRecovery
                          )
     deserializer <-
-      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
+      UrlAndIdSubscriptionDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
   } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](categoryName,
                                                                        subscribers,
                                                                        eventsDistributor,

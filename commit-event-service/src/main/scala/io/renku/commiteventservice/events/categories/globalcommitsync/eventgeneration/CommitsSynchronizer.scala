@@ -76,7 +76,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
       }
     }
   } recoverWith { case NonFatal(error) =>
-    Logger[F].error(error)(show"$categoryName - failed to sync commits for project ${event.project}") >>
+    Logger[F].error(error)(show"$categoryName: failed to sync commits for project ${event.project}") >>
       error.raiseError[F, Unit]
   }
 

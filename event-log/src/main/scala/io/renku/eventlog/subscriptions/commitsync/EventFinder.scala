@@ -39,7 +39,7 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource](
+private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource](
     queriesExecTimes: LabeledHistogram[F],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
@@ -63,36 +63,37 @@ private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource]
               (CommitSyncEvent, Option[LastSyncedDate], Option[EventStatus])
       ](
         sql"""
-              SELECT
-                (SELECT evt.event_id
-                  FROM event evt
-                  WHERE evt.project_id = proj.project_id
-                    AND evt.event_date = proj.latest_event_date
-                  ORDER BY created_date DESC
-                  LIMIT 1
-                ) event_id,
-				        (SELECT evt.status
-                  FROM event evt
-                  WHERE evt.project_id = proj.project_id
-                    AND evt.event_date = proj.latest_event_date
-                  ORDER BY created_date DESC
-                  LIMIT 1
-                ) event_status,
-                proj.project_id,
-                proj.project_path,
-                sync_time.last_synced,
-                proj.latest_event_date
-              FROM project proj
-              LEFT JOIN subscription_category_sync_time sync_time
-                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
-              WHERE
-               (sync_time.last_synced IS NULL
-                OR (
-                     (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
-                  OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
-                ))
-              ORDER BY proj.latest_event_date DESC
-              LIMIT 1"""
+          SELECT
+            (SELECT evt.event_id
+              FROM event evt
+              WHERE evt.project_id = proj.project_id
+                AND evt.event_date = proj.latest_event_date
+              ORDER BY created_date DESC
+              LIMIT 1
+            ) event_id,
+		      (SELECT evt.status
+              FROM event evt
+              WHERE evt.project_id = proj.project_id
+                AND evt.event_date = proj.latest_event_date
+              ORDER BY created_date DESC
+              LIMIT 1
+            ) event_status,
+            proj.project_id,
+            proj.project_path,
+            sync_time.last_synced,
+            proj.latest_event_date
+          FROM project proj
+          LEFT JOIN subscription_category_sync_time sync_time
+            ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
+          WHERE
+           (sync_time.last_synced IS NULL
+            OR (
+                 (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
+              OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
+            ))
+          ORDER BY proj.latest_event_date DESC
+          LIMIT 1
+          """
           .query(
             eventIdDecoder.opt ~ eventStatusDecoder.opt ~ projectDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
           )
@@ -128,26 +129,23 @@ private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource]
 
   private def updateLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced"))
-      .command[LastSyncedDate ~ projects.Id ~ CategoryName](
-        sql"""UPDATE subscription_category_sync_time
-                  SET last_synced = $lastSyncedDateEncoder
-                  WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
-            """.command
-      )
+      .command[LastSyncedDate ~ projects.Id ~ CategoryName](sql"""
+        UPDATE subscription_category_sync_time
+        SET last_synced = $lastSyncedDateEncoder
+        WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
+        """.command)
       .arguments(LastSyncedDate(now()) ~ event.projectId ~ categoryName)
       .build
   }
 
   private def insertLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced"))
-      .command[projects.Id ~ CategoryName ~ LastSyncedDate](
-        sql"""INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-                VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
-                ON CONFLICT (project_id, category_name)
-                DO UPDATE
-                  SET last_synced = EXCLUDED.last_synced
-            """.command
-      )
+      .command[projects.Id ~ CategoryName ~ LastSyncedDate](sql"""
+        INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
+        VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
+        ON CONFLICT (project_id, category_name)
+        DO UPDATE SET last_synced = EXCLUDED.last_synced
+        """.command)
       .arguments(event.projectId ~ categoryName ~ LastSyncedDate(now()))
       .build
   }
@@ -165,10 +163,10 @@ private class CommitSyncEventFinderImpl[F[_]: MonadCancelThrow: SessionResource]
   }
 }
 
-private object CommitSyncEventFinder {
+private object EventFinder {
   def apply[F[_]: MonadCancelThrow: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
   ): F[EventFinder[F, CommitSyncEvent]] = MonadThrow[F].catchNonFatal {
-    new CommitSyncEventFinderImpl(queriesExecTimes)
+    new EventFinderImpl(queriesExecTimes)
   }
 }

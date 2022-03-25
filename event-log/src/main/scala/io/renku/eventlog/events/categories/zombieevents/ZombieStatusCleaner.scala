@@ -85,8 +85,7 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource](
         case Completion.Update(1) => (Updated: UpdateResult).pure[F]
         case Completion.Update(0) => (NotUpdated: UpdateResult).pure[F]
         case _ =>
-          new Exception(s"${categoryName.value} - zombie_chasing - update status- More than one row updated")
-            .raiseError[F, UpdateResult]
+          new Exception(show"$categoryName: update status - More than one row updated").raiseError[F, UpdateResult]
       }
   }
 }

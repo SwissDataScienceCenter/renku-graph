@@ -51,23 +51,23 @@ Response body example:
 ```json
 [
   {
-    "id": "df654c3b1bd105a29d658f78f6380a842feac879",
-    "status": "NEW",
+    "id":              "df654c3b1bd105a29d658f78f6380a842feac879",
+    "status":          "NEW",
     "processingTimes": [],
-    "date": "2001-09-04T10:48:29.457Z",
-    "executionDate": "2001-09-04T10:48:29.457Z"
+    "date":            "2001-09-04T10:48:29.457Z",
+    "executionDate":   "2001-09-04T10:48:29.457Z"
   },
   {
-    "id": "df654c3b1bd105a29d658f78f6380a842feac879",
-    "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
+    "id":      "df654c3b1bd105a29d658f78f6380a842feac879",
+    "status":  "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
     "message": "detailed info about the cause of the failure",
     "processingTimes": [
       {
-        "status": "TRIPLES_GENERATED",
+        "status":         "TRIPLES_GENERATED",
         "processingTime": "PT20.345S"
       }
     ],
-    "date": "2001-09-04T10:48:29.457Z",
+    "date":          "2001-09-04T10:48:29.457Z",
     "executionDate": "2001-09-04T10:48:29.457Z"
   }
 ]
@@ -117,15 +117,15 @@ In the case of a *NEW* event
 ```json
 {
   "categoryName": "CREATION",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 123,
+    "id":   123,
     "path": "namespace/project-name"
   },
-  "date": "2001-09-04T10:48:29.457Z",
+  "date":      "2001-09-04T10:48:29.457Z",
   "batchDate": "2001-09-04T11:00:00.000Z",
-  "body": "JSON payload",
-  "status": "NEW"
+  "body":      "JSON payload",
+  "status":    "NEW"
 }
 ```
 
@@ -134,16 +134,16 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
 ```json
 {
   "categoryName": "CREATION",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 123,
+    "id":   123,
     "path": "namespace/project-name"
   },
-  "date": "2001-09-04T10:48:29.457Z",
+  "date":      "2001-09-04T10:48:29.457Z",
   "batchDate": "2001-09-04T11:00:00.000Z",
-  "body": "JSON payload",
-  "status": "SKIPPED",
-  "message": "reason for skipping"
+  "body":      "JSON payload",
+  "status":    "SKIPPED",
+  "message":   "reason for skipping"
 }
 ```
 
@@ -161,9 +161,9 @@ the new status.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   },
   "newStatus": "NEW"
@@ -188,12 +188,12 @@ the new status.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   },
-  "message": "<failure message>",
+  "message":   "<failure message>",
   "newStatus": "<failure status>"
 }
 ```
@@ -207,9 +207,9 @@ the new status.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   },
   "newStatus": "TRIPLES_GENERATED"
@@ -225,9 +225,9 @@ the new status.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   },
   "newStatus": "AWAITING_DELETION"
@@ -243,12 +243,12 @@ the new status.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "TRIPLES_GENERATED",
+  "newStatus":      "TRIPLES_GENERATED",
   "processingTime": "PT2.023S"
 }
 ```
@@ -264,12 +264,12 @@ the new status.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   },
-  "newStatus": "TRIPLES_STORE",
+  "newStatus":      "TRIPLES_STORE",
   "processingTime": "PT2.023S"
 }
 ```
@@ -284,7 +284,7 @@ the new status.
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   },
   "newStatus": "NEW"
@@ -301,7 +301,7 @@ the new status.
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   },
   "newStatus": "AWAITING_DELETION"
@@ -317,7 +317,7 @@ the new status.
 ```json
 {
   "categoryName": "EVENTS_STATUS_CHANGE",
-  "newStatus": "NEW"
+  "newStatus":    "NEW"
 }
 ```
 
@@ -332,9 +332,9 @@ Changes the status of a zombie event
 ```json
 {
   "categoryName": "ZOMBIE_CHASING",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   },
   "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
@@ -353,7 +353,7 @@ Forces issuing a commit sync event for the given project
 {
   "categoryName": "COMMIT_SYNC_REQUEST",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "namespace/project-name"
   }
 }
@@ -418,8 +418,8 @@ Response body examples:
 
 ```json
 {
-  "done": 20,
-  "total": 20,
+  "done":     20,
+  "total":    20,
   "progress": 100.00
 }
 ```
@@ -428,8 +428,8 @@ Response body examples:
 
 ```json
 {
-  "done": 10,
-  "total": 20,
+  "done":     10,
+  "total":    20,
   "progress": 50.00
 }
 ```
@@ -451,8 +451,8 @@ All events are sent as multipart requests
 {
   "categoryName": "AWAITING_GENERATION",
   "subscriber": {
-    "url": "http://host/path",
-    "id": "20210302140653-8641",
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641",
     "capacity": 4
   }
 }
@@ -465,7 +465,7 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "AWAITING_GENERATION",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id": 12
   }
@@ -487,7 +487,7 @@ All events are sent as multipart requests
   "categoryName": "TRIPLES_GENERATED",
   "subscriber": {
     "url": "http://host/path",
-    "id": "20210302140653-8641"
+    "id":  "20210302140653-8641"
   }
 }
 ```
@@ -499,9 +499,9 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "TRIPLES_GENERATED",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "project/path"
   }
 }
@@ -511,7 +511,7 @@ All events are sent as multipart requests
 
 ```json
 {
-  "payload": "json-ld payload as string",
+  "payload":       "json-ld payload as string",
   "schemaVersion": "8"
 }
 ```
@@ -525,7 +525,7 @@ All events are sent as multipart requests
   "categoryName": "MEMBER_SYNC",
   "subscriber": {
     "url": "http://host/path",
-    "id": "20210302140653-8641"
+    "id":  "20210302140653-8641"
   }
 }
 ```
@@ -552,7 +552,7 @@ All events are sent as multipart requests
   "categoryName": "COMMIT_SYNC",
   "subscriber": {
     "url": "http://host/path",
-    "id": "20210302140653-8641"
+    "id":  "20210302140653-8641"
   }
 }
 ```
@@ -564,9 +564,9 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "COMMIT_SYNC",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "project/path"
   },
   "lastSynced": "2001-09-04T11:00:00.000Z"
@@ -579,7 +579,7 @@ or
 {
   "categoryName": "COMMIT_SYNC",
   "project": {
-    "id": 12,
+    "id":   12,
     "path": "project/path"
   }
 }
@@ -594,7 +594,7 @@ or
   "categoryName": "GLOBAL_COMMIT_SYNC",
   "subscriber": {
     "url": "http://host/path",
-    "id": "20210302140653-8641"
+    "id":  "20210302140653-8641"
   }
 }
 ```
@@ -626,7 +626,7 @@ or
   "categoryName": "ZOMBIE_CHASING",
   "subscriber": {
     "url": "http://host/path",
-    "id": "20210302140653-8641"
+    "id":  "20210302140653-8641"
   }
 }
 ```
@@ -644,6 +644,32 @@ or
     "path": "namespace/project-name"
   },
   "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
+}
+```
+
+- **TS_MIGRATION_REQUEST**
+
+**Request**
+
+```json
+{
+  "categoryName": "TS_MIGRATION_REQUEST",
+  "subscriber": {
+    "url":     "http://host/path",
+    "id":      "20210302140653-8641",
+    "version": "1.22.4-10-g34454567"
+  }
+}
+```
+
+**Event example**
+
+`event` part:
+
+```json
+{
+  "categoryName": "TS_MIGRATION_REQUEST",
+  "version":      "1.22.4-10-g34454567"
 }
 ```
 
@@ -684,17 +710,17 @@ Response body example:
 
 Event-log uses relational database as an internal storage. The DB has the following schema:
 
-| event                                |
-|--------------------------------------|
-| event_id   VARCHAR    PK    NOT NULL |
-| project_id INT4       PK FK NOT NULL |
-| status     VARCHAR          NOT NULL |
-| created_date TIMESTAMPTZ    NOT NULL |
-| execution_date TIMESTAMPTZ  NOT NULL |
-| event_date TIMESTAMPTZ      NOT NULL |
-| batch_date TIMESTAMPTZ      NOT NULL |
-| event_body TEXT             NOT NULL |
-| message TEXT                         |
+| event                                     |
+|-------------------------------------------|
+| event_id       VARCHAR     PK    NOT NULL |
+| project_id     INT4        PK FK NOT NULL |
+| status         VARCHAR           NOT NULL |
+| created_date   TIMESTAMPTZ       NOT NULL |
+| execution_date TIMESTAMPTZ       NOT NULL |
+| event_date     TIMESTAMPTZ       NOT NULL |
+| batch_date     TIMESTAMPTZ       NOT NULL |
+| event_body     TEXT              NOT NULL |
+| message        VARCHAR                    |
 
 | project                                   |
 |-------------------------------------------|
@@ -702,17 +728,17 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | project_path      VARCHAR        NOT NULL |
 | latest_event_date TIMESTAMPTZ    NOT NULL |
 
-| event_payload                        |
-|--------------------------------------|
-| event_id   VARCHAR    PK FK NOT NULL |
-| project_id INT4       PK FK NOT NULL |
-| payload    BYTEA            NOT NULL |
+| event_payload                    |
+|----------------------------------|
+| event_id   VARCHAR PK FK NOT NULL |
+| project_id INT4    PK FK NOT NULL |
+| payload    BYTEA         NOT NULL |
 
-| subscription_category_sync_time       |
-|---------------------------------------|
-| project_id     INT4  PK FK   NOT NULL |
-| category_name  TEXT  PK      NOT NULL |
-| last_synced    TIMESTAMPTZ   NOT NULL |
+| subscription_category_sync_time           |
+|-------------------------------------------|
+| project_id     INT4        PK FK NOT NULL |
+| category_name  TEXT        PK    NOT NULL |
+| last_synced    TIMESTAMPTZ       NOT NULL |
 
 | status_processing_time                    |
 |-------------------------------------------|
@@ -734,12 +760,20 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | delivery_id   VARCHAR(19)        NOT NULL |
 | event_type_id VARCHAR         UK NULL     | 
 
-| status_change_events_queue       |
-|----------------------------------|
-| id         SERIAL    PRIMARY KEY |
-| date       TIMESTAMP NOT NULL    |
-| event_type VARCHAR   NOT NULL    |
-| payload    TEXT      NOT NULL    |
+| status_change_events_queue         |
+|------------------------------------|
+| id         SERIAL      PK NOT NULL |
+| date       TIMESTAMPTZ    NOT NULL |
+| event_type VARCHAR        NOT NULL |
+| payload    TEXT           NOT NULL |
+
+| ts_migration                                |
+|---------------------------------------------|
+| subscriber_version  VARCHAR     PK NOT NULL |
+| subscriber_url      VARCHAR     PK NOT NULL |
+| status              VARCHAR        NOT NULL |
+| change_date         TIMESTAMPTZ    NOT NULL |
+| message             TEXT                    |
 
 ## Trying out
 
