@@ -105,12 +105,12 @@ class DispatchRecoverySpec
 
     val exception = exceptions.generateOne
 
-    "change status of the relevant row to NonRecoverableFailure if in Sent" in new TestCase {
+    "change status of the relevant row to Failure if in Sent" in new TestCase {
       insertSubscriptionRecord(url, version, Sent, changeDate)
 
       recovery.recover(url, MigrationRequestEvent(url, version))(exception).unsafeRunSync() shouldBe ()
 
-      findRows(url, version)    shouldBe NonRecoverableFailure -> ChangeDate(now)
+      findRows(url, version)    shouldBe Failure -> ChangeDate(now)
       findMessage(url, version) shouldBe MigrationMessage(exception).some
 
       logger.loggedOnly(Info("TS_MIGRATION_REQUEST: recovering from NonRecoverable Failure", exception))

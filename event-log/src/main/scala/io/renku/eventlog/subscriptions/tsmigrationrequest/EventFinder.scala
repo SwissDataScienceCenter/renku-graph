@@ -82,11 +82,6 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
       if (groupedByStatus contains MigrationStatus.Done) None
       else if (groupedByStatus contains MigrationStatus.Sent)
         groupedByStatus(MigrationStatus.Sent).find(olderThan(SentStatusTimeout))
-      else if (groupedByStatus contains MigrationStatus.RecoverableFailure)
-        (groupedByStatus
-          .get(MigrationStatus.RecoverableFailure)
-          .map(_.filter(olderThan(RecoverableStatusTimeout))) combine groupedByStatus.get(MigrationStatus.New))
-          .flatMap(_.sortBy(_._4.value).reverse.headOption)
       else groupedByStatus.get(MigrationStatus.New).flatMap(_.sortBy(_._4.value).reverse.headOption)
   }
 
@@ -123,8 +118,7 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
 }
 
 private object EventFinder {
-  val SentStatusTimeout        = Duration ofHours 1
-  val RecoverableStatusTimeout = Duration ofMinutes 2
+  val SentStatusTimeout = Duration ofHours 1
 
   def apply[F[_]: Async: SessionResource](
       queriesExecTimes: LabeledHistogram[F]

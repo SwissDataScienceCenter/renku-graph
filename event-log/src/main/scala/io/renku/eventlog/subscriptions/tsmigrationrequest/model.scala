@@ -48,7 +48,7 @@ private sealed trait MigrationStatus extends StringTinyType with Product with Se
 
 private object MigrationStatus extends TinyTypeFactory[MigrationStatus](MigrationStatusInstantiator) {
 
-  val all: Set[MigrationStatus] = Set(New, Sent, Done, NonRecoverableFailure, RecoverableFailure)
+  val all: Set[MigrationStatus] = Set(New, Sent, Done, Failure)
 
   type New = New.type
   final case object New extends MigrationStatus {
@@ -65,14 +65,9 @@ private object MigrationStatus extends TinyTypeFactory[MigrationStatus](Migratio
     override val value: String = "DONE"
   }
 
-  type NonRecoverableFailure = NonRecoverableFailure.type
-  final case object NonRecoverableFailure extends MigrationStatus {
-    override val value: String = "NON_RECOVERABLE_FAILURE"
-  }
-
-  type RecoverableFailure = RecoverableFailure.type
-  final case object RecoverableFailure extends MigrationStatus {
-    override val value: String = "RECOVERABLE_FAILURE"
+  type Failure = Failure.type
+  final case object Failure extends MigrationStatus {
+    override val value: String = "FAILURE"
   }
 
   import io.circe.Decoder.decodeString
