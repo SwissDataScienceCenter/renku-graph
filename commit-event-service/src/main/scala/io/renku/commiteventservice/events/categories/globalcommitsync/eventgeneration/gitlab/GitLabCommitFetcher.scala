@@ -30,7 +30,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.Page
 import org.http4s.Method.GET
-import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
+import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.implicits.http4sLiteralsSyntax
@@ -80,7 +80,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
                              pageRequest:   PagingRequest
   ): PartialFunction[(Status, Request[F], Response[F]), F[PageResult]] = {
     case (Ok, _, response) => (response.as[List[CommitId]] -> maybeNextPage(response)).mapN(PageResult(_, _))
-    case (NotFound, _, _)  => PageResult.empty.pure[F]
+    case (NotFound | InternalServerError, _, _) => PageResult.empty.pure[F]
     case (Unauthorized | Forbidden, _, _) =>
       fetchGitLabCommits(projectId, dateCondition, pageRequest)(maybeAccessToken = None)
   }
@@ -88,9 +88,9 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
   private def mapLatestCommit(
       projectId: projects.Id
   ): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitId]]] = {
-    case (Ok, _, response)                => response.as[List[CommitId]].map(_.headOption)
-    case (NotFound, _, _)                 => Option.empty[CommitId].pure[F]
-    case (Unauthorized | Forbidden, _, _) => fetchLatestGitLabCommit(projectId)(maybeAccessToken = None)
+    case (Ok, _, response)                      => response.as[List[CommitId]].map(_.headOption)
+    case (NotFound | InternalServerError, _, _) => Option.empty[CommitId].pure[F]
+    case (Unauthorized | Forbidden, _, _)       => fetchLatestGitLabCommit(projectId)(maybeAccessToken = None)
   }
 
   private implicit val commitIdDecoder: EntityDecoder[F, List[CommitId]] =
