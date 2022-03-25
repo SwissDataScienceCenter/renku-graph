@@ -36,8 +36,7 @@ trait InMemoryEventLogDbSpec
     with EventDataFetching {
   self: TestSuite with IOSpec =>
 
-  protected def initDb(): Unit =
-    allMigrations.map(_.run()).sequence.void.unsafeRunSync()
+  protected def initDb(): Unit = allMigrations.map(_.run()).sequence.void.unsafeRunSync()
 
   private def findAllTables(): List[String] = execute {
     Kleisli { session =>

@@ -44,7 +44,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.Instant
 import java.time.temporal.ChronoUnit.DAYS
 
-private class AwaitingGenerationEventFinderSpec
+private class EventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -303,12 +303,12 @@ private class AwaitingGenerationEventFinderSpec
 
     "return the latest events from each projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      val eventLogFind = new AwaitingGenerationEventFinderImpl(waitingEventsGauge,
-                                                               underProcessingGauge,
-                                                               queriesExecTimes,
-                                                               currentTime,
-                                                               projectsFetchingLimit = 5,
-                                                               projectPrioritisation = projectPrioritisation
+      val eventLogFind = new EventFinderImpl(waitingEventsGauge,
+                                             underProcessingGauge,
+                                             queriesExecTimes,
+                                             currentTime,
+                                             projectsFetchingLimit = 5,
+                                             projectPrioritisation = projectPrioritisation
       )
 
       val events = readyStatuses
@@ -380,12 +380,12 @@ private class AwaitingGenerationEventFinderSpec
 
   private trait TestCase extends TestCaseCommons {
 
-    val finder = new AwaitingGenerationEventFinderImpl(waitingEventsGauge,
-                                                       underProcessingGauge,
-                                                       queriesExecTimes,
-                                                       currentTime,
-                                                       projectsFetchingLimit = 1,
-                                                       projectPrioritisation = projectPrioritisation
+    val finder = new EventFinderImpl(waitingEventsGauge,
+                                     underProcessingGauge,
+                                     queriesExecTimes,
+                                     currentTime,
+                                     projectsFetchingLimit = 1,
+                                     projectPrioritisation = projectPrioritisation
     )
   }
 

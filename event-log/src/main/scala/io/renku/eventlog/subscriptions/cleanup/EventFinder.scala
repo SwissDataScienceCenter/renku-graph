@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.cleanup
+package io.renku.eventlog.subscriptions
+package cleanup
 
 import cats.data.Kleisli
 import cats.effect.Async
@@ -25,8 +26,7 @@ import cats.{MonadThrow, Parallel}
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
-import io.renku.eventlog.{ExecutionDate, TypeSerializers}
+import io.renku.eventlog.{ExecutionDate, TypeSerializers, subscriptions}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events._
@@ -38,14 +38,14 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class CleanUpEventFinderImpl[F[_]: Async: Parallel: SessionResource](
+private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
     awaitingDeletionGauge: LabeledGauge[F, projects.Path],
     deletingGauge:         LabeledGauge[F, projects.Path],
     queriesExecTimes:      LabeledHistogram[F],
     now:                   () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
-    with EventFinder[F, CleanUpEvent]
-    with SubscriptionTypeSerializers
+    with subscriptions.EventFinder[F, CleanUpEvent]
+    with subscriptions.SubscriptionTypeSerializers
     with TypeSerializers {
 
   override def popEvent(): F[Option[CleanUpEvent]] = SessionResource[F].useK {
@@ -67,15 +67,14 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel: SessionResource](
       name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
     ).select[EventStatus ~ ExecutionDate, Project](
       sql"""
-       SELECT evt.project_id, prj.project_path
-       FROM event evt
-       JOIN  project prj ON prj.project_id = evt.project_id 
-       WHERE evt.status = $eventStatusEncoder
-         AND evt.execution_date < $executionDateEncoder
-       ORDER BY evt.execution_date ASC
-       LIMIT 1
-       """
-        .query(projectDecoder)
+      SELECT evt.project_id, prj.project_path
+      FROM event evt
+      JOIN  project prj ON prj.project_id = evt.project_id 
+      WHERE evt.status = $eventStatusEncoder
+        AND evt.execution_date < $executionDateEncoder
+      ORDER BY evt.execution_date ASC
+      LIMIT 1
+      """.query(projectDecoder)
     ).arguments(AwaitingDeletion ~ executionDate)
       .build(_.option)
   }
@@ -85,19 +84,17 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel: SessionResource](
       measureExecutionTime {
         SqlStatement(
           name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
-        ).command[EventStatus ~ ExecutionDate ~ EventStatus ~ projects.Id](
-          sql"""
-           UPDATE event
-           SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
-           WHERE status = $eventStatusEncoder
-             AND project_id = $projectIdEncoder
-       """.command
-        ).arguments(Deleting ~ ExecutionDate(now()) ~ AwaitingDeletion ~ projectId)
+        ).command[EventStatus ~ ExecutionDate ~ EventStatus ~ projects.Id](sql"""
+          UPDATE event
+          SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+          WHERE status = $eventStatusEncoder
+            AND project_id = $projectIdEncoder
+       """.command)
+          .arguments(Deleting ~ ExecutionDate(now()) ~ AwaitingDeletion ~ projectId)
           .build
           .mapResult {
-            case Completion.Update(count) =>
-              (CleanUpEvent(project) -> count).some
-            case _ => Option.empty[(CleanUpEvent, Int)]
+            case Completion.Update(count) => (CleanUpEvent(project) -> count).some
+            case _                        => Option.empty[(CleanUpEvent, Int)]
           }
       }
     } getOrElse Kleisli.pure(Option.empty[(CleanUpEvent, Int)])
@@ -113,12 +110,12 @@ private class CleanUpEventFinderImpl[F[_]: Async: Parallel: SessionResource](
     } getOrElse Kleisli.pure[F, Session[F], Unit](())
 }
 
-private object CleanUpEventFinder {
+private object EventFinder {
   def apply[F[_]: Async: Parallel: SessionResource](
       awatingDeletionGauge: LabeledGauge[F, projects.Path],
       deletingGauge:        LabeledGauge[F, projects.Path],
       queriesExecTimes:     LabeledHistogram[F]
   ): F[EventFinder[F, CleanUpEvent]] = MonadThrow[F].catchNonFatal {
-    new CleanUpEventFinderImpl(awatingDeletionGauge, deletingGauge, queriesExecTimes)
+    new EventFinderImpl(awatingDeletionGauge, deletingGauge, queriesExecTimes)
   }
 }

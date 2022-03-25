@@ -35,23 +35,22 @@ private[subscriptions] object SubscriptionCategory {
 
   val name: CategoryName = CategoryName("CLEAN_UP")
 
-  def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
-      subscriberTracker:     SubscriberTracker[F],
+  def apply[F[_]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
       awaitingDeletionGauge: LabeledGauge[F, projects.Path],
       deletingGauge:         LabeledGauge[F, projects.Path],
       queriesExecTimes:      LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers <- Subscribers(name, subscriberTracker)
+    subscribers <- UrlAndIdSubscribers[F](name)
     eventDelivery <- eventdelivery.EventDelivery[F, CleanUpEvent](
                        eventDeliveryIdExtractor = (event: CleanUpEvent) => DeletingProjectDeliverId(event.project.id),
                        queriesExecTimes
                      )
     dispatchRecovery <- DispatchRecovery[F]
-    eventFinder      <- CleanUpEventFinder(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
+    eventFinder      <- EventFinder(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
     eventsDistributor <-
       EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)
     deserializer <-
-      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
+      UrlAndIdSubscriptionDeserializer[F, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
   } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](name,
                                                                        subscribers,
                                                                        eventsDistributor,

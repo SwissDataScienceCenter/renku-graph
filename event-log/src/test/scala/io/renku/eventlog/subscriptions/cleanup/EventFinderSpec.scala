@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.awaitinggeneration
+package io.renku.eventlog.subscriptions.cleanup
 
 import io.renku.eventlog._
 import io.renku.testtools.IOSpec
@@ -24,7 +24,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-private class CleanUpEventFinderSpec
+private class EventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -32,5 +32,4 @@ private class CleanUpEventFinderSpec
     with should.Matchers {
 
   "popEvent" should {}
-
 }

@@ -32,12 +32,11 @@ import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
-      queriesExecTimes:  LabeledHistogram[F],
-      subscriberTracker: SubscriberTracker[F]
+  def apply[F[_]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
+      queriesExecTimes: LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers      <- Subscribers(categoryName, subscriberTracker)
-    eventsFinder     <- ZombieEventFinder(queriesExecTimes)
+    subscribers      <- UrlAndIdSubscribers[F](categoryName)
+    eventsFinder     <- EventFinder(queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[F, ZombieEvent](categoryName)
     eventDelivery    <- EventDelivery.noOp[F, ZombieEvent]
     eventsDistributor <- EventsDistributor(categoryName,
@@ -48,7 +47,7 @@ private[subscriptions] object SubscriptionCategory {
                                            dispatchRecovery
                          )
     deserializer <-
-      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
+      UrlAndIdSubscriptionDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
   } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](categoryName,
                                                                        subscribers,
                                                                        eventsDistributor,
@@ -59,4 +58,4 @@ private[subscriptions] object SubscriptionCategory {
 private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
                                                subscriberId:  SubscriberId,
                                                maybeCapacity: Option[Capacity]
-) extends subscriptions.SubscriptionInfo
+) extends subscriptions.UrlAndIdSubscriptionInfo

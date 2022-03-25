@@ -24,8 +24,9 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
+import io.renku.eventlog.subscriptions.UrlAndIdSubscribers.UrlAndIdSubscribers
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
-import io.renku.eventlog.subscriptions.{Capacity, ProjectIds, Subscribers}
+import io.renku.eventlog.subscriptions.{Capacity, ProjectIds, UrlAndIdSubscribers}
 import io.renku.graph.model.projects
 import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 
@@ -35,7 +36,7 @@ private trait ProjectPrioritisation[F[_]] {
   def prioritise(projects: List[ProjectInfo], totalOccupancy: Long): List[(ProjectIds, Priority)]
 }
 
-private class ProjectPrioritisationImpl[F[_]](subscribers: Subscribers[F]) extends ProjectPrioritisation[F] {
+private class ProjectPrioritisationImpl[F[_]: UrlAndIdSubscribers] extends ProjectPrioritisation[F] {
   import ProjectPrioritisation.Priority._
 
   private val FreeSpotsRatio = .15
@@ -48,7 +49,7 @@ private class ProjectPrioritisationImpl[F[_]](subscribers: Subscribers[F]) exten
   private def rejectProjectsAboveOccupancyThreshold(projects:       List[ProjectInfo],
                                                     totalOccupancy: Long
   ): List[ProjectInfo] =
-    subscribers.getTotalCapacity
+    UrlAndIdSubscribers[F].getTotalCapacity
       .map(_.value)
       .map { totalCapacity =>
         val freeSpots =
@@ -95,7 +96,8 @@ private class ProjectPrioritisationImpl[F[_]](subscribers: Subscribers[F]) exten
     case prioritiesList =>
       val prioritiesCorrectedByOccupancy = prioritiesList.map(
         correctPriority(
-          totalCapacity = subscribers.getTotalCapacity getOrElse Capacity((prioritiesList map toOccupancy).sum),
+          totalCapacity =
+            UrlAndIdSubscribers[F].getTotalCapacity getOrElse Capacity((prioritiesList map toOccupancy).sum),
           totalPriority = (prioritiesList map toPriority).sum
         )
       )
@@ -144,10 +146,8 @@ private class ProjectPrioritisationImpl[F[_]](subscribers: Subscribers[F]) exten
 
 private object ProjectPrioritisation {
 
-  def apply[F[_]: MonadThrow](
-      subscribers: Subscribers[F]
-  ): F[ProjectPrioritisation[F]] =
-    MonadThrow[F].catchNonFatal(new ProjectPrioritisationImpl[F](subscribers))
+  def apply[F[_]: MonadThrow: UrlAndIdSubscribers]: F[ProjectPrioritisation[F]] =
+    MonadThrow[F].catchNonFatal(new ProjectPrioritisationImpl[F])
 
   final case class ProjectInfo(id:               projects.Id,
                                path:             projects.Path,

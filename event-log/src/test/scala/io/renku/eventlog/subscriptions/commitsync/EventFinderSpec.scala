@@ -41,7 +41,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 
-class CommitSyncEventFinderSpec
+class EventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -215,7 +215,7 @@ class CommitSyncEventFinderSpec
   }
 
   private trait TestCase {
-    val finder = new CommitSyncEventFinderImpl(TestLabeledHistogram[SqlStatement.Name]("query_id"))
+    val finder = new EventFinderImpl(TestLabeledHistogram[SqlStatement.Name]("query_id"))
   }
 
   private def addEvent(eventId:     CompoundEventId,

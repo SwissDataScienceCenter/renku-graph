@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.awaitinggeneration
+package io.renku.eventlog.subscriptions
+package awaitinggeneration
 
 import cats.data.Kleisli
-import cats.effect.{Async, MonadCancelThrow}
+import cats.effect.Async
 import cats.syntax.all._
 import cats.{Id, Parallel}
 import eu.timepit.refined.api.Refined
@@ -29,6 +30,7 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
+import io.renku.eventlog.subscriptions.UrlAndIdSubscribers.UrlAndIdSubscribers
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
@@ -43,7 +45,7 @@ import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: Parallel: SessionResource](
+private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
     waitingEventsGauge:    LabeledGauge[F, projects.Path],
     underProcessingGauge:  LabeledGauge[F, projects.Path],
     queriesExecTimes:      LabeledHistogram[F],
@@ -82,7 +84,7 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
 
   private def findProjectsWithEventsInQueue = measureExecutionTime {
     SqlStatement(
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
+      name = Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find projects")
     ).select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
       sql"""
       SELECT p.project_id, p.project_path, p.latest_event_date,
@@ -111,7 +113,7 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
 
   private def findTotalOccupancy = measureExecutionTime {
     SqlStatement(
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find total occupancy")
+      name = Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find total occupancy")
     ).select[EventStatus, Long](
       sql"""SELECT count(event_id) FROM event WHERE status = $eventStatusEncoder""".query(int8)
     ).arguments(GeneratingTriples)
@@ -121,7 +123,7 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
   private def findLatestEvent(idAndPath: subscriptions.ProjectIds) = measureExecutionTime {
     val executionDate = ExecutionDate(now())
     SqlStatement(
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find latest")
+      name = Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find latest")
     ).select[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent](
       sql"""
        SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt.event_body
@@ -164,7 +166,9 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
   }
 
   private def updateStatus(commitEventId: CompoundEventId) =
-    SqlStatement[F](name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status"))
+    SqlStatement[F](name =
+      Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - update status")
+    )
       .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
         sql"""
         UPDATE event 
@@ -201,21 +205,20 @@ private class AwaitingGenerationEventFinderImpl[F[_]: MonadCancelThrow: Async: P
     (compoundEventIdDecoder ~ projectPathDecoder ~ eventBodyDecoder).gmap[AwaitingGenerationEvent]
 }
 
-private object AwaitingGenerationEventFinder {
+private object EventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 20
 
-  def apply[F[_]: MonadCancelThrow: Async: Parallel: SessionResource](
-      subscribers:          subscriptions.Subscribers[F],
+  def apply[F[_]: Async: Parallel: UrlAndIdSubscribers: SessionResource](
       waitingEventsGauge:   LabeledGauge[F, projects.Path],
       underProcessingGauge: LabeledGauge[F, projects.Path],
       queriesExecTimes:     LabeledHistogram[F]
   ): F[subscriptions.EventFinder[F, AwaitingGenerationEvent]] = for {
-    projectPrioritisation <- ProjectPrioritisation(subscribers)
-  } yield new AwaitingGenerationEventFinderImpl(waitingEventsGauge,
-                                                underProcessingGauge,
-                                                queriesExecTimes,
-                                                projectsFetchingLimit = ProjectsFetchingLimit,
-                                                projectPrioritisation = projectPrioritisation
+    projectPrioritisation <- ProjectPrioritisation[F]
+  } yield new EventFinderImpl(waitingEventsGauge,
+                              underProcessingGauge,
+                              queriesExecTimes,
+                              projectsFetchingLimit = ProjectsFetchingLimit,
+                              projectPrioritisation = projectPrioritisation
   )
 }

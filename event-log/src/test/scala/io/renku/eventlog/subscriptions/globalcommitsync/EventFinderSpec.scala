@@ -47,7 +47,7 @@ import java.time.temporal.ChronoUnit.HOURS
 import java.time.{Duration, Instant}
 import scala.util.Random
 
-class GlobalCommitSyncEventFinderSpec
+class EventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
@@ -225,10 +225,10 @@ class GlobalCommitSyncEventFinderSpec
     val lastSyncedDateUpdater = mock[LastSyncedDateUpdater[IO]]
     val currentTime           = mockFunction[Instant]
     val now                   = Instant.now()
-    val finder = new GlobalCommitSyncEventFinderImpl(lastSyncedDateUpdater,
-                                                     TestLabeledHistogram[SqlStatement.Name]("query_id"),
-                                                     syncFrequency,
-                                                     currentTime
+    val finder = new EventFinderImpl(lastSyncedDateUpdater,
+                                     TestLabeledHistogram[SqlStatement.Name]("query_id"),
+                                     syncFrequency,
+                                     currentTime
     )
 
     def givenTheLastSyncedDateIsUpdated(project: Project) = {

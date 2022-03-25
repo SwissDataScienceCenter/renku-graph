@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
+import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import org.typelevel.log4cats.Logger
@@ -28,7 +29,7 @@ import scala.util.control.NonFatal
 
 private trait DispatchRecovery[F[_], CategoryEvent] {
 
-  def returnToQueue(event: CategoryEvent): F[Unit]
+  def returnToQueue(event: CategoryEvent, reason: SendingResult): F[Unit]
 
   def recover(url: SubscriberUrl, event: CategoryEvent): PartialFunction[Throwable, F[Unit]]
 }
@@ -40,7 +41,7 @@ private object LoggingDispatchRecovery {
   )(implicit show:  Show[CategoryEvent]): F[DispatchRecovery[F, CategoryEvent]] = MonadThrow[F].catchNonFatal {
     new DispatchRecovery[F, CategoryEvent] {
 
-      override def returnToQueue(event: CategoryEvent): F[Unit] = ().pure[F]
+      override def returnToQueue(event: CategoryEvent, reason: SendingResult): F[Unit] = ().pure[F]
 
       override def recover(url: SubscriberUrl, event: CategoryEvent): PartialFunction[Throwable, F[Unit]] = {
         case NonFatal(exception) =>

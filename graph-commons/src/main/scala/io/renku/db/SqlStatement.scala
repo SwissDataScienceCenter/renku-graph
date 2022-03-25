@@ -50,6 +50,9 @@ object SqlStatement {
   def apply[F[_]: MonadCancelThrow](name: Name): QueryBuilder[F] =
     new QueryBuilder[F](name)
 
+  def named[F[_]: MonadCancelThrow](name: String): QueryBuilder[F] =
+    new QueryBuilder[F](Refined.unsafeApply(name))
+
   class QueryBuilder[F[_]: MonadCancelThrow](val name: Name) {
 
     def select[In, Out](query: Query[In, Out]): SelectBuilder[F, In, Out] =
