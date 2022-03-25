@@ -498,7 +498,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
                                   event.project,
                                   executionTimeRecorder.elapsedTime,
                                   exception,
-                                  "COMMIT_SYNC - Commit Remover failed to send commit deletion status"
+                                  "COMMIT_SYNC: Commit Remover failed to send commit deletion status"
           ),
           logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
           logSummary(latestCommitInfo.id,
