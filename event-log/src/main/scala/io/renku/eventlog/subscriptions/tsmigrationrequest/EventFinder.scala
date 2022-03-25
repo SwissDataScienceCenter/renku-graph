@@ -112,7 +112,7 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
         case Completion.Update(1) => true.pure[F]
         case Completion.Update(0) => false.pure[F]
         case completion =>
-          new Exception(s"${categoryName.show} - cannot update TS migration record: $completion").raiseError[F, Boolean]
+          new Exception(s"${categoryName.show}: cannot update TS migration record: $completion").raiseError[F, Boolean]
       }
   }
 

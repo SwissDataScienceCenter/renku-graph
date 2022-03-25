@@ -57,7 +57,7 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger](queries
 
   override def recover(url: SubscriberUrl, event: MigrationRequestEvent): PartialFunction[Throwable, F[Unit]] = {
     case NonFatal(exception) =>
-      Logger[F].info(s"${categoryName.show} - recovering from ${exception.getMessage}") >>
+      Logger[F].info(s"${categoryName.show}: recovering from ${exception.getMessage}") >>
         SessionResource[F].useK(updateStatus(event, newStatus = NonRecoverableFailure))
   }
 
@@ -76,7 +76,7 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger](queries
       .flatMapResult {
         case Completion.Update(0 | 1) => ().pure[F]
         case completion =>
-          new Exception(s"${categoryName.show} - ${event.show} cannot change status to $newStatus due to: $completion")
+          new Exception(s"${categoryName.show}: ${event.show} cannot change status to $newStatus due to: $completion")
             .raiseError[F, Unit]
       }
   }

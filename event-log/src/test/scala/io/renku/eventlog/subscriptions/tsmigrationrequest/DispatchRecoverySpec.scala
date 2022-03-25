@@ -89,7 +89,7 @@ class DispatchRecoverySpec
 
       findRows(url, version) shouldBe NonRecoverableFailure -> ChangeDate(now)
 
-      logger.loggedOnly(Info(s"TS_MIGRATION_REQUEST - recovering from ${exception.getMessage}"))
+      logger.loggedOnly(Info(s"TS_MIGRATION_REQUEST: recovering from ${exception.getMessage}"))
     }
 
     MigrationStatus.all - Sent foreach { status =>

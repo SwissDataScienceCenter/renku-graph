@@ -74,7 +74,7 @@ class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with Mock
         .returning(exception.raiseError[Try, Unit])
 
       commitRemover.removeDeletedEvent(project, commitId) shouldBe Failed(
-        s"$categoryName - Commit Remover failed to send commit deletion status",
+        s"$categoryName: Commit Remover failed to send commit deletion status",
         exception
       ).pure[Try]
     }
