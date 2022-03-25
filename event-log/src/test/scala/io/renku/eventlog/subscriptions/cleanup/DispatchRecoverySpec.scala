@@ -21,6 +21,7 @@ package io.renku.eventlog.subscriptions.cleanup
 import Generators._
 import cats.syntax.all._
 import io.circe.literal._
+import io.renku.eventlog.subscriptions.Generators.sendingResults
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions._
 import io.renku.events.producers.EventSender
@@ -62,7 +63,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
         )
         .returning(().pure[Try])
 
-      dispatchRecovery.returnToQueue(event) shouldBe ().pure[Try]
+      dispatchRecovery.returnToQueue(event, sendingResults.generateOne) shouldBe ().pure[Try]
     }
   }
 

@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
+import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.{EventMessage, subscriptions}
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
@@ -39,7 +40,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
 ) extends subscriptions.DispatchRecovery[F, TriplesGeneratedEvent]
     with TinyTypeEncoders {
 
-  override def returnToQueue(event: TriplesGeneratedEvent): F[Unit] = eventSender.sendEvent(
+  override def returnToQueue(event: TriplesGeneratedEvent, reason: SendingResult): F[Unit] = eventSender.sendEvent(
     EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},

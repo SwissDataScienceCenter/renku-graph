@@ -16,12 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigrationrequest
+package io.renku.eventlog.subscriptions
+package tsmigrationrequest
 
+import EventsSender.SendingResult._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.subscriptions.Generators.sendingResults
 import io.renku.eventlog.subscriptions.tsmigrationrequest.Generators.changeDates
 import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus._
 import io.renku.events.consumers.subscriptions.subscriberUrls
@@ -49,19 +52,36 @@ class DispatchRecoverySpec
 
   "returnToQueue" should {
 
-    "change the status of the corresponding row in the ts_migration table to New if it was in Sent" in new TestCase {
-      insertSubscriptionRecord(url, version, Sent, changeDate)
+    "change the status of the corresponding row in the ts_migration table to New " +
+      "if it was in Sent and the reason is NOT TemporarilyUnavailable" in new TestCase {
+        insertSubscriptionRecord(url, version, Sent, changeDate)
 
-      recovery.returnToQueue(MigrationRequestEvent(url, version)).unsafeRunSync() shouldBe ()
+        recovery
+          .returnToQueue(MigrationRequestEvent(url, version), reason = notBusyStatus.generateOne)
+          .unsafeRunSync() shouldBe ()
 
-      findRows(url, version) shouldBe New -> ChangeDate(now)
-    }
+        findRows(url, version) shouldBe New -> ChangeDate(now)
+      }
+
+    "leave the status of the corresponding row in the ts_migration table as Sent " +
+      "and update the change_date " +
+      "if it was in Sent and the reason is TemporarilyUnavailable" in new TestCase {
+        insertSubscriptionRecord(url, version, Sent, changeDate)
+
+        recovery
+          .returnToQueue(MigrationRequestEvent(url, version), reason = TemporarilyUnavailable)
+          .unsafeRunSync() shouldBe ()
+
+        findRows(url, version) shouldBe Sent -> ChangeDate(now)
+      }
 
     MigrationStatus.all - Sent foreach { status =>
       s"do no change the status of the corresponding row if it's in $status" in new TestCase {
         insertSubscriptionRecord(url, version, status, changeDate)
 
-        recovery.returnToQueue(MigrationRequestEvent(url, version)).unsafeRunSync() shouldBe ()
+        recovery
+          .returnToQueue(MigrationRequestEvent(url, version), reason = sendingResults.generateOne)
+          .unsafeRunSync() shouldBe ()
 
         findRows(url, version) shouldBe status -> changeDate
       }
@@ -72,7 +92,9 @@ class DispatchRecoverySpec
       insertSubscriptionRecord(url, version, status, changeDate)
 
       recovery
-        .returnToQueue(MigrationRequestEvent(subscriberUrls.generateOne, serviceVersions.generateOne))
+        .returnToQueue(MigrationRequestEvent(subscriberUrls.generateOne, serviceVersions.generateOne),
+                       reason = sendingResults.generateOne
+        )
         .unsafeRunSync() shouldBe ()
 
       findRows(url, version) shouldBe status -> changeDate
@@ -129,4 +151,8 @@ class DispatchRecoverySpec
 
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
+
+  private lazy val notBusyStatus: Gen[EventsSender.SendingResult] = Gen.oneOf(
+    EventsSender.SendingResult.all - TemporarilyUnavailable
+  )
 }

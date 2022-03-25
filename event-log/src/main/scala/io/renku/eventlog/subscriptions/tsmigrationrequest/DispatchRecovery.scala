@@ -24,6 +24,7 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.DispatchRecovery
+import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus.{New, NonRecoverableFailure, Sent}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.server.version.ServiceVersion
@@ -51,8 +52,12 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger](queries
   import skunk.data.Completion
   import skunk.implicits._
 
-  override def returnToQueue(event: MigrationRequestEvent): F[Unit] = SessionResource[F].useK {
-    updateStatus(event, newStatus = New)
+  override def returnToQueue(event: MigrationRequestEvent, reason: SendingResult): F[Unit] = SessionResource[F].useK {
+    reason match {
+      case SendingResult.TemporarilyUnavailable => updateDate(event, newDate = ChangeDate(now()))
+      case _                                    => updateStatus(event, newStatus = New)
+    }
+
   }
 
   private def updateStatus(event: MigrationRequestEvent, newStatus: MigrationStatus) = measureExecutionTime {
@@ -71,6 +76,26 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger](queries
         case Completion.Update(0 | 1) => ().pure[F]
         case completion =>
           new Exception(s"${categoryName.show}: ${event.show} cannot change status to $newStatus due to: $completion")
+            .raiseError[F, Unit]
+      }
+  }
+
+  private def updateDate(event: MigrationRequestEvent, newDate: ChangeDate) = measureExecutionTime {
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - bump date")
+      .command[ChangeDate ~ SubscriberUrl ~ ServiceVersion](sql"""
+          UPDATE ts_migration
+          SET change_date = $changeDateEncoder
+          WHERE subscriber_url = $subscriberUrlEncoder 
+            AND subscriber_version = $serviceVersionEncoder
+            AND status = '#${Sent.value}'
+        """.command)
+      .arguments(newDate ~ event.subscriberUrl ~ event.subscriberVersion)
+      .build
+      .flatMapResult {
+        case Completion.Update(0 | 1) => ().pure[F]
+        case completion =>
+          new Exception(s"${categoryName.show}: ${event.show} cannot update changeDate to $newDate due to: $completion")
             .raiseError[F, Unit]
       }
   }

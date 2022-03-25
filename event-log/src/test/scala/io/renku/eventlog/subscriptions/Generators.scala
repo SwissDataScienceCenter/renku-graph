@@ -56,4 +56,6 @@ private object Generators {
     id            <- subscriberIds
     maybeCapacity <- capacities.toGeneratorOfOptions
   } yield TestSubscriptionInfo(url, id, maybeCapacity)
+
+  implicit val sendingResults: Gen[EventsSender.SendingResult] = Gen.oneOf(EventsSender.SendingResult.all)
 }

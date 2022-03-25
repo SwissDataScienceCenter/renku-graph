@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
+import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.{EventMessage, subscriptions}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
@@ -39,7 +40,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
 ) extends subscriptions.DispatchRecovery[F, AwaitingGenerationEvent]
     with TinyTypeEncoders {
 
-  override def returnToQueue(event: AwaitingGenerationEvent): F[Unit] =
+  override def returnToQueue(event: AwaitingGenerationEvent, reason: SendingResult): F[Unit] =
     eventSender.sendEvent(
       EventRequestContent.NoPayload(
         json"""{
