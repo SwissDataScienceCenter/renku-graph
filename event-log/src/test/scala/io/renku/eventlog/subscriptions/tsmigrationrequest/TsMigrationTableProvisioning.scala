@@ -49,13 +49,25 @@ trait TsMigrationTableProvisioning {
   private[tsmigrationrequest] def findRows(url: SubscriberUrl, version: ServiceVersion): (MigrationStatus, ChangeDate) =
     execute {
       Kleisli { session =>
-        val query: Query[SubscriberUrl ~ ServiceVersion, (MigrationStatus, ChangeDate)] =
-          sql"""SELECT status, change_date
-              FROM ts_migration
-              WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
-            .query(migrationStatusDecoder ~ changeDateDecoder)
-            .map { case status ~ changeDate => status -> changeDate }
+        val query: Query[SubscriberUrl ~ ServiceVersion, (MigrationStatus, ChangeDate)] = sql"""
+            SELECT status, change_date
+            FROM ts_migration
+            WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
+          .query(migrationStatusDecoder ~ changeDateDecoder)
+          .map { case status ~ changeDate => status -> changeDate }
         session.prepare(query).use(_.unique(url ~ version))
+      }
+    }
+
+  private[tsmigrationrequest] def findMessage(url: SubscriberUrl, version: ServiceVersion): Option[MigrationMessage] =
+    execute {
+      Kleisli { session =>
+        val query: Query[SubscriberUrl ~ ServiceVersion, MigrationMessage] = sql"""
+            SELECT message
+            FROM ts_migration
+            WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
+          .query(migrationMessageDecoder)
+        session.prepare(query).use(_.option(url ~ version))
       }
     }
 }

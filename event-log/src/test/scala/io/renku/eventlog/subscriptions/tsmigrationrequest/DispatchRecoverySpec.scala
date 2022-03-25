@@ -19,6 +19,7 @@
 package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.subscriptions.tsmigrationrequest.Generators.changeDates
@@ -87,9 +88,10 @@ class DispatchRecoverySpec
 
       recovery.recover(url, MigrationRequestEvent(url, version))(exception).unsafeRunSync() shouldBe ()
 
-      findRows(url, version) shouldBe NonRecoverableFailure -> ChangeDate(now)
+      findRows(url, version)    shouldBe NonRecoverableFailure -> ChangeDate(now)
+      findMessage(url, version) shouldBe MigrationMessage(exception).some
 
-      logger.loggedOnly(Info(s"TS_MIGRATION_REQUEST: recovering from ${exception.getMessage}"))
+      logger.loggedOnly(Info("TS_MIGRATION_REQUEST: recovering from NonRecoverable Failure", exception))
     }
 
     MigrationStatus.all - Sent foreach { status =>

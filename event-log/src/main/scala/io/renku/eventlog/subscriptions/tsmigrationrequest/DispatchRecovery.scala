@@ -55,12 +55,6 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger](queries
     updateStatus(event, newStatus = New)
   }
 
-  override def recover(url: SubscriberUrl, event: MigrationRequestEvent): PartialFunction[Throwable, F[Unit]] = {
-    case NonFatal(exception) =>
-      Logger[F].info(s"${categoryName.show}: recovering from ${exception.getMessage}") >>
-        SessionResource[F].useK(updateStatus(event, newStatus = NonRecoverableFailure))
-  }
-
   private def updateStatus(event: MigrationRequestEvent, newStatus: MigrationStatus) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - back to queue")
@@ -77,6 +71,32 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger](queries
         case Completion.Update(0 | 1) => ().pure[F]
         case completion =>
           new Exception(s"${categoryName.show}: ${event.show} cannot change status to $newStatus due to: $completion")
+            .raiseError[F, Unit]
+      }
+  }
+
+  override def recover(url: SubscriberUrl, event: MigrationRequestEvent): PartialFunction[Throwable, F[Unit]] = {
+    case NonFatal(exception) =>
+      Logger[F].info(exception)(s"${categoryName.show}: recovering from NonRecoverable Failure") >>
+        SessionResource[F].useK(setFailureStatus(event, exception))
+  }
+
+  private def setFailureStatus(event: MigrationRequestEvent, exception: Throwable) = measureExecutionTime {
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - set failure")
+      .command[ChangeDate ~ MigrationMessage ~ SubscriberUrl ~ ServiceVersion](sql"""
+          UPDATE ts_migration
+          SET status = '#${NonRecoverableFailure.value}', change_date = $changeDateEncoder, message = $migrationMessageEncoder
+          WHERE subscriber_url = $subscriberUrlEncoder 
+            AND subscriber_version = $serviceVersionEncoder
+            AND status = '#${Sent.value}'
+        """.command)
+      .arguments(ChangeDate(now()) ~ MigrationMessage(exception) ~ event.subscriberUrl ~ event.subscriberVersion)
+      .build
+      .flatMapResult {
+        case Completion.Update(0 | 1) => ().pure[F]
+        case completion =>
+          new Exception(s"${categoryName.show}: ${event.show} cannot set failure status due to: $completion")
             .raiseError[F, Unit]
       }
   }
