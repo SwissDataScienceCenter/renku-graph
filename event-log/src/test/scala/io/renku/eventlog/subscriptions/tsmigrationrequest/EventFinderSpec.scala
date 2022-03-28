@@ -73,7 +73,7 @@ class EventFinderSpec
       }
 
     "return no Event " +
-      "- case when there are New for older versions " +
+      "- case when there are New and RecoverableFailure for older versions " +
       "but the most recent version has Done" in new TestCase {
 
         // the most recent version records
@@ -82,6 +82,7 @@ class EventFinderSpec
 
         // older versions records
         insertSubscriptionRecord(subscriberUrls.generateOne, serviceVersions.generateOne, New, dateBefore(changeDate))
+        insertSubscriptionRecord(url, serviceVersions.generateOne, RecoverableFailure, dateBefore(changeDate))
 
         finder.popEvent().unsafeRunSync() shouldBe None
       }
@@ -94,6 +95,7 @@ class EventFinderSpec
 
         insertSubscriptionRecord(url, version, New, changeDate)
         insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateBefore(changeDate))
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, dateBefore(changeDate))
 
         finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
 
@@ -102,11 +104,49 @@ class EventFinderSpec
 
     "return Migration Request Event for the most recent row " +
       "- case when there are multiple rows for the same version but any in Sent or Done " +
-      "and the latest is in Failure" in new TestCase {
+      "and the latest is in NonRecoverableFailure" in new TestCase {
 
         insertSubscriptionRecord(url, version, New, changeDate)
         insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateBefore(changeDate))
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, Failure, dateAfter(changeDate))
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, NonRecoverableFailure, dateAfter(changeDate))
+
+        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
+
+    "return Migration Request Event for the most recent row " +
+      "- case when there are multiple rows for the same version, any in Sent or Done " +
+      "but some in RecoverableFailure for more than 2 mins" in new TestCase {
+
+        insertSubscriptionRecord(url, version, New, changeDate)
+
+        val urlForRecoverable = subscriberUrls.generateOne
+        insertSubscriptionRecord(urlForRecoverable, version, RecoverableFailure, more(than = twoMins))
+
+        finder.popEvent().unsafeRunSync() should {
+          be(MigrationRequestEvent(urlForRecoverable, version).some) or
+            be(MigrationRequestEvent(url, version).some)
+        }
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
+
+    "return no Event " +
+      "- case when there are multiple rows for the same version, any in Sent, Done or New " +
+      "but some in RecoverableFailure for less than 2 mins" in new TestCase {
+
+        insertSubscriptionRecord(url, version, NonRecoverableFailure, changeDate)
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, less(than = twoMins))
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
+
+    "return Migration Request Event for the most recent row but not for the RecoverableFailure for less than 2 mins " +
+      "- case when there are multiple rows for the same version, any in Sent or Done but some in New" in new TestCase {
+
+        insertSubscriptionRecord(url, version, New, changeDate)
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, less(than = twoMins))
 
         finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
 
@@ -150,9 +190,35 @@ class EventFinderSpec
       }
 
     "return no Event " +
-      "- case when there is a single Failure for the most recent version" in new TestCase {
+      "- case when there are multiple rows for the same version " +
+      "one in Sent for less than an hour" +
+      "but also one in RecoverableFailure for more than 2 mins" in new TestCase {
 
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, Failure, changeDate)
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, Sent, less(than = anHour))
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, more(than = twoMins))
+        insertSubscriptionRecord(url, version, New, ChangeDate(now))
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
+
+    "return Migration Request Event for the most recent version row with Sent " +
+      "- case when there are multiple rows for the same version " +
+      "one in Sent for more than an hour" +
+      "but also one in RecoverableFailure for more than 2 mins" in new TestCase {
+
+        insertSubscriptionRecord(url, version, Sent, more(than = anHour))
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, more(than = twoMins))
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, New, changeDate)
+
+        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
+
+    "return no Event " +
+      "- case when there is a single NonRecoverableFailure for the most recent version" in new TestCase {
+
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, NonRecoverableFailure, changeDate)
 
         finder.popEvent().unsafeRunSync() shouldBe None
       }
@@ -174,6 +240,9 @@ class EventFinderSpec
   private def dateAfter(date: ChangeDate) =
     timestampsNotInTheFuture(butYoungerThan = date.value).generateAs(ChangeDate)
 
+  private def less(than: Duration) =
+    timestampsNotInTheFuture(butYoungerThan = now() minus than).generateAs(ChangeDate)
+
   private def less(than: Duration, butAfter: ChangeDate) =
     if ((Duration.between(butAfter.value, now()) compareTo than) < 0)
       timestampsNotInTheFuture(butYoungerThan = butAfter.value).generateAs(ChangeDate)
@@ -186,5 +255,6 @@ class EventFinderSpec
   private def dateBefore(date: ChangeDate) =
     timestamps(max = date.value.minusSeconds(1)).generateAs(ChangeDate)
 
-  private lazy val anHour = Duration ofHours 1
+  private lazy val anHour  = Duration ofHours 1
+  private lazy val twoMins = Duration ofMinutes 2
 }

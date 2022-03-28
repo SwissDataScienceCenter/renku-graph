@@ -50,10 +50,11 @@ class MigrationStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     val scenarios = Table(
       "String Value" -> "Expected Status",
       MigrationStatus.all.toList.map {
-        case New     => "NEW"     -> New
-        case Sent    => "SENT"    -> Sent
-        case Done    => "DONE"    -> Done
-        case Failure => "FAILURE" -> Failure
+        case New                   => "NEW"                     -> New
+        case Sent                  => "SENT"                    -> Sent
+        case Done                  => "DONE"                    -> Done
+        case NonRecoverableFailure => "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
+        case RecoverableFailure    => "RECOVERABLE_FAILURE"     -> RecoverableFailure
       }: _*
     )
 

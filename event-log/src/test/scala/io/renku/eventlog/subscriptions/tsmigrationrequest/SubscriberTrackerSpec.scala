@@ -129,7 +129,7 @@ class SubscriberTrackerSpec
 
   "remove" should {
 
-    New :: Sent :: Failure :: Nil foreach { status =>
+    New :: Sent :: NonRecoverableFailure :: RecoverableFailure :: Nil foreach { status =>
       s"delete version -> url pair if exists and not in status $status" in new TestCase {
 
         (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
