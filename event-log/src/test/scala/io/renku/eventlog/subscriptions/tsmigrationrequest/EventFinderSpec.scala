@@ -24,15 +24,17 @@ import cats.syntax.all._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus._
-import io.renku.events.consumers.subscriptions.subscriberUrls
+import io.renku.events.consumers.subscriptions.{SubscriberUrl, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
+import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant.now
 import java.time.{Duration, Instant}
@@ -42,6 +44,7 @@ class EventFinderSpec
     with IOSpec
     with InMemoryEventLogDbSpec
     with TsMigrationTableProvisioning
+    with ScalaCheckPropertyChecks
     with MockFactory
     with should.Matchers {
 
@@ -180,9 +183,9 @@ class EventFinderSpec
       "- case when there are multiple rows for the same version " +
       "and there's one with Sent for more than an hour" in new TestCase {
 
-        val newestVersionDate = more(than = anHour)
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateAfter(newestVersionDate))
-        insertSubscriptionRecord(url, version, Sent, newestVersionDate)
+        override val changeDate = more(than = anHour)
+        insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateAfter(changeDate))
+        insertSubscriptionRecord(url, version, Sent, changeDate)
 
         finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
 
@@ -203,7 +206,7 @@ class EventFinderSpec
 
     "return Migration Request Event for the most recent version row with Sent " +
       "- case when there are multiple rows for the same version " +
-      "one in Sent for more than an hour" +
+      "one in Sent for more than an hour " +
       "but also one in RecoverableFailure for more than 2 mins" in new TestCase {
 
         insertSubscriptionRecord(url, version, Sent, more(than = anHour))
@@ -221,6 +224,30 @@ class EventFinderSpec
         insertSubscriptionRecord(subscriberUrls.generateOne, version, NonRecoverableFailure, changeDate)
 
         finder.popEvent().unsafeRunSync() shouldBe None
+      }
+  }
+
+  "pop" should {
+
+    "never return more than one event for a single version " +
+      "- case when there are multiple urls for the most recent version coming at the very same time" in new TestCase {
+
+        forAll { (url1: SubscriberUrl, url2: SubscriberUrl, version: ServiceVersion) =>
+          def singleEvent(subscriberUrl: SubscriberUrl) =
+            IO(insertSubscriptionRecord(subscriberUrl, version, New, changeDate)) >> finder.popEvent()
+
+          val result = (singleEvent(url1), singleEvent(url2)).parTupled
+            .unsafeRunSync()
+            .bimap(_.isDefined, _.isDefined)
+
+          result should {
+            be(false -> true) or be(true -> false)
+          }
+
+          Set(url1, url2).map(findRows(_, version)._1) shouldBe Set(New, Sent)
+
+          prepareDbForTest()
+        }
       }
   }
 
