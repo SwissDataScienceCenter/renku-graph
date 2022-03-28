@@ -16,12 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog
+package io.renku.eventlog.events.categories
 
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.timestampsNotInTheFuture
-import org.scalacheck.Gen
+import io.renku.events.CategoryName
 
-object TSMigrationGenerators {
-  implicit val changeDates: Gen[ChangeDate] = timestampsNotInTheFuture.toGeneratorOf(ChangeDate)
+package object migrationstatuschange {
+  val categoryName: CategoryName = CategoryName("MIGRATION_STATUS_CHANGE")
 }

@@ -342,7 +342,8 @@ Allowed values for the `newStatus` property are: `DONE`, `NON_RECOVERABLE_FAILUR
     "id":      "20210302140653-8641",
     "version": "1.22.4-10-g34454567"
   },
-  "newStatus": "DONE"
+  "newStatus": "DONE",
+  "message":   "cause of failure" // required for failure statuses
 }
 ```
 

@@ -26,9 +26,9 @@ import io.renku.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
 import java.time.Instant
 
-private sealed trait MigrationStatus extends StringTinyType with Product with Serializable
+sealed trait MigrationStatus extends StringTinyType with Product with Serializable
 
-private object MigrationStatus extends TinyTypeFactory[MigrationStatus](MigrationStatusInstantiator) {
+object MigrationStatus extends TinyTypeFactory[MigrationStatus](MigrationStatusInstantiator) {
 
   val all: Set[MigrationStatus] = Set(New, Sent, Done, NonRecoverableFailure, RecoverableFailure)
 

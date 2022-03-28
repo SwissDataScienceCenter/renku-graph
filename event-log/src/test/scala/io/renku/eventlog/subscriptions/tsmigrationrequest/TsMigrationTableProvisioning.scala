@@ -29,10 +29,10 @@ import skunk.{Command, Query, ~}
 trait TsMigrationTableProvisioning {
   self: InMemoryEventLogDb =>
 
-  private[tsmigrationrequest] def insertSubscriptionRecord(url:        SubscriberUrl,
-                                                           version:    ServiceVersion,
-                                                           status:     MigrationStatus,
-                                                           changeDate: ChangeDate
+  protected def insertSubscriptionRecord(url:        SubscriberUrl,
+                                         version:    ServiceVersion,
+                                         status:     MigrationStatus,
+                                         changeDate: ChangeDate
   ): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[ServiceVersion ~ SubscriberUrl ~ MigrationStatus ~ ChangeDate] = sql"""
@@ -46,7 +46,7 @@ trait TsMigrationTableProvisioning {
     }
   }
 
-  private[tsmigrationrequest] def findRows(url: SubscriberUrl, version: ServiceVersion): (MigrationStatus, ChangeDate) =
+  protected def findRows(url: SubscriberUrl, version: ServiceVersion): (MigrationStatus, ChangeDate) =
     execute {
       Kleisli { session =>
         val query: Query[SubscriberUrl ~ ServiceVersion, (MigrationStatus, ChangeDate)] = sql"""
@@ -59,15 +59,14 @@ trait TsMigrationTableProvisioning {
       }
     }
 
-  private[tsmigrationrequest] def findMessage(url: SubscriberUrl, version: ServiceVersion): Option[MigrationMessage] =
-    execute {
-      Kleisli { session =>
-        val query: Query[SubscriberUrl ~ ServiceVersion, MigrationMessage] = sql"""
-            SELECT message
-            FROM ts_migration
-            WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
-          .query(migrationMessageDecoder)
-        session.prepare(query).use(_.option(url ~ version))
-      }
+  protected def findMessage(url: SubscriberUrl, version: ServiceVersion): Option[MigrationMessage] = execute {
+    Kleisli { session =>
+      val query: Query[SubscriberUrl ~ ServiceVersion, Option[MigrationMessage]] = sql"""
+        SELECT message
+        FROM ts_migration
+        WHERE subscriber_url = $subscriberUrlEncoder AND subscriber_version = $serviceVersionEncoder"""
+        .query(migrationMessageDecoder.opt)
+      session.prepare(query).use(_.unique(url ~ version))
     }
+  }
 }

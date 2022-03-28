@@ -16,12 +16,21 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog
+package io.renku.eventlog.events.categories.migrationstatuschange
 
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.timestampsNotInTheFuture
-import org.scalacheck.Gen
+import cats.effect.Async
+import cats.syntax.all._
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.metrics.LabeledHistogram
+import org.typelevel.log4cats.Logger
 
-object TSMigrationGenerators {
-  implicit val changeDates: Gen[ChangeDate] = timestampsNotInTheFuture.toGeneratorOf(ChangeDate)
+object SubscriptionFactory {
+
+  def apply[F[_]: Async: SessionResource: Logger](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+    handler <- EventHandler[F](queriesExecTimes)
+  } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

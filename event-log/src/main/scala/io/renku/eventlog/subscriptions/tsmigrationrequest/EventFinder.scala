@@ -115,7 +115,7 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
       .named(s"${categoryName.value.toLowerCase} - mark taken")
       .command[ChangeDate ~ SubscriberUrl ~ ServiceVersion ~ ChangeDate](sql"""
         UPDATE ts_migration
-        SET status = '#${Sent.value}', change_date = $changeDateEncoder
+        SET status = '#${Sent.value}', change_date = $changeDateEncoder, message = NULL
         WHERE subscriber_url = $subscriberUrlEncoder 
           AND subscriber_version = $serviceVersionEncoder
           AND (status <> '#${Sent.value}' OR change_date < $changeDateEncoder)
