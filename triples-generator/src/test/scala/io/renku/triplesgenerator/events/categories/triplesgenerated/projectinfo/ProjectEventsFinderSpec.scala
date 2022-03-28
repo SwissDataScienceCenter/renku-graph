@@ -5,7 +5,6 @@ import cats.effect.IO
 import cats.syntax.all._
 import org.http4s.{Header, Headers}
 import org.typelevel.ci.CIStringSyntax
-//import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -29,7 +28,6 @@ import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import org.http4s.Method.GET
-//import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
@@ -39,7 +37,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
-//import scala.language.reflectiveCalls
 import scala.util.Random
 
 class ProjectEventsFinderSpec
@@ -119,16 +116,13 @@ class ProjectEventsFinderSpec
         List(Header.Raw(ci"X-Next-Page", nextPage.toString()), Header.Raw(ci"X-Total-Pages", totalPages.toString()))
       )
 
-      val actual =
-        mapResponse(Status.Ok, Request[IO](), Response[IO]().withEntity(events.asJson.noSpaces).withHeaders(headers))
-          .unsafeRunSync()
-      val expected = (events.map(_.asNormalPushEvent), PagingInfo(nextPage.some, totalPages.some))
-      actual shouldBe expected
+      mapResponse(Status.Ok, Request[IO](), Response[IO]().withEntity(events.asJson.noSpaces).withHeaders(headers))
+        .unsafeRunSync() shouldBe (events.map(_.asNormalPushEvent), PagingInfo(nextPage.some, totalPages.some))
     }
 
     "return an empty List if project NotFound" in new TestCase {
       mapResponse(Status.NotFound, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe
-        (None, PagingInfo(None, None))
+        (List.empty[PushEvent], PagingInfo(None, None))
     }
 
     "fail the interpretation if response is Unauthorized" in new TestCase {
