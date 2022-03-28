@@ -23,6 +23,8 @@ import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.Page
 
+import java.time.Instant
+
 private[globalcommitsync] final case class CommitWithParents(id:        CommitId,
                                                              projectId: projects.Id,
                                                              parents:   List[CommitId]
@@ -35,4 +37,19 @@ private[globalcommitsync] final case class ProjectCommitStats(maybeLatestCommit:
 private[globalcommitsync] final case class PageResult(commits: List[CommitId], maybeNextPage: Option[Page])
 private[globalcommitsync] object PageResult {
   val empty: PageResult = PageResult(commits = Nil, maybeNextPage = None)
+}
+
+private[globalcommitsync] sealed trait DateCondition {
+  val date: Instant
+  def asQueryParameter: (String, String)
+}
+
+private[globalcommitsync] object DateCondition {
+
+  final case class Since(date: Instant) extends DateCondition {
+    override lazy val asQueryParameter: (String, String) = "since" -> date.toString
+  }
+  final case class Until(date: Instant) extends DateCondition {
+    override lazy val asQueryParameter: (String, String) = "until" -> date.toString
+  }
 }

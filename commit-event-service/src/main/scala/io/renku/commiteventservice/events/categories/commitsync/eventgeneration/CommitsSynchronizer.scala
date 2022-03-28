@@ -110,7 +110,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
         }"""
       ),
       EventSender.EventContext(CategoryName("GLOBAL_COMMIT_SYNC_REQUEST"),
-                               s"$categoryName - Triggering Global Commit Sync Failed"
+                               s"$categoryName: Triggering Global Commit Sync Failed"
       )
     )
 
@@ -159,7 +159,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
 
   private def sendDeletionStatusAndRecover(project: Project, commitFromEL: CommitWithParents): F[UpdateResult] =
     removeDeletedEvent(project, commitFromEL.id).recoverWith { case NonFatal(e) =>
-      Failed(s"$categoryName - Commit Remover failed to send commit deletion status", e)
+      Failed(s"$categoryName: Commit Remover failed to send commit deletion status", e)
         .pure[F]
         .widen[UpdateResult]
     }
@@ -185,10 +185,8 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
   }
 
   private def logResult(event: CommitSyncEvent): ((ElapsedTime, UpdateResult)) => F[Unit] = {
-    case (elapsedTime, Skipped) =>
-      Logger[F].info(s"${logMessageCommon(event)} -> event skipped in ${elapsedTime}ms")
-    case (elapsedTime, Existed) =>
-      Logger[F].info(s"${logMessageCommon(event)} -> no new event found in ${elapsedTime}ms")
+    case (_, Skipped) => ().pure[F]
+    case (_, Existed) => ().pure[F]
     case (elapsedTime, Created) =>
       Logger[F].info(s"${logMessageCommon(event)} -> new events found in ${elapsedTime}ms")
     case (elapsedTime, Deleted) =>
@@ -198,10 +196,8 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
   }
 
   private def logResult(eventId: CommitId, project: Project): ((ElapsedTime, UpdateResult)) => F[Unit] = {
-    case (elapsedTime, Skipped) =>
-      Logger[F].info(logMessageFor(eventId, project, s"event skipped in ${elapsedTime}ms"))
-    case (elapsedTime, Existed) =>
-      Logger[F].info(logMessageFor(eventId, project, s"no new events found in ${elapsedTime}ms"))
+    case (_, Skipped) => ().pure[F]
+    case (_, Existed) => ().pure[F]
     case (elapsedTime, Created) =>
       Logger[F].info(logMessageFor(eventId, project, s"new events found in ${elapsedTime}ms"))
     case (elapsedTime, Deleted) =>

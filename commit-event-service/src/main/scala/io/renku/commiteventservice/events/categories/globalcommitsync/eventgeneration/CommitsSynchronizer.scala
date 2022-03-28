@@ -37,6 +37,7 @@ import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
+import java.time.Instant
 import scala.util.control.NonFatal
 
 private[globalcommitsync] trait CommitsSynchronizer[F[_]] {
@@ -50,7 +51,8 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
     elCommitFetcher:           ELCommitFetcher[F],
     commitEventDeleter:        CommitEventDeleter[F],
     missingCommitEventCreator: MissingCommitEventCreator[F],
-    executionTimeRecorder:     ExecutionTimeRecorder[F]
+    executionTimeRecorder:     ExecutionTimeRecorder[F],
+    now:                       () => Instant = () => Instant.now
 ) extends CommitsSynchronizer[F] {
 
   val commitsPerPage = PerPage(50)
@@ -74,7 +76,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
       }
     }
   } recoverWith { case NonFatal(error) =>
-    Logger[F].error(error)(show"$categoryName - failed to sync commits for project ${event.project}") >>
+    Logger[F].error(error)(show"$categoryName: failed to sync commits for project ${event.project}") >>
       error.raiseError[F, Unit]
   }
 
@@ -95,13 +97,14 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
       event:                   GlobalCommitSyncEvent,
       maybeNextGLPage:         Option[Page] = Some(Page.first),
       maybeNextELPage:         Option[Page] = Some(Page.first),
+      dateCondition:           DateCondition = DateCondition.Until(now()),
       actions:                 Map[Action, List[CommitId]] = Map(Create -> Nil, Delete -> Nil)
   )(implicit maybeAccessToken: Option[AccessToken]): F[Map[Action, List[CommitId]]] =
     (
-      fetch(maybeNextGLPage, fetchGitLabCommits(event.project.id, _)),
-      fetch(maybeNextELPage, fetchELCommits(event.project.path, _))
+      fetch(maybeNextGLPage, fetchGitLabCommits(event.project.id, dateCondition, _)),
+      fetch(maybeNextELPage, fetchELCommits(event.project.path, dateCondition, _))
     ).parMapN { case (glCommitsPage, elCommitsPage) =>
-      addNextPage(update(actions, glCommitsPage, elCommitsPage), glCommitsPage, elCommitsPage, event)
+      addNextPage(dateCondition, update(actions, glCommitsPage, elCommitsPage), glCommitsPage, elCommitsPage, event)
     }.flatten
 
   private def fetch(maybeNextPage: Option[Page], fetcher: PagingRequest => F[PageResult]) =
@@ -127,13 +130,19 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
     updatedAllCommits -> (candidateCommits diff toBeSkipped)
   }
 
-  private def addNextPage(actions:       Map[Action, List[CommitId]],
+  private def addNextPage(dateCondition: DateCondition,
+                          actions:       Map[Action, List[CommitId]],
                           glCommitsPage: PageResult,
                           elCommitsPage: PageResult,
                           event:         GlobalCommitSyncEvent
   )(implicit maybeAccessToken:           Option[AccessToken]) =
-    if (glCommitsPage.maybeNextPage.isEmpty && elCommitsPage.maybeNextPage.isEmpty) actions.pure[F]
-    else buildActionsList(event, glCommitsPage.maybeNextPage, elCommitsPage.maybeNextPage, actions)
+    (glCommitsPage.maybeNextPage, elCommitsPage.maybeNextPage, dateCondition) match {
+      case (None, None, _: DateCondition.Since) => actions.pure[F]
+      case (None, None, DateCondition.Until(time)) =>
+        buildActionsList(event, dateCondition = DateCondition.Since(time), actions = actions)
+      case _ =>
+        buildActionsList(event, glCommitsPage.maybeNextPage, elCommitsPage.maybeNextPage, dateCondition, actions)
+    }
 
   private def execute(project: Project)(actions: Map[Action, List[CommitId]])(implicit
       maybeAccessToken:        Option[AccessToken]

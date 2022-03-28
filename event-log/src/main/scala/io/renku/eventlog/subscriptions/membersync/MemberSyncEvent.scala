@@ -32,10 +32,9 @@ private object MemberSyncEvent {
 private object MemberSyncEventEncoder {
 
   import io.circe.Json
-  import io.circe.literal.JsonStringContext
+  import io.circe.literal._
 
-  def encodeEvent(event: MemberSyncEvent): Json =
-    json"""{
+  def encodeEvent(event: MemberSyncEvent): Json = json"""{
     "categoryName": ${categoryName.value},
     "project": {
       "path":       ${event.projectPath.value}

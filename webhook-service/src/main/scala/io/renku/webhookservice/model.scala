@@ -18,8 +18,8 @@
 
 package io.renku.webhookservice
 
-import cats.MonadThrow
 import cats.syntax.all._
+import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.config.ConfigLoader.{find, urlTinyTypeReader}
 import io.renku.graph.model.projects
@@ -34,6 +34,11 @@ object model {
   final case class CommitSyncRequest(project: Project)
 
   final case class Project(id: projects.Id, path: projects.Path)
+  object Project {
+    implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
+      s"projectId = $id, projectPath = $path"
+    }
+  }
 
   final class ProjectHookUrl private (val value: String) extends AnyVal with StringTinyType
 

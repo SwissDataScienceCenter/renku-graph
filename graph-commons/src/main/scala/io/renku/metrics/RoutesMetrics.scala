@@ -32,9 +32,7 @@ class RoutesMetrics[F[_]: Sync: MetricsRegistry] {
       MetricsRegistry[F].maybeCollectorRegistry match {
         case Some(collectorRegistry) =>
           Prometheus.metricsOps[F](collectorRegistry, "server").map { metrics =>
-            PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[F](
-              metrics
-            )(routes)
+            PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[F](metrics)(routes)
           }
         case _ => Resource.eval(Sync[F].pure(routes))
       }

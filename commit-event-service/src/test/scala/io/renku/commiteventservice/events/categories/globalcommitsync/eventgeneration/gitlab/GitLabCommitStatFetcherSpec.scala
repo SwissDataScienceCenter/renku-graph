@@ -95,7 +95,7 @@ class GitLabCommitStatFetcherSpec
       gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
     }
 
-    Status.NotFound :: Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
+    Status.NotFound :: Status.InternalServerError :: Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
       s"return None if the gitlab API returns a $status" in new TestCase {
         val maybeLatestCommit = commitIds.generateOption
         (gitLabCommitFetcher

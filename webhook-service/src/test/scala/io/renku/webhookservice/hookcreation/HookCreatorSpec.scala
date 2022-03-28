@@ -74,7 +74,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returning(IO.unit)
 
       (commitSyncRequestSender.sendCommitSyncRequest _)
-        .expects(CommitSyncRequest(Project(projectInfo.id, projectInfo.path)))
+        .expects(CommitSyncRequest(Project(projectInfo.id, projectInfo.path)), "HookCreation")
         .returning(().pure[IO])
 
       hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookCreated
@@ -247,7 +247,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returning(IO.unit)
 
       (commitSyncRequestSender.sendCommitSyncRequest _)
-        .expects(CommitSyncRequest(Project(projectInfo.id, projectInfo.path)))
+        .expects(CommitSyncRequest(Project(projectInfo.id, projectInfo.path)), "HookCreation")
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
       hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookCreated

@@ -33,37 +33,38 @@ import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
 
-  val name: CategoryName = CategoryName("AWAITING_GENERATION")
+  val categoryName: CategoryName = CategoryName("AWAITING_GENERATION")
 
-  def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
-      awaitingTriplesGenerationGauge: LabeledGauge[F, projects.Path],
-      underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],
-      queriesExecTimes:               LabeledHistogram[F],
-      subscriberTracker:              SubscriberTracker[F]
-  ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers <- Subscribers(name, subscriberTracker)
-    eventFetcher <- AwaitingGenerationEventFinder(subscribers,
-                                                  awaitingTriplesGenerationGauge,
-                                                  underTriplesGenerationGauge,
-                                                  queriesExecTimes
-                    )
-    dispatchRecovery <- DispatchRecovery[F]
-    eventDelivery <- eventdelivery.EventDelivery[F, AwaitingGenerationEvent](
-                       eventDeliveryIdExtractor = (event: AwaitingGenerationEvent) => CompoundEventDeliveryId(event.id),
-                       queriesExecTimes
-                     )
-    eventsDistributor <- EventsDistributor(name,
-                                           subscribers,
-                                           eventFetcher,
-                                           eventDelivery,
-                                           EventEncoder(encodeEvent, encodePayload),
-                                           dispatchRecovery
+  def apply[F[_]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
+      awaitingGenerationGauge: LabeledGauge[F, projects.Path],
+      underGenerationGauge:    LabeledGauge[F, projects.Path],
+      queriesExecTimes:        LabeledHistogram[F]
+  ): F[subscriptions.SubscriptionCategory[F]] = UrlAndIdSubscribers[F](categoryName)
+    .flatMap { implicit subscribers =>
+      for {
+        eventFetcher     <- EventFinder(awaitingGenerationGauge, underGenerationGauge, queriesExecTimes)
+        dispatchRecovery <- DispatchRecovery[F]
+        eventDelivery <- eventdelivery.EventDelivery[F, AwaitingGenerationEvent](
+                           eventDeliveryIdExtractor =
+                             (event: AwaitingGenerationEvent) => CompoundEventDeliveryId(event.id),
+                           queriesExecTimes
                          )
-    deserializer <-
-      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
-  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](name,
-                                                                       subscribers,
-                                                                       eventsDistributor,
-                                                                       deserializer
-  )
+        eventsDistributor <- EventsDistributor(categoryName,
+                                               subscribers,
+                                               eventFetcher,
+                                               eventDelivery,
+                                               EventEncoder(encodeEvent, encodePayload),
+                                               dispatchRecovery
+                             )
+        deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionCategoryPayload](
+                          categoryName,
+                          SubscriptionCategoryPayload.apply
+                        )
+      } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](categoryName,
+                                                                           subscribers,
+                                                                           eventsDistributor,
+                                                                           deserializer
+      )
+    }
+    .widen[subscriptions.SubscriptionCategory[F]]
 }

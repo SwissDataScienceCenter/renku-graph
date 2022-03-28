@@ -19,10 +19,14 @@
 package io.renku.triplesgenerator
 
 import cats.MonadThrow
-import cats.effect.{Clock, Resource}
+import cats.effect.{Async, Clock, Resource}
+import cats.syntax.all._
 import com.typesafe.config.Config
-import io.renku.metrics.RoutesMetrics
+import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.http.server.version
+import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesgenerator.events.EventEndpoint
+import io.renku.triplesgenerator.reprovisioning.ReProvisioningStatus
 import org.http4s.dsl.Http4sDsl
 
 import scala.jdk.CollectionConverters._
@@ -30,6 +34,7 @@ import scala.jdk.CollectionConverters._
 private class MicroserviceRoutes[F[_]: MonadThrow](
     eventEndpoint: EventEndpoint[F],
     routesMetrics: RoutesMetrics[F],
+    versionRoutes: version.Routes[F],
     config:        Option[Config] = None
 )(implicit clock:  Clock[F])
     extends Http4sDsl[F] {
@@ -43,7 +48,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     case request @ POST -> Root / "events"        => processEvent(request)
     case GET            -> Root / "ping"          => Ok("pong")
     case GET            -> Root / "config-info"   => Ok(configInfo)
-  }.withMetrics
+  }.withMetrics.map(_ <+> versionRoutes())
   // format: on
 
   private lazy val configInfo = config
@@ -53,4 +58,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .mkString("\n")
     )
     .getOrElse("No config found")
+}
+
+private object MicroserviceRoutes {
+  def apply[F[_]: Async: MetricsRegistry](
+      eventConsumersRegistry: EventConsumersRegistry[F],
+      reProvisioningStatus:   ReProvisioningStatus[F],
+      config:                 Option[Config]
+  ): F[MicroserviceRoutes[F]] = for {
+    eventEndpoint <- EventEndpoint(eventConsumersRegistry, reProvisioningStatus)
+    versionRoutes <- version.Routes[F]
+  } yield new MicroserviceRoutes(eventEndpoint, new RoutesMetrics[F], versionRoutes, config)
 }

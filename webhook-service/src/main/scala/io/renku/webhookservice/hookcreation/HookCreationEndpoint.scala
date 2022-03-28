@@ -28,6 +28,7 @@ import io.renku.http.ErrorMessage._
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation
 import io.renku.webhookservice.hookcreation.HookCreator.CreationResult
@@ -73,7 +74,7 @@ class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
 }
 
 object HookCreationEndpoint {
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       projectHookUrl:  ProjectHookUrl,
       gitLabThrottler: Throttler[F, GitLab],
       hookTokenCrypto: HookTokenCrypto[F]

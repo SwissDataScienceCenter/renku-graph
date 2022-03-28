@@ -82,6 +82,7 @@ object DbInitializer {
           StatusChangeEventsTableCreator[F],
           EventDeliveryEventTypeAdder[F],
           EventDeliveryEventTypeAdder[F],
+          TSMigrationTableCreator[F],
           FailedEventsRestorer[F](
             "%Error: The repository is dirty. Please use the \"git\" command to clean it.%",
             currentStatus = GenerationNonRecoverableFailure,
@@ -117,6 +118,12 @@ object DbInitializer {
             currentStatus = TransformationNonRecoverableFailure,
             destinationStatus = TriplesGenerated,
             discardingStatuses = TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%fatal: not removing ''.'' recursively without -r%",
+            currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
           )
         ),
         isMigrating

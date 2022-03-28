@@ -20,11 +20,14 @@ package io.renku.tokenrepository
 
 import cats.data.OptionT
 import cats.effect.IO
+import cats.syntax.all._
+import io.renku.generators.CommonGraphGenerators.httpStatuses
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.http.server.EndpointTester._
+import io.renku.http.server.version
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
@@ -108,9 +111,13 @@ class MicroserviceRoutesSpec
         .expects(projectId)
         .returning(IO.pure(Response[IO](NoContent)))
 
-      val response = routes call Request[IO](DELETE, uri"/projects" / projectId.toString / "tokens")
+      (routes call Request[IO](DELETE, uri"/projects" / projectId.toString / "tokens")).status shouldBe NoContent
+    }
+  }
 
-      response.status shouldBe NoContent
+  "GET /version" should {
+    "return response from the version endpoint" in new TestCase {
+      (routes call Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
     }
   }
 
@@ -120,11 +127,21 @@ class MicroserviceRoutesSpec
     val associateEndpoint = mock[AssociateTokenEndpoint[IO]]
     val deleteEndpoint    = mock[deletion.DeleteTokenEndpoint[IO]]
     val routesMetrics     = TestRoutesMetrics()
+    val versionRoutes     = mock[version.Routes[IO]]
     val routes = new MicroserviceRoutes[IO](
       fetchEndpoint,
       associateEndpoint,
       deleteEndpoint,
-      routesMetrics
+      routesMetrics,
+      versionRoutes
     ).routes.map(_.or(notAvailableResponse))
+
+    val versionEndpointResponse = Response[IO](httpStatuses.generateOne)
+    (versionRoutes.apply _)
+      .expects()
+      .returning {
+        import org.http4s.dsl.io.{GET => _, _}
+        HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
+      }
   }
 }

@@ -27,6 +27,7 @@ import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.CommitSyncRequestSender
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
@@ -59,7 +60,7 @@ class HookEventEndpointImpl[F[_]: Concurrent: Logger](
       authToken <- findHookToken(request)
       hookToken <- decrypt(authToken) recoverWith unauthorizedException
       _         <- validate(hookToken, pushEvent._2)
-      _         <- Spawn[F].start(sendCommitSyncRequest(pushEvent._2))
+      _         <- Spawn[F].start(sendCommitSyncRequest(pushEvent._2, "HookEvent"))
       _         <- logInfo(pushEvent)
       response  <- Accepted(InfoMessage("Event accepted"))
     } yield response
@@ -115,7 +116,7 @@ class HookEventEndpointImpl[F[_]: Concurrent: Logger](
 
 object HookEventEndpoint {
 
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger: MetricsRegistry](
       hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookEventEndpoint[F]] = for {
     commitSyncRequestSender <- CommitSyncRequestSender[F]
@@ -136,5 +137,4 @@ object HookEventEndpoint {
       project  <- cursor.downField("project").as[Project]
     } yield commitId -> CommitSyncRequest(project)
   }
-
 }

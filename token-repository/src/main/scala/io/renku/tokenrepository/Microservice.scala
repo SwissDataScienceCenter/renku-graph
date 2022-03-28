@@ -24,11 +24,8 @@ import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
-import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
+import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.IOMicroservice
-import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
-import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
-import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
 import io.renku.tokenrepository.repository.init.DbInitializer
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
@@ -49,19 +46,11 @@ object Microservice extends IOMicroservice {
   ) = sessionPoolResource.use { implicit sessionResource =>
     MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
       for {
-        certificateLoader      <- CertificateLoader[IO]
-        sentryInitializer      <- SentryInitializer[IO]
-        queriesExecTimes       <- QueriesExecutionTimes[IO]
-        fetchTokenEndpoint     <- FetchTokenEndpoint(sessionResource, queriesExecTimes)
-        associateTokenEndpoint <- AssociateTokenEndpoint(sessionResource, queriesExecTimes)
-        dbInitializer          <- DbInitializer(sessionResource, queriesExecTimes)
-        deleteTokenEndpoint    <- DeleteTokenEndpoint(sessionResource, queriesExecTimes)
-        microserviceRoutes = new MicroserviceRoutes[IO](
-                               fetchTokenEndpoint,
-                               associateTokenEndpoint,
-                               deleteTokenEndpoint,
-                               new RoutesMetrics[IO]
-                             ).routes
+        certificateLoader  <- CertificateLoader[IO]
+        sentryInitializer  <- SentryInitializer[IO]
+        queriesExecTimes   <- QueriesExecutionTimes[IO]
+        dbInitializer      <- DbInitializer(sessionResource, queriesExecTimes)
+        microserviceRoutes <- MicroserviceRoutes[IO](sessionResource, queriesExecTimes).map(_.routes)
         exitcode <- microserviceRoutes.use { routes =>
                       new MicroserviceRunner(
                         certificateLoader,

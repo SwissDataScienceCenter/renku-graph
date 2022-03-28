@@ -80,11 +80,18 @@ object EventsEndpoint {
 
   object Criteria {
 
-    sealed trait Filters
+    sealed trait Filters       extends Product with Serializable
+    sealed trait FiltersOnDate extends Filters
 
     object Filters {
-      final case class ProjectEvents(projectPath: projects.Path, maybeStatus: Option[EventStatus]) extends Filters
-      final case class EventsWithStatus(status: EventStatus)                                       extends Filters
+      final case class ProjectEvents(projectPath: projects.Path,
+                                     maybeStatus: Option[EventStatus],
+                                     maybeDates:  Option[FiltersOnDate]
+      ) extends Filters
+      final case class EventsWithStatus(status: EventStatus, maybeDates: Option[FiltersOnDate]) extends Filters
+      final case class EventsSince(eventDate: EventDate)                                        extends FiltersOnDate
+      final case class EventsUntil(eventDate: EventDate)                                        extends FiltersOnDate
+      final case class EventsSinceAndUntil(since: EventsSince, until: EventsUntil)              extends FiltersOnDate
     }
 
     object Sorting extends io.renku.http.rest.SortBy {
@@ -104,10 +111,19 @@ object EventsEndpoint {
 
   implicit val show: Show[Criteria] = Show.show {
     _.filters match {
-      case Filters.ProjectEvents(path, Some(status)) => show"project-path: $path; status: $status"
-      case Filters.ProjectEvents(path, None)         => show"project-path: $path"
-      case Filters.EventsWithStatus(status)          => show"status: $status"
+      case Filters.ProjectEvents(path, Some(status), Some(dates)) => show"project-path: $path; status: $status; $dates"
+      case Filters.ProjectEvents(path, Some(status), None)        => show"project-path: $path; status: $status"
+      case Filters.ProjectEvents(path, None, Some(dates))         => show"project-path: $path; $dates"
+      case Filters.ProjectEvents(path, None, _)                   => show"project-path: $path"
+      case Filters.EventsWithStatus(status, _)                    => show"status: $status"
+      case filterOnDate: Criteria.FiltersOnDate => filterOnDate.show
     }
+  }
+
+  implicit val filtersOnDateShow: Show[Criteria.FiltersOnDate] = Show.show {
+    case Filters.EventsSince(since)                => show"since: $since"
+    case Filters.EventsUntil(until)                => show"until: $until"
+    case Filters.EventsSinceAndUntil(since, until) => show"since: ${since.eventDate}; until: ${until.eventDate}"
   }
 
   final case class EventInfo(eventId:         EventId,

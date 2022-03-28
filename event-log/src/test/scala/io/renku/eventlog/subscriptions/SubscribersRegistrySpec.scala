@@ -26,7 +26,7 @@ import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Debug, Info}
+import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
@@ -63,7 +63,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
         registry.add(subscriptionInfo.copy(maybeCapacity = initialCapacity.some)).unsafeRunSync() shouldBe true
         registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync()                         shouldBe subscriberUrl
 
-        val infoSameUrlButOtherId = subscriptionInfos.generateOne
+        val infoSameUrlButOtherId = urlAndIdSubscriptionInfos.generateOne
           .copy(
             subscriberUrl = subscriberUrl,
             maybeCapacity = capacities.generateDifferentThan(initialCapacity).some
@@ -111,7 +111,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "not always return the same subscriber" in new TestCase {
 
-      val subscribers = subscriptionInfos.generateNonEmptyList(minElements = 10, maxElements = 20).toList
+      val subscribers = urlAndIdSubscriptionInfos.generateNonEmptyList(minElements = 10, maxElements = 20).toList
 
       subscribers.map(registry.add).sequence.unsafeRunSync()
 
@@ -127,7 +127,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
       override val busySleep = 10 seconds
 
-      val busySubscriber = subscriptionInfos.generateOne
+      val busySubscriber = urlAndIdSubscriptionInfos.generateOne
       registry.add(busySubscriber).unsafeRunSync()                      shouldBe true
       registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe busySubscriber.subscriberUrl
       registry.markBusy(busySubscriber.subscriberUrl).unsafeRunSync()   shouldBe ((): Unit)
@@ -200,15 +200,8 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
       (endTime.toEpochMilli - startTime.toEpochMilli) should be > busySleep.toMillis
       (endTime.toEpochMilli - startTime.toEpochMilli) should be < (busySleep + checkupInterval + (300 millis)).toMillis
 
-      val withCapacity =
-        subscriptionInfo.maybeCapacity.map(capacity => s" with capacity ${capacity.value}").getOrElse("")
       eventually {
-        logger.loggedOnly(
-          Info(s"$categoryName: all 1 subscriber(s) are busy; waiting for one to become available"),
-          Debug(
-            s"$categoryName: subscriber = ${subscriptionInfo.subscriberUrl}, id = ${subscriptionInfo.subscriberId}$withCapacity taken from busy state"
-          )
-        )
+        logger.loggedOnly(Info(s"$categoryName: all 1 subscriber(s) are busy; waiting for one to become available"))
       }
     }
 
@@ -239,8 +232,8 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
     }
 
     "return None if all subscribers have no capacity specified" in new TestCase {
-      registry.add(subscriptionInfo.copy(maybeCapacity = None)).unsafeRunSync()              shouldBe true
-      registry.add(subscriptionInfos.generateOne.copy(maybeCapacity = None)).unsafeRunSync() shouldBe true
+      registry.add(subscriptionInfo.copy(maybeCapacity = None)).unsafeRunSync()                      shouldBe true
+      registry.add(urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = None)).unsafeRunSync() shouldBe true
 
       registry.getTotalCapacity shouldBe None
     }
@@ -249,7 +242,9 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
       val capacity1 = capacities.generateOne
       registry.add(subscriptionInfo.copy(maybeCapacity = capacity1.some)).unsafeRunSync() shouldBe true
       val capacity2 = capacities.generateOne
-      registry.add(subscriptionInfos.generateOne.copy(maybeCapacity = capacity2.some)).unsafeRunSync() shouldBe true
+      registry
+        .add(urlAndIdSubscriptionInfos.generateOne.copy(maybeCapacity = capacity2.some))
+        .unsafeRunSync() shouldBe true
 
       registry.getTotalCapacity shouldBe Capacity(capacity1.value + capacity2.value).some
     }
@@ -257,12 +252,12 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
   private trait TestCase {
 
-    val subscriptionInfo = subscriptionInfos.generateOne
+    val subscriptionInfo = urlAndIdSubscriptionInfos.generateOne
     val subscriberUrl    = subscriptionInfo.subscriberUrl
-    val categoryName     = categoryNames.generateOne
 
-    val busySleep       = 500 milliseconds
+    val categoryName    = categoryNames.generateOne
     val checkupInterval = 500 milliseconds
+    val busySleep       = 500 milliseconds
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     lazy val registry = SubscribersRegistry[IO](categoryName, checkupInterval, busySleep).unsafeRunSync()
 

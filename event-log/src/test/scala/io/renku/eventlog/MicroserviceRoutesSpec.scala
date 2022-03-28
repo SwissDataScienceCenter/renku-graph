@@ -18,6 +18,8 @@
 
 package io.renku.eventlog
 
+import EventContentGenerators._
+import cats.Show
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.circe.Json
@@ -26,7 +28,7 @@ import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
-import io.renku.generators.CommonGraphGenerators.{pages, perPages, sortingDirections}
+import io.renku.generators.CommonGraphGenerators.{httpStatuses, pages, perPages, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
@@ -35,11 +37,14 @@ import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.EndpointTester._
+import io.renku.http.server.version
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.testtools.IOSpec
+import io.renku.tinytypes.InstantTinyType
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, POST}
+import org.http4s.QueryParamEncoder._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -69,32 +74,86 @@ class MicroserviceRoutesSpec
         "uri" -> "criteria",
         projectPaths
           .map(path =>
-            uri"/events" +? ("project-path" -> path.value) -> Criteria(Filters.ProjectEvents(path, maybeStatus = None))
+            uri"/events" +? ("project-path" -> path.value) -> Criteria(
+              Filters.ProjectEvents(path, maybeStatus = None, maybeDates = None)
+            )
           )
           .generateOne,
         (projectPaths -> eventStatuses).mapN { case (path, status) =>
           uri"/events" +? ("project-path" -> path.value) +? ("status" -> status.value) -> Criteria(
-            Filters.ProjectEvents(path, Some(status))
+            Filters.ProjectEvents(path, Some(status), maybeDates = None)
+          )
+        }.generateOne,
+        (projectPaths -> eventDates).mapN { case (path, since) =>
+          uri"/events" +? ("project-path" -> path.value) +? ("since" -> since) -> Criteria(
+            Filters.ProjectEvents(path, None, Filters.EventsSince(since).some)
+          )
+        }.generateOne,
+        (projectPaths -> eventDates).mapN { case (path, until) =>
+          uri"/events" +? ("project-path" -> path.value) +? ("until" -> until) -> Criteria(
+            Filters.ProjectEvents(path, None, Filters.EventsUntil(until).some)
+          )
+        }.generateOne,
+        (projectPaths, eventDates, eventDates).mapN { case (path, since, until) =>
+          uri"/events" +? ("project-path" -> path.value) +? ("since" -> since) +? ("until" -> until) -> Criteria(
+            Filters.ProjectEvents(
+              path,
+              maybeStatus = None,
+              Filters.EventsSinceAndUntil(Filters.EventsSince(since), Filters.EventsUntil(until)).some
+            )
           )
         }.generateOne,
         eventStatuses
-          .map(status => uri"/events" +? ("status" -> status.value) -> Criteria(Filters.EventsWithStatus(status)))
+          .map(status =>
+            uri"/events" +? ("status" -> status.value) -> Criteria(Filters.EventsWithStatus(status, maybeDates = None))
+          )
+          .generateOne,
+        (eventStatuses -> eventDates).mapN { case (status, since) =>
+          uri"/events" +? ("status" -> status.value) +? ("since" -> since) -> Criteria(
+            Filters.EventsWithStatus(status, Filters.EventsSince(since).some)
+          )
+        }.generateOne,
+        (eventStatuses -> eventDates).mapN { case (status, until) =>
+          uri"/events" +? ("status" -> status.value) +? ("until" -> until) -> Criteria(
+            Filters.EventsWithStatus(status, Filters.EventsUntil(until).some)
+          )
+        }.generateOne,
+        (eventStatuses, eventDates, eventDates).mapN { case (status, since, until) =>
+          uri"/events" +? ("status" -> status.value) +? ("since" -> since) +? ("until" -> until) -> Criteria(
+            Filters.EventsWithStatus(
+              status,
+              Filters.EventsSinceAndUntil(Filters.EventsSince(since), Filters.EventsUntil(until)).some
+            )
+          )
+        }.generateOne,
+        eventDates
+          .map(since => uri"/events" +? ("since" -> since) -> Criteria(Filters.EventsSince(since)))
+          .generateOne,
+        eventDates
+          .map(until => uri"/events" +? ("until" -> until) -> Criteria(Filters.EventsUntil(until)))
+          .generateOne,
+        (eventDates, eventDates)
+          .mapN((since, until) =>
+            uri"/events" +? ("since" -> since) +? ("until" -> until) -> Criteria(
+              Filters.EventsSinceAndUntil(Filters.EventsSince(since), Filters.EventsUntil(until))
+            )
+          )
           .generateOne,
         (eventStatuses -> sortingDirections).mapN { (status, dir) =>
           uri"/events" +? ("status" -> status.value) +? ("sort" -> s"eventDate:$dir") -> Criteria(
-            Filters.EventsWithStatus(status),
+            Filters.EventsWithStatus(status, maybeDates = None),
             Sorting.By(EventDate, dir)
           )
         }.generateOne,
         (eventStatuses -> pages).mapN { (status, page) =>
           uri"/events" +? ("status" -> status.value) +? ("page" -> page.show) -> Criteria(
-            Filters.EventsWithStatus(status),
+            Filters.EventsWithStatus(status, maybeDates = None),
             paging = PagingRequest.default.copy(page = page)
           )
         }.generateOne,
         (eventStatuses -> perPages).mapN { (status, perPage) =>
           uri"/events" +? ("status" -> status.value) +? ("per_page" -> perPage.show) -> Criteria(
-            Filters.EventsWithStatus(status),
+            Filters.EventsWithStatus(status, maybeDates = None),
             paging = PagingRequest.default.copy(perPage = perPage)
           )
         }.generateOne
@@ -123,6 +182,8 @@ class MicroserviceRoutesSpec
       uri"/events"
         .withQueryParam("status", eventStatuses.generateOne.show)
         .withQueryParam("sort", nonEmptyStrings().generateOne),
+      uri"/events".withQueryParam("since", nonEmptyStrings().generateOne),
+      uri"/events".withQueryParam("until", nonEmptyStrings().generateOne),
       uri"/events"
         .withQueryParam("status", eventStatuses.generateOne.show)
         .withQueryParam("page", nonEmptyStrings().generateOne),
@@ -192,6 +253,12 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "GET /version" should {
+    "return response from the version endpoint" in new TestCase {
+      routes.call(Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
+    }
+  }
+
   "GET /processing-status?project-id=:id" should {
 
     s"find processing status and return it with $Ok" in new TestCase with IsNotMigrating {
@@ -246,23 +313,18 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "all endpoints except ping" should {
+  "all endpoints except /ping and /version" should {
 
     s"return $ServiceUnavailable if migration is happening" in new TestCase {
       (() => isMigrating.get)
         .expects()
         .returning(true.pure[IO])
 
-      val projectPath = projectPaths.generateOne
-
-      val request = Request[IO](method = GET, uri"/events".withQueryParam("project-path", projectPath.value))
-
+      val request = Request[IO](GET, uri"/events".withQueryParam("project-path", projectPaths.generateOne.value))
       routes.call(request).status shouldBe ServiceUnavailable
 
-      val response = routes.call(Request(GET, uri"/ping"))
-
-      response.status       shouldBe Ok
-      response.body[String] shouldBe "pong"
+      routes.call(Request(GET, uri"/ping")).status    shouldBe Ok
+      routes.call(Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
     }
   }
 
@@ -274,6 +336,7 @@ class MicroserviceRoutesSpec
     val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
     val isMigrating              = mock[Ref[IO, Boolean]]
+    val versionRoutes            = mock[version.Routes[IO]]
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
       eventsEndpoint,
@@ -281,9 +344,23 @@ class MicroserviceRoutesSpec
       subscriptionsEndpoint,
       eventDetailsEndpoint,
       routesMetrics,
-      isMigrating
+      isMigrating,
+      versionRoutes
     ).routes.map(_.or(notAvailableResponse))
+
+    val versionEndpointResponse = Response[IO](httpStatuses.generateOne)
+    (versionRoutes.apply _)
+      .expects()
+      .returning {
+        import org.http4s.dsl.io.{GET => _, _}
+        HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
+      }
+      .atLeastOnce()
   }
+
+  private implicit def instantQueryParamEncoder[TT <: InstantTinyType](implicit
+      show: Show[TT]
+  ): QueryParamEncoder[TT] = fromShow(show)
 
   private trait IsNotMigrating {
     self: TestCase =>

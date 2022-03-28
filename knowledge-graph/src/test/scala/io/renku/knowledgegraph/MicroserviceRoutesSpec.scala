@@ -40,6 +40,7 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.version
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
@@ -50,6 +51,7 @@ import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
+import org.http4s.Method.GET
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -508,6 +510,12 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "GET /version" should {
+    "return response from the version endpoint" in new TestCase {
+      routes().call(Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
+    }
+  }
+
   private trait TestCase {
 
     val datasetsSearchEndpoint  = mock[DatasetsSearchEndpoint[IO]]
@@ -519,6 +527,7 @@ class MicroserviceRoutesSpec
     val projectPathAuthorizer   = mock[Authorizer[IO, model.projects.Path]]
     val datasetIdAuthorizer     = mock[Authorizer[IO, model.datasets.Identifier]]
     val routesMetrics           = TestRoutesMetrics()
+    val versionRoutes           = mock[version.Routes[IO]]
 
     def routes(maybeAuthUser: Option[AuthUser] = None): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] = routes(
       givenAuthIfNeededMiddleware(returning = OptionT.some[IO](maybeAuthUser))
@@ -535,7 +544,17 @@ class MicroserviceRoutesSpec
         middleware,
         projectPathAuthorizer,
         datasetIdAuthorizer,
-        routesMetrics
+        routesMetrics,
+        versionRoutes
       ).routes.map(_.or(notAvailableResponse))
+
+    val versionEndpointResponse = Response[IO](httpStatuses.generateOne)
+    (versionRoutes.apply _)
+      .expects()
+      .returning {
+        import org.http4s.dsl.io.{GET => _, _}
+        HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
+      }
+      .atLeastOnce()
   }
 }

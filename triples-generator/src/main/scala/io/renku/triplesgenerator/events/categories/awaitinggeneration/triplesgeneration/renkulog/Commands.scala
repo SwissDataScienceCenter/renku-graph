@@ -134,16 +134,33 @@ private object Commands {
     import cats.syntax.all._
 
     override def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): F[Unit] =
-      MonadThrow[F].catchNonFatal {
-        %%("git", "checkout", commitId.value)(repositoryDirectory.value)
-      }.void
+      MonadThrow[F]
+        .catchNonFatal {
+          %%("git", "checkout", commitId.value)(repositoryDirectory.value)
+        }
+        .void
+        .recoverWith(relevantOnCheckout)
+
+    private lazy val relevantOnCheckout: PartialFunction[Throwable, F[Unit]] = { case ShelloutException(result) =>
+      def errorMessage(message: String) = s"git checkout failed with: $message"
+
+      val malformedRepositoryErrors = Set("fatal: reference is not a tree")
+
+      MonadThrow[F].catchNonFatal(result.toString()) >>= {
+        case out if malformedRepositoryErrors exists out.contains =>
+          ProcessingNonRecoverableError
+            .MalformedRepository(errorMessage(result.toString()))
+            .raiseError[F, Unit]
+        case _ => new Exception(errorMessage(result.toString())).raiseError[F, Unit]
+      }
+    }
 
     override def `reset --hard`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
       %%("git", "reset", "--hard")(repositoryDirectory.value)
     }.void
 
     override def `rm --cached`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {
-      %%("git", "rm", "--cached", ".")(repositoryDirectory.value)
+      %%("git", "rm", "-r", "--cached", ".")(repositoryDirectory.value)
     }.void
 
     override def `add -A`(implicit repositoryDirectory: RepositoryPath): F[Unit] = MonadThrow[F].catchNonFatal {

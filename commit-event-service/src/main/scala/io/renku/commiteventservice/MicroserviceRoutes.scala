@@ -19,17 +19,18 @@
 package io.renku.commiteventservice
 
 import cats.MonadThrow
-import cats.effect.Resource
-import cats.effect.kernel.Concurrent
+import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import io.renku.commiteventservice.events.EventEndpoint
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.http.server.version
 import io.renku.metrics.RoutesMetrics
 import org.http4s.dsl.Http4sDsl
 
 private class MicroserviceRoutes[F[_]: MonadThrow](
     eventEndpoint: EventEndpoint[F],
-    routesMetrics: RoutesMetrics[F]
+    routesMetrics: RoutesMetrics[F],
+    versionRoutes: version.Routes[F]
 ) extends Http4sDsl[F] {
 
   import eventEndpoint._
@@ -40,15 +41,16 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"   => Ok("pong")
     case request @ POST -> Root / "events" => processEvent(request)
-  }.withMetrics
+  }.withMetrics.map(_  <+> versionRoutes())
   // format: on
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: MonadThrow: Concurrent](
+  def apply[F[_]: Async](
       consumersRegistry: EventConsumersRegistry[F],
       routesMetrics:     RoutesMetrics[F]
   ): F[MicroserviceRoutes[F]] = for {
     eventEndpoint <- EventEndpoint[F](consumersRegistry)
-  } yield new MicroserviceRoutes(eventEndpoint, routesMetrics)
+    versionRoutes <- version.Routes[F]
+  } yield new MicroserviceRoutes(eventEndpoint, routesMetrics, versionRoutes)
 }

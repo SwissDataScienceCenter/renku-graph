@@ -25,4 +25,4 @@ import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
                                                subscriberId:  SubscriberId,
                                                maybeCapacity: Option[Capacity]
-) extends subscriptions.SubscriptionInfo
+) extends subscriptions.UrlAndIdSubscriptionInfo

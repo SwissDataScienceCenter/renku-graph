@@ -142,8 +142,10 @@ class CommitInfoFinderSpec
       }
   }
 
-  "return None if remote client responds with Not found" in new TestCase {
-    mapToMaybeCommit((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
+  Status.NotFound :: Status.InternalServerError :: Nil foreach { status =>
+    s"return None if remote client responds with $status" in new TestCase {
+      mapToMaybeCommit((status, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
+    }
   }
 
   Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>

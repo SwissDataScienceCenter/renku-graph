@@ -18,15 +18,18 @@
 
 package io.renku.eventlog
 
+import cats.NonEmptyParallel
 import cats.data.{Validated, ValidatedNel}
-import cats.effect.Resource
 import cats.effect.kernel.{Ref, Sync}
+import cats.effect.{Async, Resource}
 import cats.syntax.all._
 import io.circe.literal.JsonStringContext
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
-import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
+import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
+import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders._
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.graph.model.projects
@@ -36,11 +39,14 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import io.renku.http.rest.paging.model.{Page, PerPage}
 import io.renku.http.server.QueryParameterTools.{resourceNotFound, toBadRequest}
-import io.renku.metrics.RoutesMetrics
+import io.renku.http.server.version
+import io.renku.metrics.{LabeledHistogram, MetricsRegistry, RoutesMetrics}
 import org.http4s._
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
+import java.time.Instant
 import scala.util.Try
 
 private class MicroserviceRoutes[F[_]: Sync](
@@ -50,7 +56,8 @@ private class MicroserviceRoutes[F[_]: Sync](
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     eventDetailsEndpoint:     EventDetailsEndpoint[F],
     routesMetrics:            RoutesMetrics[F],
-    isMigrating:              Ref[F, Boolean]
+    isMigrating:              Ref[F, Boolean],
+    versionRoutes:            version.Routes[F]
 ) extends Http4sDsl[F] {
 
   import EventStatusParameter._
@@ -68,14 +75,14 @@ private class MicroserviceRoutes[F[_]: Sync](
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ GET  -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& page(page) +& perPage(perPage) +& sort(sortBy) => respond503IfMigrating(maybeFindEvents(validatedProjectPath, status, page, perPage, sortBy, request))
+    case request @ GET  -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& since(since) +& until(until) +& page(page) +& perPage(perPage) +& sort(sortBy) => respond503IfMigrating(maybeFindEvents(validatedProjectPath, status, since, until, page, perPage, sortBy, request))
     case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
     case           GET  -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
     case           GET  -> Root / "processing-status" :? `project-id`(maybeProjectId) => respond503IfMigrating(maybeFindProcessingStatus(maybeProjectId))
     case           GET  -> Root / "ping"                                              => Ok("pong")
     case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
     case request @ POST -> Root / "subscriptions"                                     => respond503IfMigrating(addSubscription(request))
-  }.withMetrics
+  }.withMetrics.map(_  <+> versionRoutes())
   // format: on
 
   def respond503IfMigrating(otherwise: => F[Response[F]]): F[Response[F]] = isMigrating.get.flatMap {
@@ -124,10 +131,30 @@ private class MicroserviceRoutes[F[_]: Sync](
       val parameterName:     String = "status"
       override val toString: String = parameterName
     }
+
+    private def eventDateDecoder(paramName: String): QueryParamDecoder[EventDate] =
+      (value: QueryParameterValue) =>
+        Either
+          .catchNonFatal(Instant.parse(value.value))
+          .flatMap(EventDate.from)
+          .leftMap(_ => ParseFailure(s"'$paramName' parameter with invalid value", ""))
+          .toValidatedNel
+
+    object since extends OptionalValidatingQueryParamDecoderMatcher[EventDate]("since")(eventDateDecoder("since")) {
+      val parameterName:     String = "since"
+      override val toString: String = parameterName
+    }
+
+    object until extends OptionalValidatingQueryParamDecoderMatcher[EventDate]("until")(eventDateDecoder("until")) {
+      val parameterName:     String = "until"
+      override val toString: String = parameterName
+    }
   }
 
   private def maybeFindEvents(maybeProjectPath: Option[ValidatedNel[ParseFailure, projects.Path]],
                               maybeStatus:      Option[ValidatedNel[ParseFailure, EventStatus]],
+                              maybeSince:       Option[ValidatedNel[ParseFailure, EventDate]],
+                              maybeUntil:       Option[ValidatedNel[ParseFailure, EventDate]],
                               maybePage:        Option[ValidatedNel[ParseFailure, Page]],
                               maybePerPage:     Option[ValidatedNel[ParseFailure, PerPage]],
                               maybeSortBy:      Option[ValidatedNel[ParseFailure, EventsEndpoint.Criteria.Sorting.By]],
@@ -135,24 +162,43 @@ private class MicroserviceRoutes[F[_]: Sync](
   ): F[Response[F]] = {
     import EventsEndpoint.Criteria._
 
-    (maybeProjectPath, maybeStatus) match {
-      case (None, None) => resourceNotFound
-      case (Some(validatedPath), maybeStatus) =>
+    val filtersOnDate: Option[ValidatedNel[ParseFailure, FiltersOnDate]] = maybeSince -> maybeUntil match {
+      case (Some(since), None) => since.map(Filters.EventsSince).some
+      case (None, Some(until)) => until.map(Filters.EventsUntil).some
+      case (Some(since), Some(until)) =>
+        (since.map(Filters.EventsSince) -> until.map(Filters.EventsUntil)).mapN(Filters.EventsSinceAndUntil).some
+      case _ => None
+    }
+
+    (maybeProjectPath, maybeStatus, filtersOnDate) match {
+      case (None, None, None) => resourceNotFound
+      case (Some(validatedPath), maybeStatus, maybeDates) =>
         (
           validatedPath,
           maybeStatus.sequence,
+          maybeDates.sequence,
           maybeSortBy getOrElse Validated.validNel(EventsEndpoint.Criteria.Sorting.default),
           PagingRequest(maybePage, maybePerPage)
-        ).mapN { case (path, maybeStatus, sorting, paging) =>
-          findEvents(EventsEndpoint.Criteria(Filters.ProjectEvents(path, maybeStatus), sorting, paging), request)
+        ).mapN { case (path, maybeStatus, maybeDates, sorting, paging) =>
+          findEvents(EventsEndpoint.Criteria(Filters.ProjectEvents(path, maybeStatus, maybeDates), sorting, paging),
+                     request
+          )
         }.fold(toBadRequest, identity)
-      case (None, Some(validatedStatus)) =>
+      case (None, Some(validatedStatus), maybeDates) =>
         (
           validatedStatus,
+          maybeDates.sequence,
           maybeSortBy getOrElse Validated.validNel(EventsEndpoint.Criteria.Sorting.default),
           PagingRequest(maybePage, maybePerPage)
-        ).mapN { case (status, sorting, paging) =>
-          findEvents(EventsEndpoint.Criteria(Filters.EventsWithStatus(status), sorting, paging), request)
+        ).mapN { case (status, maybeDates, sorting, paging) =>
+          findEvents(EventsEndpoint.Criteria(Filters.EventsWithStatus(status, maybeDates), sorting, paging), request)
+        }.fold(toBadRequest, identity)
+      case (None, None, Some(validatedDates)) =>
+        (validatedDates,
+         maybeSortBy getOrElse Validated.validNel(EventsEndpoint.Criteria.Sorting.default),
+         PagingRequest(maybePage, maybePerPage)
+        ).mapN { case (dates, sorting, paging) =>
+          findEvents(EventsEndpoint.Criteria(dates, sorting, paging), request)
         }.fold(toBadRequest, identity)
     }
   }
@@ -167,4 +213,28 @@ private class MicroserviceRoutes[F[_]: Sync](
         findProcessingStatus
       )
   }
+}
+
+private object MicroserviceRoutes {
+  def apply[F[_]: Async: NonEmptyParallel: SessionResource: Logger: MetricsRegistry](
+      consumersRegistry:      EventConsumersRegistry[F],
+      queriesExecTimes:       LabeledHistogram[F],
+      eventProducersRegistry: EventProducersRegistry[F],
+      isMigrating:            Ref[F, Boolean]
+  ): F[MicroserviceRoutes[F]] = for {
+    eventEndpoint            <- EventEndpoint[F](consumersRegistry)
+    eventsEndpoint           <- EventsEndpoint(queriesExecTimes)
+    processingStatusEndpoint <- ProcessingStatusEndpoint(queriesExecTimes)
+    subscriptionsEndpoint    <- SubscriptionsEndpoint(eventProducersRegistry)
+    eventDetailsEndpoint     <- EventDetailsEndpoint(queriesExecTimes)
+    versionRoutes            <- version.Routes[F]
+  } yield new MicroserviceRoutes(eventEndpoint,
+                                 eventsEndpoint,
+                                 processingStatusEndpoint,
+                                 subscriptionsEndpoint,
+                                 eventDetailsEndpoint,
+                                 new RoutesMetrics[F],
+                                 isMigrating,
+                                 versionRoutes
+  )
 }

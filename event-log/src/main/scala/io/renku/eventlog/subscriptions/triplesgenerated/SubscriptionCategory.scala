@@ -31,22 +31,21 @@ import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 private[subscriptions] object SubscriptionCategory {
-  val name: CategoryName = CategoryName("TRIPLES_GENERATED")
+  val categoryName: CategoryName = CategoryName("TRIPLES_GENERATED")
 
-  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
+  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
       awaitingTransformationGauge: LabeledGauge[F, projects.Path],
       underTransformationGauge:    LabeledGauge[F, projects.Path],
-      queriesExecTimes:            LabeledHistogram[F],
-      subscriberTracker:           SubscriberTracker[F]
+      queriesExecTimes:            LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
-    subscribers  <- Subscribers(name, subscriberTracker)
-    eventFetcher <- TriplesGeneratedEventFinder(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
+    subscribers      <- UrlAndIdSubscribers[F](categoryName)
+    eventFetcher     <- EventFinder(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
     dispatchRecovery <- DispatchRecovery[F]
     eventDelivery <- EventDelivery[F, TriplesGeneratedEvent](
                        eventDeliveryIdExtractor = (event: TriplesGeneratedEvent) => CompoundEventDeliveryId(event.id),
                        queriesExecTimes
                      )
-    eventsDistributor <- EventsDistributor(name,
+    eventsDistributor <- EventsDistributor(categoryName,
                                            subscribers,
                                            eventFetcher,
                                            eventDelivery,
@@ -54,8 +53,8 @@ private[subscriptions] object SubscriptionCategory {
                                            dispatchRecovery
                          )
     deserializer <-
-      SubscriptionRequestDeserializer[F, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
-  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](name,
+      UrlAndIdSubscriptionDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
+  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](categoryName,
                                                                        subscribers,
                                                                        eventsDistributor,
                                                                        deserializer

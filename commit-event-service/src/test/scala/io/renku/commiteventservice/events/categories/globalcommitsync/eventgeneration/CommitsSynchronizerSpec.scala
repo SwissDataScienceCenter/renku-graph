@@ -22,6 +22,7 @@ package eventgeneration
 import Generators.{commitsInfos, globalCommitSyncEvents}
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.commiteventservice.events.categories.common.SynchronizationSummary
 import io.renku.commiteventservice.events.categories.common.UpdateResult._
 import io.renku.commiteventservice.events.categories.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
@@ -49,6 +50,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.Instant
 import scala.util.Random
 
 class CommitsSynchronizerSpec
@@ -64,7 +66,7 @@ class CommitsSynchronizerSpec
       "if commits count and the latest commit id are the same between EL and GitLab" in new TestCase {
         val event = globalCommitSyncEvents().generateOne
 
-        givenAccessTokenIsFound(event.project.id)
+        givenAccessTokenFound(event.project.id)
         givenCommitStatsInGL(event.project.id, event.commits)
 
         commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
@@ -74,19 +76,21 @@ class CommitsSynchronizerSpec
         )
       }
 
-    "skip commits existing on EL and GL, create missing on EL, delete missing on GL" +
-      " - case of a single page" in new TestCase {
+    "skip commits existing on EL and GL, create missing on EL, delete missing on GL " +
+      "- case of a single page" in new TestCase {
         val event = globalCommitSyncEvents().generateOne
 
-        givenAccessTokenIsFound(event.project.id)
+        givenAccessTokenFound(event.project.id)
         givenCommitStatsInGL(event.project.id, commitsInfos.generateOne)
 
         val commonIds = commitIds.generateList()
         val glOnlyIds = commitIds.generateList()
         val elOnlyIds = commitIds.generateList()
 
-        givenCommitsInGL(event.project.id, PageResult(commonIds ::: glOnlyIds, maybeNextPage = None))
-        givenCommitsInEL(event.project.path, PageResult(commonIds ::: elOnlyIds, maybeNextPage = None))
+        givenCommitsInGL(event.project.id, untilNow, PageResult(commonIds ::: glOnlyIds, maybeNextPage = None))
+        givenCommitsInEL(event.project.path, untilNow, PageResult(commonIds ::: elOnlyIds, maybeNextPage = None))
+        givenCommitsInGL(event.project.id, sinceNow, PageResult.empty)
+        givenCommitsInEL(event.project.path, sinceNow, PageResult.empty)
 
         expectEventsToBeCreated(event.project, glOnlyIds)
         expectEventsToBeDeleted(event.project, elOnlyIds)
@@ -102,16 +106,18 @@ class CommitsSynchronizerSpec
         )
       }
 
-    "skip commits existing on EL and GL, create missing on EL, delete missing on GL" +
-      " - case of multiple pages" in new TestCase {
+    "skip commits existing on EL and GL, create missing on EL, delete missing on GL " +
+      "- case of multiple pages" in new TestCase {
         forAll { (commonIds: List[CommitId], glOnlyIds: List[CommitId], elOnlyIds: List[CommitId]) =>
           val event = globalCommitSyncEvents().generateOne
 
-          givenAccessTokenIsFound(event.project.id)
+          givenAccessTokenFound(event.project.id)
           givenCommitStatsInGL(event.project.id, commitsInfos.generateOne)
 
-          givenCommitsInGL(event.project.id, (commonIds ::: glOnlyIds).shuffle.toPages(ofSize = 2):   _*)
-          givenCommitsInEL(event.project.path, (commonIds ::: elOnlyIds).shuffle.toPages(ofSize = 2): _*)
+          givenCommitsInGL(event.project.id, untilNow, (commonIds ::: glOnlyIds).shuffle.toPages(ofSize = 2):   _*)
+          givenCommitsInEL(event.project.path, untilNow, (commonIds ::: elOnlyIds).shuffle.toPages(ofSize = 2): _*)
+          givenCommitsInGL(event.project.id, sinceNow, PageResult.empty)
+          givenCommitsInEL(event.project.path, sinceNow, PageResult.empty)
 
           expectEventsToBeCreated(event.project, glOnlyIds)
           expectEventsToBeDeleted(event.project, elOnlyIds)
@@ -129,6 +135,49 @@ class CommitsSynchronizerSpec
         }
       }
 
+    "skip commits existing on EL and GL, create missing on EL, delete missing on GL " +
+      "- case of events added after event arrival" in new TestCase {
+        val commonIds = commitIds.generateNonEmptyList(minElements = 2).toList
+        val glOnlyIds = commitIds.generateNonEmptyList().toList
+        val elOnlyIds = commitIds.generateNonEmptyList().toList
+
+        val commonIdsSinceArrival = commitIds.generateNonEmptyList().toList
+        val glEventsSinceArrival  = commitIds.generateNonEmptyList().toList
+        val elEventsSinceArrival  = commitIds.generateNonEmptyList().toList
+
+        val event = globalCommitSyncEvents().generateOne
+
+        givenAccessTokenFound(event.project.id)
+        givenCommitStatsInGL(event.project.id, commitsInfos.generateOne)
+
+        givenCommitsInGL(event.project.id, untilNow, (commonIds ::: glOnlyIds).shuffle.toPages(ofSize = 2):   _*)
+        givenCommitsInEL(event.project.path, untilNow, (commonIds ::: elOnlyIds).shuffle.toPages(ofSize = 2): _*)
+        givenCommitsInGL(event.project.id,
+                         sinceNow,
+                         (commonIdsSinceArrival ::: glEventsSinceArrival).shuffle.toPages(ofSize = 2): _*
+        )
+        givenCommitsInEL(event.project.path,
+                         sinceNow,
+                         (commonIdsSinceArrival ::: elEventsSinceArrival).shuffle.toPages(ofSize = 2): _*
+        )
+
+        expectEventsToBeCreated(event.project, glOnlyIds ++ glEventsSinceArrival)
+        expectEventsToBeDeleted(event.project, elOnlyIds ++ elEventsSinceArrival)
+
+        commitsSynchronizer.synchronizeEvents(event).unsafeRunSync() shouldBe ()
+
+        logger.loggedOnly(
+          logSummary(
+            event.project,
+            SynchronizationSummary(Created.name -> (glOnlyIds ::: glEventsSinceArrival).size,
+                                   Deleted.name -> (elOnlyIds ::: elEventsSinceArrival).size
+            ),
+            executionTimeRecorder.elapsedTime.some
+          )
+        )
+        logger.reset()
+      }
+
     "fail if finding Access Token fails" in new TestCase {
       val event     = globalCommitSyncEvents().generateOne
       val exception = exceptions.generateOne
@@ -142,19 +191,21 @@ class CommitsSynchronizerSpec
         commitsSynchronizer.synchronizeEvents(event).unsafeRunSync()
       } shouldBe exception
 
-      logger.loggedOnly(Error(show"$categoryName - failed to sync commits for project ${event.project}", exception))
+      logger.loggedOnly(Error(show"$categoryName: failed to sync commits for project ${event.project}", exception))
     }
 
-    "delete all Event Log commits if the project in GL was removed but there are commits for it in EL" in new TestCase {
+    "delete all commits in EL if the project in GL is removed" in new TestCase {
       val event = globalCommitSyncEvents().generateOne
 
-      givenAccessTokenIsFound(event.project.id)
+      givenAccessTokenFound(event.project.id)
       givenProjectDoesntExistInGL(event.project.id)
 
-      givenCommitsInGL(event.project.id)
+      givenCommitsInGL(event.project.id, untilNow)
+      givenCommitsInGL(event.project.id, sinceNow)
 
       val elOnlyIds = commitIds.generateList()
-      givenCommitsInEL(event.project.path, elOnlyIds.toPages(2): _*)
+      givenCommitsInEL(event.project.path, untilNow, elOnlyIds.toPages(2): _*)
+      givenCommitsInEL(event.project.path, sinceNow)
 
       expectEventsToBeCreated(event.project, Nil)
       expectEventsToBeDeleted(event.project, elOnlyIds)
@@ -174,6 +225,9 @@ class CommitsSynchronizerSpec
   private trait TestCase {
 
     val maybeAccessToken = personalAccessTokens.generateOption
+    val now              = Instant.now()
+    val untilNow         = DateCondition.Until(now)
+    val sinceNow         = DateCondition.Since(now)
 
     implicit val logger: TestLogger[IO] = TestLogger()
     val accessTokenFinder         = mock[AccessTokenFinder[IO]]
@@ -183,16 +237,20 @@ class CommitsSynchronizerSpec
     val commitEventDeleter        = mock[CommitEventDeleter[IO]]
     val missingCommitEventCreator = mock[MissingCommitEventCreator[IO]]
     val executionTimeRecorder     = TestExecutionTimeRecorder[IO]()
+    private val currentTime       = mockFunction[Instant]
     val commitsSynchronizer = new CommitsSynchronizerImpl[IO](accessTokenFinder,
                                                               gitLabCommitStatFetcher,
                                                               gitLabCommitFetcher,
                                                               eventLogCommitFetcher,
                                                               commitEventDeleter,
                                                               missingCommitEventCreator,
-                                                              executionTimeRecorder
+                                                              executionTimeRecorder,
+                                                              currentTime
     )
 
-    def givenAccessTokenIsFound(projectId: Id) = (accessTokenFinder
+    currentTime.expects().returning(now).anyNumberOfTimes()
+
+    def givenAccessTokenFound(projectId: Id) = (accessTokenFinder
       .findAccessToken(_: Id)(_: Id => String))
       .expects(projectId, projectIdToPath)
       .returning(maybeAccessToken.pure[IO])
@@ -209,42 +267,41 @@ class CommitsSynchronizerSpec
         .expects(projectId, maybeAccessToken)
         .returning(Some(ProjectCommitStats(Some(commitsInfo.latest), commitsInfo.count)).pure[IO])
 
-    def givenCommitsInGL(projectId: Id, pageResults: PageResult*) = {
+    def givenCommitsInGL(projectId: Id, condition: DateCondition, pageResults: PageResult*) = {
       val lastPage =
         if (pageResults.isEmpty) Page.first
         else pageResults.reverse.tail.headOption.flatMap(_.maybeNextPage).getOrElse(Page(pageResults.size))
 
-      if (pageResults.isEmpty) {
-        (gitLabCommitFetcher
-          .fetchGitLabCommits(_: projects.Id, _: PagingRequest)(_: Option[AccessToken]))
-          .expects(projectId, pageRequest(Page.first), maybeAccessToken)
-          .returning(PageResult.empty.pure[IO])
-      } else
+      if (pageResults.isEmpty)(gitLabCommitFetcher
+        .fetchGitLabCommits(_: projects.Id, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
+        .expects(projectId, condition, pageRequest(Page.first), maybeAccessToken)
+        .returning(PageResult.empty.pure[IO])
+      else
         pageResults foreach { pageResult =>
           val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
           (gitLabCommitFetcher
-            .fetchGitLabCommits(_: projects.Id, _: PagingRequest)(_: Option[AccessToken]))
-            .expects(projectId, pageRequest(previousPage), maybeAccessToken)
+            .fetchGitLabCommits(_: projects.Id, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
+            .expects(projectId, condition, pageRequest(previousPage), maybeAccessToken)
             .returning(pageResult.pure[IO])
         }
     }
 
-    def givenCommitsInEL(projectPath: projects.Path, pageResults: PageResult*) = {
+    def givenCommitsInEL(projectPath: projects.Path, condition: DateCondition, pageResults: PageResult*) = {
       val lastPage =
         if (pageResults.isEmpty) Page.first
         else pageResults.reverse.tail.headOption.flatMap(_.maybeNextPage).getOrElse(Page(pageResults.size))
 
       if (pageResults.isEmpty) {
         (eventLogCommitFetcher
-          .fetchELCommits(_: projects.Path, _: PagingRequest))
-          .expects(projectPath, pageRequest(Page.first))
+          .fetchELCommits(_: projects.Path, _: DateCondition, _: PagingRequest))
+          .expects(projectPath, condition, pageRequest(Page.first))
           .returning(PageResult.empty.pure[IO])
       } else
         pageResults foreach { pageResult =>
           val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
           (eventLogCommitFetcher
-            .fetchELCommits(_: projects.Path, _: PagingRequest))
-            .expects(projectPath, pageRequest(previousPage))
+            .fetchELCommits(_: projects.Path, _: DateCondition, _: PagingRequest))
+            .expects(projectPath, condition, pageRequest(previousPage))
             .returning(pageResult.pure[IO])
         }
     }

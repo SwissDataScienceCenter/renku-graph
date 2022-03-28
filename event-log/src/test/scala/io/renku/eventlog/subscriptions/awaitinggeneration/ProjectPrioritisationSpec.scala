@@ -24,7 +24,8 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.EventDate
-import io.renku.eventlog.subscriptions.{Capacity, ProjectIds, Subscribers}
+import io.renku.eventlog.subscriptions.UrlAndIdSubscribers.UrlAndIdSubscribers
+import io.renku.eventlog.subscriptions._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -307,8 +308,8 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
   }
 
   private trait TestCase {
-    val subscribers                = mock[Subscribers[Try]]
-    lazy val projectPrioritisation = new ProjectPrioritisationImpl(subscribers)
+    implicit val subscribers: UrlAndIdSubscribers[Try] = mock[Subscribers[Try, UrlAndIdSubscriptionInfo]]
+    lazy val projectPrioritisation = new ProjectPrioritisationImpl[Try]
 
     def `given no totalCapacity` =
       (() => subscribers.getTotalCapacity)

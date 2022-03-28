@@ -98,6 +98,8 @@ private object EventsSender {
     case object TemporarilyUnavailable extends SendingResult
     case object Misdelivered           extends SendingResult
 
+    val all: Set[SendingResult] = Set(Delivered, TemporarilyUnavailable, Misdelivered)
+
     implicit lazy val show: Show[SendingResult] = Show.fromToString
   }
 }
