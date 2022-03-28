@@ -18,15 +18,22 @@
 
 package io.renku.eventlog.subscriptions.tsmigrationrequest
 
-import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
-import io.renku.generators.CommonGraphGenerators.serviceVersions
-import org.scalacheck.Gen
+import cats.Show
+import cats.syntax.all._
+import io.renku.eventlog.subscriptions.{Capacity, SubscriptionInfo}
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.renku.http.server.version.ServiceVersion
 
-private object Generators {
+private final case class MigratorSubscriptionInfo(subscriberUrl:     SubscriberUrl,
+                                                  subscriberId:      SubscriberId,
+                                                  subscriberVersion: ServiceVersion
+) extends SubscriptionInfo {
+  override val maybeCapacity: Option[Capacity] = None
+}
 
-  implicit val migratorSubscriptionInfos: Gen[MigratorSubscriptionInfo] = for {
-    url     <- subscriberUrls
-    id      <- subscriberIds
-    version <- serviceVersions
-  } yield MigratorSubscriptionInfo(url, id, version)
+private object MigratorSubscriptionInfo {
+  implicit lazy val show: Show[MigratorSubscriptionInfo] = Show.show { info =>
+    import info._
+    show"subscriber = $subscriberUrl, id = $subscriberId, version = $subscriberVersion"
+  }
 }

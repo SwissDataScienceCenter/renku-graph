@@ -18,15 +18,19 @@
 
 package io.renku.eventlog.subscriptions.tsmigrationrequest
 
-import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
-import io.renku.generators.CommonGraphGenerators.serviceVersions
-import org.scalacheck.Gen
+import Generators._
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private object Generators {
+class MigratorSubscriptionInfoSpec extends AnyWordSpec with should.Matchers {
 
-  implicit val migratorSubscriptionInfos: Gen[MigratorSubscriptionInfo] = for {
-    url     <- subscriberUrls
-    id      <- subscriberIds
-    version <- serviceVersions
-  } yield MigratorSubscriptionInfo(url, id, version)
+  "show" should {
+
+    "return a String representation with the url, id and version" in {
+      val info = migratorSubscriptionInfos.generateOne
+      info.show shouldBe s"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId}, version = ${info.subscriberVersion}"
+    }
+  }
 }

@@ -19,8 +19,8 @@
 package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.data.Kleisli
-import io.renku.eventlog.InMemoryEventLogDb
-import io.renku.eventlog.subscriptions.tsmigrationrequest.TypeSerializers._
+import io.renku.eventlog.TSMigtationTypeSerializers._
+import io.renku.eventlog._
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.server.version.ServiceVersion
 import skunk.implicits._

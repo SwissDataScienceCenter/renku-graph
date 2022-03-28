@@ -25,8 +25,8 @@ import cats.{Id, MonadThrow}
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus._
+import io.renku.eventlog.MigrationStatus._
+import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers, subscriptions}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
@@ -41,7 +41,7 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
                                                         now: () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with subscriptions.EventFinder[F, MigrationRequestEvent]
-    with TypeSerializers {
+    with TSMigtationTypeSerializers {
 
   import EventFinder._
 
