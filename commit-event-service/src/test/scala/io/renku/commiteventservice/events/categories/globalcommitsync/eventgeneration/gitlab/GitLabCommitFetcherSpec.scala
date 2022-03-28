@@ -100,13 +100,12 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .unsafeRunSync() shouldBe PageResult(commitInfoList.map(_.id), maybeNextPage)
     }
 
-    "fetch commits from the given page - response NotFound" in new AllCommitsEndpointTestCase {
-
-      responseMapping(dateConditions.generateOne)
-        .value(
-          (Status.NotFound, Request[IO](), Response[IO]())
-        )
-        .unsafeRunSync() shouldBe PageResult.empty
+    Status.NotFound :: Status.InternalServerError :: Nil foreach { status =>
+      s"return an empty page if fetch commits returns $status" in new AllCommitsEndpointTestCase {
+        responseMapping(dateConditions.generateOne)
+          .value((status, Request[IO](), Response[IO]()))
+          .unsafeRunSync() shouldBe PageResult.empty
+      }
     }
 
     Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
@@ -179,10 +178,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         .unsafeRunSync() shouldBe commitInfoList.head.id.some
     }
 
-    "fetch the latest commit from the given page - response NotFound" in new LatestCommitsEndpointTestCase {
-      responseMapping
-        .value((Status.NotFound, Request[IO](), Response[IO]()))
-        .unsafeRunSync() shouldBe None
+    Status.NotFound :: Status.InternalServerError :: Nil foreach { status =>
+      s"return None if fetch the latest commit returns $status" in new LatestCommitsEndpointTestCase {
+        responseMapping.value((status, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
+      }
     }
 
     Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>

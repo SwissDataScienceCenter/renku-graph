@@ -51,9 +51,9 @@ private class LatestCommitFinderImpl[F[_]: Async: Logger](
     )(mapResponse(projectId))
 
   private def mapResponse(projectId: Id): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
-    case (Ok, _, response)                => response.as[List[CommitInfo]] map (_.headOption)
-    case (NotFound, _, _)                 => Option.empty[CommitInfo].pure[F]
-    case (Unauthorized | Forbidden, _, _) => findLatestCommit(projectId)(maybeAccessToken = None)
+    case (Ok, _, response)                      => response.as[List[CommitInfo]] map (_.headOption)
+    case (NotFound | InternalServerError, _, _) => Option.empty[CommitInfo].pure[F]
+    case (Unauthorized | Forbidden, _, _)       => findLatestCommit(projectId)(maybeAccessToken = None)
   }
 
   private implicit val commitInfosEntityDecoder: EntityDecoder[F, List[CommitInfo]] = {
