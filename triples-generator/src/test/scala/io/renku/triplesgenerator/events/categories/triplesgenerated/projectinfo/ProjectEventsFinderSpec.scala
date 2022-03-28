@@ -137,6 +137,7 @@ class ProjectEventsFinderSpec
   private lazy val requestTimeout = 2 seconds
 
   private trait TestCase {
+    
     val project = Project(projectIds.generateOne, projectPaths.generateOne)
     val member  = projectMembersNoEmail.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
