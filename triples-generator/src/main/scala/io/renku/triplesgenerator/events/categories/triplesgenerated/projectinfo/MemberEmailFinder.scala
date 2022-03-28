@@ -22,8 +22,6 @@ import cats.data.EitherT
 import cats.data.EitherT.rightT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.{persons, projects}
@@ -39,11 +37,9 @@ private trait MemberEmailFinder[F[_]] {
 }
 
 private object MemberEmailFinder {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F],
-                                 gitLabThrottler: Throttler[F, GitLab]
-  ): F[MemberEmailFinder[F]] = for {
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[MemberEmailFinder[F]] = for {
     commitAuthorFinder  <- CommitAuthorFinder[F](gitLabClient)
-    projectEventsFinder <- ProjectEventsFinder[F](gitLabThrottler)
+    projectEventsFinder <- ProjectEventsFinder[F](gitLabClient)
   } yield new MemberEmailFinderImpl(commitAuthorFinder, projectEventsFinder)
 }
 

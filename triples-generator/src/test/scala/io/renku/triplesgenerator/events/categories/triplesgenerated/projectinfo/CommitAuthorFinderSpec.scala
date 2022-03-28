@@ -55,8 +55,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.duration._
-
 class CommitAuthorFinderSpec
     extends AnyWordSpec
     with IOSpec
@@ -146,8 +144,6 @@ class CommitAuthorFinderSpec
       ).unsafeRunSync() shouldBe None
     }
   }
-
-  private lazy val requestTimeout = 2 seconds
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption

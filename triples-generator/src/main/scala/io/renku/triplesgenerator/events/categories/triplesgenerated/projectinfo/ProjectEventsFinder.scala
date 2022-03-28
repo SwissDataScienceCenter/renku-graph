@@ -3,25 +3,21 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
+import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.{GitLabApiUrl, persons, projects}
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.graph.model.{persons, projects}
+import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
+import org.http4s.EntityDecoder
 import org.http4s.Method.GET
 import org.http4s.dsl.io.{NotFound, Ok}
-import org.http4s.{EntityDecoder, Request, Response, Status}
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private trait ProjectEventsFinder[F[_]] {
   def find(project:     Project, page: Int)(implicit
@@ -30,31 +26,25 @@ private trait ProjectEventsFinder[F[_]] {
 }
 
 private class ProjectEventsFinderImpl[F[_]: Async: Logger](
-    gitLabApiUrl:           GitLabApiUrl,
-    gitLabThrottler:        Throttler[F, GitLab],
-    recoveryStrategy:       RecoverableErrorsRecovery = RecoverableErrorsRecovery,
-    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(gitLabThrottler,
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
-    )
-    with ProjectEventsFinder[F] {
+    gitLabClient:     GitLabClient[F],
+    recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
+) extends ProjectEventsFinder[F] {
+
   override def find(project: Project, page: Int)(implicit
       maybeAccessToken:      Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)] =
     EitherT {
-      {
-        for {
-          uri             <- validateUri(s"$gitLabApiUrl/projects/${project.id}/events?action=pushed&page=$page")
-          eventsAndPaging <- send(secureRequest(GET, uri))(mapResponse)
-        } yield eventsAndPaging
-      }.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)
+      gitLabClient
+        .send(
+          GET,
+          uri"projects" / project.id.show / "events" withQueryParams Map("action" -> "pushed", "page" -> page.toString),
+          "events"
+        )(mapResponse)
+        .map(_.asRight[ProcessingRecoverableError])
+        .recoverWith(recoveryStrategy.maybeRecoverableError)
     }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[(List[PushEvent], PagingInfo)]] = {
+  private lazy val mapResponse: ResponseMappingF[F, (List[PushEvent], PagingInfo)] = {
     case (Ok, _, response) =>
       lazy val maybeNextPage   = response.headers.get(ci"X-Next-Page") >>= (_.head.value.toIntOption)
       lazy val maybeTotalPages = response.headers.get(ci"X-Total-Pages") >>= (_.head.value.toIntOption)
@@ -80,9 +70,8 @@ private class ProjectEventsFinderImpl[F[_]: Async: Logger](
 }
 
 private object ProjectEventsFinder {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[ProjectEventsFinder[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new ProjectEventsFinderImpl[F](gitLabUrl.apiV4, gitLabThrottler)
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[ProjectEventsFinder[F]] =
+    new ProjectEventsFinderImpl[F](gitLabClient).pure[F].widen[ProjectEventsFinder[F]]
 }
 
 private[projectinfo] case class PushEvent(projectId:  projects.Id,
