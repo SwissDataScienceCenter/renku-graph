@@ -37,6 +37,6 @@ private object MigrationRequestEvent {
   }"""
 
   implicit lazy val show: Show[MigrationRequestEvent] = Show.show { event =>
-    show"subscriberUrl = ${event.subscriberUrl}, subscriberVersion = ${event.subscriberVersion}"
+    show"subscriberVersion = ${event.subscriberVersion}"
   }
 }

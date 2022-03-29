@@ -48,7 +48,7 @@ class MigrationRequestEventSpec extends AnyWordSpec with should.Matchers {
     "return String representation of the event containing url and version" in {
       val event = events.generateOne
 
-      event.show shouldBe show"""subscriberUrl = ${event.subscriberUrl}, subscriberVersion = ${event.subscriberVersion}"""
+      event.show shouldBe show"""subscriberVersion = ${event.subscriberVersion}"""
     }
   }
 

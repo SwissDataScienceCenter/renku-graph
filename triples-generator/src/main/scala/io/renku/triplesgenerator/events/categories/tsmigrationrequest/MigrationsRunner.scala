@@ -41,12 +41,12 @@ private class MigrationsRunnerImpl[F[_]: MonadThrow: Logger](migrations: List[Mi
     migration
       .run()
       .semiflatMap(_ => Logger[F].info(show"$categoryName: ${migration.name} done"))
-      .leftSemiflatTap(logIfLogWorthy(migration))
+      .leftSemiflatTap(logError(migration))
       .value
       .recoverWith(errorInLogs(migration))
   }
 
-  private def logIfLogWorthy(migration: Migration[F]): ProcessingRecoverableError => F[Unit] = { recoverableFailure =>
+  private def logError(migration: Migration[F]): ProcessingRecoverableError => F[Unit] = { recoverableFailure =>
     Logger[F].error(recoverableFailure.cause)(
       show"$categoryName: ${migration.name} failed: ${recoverableFailure.message}"
     )
