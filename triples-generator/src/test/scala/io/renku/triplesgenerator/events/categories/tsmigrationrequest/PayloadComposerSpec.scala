@@ -16,44 +16,40 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigrationrequest
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.events.consumers.subscriptions.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
-import org.scalacheck.Gen
+import io.renku.microservices.MicroserviceIdentifier
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class MigrationRequestEventSpec extends AnyWordSpec with should.Matchers {
+import scala.util.Try
 
-  "encodeEvent" should {
+class PayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
-    "serialize MemberSyncEvent to Json" in {
-      val event = events.generateOne
+  "prepareSubscriptionPayload" should {
 
-      MigrationRequestEvent.encodeEvent(event) shouldBe json"""{
-        "categoryName": "TS_MIGRATION_REQUEST",
+    "return Payload containing the given CategoryName, found subscriberUrl and capacity" in new TestCase {
+      composer.prepareSubscriptionPayload() shouldBe json"""{
+        "categoryName" : ${categoryName.value},
         "subscriber": {
-          "version": ${event.subscriberVersion.value}
+          "url":     ${subscriberUrl.value},
+          "id":      ${serviceId.value},
+          "version": ${serviceVersion.value}
         }
-      }"""
+      }""".pure[Try]
     }
   }
 
-  "show" should {
-
-    "return String representation of the event containing url and version" in {
-      val event = events.generateOne
-
-      event.show shouldBe show"""subscriberVersion = ${event.subscriberVersion}"""
-    }
+  private trait TestCase {
+    val subscriberUrl  = subscriberUrls.generateOne
+    val serviceId      = MicroserviceIdentifier.generate
+    val serviceVersion = serviceVersions.generateOne
+    val composer       = new PayloadComposer[Try](subscriberUrl, serviceId, serviceVersion)
   }
-
-  private lazy val events: Gen[MigrationRequestEvent] = for {
-    url     <- subscriberUrls
-    version <- serviceVersions
-  } yield MigrationRequestEvent(url, version)
 }

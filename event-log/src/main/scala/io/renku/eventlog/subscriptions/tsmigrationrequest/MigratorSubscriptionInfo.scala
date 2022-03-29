@@ -20,23 +20,20 @@ package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.events.consumers.subscriptions.SubscriberUrl
+import io.renku.eventlog.subscriptions.{Capacity, SubscriptionInfo}
+import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import io.renku.http.server.version.ServiceVersion
 
-private final case class MigrationRequestEvent(subscriberUrl: SubscriberUrl, subscriberVersion: ServiceVersion)
+private final case class MigratorSubscriptionInfo(subscriberUrl:     SubscriberUrl,
+                                                  subscriberId:      SubscriberId,
+                                                  subscriberVersion: ServiceVersion
+) extends SubscriptionInfo {
+  override val maybeCapacity: Option[Capacity] = None
+}
 
-private object MigrationRequestEvent {
-  import io.circe.Json
-  import io.circe.literal._
-
-  def encodeEvent(event: MigrationRequestEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
-    "subscriber": {
-      "version": ${event.subscriberVersion.value}
-    }
-  }"""
-
-  implicit lazy val show: Show[MigrationRequestEvent] = Show.show { event =>
-    show"subscriberVersion = ${event.subscriberVersion}"
+private object MigratorSubscriptionInfo {
+  implicit lazy val show: Show[MigratorSubscriptionInfo] = Show.show { info =>
+    import info._
+    show"subscriber = $subscriberUrl, id = $subscriberId, version = $subscriberVersion"
   }
 }

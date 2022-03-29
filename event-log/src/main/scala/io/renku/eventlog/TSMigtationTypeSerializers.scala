@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigrationrequest
+package io.renku.eventlog
 
 import io.renku.http.server.version.ServiceVersion
 import skunk.codec.all.{text, timestamptz, varchar}
@@ -24,9 +24,9 @@ import skunk.{Decoder, Encoder}
 
 import java.time.{OffsetDateTime, ZoneOffset}
 
-private object TypeSerializers extends TypeSerializers
+private object TSMigtationTypeSerializers extends TSMigtationTypeSerializers
 
-private trait TypeSerializers extends io.renku.eventlog.TypeSerializers {
+private trait TSMigtationTypeSerializers extends TypeSerializers {
 
   val serviceVersionDecoder: Decoder[ServiceVersion] = varchar.map(ServiceVersion.apply)
   val serviceVersionEncoder: Encoder[ServiceVersion] = varchar.values.contramap(_.value)

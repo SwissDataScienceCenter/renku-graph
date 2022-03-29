@@ -16,27 +16,21 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigrationrequest
+package io.renku.eventlog.events.categories.migrationstatuschange
 
-import cats.Show
+import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.http.server.version.ServiceVersion
+import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.metrics.LabeledHistogram
+import org.typelevel.log4cats.Logger
 
-private final case class MigrationRequestEvent(subscriberUrl: SubscriberUrl, subscriberVersion: ServiceVersion)
+object SubscriptionFactory {
 
-private object MigrationRequestEvent {
-  import io.circe.Json
-  import io.circe.literal._
-
-  def encodeEvent(event: MigrationRequestEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
-    "subscriber": {
-      "version": ${event.subscriberVersion.value}
-    }
-  }"""
-
-  implicit lazy val show: Show[MigrationRequestEvent] = Show.show { event =>
-    show"subscriberVersion = ${event.subscriberVersion}"
-  }
+  def apply[F[_]: Async: SessionResource: Logger](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+    handler <- EventHandler[F](queriesExecTimes)
+  } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

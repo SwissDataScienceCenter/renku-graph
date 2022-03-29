@@ -16,27 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigrationrequest
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 
-import cats.Show
-import cats.syntax.all._
-import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.http.server.version.ServiceVersion
+import cats.data.EitherT
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 
-private final case class MigrationRequestEvent(subscriberUrl: SubscriberUrl, subscriberVersion: ServiceVersion)
-
-private object MigrationRequestEvent {
-  import io.circe.Json
-  import io.circe.literal._
-
-  def encodeEvent(event: MigrationRequestEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
-    "subscriber": {
-      "version": ${event.subscriberVersion.value}
-    }
-  }"""
-
-  implicit lazy val show: Show[MigrationRequestEvent] = Show.show { event =>
-    show"subscriberVersion = ${event.subscriberVersion}"
-  }
+private trait Migration[F[_]] {
+  def name:  String
+  def run(): EitherT[F, ProcessingRecoverableError, Unit]
 }

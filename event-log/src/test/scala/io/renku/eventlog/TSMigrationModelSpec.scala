@@ -16,14 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigrationrequest
+package io.renku.eventlog
 
-import Generators._
-import cats.syntax.all._
 import io.circe.Json
 import io.renku.data.ErrorMessage
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
+import io.renku.generators.Generators.{nestedExceptions, nonEmptyStrings, timestamps}
 import io.renku.tinytypes.constraints.NonBlank
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -31,29 +29,19 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
 
-class MigratorSubscriptionInfoSpec extends AnyWordSpec with should.Matchers {
-
-  "show" should {
-
-    "return a String representation with the url, id and version" in {
-      val info = migratorSubscriptionInfos.generateOne
-      info.show shouldBe s"subscriber = ${info.subscriberUrl}, id = ${info.subscriberId}, version = ${info.subscriberVersion}"
-    }
-  }
-}
-
 class MigrationStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
-  import MigrationStatus._
+  import io.renku.eventlog.MigrationStatus._
 
   "MigrationStatus" should {
 
     val scenarios = Table(
       "String Value" -> "Expected Status",
       MigrationStatus.all.toList.map {
-        case New     => "NEW"     -> New
-        case Sent    => "SENT"    -> Sent
-        case Done    => "DONE"    -> Done
-        case Failure => "FAILURE" -> Failure
+        case New                   => "NEW"                     -> New
+        case Sent                  => "SENT"                    -> Sent
+        case Done                  => "DONE"                    -> Done
+        case NonRecoverableFailure => "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
+        case RecoverableFailure    => "RECOVERABLE_FAILURE"     -> RecoverableFailure
       }: _*
     )
 

@@ -16,39 +16,21 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigrationrequest
+package io.renku.eventlog
 
-import cats.Show
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.data.ErrorMessage
-import io.renku.eventlog.subscriptions.{Capacity, SubscriptionInfo}
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import io.renku.http.server.version.ServiceVersion
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import io.renku.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 
 import java.time.Instant
 
-private final case class MigratorSubscriptionInfo(subscriberUrl:     SubscriberUrl,
-                                                  subscriberId:      SubscriberId,
-                                                  subscriberVersion: ServiceVersion
-) extends SubscriptionInfo {
-  override val maybeCapacity: Option[Capacity] = None
-}
+sealed trait MigrationStatus extends StringTinyType with Product with Serializable
 
-private object MigratorSubscriptionInfo {
-  implicit lazy val show: Show[MigratorSubscriptionInfo] = Show.show { info =>
-    import info._
-    show"subscriber = $subscriberUrl, id = $subscriberId, version = $subscriberVersion"
-  }
-}
+object MigrationStatus extends TinyTypeFactory[MigrationStatus](MigrationStatusInstantiator) {
 
-private sealed trait MigrationStatus extends StringTinyType with Product with Serializable
-
-private object MigrationStatus extends TinyTypeFactory[MigrationStatus](MigrationStatusInstantiator) {
-
-  val all: Set[MigrationStatus] = Set(New, Sent, Done, Failure)
+  val all: Set[MigrationStatus] = Set(New, Sent, Done, NonRecoverableFailure, RecoverableFailure)
 
   type New = New.type
   final case object New extends MigrationStatus {
@@ -65,9 +47,14 @@ private object MigrationStatus extends TinyTypeFactory[MigrationStatus](Migratio
     override val value: String = "DONE"
   }
 
-  type Failure = Failure.type
-  final case object Failure extends MigrationStatus {
-    override val value: String = "FAILURE"
+  type NonRecoverableFailure = NonRecoverableFailure.type
+  final case object NonRecoverableFailure extends MigrationStatus {
+    override val value: String = "NON_RECOVERABLE_FAILURE"
+  }
+
+  type RecoverableFailure = RecoverableFailure.type
+  final case object RecoverableFailure extends MigrationStatus {
+    override val value: String = "RECOVERABLE_FAILURE"
   }
 
   import io.circe.Decoder.decodeString

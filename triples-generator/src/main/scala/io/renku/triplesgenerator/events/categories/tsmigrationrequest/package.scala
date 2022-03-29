@@ -16,27 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.tsmigrationrequest
+package io.renku.triplesgenerator.events.categories
 
-import cats.Show
-import cats.syntax.all._
-import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.http.server.version.ServiceVersion
+import io.renku.events.CategoryName
 
-private final case class MigrationRequestEvent(subscriberUrl: SubscriberUrl, subscriberVersion: ServiceVersion)
-
-private object MigrationRequestEvent {
-  import io.circe.Json
-  import io.circe.literal._
-
-  def encodeEvent(event: MigrationRequestEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
-    "subscriber": {
-      "version": ${event.subscriberVersion.value}
-    }
-  }"""
-
-  implicit lazy val show: Show[MigrationRequestEvent] = Show.show { event =>
-    show"subscriberVersion = ${event.subscriberVersion}"
-  }
+package object tsmigrationrequest {
+  val categoryName: CategoryName = CategoryName("TS_MIGRATION_REQUEST")
 }
