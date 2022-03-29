@@ -36,7 +36,9 @@ class MigrationRequestEventSpec extends AnyWordSpec with should.Matchers {
 
       MigrationRequestEvent.encodeEvent(event) shouldBe json"""{
         "categoryName": "TS_MIGRATION_REQUEST",
-        "version":      ${event.subscriberVersion.value}
+        "subscriber": {
+          "version": ${event.subscriberVersion.value}
+        }
       }"""
     }
   }

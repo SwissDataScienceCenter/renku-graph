@@ -184,8 +184,6 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     def requestPayload(version: ServiceVersion) = EventRequestContent.NoPayload(json"""{
       "categoryName": "TS_MIGRATION_REQUEST",
       "subscriber": {
-        "url":     ${subscriberUrl.value},
-        "id":      ${serviceId.value},
         "version": ${version.value}
       }
     }
