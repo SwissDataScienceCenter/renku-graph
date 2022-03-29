@@ -1,3 +1,21 @@
+/*
+ * Copyright 2022 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 
 import cats.data.EitherT
@@ -38,7 +56,7 @@ private class ProjectEventsFinderImpl[F[_]: Async: Logger](
         .send(
           GET,
           uri"projects" / project.id.show / "events" withQueryParams Map("action" -> "pushed", "page" -> page.toString),
-          "events"
+          "project-events"
         )(mapResponse)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(recoveryStrategy.maybeRecoverableError)
@@ -74,13 +92,13 @@ private object ProjectEventsFinder {
     new ProjectEventsFinderImpl[F](gitLabClient).pure[F].widen[ProjectEventsFinder[F]]
 }
 
-private[projectinfo] case class PushEvent(projectId:  projects.Id,
-                                          commitId:   CommitId,
-                                          authorId:   persons.GitLabId,
-                                          authorName: persons.Name
+private case class PushEvent(projectId:  projects.Id,
+                             commitId:   CommitId,
+                             authorId:   persons.GitLabId,
+                             authorName: persons.Name
 )
 
-private[projectinfo] case class PagingInfo(maybeNextPage: Option[Int], maybeTotalPages: Option[Int]) {
+private case class PagingInfo(maybeNextPage: Option[Int], maybeTotalPages: Option[Int]) {
 
   private val pagesToCheck = 30
   private val step         = maybeTotalPages.map(_ / pagesToCheck).getOrElse(1)

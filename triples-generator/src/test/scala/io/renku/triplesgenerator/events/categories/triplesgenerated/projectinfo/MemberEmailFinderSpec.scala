@@ -352,7 +352,6 @@ class MemberEmailFinderSpec
     val member  = projectMembersNoEmail.generateOne
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabUrl           = GitLabUrl(externalServiceBaseUrl).apiV4
     val commitAuthorFinder  = mock[CommitAuthorFinder[IO]]
     val projectEventsFinder = mock[ProjectEventsFinder[IO]]
     val finder              = new MemberEmailFinderImpl[IO](commitAuthorFinder, projectEventsFinder)
