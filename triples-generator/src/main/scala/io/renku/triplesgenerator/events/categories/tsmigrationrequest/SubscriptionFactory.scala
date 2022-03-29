@@ -20,13 +20,25 @@ package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import eu.timepit.refined.auto._
+import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionMechanism}
+import io.renku.http.server.version.ServiceVersion
+import io.renku.metrics.MetricsRegistry
+import io.renku.microservices.MicroserviceUrlFinder
+import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: Logger]: F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriptionMechanism <- SubscriptionMechanism[F](categoryName, PayloadComposer.payloadsComposerFactory[F])
-    handler               <- EventHandler(subscriptionMechanism)
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+    urlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
+    subscriberUrl  <- urlFinder.findBaseUrl().map(SubscriberUrl(_, "events"))
+    serviceVersion <- ServiceVersion.readFromConfig()
+    subscriptionMechanism <-
+      SubscriptionMechanism[F](
+        categoryName,
+        PayloadComposer.payloadsComposerFactory[F](subscriberUrl, Microservice.Identifier, serviceVersion)
+      )
+    handler <- EventHandler(subscriberUrl, Microservice.Identifier, serviceVersion, subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

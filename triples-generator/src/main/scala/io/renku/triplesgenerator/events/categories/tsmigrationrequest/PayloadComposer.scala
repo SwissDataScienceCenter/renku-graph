@@ -21,42 +21,35 @@ package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 import cats.MonadThrow
 import cats.data.Kleisli
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionPayloadComposer}
 import io.renku.http.server.version.ServiceVersion
-import io.renku.microservices.{MicroserviceIdentifier, MicroserviceUrlFinder}
-import io.renku.triplesgenerator.Microservice
+import io.renku.microservices.MicroserviceIdentifier
 
-private class PayloadComposer[F[_]: MonadThrow](serviceUrlFinder: MicroserviceUrlFinder[F],
+private class PayloadComposer[F[_]: MonadThrow](subscriberUrl: SubscriberUrl,
                                                 serviceIdentifier: MicroserviceIdentifier,
                                                 serviceVersion:    ServiceVersion
 ) extends SubscriptionPayloadComposer[F] {
   import io.circe.literal._
-  import serviceUrlFinder._
 
-  override def prepareSubscriptionPayload(): F[Json] = findBaseUrl()
-    .map { baseUrl =>
-      json"""
-        {
-          "categoryName": ${categoryName.value},
-          "subscriber": {
-            "url":     ${SubscriberUrl(baseUrl, "events").value},
-            "id":      ${serviceIdentifier.value},
-            "version": ${serviceVersion.value}
-          }
-        }"""
+  override def prepareSubscriptionPayload(): F[Json] = json"""{
+    "categoryName": ${categoryName.value},
+    "subscriber": {
+      "url":     ${subscriberUrl.value},
+      "id":      ${serviceIdentifier.value},
+      "version": ${serviceVersion.value}
     }
+  }""".pure[F]
 }
 
 private object PayloadComposer {
 
-  def payloadsComposerFactory[F[_]: MonadThrow]: Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] =
+  def payloadsComposerFactory[F[_]: MonadThrow](subscriberUrl: SubscriberUrl,
+                                                serviceId:      MicroserviceIdentifier,
+                                                serviceVersion: ServiceVersion
+  ): Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] =
     Kleisli[F, CategoryName, SubscriptionPayloadComposer[F]] { _ =>
-      for {
-        subscriptionUrlFinder <- MicroserviceUrlFinder[F](Microservice.ServicePort)
-        serviceVersion        <- ServiceVersion.readFromConfig()
-      } yield new PayloadComposer[F](subscriptionUrlFinder, Microservice.Identifier, serviceVersion)
+      new PayloadComposer[F](subscriberUrl, serviceId, serviceVersion).pure[F].widen
     }
 }
