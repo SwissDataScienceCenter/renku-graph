@@ -20,17 +20,24 @@ package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 
 import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
 import eu.timepit.refined.auto._
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionMechanism}
 import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.Microservice
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry](
+      reProvisioningStatus: ReProvisioningStatus[F],
+      timeRecorder:         SparqlQueryTimeRecorder[F],
+      config:               Config
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     urlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
     subscriberUrl  <- urlFinder.findBaseUrl().map(SubscriberUrl(_, "events"))
     serviceVersion <- ServiceVersion.readFromConfig()
@@ -39,6 +46,13 @@ object SubscriptionFactory {
         categoryName,
         PayloadComposer.payloadsComposerFactory[F](subscriberUrl, Microservice.Identifier, serviceVersion)
       )
-    handler <- EventHandler(subscriberUrl, Microservice.Identifier, serviceVersion, subscriptionMechanism)
+    handler <- EventHandler(subscriberUrl,
+                            Microservice.Identifier,
+                            serviceVersion,
+                            subscriptionMechanism,
+                            reProvisioningStatus,
+                            timeRecorder,
+                            config
+               )
   } yield handler -> subscriptionMechanism
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
 
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}

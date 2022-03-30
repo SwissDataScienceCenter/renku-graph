@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.reprovisioning
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
 
 import cats.MonadThrow
 import cats.effect.Async

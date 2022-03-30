@@ -16,15 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.reprovisioning
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
 
+import cats.Parallel
 import cats.effect._
 import cats.syntax.all._
-import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
-import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.events.consumers.EventHandler
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.Schemas.renku
@@ -42,18 +43,17 @@ trait ReProvisioningStatus[F[_]] {
   def findReProvisioningService(): F[Option[MicroserviceBaseUrl]]
 }
 
-private class ReProvisioningStatusImpl[F[_]: Async: Logger](
-    eventConsumersRegistry: EventConsumersRegistry[F],
-    rdfStoreConfig:         RdfStoreConfig,
-    timeRecorder:           SparqlQueryTimeRecorder[F],
-    statusRefreshInterval:  FiniteDuration,
-    cacheRefreshInterval:   FiniteDuration,
-    lastCacheCheckTimeRef:  Ref[F, Long]
-)(implicit renkuBaseUrl:    RenkuBaseUrl)
+private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger](
+    subscriptions:         List[SubscriptionMechanism[F]],
+    rdfStoreConfig:        RdfStoreConfig,
+    timeRecorder:          SparqlQueryTimeRecorder[F],
+    statusRefreshInterval: FiniteDuration,
+    cacheRefreshInterval:  FiniteDuration,
+    lastCacheCheckTimeRef: Ref[F, Long]
+)(implicit renkuBaseUrl:   RenkuBaseUrl)
     extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
     with ReProvisioningStatus[F] {
 
-  import eventConsumersRegistry._
   import io.renku.jsonld.syntax._
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
@@ -72,7 +72,7 @@ private class ReProvisioningStatusImpl[F[_]: Async: Logger](
     ReProvisioningInfo(ReProvisioningInfo.Status.Running, on).asJsonLD
   )
 
-  override def clear(): F[Unit] = deleteFromDb() >> renewAllSubscriptions()
+  override def clear(): F[Unit] = deleteFromDb() >> renewSubscriptions()
 
   override def findReProvisioningService(): F[Option[MicroserviceBaseUrl]] =
     queryExpecting[Option[MicroserviceBaseUrl]] {
@@ -120,10 +120,12 @@ private class ReProvisioningStatusImpl[F[_]: Async: Logger](
   private def periodicStatusCheck: F[Unit] = Temporal[F].delayBy(
     fetchStatus >>= {
       case Some(ReProvisioningInfo.Status.Running) => periodicStatusCheck
-      case _                                       => (runningStatusCheckStarted set false) >> renewAllSubscriptions()
+      case _                                       => (runningStatusCheckStarted set false) >> renewSubscriptions()
     },
     time = statusRefreshInterval
   )
+
+  private def renewSubscriptions() = subscriptions.map(_.renewSubscription()).parSequence.void
 
   private def fetchStatus: F[Option[ReProvisioningInfo.Status]] = queryExpecting[Option[ReProvisioningInfo.Status]] {
     SparqlQuery.of(
@@ -166,17 +168,16 @@ object ReProvisioningStatus {
   private val CacheRefreshInterval:  FiniteDuration = 2 minutes
   private val StatusRefreshInterval: FiniteDuration = 15 seconds
 
-  def apply[F[_]: Async: Logger](
-      eventConsumersRegistry: EventConsumersRegistry[F],
-      timeRecorder:           SparqlQueryTimeRecorder[F],
-      configuration:          Config = ConfigFactory.load()
+  def apply[F[_]: Async: Parallel: Logger](
+      timeRecorder:          SparqlQueryTimeRecorder[F],
+      subscriptionFactories: (EventHandler[F], SubscriptionMechanism[F])*
   ): F[ReProvisioningStatus[F]] = for {
-    rdfStoreConfig        <- RdfStoreConfig[F](configuration)
+    rdfStoreConfig        <- RdfStoreConfig[F]()
     renkuBaseUrl          <- RenkuBaseUrlLoader[F]()
     lastCacheCheckTimeRef <- Ref.of[F, Long](0)
   } yield {
     implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
-    new ReProvisioningStatusImpl(eventConsumersRegistry,
+    new ReProvisioningStatusImpl(subscriptionFactories.map(_._2).toList,
                                  rdfStoreConfig,
                                  timeRecorder,
                                  StatusRefreshInterval,

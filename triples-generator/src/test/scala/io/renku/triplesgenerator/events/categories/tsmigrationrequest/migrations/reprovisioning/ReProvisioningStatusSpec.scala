@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.reprovisioning
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
 
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.renkuBaseUrls
@@ -33,7 +33,7 @@ import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.reprovisioning.ReProvisioningInfo.Status.Running
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningInfo.Status.Running
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -81,7 +81,7 @@ class ReProvisioningStatusSpec
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
       reProvisioningStatus.underReProvisioning().unsafeRunSync()       shouldBe true
 
-      expectNotificationSent
+      expectNotificationSent()
 
       clearStatus()
 
@@ -113,7 +113,7 @@ class ReProvisioningStatusSpec
 
       findInfo shouldBe (Running.value, controller.value).some
 
-      expectNotificationSent
+      expectNotificationSent()
 
       reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
@@ -124,7 +124,7 @@ class ReProvisioningStatusSpec
 
       findInfo shouldBe None
 
-      expectNotificationSent
+      expectNotificationSent()
 
       reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
@@ -152,10 +152,10 @@ class ReProvisioningStatusSpec
     private implicit val logger:       TestLogger[IO] = TestLogger[IO]()
     private implicit val renkuBaseUrl: RenkuBaseUrl   = renkuBaseUrls.generateOne
     private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
-    private val statusCacheCheckTimeRef = Ref.of[IO, Long](0L).unsafeRunSync()
-    val eventConsumersRegistry          = mock[EventConsumersRegistry[IO]]
+    private val statusCacheCheckTimeRef = Ref.unsafe[IO, Long](0L)
+    private val subscriptions           = List(mock[SubscriptionMechanism[IO]], mock[SubscriptionMechanism[IO]])
 
-    val reProvisioningStatus = new ReProvisioningStatusImpl(eventConsumersRegistry,
+    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriptions,
                                                             rdfStoreConfig,
                                                             timeRecorder,
                                                             statusRefreshInterval,
@@ -163,10 +163,11 @@ class ReProvisioningStatusSpec
                                                             statusCacheCheckTimeRef
     )
 
-    def expectNotificationSent =
-      (eventConsumersRegistry.renewAllSubscriptions _)
+    def expectNotificationSent(): Unit = subscriptions foreach { subscription =>
+      (subscription.renewSubscription _)
         .expects()
         .returning(IO.unit)
+    }
   }
 
   private def findInfo: Option[(String, String)] = runQuery {

@@ -18,10 +18,18 @@
 
 package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 
+import Migration.Name
 import cats.data.EitherT
+import io.renku.tinytypes.constraints.NonBlank
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 
 private trait Migration[F[_]] {
-  def name:  String
+  def name:  Name
   def run(): EitherT[F, ProcessingRecoverableError, Unit]
+}
+
+private object Migration {
+  final class Name private (val value: String) extends AnyVal with StringTinyType
+  object Name                                  extends TinyTypeFactory[Name](new Name(_)) with NonBlank
 }

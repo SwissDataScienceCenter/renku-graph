@@ -22,7 +22,13 @@ package tsmigrationrequest
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.data.EitherT.liftF
+import cats.effect.Async
 import cats.syntax.all._
+import com.typesafe.config.Config
+import io.renku.metrics.MetricsRegistry
+import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.Migrations
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -61,6 +67,10 @@ private class MigrationsRunnerImpl[F[_]: MonadThrow: Logger](migrations: List[Mi
 }
 
 private object MigrationsRunner {
-  def apply[F[_]: MonadThrow: Logger]: F[MigrationsRunner[F]] =
-    new MigrationsRunnerImpl[F](migrations = Nil).pure[F].widen[MigrationsRunner[F]]
+  def apply[F[_]: Async: Logger: MetricsRegistry](reProvisioningStatus: ReProvisioningStatus[F],
+                                                  timeRecorder: SparqlQueryTimeRecorder[F],
+                                                  config:       Config
+  ): F[MigrationsRunner[F]] = for {
+    migrations <- Migrations[F](reProvisioningStatus, timeRecorder, config)
+  } yield new MigrationsRunnerImpl[F](migrations)
 }
