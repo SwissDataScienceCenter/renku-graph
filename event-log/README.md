@@ -793,6 +793,12 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | event_type VARCHAR        NOT NULL |
 | payload    TEXT           NOT NULL |
 
+| clean_up_events_queue                |
+|--------------------------------------|
+| id           SERIAL      PK NOT NULL |
+| date         TIMESTAMPTZ    NOT NULL |
+| project_path VARCHAR        NOT NULL |
+
 | ts_migration                                |
 |---------------------------------------------|
 | subscriber_version  VARCHAR     PK NOT NULL |
