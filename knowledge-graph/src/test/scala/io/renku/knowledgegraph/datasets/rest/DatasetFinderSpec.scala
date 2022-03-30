@@ -29,7 +29,7 @@ import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.model._
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -630,14 +630,14 @@ class DatasetFinderSpec
   }
 
   private trait TestCase {
-    implicit val renkuBaseUrl:   RenkuBaseUrl   = renkuBaseUrls.generateOne
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
+    implicit val renkuBaseUrl:         RenkuBaseUrl                = renkuBaseUrls.generateOne
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val datasetFinder = new DatasetFinderImpl[IO](
-      new BaseDetailsFinderImpl[IO](rdfStoreConfig, timeRecorder),
-      new CreatorsFinderImpl[IO](rdfStoreConfig, timeRecorder),
-      new PartsFinderImpl[IO](rdfStoreConfig, timeRecorder),
-      new ProjectsFinderImpl[IO](rdfStoreConfig, timeRecorder)
+      new BaseDetailsFinderImpl[IO](rdfStoreConfig),
+      new CreatorsFinderImpl[IO](rdfStoreConfig),
+      new PartsFinderImpl[IO](rdfStoreConfig),
+      new ProjectsFinderImpl[IO](rdfStoreConfig)
     )
   }
 

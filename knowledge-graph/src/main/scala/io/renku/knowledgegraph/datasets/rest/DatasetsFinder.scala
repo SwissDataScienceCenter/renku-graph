@@ -50,11 +50,10 @@ private trait DatasetsFinder[F[_]] {
 
 private object DatasetsFinder {
 
-  def apply[F[_]: Parallel: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                           creatorsFinder: CreatorsFinder[F],
-                                           timeRecorder:   SparqlQueryTimeRecorder[F]
+  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig,
+                                                                    creatorsFinder: CreatorsFinder[F]
   ): F[DatasetsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new DatasetsFinderImpl[F](rdfStoreConfig, creatorsFinder, timeRecorder))
+    MonadThrow[F].catchNonFatal(new DatasetsFinderImpl[F](rdfStoreConfig, creatorsFinder))
 
   final case class DatasetSearchResult(
       id:                  Identifier,
@@ -74,11 +73,10 @@ private object DatasetsFinder {
   implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegativeInt
 }
 
-private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger](
+private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig: RdfStoreConfig,
-    creatorsFinder: CreatorsFinder[F],
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+    creatorsFinder: CreatorsFinder[F]
+) extends RdfStoreClientImpl[F](rdfStoreConfig)
     with DatasetsFinder[F]
     with Paging[DatasetSearchResult] {
 

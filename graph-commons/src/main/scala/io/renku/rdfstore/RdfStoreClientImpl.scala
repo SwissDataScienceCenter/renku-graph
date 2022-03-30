@@ -37,16 +37,15 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-abstract class RdfStoreClientImpl[F[_]: Async: Logger](
+abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig:         RdfStoreConfig,
-    timeRecorder:           SparqlQueryTimeRecorder[F],
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeoutOverride:    Option[Duration] = None,
     requestTimeoutOverride: Option[Duration] = None,
     printQueries:           Boolean = false
 ) extends RestClient(Throttler.noThrottling,
-                     Some(timeRecorder.instance),
+                     Some(implicitly[SparqlQueryTimeRecorder[F]].instance),
                      retryInterval,
                      maxRetries,
                      idleTimeoutOverride,

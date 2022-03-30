@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.reprovisioning
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
 
 import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.Schemas.renku
@@ -24,7 +24,7 @@ import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.jsonld._
 import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.reprovisioning.ReProvisioningInfo.Status.Running
+import ReProvisioningInfo.Status.Running
 
 private final case class ReProvisioningInfo(status:        ReProvisioningInfo.Status.Running,
                                             controllerUrl: MicroserviceBaseUrl

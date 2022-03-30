@@ -32,7 +32,6 @@ import io.renku.microservices.ServiceReadinessChecker
 import io.renku.testtools.{IOSpec, MockedRunnableCollaborators}
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.init.CliVersionCompatibilityVerifier
-import io.renku.triplesgenerator.reprovisioning.ReProvisioning
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -58,7 +57,6 @@ class MicroserviceRunnerSpec
         given(sentryInitializer).succeeds(returning = ())
         given(cliVersionCompatChecker).succeeds(returning = ())
         given(eventConsumersRegistry).succeeds(returning = ())
-        given(reProvisioning).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
         Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync() shouldBe ExitCode.Success
@@ -133,7 +131,6 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(eventConsumersRegistry).succeeds(returning = ())
-      given(reProvisioning).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
 
@@ -146,20 +143,6 @@ class MicroserviceRunnerSpec
       )
     }
 
-    "return Success ExitCode even when starting re-provisioning process fails" in new TestCase {
-
-      (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
-      given(certificateLoader).succeeds(returning = ())
-      given(gitCertificateInstaller).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(cliVersionCompatChecker).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(reProvisioning).fails(becauseOf = exception)
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync() shouldBe ExitCode.Success
-    }
-
     "return Success ExitCode even when running eventConsumersRegistry fails" in new TestCase {
 
       (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])
@@ -168,7 +151,6 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
-      given(reProvisioning).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       Temporal[IO].andWait(runner.run(), 1 second).unsafeRunSync() shouldBe ExitCode.Success
@@ -183,7 +165,6 @@ class MicroserviceRunnerSpec
     val sentryInitializer       = mock[SentryInitializer[IO]]
     val cliVersionCompatChecker = mock[CliVersionCompatibilityVerifier[IO]]
     val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
-    val reProvisioning          = mock[ReProvisioning[IO]]
     val httpServer              = mock[HttpServer[IO]]
 
     val runner = new MicroserviceRunner(serviceReadinessChecker,
@@ -192,7 +173,6 @@ class MicroserviceRunnerSpec
                                         sentryInitializer,
                                         cliVersionCompatChecker,
                                         eventConsumersRegistry,
-                                        reProvisioning,
                                         httpServer
     )
   }

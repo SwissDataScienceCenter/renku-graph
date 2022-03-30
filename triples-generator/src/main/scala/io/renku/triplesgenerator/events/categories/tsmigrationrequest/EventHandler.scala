@@ -23,6 +23,7 @@ import cats.data.EitherT.{left, leftT, rightT}
 import cats.effect.kernel.Deferred
 import cats.effect.{Async, Concurrent}
 import cats.syntax.all._
+import com.typesafe.config.Config
 import io.circe.Json
 import io.renku.data.ErrorMessage
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
@@ -33,7 +34,9 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
+import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -131,13 +134,15 @@ private[events] class EventHandler[F[_]: Async: Logger](
 private[events] object EventHandler {
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriberUrl:         SubscriberUrl,
       serviceId:             MicroserviceIdentifier,
       serviceVersion:        ServiceVersion,
-      subscriptionMechanism: SubscriptionMechanism[F]
+      subscriptionMechanism: SubscriptionMechanism[F],
+      reProvisioningStatus:  ReProvisioningStatus[F],
+      config:                Config
   ): F[EventHandler[F]] = for {
-    migrationsRunner         <- MigrationsRunner[F]
+    migrationsRunner         <- MigrationsRunner[F](reProvisioningStatus, config)
     eventSender              <- EventSender[F]
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(1)
   } yield new EventHandler[F](

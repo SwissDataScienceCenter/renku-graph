@@ -20,7 +20,7 @@ package io.renku.graph.acceptancetests
 
 import cats.syntax.all._
 import io.circe.Json
-import io.renku.generators.CommonGraphGenerators.authUsers
+import io.renku.generators.CommonGraphGenerators.{authUsers, serviceVersions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.acceptancetests.data._
@@ -30,6 +30,7 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
+import io.renku.http.server.version.ServiceVersion
 import io.renku.jsonld.syntax._
 import org.http4s.Status.Ok
 import org.scalactic.source.Position
@@ -37,6 +38,8 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.enablers.Retrying
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.time.{Minutes, Seconds, Span}
+
+import java.nio.file.{Files, Paths}
 
 class ReProvisioningSpec
     extends AnyFeatureSpec
@@ -77,7 +80,8 @@ class ReProvisioningSpec
                                                                       testEntitiesProjectWithNewSchemaVersion.asJsonLD
       )
 
-      When("The compatibility matrix is updated and the TG is restarted")
+      When("The compatibility matrix is updated, TG version changed and TG is restarted")
+      updateVersionConfs(serviceVersions.generateOne)
       restartTGWithNewCompatMatrix()
 
       Then("Re-provisioning is triggered")
@@ -124,4 +128,20 @@ class ReProvisioningSpec
     stop(triplesGenerator)
     run(newTriplesGenerator)
   }
+
+  private def updateVersionConfs(version: ServiceVersion): Unit =
+    Set("./webhook-service",
+        "./token-repository",
+        "./triples-generator",
+        "./event-log",
+        "./knowledge-graph",
+        "./commit-event-service"
+    ) foreach { service =>
+      val classesFile     = Paths.get(s"$service/target/scala-2.13/classes/version.conf")
+      val testClassesFile = Paths.get(s"$service/target/scala-2.13/test-classes/version.conf")
+      if (Files exists testClassesFile)
+        Files.writeString(testClassesFile, s"""version = "$version"""")
+      else
+        Files.writeString(classesFile, s"""version = "$version"""")
+    }
 }

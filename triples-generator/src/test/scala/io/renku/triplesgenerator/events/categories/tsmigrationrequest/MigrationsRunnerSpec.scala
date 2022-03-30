@@ -83,13 +83,13 @@ class MigrationsRunnerSpec extends AnyWordSpec with should.Matchers with MockFac
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
 
     val migration1 = mock[Migration[Try]]
-    (() => migration1.name).expects().returning("migration1")
+    (() => migration1.name).expects().returning(Migration.Name("migration1"))
 
     val migration2 = mock[Migration[Try]]
-    (() => migration2.name).expects().returning("migration2")
+    (() => migration2.name).expects().returning(Migration.Name("migration2"))
 
     val migration3 = mock[Migration[Try]]
-    (() => migration3.name).expects().returning("migration3").anyNumberOfTimes()
+    (() => migration3.name).expects().returning(Migration.Name("migration3")).anyNumberOfTimes()
 
     val runner = new MigrationsRunnerImpl[Try](List(migration1, migration2, migration3))
   }

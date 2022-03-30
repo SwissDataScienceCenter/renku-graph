@@ -38,10 +38,9 @@ private trait BaseDetailsFinder[F[_]] {
   def findImages(identifier:      Identifier): F[List[ImageUri]]
 }
 
-private class BaseDetailsFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig: RdfStoreConfig
+) extends RdfStoreClientImpl(rdfStoreConfig)
     with BaseDetailsFinder[F] {
 
   import BaseDetailsFinderImpl._
@@ -137,10 +136,8 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger](
 
 private object BaseDetailsFinder {
 
-  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                 timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[BaseDetailsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new BaseDetailsFinderImpl[F](rdfStoreConfig, timeRecorder))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): F[BaseDetailsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new BaseDetailsFinderImpl[F](rdfStoreConfig))
 }
 
 private object BaseDetailsFinderImpl {

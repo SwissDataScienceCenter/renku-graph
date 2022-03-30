@@ -84,18 +84,11 @@ private class DatasetFinderImpl[F[_]: Spawn](
 
 private object DatasetFinder {
 
-  def apply[F[_]: Async: Logger](
-      timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[DatasetFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetFinder[F]] = for {
     config           <- RdfStoreConfig[F]()
-    baseDetailFinder <- BaseDetailsFinder[F](config, timeRecorder)
-    creatorsFinder   <- CreatorsFinder[F](config, timeRecorder)
-    partsFinder      <- PartsFinder[F](config, timeRecorder)
-    projectsFinder   <- ProjectsFinder[F](config, timeRecorder)
-  } yield new DatasetFinderImpl[F](
-    baseDetailFinder,
-    creatorsFinder,
-    partsFinder,
-    projectsFinder
-  )
+    baseDetailFinder <- BaseDetailsFinder[F](config)
+    creatorsFinder   <- CreatorsFinder[F](config)
+    partsFinder      <- PartsFinder[F](config)
+    projectsFinder   <- ProjectsFinder[F](config)
+  } yield new DatasetFinderImpl[F](baseDetailFinder, creatorsFinder, partsFinder, projectsFinder)
 }

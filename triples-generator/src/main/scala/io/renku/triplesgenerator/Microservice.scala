@@ -36,9 +36,9 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
-import io.renku.triplesgenerator.config.{TriplesGeneration, VersionCompatibilityConfig}
+import io.renku.triplesgenerator.events.categories._
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
-import io.renku.triplesgenerator.reprovisioning.{ReProvisioning, ReProvisioningStatus}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -56,49 +56,49 @@ object Microservice extends IOMicroservice {
   }
 
   override def run(args: List[String]): IO[ExitCode] =
-    MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
-      for {
-        config                         <- parseConfigArgs(args)
-        certificateLoader              <- CertificateLoader[IO]
-        gitCertificateInstaller        <- GitCertificateInstaller[IO]
-        triplesGeneration              <- TriplesGeneration[IO](config)
-        sentryInitializer              <- SentryInitializer[IO]
-        renkuVersionPairs              <- VersionCompatibilityConfig[IO](config)
-        cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](triplesGeneration, renkuVersionPairs)
-        gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-        gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
-        sparqlTimeRecorder             <- SparqlQueryTimeRecorder[IO]
-        awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory[IO]
-        membersSyncSubscription <- events.categories.membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
-        triplesGeneratedSubscription <-
-          events.categories.triplesgenerated.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
-        cleanUpSubscription          <- events.categories.cleanup.SubscriptionFactory(sparqlTimeRecorder)
-        migrationRequestSubscription <- events.categories.tsmigrationrequest.SubscriptionFactory[IO]
-        eventConsumersRegistry <- consumers.EventConsumersRegistry(
-                                    awaitingGenerationSubscription,
-                                    membersSyncSubscription,
-                                    triplesGeneratedSubscription,
-                                    cleanUpSubscription,
-                                    migrationRequestSubscription
+    MetricsRegistry[IO]() >>= { implicit metricsRegistry =>
+      SparqlQueryTimeRecorder[IO](metricsRegistry) >>= { implicit sparqlTimeRecorder =>
+        for {
+          config                         <- parseConfigArgs(args)
+          certificateLoader              <- CertificateLoader[IO]
+          gitCertificateInstaller        <- GitCertificateInstaller[IO]
+          sentryInitializer              <- SentryInitializer[IO]
+          cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
+          gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+          gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
+          awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
+          membersSyncSubscription        <- membersync.SubscriptionFactory(gitLabThrottler)
+          triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory(gitLabThrottler)
+          cleanUpSubscription            <- cleanup.SubscriptionFactory[IO]
+          reProvisioningStatus <- ReProvisioningStatus(awaitingGenerationSubscription,
+                                                       membersSyncSubscription,
+                                                       triplesGeneratedSubscription,
+                                                       cleanUpSubscription
                                   )
-        reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, sparqlTimeRecorder)
-        reProvisioning          <- ReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder)
-        serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-        microserviceRoutes <-
-          MicroserviceRoutes[IO](eventConsumersRegistry, reProvisioningStatus, config.some).map(_.routes)
-        exitCode <- microserviceRoutes.use { routes =>
-                      new MicroserviceRunner[IO](
-                        serviceReadinessChecker,
-                        certificateLoader,
-                        gitCertificateInstaller,
-                        sentryInitializer,
-                        cliVersionCompatChecker,
-                        eventConsumersRegistry,
-                        reProvisioning,
-                        HttpServer[IO](serverPort = ServicePort.value, routes)
-                      ).run()
-                    }
-      } yield exitCode
+          migrationRequestSubscription <- tsmigrationrequest.SubscriptionFactory[IO](reProvisioningStatus, config)
+          eventConsumersRegistry <- consumers.EventConsumersRegistry(
+                                      awaitingGenerationSubscription,
+                                      membersSyncSubscription,
+                                      triplesGeneratedSubscription,
+                                      cleanUpSubscription,
+                                      migrationRequestSubscription
+                                    )
+          serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
+          microserviceRoutes <-
+            MicroserviceRoutes[IO](eventConsumersRegistry, reProvisioningStatus, config.some).map(_.routes)
+          exitCode <- microserviceRoutes.use { routes =>
+                        new MicroserviceRunner[IO](
+                          serviceReadinessChecker,
+                          certificateLoader,
+                          gitCertificateInstaller,
+                          sentryInitializer,
+                          cliVersionCompatChecker,
+                          eventConsumersRegistry,
+                          HttpServer[IO](serverPort = ServicePort.value, routes)
+                        ).run()
+                      }
+        } yield exitCode
+      }
     }
 }
 
@@ -109,17 +109,16 @@ private class MicroserviceRunner[F[_]: Spawn: Logger](
     sentryInitializer:               SentryInitializer[F],
     cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[F],
     eventConsumersRegistry:          EventConsumersRegistry[F],
-    reProvisioning:                  ReProvisioning[F],
     httpServer:                      HttpServer[F]
 ) {
 
   def run(): F[ExitCode] = {
     for {
-      _ <- certificateLoader.run()
-      _ <- gitCertificateInstaller.run()
-      _ <- sentryInitializer.run()
-      _ <- cliVersionCompatibilityVerifier.run()
-      _ <- Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> reProvisioning.run() >> eventConsumersRegistry.run())
+      _        <- certificateLoader.run()
+      _        <- gitCertificateInstaller.run()
+      _        <- sentryInitializer.run()
+      _        <- cliVersionCompatibilityVerifier.run()
+      _        <- Spawn[F].start(serviceReadinessChecker.waitIfNotUp >> eventConsumersRegistry.run())
       exitCode <- httpServer.run()
     } yield exitCode
   } recoverWith logAndThrow

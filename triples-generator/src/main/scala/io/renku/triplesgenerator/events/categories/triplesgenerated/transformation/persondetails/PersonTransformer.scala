@@ -80,7 +80,7 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
 
 private[transformation] object PersonTransformer {
 
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[PersonTransformer[F]] = for {
-    kgPersonFinder <- KGPersonFinder(timeRecorder)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PersonTransformer[F]] = for {
+    kgPersonFinder <- KGPersonFinder[F]
   } yield new PersonTransformerImpl[F](kgPersonFinder, PersonMerger, UpdatesCreator, ProjectFunctions)
 }

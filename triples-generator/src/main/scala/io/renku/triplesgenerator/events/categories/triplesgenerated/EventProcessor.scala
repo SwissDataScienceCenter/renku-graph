@@ -210,13 +210,12 @@ private object EventProcessor {
   import io.renku.config.GitLab
   import io.renku.control.Throttler
 
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
-      gitLabThrottler: Throttler[F, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[F]
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      gitLabThrottler: Throttler[F, GitLab]
   ): F[EventProcessor[F]] = for {
-    uploader           <- TransformationStepsRunner(timeRecorder)
+    uploader           <- TransformationStepsRunner[F]
     accessTokenFinder  <- AccessTokenFinder[F]
-    triplesCurator     <- TransformationStepsCreator(timeRecorder)
+    triplesCurator     <- TransformationStepsCreator[F]
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     eventsProcessingTimes <- Histogram(
                                name = "triples_transformation_processing_times",

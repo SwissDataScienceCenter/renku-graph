@@ -16,24 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.cleanup
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import com.typesafe.config.Config
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
-import io.renku.triplesgenerator.Microservice
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
+import reprovisioning.{ReProvisioning, ReProvisioningStatus}
 
-object SubscriptionFactory {
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
-      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    subscriptionMechanism <- SubscriptionMechanism[F](
-                               categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
-                             )
-    handler <- EventHandler(subscriptionMechanism)
-  } yield handler -> subscriptionMechanism
+private[tsmigrationrequest] object Migrations {
+
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      reProvisioningStatus: ReProvisioningStatus[F],
+      config:               Config
+  ): F[List[Migration[F]]] = for {
+    reProvisioning <- ReProvisioning[F](reProvisioningStatus, config)
+  } yield List(reProvisioning)
 }

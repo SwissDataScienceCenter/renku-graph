@@ -16,20 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package io.renku.logging
 
-import Migration.Name
-import cats.data.EitherT
-import io.renku.tinytypes.constraints.NonBlank
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
+import cats.MonadThrow
+import io.renku.rdfstore.SparqlQueryTimeRecorder
+import org.typelevel.log4cats.Logger
 
-private trait Migration[F[_]] {
-  def name:  Name
-  def run(): EitherT[F, ProcessingRecoverableError, Unit]
-}
-
-private object Migration {
-  final class Name private (val value: String) extends AnyVal with StringTinyType
-  object Name                                  extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+object TestSparqlQueryTimeRecorder {
+  def apply[F[_]: MonadThrow: Logger] = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[F]())
+  def apply[F[_]: MonadThrow: Logger](instance: ExecutionTimeRecorder[F]) = new SparqlQueryTimeRecorder(instance)
 }

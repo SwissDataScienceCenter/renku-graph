@@ -28,7 +28,7 @@ import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
@@ -119,9 +119,9 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
   }
 
   private trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
-    val kgDatasetInfoFinder  = new KGDatasetInfoFinderImpl(rdfStoreConfig, timeRecorder)
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    val kgDatasetInfoFinder = new KGDatasetInfoFinderImpl[IO](rdfStoreConfig)
   }
 
   private def removeTopmostSameAs(datasetId: EntityId): Unit = runUpdate {

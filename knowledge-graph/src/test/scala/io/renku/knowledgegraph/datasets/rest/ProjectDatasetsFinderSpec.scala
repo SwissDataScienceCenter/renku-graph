@@ -25,7 +25,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{InitialVersion, SameAs}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -155,8 +155,8 @@ class ProjectDatasetsFinderSpec
   }
 
   private trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
-    val datasetsFinder       = new ProjectDatasetsFinderImpl[IO](rdfStoreConfig, timeRecorder)
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    val datasetsFinder = new ProjectDatasetsFinderImpl[IO](rdfStoreConfig)
   }
 }

@@ -16,11 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.reprovisioning
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
 
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.circe.literal._
+import io.renku.events.producers.EventSender
+import io.renku.events.producers.EventSender.EventContext
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -53,16 +57,16 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
-        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(IO.unit)
+        expectStatusChangeEventSucceeds()
 
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().unsafeRunSync() shouldBe ()
+      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("Kicking-off re-provisioning"),
-        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Info("re-provisioning: kicking-off re-provisioning"),
+        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -70,9 +74,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
 
-      reProvisioning.run().unsafeRunSync() shouldBe ()
+      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
 
-      logger.loggedOnly(Info("Triples Store up to date"))
+      logger.loggedOnly(Info("re-provisioning: TS up to date"))
     }
 
     "do not fail but simply retry if checking if re-provisioning is needed fails" in new TestCase {
@@ -83,11 +87,11 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
       }
 
-      reProvisioning.run().unsafeRunSync() shouldBe ()
+      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Error("Re-provisioning failure", exception),
-        Info("Triples Store up to date")
+        Error("re-provisioning: failure", exception),
+        Info("re-provisioning: TS up to date")
       )
     }
 
@@ -107,17 +111,17 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
-        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(IO.unit)
+        expectStatusChangeEventSucceeds()
 
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().unsafeRunSync() shouldBe ()
+      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("Kicking-off re-provisioning"),
-        Error("Re-provisioning failure", exception),
-        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Info("re-provisioning: kicking-off re-provisioning"),
+        Error("re-provisioning: failure", exception),
+        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -137,17 +141,17 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
-        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(IO.unit)
+        expectStatusChangeEventSucceeds()
 
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().unsafeRunSync() shouldBe ()
+      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("Kicking-off re-provisioning"),
-        Error("Re-provisioning failure", exception),
-        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Info("re-provisioning: kicking-off re-provisioning"),
+        Error("re-provisioning: failure", exception),
+        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -169,17 +173,17 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
-        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(IO.unit)
+        expectStatusChangeEventSucceeds()
 
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().unsafeRunSync() shouldBe ()
+      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("Kicking-off re-provisioning"),
-        Error("Re-provisioning failure", exception),
-        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Info("re-provisioning: kicking-off re-provisioning"),
+        Error("re-provisioning: failure", exception),
+        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -200,17 +204,17 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
-        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(IO.unit)
+        expectStatusChangeEventSucceeds()
 
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().unsafeRunSync() shouldBe ()
+      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("Kicking-off re-provisioning"),
-        Error("Re-provisioning failure", exception),
-        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Info("re-provisioning: kicking-off re-provisioning"),
+        Error("re-provisioning: failure", exception),
+        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -230,22 +234,20 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
-        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(exception1.raiseError[IO, Unit])
-
-        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(exception2.raiseError[IO, Unit])
-
-        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(IO.unit)
+        expectStatusChangeEventFailing(exception1)
+        expectStatusChangeEventFailing(exception2)
+        expectStatusChangeEventSucceeds()
 
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().unsafeRunSync() shouldBe ()
+      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("Kicking-off re-provisioning"),
-        Error("Re-provisioning failure", exception1),
-        Error("Re-provisioning failure", exception2),
-        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Info("re-provisioning: kicking-off re-provisioning"),
+        Error("re-provisioning: failure", exception1),
+        Error("re-provisioning: failure", exception2),
+        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -264,18 +266,18 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
-        (eventsReScheduler.triggerEventsReScheduling _).expects().returning(IO.unit)
+        expectStatusChangeEventSucceeds()
 
         (reProvisioningStatus.clear _).expects().returning(exception.raiseError[IO, Unit])
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().unsafeRunSync() shouldBe ()
+      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("Kicking-off re-provisioning"),
-        Error("Re-provisioning failure", exception),
-        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Info("re-provisioning: kicking-off re-provisioning"),
+        Error("re-provisioning: failure", exception),
+        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
   }
@@ -287,7 +289,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
     val configuredRenkuVersionPairs = renkuVersionPairs.generateNonEmptyList(2)
     val reprovisionJudge            = mock[ReProvisionJudge[IO]]
     val triplesRemover              = mock[TriplesRemover[IO]]
-    val eventsReScheduler           = mock[EventsReScheduler[IO]]
+    val eventSender                 = mock[EventSender[IO]]
     val renkuVersionPairUpdater     = mock[RenkuVersionPairUpdater[IO]]
     val microserviceUrlFinder       = mock[MicroserviceUrlFinder[IO]]
     val reProvisioningStatus        = mock[ReProvisioningStatus[IO]]
@@ -296,12 +298,28 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       configuredRenkuVersionPairs,
       reprovisionJudge,
       triplesRemover,
-      eventsReScheduler,
+      eventSender,
       renkuVersionPairUpdater,
       microserviceUrlFinder,
       reProvisioningStatus,
       executionTimeRecorder,
       250 millis
     )
+
+    def expectStatusChangeEventSucceeds() = expectStatusChangeReturning(().pure[IO])
+
+    def expectStatusChangeEventFailing(exception: Exception) =
+      expectStatusChangeReturning(exception.raiseError[IO, Unit])
+
+    def expectStatusChangeReturning(result: IO[Unit]) =
+      (eventSender
+        .sendEvent(_: EventRequestContent.NoPayload, _: EventContext))
+        .expects(
+          EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}"""),
+          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
+                                   "re-provisioning: sending EVENTS_STATUS_CHANGE failed"
+          )
+        )
+        .returning(result)
   }
 }

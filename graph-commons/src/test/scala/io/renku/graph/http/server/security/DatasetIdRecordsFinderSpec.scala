@@ -24,7 +24,7 @@ import io.renku.graph.model.GitLabApiUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -83,8 +83,8 @@ class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
   private implicit lazy val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
   private trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
-    val recordsFinder        = new DatasetIdRecordsFinderImpl(rdfStoreConfig, timeRecorder)
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    val recordsFinder = new DatasetIdRecordsFinderImpl[IO](rdfStoreConfig)
   }
 }
