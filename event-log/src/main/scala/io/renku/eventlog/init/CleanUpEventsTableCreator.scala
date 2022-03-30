@@ -54,6 +54,8 @@ private class CleanUpEventsTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Sess
   private def createTable(): Kleisli[F, Session[F], Unit] = for {
     _ <- execute(createTableSql)
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_date ON clean_up_events_queue(date)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON clean_up_events_queue(project_path)".command)
+    _ <- execute(sql"ALTER TABLE clean_up_events_queue ADD CONSTRAINT project_path_unique UNIQUE(project_path)".command)
     _ <- Kleisli.liftF(Logger[F] info "'clean_up_events_queue' table created")
   } yield ()
 

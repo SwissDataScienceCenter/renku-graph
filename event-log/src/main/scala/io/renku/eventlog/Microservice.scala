@@ -101,6 +101,7 @@ object Microservice extends IOMicroservice {
                                              deletingGauge,
                                              queriesExecTimes
                                            )
+          cleanUpRequestSubscription <- events.categories.cleanuprequest.SubscriptionFactory(queriesExecTimes)
           migrationStatusChange <- events.categories.migrationstatuschange.SubscriptionFactory[IO](queriesExecTimes)
           eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                       creationSubscription,
@@ -108,6 +109,7 @@ object Microservice extends IOMicroservice {
                                       commitSyncRequestSubscription,
                                       statusChangeEventSubscription,
                                       globalCommitSyncRequestSubscription,
+                                      cleanUpRequestSubscription,
                                       migrationStatusChange
                                     )
           serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)

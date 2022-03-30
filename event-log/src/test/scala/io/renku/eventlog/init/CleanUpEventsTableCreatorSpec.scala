@@ -50,6 +50,8 @@ class CleanUpEventsTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitS
       tableCreator.run().unsafeRunSync() shouldBe ()
 
       verifyIndexExists("clean_up_events_queue", "idx_date")
+      verifyIndexExists("clean_up_events_queue", "idx_project_path")
+      verifyConstraintExists("clean_up_events_queue", "project_path_unique")
     }
   }
 

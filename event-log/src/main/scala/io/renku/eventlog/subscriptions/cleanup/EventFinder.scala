@@ -61,21 +61,18 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
   } yield maybeCleanUpEvent
 
   private def findProject = measureExecutionTime {
-
-    val executionDate = ExecutionDate(now())
-    SqlStatement(
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
-    ).select[EventStatus ~ ExecutionDate, Project](
-      sql"""
-      SELECT evt.project_id, prj.project_path
-      FROM event evt
-      JOIN  project prj ON prj.project_id = evt.project_id 
-      WHERE evt.status = $eventStatusEncoder
-        AND evt.execution_date < $executionDateEncoder
-      ORDER BY evt.execution_date ASC
-      LIMIT 1
-      """.query(projectDecoder)
-    ).arguments(AwaitingDeletion ~ executionDate)
+    SqlStatement
+      .named(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
+      .select[EventStatus ~ ExecutionDate, Project](sql"""
+        SELECT evt.project_id, prj.project_path
+        FROM event evt
+        JOIN  project prj ON prj.project_id = evt.project_id 
+        WHERE evt.status = $eventStatusEncoder
+          AND evt.execution_date < $executionDateEncoder
+        ORDER BY evt.execution_date ASC
+        LIMIT 1
+        """.query(projectDecoder))
+      .arguments(AwaitingDeletion ~ ExecutionDate(now()))
       .build(_.option)
   }
 
