@@ -37,8 +37,7 @@ private trait ProjectTriplesRemover[F[_]] {
 }
 
 private object ProjectTriplesRemover {
-  def apply[F[_]: Async: Logger](
-      timeRecorder:   SparqlQueryTimeRecorder[F],
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
       maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
       idleTimeout:    Duration = 6 minutes,
@@ -47,7 +46,6 @@ private object ProjectTriplesRemover {
     rdfStoreConfig <- RdfStoreConfig[F]()
     renkuBaseUrl   <- RenkuBaseUrlLoader[F]()
   } yield new ProjectTriplesRemoverImpl[F](rdfStoreConfig,
-                                           timeRecorder,
                                            renkuBaseUrl,
                                            retryInterval,
                                            maxRetries,
@@ -55,23 +53,21 @@ private object ProjectTriplesRemover {
                                            requestTimeout
   )
 }
-private class ProjectTriplesRemoverImpl[F[_]: Async: Logger](
+private class ProjectTriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F],
     renkuBaseUrl:   RenkuBaseUrl,
     retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:    Duration = 6 minutes,
     requestTimeout: Duration = 5 minutes
 ) extends RdfStoreClientImpl(rdfStoreConfig,
-                             timeRecorder,
                              retryInterval = retryInterval,
                              maxRetries = maxRetries,
                              idleTimeoutOverride = idleTimeout.some,
                              requestTimeoutOverride = requestTimeout.some
     )
     with ProjectTriplesRemover[F] {
-  implicit val baseUrl = renkuBaseUrl
+  implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
 
   override def removeTriples(projectPath: projects.Path): F[Unit] = for {
     _ <- relinkDatasetHierarchy(projectPath)

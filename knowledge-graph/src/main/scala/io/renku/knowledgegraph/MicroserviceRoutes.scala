@@ -211,37 +211,37 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
 private object MicroserviceRoutes {
 
-  def apply(sparqlTimeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext:         ExecutionContext,
-      runtime:                  IORuntime,
-      logger:                   Logger[IO],
-      metricsRegistry:          MetricsRegistry[IO]
-  ): IO[MicroserviceRoutes[IO]] =
-    for {
-      gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-      gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
-      datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO](sparqlTimeRecorder)
-      datasetEndpoint         <- DatasetEndpoint[IO](sparqlTimeRecorder)
-      entitiesEndpoint        <- entities.Endpoint(sparqlTimeRecorder)
-      gitLabClient            <- GitLabClient(gitLabThrottler)
-      queryEndpoint           <- QueryEndpoint(sparqlTimeRecorder)
-      projectEndpoint         <- ProjectEndpoint[IO](gitLabClient, sparqlTimeRecorder)
-      projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO](sparqlTimeRecorder)
-      authenticator           <- GitLabAuthenticator(gitLabThrottler)
-      authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-      projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO](sparqlTimeRecorder))
-      datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO](sparqlTimeRecorder))
-      versionRoutes           <- version.Routes[IO]
-    } yield new MicroserviceRoutes(datasetsSearchEndpoint,
-                                   datasetEndpoint,
-                                   entitiesEndpoint,
-                                   queryEndpoint,
-                                   projectEndpoint,
-                                   projectDatasetsEndpoint,
-                                   authMiddleware,
-                                   projectPathAuthorizer,
-                                   datasetIdAuthorizer,
-                                   new RoutesMetrics[IO],
-                                   versionRoutes
-    )
+  def apply()(implicit
+      executionContext:   ExecutionContext,
+      runtime:            IORuntime,
+      logger:             Logger[IO],
+      metricsRegistry:    MetricsRegistry[IO],
+      sparqlTimeRecorder: SparqlQueryTimeRecorder[IO]
+  ): IO[MicroserviceRoutes[IO]] = for {
+    gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+    gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
+    datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO]
+    datasetEndpoint         <- DatasetEndpoint[IO]
+    entitiesEndpoint        <- entities.Endpoint[IO]
+    gitLabClient            <- GitLabClient(gitLabThrottler)
+    queryEndpoint           <- QueryEndpoint()
+    projectEndpoint         <- ProjectEndpoint[IO](gitLabClient)
+    projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
+    authenticator           <- GitLabAuthenticator(gitLabThrottler)
+    authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
+    projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
+    datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
+    versionRoutes           <- version.Routes[IO]
+  } yield new MicroserviceRoutes(datasetsSearchEndpoint,
+                                 datasetEndpoint,
+                                 entitiesEndpoint,
+                                 queryEndpoint,
+                                 projectEndpoint,
+                                 projectDatasetsEndpoint,
+                                 authMiddleware,
+                                 projectPathAuthorizer,
+                                 datasetIdAuthorizer,
+                                 new RoutesMetrics[IO],
+                                 versionRoutes
+  )
 }

@@ -56,50 +56,49 @@ object Microservice extends IOMicroservice {
   }
 
   override def run(args: List[String]): IO[ExitCode] =
-    MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
-      for {
-        config                         <- parseConfigArgs(args)
-        certificateLoader              <- CertificateLoader[IO]
-        gitCertificateInstaller        <- GitCertificateInstaller[IO]
-        sentryInitializer              <- SentryInitializer[IO]
-        cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
-        gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-        gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
-        sparqlTimeRecorder             <- SparqlQueryTimeRecorder[IO]
-        awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
-        membersSyncSubscription        <- membersync.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
-        triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder)
-        cleanUpSubscription            <- cleanup.SubscriptionFactory(sparqlTimeRecorder)
-        reProvisioningStatus <- ReProvisioningStatus(sparqlTimeRecorder,
-                                                     awaitingGenerationSubscription,
-                                                     membersSyncSubscription,
-                                                     triplesGeneratedSubscription,
-                                                     cleanUpSubscription
-                                )
-        migrationRequestSubscription <-
-          tsmigrationrequest.SubscriptionFactory[IO](reProvisioningStatus, sparqlTimeRecorder, config)
-        eventConsumersRegistry <- consumers.EventConsumersRegistry(
-                                    awaitingGenerationSubscription,
-                                    membersSyncSubscription,
-                                    triplesGeneratedSubscription,
-                                    cleanUpSubscription,
-                                    migrationRequestSubscription
+    MetricsRegistry[IO]() >>= { implicit metricsRegistry =>
+      SparqlQueryTimeRecorder[IO](metricsRegistry) >>= { implicit sparqlTimeRecorder =>
+        for {
+          config                         <- parseConfigArgs(args)
+          certificateLoader              <- CertificateLoader[IO]
+          gitCertificateInstaller        <- GitCertificateInstaller[IO]
+          sentryInitializer              <- SentryInitializer[IO]
+          cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
+          gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+          gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
+          awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
+          membersSyncSubscription        <- membersync.SubscriptionFactory(gitLabThrottler)
+          triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory(gitLabThrottler)
+          cleanUpSubscription            <- cleanup.SubscriptionFactory[IO]
+          reProvisioningStatus <- ReProvisioningStatus(awaitingGenerationSubscription,
+                                                       membersSyncSubscription,
+                                                       triplesGeneratedSubscription,
+                                                       cleanUpSubscription
                                   )
-        serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-        microserviceRoutes <-
-          MicroserviceRoutes[IO](eventConsumersRegistry, reProvisioningStatus, config.some).map(_.routes)
-        exitCode <- microserviceRoutes.use { routes =>
-                      new MicroserviceRunner[IO](
-                        serviceReadinessChecker,
-                        certificateLoader,
-                        gitCertificateInstaller,
-                        sentryInitializer,
-                        cliVersionCompatChecker,
-                        eventConsumersRegistry,
-                        HttpServer[IO](serverPort = ServicePort.value, routes)
-                      ).run()
-                    }
-      } yield exitCode
+          migrationRequestSubscription <- tsmigrationrequest.SubscriptionFactory[IO](reProvisioningStatus, config)
+          eventConsumersRegistry <- consumers.EventConsumersRegistry(
+                                      awaitingGenerationSubscription,
+                                      membersSyncSubscription,
+                                      triplesGeneratedSubscription,
+                                      cleanUpSubscription,
+                                      migrationRequestSubscription
+                                    )
+          serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
+          microserviceRoutes <-
+            MicroserviceRoutes[IO](eventConsumersRegistry, reProvisioningStatus, config.some).map(_.routes)
+          exitCode <- microserviceRoutes.use { routes =>
+                        new MicroserviceRunner[IO](
+                          serviceReadinessChecker,
+                          certificateLoader,
+                          gitCertificateInstaller,
+                          sentryInitializer,
+                          cliVersionCompatChecker,
+                          eventConsumersRegistry,
+                          HttpServer[IO](serverPort = ServicePort.value, routes)
+                        ).run()
+                      }
+        } yield exitCode
+      }
     }
 }
 

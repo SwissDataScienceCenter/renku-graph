@@ -35,10 +35,9 @@ private trait CreatorsFinder[F[_]] {
   def findCreators(identifier: Identifier): F[Set[DatasetCreator]]
 }
 
-private class CreatorsFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig: RdfStoreConfig
+) extends RdfStoreClientImpl(rdfStoreConfig)
     with CreatorsFinder[F] {
 
   import CreatorsFinder._
@@ -67,10 +66,8 @@ private class CreatorsFinderImpl[F[_]: Async: Logger](
 
 private object CreatorsFinder {
 
-  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                 timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[CreatorsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new CreatorsFinderImpl(rdfStoreConfig, timeRecorder))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): F[CreatorsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new CreatorsFinderImpl(rdfStoreConfig))
 
   import io.circe.Decoder
 

@@ -59,7 +59,7 @@ private class ProjectTransformerImpl[F[_]: MonadThrow](
 }
 
 private[transformation] object ProjectTransformer {
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ProjectTransformer[F]] = for {
-    kgProjectFinder <- KGProjectFinder(timeRecorder)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectTransformer[F]] = for {
+    kgProjectFinder <- KGProjectFinder[F]
   } yield new ProjectTransformerImpl[F](kgProjectFinder, UpdatesCreator)
 }

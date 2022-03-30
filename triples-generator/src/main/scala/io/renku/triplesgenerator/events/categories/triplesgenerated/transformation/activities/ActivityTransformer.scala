@@ -35,8 +35,8 @@ private[transformation] trait ActivityTransformer[F[_]] {
 }
 
 private[transformation] object ActivityTransformer {
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ActivityTransformer[F]] = for {
-    kgInfoFinder <- KGInfoFinder(timeRecorder)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ActivityTransformer[F]] = for {
+    kgInfoFinder <- KGInfoFinder[F]
   } yield new ActivityTransformerImpl[F](kgInfoFinder, UpdatesCreator)
 }
 

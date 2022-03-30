@@ -197,7 +197,7 @@ private class EdgesTrimmerImpl[F[_]: MonadThrow]() extends EdgesTrimmer[F] {
 }
 
 private object LineageDataTrimmer {
-  def apply[F[_]: MonadThrow](): F[EdgesTrimmer[F]] = MonadThrow[F].catchNonFatal(new EdgesTrimmerImpl[F]())
+  def apply[F[_]: MonadThrow]: F[EdgesTrimmer[F]] = MonadThrow[F].catchNonFatal(new EdgesTrimmerImpl[F]())
 
   implicit class EntityIdOps(entityId: EntityId) {
     lazy val toLocation: Node.Location = Node.Location(entityId.value.toString)

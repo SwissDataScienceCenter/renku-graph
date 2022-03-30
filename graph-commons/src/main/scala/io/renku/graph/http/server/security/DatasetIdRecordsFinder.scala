@@ -22,24 +22,21 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
-import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{datasets, projects}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 object DatasetIdRecordsFinder {
-  def apply[F[_]: Async: Logger](
-      timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[SecurityRecordFinder[F, datasets.Identifier]] =
-    RdfStoreConfig[F]().map(new DatasetIdRecordsFinderImpl(_, timeRecorder))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SecurityRecordFinder[F, datasets.Identifier]] =
+    RdfStoreConfig[F]().map(new DatasetIdRecordsFinderImpl(_))
 }
 
-private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig: RdfStoreConfig
+) extends RdfStoreClientImpl(rdfStoreConfig)
     with SecurityRecordFinder[F, datasets.Identifier] {
 
   override def apply(id: datasets.Identifier): F[List[SecurityRecord]] =

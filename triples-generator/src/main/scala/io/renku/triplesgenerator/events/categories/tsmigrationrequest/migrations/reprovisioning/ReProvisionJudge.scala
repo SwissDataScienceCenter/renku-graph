@@ -33,13 +33,12 @@ private trait ReProvisionJudge[F[_]] {
 }
 
 private object ReProvisionJudge {
-  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                 reProvisioningStatus:      ReProvisioningStatus[F],
-                                 microserviceUrlFinder:     MicroserviceUrlFinder[F],
-                                 versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
-                                 timeRecorder:              SparqlQueryTimeRecorder[F]
-  )(implicit renkuBaseUrl:                                  RenkuBaseUrl) = for {
-    renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig, timeRecorder)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig,
+                                                          reProvisioningStatus:      ReProvisioningStatus[F],
+                                                          microserviceUrlFinder:     MicroserviceUrlFinder[F],
+                                                          versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
+  )(implicit renkuBaseUrl:                                                           RenkuBaseUrl) = for {
+    renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig)
     serviceHealthChecker   <- ServiceHealthChecker[F]
   } yield new ReProvisionJudgeImpl[F](renkuVersionPairFinder,
                                       reProvisioningStatus,

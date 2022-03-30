@@ -27,7 +27,7 @@ import io.renku.http.rest.SortBy
 import io.renku.http.rest.paging.PagingResponse
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import org.scalatest.TestSuite
 
@@ -37,9 +37,9 @@ trait FinderSpecOps {
   self: TestSuite with InMemoryRdfStore =>
 
   protected[finder] trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val finder =
-      new EntitiesFinderImpl[IO](rdfStoreConfig, new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]()))
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    val finder = new EntitiesFinderImpl[IO](rdfStoreConfig)
   }
 
   protected implicit class PagingResponseOps(response: PagingResponse[model.Entity]) {

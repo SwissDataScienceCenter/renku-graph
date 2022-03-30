@@ -22,7 +22,7 @@ import cats.effect.{ExitCode, IO, IOApp}
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private object TestSparqlQueryRunner extends IOApp {
@@ -53,13 +53,13 @@ private object TestSparqlQueryRunner extends IOApp {
     println("]")
   }
 
-  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
-  private lazy val queryRunner = new RdfStoreClientImpl(
+  private implicit lazy val logger:  TestLogger[IO]              = TestLogger[IO]()
+  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+  private lazy val queryRunner = new RdfStoreClientImpl[IO](
     RdfStoreConfig(FusekiBaseUrl(s"http://localhost:$fusekiPort"),
                    datasetName,
                    BasicAuthCredentials(BasicAuthUsername("not-needed"), BasicAuthPassword("not-needed"))
-    ),
-    new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
+    )
   ) {
 
     import io.circe.Decoder._

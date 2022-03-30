@@ -68,14 +68,13 @@ object KGMetrics {
   private[metrics] val initialDelay:   FiniteDuration = 10 seconds
   private[metrics] val countsInterval: FiniteDuration = 1 minute
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGMetrics[F]] =
-    for {
-      statsFinder <- StatsFinder(timeRecorder)
-      entitiesCountGauge <-
-        Gauge[F, EntityLabel](
-          name = "entities_count",
-          help = "Total object by type.",
-          labelName = "entities"
-        )
-    } yield new KGMetricsImpl[F](statsFinder, entitiesCountGauge)
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[KGMetrics[F]] = for {
+    statsFinder <- StatsFinder[F]
+    entitiesCountGauge <-
+      Gauge[F, EntityLabel](
+        name = "entities_count",
+        help = "Total object by type.",
+        labelName = "entities"
+      )
+  } yield new KGMetricsImpl[F](statsFinder, entitiesCountGauge)
 }

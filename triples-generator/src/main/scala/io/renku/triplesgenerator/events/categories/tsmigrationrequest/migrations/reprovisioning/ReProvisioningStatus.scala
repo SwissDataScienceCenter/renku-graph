@@ -43,15 +43,14 @@ trait ReProvisioningStatus[F[_]] {
   def findReProvisioningService(): F[Option[MicroserviceBaseUrl]]
 }
 
-private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger](
+private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
     subscriptions:         List[SubscriptionMechanism[F]],
     rdfStoreConfig:        RdfStoreConfig,
-    timeRecorder:          SparqlQueryTimeRecorder[F],
     statusRefreshInterval: FiniteDuration,
     cacheRefreshInterval:  FiniteDuration,
     lastCacheCheckTimeRef: Ref[F, Long]
 )(implicit renkuBaseUrl:   RenkuBaseUrl)
-    extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    extends RdfStoreClientImpl(rdfStoreConfig)
     with ReProvisioningStatus[F] {
 
   import io.renku.jsonld.syntax._
@@ -168,8 +167,7 @@ object ReProvisioningStatus {
   private val CacheRefreshInterval:  FiniteDuration = 2 minutes
   private val StatusRefreshInterval: FiniteDuration = 15 seconds
 
-  def apply[F[_]: Async: Parallel: Logger](
-      timeRecorder:          SparqlQueryTimeRecorder[F],
+  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
       subscriptionFactories: (EventHandler[F], SubscriptionMechanism[F])*
   ): F[ReProvisioningStatus[F]] = for {
     rdfStoreConfig        <- RdfStoreConfig[F]()
@@ -179,7 +177,6 @@ object ReProvisioningStatus {
     implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
     new ReProvisioningStatusImpl(subscriptionFactories.map(_._2).toList,
                                  rdfStoreConfig,
-                                 timeRecorder,
                                  StatusRefreshInterval,
                                  CacheRefreshInterval,
                                  lastCacheCheckTimeRef

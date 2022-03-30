@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators._
@@ -47,14 +47,13 @@ class RenkuVersionPairUpdaterSpec extends AnyWordSpec with IOSpec with InMemoryR
   }
 
   private trait TestCase {
-    val currentRenkuVersionPair = renkuVersionPairs.generateOne
-
-    private implicit val renkuBaseUrl: RenkuBaseUrl   = renkuBaseUrls.generateOne
-    private implicit val logger:       TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder         = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
+    val currentRenkuVersionPair      = renkuVersionPairs.generateOne
     val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
 
-    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl(rdfStoreConfig, timeRecorder)
+    private implicit val renkuBaseUrl: RenkuBaseUrl                = renkuBaseUrls.generateOne
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl[IO](rdfStoreConfig)
 
     def findPairInDb: Set[RenkuVersionPair] =
       runQuery(s"""|SELECT DISTINCT ?schemaVersion ?cliVersion 

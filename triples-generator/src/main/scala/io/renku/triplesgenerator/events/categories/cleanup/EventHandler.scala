@@ -66,12 +66,11 @@ object EventHandler {
 
   private val singleProcess = 1
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[F],
-      subscriptionMechanism:   SubscriptionMechanism[F]
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      subscriptionMechanism: SubscriptionMechanism[F]
   ): F[EventHandler[F]] = for {
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(singleProcess))
-    eventProcessor           <- CleanUpEventProcessor[F](sparqlQueryTimeRecorder)
+    eventProcessor           <- CleanUpEventProcessor[F]
   } yield new EventHandler[F](categoryName,
                               eventProcessor,
                               EventBodyDeserializer[F],

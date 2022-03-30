@@ -34,14 +34,12 @@ private trait TriplesRemover[F[_]] {
   def removeAllTriples(): F[Unit]
 }
 
-private class TriplesRemoverImpl[F[_]: Async: Logger](
+private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     removalBatchSize: Long Refined Positive,
     rdfStoreConfig:   RdfStoreConfig,
-    timeRecorder:     SparqlQueryTimeRecorder[F],
     idleTimeout:      Duration = 10 minutes,
     requestTimeout:   Duration = 10 minutes
 ) extends RdfStoreClientImpl(rdfStoreConfig,
-                             timeRecorder,
                              idleTimeoutOverride = idleTimeout.some,
                              requestTimeoutOverride = requestTimeout.some
     )
@@ -111,11 +109,10 @@ private object TriplesRemoverImpl {
   import eu.timepit.refined.pureconfig._
   import io.renku.config.ConfigLoader._
 
-  def apply[F[_]: Async: Logger](
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       rdfStoreConfig: RdfStoreConfig,
-      timeRecorder:   SparqlQueryTimeRecorder[F],
       config:         Config = ConfigFactory.load()
   ): F[TriplesRemover[F]] = for {
     removalBatchSize <- find[F, Long Refined Positive]("re-provisioning-removal-batch-size", config)
-  } yield new TriplesRemoverImpl(removalBatchSize, rdfStoreConfig, timeRecorder)
+  } yield new TriplesRemoverImpl(removalBatchSize, rdfStoreConfig)
 }

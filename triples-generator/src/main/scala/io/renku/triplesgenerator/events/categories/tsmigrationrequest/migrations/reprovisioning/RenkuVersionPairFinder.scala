@@ -32,11 +32,10 @@ trait RenkuVersionPairFinder[F[_]] {
   def find(): F[Option[RenkuVersionPair]]
 }
 
-private class RenkuVersionPairFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig:      RdfStoreConfig,
-    timeRecorder:        SparqlQueryTimeRecorder[F]
+private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig:      RdfStoreConfig
 )(implicit renkuBaseUrl: RenkuBaseUrl)
-    extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+    extends RdfStoreClientImpl[F](rdfStoreConfig)
     with RenkuVersionPairFinder[F] {
 
   override def find(): F[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
@@ -61,10 +60,9 @@ private class RenkuVersionPairFinderImpl[F[_]: Async: Logger](
 }
 
 private object RenkuVersionPairFinder {
-  def apply[F[_]: Async: Logger](
-      rdfStoreConfig:      RdfStoreConfig,
-      timeRecorder:        SparqlQueryTimeRecorder[F]
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      rdfStoreConfig:      RdfStoreConfig
   )(implicit renkuBaseUrl: RenkuBaseUrl): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal {
-    new RenkuVersionPairFinderImpl[F](rdfStoreConfig, timeRecorder)
+    new RenkuVersionPairFinderImpl[F](rdfStoreConfig)
   }
 }

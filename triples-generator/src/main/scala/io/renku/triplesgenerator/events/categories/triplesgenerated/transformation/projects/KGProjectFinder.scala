@@ -32,9 +32,8 @@ private trait KGProjectFinder[F[_]] {
   def find(resourceId: projects.ResourceId): F[Option[KGProjectInfo]]
 }
 
-private class KGProjectFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                                       timeRecorder: SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig)
+    extends RdfStoreClientImpl(rdfStoreConfig)
     with KGProjectFinder[F] {
 
   import eu.timepit.refined.auto._
@@ -87,9 +86,9 @@ private class KGProjectFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreC
 }
 
 private object KGProjectFinder {
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGProjectFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] = for {
     config <- RdfStoreConfig[F]()
-  } yield new KGProjectFinderImpl(config, timeRecorder)
+  } yield new KGProjectFinderImpl(config)
 
   type KGProjectInfo = (projects.Name,
                         Option[projects.ResourceId],

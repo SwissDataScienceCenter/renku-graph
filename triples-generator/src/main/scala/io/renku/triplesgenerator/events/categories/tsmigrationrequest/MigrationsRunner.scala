@@ -67,10 +67,10 @@ private class MigrationsRunnerImpl[F[_]: MonadThrow: Logger](migrations: List[Mi
 }
 
 private object MigrationsRunner {
-  def apply[F[_]: Async: Logger: MetricsRegistry](reProvisioningStatus: ReProvisioningStatus[F],
-                                                  timeRecorder: SparqlQueryTimeRecorder[F],
-                                                  config:       Config
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      reProvisioningStatus: ReProvisioningStatus[F],
+      config:               Config
   ): F[MigrationsRunner[F]] = for {
-    migrations <- Migrations[F](reProvisioningStatus, timeRecorder, config)
+    migrations <- Migrations[F](reProvisioningStatus, config)
   } yield new MigrationsRunnerImpl[F](migrations)
 }

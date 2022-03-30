@@ -29,7 +29,7 @@ import io.renku.graph.model.GraphModelGenerators.renkuBaseUrls
 import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.Schemas._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
@@ -149,18 +149,16 @@ class ReProvisioningStatusSpec
   private trait TestCase {
     val cacheRefreshInterval  = 1 second
     val statusRefreshInterval = 1 second
-    private implicit val logger:       TestLogger[IO] = TestLogger[IO]()
-    private implicit val renkuBaseUrl: RenkuBaseUrl   = renkuBaseUrls.generateOne
-    private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    private implicit val renkuBaseUrl: RenkuBaseUrl                = renkuBaseUrls.generateOne
     private val statusCacheCheckTimeRef = Ref.unsafe[IO, Long](0L)
     private val subscriptions           = List(mock[SubscriptionMechanism[IO]], mock[SubscriptionMechanism[IO]])
-
-    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriptions,
-                                                            rdfStoreConfig,
-                                                            timeRecorder,
-                                                            statusRefreshInterval,
-                                                            cacheRefreshInterval,
-                                                            statusCacheCheckTimeRef
+    val reProvisioningStatus = new ReProvisioningStatusImpl[IO](subscriptions,
+                                                                rdfStoreConfig,
+                                                                statusRefreshInterval,
+                                                                cacheRefreshInterval,
+                                                                statusCacheCheckTimeRef
     )
 
     def expectNotificationSent(): Unit = subscriptions foreach { subscription =>

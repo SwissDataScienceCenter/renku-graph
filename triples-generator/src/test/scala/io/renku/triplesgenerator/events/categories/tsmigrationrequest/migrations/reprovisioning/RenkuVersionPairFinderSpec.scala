@@ -25,7 +25,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuBaseUrl
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
@@ -65,10 +65,12 @@ class RenkuVersionPairFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
   }
 
   private trait TestCase {
+    val currentVersionPair = renkuVersionPairs.generateOne
+
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val currentVersionPair    = renkuVersionPairs.generateOne
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    private val timeRecorder  = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val versionPairFinder     = new RenkuVersionPairFinderImpl[IO](rdfStoreConfig, timeRecorder)
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
+      TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
+    val versionPairFinder = new RenkuVersionPairFinderImpl[IO](rdfStoreConfig)
   }
 }

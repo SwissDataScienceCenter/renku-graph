@@ -38,7 +38,7 @@ import io.renku.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort.{DateProperty, DatePublishedProperty, ProjectsCountProperty, TitleProperty}
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -902,13 +902,9 @@ class DatasetsFinderSpec
   }
 
   private trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
-    val datasetsFinder = new DatasetsFinderImpl[IO](
-      rdfStoreConfig,
-      new CreatorsFinderImpl[IO](rdfStoreConfig, timeRecorder),
-      timeRecorder
-    )
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    val datasetsFinder = new DatasetsFinderImpl[IO](rdfStoreConfig, new CreatorsFinderImpl[IO](rdfStoreConfig))
   }
 
   private lazy val publicProjectEntities: Gen[RenkuProject.WithoutParent] = renkuProjectEntities(visibilityPublic)

@@ -134,16 +134,15 @@ private[events] class EventHandler[F[_]: Async: Logger](
 private[events] object EventHandler {
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriberUrl:         SubscriberUrl,
       serviceId:             MicroserviceIdentifier,
       serviceVersion:        ServiceVersion,
       subscriptionMechanism: SubscriptionMechanism[F],
       reProvisioningStatus:  ReProvisioningStatus[F],
-      timeRecorder:          SparqlQueryTimeRecorder[F],
       config:                Config
   ): F[EventHandler[F]] = for {
-    migrationsRunner         <- MigrationsRunner[F](reProvisioningStatus, timeRecorder, config)
+    migrationsRunner         <- MigrationsRunner[F](reProvisioningStatus, config)
     eventSender              <- EventSender[F]
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(1)
   } yield new EventHandler[F](

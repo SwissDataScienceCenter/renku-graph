@@ -114,9 +114,8 @@ private[migrations] object ReProvisioning {
 
   import scala.concurrent.duration._
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       reProvisioningStatus: ReProvisioningStatus[F],
-      timeRecorder:         SparqlQueryTimeRecorder[F],
       config:               Config = ConfigFactory.load()
   ): F[Migration[F]] = RenkuBaseUrlLoader[F]() flatMap { implicit renkuBaseUrl =>
     for {
@@ -126,19 +125,15 @@ private[migrations] object ReProvisioning {
       microserviceUrlFinder <- MicroserviceUrlFinder[F](Microservice.ServicePort)
       compatibilityMatrix   <- VersionCompatibilityConfig[F](config)
       executionTimeRecorder <- ExecutionTimeRecorder[F]()
-      triplesRemover        <- TriplesRemoverImpl(rdfStoreConfig, timeRecorder)
-      reProvisioningJudge <- ReProvisionJudge[F](rdfStoreConfig,
-                                                 reProvisioningStatus,
-                                                 microserviceUrlFinder,
-                                                 compatibilityMatrix,
-                                                 timeRecorder
-                             )
+      triplesRemover        <- TriplesRemoverImpl(rdfStoreConfig)
+      reProvisioningJudge <-
+        ReProvisionJudge[F](rdfStoreConfig, reProvisioningStatus, microserviceUrlFinder, compatibilityMatrix)
     } yield new ReProvisioningImpl[F](
       compatibilityMatrix,
       reProvisioningJudge,
       triplesRemover,
       eventSender,
-      new RenkuVersionPairUpdaterImpl(rdfStoreConfig, timeRecorder),
+      new RenkuVersionPairUpdaterImpl(rdfStoreConfig),
       microserviceUrlFinder,
       reProvisioningStatus,
       executionTimeRecorder,

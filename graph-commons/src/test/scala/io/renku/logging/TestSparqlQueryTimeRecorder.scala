@@ -16,23 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
+package io.renku.logging
 
-import cats.effect.Async
-import cats.syntax.all._
-import com.typesafe.config.Config
-import io.renku.metrics.MetricsRegistry
+import cats.MonadThrow
 import io.renku.rdfstore.SparqlQueryTimeRecorder
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
-import reprovisioning.{ReProvisioning, ReProvisioningStatus}
 
-private[tsmigrationrequest] object Migrations {
-
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      reProvisioningStatus: ReProvisioningStatus[F],
-      config:               Config
-  ): F[List[Migration[F]]] = for {
-    reProvisioning <- ReProvisioning[F](reProvisioningStatus, config)
-  } yield List(reProvisioning)
+object TestSparqlQueryTimeRecorder {
+  def apply[F[_]: MonadThrow: Logger] = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[F]())
+  def apply[F[_]: MonadThrow: Logger](instance: ExecutionTimeRecorder[F]) = new SparqlQueryTimeRecorder(instance)
 }
