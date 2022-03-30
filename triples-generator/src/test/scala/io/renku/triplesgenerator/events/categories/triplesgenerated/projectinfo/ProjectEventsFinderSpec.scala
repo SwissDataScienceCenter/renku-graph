@@ -36,7 +36,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.duration._
 import scala.util.Random
 
 class ProjectEventsFinderSpec
@@ -134,10 +133,8 @@ class ProjectEventsFinderSpec
     }
   }
 
-  private lazy val requestTimeout = 2 seconds
-
   private trait TestCase {
-    
+
     val project = Project(projectIds.generateOne, projectPaths.generateOne)
     val member  = projectMembersNoEmail.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption

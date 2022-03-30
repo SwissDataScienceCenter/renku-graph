@@ -35,7 +35,8 @@ trait GitLabClientTools[F[_]] {
 
   def captureMapping[FinderType, ResultType, A](finder: FinderType, gitLabClient: GitLabClient[F])(
       findingMethod:                                    FinderType => A,
-      resultGenerator:                                  Gen[ResultType]
+      resultGenerator:                                  Gen[ResultType],
+      expectedNumberOfCalls:                            Int = 1
   )(implicit applicative:                               Applicative[F]): ResponseMappingF[F, ResultType] = {
     val responseMapping = CaptureOne[ResponseMappingF[F, ResultType]]()
 
@@ -45,9 +46,9 @@ trait GitLabClientTools[F[_]] {
       ))
       .expects(*, *, *, capture(responseMapping), *)
       .returning(resultGenerator.generateOne.pure[F])
+      .repeat(expectedNumberOfCalls)
 
     findingMethod(finder)
-
     responseMapping.value
   }
 }

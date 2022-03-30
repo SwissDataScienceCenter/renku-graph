@@ -31,7 +31,7 @@ import io.renku.graph.model.GraphModelGenerators.{personEmails, personGitLabIds,
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.{GitLabUrl, persons, projects}
+import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
@@ -45,7 +45,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.duration._
 import scala.util.Random
 
 class MemberEmailFinderSpec
@@ -344,8 +343,6 @@ class MemberEmailFinderSpec
     }
   }
 
-  private lazy val requestTimeout = 2 seconds
-
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val project = Project(projectIds.generateOne, projectPaths.generateOne)
@@ -360,7 +357,7 @@ class MemberEmailFinderSpec
       EitherT.fromEither[IO]((events, pagingInfo).asRight[ProcessingRecoverableError])
   }
 
-  implicit class PushEventOps(event: PushEvent) {
+  private implicit class PushEventOps(event: PushEvent) {
     def forMember(member: ProjectMember): PushEvent =
       event.copy(authorId = member.gitLabId, authorName = member.name)
 

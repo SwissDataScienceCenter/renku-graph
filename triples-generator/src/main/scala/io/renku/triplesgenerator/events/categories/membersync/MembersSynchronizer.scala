@@ -21,10 +21,9 @@ package io.renku.triplesgenerator.events.categories.membersync
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.rdfstore._
@@ -89,11 +88,11 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: Logger](
 }
 
 private object MembersSynchronizer {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab],
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F],
                                  timeRecorder: SparqlQueryTimeRecorder[F]
   ): F[MembersSynchronizer[F]] = for {
     accessTokenFinder          <- AccessTokenFinder[F]
-    gitLabProjectMembersFinder <- GitLabProjectMembersFinder(gitLabThrottler)
+    gitLabProjectMembersFinder <- GitLabProjectMembersFinder(gitLabClient)
     kGProjectMembersFinder     <- KGProjectMembersFinder(timeRecorder)
     kGPersonFinder             <- KGPersonFinder(timeRecorder)
     updatesCreator             <- UpdatesCreator[F]

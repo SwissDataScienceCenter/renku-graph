@@ -22,11 +22,10 @@ import cats.Show
 import cats.data.EitherT.fromEither
 import cats.effect.{Async, Concurrent, Spawn}
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.events.consumers.EventSchedulingResult.Accepted
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.http.client.GitLabClient
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
@@ -57,9 +56,9 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private[events] object EventHandler {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab],
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F],
                                  timeRecorder: SparqlQueryTimeRecorder[F]
   ): F[EventHandler[F]] = for {
-    membersSynchronizer <- MembersSynchronizer[F](gitLabThrottler, timeRecorder)
+    membersSynchronizer <- MembersSynchronizer[F](gitLabClient, timeRecorder)
   } yield new EventHandler[F](categoryName, membersSynchronizer)
 }
