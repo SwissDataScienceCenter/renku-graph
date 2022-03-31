@@ -25,7 +25,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.TypeSerializers.projectIdEncoder
+import io.renku.eventlog.TypeSerializers.{projectIdEncoder, projectPathEncoder}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
@@ -57,6 +57,7 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
 
   override def cleanUp(project: Project): Kleisli[F, Session[F], Unit] = {
     for {
+      _       <- removeCleanUpEvents(project)
       _       <- removeProjectSubscriptionSyncTimes(project)
       removed <- removeProject(project)
       _       <- Kleisli.liftF[F, Session[F], Unit](removeWebhookAndToken(project)) recoverWith logError(project)
@@ -69,12 +70,21 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
       Kleisli.liftF(Logger[F].error(error)(s"Failed to remove webhook or token for project: ${project.show}"))
   }
 
+  private def removeCleanUpEvents(project: Project) = measureExecutionTime {
+    SqlStatement(name = "project_to_new - clean_up_events_queue removal")
+      .command[projects.Path](sql"""
+        DELETE FROM clean_up_events_queue 
+        WHERE project_path = $projectPathEncoder""".command)
+      .arguments(project.path)
+      .build
+      .void
+  }
+
   private def removeProjectSubscriptionSyncTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - subscription_time removal")
-      .command[projects.Id](
-        sql"""DELETE FROM subscription_category_sync_time 
-              WHERE project_id = $projectIdEncoder""".command
-      )
+      .command[projects.Id](sql"""
+        DELETE FROM subscription_category_sync_time 
+        WHERE project_id = $projectIdEncoder""".command)
       .arguments(project.id)
       .build
       .void
@@ -82,10 +92,9 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
 
   private def removeProject(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - remove project")
-      .command[projects.Id](
-        sql"""DELETE FROM project 
-              WHERE project_id = $projectIdEncoder""".command
-      )
+      .command[projects.Id](sql"""
+        DELETE FROM project 
+        WHERE project_id = $projectIdEncoder""".command)
       .arguments(project.id)
       .build
       .mapResult {

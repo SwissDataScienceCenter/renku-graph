@@ -66,8 +66,7 @@ private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionRes
       _ <- execute(foreignKeySql)
     } yield ()
 
-  private lazy val createTableSql: Command[Void] =
-    sql"""
+  private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS project(
       project_id        int4      NOT NULL,
       project_path      VARCHAR   NOT NULL,
@@ -76,8 +75,7 @@ private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionRes
     );
     """.command
 
-  private lazy val fillInTableSql: Command[Void] =
-    sql"""
+  private lazy val fillInTableSql: Command[Void] = sql"""
     INSERT INTO project
     SELECT DISTINCT
       log.project_id,
@@ -93,8 +91,7 @@ private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionRes
     JOIN event_log log ON log.project_id = project_event_date.project_id AND log.event_date = project_event_date.latest_event_date
     """.command
 
-  private lazy val foreignKeySql: Command[Void] =
-    sql"""
+  private lazy val foreignKeySql: Command[Void] = sql"""
     ALTER TABLE event_log
     ADD CONSTRAINT fk_project
     FOREIGN KEY (project_id) 

@@ -86,7 +86,7 @@ trait RemoteTriplesGenerator {
 
   private def stubFor(mappingBuilder: MappingBuilder): StubMapping = instance.register(mappingBuilder)
 
-  def reset(): Unit = server.resetAll()
+  def resetTriplesGenerator(): Unit = server.resetAll()
 }
 
 private object RemoteTriplesGeneratorWiremockInstance {
