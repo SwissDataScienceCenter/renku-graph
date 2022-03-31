@@ -21,10 +21,25 @@ package io.renku.eventlog
 import cats.data.Kleisli
 import io.renku.graph.model.projects
 import skunk._
+import skunk.codec.all.timestamptz
 import skunk.implicits._
+
+import java.time.OffsetDateTime
 
 trait CleanUpEventsProvisioning {
   self: InMemoryEventLogDb =>
+
+  protected def insertCleanUpEvent(projectPath: projects.Path): projects.Path = execute {
+    Kleisli { session =>
+      val query: Command[OffsetDateTime ~ projects.Path] =
+        sql"""INSERT INTO clean_up_events_queue (date, project_path)
+              VALUES ($timestamptz, $projectPathEncoder)""".command
+      session
+        .prepare(query)
+        .use(_.execute(OffsetDateTime.now() ~ projectPath))
+        .map(_ => projectPath)
+    }
+  }
 
   protected def findCleanUpEvents: List[projects.Path] = execute {
     Kleisli { session =>
