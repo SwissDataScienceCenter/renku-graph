@@ -29,14 +29,16 @@ import java.time.OffsetDateTime
 trait CleanUpEventsProvisioning {
   self: InMemoryEventLogDb =>
 
-  protected def insertCleanUpEvent(projectPath: projects.Path): projects.Path = execute {
+  protected def insertCleanUpEvent(projectPath: projects.Path,
+                                   date:        OffsetDateTime = OffsetDateTime.now()
+  ): projects.Path = execute {
     Kleisli { session =>
       val query: Command[OffsetDateTime ~ projects.Path] =
         sql"""INSERT INTO clean_up_events_queue (date, project_path)
               VALUES ($timestamptz, $projectPathEncoder)""".command
       session
         .prepare(query)
-        .use(_.execute(OffsetDateTime.now() ~ projectPath))
+        .use(_.execute(date ~ projectPath))
         .map(_ => projectPath)
     }
   }
@@ -51,5 +53,4 @@ trait CleanUpEventsProvisioning {
       session.prepare(query).use(_.stream(Void, 32).compile.toList)
     }
   }
-
 }

@@ -23,13 +23,11 @@ import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
-import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.{ExecutionDate, TypeSerializers, subscriptions}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
-import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import skunk._
@@ -49,70 +47,103 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
     with TypeSerializers {
 
   override def popEvent(): F[Option[CleanUpEvent]] = SessionResource[F].useK {
-    for {
-      maybeCleanUpEvent <- findEventAndUpdateForProcessing
-      _                 <- maybeUpdateMetrics(maybeCleanUpEvent)
-    } yield maybeCleanUpEvent.map(_._1)
+    (findEventAndMarkTaken flatTap updateMetrics).map(_.map(_._1))
   }
 
-  private def findEventAndUpdateForProcessing = for {
-    maybeProject      <- findProject
-    maybeCleanUpEvent <- updateForProcessing(maybeProject)
-  } yield maybeCleanUpEvent
+  private def findEventAndMarkTaken =
+    findInCleanUpEvents >>= {
+      case Some(event) => Kleisli.pure(Option(event))
+      case None        => findInEvents
+    } >>= removeEventFromQueue >>= markEventsDeleting
 
-  private def findProject = measureExecutionTime {
+  private def findInCleanUpEvents = measureExecutionTime {
     SqlStatement
-      .named(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
-      .select[EventStatus ~ ExecutionDate, Project](sql"""
-        SELECT evt.project_id, prj.project_path
-        FROM event evt
-        JOIN  project prj ON prj.project_id = evt.project_id 
-        WHERE evt.status = $eventStatusEncoder
-          AND evt.execution_date < $executionDateEncoder
-        ORDER BY evt.execution_date ASC
+      .named(s"${SubscriptionCategory.name.value.toLowerCase} - find clean-up event")
+      .select[Void, Project](sql"""
+        SELECT prj.project_id, prj.project_path
+        FROM clean_up_events_queue queue
+        JOIN  project prj ON prj.project_path = queue.project_path 
+        ORDER BY queue.date ASC
         LIMIT 1
         """.query(projectDecoder))
-      .arguments(AwaitingDeletion ~ ExecutionDate(now()))
+      .arguments(Void)
       .build(_.option)
   }
 
-  private def updateForProcessing(maybeProject: Option[Project]) =
-    maybeProject map { case project @ Project(projectId, _) =>
+  private def findInEvents = measureExecutionTime {
+    SqlStatement
+      .named(s"${SubscriptionCategory.name.value.toLowerCase} - find event")
+      .select[ExecutionDate, Project](sql"""
+        SELECT evt.project_id, prj.project_path
+        FROM event evt
+        JOIN  project prj ON prj.project_id = evt.project_id 
+        WHERE evt.status = '#${AwaitingDeletion.value}'
+          AND evt.execution_date <= $executionDateEncoder
+        ORDER BY evt.execution_date ASC
+        LIMIT 1
+        """.query(projectDecoder))
+      .arguments(ExecutionDate(now()))
+      .build(_.option)
+  }
+
+  private def removeEventFromQueue: Option[Project] => Kleisli[F, Session[F], Option[Project]] = {
+    case Some(project @ Project(_, projectPath)) =>
       measureExecutionTime {
-        SqlStatement(
-          name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
-        ).command[EventStatus ~ ExecutionDate ~ EventStatus ~ projects.Id](sql"""
-          UPDATE event
-          SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
-          WHERE status = $eventStatusEncoder
-            AND project_id = $projectIdEncoder
-       """.command)
-          .arguments(Deleting ~ ExecutionDate(now()) ~ AwaitingDeletion ~ projectId)
+        SqlStatement
+          .named(s"${SubscriptionCategory.name.value.toLowerCase} - delete clean-up event")
+          .command[projects.Path](sql"""
+            DELETE FROM clean_up_events_queue
+            WHERE project_path = $projectPathEncoder
+            """.command)
+          .arguments(projectPath)
+          .build
+          .mapResult {
+            case Completion.Delete(_) => project.some
+            case _                    => Option.empty[Project]
+          }
+      }
+    case None => Kleisli.pure(Option.empty[Project])
+  }
+
+  private def markEventsDeleting: Option[Project] => Kleisli[F, Session[F], Option[(CleanUpEvent, Int)]] = {
+    case Some(project @ Project(projectId, _)) =>
+      measureExecutionTime {
+        SqlStatement
+          .named(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
+          .command[ExecutionDate ~ projects.Id](sql"""
+            UPDATE event
+            SET status = '#${Deleting.value}', execution_date = $executionDateEncoder
+            WHERE status = '#${AwaitingDeletion.value}'
+              AND project_id = $projectIdEncoder
+            """.command)
+          .arguments(ExecutionDate(now()) ~ projectId)
           .build
           .mapResult {
             case Completion.Update(count) => (CleanUpEvent(project) -> count).some
             case _                        => Option.empty[(CleanUpEvent, Int)]
           }
       }
-    } getOrElse Kleisli.pure(Option.empty[(CleanUpEvent, Int)])
+    case None => Kleisli.pure(Option.empty[(CleanUpEvent, Int)])
+  }
 
-  private def maybeUpdateMetrics(maybeCleanUpEvent: Option[(CleanUpEvent, Int)]) =
-    maybeCleanUpEvent map { case (CleanUpEvent(Project(_, projectPath)), updatedRows) =>
+  private lazy val updateMetrics: Option[(CleanUpEvent, Int)] => Kleisli[F, Session[F], Unit] = {
+    case Some(CleanUpEvent(Project(_, projectPath)) -> updatedRows) =>
       Kleisli.liftF {
         for {
           _ <- awaitingDeletionGauge.update((projectPath, updatedRows * -1))
           _ <- deletingGauge.update((projectPath, updatedRows))
         } yield ()
       }
-    } getOrElse Kleisli.pure[F, Session[F], Unit](())
+    case None => Kleisli.pure[F, Session[F], Unit](())
+  }
 }
 
 private object EventFinder {
   def apply[F[_]: Async: Parallel: SessionResource](
-      awatingDeletionGauge: LabeledGauge[F, projects.Path],
-      deletingGauge:        LabeledGauge[F, projects.Path],
-      queriesExecTimes:     LabeledHistogram[F]
+      awaitingDeletionGauge: LabeledGauge[F, projects.Path],
+      deletingGauge:         LabeledGauge[F, projects.Path],
+      queriesExecTimes:      LabeledHistogram[F]
   ): F[EventFinder[F, CleanUpEvent]] = MonadThrow[F].catchNonFatal {
-    new EventFinderImpl(awatingDeletionGauge, deletingGauge, queriesExecTimes)
+    new EventFinderImpl(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
   }
 }
