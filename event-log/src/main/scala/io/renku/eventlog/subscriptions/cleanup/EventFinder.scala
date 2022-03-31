@@ -54,7 +54,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
     findInCleanUpEvents >>= {
       case Some(event) => Kleisli.pure(Option(event))
       case None        => findInEvents
-    } >>= removeEventFromQueue >>= markEventsDeleting
+    } >>= removeEventFromQueue() >>= markEventsDeleting()
 
   private def findInCleanUpEvents = measureExecutionTime {
     SqlStatement
@@ -86,7 +86,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
       .build(_.option)
   }
 
-  private def removeEventFromQueue: Option[Project] => Kleisli[F, Session[F], Option[Project]] = {
+  private def removeEventFromQueue(): Option[Project] => Kleisli[F, Session[F], Option[Project]] = {
     case Some(project @ Project(_, projectPath)) =>
       measureExecutionTime {
         SqlStatement
@@ -105,7 +105,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
     case None => Kleisli.pure(Option.empty[Project])
   }
 
-  private def markEventsDeleting: Option[Project] => Kleisli[F, Session[F], Option[(CleanUpEvent, Int)]] = {
+  private def markEventsDeleting(): Option[Project] => Kleisli[F, Session[F], Option[(CleanUpEvent, Int)]] = {
     case Some(project @ Project(projectId, _)) =>
       measureExecutionTime {
         SqlStatement
