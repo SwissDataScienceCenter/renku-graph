@@ -73,7 +73,7 @@ object Microservice extends IOMicroservice {
         awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory[IO]
         membersSyncSubscription <- events.categories.membersync.SubscriptionFactory(gitLabClient, sparqlTimeRecorder)
         triplesGeneratedSubscription <-
-          events.categories.triplesgenerated.SubscriptionFactory(gitLabThrottler, sparqlTimeRecorder, gitLabClient)
+          events.categories.triplesgenerated.SubscriptionFactory(sparqlTimeRecorder, gitLabClient)
         cleanUpSubscription <- events.categories.cleanup.SubscriptionFactory(sparqlTimeRecorder)
         eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                     awaitingGenerationSubscription,

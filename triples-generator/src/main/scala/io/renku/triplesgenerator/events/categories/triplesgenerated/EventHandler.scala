@@ -26,8 +26,7 @@ import cats.{NonEmptyParallel, Parallel, Show}
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.renku.config.{ConfigLoader, GitLab}
-import io.renku.control.Throttler
+import io.renku.config.ConfigLoader
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
@@ -93,14 +92,13 @@ private[events] object EventHandler {
   import eu.timepit.refined.pureconfig._
 
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
-      gitLabThrottler:       Throttler[F, GitLab],
       timeRecorder:          SparqlQueryTimeRecorder[F],
       gitLabClient:          GitLabClient[F],
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
     generationProcesses        <- find[F, Int Refined Positive]("transformation-processes-number", config)
-    eventProcessor             <- EventProcessor(gitLabThrottler, timeRecorder, gitLabClient)
+    eventProcessor             <- EventProcessor(timeRecorder, gitLabClient)
     concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
   } yield new EventHandler[F](categoryName,
                               EventBodyDeserializer[F],

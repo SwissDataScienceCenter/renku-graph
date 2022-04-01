@@ -207,13 +207,9 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
 private object EventProcessor {
 
-  import io.renku.config.GitLab
-  import io.renku.control.Throttler
-
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
-      gitLabThrottler: Throttler[F, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[F],
-      gitLabClient:    GitLabClient[F]
+      timeRecorder: SparqlQueryTimeRecorder[F],
+      gitLabClient: GitLabClient[F]
   ): F[EventProcessor[F]] = for {
     uploader           <- TransformationStepsRunner(timeRecorder)
     accessTokenFinder  <- AccessTokenFinder[F]
@@ -226,7 +222,7 @@ private object EventProcessor {
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
-    jsonLDDeserializer    <- JsonLDDeserializer(gitLabThrottler, gitLabClient)
+    jsonLDDeserializer    <- JsonLDDeserializer(gitLabClient)
   } yield new EventProcessorImpl(
     accessTokenFinder,
     triplesCurator,
