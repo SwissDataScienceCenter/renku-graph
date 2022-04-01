@@ -33,6 +33,7 @@ private[tsmigrationrequest] object Migrations {
       reProvisioningStatus: ReProvisioningStatus[F],
       config:               Config
   ): F[List[Migration[F]]] = for {
-    reProvisioning <- ReProvisioning[F](reProvisioningStatus, config)
-  } yield List(reProvisioning)
+    reProvisioning     <- ReProvisioning[F](reProvisioningStatus, config)
+    topMostDerivedFrom <- TopMostDerivedFrom[F]
+  } yield List(reProvisioning, topMostDerivedFrom)
 }

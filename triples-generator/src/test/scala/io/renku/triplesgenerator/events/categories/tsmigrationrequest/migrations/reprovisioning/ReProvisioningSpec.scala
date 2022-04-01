@@ -49,14 +49,14 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
 
-      reProvisioning.required.unsafeRunSync() shouldBe MigrationRequired.No("TS up to date")
+      reProvisioning.required.value.unsafeRunSync() shouldBe MigrationRequired.No("TS up to date").asRight
     }
 
     "return Yes if TS is not up to date" in new TestCase {
 
       (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
-      reProvisioning.required.unsafeRunSync() shouldBe MigrationRequired.Yes("TS in incompatible version")
+      reProvisioning.required.value.unsafeRunSync() shouldBe MigrationRequired.Yes("TS in incompatible version").asRight
     }
 
     "retry checking if re-provisioning is needed on failure" in new TestCase {
@@ -67,7 +67,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
       }
 
-      reProvisioning.required.unsafeRunSync() shouldBe MigrationRequired.No("TS up to date")
+      reProvisioning.required.value.unsafeRunSync() shouldBe MigrationRequired.No("TS up to date").asRight
     }
   }
 
@@ -85,8 +85,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
@@ -111,8 +109,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
@@ -138,8 +134,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
@@ -167,8 +161,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
@@ -195,8 +187,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
@@ -224,8 +214,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         expectStatusChangeEventFailing(exception1)
         expectStatusChangeEventFailing(exception2)
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
@@ -236,32 +224,16 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
+  }
+
+  "postMigration" should {
 
     "do not fail but retry from the clearing the re-provisioning flag step if it fails" in new TestCase {
       val exception = exceptions.generateOne
+      (reProvisioningStatus.clear _).expects().returning(exception.raiseError[IO, Unit])
+      (reProvisioningStatus.clear _).expects().returning(IO.unit)
 
-      inSequence {
-
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
-
-        (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
-
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
-
-        (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
-
-        expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(exception.raiseError[IO, Unit])
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
-      }
-
-      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
-
-      logger.loggedOnly(
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
-      )
+      reProvisioning.postMigration().value.unsafeRunSync() shouldBe ().asRight
     }
   }
 

@@ -27,4 +27,5 @@ private object Generators {
   val migrationNames:       Gen[Migration.Name]    = nonEmptyStrings().toGeneratorOf(Migration.Name)
   val migrationRequiredYes: Gen[MigrationRequired] = nonEmptyStrings().map(MigrationRequired.Yes)
   val migrationRequiredNo:  Gen[MigrationRequired] = nonEmptyStrings().map(MigrationRequired.No)
+  val migrationRequired:    Gen[MigrationRequired] = Gen.oneOf(migrationRequiredYes, migrationRequiredNo)
 }

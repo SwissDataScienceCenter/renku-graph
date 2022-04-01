@@ -24,7 +24,10 @@ import cats.data.EitherT
 import cats.data.EitherT._
 import cats.syntax.all._
 import cats.{MonadThrow, Show}
+import io.circe.Decoder
+import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes.constraints.NonBlank
+import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
@@ -36,19 +39,22 @@ private trait Migration[F[_]] {
 
 private object Migration {
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  object Name                                  extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+  object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name] {
+    implicit val decoder: Decoder[Name] = stringDecoder(Name)
+  }
 }
 
 private abstract class ConditionedMigration[F[_]: MonadThrow: Logger] extends Migration[F] {
 
-  protected def required:  F[MigrationRequired]
-  protected def migrate(): EitherT[F, ProcessingRecoverableError, Unit]
+  protected def required:        EitherT[F, ProcessingRecoverableError, MigrationRequired]
+  protected def migrate():       EitherT[F, ProcessingRecoverableError, Unit]
+  protected def postMigration(): EitherT[F, ProcessingRecoverableError, Unit]
 
-  final def run(): EitherT[F, ProcessingRecoverableError, Unit] = right[ProcessingRecoverableError](required) >>= {
+  final def run(): EitherT[F, ProcessingRecoverableError, Unit] = required >>= {
     case r: MigrationRequired.No =>
       right(Logger[F].info(show"$categoryName: $name $r"))
     case r: MigrationRequired.Yes =>
-      right[ProcessingRecoverableError](Logger[F].info(show"$categoryName: $name $r")) >> migrate()
+      right[ProcessingRecoverableError](Logger[F].info(show"$categoryName: $name $r")) >> migrate() >> postMigration()
   }
 }
 

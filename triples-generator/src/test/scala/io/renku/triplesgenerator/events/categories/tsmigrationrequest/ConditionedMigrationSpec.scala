@@ -45,6 +45,9 @@ class ConditionedMigrationSpec extends AnyWordSpec with should.Matchers {
 
       migration.run().value shouldBe ().asRight.pure[Try]
 
+      migration.migrationExecuted     shouldBe false
+      migration.postMigrationExecuted shouldBe false
+
       logger.loggedOnly(Info(show"$categoryName: ${migration.name} $required"))
     }
 
@@ -54,7 +57,8 @@ class ConditionedMigrationSpec extends AnyWordSpec with should.Matchers {
 
       migration.run().value shouldBe ().asRight.pure[Try]
 
-      migration.wasRun shouldBe true
+      migration.migrationExecuted     shouldBe true
+      migration.postMigrationExecuted shouldBe true
 
       logger.loggedOnly(Info(show"$categoryName: ${migration.name} $required"))
     }
@@ -67,7 +71,8 @@ class ConditionedMigrationSpec extends AnyWordSpec with should.Matchers {
 
       migration.run() shouldBe migrationResult
 
-      migration.wasRun shouldBe true
+      migration.migrationExecuted     shouldBe true
+      migration.postMigrationExecuted shouldBe false
 
       logger.loggedOnly(Info(show"$categoryName: ${migration.name} $required"))
     }
@@ -80,7 +85,36 @@ class ConditionedMigrationSpec extends AnyWordSpec with should.Matchers {
 
       migration.run().value shouldBe exception.raiseError[Try, Either[ProcessingRecoverableError, Unit]]
 
-      migration.wasRun shouldBe true
+      migration.migrationExecuted     shouldBe true
+      migration.postMigrationExecuted shouldBe false
+
+      logger.loggedOnly(Info(show"$categoryName: ${migration.name} $required"))
+    }
+
+    "return Processing Recoverable Failure if the post migration process returns one" in new TestCase {
+      val required            = migrationRequiredYes.generateOne
+      val recoverableError    = processingRecoverableErrors.generateOne
+      val postMigrationResult = leftT[Try, Unit](recoverableError)
+      val migration           = createMigration(required, postMigrationResult = postMigrationResult)
+
+      migration.run() shouldBe postMigrationResult
+
+      migration.migrationExecuted     shouldBe true
+      migration.postMigrationExecuted shouldBe true
+
+      logger.loggedOnly(Info(show"$categoryName: ${migration.name} $required"))
+    }
+
+    "fail if the post migration process fails" in new TestCase {
+      val required            = migrationRequiredYes.generateOne
+      val exception           = exceptions.generateOne
+      val postMigrationResult = right[ProcessingRecoverableError](exception.raiseError[Try, Unit])
+      val migration           = createMigration(required, postMigrationResult = postMigrationResult)
+
+      migration.run().value shouldBe exception.raiseError[Try, Either[ProcessingRecoverableError, Unit]]
+
+      migration.migrationExecuted     shouldBe true
+      migration.postMigrationExecuted shouldBe true
 
       logger.loggedOnly(Info(show"$categoryName: ${migration.name} $required"))
     }
@@ -89,16 +123,23 @@ class ConditionedMigrationSpec extends AnyWordSpec with should.Matchers {
   private trait TestCase {
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
 
-    def createMigration(migrationRequired: MigrationRequired,
-                        result:            EitherT[Try, ProcessingRecoverableError, Unit] = rightT(())
+    def createMigration(migrationRequired:   MigrationRequired,
+                        migrationResult:     EitherT[Try, ProcessingRecoverableError, Unit] = rightT(()),
+                        postMigrationResult: EitherT[Try, ProcessingRecoverableError, Unit] = rightT(())
     ) = new ConditionedMigration[Try] {
       override val name     = migrationNames.generateOne
-      override val required = migrationRequired.pure[Try]
+      override val required = rightT(migrationRequired)
 
-      var wasRun: Boolean = false
+      var migrationExecuted: Boolean = false
       protected override def migrate(): EitherT[Try, ProcessingRecoverableError, Unit] = {
-        wasRun = true
-        result
+        migrationExecuted = true
+        migrationResult
+      }
+
+      var postMigrationExecuted: Boolean = false
+      protected override def postMigration(): EitherT[Try, ProcessingRecoverableError, Unit] = {
+        postMigrationExecuted = true
+        postMigrationResult
       }
     }
   }
