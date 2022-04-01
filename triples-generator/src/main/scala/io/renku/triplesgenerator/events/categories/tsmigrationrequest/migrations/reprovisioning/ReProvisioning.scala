@@ -36,7 +36,8 @@ import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.ConditionedMigration.MigrationRequired
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.{ConditionedMigration, Migration}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
@@ -52,7 +53,7 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
     reProvisioningStatus:      ReProvisioningStatus[F],
     executionTimeRecorder:     ExecutionTimeRecorder[F],
     retryDelay:                FiniteDuration
-) extends Migration[F] {
+) extends ConditionedMigration[F] {
 
   override val name: Migration.Name = Migration.Name("re-provisioning")
 
@@ -61,18 +62,19 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
   import reProvisionJudge.reProvisioningNeeded
   import triplesRemover._
 
-  override def run(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    (reProvisioningNeeded() recoverWith tryAgain(reProvisioningNeeded()))
-      .flatMap {
-        case true  => triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
-        case false => Logger[F].info(show"$name: TS up to date")
-      }
-      .map(_.asRight[ProcessingRecoverableError])
+  override def required: F[MigrationRequired] = reProvisioningNeeded()
+    .recoverWith(tryAgain(reProvisioningNeeded()))
+    .map {
+      case true  => MigrationRequired.Yes("TS in incompatible version")
+      case false => MigrationRequired.No("TS up to date")
+    }
+
+  override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT.right {
+    triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
   }
 
   private def triggerReProvisioning = measureExecutionTime {
     for {
-      _ <- Logger[F].info(show"$name: kicking-off re-provisioning")
       _ <- setRunningStatusInTS()
       _ <- versionPairUpdater
              .update(versionCompatibilityPairs.head)

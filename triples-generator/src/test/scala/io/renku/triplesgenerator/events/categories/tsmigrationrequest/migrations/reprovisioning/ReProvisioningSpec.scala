@@ -33,6 +33,7 @@ import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.ConditionedMigration.MigrationRequired
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -42,13 +43,39 @@ import scala.concurrent.duration._
 
 class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  "run" should {
+  "required" should {
+
+    "return No if TS is up to date" in new TestCase {
+
+      (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
+
+      reProvisioning.required.unsafeRunSync() shouldBe MigrationRequired.No("TS up to date")
+    }
+
+    "return Yes if TS is not up to date" in new TestCase {
+
+      (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
+
+      reProvisioning.required.unsafeRunSync() shouldBe MigrationRequired.Yes("TS in incompatible version")
+    }
+
+    "retry checking if re-provisioning is needed on failure" in new TestCase {
+      val exception = exceptions.generateOne
+
+      inSequence {
+        (reprovisionJudge.reProvisioningNeeded _).expects().returning(exception.raiseError[IO, Boolean])
+        (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
+      }
+
+      reProvisioning.required.unsafeRunSync() shouldBe MigrationRequired.No("TS up to date")
+    }
+  }
+
+  "migrate" should {
 
     "clear the RDF Store and reschedule all Commit Events for processing in the Log if store is outdated" in new TestCase {
 
       inSequence {
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
-
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
@@ -62,36 +89,10 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
         Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
-      )
-    }
-
-    "do nothing if there all RDF store is up to date" in new TestCase {
-
-      (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
-
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
-
-      logger.loggedOnly(Info("re-provisioning: TS up to date"))
-    }
-
-    "do not fail but simply retry if checking if re-provisioning is needed fails" in new TestCase {
-      val exception = exceptions.generateOne
-
-      inSequence {
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(exception.raiseError[IO, Boolean])
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
-      }
-
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
-
-      logger.loggedOnly(
-        Error("re-provisioning: failure", exception),
-        Info("re-provisioning: TS up to date")
       )
     }
 
@@ -99,8 +100,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(exception.raiseError[IO, MicroserviceBaseUrl])
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
@@ -116,10 +115,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
         Error("re-provisioning: failure", exception),
         Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
@@ -129,8 +127,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
@@ -146,10 +142,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
         Error("re-provisioning: failure", exception),
         Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
@@ -159,8 +154,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
@@ -178,10 +171,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
         Error("re-provisioning: failure", exception),
         Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
@@ -191,8 +183,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
@@ -209,10 +199,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
         Error("re-provisioning: failure", exception),
         Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
@@ -223,8 +212,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception2 = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
@@ -241,10 +228,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
         Error("re-provisioning: failure", exception1),
         Error("re-provisioning: failure", exception2),
         Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
@@ -255,8 +241,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
@@ -272,10 +256,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
         Error("re-provisioning: failure", exception),
         Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
