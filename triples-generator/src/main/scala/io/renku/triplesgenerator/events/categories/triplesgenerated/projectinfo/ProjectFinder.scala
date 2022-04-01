@@ -21,24 +21,18 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 import cats.data.{EitherT, OptionT}
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
+import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.{GitLabApiUrl, persons, projects}
-import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.graph.model.{persons, projects}
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
 import org.http4s.Method.GET
 import org.http4s.dsl.io.{NotFound, Ok}
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{EntityDecoder, Request, Response, Status}
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private trait ProjectFinder[F[_]] {
   def findProject(path: projects.Path)(implicit
@@ -47,24 +41,15 @@ private trait ProjectFinder[F[_]] {
 }
 
 private object ProjectFinder {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[ProjectFinder[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new ProjectFinderImpl(gitLabUrl.apiV4, gitLabThrottler)
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[ProjectFinder[F]] = new ProjectFinderImpl(
+    gitLabClient
+  ).pure[F].widen[ProjectFinder[F]]
 }
 
 private class ProjectFinderImpl[F[_]: Async: Logger](
-    gitLabApiUrl:           GitLabApiUrl,
-    gitLabThrottler:        Throttler[F, GitLab],
-    recoveryStrategy:       RecoverableErrorsRecovery = RecoverableErrorsRecovery,
-    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(gitLabThrottler,
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
-    )
-    with ProjectFinder[F] {
+    gitLabClient:     GitLabClient[F],
+    recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
+) extends ProjectFinder[F] {
 
   import io.circe.Decoder.decodeOption
   import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -84,10 +69,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
   }
 
   private def fetchProject(path: projects.Path)(implicit maybeAccessToken: Option[AccessToken]) = OptionT {
-    for {
-      projectsUri       <- validateUri(s"$gitLabApiUrl/projects/${urlEncode(path.value)}")
-      projectAndCreator <- send(secureRequest(GET, projectsUri))(mapTo[ProjectAndCreator])
-    } yield projectAndCreator
+    gitLabClient.send(GET, uri"projects" / path.show, "project")(mapTo[ProjectAndCreator])
   }
 
   private def mapTo[OUT](implicit
@@ -137,10 +119,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
       case None => OptionT.some[F](Option.empty[ProjectMember])
       case Some(creatorId) =>
         OptionT.liftF {
-          for {
-            usersUri     <- validateUri(s"$gitLabApiUrl/users/$creatorId")
-            maybeCreator <- send(secureRequest(GET, usersUri))(mapTo[ProjectMember])
-          } yield maybeCreator
+          gitLabClient.send(GET, uri"users" / creatorId.show, "user")(mapTo[ProjectMember])
         }
     }
 

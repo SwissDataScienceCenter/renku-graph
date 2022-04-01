@@ -42,7 +42,7 @@ private[triplesgenerated] object ProjectInfoFinder {
       gitLabThrottler: Throttler[F, GitLab],
       gitLabClient:    GitLabClient[F]
   ): F[ProjectInfoFinder[F]] = for {
-    projectFinder     <- ProjectFinder[F](gitLabThrottler)
+    projectFinder     <- ProjectFinder[F](gitLabClient)
     membersFinder     <- ProjectMembersFinder[F](gitLabThrottler)
     memberEmailFinder <- MemberEmailFinder[F](gitLabClient)
   } yield new ProjectInfoFinderImpl(projectFinder, membersFinder, memberEmailFinder)
