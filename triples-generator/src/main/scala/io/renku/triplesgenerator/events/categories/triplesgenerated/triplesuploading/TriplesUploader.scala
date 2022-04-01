@@ -56,7 +56,7 @@ private class TriplesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import org.http4s.{Request, Response, Status}
 
   override def uploadTriples(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    upload[Either[ProcessingRecoverableError, Unit]](triples)(
+    uploadAndMap[Either[ProcessingRecoverableError, Unit]](triples)(
       mapResponse
     ) recoverWith recoveryStrategy.maybeRecoverableError
   }
