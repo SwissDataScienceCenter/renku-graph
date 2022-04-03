@@ -25,6 +25,7 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage._
+import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
@@ -76,9 +77,10 @@ class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
 object HookCreationEndpoint {
   def apply[F[_]: Async: Logger: MetricsRegistry](
       projectHookUrl:  ProjectHookUrl,
+      gitLabClient:    GitLabClient[F],
       gitLabThrottler: Throttler[F, GitLab],
       hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookCreationEndpoint[F]] = for {
-    hookCreator <- hookcreation.HookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto)
+    hookCreator <- hookcreation.HookCreator(projectHookUrl, gitLabClient, gitLabThrottler, hookTokenCrypto)
   } yield new HookCreationEndpointImpl[F](hookCreator)
 }

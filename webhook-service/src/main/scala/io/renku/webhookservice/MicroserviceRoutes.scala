@@ -25,6 +25,7 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.http.server.binders.ProjectId
 import io.renku.graph.http.server.security.GitLabAuthenticator
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
@@ -83,13 +84,14 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
 private object MicroserviceRoutes {
   def apply[F[_]: Async: Logger: MetricsRegistry](
+      gitLabClient:          GitLabClient[F],
       gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[MicroserviceRoutes[F]] = for {
     projectHookUrl      <- ProjectHookUrl.fromConfig[F]()
     hookTokenCrypto     <- HookTokenCrypto[F]()
     hookEventEndpoint   <- HookEventEndpoint(hookTokenCrypto)
-    hookCreatorEndpoint <- HookCreationEndpoint(projectHookUrl, gitLabThrottler, hookTokenCrypto)
+    hookCreatorEndpoint <- HookCreationEndpoint(projectHookUrl, gitLabClient, gitLabThrottler, hookTokenCrypto)
     processingStatusEndpoint <-
       eventprocessing.ProcessingStatusEndpoint(
         projectHookUrl,
