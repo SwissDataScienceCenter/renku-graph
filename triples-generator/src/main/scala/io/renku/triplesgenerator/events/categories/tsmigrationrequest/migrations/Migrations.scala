@@ -35,5 +35,6 @@ private[tsmigrationrequest] object Migrations {
   ): F[List[Migration[F]]] = for {
     reProvisioning     <- ReProvisioning[F](reProvisioningStatus, config)
     topMostDerivedFrom <- TopMostDerivedFrom[F]
-  } yield List(reProvisioning, topMostDerivedFrom)
+    brokenActivityIds  <- BrokenActivityIds[F]
+  } yield List(reProvisioning, topMostDerivedFrom, brokenActivityIds)
 }
