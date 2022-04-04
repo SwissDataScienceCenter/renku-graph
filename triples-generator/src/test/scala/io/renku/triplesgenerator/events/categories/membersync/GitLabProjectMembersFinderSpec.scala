@@ -126,6 +126,15 @@ class GitLabProjectMembersFinderSpec
       s"try without an access token when service responds with $status" in new TestCase {
         val members = gitLabProjectMembers.generateNonEmptyList().toList.toSet
 
+        implicit override val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
+
+        override val mapResponse =
+          captureMapping(finder, gitLabClient)(
+            _.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
+            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
+            expectedNumberOfCalls = 2
+          )
+
         setGitLabClientExpectation("members",
                                    path,
                                    maybePage = None,
@@ -137,10 +146,19 @@ class GitLabProjectMembersFinderSpec
 
       }
 
-      s"return an empty set when service responds with $status with or without access token" in new TestCase {
-        implicit override val maybeAccessToken = None
+      s"return an empty set when service responds with $status without access token" in new TestCase {
+        implicit override val maybeAccessToken: Option[AccessToken] = Option.empty[AccessToken]
 
-        mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe (Set.empty[GitLabProjectMember], None)
+        override val mapResponse =
+          captureMapping(finder, gitLabClient)(
+            _.findProjectMembers(path)(maybeAccessToken).unsafeRunSync(),
+            Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
+            expectedNumberOfCalls = 2
+          )
+
+        val actual   = mapResponse(status, Request(), Response()).unsafeRunSync()
+        val expected = (Set.empty[GitLabProjectMember], None)
+        actual shouldBe expected
       }
     }
   }
