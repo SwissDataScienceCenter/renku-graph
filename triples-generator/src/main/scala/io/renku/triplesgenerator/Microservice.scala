@@ -69,8 +69,8 @@ object Microservice extends IOMicroservice {
           gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
           gitLabClient                   <- GitLabClient[IO](gitLabThrottler)
           awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
-          membersSyncSubscription        <- membersync.SubscriptionFactory(gitLabThrottler)
-          triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory(gitLabThrottler)
+          membersSyncSubscription        <- membersync.SubscriptionFactory(gitLabClient)
+          triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory(gitLabClient)
           cleanUpSubscription            <- cleanup.SubscriptionFactory[IO]
           reProvisioningStatus <- ReProvisioningStatus(awaitingGenerationSubscription,
                                                        membersSyncSubscription,
