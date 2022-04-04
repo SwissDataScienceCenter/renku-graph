@@ -37,6 +37,6 @@ object SubscriptionFactory {
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
-    handler <- EventHandler( gitLabClient, subscriptionMechanism)
+    handler <- EventHandler(gitLabClient, subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

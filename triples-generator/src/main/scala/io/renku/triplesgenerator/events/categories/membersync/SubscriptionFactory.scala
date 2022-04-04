@@ -29,7 +29,9 @@ import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](gitLabClient: GitLabClient[F]): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      gitLabClient: GitLabClient[F]
+  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
