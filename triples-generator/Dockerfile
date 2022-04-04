@@ -1,7 +1,7 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
 
-FROM openjdk:15-jdk-alpine as builder
+FROM openjdk:17-jdk-alpine as builder
 
 WORKDIR /work
 
@@ -16,7 +16,7 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositor
     sbt "project triples-generator" stage && \
     apk del .build-dependencies
 
-FROM openjdk:15-jdk-alpine
+FROM openjdk:17-jdk-alpine
 
 WORKDIR /opt/triples-generator
 
