@@ -53,6 +53,7 @@ import org.scalacheck.{Arbitrary, Gen}
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
+import scala.language.implicitConversions
 import scala.util.Try
 
 object CommonGraphGenerators {
@@ -241,8 +242,11 @@ object CommonGraphGenerators {
     GatewayTimeout
   )
 
-  implicit val unexpectedResponseExceptions: Gen[UnexpectedResponseException] = for {
-    status  <- serverErrorHttpStatuses
+  implicit val unexpectedResponseExceptions: Gen[UnexpectedResponseException] =
+    unexpectedResponseExceptions(serverErrorHttpStatuses)
+
+  implicit def unexpectedResponseExceptions(statusesGen: Gen[Status]): Gen[UnexpectedResponseException] = for {
+    status  <- statusesGen
     message <- nonBlankStrings()
   } yield UnexpectedResponseException(status, message.value)
 
