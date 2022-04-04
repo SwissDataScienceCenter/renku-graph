@@ -69,7 +69,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class GitLabProjectMembersFinderSpec
-  extends AnyWordSpec
+    extends AnyWordSpec
     with IOSpec
     with ExternalServiceStubbing
     with MockFactory
@@ -90,7 +90,7 @@ class GitLabProjectMembersFinderSpec
     }
 
     "collect users from paged results" in new TestCase {
-      val projectUsers = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList.toSet
+      val projectUsers   = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList.toSet
       val projectMembers = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList.toSet
 
       setGitLabClientExpectation("users", path, None, returning = (Set(projectUsers.head), 2.some))
@@ -106,19 +106,19 @@ class GitLabProjectMembersFinderSpec
     "parse results and request next page" in new TestCase {
       val projectUsers = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList.toSet
 
-      val nextPage = 2
+      val nextPage   = 2
       val totalPages = 2
       val headers = Headers(
         List(Header.Raw(ci"X-Next-Page", nextPage.toString()), Header.Raw(ci"X-Total-Pages", totalPages.toString()))
       )
 
       mapResponse(Status.Ok, Request(), Response().withEntity(projectUsers.asJson).withHeaders(headers))
-        .unsafeRunSync() shouldBe(projectUsers, Some(2))
+        .unsafeRunSync() shouldBe (projectUsers, Some(2))
     }
 
     "return an empty set when service responds with NOT_FOUND" in new TestCase {
 
-      mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe(Set
+      mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe (Set
         .empty[GitLabProjectMember], None)
     }
 
@@ -127,45 +127,45 @@ class GitLabProjectMembersFinderSpec
         val members = gitLabProjectMembers.generateNonEmptyList().toList.toSet
 
         setGitLabClientExpectation("members",
-          path,
-          maybePage = None,
-          maybeAccessTokenOverride = None,
-          returning = (members, None)
+                                   path,
+                                   maybePage = None,
+                                   maybeAccessTokenOverride = None,
+                                   returning = (members, None)
         )
 
-        mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe(members, None)
+        mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe (members, None)
 
       }
 
-      s"return an empty set when service responds with $status with or without access token" in new TestCase(
-        maybeAccessToken = None
-      ) {
-        mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe(Set.empty[GitLabProjectMember], None)
+      s"return an empty set when service responds with $status with or without access token" in new TestCase {
+        implicit override val maybeAccessToken = None
+
+        mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe (Set.empty[GitLabProjectMember], None)
       }
     }
   }
 
-  private abstract class TestCase(val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption) {
+  private trait TestCase {
 
     val path = projectPaths.generateOne
-    implicit val maybeAccessTokenImplicit: Option[AccessToken] = maybeAccessToken
+    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gitLabClient = mock[GitLabClient[IO]]
-    val finder = new GitLabProjectMembersFinderImpl[IO](gitLabClient)
+    val finder       = new GitLabProjectMembersFinderImpl[IO](gitLabClient)
 
-    def setGitLabClientExpectation(endpointName: String Refined NonEmpty,
-                                   projectPath: projects.Path,
-                                   maybePage: Option[Int] = None,
+    def setGitLabClientExpectation(endpointName:             String Refined NonEmpty,
+                                   projectPath:              projects.Path,
+                                   maybePage:                Option[Int] = None,
                                    maybeAccessTokenOverride: Option[AccessToken] = maybeAccessToken,
-                                   returning: (Set[GitLabProjectMember], Option[Int])
-                                  ) = {
+                                   returning:                (Set[GitLabProjectMember], Option[Int])
+    ) = {
 
       val uri = {
         val uri = uri"projects" / urlEncode(projectPath.value) / endpointName
         maybePage match {
-          case Some(page) => uri withQueryParam("page", page.toString)
-          case None => uri
+          case Some(page) => uri withQueryParam ("page", page.toString)
+          case None       => uri
         }
       }
 

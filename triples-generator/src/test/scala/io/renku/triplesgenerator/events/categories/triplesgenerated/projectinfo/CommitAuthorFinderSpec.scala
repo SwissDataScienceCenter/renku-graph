@@ -21,8 +21,6 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
-import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -34,15 +32,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons
-import io.renku.graph.model.projects.Path
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.UrlEncoder._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
-import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
@@ -58,7 +52,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class CommitAuthorFinderSpec
     extends AnyWordSpec
     with IOSpec
-    with ExternalServiceStubbing
     with should.Matchers
     with MockFactory
     with ScalaCheckPropertyChecks
@@ -167,15 +160,5 @@ class CommitAuthorFinderSpec
       "author_name":  $authorName,
       "author_email": $authorEmail
     }"""
-  }
-
-  private def `/api/v4/projects/:id/repository/commits/:sha`(path: Path, commitId: CommitId)(implicit
-      maybeAccessToken:                                            Option[AccessToken]
-  ) = new {
-    def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get(s"/api/v4/projects/${urlEncode(path.value)}/repository/commits/$commitId")
-        .withAccessToken(maybeAccessToken)
-        .willReturn(response)
-    }
   }
 }
