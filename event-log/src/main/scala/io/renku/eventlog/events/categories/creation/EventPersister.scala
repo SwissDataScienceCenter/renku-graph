@@ -70,11 +70,10 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
     case _                                     => false
   }
 
-  private def insertIfNotDuplicate(event: Event) =
-    checkIfPersisted(event) >>= {
-      case true  => Kleisli.pure(Existed: Result)
-      case false => persist(event)
-    }
+  private def insertIfNotDuplicate(event: Event) = checkIfPersisted(event) >>= {
+    case true  => Kleisli.pure(Existed: Result)
+    case false => persist(event)
+  }
 
   private def persist(event: Event): Kleisli[F, Session[F], Result] = for {
     updatedCommitEvent <- eventuallyAddToExistingBatch(event) >>= eventuallyUpdateStatus

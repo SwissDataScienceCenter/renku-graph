@@ -56,9 +56,7 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private[events] object EventHandler {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F],
-                                 timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[EventHandler[F]] = for {
-    membersSynchronizer <- MembersSynchronizer[F](gitLabClient, timeRecorder)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](gitLabClient: GitLabClient[F]): F[EventHandler[F]] = for {
+    membersSynchronizer <- MembersSynchronizer[F](gitLabClient)
   } yield new EventHandler[F](categoryName, membersSynchronizer)
 }

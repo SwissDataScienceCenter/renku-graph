@@ -125,6 +125,9 @@ class StatsFinderImpl[F[_]: Async: SessionResource](
               SELECT event_type AS category_name, COUNT(DISTINCT id) AS count
               FROM status_change_events_queue
               GROUP BY event_type
+            ) UNION ALL (
+              SELECT 'CLEAN_UP_EVENT' AS category_name, COUNT(DISTINCT id) AS count
+              FROM clean_up_events_queue
             )
           ) all_counts
           GROUP BY all_counts.category_name

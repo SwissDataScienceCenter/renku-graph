@@ -88,17 +88,15 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: Logger](
 }
 
 private object MembersSynchronizer {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F],
-                                 timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[MembersSynchronizer[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](gitLabClient: GitLabClient[F]): F[MembersSynchronizer[F]] = for {
     accessTokenFinder          <- AccessTokenFinder[F]
     gitLabProjectMembersFinder <- GitLabProjectMembersFinder(gitLabClient)
-    kGProjectMembersFinder     <- KGProjectMembersFinder(timeRecorder)
-    kGPersonFinder             <- KGPersonFinder(timeRecorder)
+    kGProjectMembersFinder     <- KGProjectMembersFinder[F]
+    kGPersonFinder             <- KGPersonFinder[F]
     updatesCreator             <- UpdatesCreator[F]
     rdfStoreConfig             <- RdfStoreConfig[F]()
     querySender <-
-      MonadThrow[F].catchNonFatal(new RdfStoreClientImpl(rdfStoreConfig, timeRecorder) with QuerySender[F] {
+      MonadThrow[F].catchNonFatal(new RdfStoreClientImpl(rdfStoreConfig) with QuerySender[F] {
         override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
       })
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)

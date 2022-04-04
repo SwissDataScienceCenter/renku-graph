@@ -124,12 +124,12 @@ class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
 
 object ProjectDatasetsEndpoint {
 
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[ProjectDatasetsEndpoint[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectDatasetsEndpoint[F]] = for {
     rdfStoreConfig        <- RdfStoreConfig[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     renkuResourceUrl      <- renku.ResourcesUrl[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
-    projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig, timeRecorder)
+    projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig)
   } yield new ProjectDatasetsEndpointImpl[F](
     projectDatasetFinder,
     renkuResourceUrl,

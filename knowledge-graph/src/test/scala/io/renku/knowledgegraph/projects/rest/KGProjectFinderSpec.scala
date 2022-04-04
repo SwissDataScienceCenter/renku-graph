@@ -27,7 +27,7 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.projects.rest.Converters._
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder.KGProject
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -111,9 +111,9 @@ class KGProjectFinderSpec
   }
 
   private trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder[IO](TestExecutionTimeRecorder[IO]())
-    val kgProjectFinder      = new KGProjectFinderImpl[IO](rdfStoreConfig, timeRecorder)
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    val kgProjectFinder = new KGProjectFinderImpl[IO](rdfStoreConfig)
   }
 
   private def replaceMembers(members: Set[Person]): Project => Project = {

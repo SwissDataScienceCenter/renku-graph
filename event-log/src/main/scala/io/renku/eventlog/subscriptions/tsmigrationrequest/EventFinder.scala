@@ -18,19 +18,20 @@
 
 package io.renku.eventlog.subscriptions.tsmigrationrequest
 
-import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{Id, MonadThrow}
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus._
+import io.renku.eventlog.MigrationStatus._
+import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers, subscriptions}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
 import skunk._
+import skunk.codec.all.int8
 import skunk.data.Completion
 import skunk.implicits._
 
@@ -40,15 +41,27 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
                                                         now: () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with subscriptions.EventFinder[F, MigrationRequestEvent]
-    with TypeSerializers {
+    with TSMigtationTypeSerializers {
 
   import EventFinder._
 
-  override def popEvent(): F[Option[MigrationRequestEvent]] = SessionResource[F].useK {
-    findEvent >>= {
-      case Some(event) => markTaken(event) map toNoneIfTaken(event)
-      case _           => Kleisli.pure(None)
+  override def popEvent(): F[Option[MigrationRequestEvent]] =
+    SessionResource[F].useWithTransactionK[Option[MigrationRequestEvent]] {
+      Kleisli { case (transaction, session) =>
+        for {
+          savepoint           <- transaction.savepoint
+          maybeEventCandidate <- tryToPop(session)
+          maybeEvent <- verifySingleEventTaken(maybeEventCandidate)(session) >>= {
+                          case true  => maybeEventCandidate.pure[F]
+                          case false => (transaction rollback savepoint).map(_ => Option.empty[MigrationRequestEvent])
+                        }
+        } yield maybeEvent
+      }
     }
+
+  private def tryToPop = findEvent.flatMap {
+    case Some(event) => markTaken(event) map toNoneIfTaken(event)
+    case _           => Kleisli.pure(Option.empty[MigrationRequestEvent])
   }
 
   type SubscriptionRecord = (SubscriberUrl, ServiceVersion, MigrationStatus, ChangeDate)
@@ -82,6 +95,11 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
       if (groupedByStatus contains MigrationStatus.Done) None
       else if (groupedByStatus contains MigrationStatus.Sent)
         groupedByStatus(MigrationStatus.Sent).find(olderThan(SentStatusTimeout))
+      else if (groupedByStatus contains MigrationStatus.RecoverableFailure)
+        (groupedByStatus
+          .get(MigrationStatus.RecoverableFailure)
+          .map(_.filter(olderThan(RecoverableStatusTimeout))) combine groupedByStatus.get(MigrationStatus.New))
+          .flatMap(_.sortBy(_._4.value).reverse.headOption)
       else groupedByStatus.get(MigrationStatus.New).flatMap(_.sortBy(_._4.value).reverse.headOption)
   }
 
@@ -95,13 +113,17 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
   private def markTaken(event: MigrationRequestEvent) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - mark taken")
-      .command[ChangeDate ~ SubscriberUrl ~ ServiceVersion](sql"""
+      .command[ChangeDate ~ SubscriberUrl ~ ServiceVersion ~ ChangeDate](sql"""
         UPDATE ts_migration
-        SET status = '#${Sent.value}', change_date = $changeDateEncoder
+        SET status = '#${Sent.value}', change_date = $changeDateEncoder, message = NULL
         WHERE subscriber_url = $subscriberUrlEncoder 
           AND subscriber_version = $serviceVersionEncoder
+          AND (status <> '#${Sent.value}' OR change_date < $changeDateEncoder)
         """.command)
-      .arguments(ChangeDate(now()) ~ event.subscriberUrl ~ event.subscriberVersion)
+      .arguments(
+        ChangeDate(now()) ~ event.subscriberUrl ~ event.subscriberVersion ~
+          ChangeDate(now() minus SentStatusTimeout)
+      )
       .build
       .flatMapResult {
         case Completion.Update(1) => true.pure[F]
@@ -115,10 +137,35 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
     case true  => event.some
     case false => None
   }
+
+  private def verifySingleEventTaken: Option[MigrationRequestEvent] => Kleisli[F, Session[F], Boolean] = {
+    case None        => Kleisli pure true
+    case Some(event) => checkSingleEventTaken(event)
+  }
+
+  private def checkSingleEventTaken(event: MigrationRequestEvent) = measureExecutionTime {
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - check single sent")
+      .select[ServiceVersion, Boolean](
+        sql"""SELECT COUNT(DISTINCT subscriber_url)
+              FROM ts_migration
+              WHERE subscriber_version = $serviceVersionEncoder 
+                AND status = '#${Sent.value}'
+           """
+          .query(int8)
+          .map {
+            case 0 | 1 => true
+            case _     => false
+          }
+      )
+      .arguments(event.subscriberVersion)
+      .build[Id](_.unique)
+  }
 }
 
 private object EventFinder {
-  val SentStatusTimeout = Duration ofHours 1
+  val SentStatusTimeout        = Duration ofHours 1
+  val RecoverableStatusTimeout = Duration ofMinutes 2
 
   def apply[F[_]: Async: SessionResource](
       queriesExecTimes: LabeledHistogram[F]

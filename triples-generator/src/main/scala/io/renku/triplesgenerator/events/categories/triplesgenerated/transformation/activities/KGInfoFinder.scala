@@ -36,14 +36,13 @@ private trait KGInfoFinder[F[_]] {
 }
 
 private object KGInfoFinder {
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGInfoFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGInfoFinder[F]] = for {
     config <- RdfStoreConfig[F]()
-  } yield new KGInfoFinderImpl(config, timeRecorder)
+  } yield new KGInfoFinderImpl(config)
 }
 
-private class KGInfoFinderImpl[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                                    timeRecorder: SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig)
+    extends RdfStoreClientImpl(rdfStoreConfig)
     with KGInfoFinder[F] {
 
   override def findActivityAuthor(resourceId: activities.ResourceId): F[Option[persons.ResourceId]] =

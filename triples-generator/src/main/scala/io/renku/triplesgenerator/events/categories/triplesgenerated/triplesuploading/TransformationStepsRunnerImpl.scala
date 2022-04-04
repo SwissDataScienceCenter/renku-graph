@@ -108,12 +108,12 @@ private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
 
 private[triplesgenerated] object TransformationStepsRunner {
 
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[TransformationStepsRunnerImpl[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsRunnerImpl[F]] = for {
     rdfStoreConfig <- RdfStoreConfig[F]()
     renkuBaseUrl   <- RenkuBaseUrlLoader[F]()
     gitlabUrl      <- GitLabUrlLoader[F]()
-  } yield new TransformationStepsRunnerImpl[F](new TriplesUploaderImpl[F](rdfStoreConfig, timeRecorder),
-                                               new UpdatesUploaderImpl(rdfStoreConfig, timeRecorder),
+  } yield new TransformationStepsRunnerImpl[F](new TriplesUploaderImpl[F](rdfStoreConfig),
+                                               new UpdatesUploaderImpl(rdfStoreConfig),
                                                renkuBaseUrl,
                                                gitlabUrl
   )

@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.membersync.PersonOps._
@@ -57,8 +57,8 @@ class KGProjectMembersFinderSpec
   }
 
   private trait TestCase {
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
-    val finder               = new KGProjectMembersFinderImpl(rdfStoreConfig, renkuBaseUrl, timeRecorder)
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    val finder = new KGProjectMembersFinderImpl[IO](rdfStoreConfig, renkuBaseUrl)
   }
 }

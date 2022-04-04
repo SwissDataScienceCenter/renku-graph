@@ -180,10 +180,8 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
 
 object DatasetEndpoint {
 
-  def apply[F[_]: Async: Logger](
-      timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[DatasetEndpoint[F]] = for {
-    datasetFinder         <- DatasetFinder[F](timeRecorder)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetEndpoint[F]] = for {
+    datasetFinder         <- DatasetFinder[F]
     renkuResourceUrl      <- renku.ResourcesUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()

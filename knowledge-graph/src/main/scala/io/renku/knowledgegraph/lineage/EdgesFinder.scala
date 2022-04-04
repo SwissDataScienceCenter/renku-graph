@@ -37,11 +37,10 @@ private trait EdgesFinder[F[_]] {
   def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): F[EdgeMap]
 }
 
-private class EdgesFinderImpl[F[_]: Async: Logger](
+private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig: RdfStoreConfig,
-    renkuBaseUrl:   RenkuBaseUrl,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+    renkuBaseUrl:   RenkuBaseUrl
+) extends RdfStoreClientImpl(rdfStoreConfig)
     with EdgesFinder[F] {
 
   private type EdgeData = (ExecutionInfo, Option[Node.Location], Option[Node.Location])
@@ -158,8 +157,8 @@ private class EdgesFinderImpl[F[_]: Async: Logger](
 
 private object EdgesFinder {
 
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[EdgesFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EdgesFinder[F]] = for {
     config       <- RdfStoreConfig[F]()
     renkuBaseUrl <- RenkuBaseUrlLoader[F]()
-  } yield new EdgesFinderImpl[F](config, renkuBaseUrl, timeRecorder)
+  } yield new EdgesFinderImpl[F](config, renkuBaseUrl)
 }

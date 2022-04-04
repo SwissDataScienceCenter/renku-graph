@@ -29,7 +29,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax.JsonEncoderOps
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -191,13 +191,8 @@ class ProjectTriplesRemoverSpec
        """
   )
   private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val sparqlTimeRecorder    = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](
-      rdfStoreConfig,
-      sparqlTimeRecorder,
-      renkuBaseUrl
-    )
+    implicit val logger:               TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](rdfStoreConfig, renkuBaseUrl)
   }
 }
