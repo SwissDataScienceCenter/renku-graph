@@ -18,13 +18,12 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
-import cats.{NonEmptyParallel, Parallel}
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
+import cats.{NonEmptyParallel, Parallel}
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
+import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.Microservice
@@ -32,12 +31,12 @@ import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      gitLabThrottler: Throttler[F, GitLab]
+      gitLabClient: GitLabClient[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
-    handler <- EventHandler(gitLabThrottler, subscriptionMechanism)
+    handler <- EventHandler(gitLabClient, subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

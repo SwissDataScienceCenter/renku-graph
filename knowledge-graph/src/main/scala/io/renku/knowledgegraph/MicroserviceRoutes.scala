@@ -92,7 +92,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
       case GET -> Root / "knowledge-graph" / "datasets" / DatasetId(id) as maybeUser => fetchDataset(id, maybeUser)
     }
   }
-  
+
   // format: off
   private lazy val `GET /entities routes`: AuthedRoutes[Option[AuthUser], F] = {
     import io.renku.knowledgegraph.entities.Endpoint.Criteria._
@@ -104,11 +104,11 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     import Sorting.sort
 
     AuthedRoutes.of {
-      case req @ GET -> Root / "knowledge-graph" / "entities" 
-        :? query(maybeQuery) +& entityType(maybeType) +& creatorName(maybeCreator) 
-        +& visibility(maybeVisibility) +& date(maybeDate) +& sort(maybeSort) 
-        +& page(maybePage) +& perPage(maybePerPage) as maybeUser => 
-        searchForEntities(maybeQuery, maybeType, maybeCreator, maybeVisibility, 
+      case req @ GET -> Root / "knowledge-graph" / "entities"
+        :? query(maybeQuery) +& entityType(maybeType) +& creatorName(maybeCreator)
+        +& visibility(maybeVisibility) +& date(maybeDate) +& sort(maybeSort)
+        +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
+        searchForEntities(maybeQuery, maybeType, maybeCreator, maybeVisibility,
           maybeDate, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
     }
   }
