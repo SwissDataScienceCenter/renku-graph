@@ -41,7 +41,8 @@ import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import org.http4s.Method.GET
-import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.Status.{BadGateway, GatewayTimeout, NotImplemented, ServiceUnavailable}
+import org.http4s.implicits._
 import org.http4s.{Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -89,7 +90,15 @@ class CommitAuthorFinderSpec
 
         val endpointName: String Refined NonEmpty = "commit-detail"
 
-        val error = Gen.oneOf(clientExceptions, connectivityExceptions, unexpectedResponseExceptions).generateOne
+        val error = Gen
+          .oneOf(
+            clientExceptions,
+            connectivityExceptions,
+            unexpectedResponseExceptions(
+              Gen.oneOf(NotImplemented, BadGateway, ServiceUnavailable, GatewayTimeout)
+            )
+          )
+          .generateOne
 
         (gitLabClient
           .send(_: Method, _: Uri, _: String Refined NonEmpty)(
@@ -107,6 +116,7 @@ class CommitAuthorFinderSpec
           .findCommitAuthor(projectPath, commitId)
           .value
           .unsafeRunSync()
+
         result            shouldBe a[ProcessingRecoverableError]
         result.getMessage shouldBe error.getMessage
       }

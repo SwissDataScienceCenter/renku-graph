@@ -38,7 +38,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig:         RdfStoreConfig,
+    triplesStoreConfig:     TriplesStoreConfig,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeoutOverride:    Option[Duration] = None,
@@ -59,7 +59,7 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import org.http4s.Status._
   import org.http4s.headers._
   import org.http4s.{Request, Response, Status}
-  import rdfStoreConfig._
+  import triplesStoreConfig._
   import org.http4s.circe._
   import eu.timepit.refined.auto._
 
@@ -78,15 +78,16 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       RdfQuery
     )
 
-  protected def upload(jsonLD: JsonLD): F[Unit] = upload[Unit](jsonLD)(jsonUploadMapResponse)
+  protected def upload(jsonLD: JsonLD): F[Unit] = uploadAndMap[Unit](jsonLD)(jsonUploadMapResponse)
 
-  protected def upload[ResultType](jsonLD: JsonLD)(mapResponse: ResponseMapping[ResultType]): F[ResultType] = for {
-    uri          <- validateUri((fusekiBaseUrl / datasetName / "data").toString)
-    uploadResult <- send(uploadRequest(uri, jsonLD))(mapResponse)
-  } yield uploadResult
+  protected def uploadAndMap[ResultType](jsonLD: JsonLD)(mapResponse: ResponseMapping[ResultType]): F[ResultType] =
+    for {
+      uri          <- validateUri((fusekiBaseUrl / datasetName / "data").toString)
+      uploadResult <- send(uploadRequest(uri, jsonLD))(mapResponse)
+    } yield uploadResult
 
   private def uploadRequest(uploadUri: Uri, jsonLD: JsonLD) = HttpRequest(
-    request(POST, uploadUri, rdfStoreConfig.authCredentials)
+    request(POST, uploadUri, triplesStoreConfig.authCredentials)
       .withEntity(jsonLD.toJson)
       .putHeaders(`Content-Type`(`ld+json`)),
     name = "json-ld upload"
@@ -106,7 +107,7 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   } yield result
 
   private def sparqlQueryRequest(uri: Uri, queryType: RdfQueryType, query: SparqlQuery) = HttpRequest(
-    request(POST, uri, rdfStoreConfig.authCredentials)
+    request(POST, uri, triplesStoreConfig.authCredentials)
       .withEntity(toEntity(queryType, query))
       .putHeaders(`Content-Type`(`x-www-form-urlencoded`),
                   Accept(new MediaType(`application/*`.mainType, "sparql-results+json"))

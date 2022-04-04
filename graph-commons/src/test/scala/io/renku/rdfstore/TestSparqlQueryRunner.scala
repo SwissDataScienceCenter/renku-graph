@@ -57,7 +57,7 @@ private object TestSparqlQueryRunner extends IOApp {
   private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
   private lazy val queryRunner = new RdfStoreClientImpl[IO](
     RdfStoreConfig(FusekiBaseUrl(s"http://localhost:$fusekiPort"),
-                   datasetName,
+                   renkuDatasetName,
                    BasicAuthCredentials(BasicAuthUsername("not-needed"), BasicAuthPassword("not-needed"))
     )
   ) {

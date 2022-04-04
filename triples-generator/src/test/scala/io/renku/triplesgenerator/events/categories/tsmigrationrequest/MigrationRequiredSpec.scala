@@ -16,18 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.events
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 
-import io.circe.Json
+import Generators._
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-sealed trait EventRequestContent {
-  val event: Json
-}
+class MigrationRequiredSpec extends AnyWordSpec with should.Matchers {
 
-object EventRequestContent {
-  def apply(event: Json): EventRequestContent = NoPayload(event)
+  "MigrationRequired.show" should {
+    "produce a meaningful message" in {
+      val yes = migrationRequiredYes.generateOne
+      yes.show shouldBe s"required as ${yes.message}"
 
-  final case class NoPayload(event: Json) extends EventRequestContent
-
-  final case class WithPayload[Payload](event: Json, payload: Payload) extends EventRequestContent
+      val no = migrationRequiredNo.generateOne
+      no.show shouldBe s"not required as ${no.message}"
+    }
+  }
 }

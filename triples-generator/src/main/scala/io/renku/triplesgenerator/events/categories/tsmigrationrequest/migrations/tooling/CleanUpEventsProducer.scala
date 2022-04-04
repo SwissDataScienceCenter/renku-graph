@@ -16,18 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.events
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations.tooling
 
-import io.circe.Json
+import io.circe.literal._
+import io.renku.events.EventRequestContent
+import io.renku.graph.model.projects
 
-sealed trait EventRequestContent {
-  val event: Json
-}
+private[tsmigrationrequest] object CleanUpEventsProducer extends (projects.Path => QueryBasedMigration.EventData) {
 
-object EventRequestContent {
-  def apply(event: Json): EventRequestContent = NoPayload(event)
-
-  final case class NoPayload(event: Json) extends EventRequestContent
-
-  final case class WithPayload[Payload](event: Json, payload: Payload) extends EventRequestContent
+  override def apply(path: projects.Path): QueryBasedMigration.EventData = (
+    path,
+    EventRequestContent.NoPayload(json"""{
+      "categoryName": "CLEAN_UP_REQUEST",
+      "project": {
+        "path": ${path.value}
+      }
+    }"""),
+    categoryName
+  )
 }

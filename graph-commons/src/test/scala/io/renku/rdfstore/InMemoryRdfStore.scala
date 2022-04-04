@@ -72,9 +72,15 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     authCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
   )
 
+  protected lazy val migrationsStoreConfig: MigrationsStoreConfig = MigrationsStoreConfig(
+    fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort"),
+    authCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
+  )
+
   protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl
 
-  private lazy val rdfStoreServer = new RdfStoreServer(fusekiServerPort, rdfStoreConfig.datasetName)
+  private lazy val rdfStoreServer =
+    new RdfStoreServer(fusekiServerPort, rdfStoreConfig.datasetName, MigrationsStoreConfig.MigrationsDS)
 
   protected lazy val sparqlEndpoint: Uri = Uri
     .fromString(s"$fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql")

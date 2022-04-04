@@ -21,6 +21,7 @@ package io.renku.http.server.version
 import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.config.ConfigLoader
+import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import pureconfig.ConfigReader
@@ -35,7 +36,11 @@ object ServiceName extends TinyTypeFactory[ServiceName](new ServiceName(_)) with
 }
 
 final class ServiceVersion private (val value: String) extends AnyVal with StringTinyType
-object ServiceVersion extends TinyTypeFactory[ServiceVersion](new ServiceVersion(_)) with NonBlank {
+object ServiceVersion
+    extends TinyTypeFactory[ServiceVersion](new ServiceVersion(_))
+    with NonBlank
+    with TinyTypeJsonLDOps[ServiceVersion] {
+
   import ConfigLoader._
   import io.circe.Decoder
   import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder

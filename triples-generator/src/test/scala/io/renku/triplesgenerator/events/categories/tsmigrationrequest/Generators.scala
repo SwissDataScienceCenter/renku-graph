@@ -16,18 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.events
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 
-import io.circe.Json
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.ConditionedMigration.MigrationRequired
+import org.scalacheck.Gen
 
-sealed trait EventRequestContent {
-  val event: Json
-}
-
-object EventRequestContent {
-  def apply(event: Json): EventRequestContent = NoPayload(event)
-
-  final case class NoPayload(event: Json) extends EventRequestContent
-
-  final case class WithPayload[Payload](event: Json, payload: Payload) extends EventRequestContent
+private object Generators {
+  val migrationNames:       Gen[Migration.Name]    = nonEmptyStrings().toGeneratorOf(Migration.Name)
+  val migrationRequiredYes: Gen[MigrationRequired] = nonEmptyStrings().map(MigrationRequired.Yes)
+  val migrationRequiredNo:  Gen[MigrationRequired] = nonEmptyStrings().map(MigrationRequired.No)
+  val migrationRequired:    Gen[MigrationRequired] = Gen.oneOf(migrationRequiredYes, migrationRequiredNo)
 }
