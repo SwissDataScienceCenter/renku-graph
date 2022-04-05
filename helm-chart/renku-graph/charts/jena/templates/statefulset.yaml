@@ -23,8 +23,9 @@ spec:
         release: {{ .Release.Name }}
         role: master
       annotations:
-        checksum/config1: {{ include (print $.Template.BasePath "/lucene-config.yaml") . | sha256sum }}
+        checksum/config1: {{ include (print $.Template.BasePath "/renku-ds.yaml") . | sha256sum }}
         checksum/config2: {{ include (print $.Template.BasePath "/fuseki-server.yaml") . | sha256sum }}
+        checksum/config3: {{ include (print $.Template.BasePath "/migration-ds.yaml") . | sha256sum }}
     spec:
       containers:
         - name: {{ .Chart.Name }}
@@ -54,9 +55,13 @@ spec:
             successThreshold: 1
             failureThreshold: 10
           volumeMounts:
-            - name: lucene-config
+            - name: renku-ds
               mountPath: /fuseki/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
               subPath: {{ .Values.global.graph.jena.dataset }}.ttl
+              readOnly: true
+            - name: migration-ds
+              mountPath: /fuseki/configuration/migrations.ttl
+              subPath: migrations.ttl
               readOnly: true
             - name: shiro-config
               mountPath: /fuseki/shiro.ini
@@ -91,9 +96,12 @@ spec:
         - name: shiro-config
           secret:
             secretName: jena-shiro-ini
-        - name: lucene-config
+        - name: renku-ds
           configMap:
-            name: lucene-config-ttl
+            name: renku-ds-ttl
+        - name: migration-ds
+          configMap:
+            name: migration-ds-ttl
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
