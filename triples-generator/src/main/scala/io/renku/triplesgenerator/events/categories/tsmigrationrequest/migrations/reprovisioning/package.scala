@@ -16,14 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations
 
+import cats.syntax.all._
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes}
 
 package object reprovisioning {
+
+  private[reprovisioning] val migrationName: Migration.Name = Migration.Name("re-provisioning")
+
+  private[reprovisioning] def formMessage(message: String): String = show"$categoryName: $migrationName $message"
 
   import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 

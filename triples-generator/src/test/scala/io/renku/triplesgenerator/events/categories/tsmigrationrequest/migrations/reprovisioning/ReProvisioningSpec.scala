@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations.reprovisioning
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -90,7 +91,9 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -114,8 +117,10 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -139,8 +144,10 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -166,8 +173,10 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -192,8 +201,10 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -219,9 +230,11 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Error("re-provisioning: failure", exception1),
-        Error("re-provisioning: failure", exception2),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception1),
+        Error(s"$categoryName: $migrationName failure", exception2),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
   }
@@ -272,7 +285,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         .expects(
           EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}"""),
           EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                                   "re-provisioning: sending EVENTS_STATUS_CHANGE failed"
+                                   s"$categoryName: $migrationName sending EVENTS_STATUS_CHANGE failed"
           )
         )
         .returning(result)

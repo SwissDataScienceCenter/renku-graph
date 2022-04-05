@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations
 package reprovisioning
 
 import cats.data.{EitherT, NonEmptyList}
@@ -37,7 +38,6 @@ import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.tsmigrationrequest.ConditionedMigration.MigrationRequired
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.{ConditionedMigration, Migration}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
@@ -55,7 +55,7 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
     retryDelay:                FiniteDuration
 ) extends ConditionedMigration[F] {
 
-  override val name: Migration.Name = Migration.Name("re-provisioning")
+  override val name: Migration.Name = migrationName
 
   import eventSender._
   import executionTimeRecorder._
@@ -102,15 +102,15 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
 
   private def sendStatusChangeEvent() = sendEvent(
     EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}"""),
-    EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), s"$name: sending EVENTS_STATUS_CHANGE failed")
+    EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), formMessage("sending EVENTS_STATUS_CHANGE failed"))
   )
 
   private def logSummary: ((ElapsedTime, Unit)) => F[Unit] = { case (elapsedTime, _) =>
-    Logger[F].info(show"$name: TS cleared in ${elapsedTime}ms - re-processing all the events")
+    Logger[F].info(formMessage(show"TS cleared in ${elapsedTime}ms - re-processing all the events"))
   }
 
   private def tryAgain[T](step: => F[T]): PartialFunction[Throwable, F[T]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(show"$name: failure") >>
+    Logger[F].error(exception)(formMessage("failure")) >>
       Temporal[F].delayBy(step, retryDelay) recoverWith tryAgain(step)
   }
 }
