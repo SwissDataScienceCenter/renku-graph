@@ -38,7 +38,13 @@ private[tsmigrationrequest] object Migrations {
     topMostDerivedFrom     <- TopMostDerivedFrom[F]
     malformedActivityIds   <- MalformedActivityIds[F]
     deDuplicatePersonNames <- DeDuplicatePersonNames[F]
-    migrations <- validateNames(reProvisioning, topMostDerivedFrom, malformedActivityIds, deDuplicatePersonNames)
+    deDuplicateDatasets    <- DeDuplicateDatasets[F]
+    migrations <- validateNames(reProvisioning,
+                                topMostDerivedFrom,
+                                malformedActivityIds,
+                                deDuplicatePersonNames,
+                                deDuplicateDatasets
+                  )
   } yield migrations
 
   private[migrations] def validateNames[F[_]: MonadThrow: Logger](migrations: Migration[F]*): F[List[Migration[F]]] = {
