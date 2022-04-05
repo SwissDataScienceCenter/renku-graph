@@ -42,10 +42,10 @@ private trait NodeDetailsFinder[F[_]] {
   )(implicit query: (T, ResourceId) => SparqlQuery): F[Set[Node]]
 }
 
-private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger](rdfStoreConfig: RdfStoreConfig,
-                                                                   renkuBaseUrl: RenkuBaseUrl,
-                                                                   timeRecorder: SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig: RdfStoreConfig,
+    renkuBaseUrl:   RenkuBaseUrl
+) extends RdfStoreClientImpl[F](rdfStoreConfig)
     with NodeDetailsFinder[F] {
 
   override def findDetails[T](
@@ -109,10 +109,10 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger](rdfStoreConfi
 
 private object NodeDetailsFinder {
 
-  def apply[F[_]: Async: Parallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[NodeDetailsFinder[F]] = for {
+  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder]: F[NodeDetailsFinder[F]] = for {
     config       <- RdfStoreConfig[F]()
     renkuBaseUrl <- RenkuBaseUrlLoader[F]()
-  } yield new NodeDetailsFinderImpl[F](config, renkuBaseUrl, timeRecorder)
+  } yield new NodeDetailsFinderImpl[F](config, renkuBaseUrl)
 
   implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, path) =>
     SparqlQuery.of(

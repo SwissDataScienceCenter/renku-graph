@@ -207,13 +207,12 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
 private object EventProcessor {
 
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
-      timeRecorder: SparqlQueryTimeRecorder[F],
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       gitLabClient: GitLabClient[F]
   ): F[EventProcessor[F]] = for {
-    uploader           <- TransformationStepsRunner(timeRecorder)
+    uploader           <- TransformationStepsRunner[F]
     accessTokenFinder  <- AccessTokenFinder[F]
-    triplesCurator     <- TransformationStepsCreator(timeRecorder)
+    triplesCurator     <- TransformationStepsCreator[F]
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     eventsProcessingTimes <- Histogram(
                                name = "triples_transformation_processing_times",

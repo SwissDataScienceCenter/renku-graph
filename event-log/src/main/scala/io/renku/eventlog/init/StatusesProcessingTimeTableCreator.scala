@@ -63,8 +63,7 @@ private class StatusesProcessingTimeTableCreatorImpl[F[_]: MonadCancelThrow: Log
     _ <- execute(foreignKeySql)
   } yield ()
 
-  private lazy val createTableSql: Command[Void] =
-    sql"""
+  private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS status_processing_time(
       event_id          varchar   NOT NULL,
       project_id        int4      NOT NULL,
@@ -74,8 +73,7 @@ private class StatusesProcessingTimeTableCreatorImpl[F[_]: MonadCancelThrow: Log
     );
     """.command
 
-  private lazy val foreignKeySql: Command[Void] =
-    sql"""
+  private lazy val foreignKeySql: Command[Void] = sql"""
     ALTER TABLE status_processing_time
     ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id);
   """.command

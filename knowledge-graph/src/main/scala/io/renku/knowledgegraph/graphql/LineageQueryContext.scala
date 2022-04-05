@@ -45,7 +45,6 @@ class LineageQueryContext[F[_]](
 }
 
 object LineageQueryContext {
-  def apply[F[_]: Async: Parallel: Logger](
-      timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[LineageQueryContext[F]] = LineageFinder[F](timeRecorder) map (new LineageQueryContext[F](_))
+  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder]: F[LineageQueryContext[F]] =
+    LineageFinder[F] map (new LineageQueryContext[F](_))
 }

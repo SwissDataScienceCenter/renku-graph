@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph
 
 import cats.effect._
+import cats.syntax.all._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.http.server.HttpServer
@@ -40,18 +41,19 @@ object Microservice extends IOMicroservice {
   private implicit val logger: Logger[IO] = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] =
-    MetricsRegistry[IO]().flatMap { implicit metricsRegistry =>
-      for {
-        certificateLoader  <- CertificateLoader[IO]
-        sentryInitializer  <- SentryInitializer[IO]
-        sparqlTimeRecorder <- SparqlQueryTimeRecorder[IO]
-        kgMetrics          <- KGMetrics(sparqlTimeRecorder)
-        microserviceRoutes <- MicroserviceRoutes(sparqlTimeRecorder)
-        exicode <- microserviceRoutes.routes.use { routes =>
-                     val httpServer = HttpServer[IO](serverPort = 9004, routes)
-                     new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run()
-                   }
-      } yield exicode
+    MetricsRegistry[IO]() >>= { implicit metricsRegistry =>
+      SparqlQueryTimeRecorder[IO](metricsRegistry) >>= { implicit sparqlTimeRecorder =>
+        for {
+          certificateLoader  <- CertificateLoader[IO]
+          sentryInitializer  <- SentryInitializer[IO]
+          kgMetrics          <- KGMetrics[IO]
+          microserviceRoutes <- MicroserviceRoutes()
+          exicode <- microserviceRoutes.routes.use { routes =>
+                       val httpServer = HttpServer[IO](serverPort = 9004, routes)
+                       new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run()
+                     }
+        } yield exicode
+      }
     }
 }
 

@@ -50,7 +50,9 @@ class DeliveryInfoRemoverSpec extends AnyWordSpec with IOSpec with should.Matche
       val otherEventId = CompoundEventId(otherEvent._1, projectId)
       upsertEventDelivery(otherEventId, subscriberId)
 
-      findAllEventDeliveries should contain theSameElementsAs List(eventId -> subscriberId, otherEventId -> subscriberId)
+      findAllEventDeliveries should contain theSameElementsAs List(eventId -> subscriberId,
+                                                                   otherEventId -> subscriberId
+      )
 
       execute(deliveryRemover.deleteDelivery(eventId)) shouldBe ()
 

@@ -22,10 +22,10 @@ import cats.MonadThrow
 import cats.effect.Async
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.subscriptions
+import io.renku.eventlog.MigrationStatus.{New, NonRecoverableFailure, Sent}
 import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
-import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus.{Failure, New, Sent}
+import io.renku.eventlog._
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
@@ -46,7 +46,7 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger](queries
                                                                          now: () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with subscriptions.DispatchRecovery[F, MigrationRequestEvent]
-    with TypeSerializers {
+    with TSMigtationTypeSerializers {
   import cats.syntax.all._
   import skunk._
   import skunk.data.Completion
@@ -111,7 +111,7 @@ private class DispatchRecoveryImpl[F[_]: Async: SessionResource: Logger](queries
       .named(s"${categoryName.value.toLowerCase} - set failure")
       .command[ChangeDate ~ MigrationMessage ~ SubscriberUrl ~ ServiceVersion](sql"""
           UPDATE ts_migration
-          SET status = '#${Failure.value}', change_date = $changeDateEncoder, message = $migrationMessageEncoder
+          SET status = '#${NonRecoverableFailure.value}', change_date = $changeDateEncoder, message = $migrationMessageEncoder
           WHERE subscriber_url = $subscriberUrlEncoder 
             AND subscriber_version = $serviceVersionEncoder
             AND status = '#${Sent.value}'

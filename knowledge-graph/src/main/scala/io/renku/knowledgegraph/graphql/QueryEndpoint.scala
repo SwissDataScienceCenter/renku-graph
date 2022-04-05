@@ -117,12 +117,13 @@ object QueryEndpoint {
 
   import io.renku.rdfstore.SparqlQueryTimeRecorder
 
-  def apply(timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-      executionContext:   ExecutionContext,
-      runtime:            IORuntime,
-      logger:             Logger[IO]
+  def apply()(implicit
+      executionContext: ExecutionContext,
+      runtime:          IORuntime,
+      logger:           Logger[IO],
+      timeRecorder:     SparqlQueryTimeRecorder[IO]
   ): IO[QueryEndpoint[IO]] = for {
-    queryContext <- LineageQueryContext(timeRecorder)
+    queryContext <- LineageQueryContext[IO]
     querySchema = QuerySchema[IO](QueryFields())
     queryRunner <- QueryRunner[IO, LineageQueryContext[IO]](querySchema, queryContext)
   } yield new QueryEndpointImpl[IO](queryRunner)

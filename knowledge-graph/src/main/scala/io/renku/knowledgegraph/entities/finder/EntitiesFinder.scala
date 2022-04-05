@@ -35,15 +35,14 @@ private[entities] trait EntitiesFinder[F[_]] {
 }
 
 private[entities] object EntitiesFinder {
-  def apply[F[_]: Async: NonEmptyParallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[EntitiesFinder[F]] =
-    RdfStoreConfig[F]().map(new EntitiesFinderImpl(_, timeRecorder))
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
+    RdfStoreConfig[F]().map(new EntitiesFinderImpl(_))
 }
 
-private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
+private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F],
     entityQueries:  List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
-) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+) extends RdfStoreClientImpl[F](rdfStoreConfig)
     with EntitiesFinder[F]
     with Paging[Entity] {
 

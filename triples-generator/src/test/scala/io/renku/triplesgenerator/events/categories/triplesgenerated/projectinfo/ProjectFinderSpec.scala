@@ -30,7 +30,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{blankStrings, nonEmptyStrings}
+import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.entities.Project.ProjectMember.ProjectMemberNoEmail
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
@@ -38,7 +38,7 @@ import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.RestClientError.UnexpectedResponseException
+import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.http.client.UrlEncoder._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
@@ -101,6 +101,8 @@ class ProjectFinderSpec
     forAll(
       Table(
         ("Problem Name", "Failing Response", "Expected Failure type"),
+        ("connection problem", ConnectivityException(errorMessage, exceptions.generateOne), shouldBeLogWorthy),
+        ("client problem", ClientException(errorMessage, exceptions.generateOne), shouldBeLogWorthy),
         ("BadGateway", UnexpectedResponseException(BadGateway, errorMessage), shouldBeLogWorthy),
         ("ServiceUnavailable", UnexpectedResponseException(ServiceUnavailable, errorMessage), shouldBeLogWorthy),
         ("Forbidden", UnexpectedResponseException(Forbidden, errorMessage), shouldBeAuth),

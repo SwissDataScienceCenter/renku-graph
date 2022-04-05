@@ -33,10 +33,9 @@ private trait KGPersonFinder[F[_]] {
   ): F[Set[(GitLabProjectMember, Option[ResourceId])]]
 }
 
-private class KGPersonFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig: RdfStoreConfig
+) extends RdfStoreClientImpl(rdfStoreConfig)
     with KGPersonFinder[F] {
 
   import eu.timepit.refined.auto._
@@ -78,7 +77,7 @@ private class KGPersonFinderImpl[F[_]: Async: Logger](
 }
 
 private object KGPersonFinder {
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGPersonFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGPersonFinder[F]] = for {
     rdfStoreConfig <- RdfStoreConfig[F]()
-  } yield new KGPersonFinderImpl(rdfStoreConfig, timeRecorder)
+  } yield new KGPersonFinderImpl(rdfStoreConfig)
 }

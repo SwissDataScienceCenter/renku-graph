@@ -30,14 +30,13 @@ import io.renku.triplesgenerator.Microservice
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
-      timeRecorder: SparqlQueryTimeRecorder[F],
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       gitLabClient: GitLabClient[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
-    handler <- EventHandler(timeRecorder, gitLabClient, subscriptionMechanism)
+    handler <- EventHandler(gitLabClient, subscriptionMechanism)
   } yield handler -> subscriptionMechanism
 }

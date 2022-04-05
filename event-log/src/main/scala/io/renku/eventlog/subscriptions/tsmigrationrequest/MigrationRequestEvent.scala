@@ -31,10 +31,12 @@ private object MigrationRequestEvent {
 
   def encodeEvent(event: MigrationRequestEvent): Json = json"""{
     "categoryName": ${categoryName.value},
-    "version":      ${event.subscriberVersion.value}
+    "subscriber": {
+      "version": ${event.subscriberVersion.value}
+    }
   }"""
 
   implicit lazy val show: Show[MigrationRequestEvent] = Show.show { event =>
-    show"subscriberUrl = ${event.subscriberUrl}, subscriberVersion = ${event.subscriberVersion}"
+    show"subscriberVersion = ${event.subscriberVersion}"
   }
 }

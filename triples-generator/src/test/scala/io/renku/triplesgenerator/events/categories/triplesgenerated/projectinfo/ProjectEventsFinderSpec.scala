@@ -70,7 +70,7 @@ class ProjectEventsFinderSpec
     "return a list of events for a given page" in new TestCase {
       val event  = pushEvents.generateOne.forMember(member).forProject(project)
       val events = Random.shuffle(event :: pushEvents.generateNonEmptyList().toList)
-      val endpointName: String Refined NonEmpty = "events"
+      val endpointName: String Refined NonEmpty = "project-events"
       val page        = 1
       val expectation = (events.map(_.asNormalPushEvent), PagingInfo(None, None))
 

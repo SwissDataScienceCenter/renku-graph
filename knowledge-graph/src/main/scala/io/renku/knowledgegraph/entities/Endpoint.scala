@@ -162,8 +162,8 @@ object Endpoint {
 
   private def parsingFailure(paramName: String) = ParseFailure(s"'$paramName' parameter with invalid value", "")
 
-  def apply[F[_]: Async: NonEmptyParallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[Endpoint[F]] = for {
-    entitiesFinder    <- EntitiesFinder(timeRecorder)
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
+    entitiesFinder    <- EntitiesFinder[F]
     renkuBaseUrl      <- RenkuBaseUrlLoader()
     renkuResourcesUrl <- renku.ResourcesUrl()
     gitLabUrl         <- GitLabUrlLoader[F]()

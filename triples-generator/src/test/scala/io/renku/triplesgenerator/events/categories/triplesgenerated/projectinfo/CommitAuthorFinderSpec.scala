@@ -21,8 +21,6 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
-import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -34,20 +32,17 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons
-import io.renku.graph.model.projects.Path
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.UrlEncoder._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
-import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import org.http4s.Method.GET
-import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.Status.{BadGateway, GatewayTimeout, NotImplemented, ServiceUnavailable}
+import org.http4s.implicits._
 import org.http4s.{Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -58,7 +53,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class CommitAuthorFinderSpec
     extends AnyWordSpec
     with IOSpec
-    with ExternalServiceStubbing
     with should.Matchers
     with MockFactory
     with ScalaCheckPropertyChecks
@@ -70,7 +64,7 @@ class CommitAuthorFinderSpec
     "return the result from the GitLabClient" in new TestCase {
       forAll { (authorName: persons.Name, authorEmail: persons.Email) =>
         val expectation = (authorName -> authorEmail).some
-        val endpointName: String Refined NonEmpty = "commit"
+        val endpointName: String Refined NonEmpty = "commit-detail"
 
         (gitLabClient
           .send(_: Method, _: Uri, _: String Refined NonEmpty)(
@@ -94,9 +88,17 @@ class CommitAuthorFinderSpec
     "return a ProcessingRecoverableError if the GitLabClient " +
       "throws an exception handled by the recovery strategy" in new TestCase {
 
-        val endpointName: String Refined NonEmpty = "commit"
+        val endpointName: String Refined NonEmpty = "commit-detail"
 
-        val error = Gen.oneOf(clientExceptions, connectivityExceptions, unexpectedResponseExceptions).generateOne
+        val error = Gen
+          .oneOf(
+            clientExceptions,
+            connectivityExceptions,
+            unexpectedResponseExceptions(
+              Gen.oneOf(NotImplemented, BadGateway, ServiceUnavailable, GatewayTimeout)
+            )
+          )
+          .generateOne
 
         (gitLabClient
           .send(_: Method, _: Uri, _: String Refined NonEmpty)(
@@ -114,6 +116,7 @@ class CommitAuthorFinderSpec
           .findCommitAuthor(projectPath, commitId)
           .value
           .unsafeRunSync()
+
         result            shouldBe a[ProcessingRecoverableError]
         result.getMessage shouldBe error.getMessage
       }
@@ -167,15 +170,5 @@ class CommitAuthorFinderSpec
       "author_name":  $authorName,
       "author_email": $authorEmail
     }"""
-  }
-
-  private def `/api/v4/projects/:id/repository/commits/:sha`(path: Path, commitId: CommitId)(implicit
-      maybeAccessToken:                                            Option[AccessToken]
-  ) = new {
-    def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get(s"/api/v4/projects/${urlEncode(path.value)}/repository/commits/$commitId")
-        .withAccessToken(maybeAccessToken)
-        .willReturn(response)
-    }
   }
 }

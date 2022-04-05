@@ -109,6 +109,24 @@ Accepts an event as multipart requests.
 }
 ```
 
+- **TS_MIGRATION_REQUEST**
+
+Once an event of the type is sent, triples-generator checks if it's running the requested version.
+If yes, it kicks-off execution of all configured Triples Store migrations.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "TS_MIGRATION_REQUEST",
+  "subscriber": {
+    "version": "1.22.4-10-g34454567"
+  }
+}
+```
+
 ##### Response
 
 | Status                     | Description                                                                  |

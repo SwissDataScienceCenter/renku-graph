@@ -172,10 +172,10 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
 
 object ProjectEndpoint {
 
-  def apply[F[_]: Parallel: Async: Logger](gitLabClient: GitLabClient[F],
-                                           timeRecorder: SparqlQueryTimeRecorder[F]
+  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](
+      gitLabClient: GitLabClient[F]
   ): F[ProjectEndpoint[F]] = for {
-    projectFinder         <- ProjectFinder[F](gitLabClient, timeRecorder)
+    projectFinder         <- ProjectFinder[F](gitLabClient)
     renkuResourceUrl      <- renku.ResourcesUrl[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
   } yield new ProjectEndpointImpl[F](

@@ -27,7 +27,7 @@ import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
 import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, timestamps}
+import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, positiveInts, timestamps}
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus._
@@ -45,6 +45,7 @@ class StatsFinderSpec
     with IOSpec
     with InMemoryEventLogDbSpec
     with SubscriptionDataProvisioning
+    with CleanUpEventsProvisioning
     with should.Matchers {
 
   "countEventsByCategoryName" should {
@@ -81,9 +82,10 @@ class StatsFinderSpec
       upsertLastSynced(compoundId5.projectId, membersync.categoryName, lastSynced5)
 
       stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName       -> 4L,
-        commitsync.categoryName       -> 5L,
-        globalcommitsync.categoryName -> 5L
+        membersync.categoryName        -> 4L,
+        commitsync.categoryName        -> 5L,
+        globalcommitsync.categoryName  -> 5L,
+        CategoryName("CLEAN_UP_EVENT") -> 0L
       )
     }
 
@@ -114,9 +116,10 @@ class StatsFinderSpec
       upsertLastSynced(compoundId4.projectId, commitsync.categoryName, lastSyncDate4)
 
       stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName       -> 4L,
-        commitsync.categoryName       -> 3L,
-        globalcommitsync.categoryName -> 4L
+        membersync.categoryName        -> 4L,
+        commitsync.categoryName        -> 3L,
+        globalcommitsync.categoryName  -> 4L,
+        CategoryName("CLEAN_UP_EVENT") -> 0L
       )
     }
 
@@ -141,9 +144,10 @@ class StatsFinderSpec
       upsertLastSynced(compoundId3.projectId, globalcommitsync.categoryName, lastSyncDate3)
 
       stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        membersync.categoryName       -> 3L,
-        commitsync.categoryName       -> 3L,
-        globalcommitsync.categoryName -> 2L
+        membersync.categoryName        -> 3L,
+        commitsync.categoryName        -> 3L,
+        globalcommitsync.categoryName  -> 2L,
+        CategoryName("CLEAN_UP_EVENT") -> 0L
       )
     }
 
@@ -157,11 +161,27 @@ class StatsFinderSpec
       insertEventIntoEventsQueue(type2, jsons.generateOne)
 
       stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
-        CategoryName(type1)           -> 2L,
-        CategoryName(type2)           -> 1L,
-        membersync.categoryName       -> 0L,
-        commitsync.categoryName       -> 0L,
-        globalcommitsync.categoryName -> 0L
+        CategoryName(type1)            -> 2L,
+        CategoryName(type2)            -> 1L,
+        membersync.categoryName        -> 0L,
+        commitsync.categoryName        -> 0L,
+        globalcommitsync.categoryName  -> 0L,
+        CategoryName("CLEAN_UP_EVENT") -> 0L
+      )
+    }
+
+    "return info about number of events in the clean_up_events_queue" in {
+
+      val eventsCount = positiveInts(max = 20).generateOne.value
+      1 to eventsCount foreach { _ =>
+        insertCleanUpEvent(projectPaths.generateOne)
+      }
+
+      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
+        CategoryName("CLEAN_UP_EVENT") -> eventsCount.toLong,
+        membersync.categoryName        -> 0L,
+        commitsync.categoryName        -> 0L,
+        globalcommitsync.categoryName  -> 0L
       )
     }
   }

@@ -47,6 +47,18 @@ object ErrorMessage {
       .fold(ifEmpty = exception.getClass.getName)(toSingleLine)
   }
 
+  def withMessageAndStackTrace(message: String, exception: Throwable): ErrorMessage = toErrorMessage {
+    Option(exception)
+      .flatMap { e =>
+        blankToNone {
+          val sw = new StringWriter
+          e.printStackTrace(new PrintWriter(sw))
+          s"$message; $sw"
+        }
+      }
+      .fold(ifEmpty = message)(toSingleLine)
+  }
+
   private def blankToNone(message: String): Option[String] =
     Option(message)
       .map(_.trim)

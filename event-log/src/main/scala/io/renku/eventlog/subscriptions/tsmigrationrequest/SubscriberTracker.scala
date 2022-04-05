@@ -25,8 +25,8 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus.Done
+import io.renku.eventlog.MigrationStatus.Done
+import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers, subscriptions}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
@@ -40,7 +40,7 @@ private class SubscriberTracker[F[_]: MonadCancelThrow: SessionResource](queries
                                                                          now: () => Instant = () => Instant.now()
 ) extends DbClient(Some(queriesExecTimes))
     with subscriptions.SubscriberTracker[F, MigratorSubscriptionInfo]
-    with TypeSerializers {
+    with TSMigtationTypeSerializers {
 
   override def add(info: MigratorSubscriptionInfo): F[Boolean] = SessionResource[F].useK {
     migrationDone(info) flatMap {

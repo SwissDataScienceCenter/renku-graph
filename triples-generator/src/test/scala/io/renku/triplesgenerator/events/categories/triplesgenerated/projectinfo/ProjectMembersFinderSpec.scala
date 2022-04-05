@@ -55,7 +55,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.util.Random
 
 class ProjectMembersFinderSpec
-  extends AnyWordSpec
+    extends AnyWordSpec
     with IOSpec
     with ExternalServiceStubbing
     with should.Matchers
@@ -84,8 +84,8 @@ class ProjectMembersFinderSpec
       setGitLabClientExpectationUsers(projectPath, maybePage = 2.some, returning = (users.tail.toSet, None).pure[IO])
       setGitLabClientExpectationMembers(projectPath, returning = (Set(members.head), 2.some).pure[IO])
       setGitLabClientExpectationMembers(projectPath,
-        maybePage = 2.some,
-        returning = (members.tail.toSet, None).pure[IO]
+                                        maybePage = 2.some,
+                                        returning = (members.tail.toSet, None).pure[IO]
       )
 
       finder.findProjectMembers(projectPath).value.unsafeRunSync() shouldBe allMembers.toSet.asRight
@@ -106,10 +106,10 @@ class ProjectMembersFinderSpec
 
     val errorMessage = nonEmptyStrings().generateOne
     Set(
-      "BadGateway" -> UnexpectedResponseException(BadGateway, errorMessage),
+      "BadGateway"         -> UnexpectedResponseException(BadGateway, errorMessage),
       "ServiceUnavailable" -> UnexpectedResponseException(ServiceUnavailable, errorMessage),
-      "Forbidden" -> UnexpectedResponseException(Forbidden, errorMessage),
-      "Unauthorized" -> UnexpectedResponseException(Unauthorized, errorMessage)
+      "Forbidden"          -> UnexpectedResponseException(Forbidden, errorMessage),
+      "Unauthorized"       -> UnexpectedResponseException(Unauthorized, errorMessage)
     ) foreach { case (problemName, error) =>
       s"return a Recoverable Failure for $problemName when fetching project members or users" in new TestCase {
         if (Random.nextBoolean()) {
@@ -131,12 +131,12 @@ class ProjectMembersFinderSpec
       val members = projectMembersNoEmail.generateSet(2, 4)
 
       mapResponse(Status.Ok, Request(), Response().withEntity(Set(members.head.asJson)))
-        .unsafeRunSync() shouldBe(Set(members.head), None)
+        .unsafeRunSync() shouldBe (Set(members.head), None)
     }
 
     "return an empty Set if NOT_FOUND" in new TestCase {
 
-      mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe(Set.empty, None)
+      mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe (Set.empty, None)
     }
 
   }
@@ -147,29 +147,29 @@ class ProjectMembersFinderSpec
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gitLabClient = mock[GitLabClient[IO]]
-    val finder = new ProjectMembersFinderImpl[IO](gitLabClient)
+    val finder       = new ProjectMembersFinderImpl[IO](gitLabClient)
 
     def setGitLabClientExpectationUsers(projectPath: projects.Path,
-                                        maybePage: Option[Int] = None,
-                                        returning: IO[(Set[ProjectMemberNoEmail], Option[Int])]
-                                       ) = setGitLabClientExpectation("users", projectPath, maybePage, returning)
+                                        maybePage:   Option[Int] = None,
+                                        returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
+    ) = setGitLabClientExpectation("users", projectPath, maybePage, returning)
 
     def setGitLabClientExpectationMembers(projectPath: projects.Path,
-                                          maybePage: Option[Int] = None,
-                                          returning: IO[(Set[ProjectMemberNoEmail], Option[Int])]
-                                         ) = setGitLabClientExpectation("members", projectPath, maybePage, returning)
+                                          maybePage:   Option[Int] = None,
+                                          returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
+    ) = setGitLabClientExpectation("members", projectPath, maybePage, returning)
 
     private def setGitLabClientExpectation(endpointName: String Refined NonEmpty,
-                                           projectPath: projects.Path,
-                                           maybePage: Option[Int] = None,
-                                           returning: IO[(Set[ProjectMemberNoEmail], Option[Int])]
-                                          ) = {
+                                           projectPath:  projects.Path,
+                                           maybePage:    Option[Int] = None,
+                                           returning:    IO[(Set[ProjectMemberNoEmail], Option[Int])]
+    ) = {
 
       val uri = {
         val uri = uri"projects" / projectPath.show / endpointName
         maybePage match {
-          case Some(page) => uri withQueryParam("page", page.toString)
-          case None => uri
+          case Some(page) => uri withQueryParam ("page", page.toString)
+          case None       => uri
         }
       }
 

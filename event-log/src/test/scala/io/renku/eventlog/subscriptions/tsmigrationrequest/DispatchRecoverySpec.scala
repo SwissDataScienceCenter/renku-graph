@@ -23,10 +23,10 @@ import EventsSender.SendingResult._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.MigrationStatus._
+import io.renku.eventlog.TSMigrationGenerators.changeDates
+import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.Generators.sendingResults
-import io.renku.eventlog.subscriptions.tsmigrationrequest.Generators.changeDates
-import io.renku.eventlog.subscriptions.tsmigrationrequest.MigrationStatus._
 import io.renku.events.consumers.subscriptions.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
@@ -105,12 +105,12 @@ class DispatchRecoverySpec
 
     val exception = exceptions.generateOne
 
-    "change status of the relevant row to Failure if in Sent" in new TestCase {
+    "change status of the relevant row to NonRecoverableFailure if in Sent" in new TestCase {
       insertSubscriptionRecord(url, version, Sent, changeDate)
 
       recovery.recover(url, MigrationRequestEvent(url, version))(exception).unsafeRunSync() shouldBe ()
 
-      findRows(url, version)    shouldBe Failure -> ChangeDate(now)
+      findRows(url, version)    shouldBe NonRecoverableFailure -> ChangeDate(now)
       findMessage(url, version) shouldBe MigrationMessage(exception).some
 
       logger.loggedOnly(Info("TS_MIGRATION_REQUEST: recovering from NonRecoverable Failure", exception))

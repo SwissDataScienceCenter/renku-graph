@@ -323,7 +323,7 @@ the new status.
 
 - **ZOMBIE_CHASING**
 
-Changes the status of a zombie event
+Changes the status of a zombie event.
 
 **Multipart Request**
 
@@ -338,6 +338,49 @@ Changes the status of a zombie event
     "path": "namespace/project-name"
   },
   "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
+}
+```
+
+- **MIGRATION_STATUS_CHANGE**
+
+Changes the status of undergoing TS migration.
+The record for which the status will be changed is defined in the `event` part of the payload.
+
+The corresponding record's status will be modified only when its current status is `SENT`.
+
+Allowed values for the `newStatus` property are: `DONE`, `NON_RECOVERABLE_FAILURE` and `RECOVERABLE_FAILURE`.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "MIGRATION_STATUS_CHANGE",
+  "subscriber": {
+    "url":     "http://host/path",
+    "id":      "20210302140653-8641",
+    "version": "1.22.4-10-g34454567"
+  },
+  "newStatus": "DONE",
+  "message":   "cause of failure" // required for failure statuses
+}
+```
+
+- **CLEAN_UP_REQUEST**
+
+Kicks off clean-up of the data in the Triples Store.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "CLEAN_UP_REQUEST",
+  "project": {
+    "path": "namespace/project-name"
+  }
 }
 ```
 
@@ -766,6 +809,12 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | date       TIMESTAMPTZ    NOT NULL |
 | event_type VARCHAR        NOT NULL |
 | payload    TEXT           NOT NULL |
+
+| clean_up_events_queue                |
+|--------------------------------------|
+| id           SERIAL      PK NOT NULL |
+| date         TIMESTAMPTZ    NOT NULL |
+| project_path VARCHAR        NOT NULL |
 
 | ts_migration                                |
 |---------------------------------------------|
