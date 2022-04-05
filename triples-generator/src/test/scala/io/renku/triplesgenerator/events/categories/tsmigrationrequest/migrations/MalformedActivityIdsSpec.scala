@@ -27,7 +27,7 @@ import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class BrokenActivityIdsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MalformedActivityIdsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
 
   "query" should {
 
@@ -59,7 +59,7 @@ class BrokenActivityIdsSpec extends AnyWordSpec with should.Matchers with IOSpec
         anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
       )
 
-      runQuery(BrokenActivityIds.query.toString)
+      runQuery(MalformedActivityIds.query.toString)
         .unsafeRunSync()
         .map(row => projects.Path(row("path")))
         .toSet shouldBe Set(project1.path, project2.path)

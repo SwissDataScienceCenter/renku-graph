@@ -16,37 +16,38 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest
-package migrations
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
 
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas._
-import io.renku.metrics.MetricsRegistry
+import io.renku.graph.model.Schemas.schema
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.tooling.UpdateQueryMigration
 import org.typelevel.log4cats.Logger
-import tooling.{CleanUpEventsProducer, QueryBasedMigration}
 
-private object TopMostDerivedFrom {
+private object DeDuplicatePersonNames {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    QueryBasedMigration[F](name, query, CleanUpEventsProducer).widen
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Migration[F]] =
+    UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Broken TopmostDerivedFrom")
+  private lazy val name = Migration.Name("Duplicate Person Names")
   private[migrations] lazy val query = SparqlQuery.of(
     Refined.unsafeApply(name.show),
-    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
-    s"""|SELECT ?path
+    Prefixes of schema -> "schema",
+    s"""|DELETE { ?id schema:name ?someName }
         |WHERE {
-        |  ?dsId a schema:Dataset;
-        |        prov:wasDerivedFrom ?derived;
-        |        ^renku:hasDataset/renku:projectPath ?path
+        |  SELECT ?id (SAMPLE(?name) AS ?someName)
+        |  WHERE {
+        |    ?id a schema:Person;
+        |        schema:name ?name.
+        |  }
+        |  GROUP BY ?id
+        |  HAVING (COUNT(?name) > 1)
         |}
-        |GROUP BY ?path
-        |HAVING (COUNT(DISTINCT ?dsId) > 1)
         |""".stripMargin
   )
 }
