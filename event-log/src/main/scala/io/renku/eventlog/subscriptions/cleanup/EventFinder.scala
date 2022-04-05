@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions
 package cleanup
 
 import cats.data.Kleisli
+import cats.data.Kleisli.liftF
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
@@ -30,13 +31,14 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
+import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant
 
-private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
+private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger](
     awaitingDeletionGauge: LabeledGauge[F, projects.Path],
     deletingGauge:         LabeledGauge[F, projects.Path],
     queriesExecTimes:      LabeledHistogram[F],
@@ -122,8 +124,17 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
             case Completion.Update(count) => (CleanUpEvent(project) -> count).some
             case _                        => Option.empty[(CleanUpEvent, Int)]
           }
-      }
+      } recoverWith retryOnDeadlock(project)
     case None => Kleisli.pure(Option.empty[(CleanUpEvent, Int)])
+  }
+
+  private def retryOnDeadlock(
+      project: Project
+  ): PartialFunction[Throwable, Kleisli[F, Session[F], Option[(CleanUpEvent, Int)]]] = {
+    case SqlState.DeadlockDetected(_) =>
+      liftF[F, Session[F], Unit](
+        Logger[F].warn(show"$categoryName: deadlock happened while popping $project; retrying")
+      ) >> markEventsDeleting()(project.some)
   }
 
   private lazy val updateMetrics: Option[(CleanUpEvent, Int)] => Kleisli[F, Session[F], Unit] = {
@@ -139,7 +150,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
 }
 
 private object EventFinder {
-  def apply[F[_]: Async: Parallel: SessionResource](
+  def apply[F[_]: Async: Parallel: SessionResource: Logger](
       awaitingDeletionGauge: LabeledGauge[F, projects.Path],
       deletingGauge:         LabeledGauge[F, projects.Path],
       queriesExecTimes:      LabeledHistogram[F]
