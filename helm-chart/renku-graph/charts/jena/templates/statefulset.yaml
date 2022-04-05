@@ -25,7 +25,7 @@ spec:
       annotations:
         checksum/config1: {{ include (print $.Template.BasePath "/renku-ds.yaml") . | sha256sum }}
         checksum/config2: {{ include (print $.Template.BasePath "/fuseki-server.yaml") . | sha256sum }}
-        checksum/config3: {{ include (print $.Template.BasePath "/migration-ds.yaml") . | sha256sum }}
+        checksum/config3: {{ include (print $.Template.BasePath "/migrations-ds.yaml") . | sha256sum }}
     spec:
       containers:
         - name: {{ .Chart.Name }}
@@ -59,7 +59,7 @@ spec:
               mountPath: /fuseki/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
               subPath: {{ .Values.global.graph.jena.dataset }}.ttl
               readOnly: true
-            - name: migration-ds
+            - name: migrations-ds
               mountPath: /fuseki/configuration/migrations.ttl
               subPath: migrations.ttl
               readOnly: true
@@ -99,9 +99,9 @@ spec:
         - name: renku-ds
           configMap:
             name: renku-ds-ttl
-        - name: migration-ds
+        - name: migrations-ds
           configMap:
-            name: migration-ds-ttl
+            name: migrations-ds-ttl
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
