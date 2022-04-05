@@ -34,11 +34,17 @@ private[tsmigrationrequest] object Migrations {
       reProvisioningStatus: ReProvisioningStatus[F],
       config:               Config
   ): F[List[Migration[F]]] = for {
-    reProvisioning         <- ReProvisioning[F](reProvisioningStatus, config)
-    topMostDerivedFrom     <- TopMostDerivedFrom[F]
-    malformedActivityIds   <- MalformedActivityIds[F]
-    deDuplicatePersonNames <- DeDuplicatePersonNames[F]
-    migrations <- validateNames(reProvisioning, topMostDerivedFrom, malformedActivityIds, deDuplicatePersonNames)
+    reProvisioning                 <- ReProvisioning[F](reProvisioningStatus, config)
+    topMostDerivedFrom             <- TopMostDerivedFrom[F]
+    malformedActivityIds           <- MalformedActivityIds[F]
+    deDuplicatePersonNames         <- DeDuplicatePersonNames[F]
+    deDuplicateOriginalIdentifiers <- DeDuplicateOriginalIdentifiers[F]
+    migrations <- validateNames(reProvisioning,
+                                topMostDerivedFrom,
+                                malformedActivityIds,
+                                deDuplicatePersonNames,
+                                deDuplicateOriginalIdentifiers
+                  )
   } yield migrations
 
   private[migrations] def validateNames[F[_]: MonadThrow: Logger](migrations: Migration[F]*): F[List[Migration[F]]] = {

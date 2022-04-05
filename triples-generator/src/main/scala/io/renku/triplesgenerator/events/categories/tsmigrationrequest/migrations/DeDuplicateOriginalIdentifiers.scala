@@ -30,22 +30,23 @@ import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
 import tooling.{CleanUpEventsProducer, QueryBasedMigration}
 
-private object MalformedActivityIds {
+private object DeDuplicateOriginalIdentifiers {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     QueryBasedMigration[F](name, query, CleanUpEventsProducer).widen
 
-  private lazy val name = Migration.Name("Malformed Activity Ids")
+  private lazy val name = Migration.Name("Duplicate DS original identifiers")
   private[migrations] lazy val query = SparqlQuery.of(
     Refined.unsafeApply(name.show),
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
     s"""|SELECT DISTINCT ?path
         |WHERE {
-        |  ?id a prov:Activity;
-        |      ^renku:hasActivity/renku:projectPath ?path
-        |  BIND (STR(?id) AS ?idString)
-        |  FILTER REGEX(?idString, '^((?!/activities/).)*$$')
+        |  ?id a schema:Dataset;
+        |      renku:originalIdentifier ?originalIdentifier;
+        |      ^renku:hasDataset/renku:projectPath ?path
         |}
+        |GROUP BY ?id ?path
+        |HAVING (COUNT(DISTINCT ?originalIdentifier) > 1)
         |""".stripMargin
   )
 }
