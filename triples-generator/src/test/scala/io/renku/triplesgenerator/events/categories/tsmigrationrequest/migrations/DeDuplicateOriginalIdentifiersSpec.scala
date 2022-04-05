@@ -33,7 +33,7 @@ import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DeDuplicateDatasetsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class DeDuplicateOriginalIdentifiersSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
 
   "query" should {
 
@@ -61,7 +61,7 @@ class DeDuplicateDatasetsSpec extends AnyWordSpec with should.Matchers with IOSp
       loadToStore(project1.asJsonLD)
       loadToStore(project2.asJsonLD)
 
-      runQuery(DeDuplicateDatasets.query.toString)
+      runQuery(DeDuplicateOriginalIdentifiers.query.toString)
         .unsafeRunSync()
         .map(row => projects.Path(row("path")))
         .toSet shouldBe Set(project1.path)
@@ -73,7 +73,7 @@ class DeDuplicateDatasetsSpec extends AnyWordSpec with should.Matchers with IOSp
       implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
       implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
       implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
-      DeDuplicateDatasets[IO].unsafeRunSync().getClass shouldBe classOf[QueryBasedMigration[IO]]
+      DeDuplicateOriginalIdentifiers[IO].unsafeRunSync().getClass shouldBe classOf[QueryBasedMigration[IO]]
     }
   }
 }

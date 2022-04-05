@@ -30,12 +30,12 @@ import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
 import tooling.{CleanUpEventsProducer, QueryBasedMigration}
 
-private object DeDuplicateDatasets {
+private object DeDuplicateOriginalIdentifiers {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     QueryBasedMigration[F](name, query, CleanUpEventsProducer).widen
 
-  private lazy val name = Migration.Name("Malformed Activity Ids")
+  private lazy val name = Migration.Name("Duplicate DS original identifiers")
   private[migrations] lazy val query = SparqlQuery.of(
     Refined.unsafeApply(name.show),
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
