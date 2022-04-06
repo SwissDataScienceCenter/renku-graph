@@ -66,7 +66,7 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
     for {
       hookValidation      <- right(validateHook(projectId, Some(accessToken)))
       _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
-      projectInfo         <- right(findProjectInfo(projectId, Some(accessToken)))
+      projectInfo         <- right(findProjectInfo(projectId)(Some(accessToken)))
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
       _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
       _                   <- right(associate(projectId, accessToken))
@@ -112,7 +112,7 @@ private object HookCreator {
     for {
       commitSyncRequestSender <- CommitSyncRequestSender[F]
       hookValidator           <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler)
-      projectInfoFinder       <- ProjectInfoFinder[F](gitLabThrottler)
+      projectInfoFinder       <- ProjectInfoFinder[F](gitLabClient)
       hookCreator             <- ProjectHookCreator[F](gitLabClient)
       tokenAssociator         <- AccessTokenAssociator[F]
     } yield new HookCreatorImpl[F](

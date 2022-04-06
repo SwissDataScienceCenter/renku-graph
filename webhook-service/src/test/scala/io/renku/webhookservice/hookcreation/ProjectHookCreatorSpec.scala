@@ -26,7 +26,6 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
@@ -45,7 +44,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class ProjectHookCreatorSpec
-  extends AnyWordSpec
+    extends AnyWordSpec
     with MockFactory
     with ExternalServiceStubbing
     with should.Matchers
@@ -57,31 +56,31 @@ class ProjectHookCreatorSpec
     "send relevant Json payload and 'PRIVATE-TOKEN' header (when Personal Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
-      (gitLabClient
-        .post(_: Uri, _: NES, _: Json)(_: ResponseMappingF[IO, Unit])(_: Option[AccessToken]))
-        .expects(uri, endpointName, toJson(projectHook), *, accessToken.some)
-        .returning(().pure[IO])
+        (gitLabClient
+          .post(_: Uri, _: NES, _: Json)(_: ResponseMappingF[IO, Unit])(_: Option[AccessToken]))
+          .expects(uri, endpointName, toJson(projectHook), *, accessToken.some)
+          .returning(().pure[IO])
 
-      hookCreator.create(projectHook, accessToken).unsafeRunSync() shouldBe(): Unit
-    }
+        hookCreator.create(projectHook, accessToken).unsafeRunSync() shouldBe (): Unit
+      }
 
     "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
-      override val accessToken: AccessToken = oauthAccessTokens.generateOne
+        override val accessToken: AccessToken = oauthAccessTokens.generateOne
 
-      (gitLabClient
-        .post(_: Uri, _: NES, _: Json)(_: ResponseMappingF[IO, Unit])(_: Option[AccessToken]))
-        .expects(uri, endpointName, toJson(projectHook), *, accessToken.some)
-        .returning(().pure[IO])
+        (gitLabClient
+          .post(_: Uri, _: NES, _: Json)(_: ResponseMappingF[IO, Unit])(_: Option[AccessToken]))
+          .expects(uri, endpointName, toJson(projectHook), *, accessToken.some)
+          .returning(().pure[IO])
 
-      hookCreator.create(projectHook, accessToken).unsafeRunSync() shouldBe ((): Unit)
-    }
+        hookCreator.create(projectHook, accessToken).unsafeRunSync() shouldBe ((): Unit)
+      }
 
     // mapResponse tests
 
     "return Unit when gitLabClient returns Created" in new TestCase {
 
-      mapResponse(Status.Created, Request(), Response()).unsafeRunSync() shouldBe(): Unit
+      mapResponse(Status.Created, Request(), Response()).unsafeRunSync() shouldBe (): Unit
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
@@ -97,24 +96,16 @@ class ProjectHookCreatorSpec
 
       override val accessToken = accessTokens.generateOne
 
-      //      stubFor {
-      //        post(s"/api/v4/projects/$projectId/hooks")
-      //          .withRequestBody(equalToJson(toJson(projectHook)))
-      //          .willReturn(badRequest().withBody("some message"))
-      //      }
-
       intercept[Exception] {
-        hookCreator.create(projectHook, accessToken).unsafeRunSync()
-      }.getMessage shouldBe s"POST $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.BadRequest}; body: some message"
+        mapResponse(Status.ServiceUnavailable, Request(), Response()).unsafeRunSync()
+      }
     }
   }
 
   private trait TestCase {
     type NES = String Refined NonEmpty
     val projectHook = projectHooks.generateOne
-    val projectId = projectHook.projectId
-    val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
-    val uri = uri"projects" / projectHook.projectId.show / "hooks"
+    val uri         = uri"projects" / projectHook.projectId.show / "hooks"
     val endpointName: NES = "project hooks"
 
     val accessToken: AccessToken = personalAccessTokens.generateOne
@@ -122,15 +113,15 @@ class ProjectHookCreatorSpec
     def toJson(projectHook: ProjectHook) =
       Json
         .obj(
-          "id" -> Json.fromInt(projectHook.projectId.value),
-          "url" -> Json.fromString(projectHook.projectHookUrl.value),
+          "id"          -> Json.fromInt(projectHook.projectId.value),
+          "url"         -> Json.fromString(projectHook.projectHookUrl.value),
           "push_events" -> Json.fromBoolean(true),
-          "token" -> Json.fromString(projectHook.serializedHookToken.value)
+          "token"       -> Json.fromString(projectHook.serializedHookToken.value)
         )
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gitLabClient = mock[GitLabClient[IO]]
-    val hookCreator = new ProjectHookCreatorImpl[IO](gitLabClient)
+    val hookCreator  = new ProjectHookCreatorImpl[IO](gitLabClient)
 
     lazy val mapResponse = captureMapping(hookCreator, gitLabClient)(
       _.create(projectHook, accessToken).unsafeRunSync(),
@@ -140,8 +131,8 @@ class ProjectHookCreatorSpec
   }
 
   private implicit lazy val projectHooks: Gen[ProjectHook] = for {
-    projectId <- projectIds
-    hookUrl <- projectHookUrls
+    projectId           <- projectIds
+    hookUrl             <- projectHookUrls
     serializedHookToken <- serializedHookTokens
   } yield ProjectHook(projectId, hookUrl, serializedHookToken)
 }
