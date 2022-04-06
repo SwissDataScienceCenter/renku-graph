@@ -21,10 +21,14 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
+import GraphModelGenerators.datasetTopmostDerivedFroms
+import io.renku.graph.model.datasets.TopmostDerivedFrom
 import io.renku.graph.model.testentities.{::~, activityEntities, anyRenkuProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, provenanceInternal, provenanceLens, provenanceNonModified, renkuProjectEntities, renkuProjectWithParentEntities, _}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import scala.util.{Failure, Try}
 
 class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
@@ -255,6 +259,64 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
         ancestorExternal,
         modified
       ).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
+    }
+  }
+
+  "findTopmostDerivedFrom" should {
+
+    def topmostDerivedFromFromDerivedFrom(
+        otherDs: Dataset[Dataset.Provenance.Modified]
+    ): Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] =
+      ds => ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(otherDs.entityId)))
+
+    "search find the very top DS' in the derivation chain and return its topmostDerivedFrom" in {
+
+      val (_ ::~ modification1, project) =
+        anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+      val (modification2, projectUpdate2) = project.addDataset(
+        modification1.createModification().modify(topmostDerivedFromFromDerivedFrom(modification1))
+      )
+      val (_, projectUpdate3) = projectUpdate2.addDataset(
+        modification2.createModification().modify(topmostDerivedFromFromDerivedFrom(modification2))
+      )
+      val finalProject = projectUpdate3.to[entities.Project]
+
+      // at this stage topmostDerivedFrom is the same as derivedFrom
+      val topDS :: mod1 :: mod2 :: mod3 :: Nil = finalProject.datasets
+      mod1.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(topDS.identification.resourceId.show)
+      mod2.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(mod1.identification.resourceId.show)
+      mod3.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(mod2.identification.resourceId.show)
+
+      findTopmostDerivedFrom[Try](mod3, finalProject) shouldBe topDS.provenance.topmostDerivedFrom.pure[Try]
+    }
+
+    "return this DS topmostDerivedFrom for any non-modified DS" in {
+      val (ds, project) = anyRenkuProjectEntities
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance]], _.to[entities.Project])
+
+      findTopmostDerivedFrom[Try](ds, project) shouldBe ds.provenance.topmostDerivedFrom.pure[Try]
+    }
+
+    "fail if the derivation chain is broken" in {
+      val (_, project) =
+        anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+      val entitiesProject        = project.to[entities.Project]
+      val _ :: modifiedDS :: Nil = entitiesProject.datasets
+
+      val brokenModifiedDS = {
+        val typedModifiedDS = modifiedDS.asInstanceOf[entities.Dataset[entities.Dataset.Provenance.Modified]]
+        typedModifiedDS.copy(provenance =
+          typedModifiedDS.provenance.copy(topmostDerivedFrom = datasetTopmostDerivedFroms.generateOne)
+        )
+      }
+
+      val finalProject = update(modifiedDS, brokenModifiedDS)(entitiesProject)
+
+      val Failure(exception) = findTopmostDerivedFrom[Try](brokenModifiedDS, finalProject)
+
+      exception.getMessage shouldBe show"Broken derivation hierarchy for ${brokenModifiedDS.provenance.topmostDerivedFrom}"
     }
   }
 }
