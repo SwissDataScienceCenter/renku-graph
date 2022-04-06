@@ -45,7 +45,7 @@ import io.renku.triplesgenerator.events.categories.triplesgenerated.transformati
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import io.renku.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{TransformationStepsRunner, TriplesUploadResult}
 import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
-import io.renku.triplesgenerator.generators.ErrorGenerators.{authRecoverableErrors, logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors}
+import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
@@ -103,12 +103,12 @@ class EventProcessorSpec
       }
 
     "mark event as TransformationRecoverableFailure and refrain from logging an error " +
-      s"if deserialization fails with $AuthRecoverableError" in new TestCase {
+      s"if deserialization fails with $SilentRecoverableError" in new TestCase {
 
         givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
           .returning(maybeAccessToken.pure[Try])
 
-        val processingError = authRecoverableErrors.generateOne
+        val processingError = silentRecoverableErrors.generateOne
         givenDeserialization(triplesGeneratedEvent, returning = leftT(processingError))
 
         expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, processingError)
@@ -187,7 +187,7 @@ class EventProcessorSpec
       }
 
     "mark event with TransformationRecoverableFailure and refrain from log an error " +
-      "if transforming triples fails with a AuthRecoverableError" in new TestCase {
+      "if transforming triples fails with a SilentRecoverableError" in new TestCase {
 
         givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
           .returning(maybeAccessToken.pure[Try])
@@ -200,7 +200,7 @@ class EventProcessorSpec
           .expects()
           .returning(steps)
 
-        val processingRecoverableError = authRecoverableErrors.generateOne
+        val processingRecoverableError = silentRecoverableErrors.generateOne
         val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
         (triplesUploader.run _)
           .expects(steps, project)
@@ -213,7 +213,7 @@ class EventProcessorSpec
         logSummary(triplesGeneratedEvent, isSuccessful = false)
       }
 
-    "mark event with TransformationRecoverableFailure if transforming triples fails with AuthRecoverableError " +
+    "mark event with TransformationRecoverableFailure if transforming triples fails with SilentRecoverableError " +
       "but doesn't log any errors" in new TestCase {
 
         givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
@@ -227,7 +227,8 @@ class EventProcessorSpec
           .expects()
           .returning(steps)
 
-        val failure = TriplesUploadResult.RecoverableFailure(AuthRecoverableError(exceptions.generateOne.getMessage))
+        val failure =
+          TriplesUploadResult.RecoverableFailure(SilentRecoverableError(exceptions.generateOne.getMessage))
         (triplesUploader.run _)
           .expects(steps, project)
           .returning(failure.pure[Try].widen[TriplesUploadResult])
@@ -414,7 +415,7 @@ class EventProcessorSpec
 
     def expectEventMarkedAsRecoverableFailure(event: TriplesGeneratedEvent, exception: ProcessingRecoverableError) = {
       val executionDelay = exception match {
-        case _: AuthRecoverableError      => ExecutionDelay(Duration.ofHours(1))
+        case _: SilentRecoverableError    => ExecutionDelay(Duration.ofHours(1))
         case _: LogWorthyRecoverableError => ExecutionDelay(Duration.ofMinutes(5))
       }
       (eventStatusUpdater
