@@ -19,8 +19,11 @@
 package io.renku.webhookservice.hookfetcher
 
 import cats.effect.IO
+import cats.implicits.toShow
 import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.circe.syntax.EncoderOps
 import io.circe.{Encoder, Json}
 import io.renku.control.Throttler
@@ -28,16 +31,19 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.webhookservice.WebhookServiceGenerators.{hookIdAndUrls, projectHookUrls}
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
-import org.http4s.Status
+import org.http4s.{Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.http4s.implicits.http4sLiteralsSyntax
 
 class ProjectHookFetcherSpec
     extends AnyWordSpec
@@ -51,14 +57,14 @@ class ProjectHookFetcherSpec
     "return the list of hooks of the project - personal access token case" in new TestCase {
 
       val personalAccessToken = personalAccessTokens.generateOne
-      val idAndUrls           = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(okJson(idAndUrls.toList.asJson.noSpaces))
-      }
+      val idAndUrls           = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne.toList
 
-      fetcher.fetchProjectHooks(projectId, personalAccessToken).unsafeRunSync() shouldBe idAndUrls.toList
+      (gitLabClient
+        .get(_: Uri, _: NES)(_: ResponseMappingF[IO, List[HookIdAndUrl]])(_: Option[AccessToken]))
+        .expects(uri, endpointName, *, Some(personalAccessToken))
+        .returning(IO.pure(idAndUrls))
+
+      fetcher.fetchProjectHooks(projectId, personalAccessToken).unsafeRunSync() shouldBe idAndUrls
     }
 
     "return the list of hooks of the project - oauth token case" in new TestCase {
@@ -153,11 +159,16 @@ class ProjectHookFetcherSpec
   }
 
   private trait TestCase {
+    type NES = String Refined NonEmpty
+
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
     val projectId = projectIds.generateOne
+    val uri       = uri"projects" / projectId.show / "hooks"
+    val endpointName: NES = "project"
 
-    val fetcher = new ProjectHookFetcherImpl[IO](gitLabUrl, Throttler.noThrottling)
+    val gitLabClient = mock[GitLabClient[IO]]
+    val fetcher      = new ProjectHookFetcherImpl[IO](gitLabClient)
     implicit val idsAndUrlsEncoder: Encoder[HookIdAndUrl] = Encoder.instance { idAndUrl =>
       Json.obj(
         "id"  -> idAndUrl.id.asJson,
