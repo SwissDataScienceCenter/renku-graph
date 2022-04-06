@@ -82,6 +82,8 @@ object DbInitializer {
           StatusChangeEventsTableCreator[F],
           EventDeliveryEventTypeAdder[F],
           EventDeliveryEventTypeAdder[F],
+          TSMigrationTableCreator[F],
+          CleanUpEventsTableCreator[F],
           FailedEventsRestorer[F](
             "%Error: The repository is dirty. Please use the \"git\" command to clean it.%",
             currentStatus = GenerationNonRecoverableFailure,

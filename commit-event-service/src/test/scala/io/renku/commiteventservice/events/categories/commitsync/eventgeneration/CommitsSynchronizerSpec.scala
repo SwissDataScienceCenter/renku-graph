@@ -498,7 +498,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
                                   event.project,
                                   executionTimeRecorder.elapsedTime,
                                   exception,
-                                  "COMMIT_SYNC - Commit Remover failed to send commit deletion status"
+                                  "COMMIT_SYNC: Commit Remover failed to send commit deletion status"
           ),
           logNewEventFound(parent1Commit.id, event.project, executionTimeRecorder.elapsedTime),
           logSummary(latestCommitInfo.id,
@@ -537,7 +537,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         .expects(
           withRequestContent(event.project),
           EventSender.EventContext(CategoryName("GLOBAL_COMMIT_SYNC_REQUEST"),
-                                   s"$categoryName - Triggering Global Commit Sync Failed"
+                                   s"$categoryName: Triggering Global Commit Sync Failed"
           )
         )
         .returning(exception.raiseError[Try, Unit])
@@ -633,7 +633,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
         .expects(
           withRequestContent(project),
           EventSender.EventContext(CategoryName("GLOBAL_COMMIT_SYNC_REQUEST"),
-                                   s"$categoryName - Triggering Global Commit Sync Failed"
+                                   s"$categoryName: Triggering Global Commit Sync Failed"
           )
         )
         .returning(Success(()))

@@ -70,17 +70,16 @@ class ConcurrentProcessesLimiterImpl[F[_]: Concurrent](
 
   def tryExecuting(
       process: EventHandlingProcess[F]
-  ): F[EventSchedulingResult] =
-    semaphore.available >>= {
-      case 0 => Busy.pure[F].widen[EventSchedulingResult]
-      case _ =>
-        {
-          for {
-            _      <- semaphore.acquire
-            result <- startProcess(process)
-          } yield result
-        } recoverWith releasingSemaphore
-    }
+  ): F[EventSchedulingResult] = semaphore.available >>= {
+    case 0 => Busy.pure[F].widen[EventSchedulingResult]
+    case _ =>
+      {
+        for {
+          _      <- semaphore.acquire
+          result <- startProcess(process)
+        } yield result
+      } recoverWith releasingSemaphore
+  }
 
   private def startProcess(process: EventHandlingProcess[F]): F[EventSchedulingResult] = {
     process.process.semiflatTap { _ =>

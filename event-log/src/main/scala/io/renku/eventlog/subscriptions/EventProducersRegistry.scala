@@ -61,40 +61,36 @@ object EventProducersRegistry {
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
   def apply[F[_]: Async: Parallel: SessionResource: Logger: MetricsRegistry](
-      awaitingTriplesGenerationGauge: LabeledGauge[F, projects.Path],
-      underTriplesGenerationGauge:    LabeledGauge[F, projects.Path],
-      awaitingTransformationGauge:    LabeledGauge[F, projects.Path],
-      underTransformationGauge:       LabeledGauge[F, projects.Path],
-      awaitingDeletionGauge:          LabeledGauge[F, projects.Path],
-      deletingGauge:                  LabeledGauge[F, projects.Path],
-      queriesExecTimes:               LabeledHistogram[F]
-  ): F[EventProducersRegistry[F]] = for {
-    subscriberTracker <- SubscriberTracker(queriesExecTimes)
-    awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(awaitingTriplesGenerationGauge,
-                                                                          underTriplesGenerationGauge,
-                                                                          queriesExecTimes,
-                                                                          subscriberTracker
-                                  )
-    memberSyncCategory       <- membersync.SubscriptionCategory(queriesExecTimes, subscriberTracker)
-    commitSyncCategory       <- commitsync.SubscriptionCategory(queriesExecTimes, subscriberTracker)
-    globalCommitSyncCategory <- globalcommitsync.SubscriptionCategory(queriesExecTimes, subscriberTracker)
-    triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(awaitingTransformationGauge,
-                                                                      underTransformationGauge,
-                                                                      queriesExecTimes,
-                                                                      subscriberTracker
-                                )
-    cleanUpEventCategory <-
-      cleanup.SubscriptionCategory(subscriberTracker, awaitingDeletionGauge, deletingGauge, queriesExecTimes)
-    zombieEventsCategory <- zombieevents.SubscriptionCategory(queriesExecTimes, subscriberTracker)
-  } yield new EventProducersRegistryImpl(
-    Set[SubscriptionCategory[F]](
-      awaitingGenerationCategory,
-      memberSyncCategory,
-      commitSyncCategory,
-      globalCommitSyncCategory,
-      triplesGeneratedCategory,
-      cleanUpEventCategory,
-      zombieEventsCategory
+      awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
+      underGenerationGauge:        LabeledGauge[F, projects.Path],
+      awaitingTransformationGauge: LabeledGauge[F, projects.Path],
+      underTransformationGauge:    LabeledGauge[F, projects.Path],
+      awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
+      deletingGauge:               LabeledGauge[F, projects.Path],
+      queriesExecTimes:            LabeledHistogram[F]
+  ): F[EventProducersRegistry[F]] = UrlAndIdSubscriberTracker(queriesExecTimes).flatMap { implicit subscriberTracker =>
+    for {
+      awaitingGenerationCategory <-
+        awaitinggeneration.SubscriptionCategory(awaitingGenerationGauge, underGenerationGauge, queriesExecTimes)
+      memberSyncCategory       <- membersync.SubscriptionCategory(queriesExecTimes)
+      commitSyncCategory       <- commitsync.SubscriptionCategory(queriesExecTimes)
+      globalCommitSyncCategory <- globalcommitsync.SubscriptionCategory(queriesExecTimes)
+      triplesGeneratedCategory <-
+        triplesgenerated.SubscriptionCategory(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
+      cleanUpEventCategory <- cleanup.SubscriptionCategory(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
+      zombieEventsCategory <- zombieevents.SubscriptionCategory(queriesExecTimes)
+      tsMigrationCategory  <- tsmigrationrequest.SubscriptionCategory(queriesExecTimes)
+    } yield new EventProducersRegistryImpl(
+      Set(
+        awaitingGenerationCategory,
+        memberSyncCategory,
+        commitSyncCategory,
+        globalCommitSyncCategory,
+        triplesGeneratedCategory,
+        cleanUpEventCategory,
+        zombieEventsCategory,
+        tsMigrationCategory
+      )
     )
-  )
+  }
 }

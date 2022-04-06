@@ -42,6 +42,7 @@ import io.renku.http.rest.{Links, SortBy, paging}
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.http.server.version.ServiceVersion
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
@@ -52,6 +53,7 @@ import org.scalacheck.{Arbitrary, Gen}
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
+import scala.language.implicitConversions
 import scala.util.Try
 
 object CommonGraphGenerators {
@@ -114,6 +116,12 @@ object CommonGraphGenerators {
 
   implicit val microserviceIdentifiers: Gen[MicroserviceIdentifier] =
     Gen.uuid map (_ => MicroserviceIdentifier.generate)
+
+  implicit val serviceVersions: Gen[ServiceVersion] = for {
+    version       <- semanticVersions
+    commitsNumber <- positiveInts(999)
+    commitPart    <- shas.toGeneratorOfOptions.map(_.map(_.take(8)).map(sha => s"-$commitsNumber-g$sha").getOrElse(""))
+  } yield ServiceVersion(s"$version$commitPart")
 
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
     url  <- httpUrls()
@@ -234,8 +242,11 @@ object CommonGraphGenerators {
     GatewayTimeout
   )
 
-  implicit val unexpectedResponseExceptions: Gen[UnexpectedResponseException] = for {
-    status  <- serverErrorHttpStatuses
+  implicit val unexpectedResponseExceptions: Gen[UnexpectedResponseException] =
+    unexpectedResponseExceptions(serverErrorHttpStatuses)
+
+  implicit def unexpectedResponseExceptions(statusesGen: Gen[Status]): Gen[UnexpectedResponseException] = for {
+    status  <- statusesGen
     message <- nonBlankStrings()
   } yield UnexpectedResponseException(status, message.value)
 

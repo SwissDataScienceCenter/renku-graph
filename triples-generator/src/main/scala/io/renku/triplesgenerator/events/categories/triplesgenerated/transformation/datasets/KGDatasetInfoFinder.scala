@@ -35,10 +35,9 @@ private trait KGDatasetInfoFinder[F[_]] {
   def findDatasetCreators(resourceId:   ResourceId): F[Set[persons.ResourceId]]
 }
 
-private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig: RdfStoreConfig
+) extends RdfStoreClientImpl(rdfStoreConfig)
     with KGDatasetInfoFinder[F] {
 
   import cats.syntax.all._
@@ -106,7 +105,7 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger](
 }
 
 private object KGDatasetInfoFinder {
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGDatasetInfoFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGDatasetInfoFinder[F]] = for {
     config <- RdfStoreConfig[F]()
-  } yield new KGDatasetInfoFinderImpl(config, timeRecorder)
+  } yield new KGDatasetInfoFinderImpl(config)
 }

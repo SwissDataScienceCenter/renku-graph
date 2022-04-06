@@ -167,22 +167,14 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
 
 object DatasetsSearchEndpoint {
 
-  def apply[F[_]: Parallel: Async: Logger](
-      timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[DatasetsSearchEndpoint[F]] =
-    for {
-      rdfStoreConfig        <- RdfStoreConfig[F]()
-      renkuResourceUrl      <- renku.ResourcesUrl[F]()
-      gitLabUrl             <- GitLabUrlLoader[F]()
-      executionTimeRecorder <- ExecutionTimeRecorder[F]()
-      creatorsFinder        <- CreatorsFinder(rdfStoreConfig, timeRecorder)
-      datasetsFinder        <- DatasetsFinder(rdfStoreConfig, creatorsFinder, timeRecorder)
-    } yield new DatasetsSearchEndpointImpl[F](
-      datasetsFinder,
-      renkuResourceUrl,
-      gitLabUrl,
-      executionTimeRecorder
-    )
+  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetsSearchEndpoint[F]] = for {
+    rdfStoreConfig        <- RdfStoreConfig[F]()
+    renkuResourceUrl      <- renku.ResourcesUrl[F]()
+    gitLabUrl             <- GitLabUrlLoader[F]()
+    executionTimeRecorder <- ExecutionTimeRecorder[F]()
+    creatorsFinder        <- CreatorsFinder(rdfStoreConfig)
+    datasetsFinder        <- DatasetsFinder(rdfStoreConfig, creatorsFinder)
+  } yield new DatasetsSearchEndpointImpl[F](datasetsFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder)
 
   object Query {
     final class Phrase private (val value: String) extends AnyVal with StringTinyType

@@ -18,16 +18,16 @@
 
 package io.renku.triplesgenerator.events.categories
 
-abstract class ProcessingRecoverableError(message: String, cause: Throwable) extends Exception(message, cause)
+abstract class ProcessingRecoverableError(val message: String, val cause: Throwable) extends Exception(message, cause)
 object ProcessingRecoverableError {
 
-  final case class LogWorthyRecoverableError(message: String, cause: Throwable)
+  final case class LogWorthyRecoverableError(override val message: String, override val cause: Throwable)
       extends ProcessingRecoverableError(message, cause)
   object LogWorthyRecoverableError {
     def apply(message: String): LogWorthyRecoverableError = LogWorthyRecoverableError(message, null)
   }
 
-  final case class AuthRecoverableError(message: String, cause: Throwable)
+  final case class AuthRecoverableError(override val message: String, override val cause: Throwable)
       extends ProcessingRecoverableError(message, cause)
   object AuthRecoverableError {
     def apply(message: String): AuthRecoverableError = AuthRecoverableError(message, null)

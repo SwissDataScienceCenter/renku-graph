@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.categories.awaitinggeneration.subscriptions
 
 import cats.syntax.all._
+import io.circe.Json
 import io.circe.literal._
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
@@ -58,7 +59,7 @@ class PayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFact
         .expects()
         .returning(exception.raiseError[Try, MicroserviceBaseUrl])
 
-      composer.prepareSubscriptionPayload() shouldBe exception.raiseError[Try, Payload]
+      composer.prepareSubscriptionPayload() shouldBe exception.raiseError[Try, Json]
     }
   }
 

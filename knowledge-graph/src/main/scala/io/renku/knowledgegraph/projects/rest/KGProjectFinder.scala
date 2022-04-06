@@ -32,10 +32,9 @@ private trait KGProjectFinder[F[_]] {
   def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[KGProject]]
 }
 
-private class KGProjectFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig: RdfStoreConfig
+) extends RdfStoreClientImpl(rdfStoreConfig)
     with KGProjectFinder[F] {
 
   import cats.syntax.all._
@@ -183,7 +182,7 @@ private object KGProjectFinder {
 
   final case class ProjectCreator(maybeEmail: Option[persons.Email], name: persons.Name)
 
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[KGProjectFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] = for {
     config <- RdfStoreConfig[F]()
-  } yield new KGProjectFinderImpl(config, timeRecorder)
+  } yield new KGProjectFinderImpl(config)
 }

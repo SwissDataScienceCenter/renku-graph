@@ -41,10 +41,9 @@ private trait ProjectsFinder[F[_]] {
   def findUsedIn(identifier: Identifier, authContext: AuthContext[Identifier]): F[List[DatasetProject]]
 }
 
-private class ProjectsFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl(rdfStoreConfig, timeRecorder)
+private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig: RdfStoreConfig
+) extends RdfStoreClientImpl(rdfStoreConfig)
     with ProjectsFinder[F] {
 
   import ProjectsFinderImpl._
@@ -121,9 +120,7 @@ private object ProjectsFinderImpl {
 
 private object ProjectsFinder {
 
-  def apply[F[_]: Async: Logger](
-      rdfStoreConfig: RdfStoreConfig,
-      timeRecorder:   SparqlQueryTimeRecorder[F]
-  ): F[ProjectsFinder[F]] = MonadThrow[F].catchNonFatal(new ProjectsFinderImpl[F](rdfStoreConfig, timeRecorder))
-
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      rdfStoreConfig: RdfStoreConfig
+  ): F[ProjectsFinder[F]] = MonadThrow[F].catchNonFatal(new ProjectsFinderImpl[F](rdfStoreConfig))
 }

@@ -32,10 +32,9 @@ private trait StatsFinder[F[_]] {
   def entitiesCount(): F[Map[EntityLabel, Count]]
 }
 
-private class StatsFinderImpl[F[_]: Async: Logger](
-    rdfStoreConfig: RdfStoreConfig,
-    timeRecorder:   SparqlQueryTimeRecorder[F]
-) extends RdfStoreClientImpl[F](rdfStoreConfig, timeRecorder)
+private class StatsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    rdfStoreConfig: RdfStoreConfig
+) extends RdfStoreClientImpl[F](rdfStoreConfig)
     with StatsFinder[F] {
 
   import EntityCount._
@@ -112,9 +111,7 @@ private object EntityCount {
 }
 
 private object StatsFinder {
-  def apply[F[_]: Async: Logger](
-      timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[StatsFinder[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[StatsFinder[F]] = for {
     config <- RdfStoreConfig[F]()
-  } yield new StatsFinderImpl[F](config, timeRecorder)
+  } yield new StatsFinderImpl[F](config)
 }

@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import cats.{Applicative, MonadThrow, Show}
 import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import org.typelevel.log4cats.Logger
 
-private trait Subscribers[F[_]] {
-  def add(subscriptionInfo: SubscriptionInfo): F[Unit]
+private trait Subscribers[F[_], -SI <: SubscriptionInfo] {
+  def add(subscriptionInfo: SI): F[Unit]
 
   def delete(subscriberUrl: SubscriberUrl): F[Unit]
 
@@ -37,16 +37,18 @@ private trait Subscribers[F[_]] {
   def getTotalCapacity: Option[Capacity]
 }
 
-private class SubscribersImpl[F[_]: MonadThrow: Logger] private[subscriptions] (
+private class SubscribersImpl[F[_]: MonadThrow: Logger, SI <: SubscriptionInfo] private[subscriptions] (
     categoryName:        CategoryName,
-    subscribersRegistry: SubscribersRegistry[F],
-    subscriberTracker:   SubscriberTracker[F]
-) extends Subscribers[F] {
+    subscribersRegistry: SubscribersRegistry[F]
+)(implicit
+    subscriberTracker: SubscriberTracker[F, SI],
+    show:              Show[SI]
+) extends Subscribers[F, SI] {
 
-  private val moandThrow = MonadThrow[F]
-  import moandThrow._
+  private val applicative = Applicative[F]
+  import applicative._
 
-  override def add(subscriptionInfo: SubscriptionInfo): F[Unit] = for {
+  override def add(subscriptionInfo: SI): F[Unit] = for {
     wasAdded <- subscribersRegistry add subscriptionInfo
     _        <- subscriberTracker add subscriptionInfo
     _        <- whenA(wasAdded)(Logger[F].info(show"$categoryName: $subscriptionInfo added"))
@@ -72,12 +74,10 @@ private class SubscribersImpl[F[_]: MonadThrow: Logger] private[subscriptions] (
 
 private object Subscribers {
 
-  def apply[F[_]: Async: Logger](
-      categoryName:      CategoryName,
-      subscriberTracker: SubscriberTracker[F]
-  ): F[Subscribers[F]] = for {
+  def apply[F[_]: Async: Logger, SI <: SubscriptionInfo, ST <: SubscriberTracker[F, SI]](
+      categoryName:             CategoryName
+  )(implicit subscriberTracker: ST, show: Show[SI]): F[Subscribers[F, SI]] = for {
     subscribersRegistry <- SubscribersRegistry(categoryName)
-    subscribers <-
-      MonadThrow[F].catchNonFatal(new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker))
+    subscribers         <- MonadThrow[F].catchNonFatal(new SubscribersImpl[F, SI](categoryName, subscribersRegistry))
   } yield subscribers
 }

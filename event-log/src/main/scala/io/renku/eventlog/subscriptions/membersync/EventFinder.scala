@@ -101,7 +101,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource](
         case Completion.Update(1) => true.pure[F]
         case Completion.Update(0) => false.pure[F]
         case completion =>
-          new Exception(s"${categoryName.show} - update last_synced failed with completion code $completion")
+          new Exception(s"${categoryName.show}: update last_synced failed with completion code $completion")
             .raiseError[F, Boolean]
       }
   }
@@ -120,7 +120,7 @@ private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource](
         case Completion.Insert(1) => true.pure[F]
         case Completion.Insert(0) => false.pure[F]
         case completion =>
-          new Exception(s"${categoryName.show} - insert last_synced failed with completion code $completion")
+          new Exception(s"${categoryName.show}: insert last_synced failed with completion code $completion")
             .raiseError[F, Boolean]
       }
   }

@@ -21,10 +21,9 @@ package io.renku.triplesgenerator.events.categories.membersync
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.rdfstore._
@@ -89,26 +88,25 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: Logger](
 }
 
 private object MembersSynchronizer {
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab],
-                                 timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[MembersSynchronizer[F]] = for {
-    accessTokenFinder          <- AccessTokenFinder[F]
-    gitLabProjectMembersFinder <- GitLabProjectMembersFinder(gitLabThrottler)
-    kGProjectMembersFinder     <- KGProjectMembersFinder(timeRecorder)
-    kGPersonFinder             <- KGPersonFinder(timeRecorder)
-    updatesCreator             <- UpdatesCreator[F]
-    rdfStoreConfig             <- RdfStoreConfig[F]()
-    querySender <-
-      MonadThrow[F].catchNonFatal(new RdfStoreClientImpl(rdfStoreConfig, timeRecorder) with QuerySender[F] {
-        override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
-      })
-    executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
-  } yield new MembersSynchronizerImpl[F](accessTokenFinder,
-                                         gitLabProjectMembersFinder,
-                                         kGProjectMembersFinder,
-                                         kGPersonFinder,
-                                         updatesCreator,
-                                         querySender,
-                                         executionTimeRecorder
-  )
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](gitLabClient: GitLabClient[F]): F[MembersSynchronizer[F]] =
+    for {
+      accessTokenFinder          <- AccessTokenFinder[F]
+      gitLabProjectMembersFinder <- GitLabProjectMembersFinder(gitLabClient)
+      kGProjectMembersFinder     <- KGProjectMembersFinder[F]
+      kGPersonFinder             <- KGPersonFinder[F]
+      updatesCreator             <- UpdatesCreator[F]
+      rdfStoreConfig             <- RdfStoreConfig[F]()
+      querySender <-
+        MonadThrow[F].catchNonFatal(new RdfStoreClientImpl(rdfStoreConfig) with QuerySender[F] {
+          override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
+        })
+      executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
+    } yield new MembersSynchronizerImpl[F](accessTokenFinder,
+                                           gitLabProjectMembersFinder,
+                                           kGProjectMembersFinder,
+                                           kGPersonFinder,
+                                           updatesCreator,
+                                           querySender,
+                                           executionTimeRecorder
+    )
 }

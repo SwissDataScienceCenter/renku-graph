@@ -89,6 +89,28 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
+  "ErrorMessage.withMessageAndStackTrace" should {
+
+    "be instantiable from the given message and Exception with a non-null, non-blank, single line message" in {
+      val message   = sentences().generateOne.value
+      val exception = exceptions.generateOne
+
+      val actual = ErrorMessage.withMessageAndStackTrace(message, exception)
+
+      val sw = new StringWriter
+      exception.printStackTrace(new PrintWriter(sw))
+      actual.value shouldBe s"$message; ${sw.toString.split("\n").map(_.trim).mkString("; ")}"
+    }
+
+    "return the message only for null exception" in {
+      val message = sentences().generateOne.value
+
+      val actual = ErrorMessage.withMessageAndStackTrace(message, exception = null)
+
+      actual.value shouldBe s"$message"
+    }
+  }
+
   private lazy val tabbedLines: Gen[(String, String)] = for {
     lineTabbing <- nonEmptyList(Gen.const(' ')).map(_.toList.mkString(""))
     lineMessage <- nonEmptyStrings()

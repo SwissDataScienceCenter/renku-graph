@@ -125,7 +125,8 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
 }
 
 private[transformation] object DatasetTransformer {
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[DatasetTransformer[F]] = for {
-    kgDatasetInfoFinder <- KGDatasetInfoFinder(timeRecorder)
+
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetTransformer[F]] = for {
+    kgDatasetInfoFinder <- KGDatasetInfoFinder[F]
   } yield new DatasetTransformerImpl[F](kgDatasetInfoFinder, UpdatesCreator, ProjectFunctions)
 }

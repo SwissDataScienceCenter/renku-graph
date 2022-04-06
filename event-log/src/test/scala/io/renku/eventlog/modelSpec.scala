@@ -78,7 +78,7 @@ class ExecutionDateSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
 
 class EventMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  "Message" should {
+  "EventMessage" should {
 
     "have the NonBlank constraint" in {
       EventMessage shouldBe an[NonBlank]

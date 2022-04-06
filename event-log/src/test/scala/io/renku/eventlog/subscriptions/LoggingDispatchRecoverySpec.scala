@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
+import Generators._
 import cats.syntax.all._
 import io.renku.eventlog.subscriptions.TestCategoryEvent.testCategoryEvents
 import io.renku.events.Generators.categoryNames
@@ -51,7 +52,7 @@ class LoggingDispatchRecoverySpec extends AnyWordSpec with IOSpec with should.Ma
 
   "returnToQueue" should {
     "return unit" in new TestCase {
-      recovery.returnToQueue(event) shouldBe ().pure[Try]
+      recovery.returnToQueue(event, sendingResults.generateOne) shouldBe ().pure[Try]
     }
   }
 

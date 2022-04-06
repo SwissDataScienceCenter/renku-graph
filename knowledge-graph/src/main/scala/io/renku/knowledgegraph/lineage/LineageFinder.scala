@@ -88,15 +88,9 @@ class LineageFinderImpl[F[_]: MonadThrow: Logger](
 
 object LineageFinder {
 
-  def apply[F[_]: Async: Parallel: Logger](
-      timeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[LineageFinder[F]] = for {
-    lineageEdgesFinder <- EdgesFinder[F](timeRecorder)
-    lineageDataTrimmer <- LineageDataTrimmer[F]()
-    nodeDetailsFinder  <- NodeDetailsFinder[F](timeRecorder)
-  } yield new LineageFinderImpl[F](
-    lineageEdgesFinder,
-    lineageDataTrimmer,
-    nodeDetailsFinder
-  )
+  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder]: F[LineageFinder[F]] = for {
+    lineageEdgesFinder <- EdgesFinder[F]
+    lineageDataTrimmer <- LineageDataTrimmer[F]
+    nodeDetailsFinder  <- NodeDetailsFinder[F]
+  } yield new LineageFinderImpl[F](lineageEdgesFinder, lineageDataTrimmer, nodeDetailsFinder)
 }

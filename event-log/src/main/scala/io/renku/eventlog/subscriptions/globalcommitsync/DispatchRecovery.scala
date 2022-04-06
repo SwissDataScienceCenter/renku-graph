@@ -23,6 +23,7 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.DispatchRecovery
+import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import org.typelevel.log4cats.Logger
 
@@ -32,7 +33,7 @@ private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: Logger](
     lastSyncUpdater: LastSyncedDateUpdater[F]
 ) extends subscriptions.DispatchRecovery[F, GlobalCommitSyncEvent] {
 
-  override def returnToQueue(event: GlobalCommitSyncEvent): F[Unit] =
+  override def returnToQueue(event: GlobalCommitSyncEvent, reason: SendingResult): F[Unit] =
     (lastSyncUpdater run (event.project.id, event.maybeLastSyncedDate)).void
 
   override def recover(url: SubscriberUrl, event: GlobalCommitSyncEvent): PartialFunction[Throwable, F[Unit]] = {
