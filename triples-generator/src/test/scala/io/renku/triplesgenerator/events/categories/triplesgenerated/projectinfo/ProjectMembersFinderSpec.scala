@@ -114,10 +114,12 @@ class ProjectMembersFinderSpec
       s"return a Recoverable Failure for $problemName when fetching project members or users" in new TestCase {
         if (Random.nextBoolean()) {
           setGitLabClientExpectationUsers(projectPath, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
+            .noMoreThanOnce()
           setGitLabClientExpectationMembers(projectPath, returning = IO.raiseError(error))
         } else {
           setGitLabClientExpectationUsers(projectPath, returning = IO.raiseError(error))
           setGitLabClientExpectationMembers(projectPath, returning = (Set.empty[ProjectMemberNoEmail], None).pure[IO])
+            .noMoreThanOnce()
         }
 
         val Left(failure) = finder.findProjectMembers(projectPath).value.unsafeRunSync()
@@ -135,10 +137,8 @@ class ProjectMembersFinderSpec
     }
 
     "return an empty Set if NOT_FOUND" in new TestCase {
-
       mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe (Set.empty, None)
     }
-
   }
 
   private trait TestCase {
