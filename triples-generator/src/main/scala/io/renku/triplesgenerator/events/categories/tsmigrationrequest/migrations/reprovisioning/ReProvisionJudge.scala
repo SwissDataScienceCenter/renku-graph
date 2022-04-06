@@ -82,7 +82,7 @@ private class ReProvisionJudgeImpl[F[_]: MonadThrow: Logger](renkuVersionPairFin
   private def logVersions(maybeTSVersionPair: Option[RenkuVersionPair]) = {
 
     implicit val show: Show[(CliVersion, SchemaVersion)] = Show.show { case (cli, schema) =>
-      formMessage(show"schema version $schema and CLI version $cli")
+      show"schema version $schema and CLI version $cli"
     }
 
     val expectedVersion = versionCompatibilityPairs.toList match {
