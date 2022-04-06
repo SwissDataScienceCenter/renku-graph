@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
 import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError.{AuthRecoverableError, LogWorthyRecoverableError}
+import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
 import org.http4s.Status
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -52,8 +52,11 @@ class RecoverableErrorsRecoverySpec extends AnyWordSpec with should.Matchers wit
          UnexpectedResponseException(Status.ServiceUnavailable, nonEmptyStrings().generateOne),
          shouldBeLogWorthy
         ),
-        ("Forbidden", UnexpectedResponseException(Status.Forbidden, nonEmptyStrings().generateOne), shouldBeAuth),
-        ("Unauthorized", UnexpectedResponseException(Status.Unauthorized, nonEmptyStrings().generateOne), shouldBeAuth)
+        ("Forbidden", UnexpectedResponseException(Status.Forbidden, nonEmptyStrings().generateOne), shouldBeSilent),
+        ("Unauthorized",
+         UnexpectedResponseException(Status.Unauthorized, nonEmptyStrings().generateOne),
+         shouldBeSilent
+        )
       )
     ) { case (problemName, exception, failureTypeAssertion) =>
       s"return a Recoverable Failure for $problemName" in {
@@ -77,5 +80,5 @@ class RecoverableErrorsRecoverySpec extends AnyWordSpec with should.Matchers wit
 
   private lazy val shouldBeLogWorthy = (failure: ProcessingRecoverableError) =>
     failure shouldBe a[LogWorthyRecoverableError]
-  private lazy val shouldBeAuth = (failure: ProcessingRecoverableError) => failure shouldBe a[AuthRecoverableError]
+  private lazy val shouldBeSilent = (failure: ProcessingRecoverableError) => failure shouldBe a[SilentRecoverableError]
 }

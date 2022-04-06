@@ -70,7 +70,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator[F[_]: Async: Logger](
         triples       <- MonadThrow[F].fromEither(parse(triplesInJson))
       } yield triples.asRight[ProcessingRecoverableError]
     } recoverWith { case UnauthorizedException =>
-      AuthRecoverableError("Unauthorized exception").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
+      SilentRecoverableError("Unauthorized exception").asLeft[JsonLD].leftWiden[ProcessingRecoverableError].pure[F]
     }
   }
 

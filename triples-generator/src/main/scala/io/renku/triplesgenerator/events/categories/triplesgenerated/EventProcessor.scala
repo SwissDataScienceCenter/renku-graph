@@ -100,7 +100,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
           Logger[F]
             .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} $message")
             .map(_ => RecoverableError(triplesGeneratedEvent, error))
-        case error @ AuthRecoverableError(_, _) =>
+        case error @ SilentRecoverableError(_, _) =>
           RecoverableError(triplesGeneratedEvent, error).pure[F].widen[UploadingResult]
       }
     case error: NonRecoverableFailure =>
@@ -127,7 +127,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
       Logger[F]
         .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} ${error.getMessage}")
         .map(_ => RecoverableError(triplesGeneratedEvent, error))
-    case error: AuthRecoverableError =>
+    case error: SilentRecoverableError =>
       RecoverableError(triplesGeneratedEvent, error).pure[F].widen[UploadingResult]
   }
 
@@ -147,7 +147,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
           EventStatus.TransformationRecoverableFailure,
           cause,
           executionDelay = cause match {
-            case _: AuthRecoverableError => ExecutionDelay(Duration.ofHours(1))
+            case _: SilentRecoverableError => ExecutionDelay(Duration.ofHours(1))
             case _ => ExecutionDelay(Duration.ofMinutes(5))
           }
         )

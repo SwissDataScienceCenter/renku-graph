@@ -20,8 +20,6 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
-import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -39,18 +37,16 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
-import io.renku.http.client.UrlEncoder._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.json.JsonOps._
-import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import org.http4s.Method.GET
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
-import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.implicits._
 import org.http4s.{Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -61,7 +57,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class ProjectFinderSpec
     extends AnyWordSpec
     with IOSpec
-    with ExternalServiceStubbing
     with should.Matchers
     with MockFactory
     with ScalaCheckPropertyChecks
@@ -95,7 +90,7 @@ class ProjectFinderSpec
     }
 
     val shouldBeLogWorthy = (failure: ProcessingRecoverableError) => failure shouldBe a[LogWorthyRecoverableError]
-    val shouldBeAuth      = (failure: ProcessingRecoverableError) => failure shouldBe a[AuthRecoverableError]
+    val shouldBeSilent    = (failure: ProcessingRecoverableError) => failure shouldBe a[SilentRecoverableError]
     val errorMessage      = nonEmptyStrings().generateOne
 
     forAll(
@@ -105,8 +100,8 @@ class ProjectFinderSpec
         ("client problem", ClientException(errorMessage, exceptions.generateOne), shouldBeLogWorthy),
         ("BadGateway", UnexpectedResponseException(BadGateway, errorMessage), shouldBeLogWorthy),
         ("ServiceUnavailable", UnexpectedResponseException(ServiceUnavailable, errorMessage), shouldBeLogWorthy),
-        ("Forbidden", UnexpectedResponseException(Forbidden, errorMessage), shouldBeAuth),
-        ("Unauthorized", UnexpectedResponseException(Unauthorized, errorMessage), shouldBeAuth)
+        ("Forbidden", UnexpectedResponseException(Forbidden, errorMessage), shouldBeSilent),
+        ("Unauthorized", UnexpectedResponseException(Unauthorized, errorMessage), shouldBeSilent)
       )
     ) { case (problemName, error, failureTypeAssertion) =>
       s"return a Recoverable Failure for $problemName when fetching project info" in new TestCase {
@@ -224,21 +219,5 @@ class ProjectFinderSpec
       "name":     ${member.name},
       "username": ${member.username}
     }"""
-  }
-
-  private def `/api/v4/projects`(path: Path)(implicit maybeAccessToken: Option[AccessToken]) = new {
-    def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get(s"/api/v4/projects/${urlEncode(path.toString)}")
-        .withAccessToken(maybeAccessToken)
-        .willReturn(response)
-    }
-  }
-
-  private def `/api/v4/users`(creatorId: persons.GitLabId)(implicit maybeAccessToken: Option[AccessToken]) = new {
-    def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get(s"/api/v4/users/$creatorId")
-        .withAccessToken(maybeAccessToken)
-        .willReturn(response)
-    }
   }
 }

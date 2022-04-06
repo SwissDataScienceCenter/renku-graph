@@ -42,7 +42,7 @@ private trait RecoverableErrorsRecovery {
         .leftWiden[ProcessingRecoverableError]
         .pure[F]
     case exception @ UnexpectedResponseException(Unauthorized | Forbidden, _) =>
-      AuthRecoverableError(composeFullMessage(maybeMessage, exception), exception.getCause)
+      SilentRecoverableError(composeFullMessage(maybeMessage, exception), exception.getCause)
         .asLeft[OUT]
         .leftWiden[ProcessingRecoverableError]
         .pure[F]
@@ -55,7 +55,7 @@ private trait RecoverableErrorsRecovery {
         .leftWiden[ProcessingRecoverableError]
         .pure[F]
     case exception @ UnauthorizedException =>
-      AuthRecoverableError(composeFullMessage(maybeMessage, exception), exception.getCause)
+      SilentRecoverableError(composeFullMessage(maybeMessage, exception), exception.getCause)
         .asLeft[OUT]
         .leftWiden[ProcessingRecoverableError]
         .pure[F]

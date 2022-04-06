@@ -31,12 +31,12 @@ object ErrorGenerators {
     maybeCause <- exceptions.toGeneratorOfOptions
   } yield LogWorthyRecoverableError(message, maybeCause.orNull)
 
-  lazy val authRecoverableErrors: Gen[AuthRecoverableError] = for {
+  lazy val silentRecoverableErrors: Gen[SilentRecoverableError] = for {
     message <- nonEmptyStrings()
-  } yield AuthRecoverableError(message)
+  } yield SilentRecoverableError(message)
 
   lazy val processingRecoverableErrors: Gen[ProcessingRecoverableError] =
-    Gen.oneOf(logWorthyRecoverableErrors, authRecoverableErrors)
+    Gen.oneOf(logWorthyRecoverableErrors, silentRecoverableErrors)
 
   lazy val nonRecoverableMalformedRepoErrors: Gen[ProcessingNonRecoverableError.MalformedRepository] = for {
     message    <- nonEmptyStrings()
