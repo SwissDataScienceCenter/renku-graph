@@ -23,25 +23,21 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.{GitLabApiUrl, persons, projects}
-import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.graph.model.{persons, projects}
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
 import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
-
-import scala.concurrent.duration.{Duration, FiniteDuration}
 
 private trait ProjectMembersFinder[F[_]] {
   def findProjectMembers(path: projects.Path)(implicit
@@ -50,23 +46,14 @@ private trait ProjectMembersFinder[F[_]] {
 }
 
 private object ProjectMembersFinder {
-  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabThrottler: Throttler[F, GitLab]): F[ProjectMembersFinder[F]] =
-    GitLabUrlLoader[F]().map(gitLabUrl => new ProjectMembersFinderImpl(gitLabUrl.apiV4, gitLabThrottler))
+  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabClient: GitLabClient[F]): F[ProjectMembersFinder[F]] =
+    new ProjectMembersFinderImpl(gitLabClient).pure[F].widen[ProjectMembersFinder[F]]
 }
 
 private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
-    gitLabApiUrl:           GitLabApiUrl,
-    gitLabThrottler:        Throttler[F, GitLab],
-    recoveryStrategy:       RecoverableErrorsRecovery = RecoverableErrorsRecovery,
-    retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
-    maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
-    requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(gitLabThrottler,
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
-    )
-    with ProjectMembersFinder[F] {
+    gitLabClient:     GitLabClient[F],
+    recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
+) extends ProjectMembersFinder[F] {
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
@@ -76,8 +63,8 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       maybeAccessToken:                 Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]] = EitherT {
     (
-      fetchMembers(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/members"),
-      fetchMembers(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/users")
+      fetchMembers(uri"projects" / path.show / "members", "members"),
+      fetchMembers(uri"projects" / path.show / "users", "users")
     ).parMapN(_ ++ _)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
@@ -94,17 +81,20 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
   private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
 
   private def fetchMembers(
-      url:                     String,
+      uri:                     Uri,
+      endpointName:            String Refined NonEmpty,
       maybePage:               Option[Int] = None,
       allMembers:              Set[ProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] = for {
-    uri                     <- validateUri(merge(url, maybePage))
-    fetchedUsersAndNextPage <- send(secureRequest(GET, uri))(mapResponse)
-    allMembers              <- addNextPage(url, allMembers, fetchedUsersAndNextPage)
+    uri                     <- uriWithPage(uri, maybePage).pure[F]
+    fetchedUsersAndNextPage <- gitLabClient.send(GET, uri, endpointName)(mapResponse)
+    allMembers              <- addNextPage(uri, endpointName, allMembers, fetchedUsersAndNextPage)
   } yield allMembers
 
-  private def merge(url: String, maybePage: Option[Int] = None) =
-    maybePage map (page => s"$url?page=$page") getOrElse url
+  private def uriWithPage(uri: Uri, maybePage: Option[Int]) = maybePage match {
+    case Some(page) => uri withQueryParam ("page", page)
+    case None       => uri
+  }
 
   private lazy val mapResponse
       : PartialFunction[(Status, Request[F], Response[F]), F[(Set[ProjectMember], Option[Int])]] = {
@@ -115,12 +105,14 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
   }
 
   private def addNextPage(
-      url:                          String,
+      url:                          Uri,
+      endpointName:                 String Refined NonEmpty,
       allMembers:                   Set[ProjectMember],
       fetchedUsersAndMaybeNextPage: (Set[ProjectMember], Option[Int])
   )(implicit maybeAccessToken:      Option[AccessToken]): F[Set[ProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
-      case (fetchedUsers, maybeNextPage @ Some(_)) => fetchMembers(url, maybeNextPage, allMembers ++ fetchedUsers)
-      case (fetchedUsers, None)                    => (allMembers ++ fetchedUsers).pure[F]
+      case (fetchedUsers, maybeNextPage @ Some(_)) =>
+        fetchMembers(url, endpointName, maybeNextPage, allMembers ++ fetchedUsers)
+      case (fetchedUsers, None) => (allMembers ++ fetchedUsers).pure[F]
     }
 }

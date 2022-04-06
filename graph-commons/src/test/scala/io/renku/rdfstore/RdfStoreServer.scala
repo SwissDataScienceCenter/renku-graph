@@ -25,25 +25,28 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import org.apache.jena.fuseki.FusekiException
 import org.apache.jena.fuseki.main.FusekiServer
+import org.apache.jena.query.DatasetFactory
 
 import java.net.BindException
 import scala.concurrent.duration._
 
 object RdfStoreServer extends IOApp {
 
-  val datasetName: DatasetName          = DatasetName("renku")
-  val fusekiPort:  Int Refined Positive = 3030
+  val renkuDatasetName:      DatasetName          = DatasetName("renku")
+  val migrationsDatasetName: DatasetName          = DatasetName("migrations")
+  val fusekiPort:            Int Refined Positive = 3030
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    _ <- new RdfStoreServer(fusekiPort, datasetName, muteLogging = false).start
+    _ <- new RdfStoreServer(fusekiPort, renkuDatasetName, migrationsDatasetName, muteLogging = false).start
   } yield ExitCode.Success
 }
 
 class RdfStoreServer(
-    port:            Int Refined Positive,
-    datasetName:     DatasetName,
-    muteLogging:     Boolean = true
-)(implicit temporal: Temporal[IO]) {
+    port:                  Int Refined Positive,
+    datasetName:           DatasetName,
+    migrationsDatasetName: DatasetName,
+    muteLogging:           Boolean = true
+)(implicit temporal:       Temporal[IO]) {
 
   if (!muteLogging) {
     import org.apache.jena.atlas.logging.LogCtl
@@ -58,7 +61,7 @@ class RdfStoreServer(
     LogCtl.setLevel("org.eclipse.jetty", ERROR.toString)
   }
 
-  private lazy val dataset = {
+  private lazy val renkuDataset = {
     import io.renku.graph.model.Schemas._
     import org.apache.jena.graph.NodeFactory
     import org.apache.jena.query.DatasetFactory
@@ -84,11 +87,14 @@ class RdfStoreServer(
     )
   }
 
+  private lazy val migrationsDataset = DatasetFactory.create()
+
   private lazy val rdfStoreServer: FusekiServer = FusekiServer
     .create()
     .loopback(true)
     .port(port.value)
-    .add(s"/$datasetName", dataset)
+    .add(s"/$datasetName", renkuDataset)
+    .add(s"/$migrationsDatasetName", migrationsDataset)
     .build
 
   def start: IO[Unit] =
@@ -107,7 +113,7 @@ class RdfStoreServer(
   def stop: IO[Unit] = IO(rdfStoreServer.stop())
 
   def clearDataset(): IO[Unit] = for {
-    _ <- IO(dataset.asDatasetGraph().clear())
+    _ <- IO(renkuDataset.asDatasetGraph().clear())
     _ <- isDatasetEmpty flatMap {
            case true  => IO.unit
            case false => IO.raiseError(new Exception(s"Clearing $datasetName wasn't successful"))
@@ -115,6 +121,6 @@ class RdfStoreServer(
   } yield ()
 
   def isDatasetEmpty: IO[Boolean] = IO {
-    dataset.asDatasetGraph().isEmpty
+    renkuDataset.asDatasetGraph().isEmpty
   }
 }

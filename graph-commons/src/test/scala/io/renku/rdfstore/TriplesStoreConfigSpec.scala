@@ -29,21 +29,21 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class RdfStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  "apply" should {
+  "RdfStoreConfig.apply" should {
 
-    "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the FusekiUserConfig" in {
-      forAll(rdfStoreConfigs) { userConfig =>
+    "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the RdfStoreConfig" in {
+      forAll(rdfStoreConfigs) { storeConfig =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
               "fuseki" -> Map(
-                "url"          -> userConfig.fusekiBaseUrl.toString,
-                "dataset-name" -> userConfig.datasetName.value,
+                "url"          -> storeConfig.fusekiBaseUrl.toString,
+                "dataset-name" -> storeConfig.datasetName.value,
                 "renku" -> Map(
-                  "username" -> userConfig.authCredentials.username.value,
-                  "password" -> userConfig.authCredentials.password.value
+                  "username" -> storeConfig.authCredentials.username.value,
+                  "password" -> storeConfig.authCredentials.password.value
                 ).asJava
               ).asJava
             ).asJava
@@ -52,10 +52,10 @@ class RdfStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
         val Success(actual) = RdfStoreConfig[Try](config)
 
-        actual.fusekiBaseUrl            shouldBe userConfig.fusekiBaseUrl
-        actual.datasetName              shouldBe userConfig.datasetName
-        actual.authCredentials.username shouldBe userConfig.authCredentials.username
-        actual.authCredentials.password shouldBe userConfig.authCredentials.password
+        actual.fusekiBaseUrl            shouldBe storeConfig.fusekiBaseUrl
+        actual.datasetName              shouldBe storeConfig.datasetName
+        actual.authCredentials.username shouldBe storeConfig.authCredentials.username
+        actual.authCredentials.password shouldBe storeConfig.authCredentials.password
       }
     }
 
@@ -141,6 +141,34 @@ class RdfStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
       val Failure(exception) = RdfStoreConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
+    }
+  }
+
+  "MigrationsStoreConfig.apply" should {
+
+    "read 'services.fuseki.url', 'services.fuseki.admin.username' and 'services.fuseki.admin.password' to instantiate the RdfStoreConfig" in {
+      forAll(rdfStoreConfigs) { storeConfig =>
+        val config = ConfigFactory.parseMap(
+          Map(
+            "services" -> Map(
+              "fuseki" -> Map(
+                "url" -> storeConfig.fusekiBaseUrl.toString,
+                "admin" -> Map(
+                  "username" -> storeConfig.authCredentials.username.value,
+                  "password" -> storeConfig.authCredentials.password.value
+                ).asJava
+              ).asJava
+            ).asJava
+          ).asJava
+        )
+
+        val Success(actual) = MigrationsStoreConfig[Try](config)
+
+        actual.fusekiBaseUrl            shouldBe storeConfig.fusekiBaseUrl
+        actual.datasetName              shouldBe DatasetName("migrations")
+        actual.authCredentials.username shouldBe storeConfig.authCredentials.username
+        actual.authCredentials.password shouldBe storeConfig.authCredentials.password
+      }
     }
   }
 }

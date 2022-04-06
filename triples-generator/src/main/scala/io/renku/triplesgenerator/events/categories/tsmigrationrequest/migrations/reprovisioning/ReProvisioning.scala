@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations
 package reprovisioning
 
 import cats.data.{EitherT, NonEmptyList}
@@ -36,7 +37,7 @@ import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.ConditionedMigration.MigrationRequired
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
@@ -52,36 +53,42 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
     reProvisioningStatus:      ReProvisioningStatus[F],
     executionTimeRecorder:     ExecutionTimeRecorder[F],
     retryDelay:                FiniteDuration
-) extends Migration[F] {
+) extends ConditionedMigration[F] {
 
-  override val name: Migration.Name = Migration.Name("re-provisioning")
+  override val name: Migration.Name = migrationName
 
   import eventSender._
   import executionTimeRecorder._
   import reProvisionJudge.reProvisioningNeeded
   import triplesRemover._
 
-  override def run(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    (reProvisioningNeeded() recoverWith tryAgain(reProvisioningNeeded()))
-      .flatMap {
-        case true  => triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
-        case false => Logger[F].info(show"$name: TS up to date")
+  override def required: EitherT[F, ProcessingRecoverableError, MigrationRequired] = EitherT.right {
+    reProvisioningNeeded()
+      .recoverWith(tryAgain(reProvisioningNeeded()))
+      .map {
+        case true  => MigrationRequired.Yes("TS in incompatible version")
+        case false => MigrationRequired.No("TS up to date")
       }
-      .map(_.asRight[ProcessingRecoverableError])
+  }
+
+  override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT.right {
+    triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
   }
 
   private def triggerReProvisioning = measureExecutionTime {
     for {
-      _ <- Logger[F].info(show"$name: kicking-off re-provisioning")
       _ <- setRunningStatusInTS()
       _ <- versionPairUpdater
              .update(versionCompatibilityPairs.head)
              .recoverWith(tryAgain(versionPairUpdater.update(versionCompatibilityPairs.head)))
       _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
       _ <- sendStatusChangeEvent() recoverWith tryAgain(sendStatusChangeEvent())
-      _ <- reProvisioningStatus.clear() recoverWith tryAgain(reProvisioningStatus.clear())
     } yield ()
   } >>= logSummary
+
+  override def postMigration(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT.right {
+    reProvisioningStatus.clear() recoverWith tryAgain(reProvisioningStatus.clear())
+  }
 
   private def setRunningStatusInTS() = findControllerUrl >>= { controllerUrl =>
     reProvisioningStatus.setRunning(on = controllerUrl) recoverWith tryAgain(
@@ -95,15 +102,15 @@ private class ReProvisioningImpl[F[_]: Temporal: Logger](
 
   private def sendStatusChangeEvent() = sendEvent(
     EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}"""),
-    EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), s"$name: sending EVENTS_STATUS_CHANGE failed")
+    EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), formMessage("sending EVENTS_STATUS_CHANGE failed"))
   )
 
   private def logSummary: ((ElapsedTime, Unit)) => F[Unit] = { case (elapsedTime, _) =>
-    Logger[F].info(show"$name: TS cleared in ${elapsedTime}ms - re-processing all the events")
+    Logger[F].info(formMessage(show"TS cleared in ${elapsedTime}ms - re-processing all the events"))
   }
 
   private def tryAgain[T](step: => F[T]): PartialFunction[Throwable, F[T]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(show"$name: failure") >>
+    Logger[F].error(exception)(formMessage("failure")) >>
       Temporal[F].delayBy(step, retryDelay) recoverWith tryAgain(step)
   }
 }

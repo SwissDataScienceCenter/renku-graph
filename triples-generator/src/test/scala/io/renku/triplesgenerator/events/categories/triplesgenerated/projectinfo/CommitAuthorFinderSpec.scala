@@ -18,54 +18,65 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 
+import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
-import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
-import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.CommonGraphGenerators.{accessTokens, clientExceptions, connectivityExceptions, unexpectedResponseExceptions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.projects.Path
-import io.renku.graph.model.{GitLabUrl, persons}
-import io.renku.http.client.AccessToken
-import io.renku.http.client.UrlEncoder._
+import io.renku.graph.model.persons
+import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
-import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
+import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
-import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
+import org.http4s.Method.GET
+import org.http4s.Status.{BadGateway, GatewayTimeout, NotImplemented, ServiceUnavailable}
+import org.http4s.implicits._
+import org.http4s.{Method, Request, Response, Status, Uri}
+import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.duration._
-import scala.language.reflectiveCalls
-
 class CommitAuthorFinderSpec
     extends AnyWordSpec
     with IOSpec
-    with ExternalServiceStubbing
     with should.Matchers
+    with MockFactory
     with ScalaCheckPropertyChecks
-    with TinyTypeEncoders {
+    with TinyTypeEncoders
+    with GitLabClientTools[IO] {
 
   "findCommitAuthor" should {
 
-    "return commit author's name and email if found" in new TestCase {
+    "return the result from the GitLabClient" in new TestCase {
       forAll { (authorName: persons.Name, authorEmail: persons.Email) =>
-        `/api/v4/projects/:id/repository/commits/:sha`(projectPath, commitId) returning okJson(
-          (authorName -> authorEmail).asJson.noSpaces
-        )
+        val expectation = (authorName -> authorEmail).some
+        val endpointName: String Refined NonEmpty = "commit-detail"
+
+        (gitLabClient
+          .send(_: Method, _: Uri, _: String Refined NonEmpty)(
+            _: ResponseMappingF[IO, Option[(persons.Name, persons.Email)]]
+          )(_: Option[AccessToken]))
+          .expects(GET,
+                   uri"projects" / projectPath.show / "repository" / "commits" / commitId.show,
+                   endpointName,
+                   *,
+                   maybeAccessToken
+          )
+          .returning(expectation.pure[IO])
 
         finder
           .findCommitAuthor(projectPath, commitId)
@@ -74,56 +85,68 @@ class CommitAuthorFinderSpec
       }
     }
 
-    "return None if commit NOT_FOUND" in new TestCase {
-      `/api/v4/projects/:id/repository/commits/:sha`(projectPath, commitId) returning notFound()
+    "return a ProcessingRecoverableError if the GitLabClient " +
+      "throws an exception handled by the recovery strategy" in new TestCase {
 
-      finder
-        .findCommitAuthor(projectPath, commitId)
-        .value
-        .unsafeRunSync() shouldBe None.asRight
+        val endpointName: String Refined NonEmpty = "commit-detail"
+
+        val error = Gen
+          .oneOf(
+            clientExceptions,
+            connectivityExceptions,
+            unexpectedResponseExceptions(
+              Gen.oneOf(NotImplemented, BadGateway, ServiceUnavailable, GatewayTimeout)
+            )
+          )
+          .generateOne
+
+        (gitLabClient
+          .send(_: Method, _: Uri, _: String Refined NonEmpty)(
+            _: ResponseMappingF[IO, Option[(persons.Name, persons.Email)]]
+          )(_: Option[AccessToken]))
+          .expects(GET,
+                   uri"projects" / projectPath.show / "repository" / "commits" / commitId.show,
+                   endpointName,
+                   *,
+                   maybeAccessToken
+          )
+          .returning(error.raiseError[IO, Option[(persons.Name, persons.Email)]])
+
+        val Left(result) = finder
+          .findCommitAuthor(projectPath, commitId)
+          .value
+          .unsafeRunSync()
+
+        result            shouldBe a[ProcessingRecoverableError]
+        result.getMessage shouldBe error.getMessage
+      }
+
+    "return commit author's name and email if found" in new TestCase {
+      forAll { (authorName: persons.Name, authorEmail: persons.Email) =>
+        mapResponse(Status.Ok, Request[IO](), Response[IO]().withEntity((authorName -> authorEmail).asJson.noSpaces))
+          .unsafeRunSync() shouldBe
+          (authorName            -> authorEmail).some
+      }
+    }
+
+    "return None if commit NOT_FOUND" in new TestCase {
+      mapResponse(Status.NotFound, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe None
     }
 
     "return None if commit author not found" in new TestCase {
-      `/api/v4/projects/:id/repository/commits/:sha`(projectPath, commitId) returning okJson("{}")
-
-      finder
-        .findCommitAuthor(projectPath, commitId)
-        .value
-        .unsafeRunSync() shouldBe None.asRight
+      mapResponse(Status.Ok, Request[IO](), Response[IO]().withEntity(json"""{}""")).unsafeRunSync() shouldBe None
     }
 
     "return None if commit author email invalid" in new TestCase {
-      `/api/v4/projects/:id/repository/commits/:sha`(projectPath, commitId) returning okJson {
-        json"""{
-          "author_name":  ${personNames.generateOne},
-          "author_email": ${nonBlankStrings().generateOne.value}
-        }""".noSpaces
-      }
-
-      finder
-        .findCommitAuthor(projectPath, commitId)
-        .value
-        .unsafeRunSync() shouldBe None.asRight
-    }
-
-    Set(
-      "connection problem" -> aResponse().withFault(CONNECTION_RESET_BY_PEER),
-      "client problem"     -> aResponse().withFixedDelay((requestTimeout.toMillis + 500).toInt),
-      "BadGateway"         -> aResponse().withStatus(BadGateway.code),
-      "ServiceUnavailable" -> aResponse().withStatus(ServiceUnavailable.code),
-      "Forbidden"          -> aResponse().withStatus(Forbidden.code),
-      "Unauthorized"       -> aResponse().withStatus(Unauthorized.code)
-    ) foreach { case (problemName, response) =>
-      s"return a Recoverable Failure for $problemName when fetching commit author" in new TestCase {
-        `/api/v4/projects/:id/repository/commits/:sha`(projectPath, commitId) returning response
-
-        val Left(failure) = finder.findCommitAuthor(projectPath, commitId).value.unsafeRunSync()
-        failure shouldBe a[ProcessingRecoverableError]
-      }
+      mapResponse(
+        Status.Ok,
+        Request[IO](),
+        Response[IO]().withEntity(
+          json"""{ "author_name":  ${personNames.generateOne}, "author_email": ${nonBlankStrings().generateOne.value} }""".noSpaces
+        )
+      ).unsafeRunSync() shouldBe None
     }
   }
-
-  private lazy val requestTimeout = 2 seconds
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
@@ -131,13 +154,15 @@ class CommitAuthorFinderSpec
     val commitId    = commitIds.generateOne
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabUrl = GitLabUrl(externalServiceBaseUrl).apiV4
-    val finder = new CommitAuthorFinderImpl[IO](gitLabUrl,
-                                                Throttler.noThrottling,
-                                                retryInterval = 100 millis,
-                                                maxRetries = 1,
-                                                requestTimeoutOverride = Some(requestTimeout)
-    )
+    val gitLabClient = mock[GitLabClient[IO]]
+    val finder       = new CommitAuthorFinderImpl[IO](gitLabClient)
+
+    val mapResponse =
+      captureMapping(finder, gitLabClient)(
+        _.findCommitAuthor(projectPaths.generateOne, commitIds.generateOne),
+        Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
+      )
+
   }
 
   private implicit lazy val authorEncoder: Encoder[(persons.Name, persons.Email)] = Encoder.instance {
@@ -145,15 +170,5 @@ class CommitAuthorFinderSpec
       "author_name":  $authorName,
       "author_email": $authorEmail
     }"""
-  }
-
-  private def `/api/v4/projects/:id/repository/commits/:sha`(path: Path, commitId: CommitId)(implicit
-      maybeAccessToken:                                            Option[AccessToken]
-  ) = new {
-    def returning(response: ResponseDefinitionBuilder) = stubFor {
-      get(s"/api/v4/projects/${urlEncode(path.value)}/repository/commits/$commitId")
-        .withAccessToken(maybeAccessToken)
-        .willReturn(response)
-    }
   }
 }

@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations.reprovisioning
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -33,6 +34,7 @@ import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.ConditionedMigration.MigrationRequired
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -42,13 +44,39 @@ import scala.concurrent.duration._
 
 class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  "run" should {
+  "required" should {
+
+    "return No if TS is up to date" in new TestCase {
+
+      (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
+
+      reProvisioning.required.value.unsafeRunSync() shouldBe MigrationRequired.No("TS up to date").asRight
+    }
+
+    "return Yes if TS is not up to date" in new TestCase {
+
+      (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
+
+      reProvisioning.required.value.unsafeRunSync() shouldBe MigrationRequired.Yes("TS in incompatible version").asRight
+    }
+
+    "retry checking if re-provisioning is needed on failure" in new TestCase {
+      val exception = exceptions.generateOne
+
+      inSequence {
+        (reprovisionJudge.reProvisioningNeeded _).expects().returning(exception.raiseError[IO, Boolean])
+        (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
+      }
+
+      reProvisioning.required.value.unsafeRunSync() shouldBe MigrationRequired.No("TS up to date").asRight
+    }
+  }
+
+  "migrate" should {
 
     "clear the RDF Store and reschedule all Commit Events for processing in the Log if store is outdated" in new TestCase {
 
       inSequence {
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
-
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
         (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
@@ -58,40 +86,14 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
-      )
-    }
-
-    "do nothing if there all RDF store is up to date" in new TestCase {
-
-      (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
-
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
-
-      logger.loggedOnly(Info("re-provisioning: TS up to date"))
-    }
-
-    "do not fail but simply retry if checking if re-provisioning is needed fails" in new TestCase {
-      val exception = exceptions.generateOne
-
-      inSequence {
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(exception.raiseError[IO, Boolean])
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(false.pure[IO])
-      }
-
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
-
-      logger.loggedOnly(
-        Error("re-provisioning: failure", exception),
-        Info("re-provisioning: TS up to date")
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -99,8 +101,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(exception.raiseError[IO, MicroserviceBaseUrl])
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
@@ -112,16 +112,15 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -129,8 +128,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
@@ -142,16 +139,15 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -159,8 +155,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
@@ -174,16 +168,15 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -191,8 +184,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
@@ -205,16 +196,15 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
 
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
 
@@ -223,8 +213,6 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception2 = exceptions.generateOne
 
       inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
 
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
 
@@ -237,48 +225,28 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         expectStatusChangeEventFailing(exception1)
         expectStatusChangeEventFailing(exception2)
         expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
       }
 
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
+      reProvisioning.migrate().value.unsafeRunSync() shouldBe ().asRight
 
       logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
-        Error("re-provisioning: failure", exception1),
-        Error("re-provisioning: failure", exception2),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+        Error(s"$categoryName: $migrationName failure", exception1),
+        Error(s"$categoryName: $migrationName failure", exception2),
+        Info(
+          s"$categoryName: $migrationName TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events"
+        )
       )
     }
+  }
+
+  "postMigration" should {
 
     "do not fail but retry from the clearing the re-provisioning flag step if it fails" in new TestCase {
       val exception = exceptions.generateOne
+      (reProvisioningStatus.clear _).expects().returning(exception.raiseError[IO, Unit])
+      (reProvisioningStatus.clear _).expects().returning(IO.unit)
 
-      inSequence {
-
-        (reprovisionJudge.reProvisioningNeeded _).expects().returning(true.pure[IO])
-
-        (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])
-
-        (reProvisioningStatus.setRunning _).expects(controller).returning(IO.unit)
-
-        (renkuVersionPairUpdater.update _).expects(configuredRenkuVersionPairs.head).returning(IO.unit)
-
-        (triplesRemover.removeAllTriples _).expects().returning(IO.unit)
-
-        expectStatusChangeEventSucceeds()
-
-        (reProvisioningStatus.clear _).expects().returning(exception.raiseError[IO, Unit])
-        (reProvisioningStatus.clear _).expects().returning(IO.unit)
-      }
-
-      reProvisioning.run().value.unsafeRunSync() shouldBe ().asRight
-
-      logger.loggedOnly(
-        Info("re-provisioning: kicking-off re-provisioning"),
-        Error("re-provisioning: failure", exception),
-        Info(s"re-provisioning: TS cleared in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
-      )
+      reProvisioning.postMigration().value.unsafeRunSync() shouldBe ().asRight
     }
   }
 
@@ -317,7 +285,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
         .expects(
           EventRequestContent.NoPayload(json"""{"categoryName": "EVENTS_STATUS_CHANGE", "newStatus": "NEW"}"""),
           EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                                   "re-provisioning: sending EVENTS_STATUS_CHANGE failed"
+                                   s"$categoryName: $migrationName sending EVENTS_STATUS_CHANGE failed"
           )
         )
         .returning(result)
