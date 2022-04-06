@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "commitEventService.fullname" . }}
+  name: { { include "commitEventService.fullname" . } }
   labels:
-    app: {{ template "commitEventService.name" . }}
-    chart: {{ template "graph.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    app: { { template "commitEventService.name" . } }
+    chart: { { template "graph.chart" . } }
+    release: { { .Release.Name } }
+    heritage: { { .Release.Service } }
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: {{ include "commitEventService.name" . }}
-      release: {{ .Release.Name }}
+      app: { { include "commitEventService.name" . } }
+      release: { { .Release.Name } }
   template:
     metadata:
       labels:
-        app: {{ include "commitEventService.name" . }}
-        release: {{ .Release.Name }}
+        app: { { include "commitEventService.name" . } }
+        release: { { .Release.Name } }
     spec:
       initContainers:
-        {{- include "certificates.initContainer" . | nindent 8 }}
+        { { - include "certificates.initContainer" . | nindent 8 } }
       containers:
         - name: commit-event-service
           image: "{{ .Values.commitEventService.image.repository }}:{{ .Values.commitEventService.image.tag }}"
-          imagePullPolicy: {{ .Values.commitEventService.image.pullPolicy }}
+          imagePullPolicy: { { .Values.commitEventService.image.pullPolicy } }
           env:
             - name: RENKU_CLIENT_CERTIFICATE
               valueFrom:
@@ -38,17 +38,17 @@ spec:
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: GITLAB_BASE_URL
-              value: {{ .Values.gitlab.url }}
+              value: { { .Values.gitlab.url } }
             - name: GITLAB_RATE_LIMIT
-              value: {{ .Values.commitEventService.gitlab.rateLimit }}
+              value: { { .Values.commitEventService.gitlab.rateLimit } }
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
-              {{- if .Values.sentry.enabled }}
+              { { - if .Values.sentry.enabled } }
             - name: SENTRY_DSN
-              value: {{ .Values.sentry.dsn }}
+              value: { { .Values.sentry.dsn } }
             - name: SENTRY_ENVIRONMENT
-              value: {{ .Values.sentry.environment }}
-              {{- end }}
+              value: { { .Values.sentry.environment } }
+              { { - end } }
             - name: JAVA_OPTS
               value: -Xmx{{ .Values.commitEventService.jvmXmx }} -XX:+UseG1GC
           ports:
@@ -64,20 +64,20 @@ spec:
               path: /ping
               port: http-commit-sv
           resources:
-            {{- toYaml .Values.commitEventService.resources | nindent 12 }}
+            { { - toYaml .Values.commitEventService.resources | nindent 12 } }
           volumeMounts:
-            {{- include "certificates.volumeMounts.openjdk17" . | nindent 12 }}
+            { { - include "certificates.volumeMounts.javaCertsGeneral" . | nindent 12 } }
       volumes:
-        {{- include "certificates.volumes" . | nindent 8 }}
-  {{- with .Values.nodeSelector }}
+        { { - include "certificates.volumes" . | nindent 8 } }
+  { { - with .Values.nodeSelector } }
 nodeSelector:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.affinity }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.affinity } }
 affinity:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.tolerations }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.tolerations } }
 tolerations:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
+  { { toYaml . | indent 8 } }
+    { { - end } }

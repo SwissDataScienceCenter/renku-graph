@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "triplesGenerator.fullname" . }}
+  name: { { include "triplesGenerator.fullname" . } }
   labels:
-    app: {{ template "triplesGenerator.name" . }}
-    chart: {{ template "graph.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    app: { { template "triplesGenerator.name" . } }
+    chart: { { template "graph.chart" . } }
+    release: { { .Release.Name } }
+    heritage: { { .Release.Service } }
 spec:
-  replicas: {{ .Values.triplesGenerator.replicas }}
+  replicas: { { .Values.triplesGenerator.replicas } }
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: {{ include "triplesGenerator.name" . }}
-      release: {{ .Release.Name }}
+      app: { { include "triplesGenerator.name" . } }
+      release: { { .Release.Name } }
   template:
     metadata:
       labels:
-        app: {{ include "triplesGenerator.name" . }}
-        release: {{ .Release.Name }}
+        app: { { include "triplesGenerator.name" . } }
+        release: { { .Release.Name } }
     spec:
       initContainers:
-        {{- include "certificates.initContainer" . | nindent 8 }}
+        { { - include "certificates.initContainer" . | nindent 8 } }
       containers:
         - name: triples-generator
           image: "{{ .Values.triplesGenerator.image.repository }}:{{ .Values.triplesGenerator.image.tag }}"
-          imagePullPolicy: {{ .Values.triplesGenerator.image.pullPolicy }}
+          imagePullPolicy: { { .Values.triplesGenerator.image.pullPolicy } }
           env:
             - name: RENKU_CLIENT_CERTIFICATE
               valueFrom:
@@ -34,7 +34,7 @@ spec:
                   name: client-certificate-secret
                   key: client-certificate
             - name: RENKU_DOMAIN
-              value: {{ .Values.global.renku.domain }}
+              value: { { .Values.global.renku.domain } }
             - name: RENKU_BASE_URL
               value: https://{{ .Values.global.renku.domain }}
             - name: EVENT_LOG_BASE_URL
@@ -42,26 +42,26 @@ spec:
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: GITLAB_BASE_URL
-              value: {{ .Values.gitlab.url }}
+              value: { { .Values.gitlab.url } }
             - name: GITLAB_RATE_LIMIT
-              value: {{ .Values.triplesGenerator.gitlab.rateLimit }}
+              value: { { .Values.triplesGenerator.gitlab.rateLimit } }
             - name: JENA_DATASET_NAME
-              {{- if .Values.global.graph.jena.dataset }}
-              value: {{ .Values.global.graph.jena.dataset }}
-              {{- else }}
-              value: {{ .Release.Namespace }}
-             {{- end }}
+              { { - if .Values.global.graph.jena.dataset } }
+              value: { { .Values.global.graph.jena.dataset } }
+              { { - else } }
+              value: { { .Release.Namespace } }
+            { { - end } }
             - name: JENA_BASE_URL
               value: "http://{{ template "jena.fullname" . }}-master:{{ .Values.jena.service.port }}"
             - name: JENA_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jena.fullname" . }}
+                  name: { { template "jena.fullname" . } }
                   key: jena-admin-password
             - name: JENA_RENKU_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jena.fullname" . }}
+                  name: { { template "jena.fullname" . } }
                   key: jena-renku-password
             - name: RENKU_DISABLE_VERSION_CHECK
               value: "true"
@@ -69,14 +69,14 @@ spec:
               value: "{{ .Values.triplesGenerator.reProvisioningRemovalBatchSize }}"
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
-              {{- if .Values.sentry.enabled }}
+              { { - if .Values.sentry.enabled } }
             - name: SENTRY_DSN
-              value: {{ .Values.sentry.sentryDsnRenkuPython }}
+              value: { { .Values.sentry.sentryDsnRenkuPython } }
             - name: SENTRY_GRAPH_DSN
-              value: {{ .Values.sentry.dsn }}
+              value: { { .Values.sentry.dsn } }
             - name: SENTRY_ENVIRONMENT
-              value: {{ .Values.sentry.environment }}
-              {{- end }}
+              value: { { .Values.sentry.environment } }
+              { { - end } }
             - name: GENERATION_PROCESSES_NUMBER
               value: "{{ .Values.triplesGenerator.generationProcessesNumber }}"
             - name: TRANSFORMATION_PROCESSES_NUMBER
@@ -97,9 +97,9 @@ spec:
             periodSeconds: 60
             successThreshold: 1
             failureThreshold: 10
-            {{- if .Values.triplesGenerator.renkuPythonDevVersion }}
+            { { - if .Values.triplesGenerator.renkuPythonDevVersion } }
             initialDelaySeconds: 120
-            {{- end }}
+            { { - end } }
           readinessProbe:
             httpGet:
               path: /ping
@@ -107,24 +107,24 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 3
-            {{- if .Values.triplesGenerator.renkuPythonDevVersion }}
+            { { - if .Values.triplesGenerator.renkuPythonDevVersion } }
             initialDelaySeconds: 120
-            {{- end }}
+            { { - end } }
           resources:
-            {{- toYaml .Values.triplesGenerator.resources | nindent 12 }}
+            { { - toYaml .Values.triplesGenerator.resources | nindent 12 } }
           volumeMounts:
-            {{- include "certificates.volumeMounts.openjdk17" . | nindent 12 }}
+            { { - include "certificates.volumeMounts.javaCertsGeneral" . | nindent 12 } }
       volumes:
-        {{- include "certificates.volumes" . | nindent 8 }}
-  {{- with .Values.nodeSelector }}
+        { { - include "certificates.volumes" . | nindent 8 } }
+  { { - with .Values.nodeSelector } }
 nodeSelector:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.affinity }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.affinity } }
 affinity:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.tolerations }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.tolerations } }
 tolerations:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
+  { { toYaml . | indent 8 } }
+    { { - end } }

@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "knowledgeGraph.fullname" . }}
+  name: { { include "knowledgeGraph.fullname" . } }
   labels:
-    app: {{ template "knowledgeGraph.name" . }}
-    chart: {{ template "graph.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    app: { { template "knowledgeGraph.name" . } }
+    chart: { { template "graph.chart" . } }
+    release: { { .Release.Name } }
+    heritage: { { .Release.Service } }
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: {{ include "knowledgeGraph.name" . }}
-      release: {{ .Release.Name }}
+      app: { { include "knowledgeGraph.name" . } }
+      release: { { .Release.Name } }
   template:
     metadata:
       labels:
-        app: {{ include "knowledgeGraph.name" . }}
-        release: {{ .Release.Name }}
+        app: { { include "knowledgeGraph.name" . } }
+        release: { { .Release.Name } }
     spec:
       initContainers:
-        {{- include "certificates.initContainer" . | nindent 8 }}
+        { { - include "certificates.initContainer" . | nindent 8 } }
       containers:
         - name: knowledge-graph
           image: "{{ .Values.knowledgeGraph.image.repository }}:{{ .Values.knowledgeGraph.image.tag }}"
-          imagePullPolicy: {{ .Values.knowledgeGraph.image.pullPolicy }}
+          imagePullPolicy: { { .Values.knowledgeGraph.image.pullPolicy } }
           env:
             - name: RENKU_CLIENT_CERTIFICATE
               valueFrom:
@@ -38,32 +38,32 @@ spec:
             - name: RENKU_RESOURCES_URL
               value: https://{{ .Values.global.renku.domain }}{{ .Values.knowledgeGraph.services.renku.resourcesPath }}
             - name: JENA_DATASET_NAME
-              {{- if .Values.global.graph.jena.dataset }}
-              value: {{ .Values.global.graph.jena.dataset }}
-              {{- else }}
-              value: {{ .Release.Namespace }}
-              {{- end }}
+              { { - if .Values.global.graph.jena.dataset } }
+              value: { { .Values.global.graph.jena.dataset } }
+              { { - else } }
+              value: { { .Release.Namespace } }
+              { { - end } }
             - name: JENA_BASE_URL
               value: "http://{{ template "jena.fullname" . }}-master:{{ .Values.jena.service.port }}"
             - name: JENA_RENKU_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jena.fullname" . }}
+                  name: { { template "jena.fullname" . } }
                   key: jena-renku-password
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: GITLAB_BASE_URL
-              value: {{ .Values.gitlab.url }}
+              value: { { .Values.gitlab.url } }
             - name: GITLAB_RATE_LIMIT
-              value: {{ .Values.knowledgeGraph.gitlab.rateLimit }}
+              value: { { .Values.knowledgeGraph.gitlab.rateLimit } }
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
-              {{- if .Values.sentry.enabled }}
+              { { - if .Values.sentry.enabled } }
             - name: SENTRY_DSN
-              value: {{ .Values.sentry.dsn }}
+              value: { { .Values.sentry.dsn } }
             - name: SENTRY_ENVIRONMENT
-              value: {{ .Values.sentry.environment }}
-              {{- end }}
+              value: { { .Values.sentry.environment } }
+              { { - end } }
             - name: JAVA_OPTS
               value: -Xmx{{ .Values.knowledgeGraph.jvmXmx }} -XX:+UseG1GC
           ports:
@@ -79,20 +79,20 @@ spec:
               path: /ping
               port: http-kg
           resources:
-            {{- toYaml .Values.knowledgeGraph.resources | nindent 12 }}
+            { { - toYaml .Values.knowledgeGraph.resources | nindent 12 } }
           volumeMounts:
-            {{- include "certificates.volumeMounts.openjdk17" . | nindent 12 }}
+            { { - include "certificates.volumeMounts.javaCertsGeneral" . | nindent 12 } }
       volumes:
-        {{- include "certificates.volumes" . | nindent 8 }}
-  {{- with .Values.nodeSelector }}
+        { { - include "certificates.volumes" . | nindent 8 } }
+  { { - with .Values.nodeSelector } }
 nodeSelector:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.affinity }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.affinity } }
 affinity:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.tolerations }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.tolerations } }
 tolerations:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
+  { { toYaml . | indent 8 } }
+    { { - end } }

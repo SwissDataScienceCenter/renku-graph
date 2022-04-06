@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "webhookService.fullname" . }}
+  name: { { include "webhookService.fullname" . } }
   labels:
-    app: {{ template "webhookService.name" . }}
-    chart: {{ template "graph.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    app: { { template "webhookService.name" . } }
+    chart: { { template "graph.chart" . } }
+    release: { { .Release.Name } }
+    heritage: { { .Release.Service } }
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: {{ include "webhookService.name" . }}
-      release: {{ .Release.Name }}
+      app: { { include "webhookService.name" . } }
+      release: { { .Release.Name } }
   template:
     metadata:
       labels:
-        app: {{ include "webhookService.name" . }}
-        release: {{ .Release.Name }}
+        app: { { include "webhookService.name" . } }
+        release: { { .Release.Name } }
     spec:
       initContainers:
-        {{- include "certificates.initContainer" . | nindent 8 }}
+        { { - include "certificates.initContainer" . | nindent 8 } }
       containers:
         - name: webhook-service
           image: "{{ .Values.webhookService.image.repository }}:{{ .Values.webhookService.image.tag }}"
-          imagePullPolicy: {{ .Values.webhookService.image.pullPolicy }}
+          imagePullPolicy: { { .Values.webhookService.image.pullPolicy } }
           env:
             - name: RENKU_CLIENT_CERTIFICATE
               valueFrom:
@@ -36,34 +36,34 @@ spec:
             - name: HOOK_TOKEN_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "webhookService.fullname" . }}
+                  name: { { template "webhookService.fullname" . } }
                   key: webhookService-hookToken-secret
             - name: EVENT_LOG_BASE_URL
               value: "http://{{ template "eventLog.fullname" . }}:{{ .Values.eventLog.service.port }}"
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
             - name: GITLAB_BASE_URL
-              value: {{ .Values.gitlab.url }}
+              value: { { .Values.gitlab.url } }
             - name: GITLAB_RATE_LIMIT
-              value: {{ .Values.webhookService.gitlab.rateLimit }}
+              value: { { .Values.webhookService.gitlab.rateLimit } }
             - name: SELF_IP
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
             - name: SELF_URL
-              {{- if .Values.global.renku.domain }}
-              value: {{ template "http" . }}://{{ .Values.global.renku.domain }}
+              { { - if .Values.global.renku.domain } }
+              value: { { template "http" . } }://{{ .Values.global.renku.domain }}
               {{- else }}
-              value: {{ printf "http://$(SELF_IP):9001" | quote }}
-              {{- end }}
+              value: { { printf "http://$(SELF_IP):9001" | quote } }
+              { { - end } }
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
-              {{- if .Values.sentry.enabled }}
+              { { - if .Values.sentry.enabled } }
             - name: SENTRY_DSN
-              value: {{ .Values.sentry.dsn }}
+              value: { { .Values.sentry.dsn } }
             - name: SENTRY_ENVIRONMENT
-              value: {{ .Values.sentry.environment }}
-              {{- end }}
+              value: { { .Values.sentry.environment } }
+              { { - end } }
             - name: JAVA_OPTS
               value: -Xmx{{ .Values.webhookService.jvmXmx }} -XX:+UseG1GC
           ports:
@@ -79,20 +79,20 @@ spec:
               path: /ping
               port: http-webhook-sv
           resources:
-            {{- toYaml .Values.webhookService.resources | nindent 12 }}
+            { { - toYaml .Values.webhookService.resources | nindent 12 } }
           volumeMounts:
-            {{- include "certificates.volumeMounts.openjdk17" . | nindent 12 }}
+            { { - include "certificates.volumeMounts.javaCertsGeneral" . | nindent 12 } }
       volumes:
-        {{- include "certificates.volumes" . | nindent 8 }}
-  {{- with .Values.nodeSelector }}
+        { { - include "certificates.volumes" . | nindent 8 } }
+  { { - with .Values.nodeSelector } }
 nodeSelector:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.affinity }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.affinity } }
 affinity:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.tolerations }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.tolerations } }
 tolerations:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
+  { { toYaml . | indent 8 } }
+    { { - end } }

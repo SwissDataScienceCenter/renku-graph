@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "eventLog.fullname" . }}
+  name: { { include "eventLog.fullname" . } }
   labels:
-    app: {{ template "eventLog.name" . }}
-    chart: {{ template "graph.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    app: { { template "eventLog.name" . } }
+    chart: { { template "graph.chart" . } }
+    release: { { .Release.Name } }
+    heritage: { { .Release.Service } }
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: {{ include "eventLog.name" . }}
-      release: {{ .Release.Name }}
+      app: { { include "eventLog.name" . } }
+      release: { { .Release.Name } }
   template:
     metadata:
       labels:
-        app: {{ include "eventLog.name" . }}
-        release: {{ .Release.Name }}
+        app: { { include "eventLog.name" . } }
+        release: { { .Release.Name } }
     spec:
       initContainers:
-        {{- include "certificates.initContainer" . | nindent 8 }}
+        { { - include "certificates.initContainer" . | nindent 8 } }
       containers:
         - name: event-log
           image: "{{ .Values.eventLog.image.repository }}:{{ .Values.eventLog.image.tag }}"
-          imagePullPolicy: {{ .Values.eventLog.image.pullPolicy }}
+          imagePullPolicy: { { .Values.eventLog.image.pullPolicy } }
           env:
             - name: RENKU_CLIENT_CERTIFICATE
               valueFrom:
@@ -38,68 +38,68 @@ spec:
             - name: EVENT_LOG_POSTGRES_PORT
               value: "5432"
             - name: EVENT_LOG_POSTGRES_USER
-              value: {{ .Values.global.graph.dbEventLog.postgresUser }}
+              value: { { .Values.global.graph.dbEventLog.postgresUser } }
             - name: EVENT_LOG_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-{{- if .Values.global.graph.dbEventLog.existingSecret }}
-                  name: {{ tpl .Values.global.graph.dbEventLog.existingSecret . }}
-{{- else }}
-                  name: {{ template "eventLog.fullname" . }}
-{{- end }}
-                  key: graph-dbEventLog-postgresPassword
-            - name: EVENT_LOG_POSTGRES_CONNECTION_POOL
-              value: "{{ .Values.eventLog.connectionPool }}"
-            - name: EVENT_LOG_BASE_URL
-              value: "http://{{ template "eventLog.fullname" . }}:{{ .Values.eventLog.service.port }}"
-            - name: SENTRY_ENABLED
-              value: "{{ .Values.sentry.enabled }}"
-              {{- if .Values.sentry.enabled }}
-            - name: SENTRY_DSN
-              value: {{ .Values.sentry.dsn }}
-            - name: SENTRY_ENVIRONMENT
-              value: {{ .Values.sentry.environment }}
-              {{- end }}
-            - name: WEBHOOK_SERVICE_BASE_URL
-              value: "http://{{ template "webhookService.fullname" . }}:{{ .Values.webhookService.service.port }}"
-            - name: TOKEN_REPOSITORY_BASE_URL
-              value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
-            - name: JAVA_OPTS
-              value: -Xmx{{ .Values.eventLog.jvmXmx }} -XX:+UseG1GC
-          ports:
-            - name: http-event-log
-              containerPort: 9005
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /ping
-              port: http-event-log
-            periodSeconds: 10
-            successThreshold: 1
-            failureThreshold: 10
-            timeoutSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /ping
-              port: http-event-log
-            periodSeconds: 10
-            successThreshold: 1
-            failureThreshold: 3
-          resources:
-            {{- toYaml .Values.eventLog.resources | nindent 12 }}
-          volumeMounts:
-            {{- include "certificates.volumeMounts.openjdk17" . | nindent 12 }}
-      volumes:
-        {{- include "certificates.volumes" . | nindent 8 }}
-  {{- with .Values.nodeSelector }}
+  { { - if .Values.global.graph.dbEventLog.existingSecret } }
+name: { { tpl .Values.global.graph.dbEventLog.existingSecret . } }
+  { { - else } }
+name: { { template "eventLog.fullname" . } }
+  { { - end } }
+key: graph-dbEventLog-postgresPassword
+- name: EVENT_LOG_POSTGRES_CONNECTION_POOL
+  value: "{{ .Values.eventLog.connectionPool }}"
+- name: EVENT_LOG_BASE_URL
+  value: "http://{{ template "eventLog.fullname" . }}:{{ .Values.eventLog.service.port }}"
+- name: SENTRY_ENABLED
+  value: "{{ .Values.sentry.enabled }}"
+  { { - if .Values.sentry.enabled } }
+- name: SENTRY_DSN
+  value: { { .Values.sentry.dsn } }
+- name: SENTRY_ENVIRONMENT
+  value: { { .Values.sentry.environment } }
+  { { - end } }
+- name: WEBHOOK_SERVICE_BASE_URL
+  value: "http://{{ template "webhookService.fullname" . }}:{{ .Values.webhookService.service.port }}"
+- name: TOKEN_REPOSITORY_BASE_URL
+  value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
+- name: JAVA_OPTS
+  value: -Xmx{{ .Values.eventLog.jvmXmx }} -XX:+UseG1GC
+ports:
+  - name: http-event-log
+    containerPort: 9005
+    protocol: TCP
+livenessProbe:
+  httpGet:
+    path: /ping
+    port: http-event-log
+  periodSeconds: 10
+  successThreshold: 1
+  failureThreshold: 10
+  timeoutSeconds: 5
+readinessProbe:
+  httpGet:
+    path: /ping
+    port: http-event-log
+  periodSeconds: 10
+  successThreshold: 1
+  failureThreshold: 3
+resources:
+  { { - toYaml .Values.eventLog.resources | nindent 12 } }
+volumeMounts:
+  { { - include "certificates.volumeMounts.javaCertsGeneral" . | nindent 12 } }
+volumes:
+  { { - include "certificates.volumes" . | nindent 8 } }
+  { { - with .Values.nodeSelector } }
 nodeSelector:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.affinity }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.affinity } }
 affinity:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.tolerations }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.tolerations } }
 tolerations:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
+  { { toYaml . | indent 8 } }
+    { { - end } }

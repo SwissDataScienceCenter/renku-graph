@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "tokenRepository.fullname" . }}
+  name: { { include "tokenRepository.fullname" . } }
   labels:
-    app: {{ template "tokenRepository.name" . }}
-    chart: {{ template "graph.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    app: { { template "tokenRepository.name" . } }
+    chart: { { template "graph.chart" . } }
+    release: { { .Release.Name } }
+    heritage: { { .Release.Service } }
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: {{ include "tokenRepository.name" . }}
-      release: {{ .Release.Name }}
+      app: { { include "tokenRepository.name" . } }
+      release: { { .Release.Name } }
   template:
     metadata:
       labels:
-        app: {{ include "tokenRepository.name" . }}
-        release: {{ .Release.Name }}
+        app: { { include "tokenRepository.name" . } }
+        release: { { .Release.Name } }
     spec:
       initContainers:
-        {{- include "certificates.initContainer" . | nindent 8 }}
+        { { - include "certificates.initContainer" . | nindent 8 } }
       containers:
         - name: token-repository
           image: "{{ .Values.tokenRepository.image.repository }}:{{ .Values.tokenRepository.image.tag }}"
-          imagePullPolicy: {{ .Values.tokenRepository.image.pullPolicy }}
+          imagePullPolicy: { { .Values.tokenRepository.image.pullPolicy } }
           env:
             - name: RENKU_CLIENT_CERTIFICATE
               valueFrom:
@@ -36,72 +36,72 @@ spec:
             - name: TOKEN_ENCRYPTION_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "tokenRepository.fullname" . }}
+                  name: { { template "tokenRepository.fullname" . } }
                   key: tokenRepository-tokenEncryption-secret
             - name: TOKEN_REPOSITORY_POSTGRES_HOST
               value: "{{ template "postgresql.fullname" . }}"
             - name: TOKEN_REPOSITORY_POSTGRES_PORT
               value: "5432"
             - name: TOKEN_REPOSITORY_POSTGRES_USER
-              value: {{ .Values.global.graph.tokenRepository.postgresUser }}
+              value: { { .Values.global.graph.tokenRepository.postgresUser } }
             - name: TOKEN_REPOSITORY_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-{{- if .Values.global.graph.tokenRepository.existingSecret }}
-                  name: {{ tpl .Values.global.graph.tokenRepository.existingSecret . }}
-{{- else }}
-                  name: {{ template "tokenRepository.fullname" . }}-postgres
-{{- end }}
-                  key: graph-tokenRepository-postgresPassword
-            - name: TOKEN_REPOSITORY_POSTGRES_CONNECTION_POOL
-              value: "{{ .Values.tokenRepository.connectionPool }}"
-            - name: GITLAB_BASE_URL
-              value: {{ .Values.gitlab.url }}
-            - name: GITLAB_RATE_LIMIT
-              value: {{ .Values.tokenRepository.gitlab.rateLimit }}
-            - name: SENTRY_ENABLED
-              value: "{{ .Values.sentry.enabled }}"
-              {{- if .Values.sentry.enabled }}
-            - name: SENTRY_DSN
-              value: {{ .Values.sentry.dsn }}
-            - name: SENTRY_ENVIRONMENT
-              value: {{ .Values.sentry.environment }}
-              {{- end }}
-            - name: JAVA_OPTS
-              value: -Xmx{{ .Values.tokenRepository.jvmXmx }} -XX:+UseG1GC
-          ports:
-            - name: http-token-repo
-              containerPort: 9003
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /ping
-              port: http-token-repo
-            periodSeconds: 10
-            successThreshold: 1
-            failureThreshold: 10
-          readinessProbe:
-            httpGet:
-              path: /ping
-              port: http-token-repo
-            periodSeconds: 10
-            successThreshold: 1
-            failureThreshold: 3
-          resources:
-            {{- toYaml .Values.tokenRepository.resources | nindent 12 }}
-          volumeMounts:
-            {{- include "certificates.volumeMounts.openjdk17" . | nindent 12 }}
-      volumes:
-        {{- include "certificates.volumes" . | nindent 8 }}
-  {{- with .Values.nodeSelector }}
+  { { - if .Values.global.graph.tokenRepository.existingSecret } }
+name: { { tpl .Values.global.graph.tokenRepository.existingSecret . } }
+  { { - else } }
+name: { { template "tokenRepository.fullname" . } }-postgres
+  { { - end } }
+key: graph-tokenRepository-postgresPassword
+- name: TOKEN_REPOSITORY_POSTGRES_CONNECTION_POOL
+  value: "{{ .Values.tokenRepository.connectionPool }}"
+- name: GITLAB_BASE_URL
+  value: { { .Values.gitlab.url } }
+- name: GITLAB_RATE_LIMIT
+  value: { { .Values.tokenRepository.gitlab.rateLimit } }
+- name: SENTRY_ENABLED
+  value: "{{ .Values.sentry.enabled }}"
+  { { - if .Values.sentry.enabled } }
+- name: SENTRY_DSN
+  value: { { .Values.sentry.dsn } }
+- name: SENTRY_ENVIRONMENT
+  value: { { .Values.sentry.environment } }
+  { { - end } }
+- name: JAVA_OPTS
+  value: -Xmx{{ .Values.tokenRepository.jvmXmx }} -XX:+UseG1GC
+ports:
+  - name: http-token-repo
+    containerPort: 9003
+    protocol: TCP
+livenessProbe:
+  httpGet:
+    path: /ping
+    port: http-token-repo
+  periodSeconds: 10
+  successThreshold: 1
+  failureThreshold: 10
+readinessProbe:
+  httpGet:
+    path: /ping
+    port: http-token-repo
+  periodSeconds: 10
+  successThreshold: 1
+  failureThreshold: 3
+resources:
+  { { - toYaml .Values.tokenRepository.resources | nindent 12 } }
+volumeMounts:
+  { { - include "certificates.volumeMounts.javaCertsGeneral" . | nindent 12 } }
+volumes:
+  { { - include "certificates.volumes" . | nindent 8 } }
+  { { - with .Values.nodeSelector } }
 nodeSelector:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.affinity }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.affinity } }
 affinity:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
-  {{- with .Values.tolerations }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
+    { { - with .Values.tolerations } }
 tolerations:
-  {{ toYaml . | indent 8 }}
-  {{- end }}
+  { { toYaml . | indent 8 } }
+    { { - end } }
