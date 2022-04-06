@@ -40,9 +40,8 @@ import io.renku.knowledgegraph.projects.rest.ProjectsGenerators._
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders._
-import org.http4s.Method.GET
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -64,10 +63,10 @@ class GitLabProjectFinderSpec
         val expectation = project.some
 
         (gitLabClient
-          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[GitLabProject]])(
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[GitLabProject]])(
             _: Option[AccessToken]
           ))
-          .expects(GET, uri(path), endpointName, *, accessToken.some)
+          .expects(uri(path), endpointName, *, accessToken.some)
           .returning(expectation.pure[IO])
 
         projectFinder.findProject(path)(accessToken).unsafeRunSync() shouldBe expectation
@@ -87,7 +86,6 @@ class GitLabProjectFinderSpec
     }
 
     "return a RuntimeException if remote client responds with status different than OK or NOT_FOUND" in new TestCase {
-      val path = projectPaths.generateOne
 
       intercept[Exception] {
         mapResponse(Status.Unauthorized, Request[IO](), Response[IO]())

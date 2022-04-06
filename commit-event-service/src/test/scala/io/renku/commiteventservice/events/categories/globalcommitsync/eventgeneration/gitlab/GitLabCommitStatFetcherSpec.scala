@@ -38,9 +38,8 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import org.http4s.Method.GET
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -65,10 +64,10 @@ class GitLabCommitStatFetcherSpec
           .returning(maybeLatestCommit.pure[IO])
 
         (gitLabClient
-          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
             _: Option[AccessToken]
           ))
-          .expects(GET, uri, endpointName, *, maybeAccessToken)
+          .expects(uri, endpointName, *, maybeAccessToken)
           .returning(commitCount.some.pure[IO])
 
         gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe ProjectCommitStats(
@@ -86,10 +85,10 @@ class GitLabCommitStatFetcherSpec
         .returning(maybeLatestCommit.pure[IO])
 
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
           _: Option[AccessToken]
         ))
-        .expects(GET, uri"projects" / projectId.show withQueryParam ("statistics", "true"), endpointName, *, *)
+        .expects(uri"projects" / projectId.show withQueryParam ("statistics", "true"), endpointName, *, *)
         .returning(None.pure[IO])
 
       gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None

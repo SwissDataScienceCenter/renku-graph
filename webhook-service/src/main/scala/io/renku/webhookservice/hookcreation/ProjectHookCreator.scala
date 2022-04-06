@@ -45,15 +45,12 @@ private class ProjectHookCreatorImpl[F[_]: Async: Logger](
   import cats.effect._
   import io.circe.Json
   import io.renku.http.client.RestClientError.UnauthorizedException
-  import org.http4s.Method.POST
   import org.http4s.Status.{Created, Unauthorized}
-  import org.http4s.circe._
   import org.http4s.{Request, Response}
 
   def create(projectHook: ProjectHook, accessToken: AccessToken): F[Unit] = {
-    val uri                = uri"projects" / projectHook.projectId.show / "hooks"
-    val requestWithPayload = gitLabClient.createRequest(POST, uri, accessToken).withEntity(payload(projectHook))
-    gitLabClient.send(requestWithPayload, "project hooks")(mapResponse)(
+    val uri = uri"projects" / projectHook.projectId.show / "hooks"
+    gitLabClient.post(uri, "project hooks", payload(projectHook))(mapResponse)(
       Some(accessToken)
     )
   }

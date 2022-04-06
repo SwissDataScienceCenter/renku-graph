@@ -29,7 +29,6 @@ import io.renku.graph.model.projects.Path
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tinytypes.json.TinyTypeDecoders._
-import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{Forbidden, NotFound, Ok, Unauthorized}
@@ -59,7 +58,7 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](gitLabClient: 
       allUsers:                Set[GitLabProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] = for {
     uri                     <- addPageToUrl(uri, maybePage).pure[F]
-    fetchedUsersAndNextPage <- gitLabClient.send(GET, uri, endpointName)(mapResponse(uri, endpointName))
+    fetchedUsersAndNextPage <- gitLabClient.get(uri, endpointName)(mapResponse(uri, endpointName))
     allUsers                <- addNextPage(uri, endpointName, allUsers, fetchedUsersAndNextPage)
   } yield allUsers
 

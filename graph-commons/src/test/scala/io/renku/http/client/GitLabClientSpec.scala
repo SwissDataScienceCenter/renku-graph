@@ -63,7 +63,7 @@ class GitLabClientSpec
           )
       }
 
-      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
+      client.get(path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
     }
 
     "fetch commits using the given access token" in new TestCase {
@@ -77,7 +77,7 @@ class GitLabClientSpec
           )
       }
 
-      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
+      client.get(path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
     }
 
     "Handle empty JSON" in new TestCase {
@@ -90,7 +90,7 @@ class GitLabClientSpec
           )
       }
 
-      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
+      client.get(path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
 
     }
 
@@ -102,7 +102,7 @@ class GitLabClientSpec
           )
       }
 
-      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe "\"Not Found\""
+      client.get(path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe "\"Not Found\""
 
     }
 
@@ -115,7 +115,7 @@ class GitLabClientSpec
       }
 
       intercept[UnauthorizedException] {
-        client.send(method, path, endpointName)(mapResponse).unsafeRunSync()
+        client.get(path, endpointName)(mapResponse).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -127,7 +127,7 @@ class GitLabClientSpec
           )
       }
 
-      intercept[Exception](client.send(method, path, endpointName)(mapResponse).unsafeRunSync())
+      intercept[Exception](client.get(path, endpointName)(mapResponse).unsafeRunSync())
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
@@ -137,7 +137,7 @@ class GitLabClientSpec
       }
 
       intercept[Exception] {
-        client.send(method, path, endpointName)(mapResponse).unsafeRunSync()
+        client.get(path, endpointName)(mapResponse).unsafeRunSync()
       }.getMessage should startWith(
         s"$method $gitLabApiUrl/$path returned 200 OK; error: Malformed message body: Invalid JSON"
       )

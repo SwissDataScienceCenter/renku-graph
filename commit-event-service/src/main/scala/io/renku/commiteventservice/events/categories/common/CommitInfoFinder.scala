@@ -46,7 +46,6 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](gi
     extends CommitInfoFinder[F] {
 
   import CommitInfo._
-  import org.http4s.Method.GET
   import org.http4s.Status.{Ok, Unauthorized}
   import org.http4s.{Request, Response}
 
@@ -65,7 +64,7 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](gi
         ResultType
       ]]
   )(implicit maybeAccessToken: Option[AccessToken]) =
-    gitLabClient.send(GET, uri"projects" / projectId.show / "repository" / "commits" / commitId.show, "commit-details")(
+    gitLabClient.get(uri"projects" / projectId.show / "repository" / "commits" / commitId.show, "commit-details")(
       mapResponse
     )
 

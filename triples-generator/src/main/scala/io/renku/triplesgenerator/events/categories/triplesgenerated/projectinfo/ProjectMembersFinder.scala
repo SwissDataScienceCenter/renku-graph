@@ -31,7 +31,6 @@ import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
-import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
@@ -87,7 +86,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       allMembers:              Set[ProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] = for {
     uri                     <- uriWithPage(uri, maybePage).pure[F]
-    fetchedUsersAndNextPage <- gitLabClient.send(GET, uri, endpointName)(mapResponse)
+    fetchedUsersAndNextPage <- gitLabClient.get(uri, endpointName)(mapResponse)
     allMembers              <- addNextPage(uri, endpointName, allMembers, fetchedUsersAndNextPage)
   } yield allMembers
 

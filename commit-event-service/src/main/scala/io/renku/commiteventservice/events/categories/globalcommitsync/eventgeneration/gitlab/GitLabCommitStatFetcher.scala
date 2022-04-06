@@ -27,7 +27,6 @@ import io.renku.commiteventservice.events.categories.globalcommitsync.CommitsCou
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
-import org.http4s.Method.GET
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
@@ -57,10 +56,9 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
   }.value
 
   private def fetchCommitCount(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]) =
-    gitLabClient.send(GET,
-                      uri"projects" / projectId.show withQueryParams Map("statistics" -> "true"),
-                      "project-details"
-    )(mapResponse)
+    gitLabClient.get(uri"projects" / projectId.show withQueryParams Map("statistics" -> "true"), "project-details")(
+      mapResponse
+    )
 
   private implicit lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitsCount]]] = {
     case (Ok, _, response)                                                 => response.as[Option[CommitsCount]]

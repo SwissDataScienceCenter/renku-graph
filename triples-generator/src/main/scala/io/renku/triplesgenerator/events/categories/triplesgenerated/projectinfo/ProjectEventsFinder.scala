@@ -31,7 +31,6 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
 import org.http4s.EntityDecoder
-import org.http4s.Method.GET
 import org.http4s.dsl.io.{NotFound, Ok}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.ci._
@@ -53,8 +52,7 @@ private class ProjectEventsFinderImpl[F[_]: Async: Logger](
   ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)] =
     EitherT {
       gitLabClient
-        .send(
-          GET,
+        .get(
           uri"projects" / project.id.show / "events" withQueryParams Map("action" -> "pushed", "page" -> page.toString),
           "project-events"
         )(mapResponse)
