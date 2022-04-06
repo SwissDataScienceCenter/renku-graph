@@ -30,6 +30,7 @@ import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.graph.model.projects.Path
+import io.renku.interpreters.TestLogger
 import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
@@ -145,6 +146,7 @@ private class EventFinderSpec
   private trait TestCase {
     val now = Instant.now()
 
+    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val awaitingDeletionGauge = mock[LabeledGauge[IO, Path]]
     val deletingGauge         = mock[LabeledGauge[IO, Path]]
     val queriesExecTimes      = TestLabeledHistogram[SqlStatement.Name]("query_id")
