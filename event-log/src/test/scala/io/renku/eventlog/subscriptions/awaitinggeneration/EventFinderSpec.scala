@@ -203,12 +203,12 @@ private class EventFinderSpec
         }
     }
 
-    Set(GeneratingTriples,
-        TriplesGenerated,
-        TransformationRecoverableFailure,
-        TriplesStore,
-        AwaitingDeletion,
-        Deleting
+    List(GeneratingTriples,
+         TriplesGenerated,
+         TransformationRecoverableFailure,
+         TriplesStore,
+         AwaitingDeletion,
+         Deleting
     ) foreach { latestEventStatus =>
       s"find no event when there are older statuses in status $New or $GenerationRecoverableFailure " +
         s"but the latest event is $latestEventStatus" in new TestCase {
