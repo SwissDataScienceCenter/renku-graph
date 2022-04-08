@@ -99,7 +99,7 @@ private object MicroserviceRoutes {
         gitLabClient,
         executionTimeRecorder
       )
-    hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl, gitLabThrottler)
+    hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl, gitLabThrottler, gitLabClient)
     hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl, gitLabThrottler, gitLabClient)
     authenticator          <- GitLabAuthenticator(gitLabThrottler)
     authMiddleware         <- Authentication.middleware(authenticator)

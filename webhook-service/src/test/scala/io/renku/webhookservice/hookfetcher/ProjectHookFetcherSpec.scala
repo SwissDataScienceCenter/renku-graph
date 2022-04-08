@@ -20,35 +20,37 @@ package io.renku.webhookservice.hookfetcher
 
 import cats.effect.IO
 import cats.implicits.toShow
-import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
+import io.circe.literal._
 import io.circe.syntax.EncoderOps
 import io.circe.{Encoder, Json}
-import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
+import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.server.EndpointTester.jsonEntityEncoder
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
+import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.webhookservice.WebhookServiceGenerators.{hookIdAndUrls, projectHookUrls}
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
-import org.http4s.{Status, Uri}
+import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.{Request, Response, Status, Uri}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.http4s.implicits.http4sLiteralsSyntax
 
 class ProjectHookFetcherSpec
     extends AnyWordSpec
     with MockFactory
     with ExternalServiceStubbing
+    with GitLabClientTools[IO]
     with should.Matchers
     with IOSpec {
 
@@ -70,91 +72,51 @@ class ProjectHookFetcherSpec
     "return the list of hooks of the project - oauth token case" in new TestCase {
 
       val oauthAccessToken = oauthAccessTokens.generateOne
-      val idAndUrls        = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne
+      val idAndUrls        = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne.toList
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(okJson(idAndUrls.toList.asJson.noSpaces))
-      }
+      (gitLabClient
+        .get(_: Uri, _: NES)(_: ResponseMappingF[IO, List[HookIdAndUrl]])(_: Option[AccessToken]))
+        .expects(uri, endpointName, *, Some(oauthAccessToken))
+        .returning(IO.pure(idAndUrls))
 
       fetcher.fetchProjectHooks(projectId, oauthAccessToken).unsafeRunSync() shouldBe idAndUrls.toList
     }
 
-    "return an empty list of hooks if the project does not exists" in new TestCase {
+    // mapResponse
 
-      val oauthAccessToken = oauthAccessTokens.generateOne
-      val idAndUrls        = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(notFound())
-      }
-
-      fetcher.fetchProjectHooks(projectId, oauthAccessToken).unsafeRunSync() shouldBe List.empty[HookIdAndUrl]
+    "return the list of hooks if the response is Ok" in new TestCase {
+      val id  = nonNegativeInts().generateOne.value
+      val url = projectHookUrls.generateOne
+      mapResponse((Status.Ok, Request(), Response().withEntity(json"""[{"id":$id, "url":${url.value}}]""")))
+        .unsafeRunSync() shouldBe List(HookIdAndUrl(id.toString(), url))
     }
 
-    "decode the list of hooks if the id is sent as a number" in new TestCase {
+    "return an empty list of hooks if the project does not exists" in new TestCase {
 
-      val oauthAccessToken = oauthAccessTokens.generateOne
-      val id               = 123
-      val url              = projectHookUrls.generateOne
-      val result           = HookIdAndUrl(id.toString, url)
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(okJson(s"""[{"id":$id, "url":"${url.value}" }]"""))
-      }
-
-      fetcher.fetchProjectHooks(projectId, oauthAccessToken).unsafeRunSync() shouldBe List(result)
+      mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe List.empty[HookIdAndUrl]
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
 
       val personalAccessToken = personalAccessTokens.generateOne
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(unauthorized())
+      intercept[UnauthorizedException] {
+        mapResponse(Status.Unauthorized, Request(), Response()).unsafeRunSync()
       }
-
-      intercept[Exception] {
-        fetcher.fetchProjectHooks(projectId, personalAccessToken).unsafeRunSync()
-      } shouldBe UnauthorizedException
     }
 
-    "return a RuntimeException if remote client responds with status neither OK , NOT_FOUND nor UNAUTHORIZED" in new TestCase {
-
-      val personalAccessToken = personalAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(serviceUnavailable().withBody("some error"))
-      }
+    "return an Exception if remote client responds with status neither OK , NOT_FOUND nor UNAUTHORIZED" in new TestCase {
 
       intercept[Exception] {
-        fetcher.fetchProjectHooks(projectId, personalAccessToken).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.ServiceUnavailable}; body: some error"
+        mapResponse(Status.ServiceUnavailable, Request(), Response()).unsafeRunSync()
+      }
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
 
-      val personalAccessToken = personalAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(okJson("{}"))
-      }
-
-      intercept[Exception] {
-        fetcher.fetchProjectHooks(projectId, personalAccessToken).unsafeRunSync()
-      }.getMessage should startWith(
-        s"GET $gitLabUrl/api/v4/projects/$projectId/hooks returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
-      )
+      intercept[RuntimeException] {
+        mapResponse((Status.Ok, Request(), Response().withEntity("""{}"""))).unsafeRunSync()
+      }.getMessage should include("Could not decode JSON")
     }
   }
 
@@ -162,10 +124,10 @@ class ProjectHookFetcherSpec
     type NES = String Refined NonEmpty
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
     val projectId = projectIds.generateOne
     val uri       = uri"projects" / projectId.show / "hooks"
-    val endpointName: NES = "project"
+    val endpointName: NES = "project hooks"
+    val accessToken = oauthAccessTokens.generateOne
 
     val gitLabClient = mock[GitLabClient[IO]]
     val fetcher      = new ProjectHookFetcherImpl[IO](gitLabClient)
@@ -175,5 +137,9 @@ class ProjectHookFetcherSpec
         "url" -> idAndUrl.url.value.asJson
       )
     }
+
+    val mapResponse = captureMapping(fetcher, gitLabClient)(_.fetchProjectHooks(projectId, accessToken).unsafeRunSync(),
+                                                            Gen.const(List.empty[HookIdAndUrl])
+    )
   }
 }
