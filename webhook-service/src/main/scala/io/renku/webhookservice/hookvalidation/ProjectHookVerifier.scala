@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.Throttler
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
@@ -37,8 +37,8 @@ private trait ProjectHookVerifier[F[_]] {
 
 private object ProjectHookVerifier {
 
-  def apply[F[_]: Async: Logger](gitlabThrottler: Throttler[F, GitLab]) = for {
-    projectHookFetcher <- ProjectHookFetcher(gitlabThrottler)
+  def apply[F[_]: Async: Logger](gitlabThrottler: Throttler[F, GitLab], gitLabClient: GitLabClient[F]) = for {
+    projectHookFetcher <- ProjectHookFetcher(gitLabClient)
   } yield new ProjectHookVerifierImpl[F](projectHookFetcher, gitlabThrottler)
 }
 

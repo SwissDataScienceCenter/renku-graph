@@ -111,7 +111,7 @@ private object HookCreator {
   ): F[HookCreator[F]] =
     for {
       commitSyncRequestSender <- CommitSyncRequestSender[F]
-      hookValidator           <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler)
+      hookValidator           <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler, gitLabClient)
       projectInfoFinder       <- ProjectInfoFinder[F](gitLabClient)
       hookCreator             <- ProjectHookCreator[F](gitLabClient)
       tokenAssociator         <- AccessTokenAssociator[F]

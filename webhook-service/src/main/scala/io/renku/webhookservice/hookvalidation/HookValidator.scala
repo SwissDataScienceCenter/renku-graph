@@ -25,7 +25,7 @@ import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
 import io.renku.graph.tokenrepository.{AccessTokenFinder, AccessTokenFinderImpl, TokenRepositoryUrl}
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
@@ -130,10 +130,11 @@ object HookValidator {
 
   def apply[F[_]: Async: Logger](
       projectHookUrl:  ProjectHookUrl,
-      gitLabThrottler: Throttler[F, GitLab]
+      gitLabThrottler: Throttler[F, GitLab],
+      gitLabClient:    GitLabClient[F]
   ): F[HookValidator[F]] = for {
     tokenRepositoryUrl    <- TokenRepositoryUrl[F]()
-    projectHookVerifier   <- ProjectHookVerifier[F](gitLabThrottler)
+    projectHookVerifier   <- ProjectHookVerifier[F](gitLabThrottler, gitLabClient)
     accessTokenAssociator <- AccessTokenAssociator[F]
     accessTokenRemover    <- AccessTokenRemover[F]
   } yield new HookValidatorImpl[F](

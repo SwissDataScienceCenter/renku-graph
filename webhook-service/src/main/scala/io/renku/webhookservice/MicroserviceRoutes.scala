@@ -96,10 +96,11 @@ private object MicroserviceRoutes {
       eventprocessing.ProcessingStatusEndpoint(
         projectHookUrl,
         gitLabThrottler,
+        gitLabClient,
         executionTimeRecorder
       )
     hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl, gitLabThrottler)
-    hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl, gitLabThrottler)
+    hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl, gitLabThrottler, gitLabClient)
     authenticator          <- GitLabAuthenticator(gitLabThrottler)
     authMiddleware         <- Authentication.middleware(authenticator)
     versionRoutes          <- version.Routes[F]

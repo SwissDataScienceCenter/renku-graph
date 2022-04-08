@@ -30,6 +30,7 @@ import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage._
+import io.renku.http.client.GitLabClient
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
@@ -120,9 +121,10 @@ object ProcessingStatusEndpoint {
   def apply[F[_]: Async: Logger](
       projectHookUrl:        ProjectHookUrl,
       gitLabThrottler:       Throttler[F, GitLab],
+      gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[ProcessingStatusEndpoint[F]] = for {
     fetcher       <- ProcessingStatusFetcher[F]
-    hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler)
+    hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler, gitLabClient)
   } yield new ProcessingStatusEndpointImpl[F](hookValidator, fetcher, executionTimeRecorder)
 }

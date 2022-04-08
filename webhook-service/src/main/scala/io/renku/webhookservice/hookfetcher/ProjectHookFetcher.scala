@@ -20,17 +20,14 @@ package io.renku.webhookservice.hookfetcher
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
-import eu.timepit.refined.auto._
 
 private[webhookservice] trait ProjectHookFetcher[F[_]] {
   def fetchProjectHooks(
