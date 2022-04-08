@@ -133,7 +133,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger](
   ): PartialFunction[Throwable, Kleisli[F, Session[F], Option[(CleanUpEvent, Int)]]] = {
     case SqlState.DeadlockDetected(_) =>
       liftF[F, Session[F], Unit](
-        Logger[F].warn(show"$categoryName: deadlock happened while popping $project; retrying")
+        Logger[F].info(show"$categoryName: deadlock happened while popping $project; retrying")
       ) >> markEventsDeleting()(project.some)
   }
 
