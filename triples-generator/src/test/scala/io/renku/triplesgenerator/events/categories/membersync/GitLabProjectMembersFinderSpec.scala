@@ -38,9 +38,6 @@ package io.renku.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.http.server.EndpointTester.jsonEntityEncoder
-import org.http4s.{Header, Headers}
-import org.typelevel.ci.CIStringSyntax
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -52,8 +49,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.server.EndpointTester.jsonEntityEncoder
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
@@ -61,12 +58,13 @@ import io.renku.triplesgenerator.events.categories.membersync.Generators._
 import org.http4s.Method.GET
 import org.http4s.Status.{Forbidden, Unauthorized}
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.{Header, Headers, Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.typelevel.ci.CIStringSyntax
 
 class GitLabProjectMembersFinderSpec
     extends AnyWordSpec
@@ -180,7 +178,7 @@ class GitLabProjectMembersFinderSpec
     ) = {
 
       val uri = {
-        val uri = uri"projects" / urlEncode(projectPath.value) / endpointName
+        val uri = uri"projects" / projectPath.show / endpointName
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri

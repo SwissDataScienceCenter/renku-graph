@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.knowledgegraph
+package io.renku.graph.acceptancetests
 
 import eu.timepit.refined.auto._
 import io.circe.Json
@@ -25,6 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.{Project, _}
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsResources, fullJson}
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
@@ -42,7 +43,7 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 
-class ProjectReProvisioningSpec
+class CommitHistoryChangesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
@@ -52,14 +53,16 @@ class ProjectReProvisioningSpec
   private val user = authUsers.generateOne
   private implicit val accessToken: AccessToken = user.accessToken
 
-  Feature("Project re-provisioning") {
+  Feature("Changes in the commit history to trigger re-provisioning") {
 
-    Scenario("A change in the commit history should trigger a re-provisioning") {
+    Scenario("A change in the commit history should trigger the re-provisioning process") {
 
-      val project = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
+      val project = dataProjects(
+        renkuProjectEntities(visibilityPublic).withDatasets(datasetEntities(provenanceInternal))
+      ).generateOne
       val commits = commitIds.generateNonEmptyList(minElements = 3)
 
-      Given("there is data in the triple store")
+      Given("there is data in the TS")
 
       `GET <gitlabApi>/user returning OK`(user)
 
@@ -70,7 +73,7 @@ class ProjectReProvisioningSpec
         EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
       }
 
-      AssertProjectDataIsCorrect(project, project.entitiesProject)
+      assertProjectDataIsCorrect(project, project.entitiesProject)
 
       When("the commit history changes")
 
@@ -95,9 +98,8 @@ class ProjectReProvisioningSpec
         EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe newCommits.toList.toSet
       }
 
-      Then("the project should show the new data")
-
-      AssertProjectDataIsCorrect(project, newEntities)
+      Then("the project should contain the new data")
+      assertProjectDataIsCorrect(project, newEntities)
     }
 
     Scenario("Removing a project from GitLab should remove it from the knowledge-graph") {
@@ -112,7 +114,7 @@ class ProjectReProvisioningSpec
       mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commits)
       `data in the RDF store`(project, commits)
 
-      AssertProjectDataIsCorrect(project, project.entitiesProject)
+      assertProjectDataIsCorrect(project, project.entitiesProject)
 
       When("the project is removed from GitLab")
 
@@ -149,7 +151,7 @@ class ProjectReProvisioningSpec
     }
   }
 
-  private def AssertProjectDataIsCorrect(project: Project, projectEntities: RenkuProject)(implicit
+  private def assertProjectDataIsCorrect(project: Project, projectEntities: RenkuProject)(implicit
       accessToken:                                AccessToken
   ) = {
 
