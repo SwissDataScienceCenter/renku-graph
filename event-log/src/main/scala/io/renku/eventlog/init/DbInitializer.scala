@@ -125,6 +125,12 @@ object DbInitializer {
             currentStatus = GenerationNonRecoverableFailure,
             destinationStatus = New,
             discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%Cannot decode % to Instant: Text % could not be parsed at index%",
+            currentStatus = TransformationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
           )
         ),
         isMigrating
