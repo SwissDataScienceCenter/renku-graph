@@ -41,6 +41,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit.MICROS
 
 class DispatchRecoverySpec
     extends AnyWordSpec
@@ -142,7 +143,7 @@ class DispatchRecoverySpec
     val url        = subscriberUrls.generateOne
     val version    = serviceVersions.generateOne
     val changeDate = changeDates.generateOne
-    val now        = Instant.now()
+    val now        = Instant.now().truncatedTo(MICROS)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")

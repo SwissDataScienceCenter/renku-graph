@@ -35,6 +35,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.temporal.ChronoUnit.MICROS
 import java.time.{Duration, Instant}
 
 class GlobalCommitSyncForcerSpec
@@ -119,7 +120,7 @@ class GlobalCommitSyncForcerSpec
     val syncFrequency  = Duration ofDays 7
     val delayOnRequest = Duration ofMinutes 5
     val currentTime    = mockFunction[Instant]
-    val now            = Instant.now()
+    val now            = Instant.now().truncatedTo(MICROS)
     currentTime.expects().returning(now)
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val forcer           = new GlobalCommitSyncForcerImpl(queriesExecTimes, syncFrequency, delayOnRequest, currentTime)
