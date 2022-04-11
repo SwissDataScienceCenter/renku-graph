@@ -27,7 +27,7 @@ import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 
-private[migrations] class UpdateQueryMigration[F[_]: MonadThrow: Logger](
+private[migrations] class UpdateQueryMigration[F[_]: MonadThrow](
     val name:          Migration.Name,
     updateQuery:       SparqlQuery,
     updateQueryRunner: UpdateQueryRunner[F],
@@ -36,11 +36,10 @@ private[migrations] class UpdateQueryMigration[F[_]: MonadThrow: Logger](
   import recoveryStrategy._
 
   override def run(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    {
-      Logger[F].info(show"$categoryName: $name starting") >>
-        updateQueryRunner.run(updateQuery) >>
-        Logger[F].info(show"$categoryName: $name done")
-    }.map(_.asRight[ProcessingRecoverableError]).recoverWith(maybeRecoverableError[F, Unit])
+    updateQueryRunner
+      .run(updateQuery)
+      .map(_.asRight[ProcessingRecoverableError])
+      .recoverWith(maybeRecoverableError[F, Unit])
   }
 }
 

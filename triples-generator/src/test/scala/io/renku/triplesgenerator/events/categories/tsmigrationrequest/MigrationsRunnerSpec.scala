@@ -43,9 +43,13 @@ class MigrationsRunnerSpec extends AnyWordSpec with should.Matchers with MockFac
 
       runner.run().value shouldBe ().asRight.pure[Try]
 
-      logger.loggedOnly(Info(s"$categoryName: migration1 done"),
-                        Info(s"$categoryName: migration2 done"),
-                        Info(s"$categoryName: migration3 done")
+      logger.loggedOnly(
+        Info(s"$categoryName: migration1 starting"),
+        Info(s"$categoryName: migration1 done"),
+        Info(s"$categoryName: migration2 starting"),
+        Info(s"$categoryName: migration2 done"),
+        Info(s"$categoryName: migration3 starting"),
+        Info(s"$categoryName: migration3 done")
       )
     }
 
@@ -58,10 +62,11 @@ class MigrationsRunnerSpec extends AnyWordSpec with should.Matchers with MockFac
 
         runner.run().value shouldBe recoverableError.asLeft.pure[Try]
 
-        logger.loggedOnly(Info(s"$categoryName: migration1 done"),
-                          Error(s"$categoryName: migration2 failed: ${recoverableError.message}",
-                                recoverableError.cause
-                          )
+        logger.loggedOnly(
+          Info(s"$categoryName: migration1 starting"),
+          Info(s"$categoryName: migration1 done"),
+          Info(s"$categoryName: migration2 starting"),
+          Error(s"$categoryName: migration2 failed: ${recoverableError.message}", recoverableError.cause)
         )
       }
 
@@ -75,7 +80,12 @@ class MigrationsRunnerSpec extends AnyWordSpec with should.Matchers with MockFac
 
       runner.run().value shouldBe exception.raiseError[Try, Either[ProcessingRecoverableError, Unit]]
 
-      logger.loggedOnly(Info(s"$categoryName: migration1 done"), Error(s"$categoryName: migration2 failed", exception))
+      logger.loggedOnly(
+        Info(s"$categoryName: migration1 starting"),
+        Info(s"$categoryName: migration1 done"),
+        Info(s"$categoryName: migration2 starting"),
+        Error(s"$categoryName: migration2 failed", exception)
+      )
     }
   }
 
@@ -83,10 +93,10 @@ class MigrationsRunnerSpec extends AnyWordSpec with should.Matchers with MockFac
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
 
     val migration1 = mock[Migration[Try]]
-    (() => migration1.name).expects().returning(Migration.Name("migration1"))
+    (() => migration1.name).expects().returning(Migration.Name("migration1")).anyNumberOfTimes()
 
     val migration2 = mock[Migration[Try]]
-    (() => migration2.name).expects().returning(Migration.Name("migration2"))
+    (() => migration2.name).expects().returning(Migration.Name("migration2")).anyNumberOfTimes()
 
     val migration3 = mock[Migration[Try]]
     (() => migration3.name).expects().returning(Migration.Name("migration3")).anyNumberOfTimes()

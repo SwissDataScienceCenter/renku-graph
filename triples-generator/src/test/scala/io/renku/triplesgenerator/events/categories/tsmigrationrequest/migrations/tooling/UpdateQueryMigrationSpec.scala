@@ -24,8 +24,6 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Generators.migrationNames
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import org.scalamock.scalatest.MockFactory
@@ -43,10 +41,6 @@ class UpdateQueryMigrationSpec extends AnyWordSpec with MockFactory with should.
       (queryRunner.run _).expects(query).returning(().pure[Try])
 
       migration.run().value shouldBe ().asRight.pure[Try]
-
-      logger.loggedOnly(Info(show"$categoryName: ${migration.name} starting"),
-                        Info(show"$categoryName: ${migration.name} done")
-      )
     }
 
     "return a Recoverable Error if in case of an exception the given strategy returns one" in new TestCase {
@@ -60,7 +54,6 @@ class UpdateQueryMigrationSpec extends AnyWordSpec with MockFactory with should.
   }
 
   private trait TestCase {
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val query            = sparqlQueries.generateOne
     val queryRunner      = mock[UpdateQueryRunner[Try]]
     val recoverableError = processingRecoverableErrors.generateOne

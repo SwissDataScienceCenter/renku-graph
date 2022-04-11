@@ -21,7 +21,7 @@ package tsmigrationrequest
 
 import cats.MonadThrow
 import cats.data.EitherT
-import cats.data.EitherT.liftF
+import cats.data.EitherT.{liftF, right}
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
@@ -44,8 +44,8 @@ private class MigrationsRunnerImpl[F[_]: MonadThrow: Logger](migrations: List[Mi
     migrations.foldLeft(liftF[F, ProcessingRecoverableError, Unit](().pure[F]))(_ >> run(_))
 
   private def run(migration: Migration[F]) = EitherT {
-    migration
-      .run()
+    right[ProcessingRecoverableError](Logger[F].info(show"$categoryName: ${migration.name} starting"))
+      .flatMap(_ => migration.run())
       .semiflatMap(_ => Logger[F].info(show"$categoryName: ${migration.name} done"))
       .leftSemiflatTap(logError(migration))
       .value
