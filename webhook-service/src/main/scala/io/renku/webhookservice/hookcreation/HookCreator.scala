@@ -21,8 +21,6 @@ package io.renku.webhookservice.hookcreation
 import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.MetricsRegistry
@@ -106,12 +104,11 @@ private object HookCreator {
   def apply[F[_]: Async: Logger: MetricsRegistry](
       projectHookUrl:  ProjectHookUrl,
       gitLabClient:    GitLabClient[F],
-      gitLabThrottler: Throttler[F, GitLab],
       hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookCreator[F]] =
     for {
       commitSyncRequestSender <- CommitSyncRequestSender[F]
-      hookValidator           <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler, gitLabClient)
+      hookValidator           <- hookvalidation.HookValidator(projectHookUrl, gitLabClient)
       projectInfoFinder       <- ProjectInfoFinder[F](gitLabClient)
       hookCreator             <- ProjectHookCreator[F](gitLabClient)
       tokenAssociator         <- AccessTokenAssociator[F]

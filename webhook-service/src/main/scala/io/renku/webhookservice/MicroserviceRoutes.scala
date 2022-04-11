@@ -21,8 +21,6 @@ package io.renku.webhookservice
 import cats.MonadThrow
 import cats.effect.{Async, Clock, Resource}
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.http.server.binders.ProjectId
 import io.renku.graph.http.server.security.GitLabAuthenticator
 import io.renku.http.client.GitLabClient
@@ -85,23 +83,21 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 private object MicroserviceRoutes {
   def apply[F[_]: Async: Logger: MetricsRegistry](
       gitLabClient:          GitLabClient[F],
-      gitLabThrottler:       Throttler[F, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[MicroserviceRoutes[F]] = for {
     projectHookUrl      <- ProjectHookUrl.fromConfig[F]()
     hookTokenCrypto     <- HookTokenCrypto[F]()
     hookEventEndpoint   <- HookEventEndpoint(hookTokenCrypto)
-    hookCreatorEndpoint <- HookCreationEndpoint(projectHookUrl, gitLabClient, gitLabThrottler, hookTokenCrypto)
+    hookCreatorEndpoint <- HookCreationEndpoint(projectHookUrl, gitLabClient, hookTokenCrypto)
     processingStatusEndpoint <-
       eventprocessing.ProcessingStatusEndpoint(
         projectHookUrl,
-        gitLabThrottler,
         gitLabClient,
         executionTimeRecorder
       )
-    hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl, gitLabThrottler, gitLabClient)
-    hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl, gitLabThrottler, gitLabClient)
-    authenticator          <- GitLabAuthenticator(gitLabThrottler)
+    hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl, gitLabClient)
+    hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl, gitLabClient)
+    authenticator          <- GitLabAuthenticator(gitLabClient)
     authMiddleware         <- Authentication.middleware(authenticator)
     versionRoutes          <- version.Routes[F]
   } yield new MicroserviceRoutes[F](

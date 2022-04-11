@@ -21,8 +21,6 @@ package io.renku.webhookservice.hookvalidation
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
@@ -73,10 +71,9 @@ class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](
 
 object HookValidationEndpoint {
   def apply[F[_]: Async: Logger](
-      projectHookUrl:  ProjectHookUrl,
-      gitLabThrottler: Throttler[F, GitLab],
-      gitLabClient:    GitLabClient[F]
+      projectHookUrl: ProjectHookUrl,
+      gitLabClient:   GitLabClient[F]
   ): F[HookValidationEndpoint[F]] = for {
-    hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler, gitLabClient)
+    hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabClient)
   } yield new HookValidationEndpointImpl[F](hookValidator)
 }

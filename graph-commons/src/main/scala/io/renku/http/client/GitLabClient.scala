@@ -48,6 +48,10 @@ trait GitLabClient[F[_]] {
       mapResponse:             ResponseMappingF[F, ResultType]
   )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
 
+  def delete[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
+      mapResponse:             ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
+
 }
 
 final class GitLabClientImpl[F[_]: Async: Logger](
@@ -85,6 +89,10 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     result  <- super.send(request)(mapResponse)
   } yield result
 
+  override def delete[ResultType](path: Uri, endpointName: Refined[String, NonEmpty])(
+      mapResponse:                      ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken:          Option[AccessToken]): F[ResultType] = ???
+
   protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
 
   private def secureNamedRequest(method: Method, uri: Uri, endpointName: String Refined NonEmpty)(implicit
@@ -100,6 +108,7 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     secureNamedRequest(POST, uri, endpointName).map(originalRequest =>
       originalRequest.copy(request = originalRequest.request.withEntity(payload))
     )
+
 }
 
 object GitLabClient {

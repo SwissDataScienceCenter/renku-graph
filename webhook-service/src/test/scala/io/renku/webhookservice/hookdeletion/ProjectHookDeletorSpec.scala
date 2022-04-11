@@ -19,20 +19,24 @@
 package io.renku.webhookservice.hookdeletion
 
 import cats.effect.IO
-import com.github.tomakehurst.wiremock.client.WireMock._
-import io.renku.control.Throttler
+import cats.syntax.all._
+import eu.timepit.refined.auto._
+import eu.timepit.refined.types.all.NonEmptyString
 import io.renku.generators.CommonGraphGenerators.{accessTokens, personalAccessTokens}
 import io.renku.generators.Generators.Implicits.GenOps
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.RestClientError.UnauthorizedException
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
+import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.webhookservice.WebhookServiceGenerators.{hookIdAndUrls, projectHookUrls, serializedHookTokens}
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
 import io.renku.webhookservice.hookdeletion.ProjectHookDeletor.ProjectHook
-import org.http4s.Status
+import org.http4s.Method.DELETE
+import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -43,79 +47,72 @@ class ProjectHookDeletorSpec
     with MockFactory
     with ExternalServiceStubbing
     with should.Matchers
+    with GitLabClientTools[IO]
     with IOSpec {
 
   "delete" should {
 
-    "send relevant header (when Personal Access Token is given) " +
-      "and return Ok if the remote responds with OK" in new TestCase {
+    "return the DeletionResult from GitLabClient" in new TestCase {
+      val personalAccessToken = personalAccessTokens.generateOne
 
-        val personalAccessToken = personalAccessTokens.generateOne
+      val result = deletionResults.generateOne
 
-        stubFor {
-          delete(s"/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id}")
-            .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-            .willReturn(ok())
-        }
+      (gitLabClient
+        .delete(_: Uri, _: NES)(_: ResponseMappingF[IO, DeletionResult])(_: Option[AccessToken]))
+        .expects(uri, endpointName, *, personalAccessToken.some)
+        .returning(result.pure[IO])
 
-        hookDeletor
-          .delete(projectId, hookIdAndUrl, personalAccessToken)
-          .unsafeRunSync() shouldBe DeletionResult.HookDeleted
-      }
+      hookDeletor
+        .delete(projectId, hookIdAndUrl, personalAccessToken)
+        .unsafeRunSync() shouldBe result
 
-    "send relevant header (when Personal Access Token is given) " +
-      "and return NotFound if the remote responds with NOT_FOUND" in new TestCase {
+    }
 
-        val personalAccessToken = personalAccessTokens.generateOne
+    // mapResponse
 
-        stubFor {
-          delete(s"/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id}")
-            .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-            .willReturn(notFound())
-        }
+    "return DeletionResult.HookDeleted when response is Ok" in new TestCase {
+      mapResponse(Status.Ok, Request(), Response()).unsafeRunSync() shouldBe DeletionResult.HookDeleted
+    }
 
-        hookDeletor
-          .delete(projectId, hookIdAndUrl, personalAccessToken)
-          .unsafeRunSync() shouldBe DeletionResult.HookNotFound
-      }
+    "return DeletionResult.NotFound when response is NotFound" in new TestCase {
+      mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe DeletionResult.HookNotFound
+    }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
 
-      val accessToken = accessTokens.generateOne
-
-      stubFor {
-        delete(s"/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id}")
-          .willReturn(unauthorized())
+      intercept[UnauthorizedException] {
+        mapResponse(Status.Unauthorized, Request(), Response()).unsafeRunSync()
       }
-
-      intercept[Exception] {
-        hookDeletor.delete(projectId, hookIdAndUrl, accessToken).unsafeRunSync()
-      } shouldBe UnauthorizedException
     }
 
     "return an Exception if remote client responds with status neither OK, NOT_FOUND or UNAUTHORIZED" in new TestCase {
 
-      val accessToken = accessTokens.generateOne
-
-      stubFor {
-        delete(s"/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id}")
-          .willReturn(badRequest().withBody("some message"))
-      }
-
       intercept[Exception] {
-        hookDeletor.delete(projectId, hookIdAndUrl, accessToken).unsafeRunSync()
-      }.getMessage shouldBe s"DELETE $gitLabUrl/api/v4/projects/$projectId/hooks/${hookIdAndUrl.id} returned ${Status.BadRequest}; body: some message"
+        mapResponse(Status.ServiceUnavailable, Request(), Response()).unsafeRunSync()
+      }
     }
   }
 
   private trait TestCase {
     val hookIdAndUrl = hookIdAndUrls.generateOne
     val projectId    = projectIds.generateOne
-    val gitLabUrl    = GitLabUrl(externalServiceBaseUrl)
-
+    val uri          = uri"projects" / projectId.show / "hooks" / hookIdAndUrl.id.show
+    val endpointName:    NES            = "project hooks"
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
-    val hookDeletor = new ProjectHookDeletorImpl[IO](gitLabUrl, Throttler.noThrottling)
+    val gitLabClient = mock[GitLabClient[IO]]
+    val hookDeletor  = new ProjectHookDeletorImpl[IO](gitLabClient)
+
+    type NES = NonEmptyString
+
+    lazy val mapResponse =
+      captureMapping(hookDeletor, gitLabClient)(
+        _.delete(projectIds.generateOne, hookIdAndUrls.generateOne, accessTokens.generateOne).unsafeRunSync(),
+        Gen.const(DeletionResult.HookDeleted),
+        method = DELETE
+      )
+
+    val deletionResults: Gen[DeletionResult] = Gen.oneOf(DeletionResult.HookDeleted, DeletionResult.HookNotFound)
   }
 
   private implicit lazy val projectHooks: Gen[ProjectHook] = for {

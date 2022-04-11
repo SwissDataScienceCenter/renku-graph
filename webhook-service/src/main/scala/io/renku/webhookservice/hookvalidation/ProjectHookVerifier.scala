@@ -20,9 +20,7 @@ package io.renku.webhookservice.hookvalidation
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.http.client.{AccessToken, GitLabClient, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
 import io.renku.webhookservice.model.{HookIdentifier, ProjectHookUrl}
@@ -37,16 +35,14 @@ private trait ProjectHookVerifier[F[_]] {
 
 private object ProjectHookVerifier {
 
-  def apply[F[_]: Async: Logger](gitlabThrottler: Throttler[F, GitLab], gitLabClient: GitLabClient[F]) = for {
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]) = for {
     projectHookFetcher <- ProjectHookFetcher(gitLabClient)
-  } yield new ProjectHookVerifierImpl[F](projectHookFetcher, gitlabThrottler)
+  } yield new ProjectHookVerifierImpl[F](projectHookFetcher)
 }
 
 private class ProjectHookVerifierImpl[F[_]: Async: Logger](
-    projectHookFetcher: ProjectHookFetcher[F],
-    gitLabThrottler:    Throttler[F, GitLab]
-) extends RestClient(gitLabThrottler)
-    with ProjectHookVerifier[F] {
+    projectHookFetcher: ProjectHookFetcher[F]
+) extends ProjectHookVerifier[F] {
 
   override def checkHookPresence(projectHookId: HookIdentifier, accessToken: AccessToken): F[Boolean] =
     projectHookFetcher.fetchProjectHooks(projectHookId.projectId, accessToken) map checkProjectHookExists(

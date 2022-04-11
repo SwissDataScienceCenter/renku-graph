@@ -41,7 +41,7 @@ object Microservice extends IOMicroservice {
       gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
       gitLabClient          <- GitLabClient(gitLabThrottler)
       executionTimeRecorder <- ExecutionTimeRecorder[IO]()
-      microserviceRoutes    <- MicroserviceRoutes(gitLabClient, gitLabThrottler, executionTimeRecorder)
+      microserviceRoutes    <- MicroserviceRoutes(gitLabClient, executionTimeRecorder)
       exitcode <- microserviceRoutes.routes.use { routes =>
                     val httpServer = HttpServer[IO](serverPort = 9001, routes)
                     new MicroserviceRunner(

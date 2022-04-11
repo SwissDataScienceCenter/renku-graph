@@ -25,8 +25,6 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage._
@@ -120,11 +118,10 @@ private object ProcessingStatusEndpointImpl {
 object ProcessingStatusEndpoint {
   def apply[F[_]: Async: Logger](
       projectHookUrl:        ProjectHookUrl,
-      gitLabThrottler:       Throttler[F, GitLab],
       gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[ProcessingStatusEndpoint[F]] = for {
     fetcher       <- ProcessingStatusFetcher[F]
-    hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler, gitLabClient)
+    hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabClient)
   } yield new ProcessingStatusEndpointImpl[F](hookValidator, fetcher, executionTimeRecorder)
 }

@@ -20,7 +20,6 @@ package io.renku.webhookservice.hookvalidation
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -80,6 +79,6 @@ class ProjectHookVerifierSpec
     val projectHookId      = projectHookIds.generateOne
     val projectId          = projectHookId.projectId
     val projectHookFetcher = mock[ProjectHookFetcher[IO]]
-    val verifier           = new ProjectHookVerifierImpl[IO](projectHookFetcher, Throttler.noThrottling)
+    val verifier           = new ProjectHookVerifierImpl[IO](projectHookFetcher)
   }
 }

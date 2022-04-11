@@ -45,8 +45,6 @@ import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
-import org.http4s.implicits._
-import org.http4s.{Method, Request, Response, Status, Uri}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen

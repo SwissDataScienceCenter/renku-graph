@@ -21,8 +21,6 @@ package io.renku.webhookservice.hookdeletion
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.GitLabClient
@@ -71,10 +69,9 @@ class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
 
 object HookDeletionEndpoint {
   def apply[F[_]: Async: Logger](
-      projectHookUrl:  ProjectHookUrl,
-      gitLabThrottler: Throttler[F, GitLab],
-      gitLabClient:    GitLabClient[F]
+      projectHookUrl: ProjectHookUrl,
+      gitLabClient:   GitLabClient[F]
   ): F[HookDeletionEndpoint[F]] = for {
-    hookDeletor <- HookDeletor(gitLabThrottler, gitLabClient)
+    hookDeletor <- HookDeletor(gitLabClient)
   } yield new HookDeletionEndpointImpl[F](projectHookUrl, hookDeletor)
 }
