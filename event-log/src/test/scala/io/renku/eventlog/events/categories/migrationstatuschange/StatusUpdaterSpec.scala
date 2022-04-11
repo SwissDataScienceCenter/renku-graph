@@ -38,6 +38,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit.MICROS
 
 class StatusUpdaterSpec
     extends AnyWordSpec
@@ -106,7 +107,7 @@ class StatusUpdaterSpec
 
   private trait TestCase {
     val changeDate = changeDates.generateOne
-    val now        = Instant.now()
+    val now        = Instant.now().truncatedTo(MICROS)
 
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val currentTime      = mockFunction[Instant]

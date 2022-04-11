@@ -38,6 +38,7 @@ import skunk._
 import skunk.implicits._
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit.MICROS
 
 class SubscriberTrackerSpec
     extends AnyWordSpec
@@ -172,7 +173,7 @@ class SubscriberTrackerSpec
 
   private trait TestCase {
     val subscriptionInfo = migratorSubscriptionInfos.generateOne
-    val now              = Instant.now()
+    val now              = Instant.now().truncatedTo(MICROS)
 
     private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val currentTime              = mockFunction[Instant]

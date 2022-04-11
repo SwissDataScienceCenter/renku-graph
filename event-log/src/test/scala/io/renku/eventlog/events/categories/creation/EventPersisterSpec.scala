@@ -20,7 +20,6 @@ package io.renku.eventlog.events.categories.creation
 
 import cats.data.Kleisli
 import cats.effect.IO
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.creation.EventPersister.Result._
@@ -40,7 +39,7 @@ import skunk._
 import skunk.implicits._
 
 import java.time.Instant
-import java.time.temporal.ChronoUnit.HOURS
+import java.time.temporal.ChronoUnit.{HOURS, MICROS}
 
 class EventPersisterSpec
     extends AnyWordSpec
@@ -76,7 +75,7 @@ class EventPersisterSpec
         val event2 = newEvents.generateOne
         (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
 
-        val nowForEvent2 = Instant.now()
+        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created(event2)
@@ -109,7 +108,7 @@ class EventPersisterSpec
         val event2 = newEvent.copy(id = eventIds.generateOne, batchDate = batchDates.generateOne)
         (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
 
-        val nowForEvent2 = Instant.now()
+        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
@@ -131,7 +130,7 @@ class EventPersisterSpec
         // storing event 2 for the same project but more recent Event Date
         val event2 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(1, HOURS)))
         (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
-        val nowForEvent2 = Instant.now()
+        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
@@ -139,7 +138,7 @@ class EventPersisterSpec
         // storing event 3 for the same project but less recent Event Date
         val event3 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
         (waitingEventsGauge.increment _).expects(event3.project.path).returning(IO.unit)
-        val nowForEvent3 = Instant.now()
+        val nowForEvent3 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent3)
 
         persister.storeNewEvent(event3).unsafeRunSync() shouldBe a[Created]
@@ -165,7 +164,7 @@ class EventPersisterSpec
                                                 date = EventDate(now.minus(1, HOURS))
         )
         (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
-        val nowForEvent2 = Instant.now()
+        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
@@ -190,7 +189,7 @@ class EventPersisterSpec
                                                 date = EventDate(now.minus(3, HOURS))
         )
         (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
-        val nowForEvent2 = Instant.now()
+        val nowForEvent2 = Instant.now().truncatedTo(MICROS)
         currentTime.expects().returning(nowForEvent2)
 
         persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
@@ -210,7 +209,7 @@ class EventPersisterSpec
       // storing event 2 older than event1
       val event2 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
 
-      val nowForEvent2 = Instant.now()
+      val nowForEvent2 = Instant.now().truncatedTo(MICROS)
       currentTime.expects().returning(nowForEvent2)
 
       persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
@@ -243,7 +242,7 @@ class EventPersisterSpec
       // storeNewEvent 2 - different event id and different project
       val skippedEvent2 = skippedEvents.generateOne
 
-      val nowForEvent2 = Instant.now()
+      val nowForEvent2 = Instant.now().truncatedTo(MICROS)
       currentTime.expects().returning(nowForEvent2)
 
       persister.storeNewEvent(skippedEvent2).unsafeRunSync() shouldBe a[Created]
@@ -274,7 +273,7 @@ class EventPersisterSpec
       val event2 = newEvents.generateOne.copy(id = newEvent.id)
       (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
 
-      val nowForEvent2 = Instant.now()
+      val nowForEvent2 = Instant.now().truncatedTo(MICROS)
       currentTime.expects().returning(nowForEvent2)
 
       persister.storeNewEvent(event2).unsafeRunSync() shouldBe a[Created]
@@ -314,7 +313,7 @@ class EventPersisterSpec
     val queriesExecTimes   = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val persister          = new EventPersisterImpl(waitingEventsGauge, queriesExecTimes, currentTime)
 
-    val now = Instant.now()
+    val now = Instant.now().truncatedTo(MICROS)
     currentTime.expects().returning(now)
 
     def storedEvent(

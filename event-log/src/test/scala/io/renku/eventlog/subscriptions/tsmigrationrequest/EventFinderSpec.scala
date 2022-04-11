@@ -37,6 +37,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant.now
+import java.time.temporal.ChronoUnit.MICROS
 import java.time.{Duration, Instant}
 
 class EventFinderSpec
@@ -255,7 +256,7 @@ class EventFinderSpec
     val url        = subscriberUrls.generateOne
     val version    = serviceVersions.generateOne
     val changeDate = changeDates.generateOne
-    val now        = Instant.now()
+    val now        = Instant.now().truncatedTo(MICROS)
 
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val currentTime      = mockFunction[Instant]

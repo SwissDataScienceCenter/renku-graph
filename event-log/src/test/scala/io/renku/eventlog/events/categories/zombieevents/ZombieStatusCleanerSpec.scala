@@ -19,7 +19,6 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
@@ -35,6 +34,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit.MICROS
 
 class ZombieStatusCleanerSpec
     extends AnyWordSpec
@@ -135,7 +135,7 @@ class ZombieStatusCleanerSpec
     val executionDate = executionDates.generateOne
     val zombieMessage = EventMessage("Zombie Event")
 
-    val now = Instant.now()
+    val now = Instant.now().truncatedTo(MICROS)
     currentTime.expects().returning(now)
 
     def addZombieEvent(status: EventStatus): Unit = storeEvent(eventId,
