@@ -39,7 +39,6 @@ import org.http4s.Method.{GET, _}
 import org.http4s.Status.{NotFound, Ok, Unauthorized}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.{Method, Request, Response, Status, Uri}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -51,12 +50,12 @@ class GitLabClientSpec
     with should.Matchers
     with MockFactory {
 
-  "send" should {
+  "get" should {
 
     "fetch json from a given page" in new TestCase {
 
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(
             okJson(result)
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
@@ -69,7 +68,7 @@ class GitLabClientSpec
     "fetch commits using the given access token" in new TestCase {
       implicit val accessToken = accessTokens.generateOne.some
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .withAccessToken(accessToken)
           .willReturn(
             okJson(result)
@@ -83,7 +82,7 @@ class GitLabClientSpec
     "Handle empty JSON" in new TestCase {
       override val result: String = Json.fromString("{}").toString()
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(
             okJson(result)
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
@@ -96,7 +95,7 @@ class GitLabClientSpec
 
     "Handle 404 NOT FOUND without throwing" in new TestCase {
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(
             notFound()
           )
@@ -108,7 +107,7 @@ class GitLabClientSpec
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(
             unauthorized()
           )
@@ -121,7 +120,7 @@ class GitLabClientSpec
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(
             badRequest()
           )
@@ -132,15 +131,46 @@ class GitLabClientSpec
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(okJson("not json"))
       }
 
       intercept[Exception] {
         client.get(path, endpointName)(mapResponse).unsafeRunSync()
       }.getMessage should startWith(
-        s"$method $gitLabApiUrl/$path returned 200 OK; error: Malformed message body: Invalid JSON"
+        s"$GET $gitLabApiUrl/$path returned 200 OK; error: Malformed message body: Invalid JSON"
       )
+    }
+  }
+
+  "post" should {
+
+    "send json to the endpoint" in new TestCase {
+
+      val payload = jsons.generateOne
+      stubFor {
+        callMethod(POST, s"/api/v4/$path")
+          .withRequestBody(equalToJson(payload.noSpaces))
+          .willReturn(ok())
+      }
+
+      client.post(path, endpointName, payload)(mapResponse).unsafeRunSync() shouldBe ()
+    }
+
+    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+
+      val payload = jsons.generateOne
+
+      stubFor {
+        callMethod(POST, s"/api/v4/$path")
+          .willReturn(
+            unauthorized()
+          )
+      }
+
+      intercept[UnauthorizedException] {
+        client.post(path, endpointName, payload)(mapResponse).unsafeRunSync()
+      } shouldBe UnauthorizedException
     }
   }
 
@@ -152,7 +182,6 @@ class GitLabClientSpec
     val gitLabApiUrl    = GitLabUrl(externalServiceBaseUrl).apiV4
     val client          = new GitLabClientImpl[IO](gitLabApiUrl, apiCallRecorder, Throttler.noThrottling)
 
-    val method       = Gen.oneOf(GET, PUT, DELETE, POST).generateOne
     val endpointName = nonBlankStrings().generateOne
     val queryParams =
       nonBlankStrings().generateList().map(key => (key.value, nonBlankStrings().generateOne.value)).toMap

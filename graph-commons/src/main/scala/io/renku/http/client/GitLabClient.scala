@@ -18,7 +18,7 @@
 
 package io.renku.http.client
 
-import cats.effect.Async
+import cats.effect.{Async, IO}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -31,8 +31,9 @@ import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
-import org.http4s.Method.GET
-import org.http4s.{Method, Uri}
+import org.http4s.Method.{GET, POST}
+import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
+import org.http4s.{EntityEncoder, Method, Uri}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -74,19 +75,17 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     result  <- super.send(request)(mapResponse)
   } yield result
 
-//  def send[ResultType](request: Request[F], endpointName: String Refined NonEmpty)(
-//      mapResponse:              ResponseMapping[ResultType]
-//  )(implicit
-//      maybeAccessToken: Option[AccessToken]
-//  ): F[ResultType] = for {
-//    result <- super.send(HttpRequest(request, endpointName))(mapResponse)
-//  } yield result
-
   def post[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Json)(
       mapResponse:           ResponseMappingF[F, ResultType]
   )(implicit
       maybeAccessToken: Option[AccessToken]
-  ): F[ResultType] = ???
+  ): F[ResultType] = for {
+    uri     <- validateUri(show"$gitLabApiUrl/$path")
+    request <- secureNamedRequest(uri, endpointName, payload)
+    result  <- super.send(request)(mapResponse)
+  } yield result
+
+  protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
 
   private def secureNamedRequest(method: Method, uri: Uri, endpointName: String Refined NonEmpty)(implicit
       maybeAccessToken:                  Option[AccessToken]
@@ -94,6 +93,13 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     super.secureRequest(method, uri),
     endpointName
   ).pure[F]
+
+  private def secureNamedRequest(uri: Uri, endpointName: String Refined NonEmpty, payload: Json)(implicit
+      maybeAccessToken:               Option[AccessToken]
+  ): F[NamedRequest[F]] =
+    secureNamedRequest(POST, uri, endpointName).map(originalRequest =>
+      originalRequest.copy(request = originalRequest.request.withEntity(payload))
+    )
 }
 
 object GitLabClient {
