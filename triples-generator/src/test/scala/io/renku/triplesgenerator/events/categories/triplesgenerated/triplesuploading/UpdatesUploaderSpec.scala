@@ -61,13 +61,13 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
     }
 
     Set(Forbidden, Unauthorized) foreach { status =>
-      s"return Auth $RecoverableFailure if remote responds with $status " in new TestCase {
+      s"return a SilentRecoverableFailure if remote responds with $status " in new TestCase {
 
         val errorMessage = nonEmptyStrings().generateOne
         givenStore(forUpdate = query, returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
         val Left(error) = updater.send(query).value.unsafeRunSync()
-        error          shouldBe a[AuthRecoverableError]
+        error          shouldBe a[SilentRecoverableError]
         error.getMessage should startWith("Triples transformation update 'curation update' failed:")
       }
     }

@@ -49,7 +49,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
-import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester.jsonEntityEncoder
 import io.renku.interpreters.TestLogger
@@ -178,7 +177,7 @@ class GitLabProjectMembersFinderSpec
     ) = {
 
       val uri = {
-        val uri = uri"projects" / urlEncode(projectPath.value) / endpointName
+        val uri = uri"projects" / projectPath.show / endpointName
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri

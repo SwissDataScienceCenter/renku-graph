@@ -386,7 +386,7 @@ trait GitLab {
     }
 
     stubFor {
-      get(urlPathEqualTo(s"/api/v4/projects/${project.id.value}")).withAccessTokenInHeader
+      get(urlPathEqualTo(s"/api/v4/projects/${project.id}")).withAccessTokenInHeader
         .willReturn(returnedJson)
     }
 

@@ -44,7 +44,7 @@ private object CommitEventSerializer extends CommitEventSerializer {
   }"""
 
   private implicit def personEncoder[E <: Person]: Encoder[E] = Encoder.instance[E] {
-    case person: Person.WithEmail => json"""{
+    case person: Person with Person.WithEmail => json"""{
       "username": ${person.name.value},
       "email"   : ${person.email.value}
     }"""

@@ -51,10 +51,26 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
 
   private def createTransformation: Transformation[F] = project =>
     EitherT {
-      (updateTopmostSameAs(project -> Queries.empty) >>= updatePersonLinks >>= updateHierarchyOnInvalidation)
+      (fixDerivationHierarchies(project -> Queries.empty) >>=
+        updateTopmostSameAs >>=
+        updatePersonLinks >>=
+        updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeRecoverableError("Problem finding dataset details in KG"))
     }
+
+  private lazy val fixDerivationHierarchies: ((Project, Queries)) => F[(Project, Queries)] = {
+    case (project, queries) =>
+      findModifiedDatasets(project)
+        .foldLeft(project.pure[F]) { (projF, originalDS) =>
+          projF >>= { proj =>
+            findTopmostDerivedFrom[F](originalDS, proj)
+              .map(originalDS.update)
+              .map(update(originalDS, _)(proj))
+          }
+        }
+        .map(_ -> queries)
+  }
 
   private lazy val updateTopmostSameAs: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
     findInternallyImportedDatasets(project)

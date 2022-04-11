@@ -19,7 +19,6 @@
 package io.renku.tokenrepository.repository.association
 
 import cats.effect.IO
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
@@ -34,49 +33,70 @@ class AssociationPersisterSpec extends AnyWordSpec with IOSpec with InMemoryProj
 
   "persistAssociation" should {
 
-    "insert the given token " +
-      "if no token for the given project path" in new TestCase {
+    "insert the association " +
+      "if there's no token for the given project id" in new TestCase {
 
-        val encryptedToken = encryptedAccessTokens.generateOne
+        val token = encryptedAccessTokens.generateOne
 
-        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ()
+        associator.persistAssociation(projectId, projectPath, token).unsafeRunSync() shouldBe ()
 
-        findToken(projectId)   shouldBe Some(encryptedToken.value)
-        findToken(projectPath) shouldBe Some(encryptedToken.value)
+        findToken(projectId)   shouldBe Some(token.value)
+        findToken(projectPath) shouldBe Some(token.value)
       }
 
     "update the given token " +
       "if there's a token for the project path and id" in new TestCase {
 
-        val encryptedToken = encryptedAccessTokens.generateOne
+        val token = encryptedAccessTokens.generateOne
 
-        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ()
+        associator.persistAssociation(projectId, projectPath, token).unsafeRunSync() shouldBe ()
 
-        findToken(projectId) shouldBe Some(encryptedToken.value)
+        findToken(projectId)   shouldBe Some(token.value)
+        findToken(projectPath) shouldBe Some(token.value)
 
-        val newEncryptedToken = encryptedAccessTokens.generateOne
-        associator.persistAssociation(projectId, projectPath, newEncryptedToken).unsafeRunSync() shouldBe ()
+        val newToken = encryptedAccessTokens.generateOne
+        associator.persistAssociation(projectId, projectPath, newToken).unsafeRunSync() shouldBe ()
 
-        findToken(projectId)   shouldBe Some(newEncryptedToken.value)
-        findToken(projectPath) shouldBe Some(newEncryptedToken.value)
+        findToken(projectId)   shouldBe Some(newToken.value)
+        findToken(projectPath) shouldBe Some(newToken.value)
       }
 
     "update the given token and project id" +
       "if there's a token for the project path but with different project id" in new TestCase {
 
-        val encryptedToken = encryptedAccessTokens.generateOne
+        val token = encryptedAccessTokens.generateOne
 
-        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ()
+        associator.persistAssociation(projectId, projectPath, token).unsafeRunSync() shouldBe ()
 
-        findToken(projectId) shouldBe Some(encryptedToken.value)
+        findToken(projectId)   shouldBe Some(token.value)
+        findToken(projectPath) shouldBe Some(token.value)
 
-        val newProjectId      = projectIds.generateOne
-        val newEncryptedToken = encryptedAccessTokens.generateOne
-        associator.persistAssociation(newProjectId, projectPath, newEncryptedToken).unsafeRunSync() shouldBe ()
+        val newId    = projectIds.generateOne
+        val newToken = encryptedAccessTokens.generateOne
+        associator.persistAssociation(newId, projectPath, newToken).unsafeRunSync() shouldBe ()
 
-        findToken(projectId)    shouldBe None
-        findToken(newProjectId) shouldBe Some(newEncryptedToken.value)
-        findToken(projectPath)  shouldBe Some(newEncryptedToken.value)
+        findToken(projectId)   shouldBe None
+        findToken(newId)       shouldBe Some(newToken.value)
+        findToken(projectPath) shouldBe Some(newToken.value)
+      }
+
+    "update the given token and project path" +
+      "if there's a token for the project id but with different project path" in new TestCase {
+
+        val token = encryptedAccessTokens.generateOne
+
+        associator.persistAssociation(projectId, projectPath, token).unsafeRunSync() shouldBe ()
+
+        findToken(projectId)   shouldBe Some(token.value)
+        findToken(projectPath) shouldBe Some(token.value)
+
+        val newPath  = projectPaths.generateOne
+        val newToken = encryptedAccessTokens.generateOne
+        associator.persistAssociation(projectId, newPath, newToken).unsafeRunSync() shouldBe ()
+
+        findToken(projectPath) shouldBe None
+        findToken(projectId)   shouldBe Some(newToken.value)
+        findToken(newPath)     shouldBe Some(newToken.value)
       }
   }
 

@@ -71,7 +71,7 @@ private class TokenAssociatorImpl[F[_]: MonadThrow](
   } yield ()
 
   private def verifyTokenIntegrity(projectPath: Path) =
-    tokenFinder.findToken(projectPath).value.flatMap {
+    (tokenFinder findToken projectPath).value >>= {
       case Some(savedToken) => decrypt(savedToken).void
       case _ =>
         new Exception(show"Token associator - saved encrypted token cannot be found for project: $projectPath")

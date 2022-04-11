@@ -23,30 +23,50 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas._
+import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
-import tooling.{CleanUpEventsProducer, QueryBasedMigration}
+import tooling.UpdateQueryMigration
 
-private object TopMostDerivedFrom {
+private object DeDuplicateModifiedDSData {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    QueryBasedMigration[F](name, query, CleanUpEventsProducer).widen
+    UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Broken TopmostDerivedFrom")
+  private lazy val name = Migration.Name("Duplicate Modified DS data")
   private[migrations] lazy val query = SparqlQuery.of(
     Refined.unsafeApply(name.show),
-    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
-    s"""|SELECT ?path
-        |WHERE {
-        |  ?dsId a schema:Dataset;
-        |        prov:wasDerivedFrom ?derived;
-        |        ^renku:hasDataset/renku:projectPath ?path
+    Prefixes.of(schema -> "schema", renku -> "renku"),
+    s"""|DELETE { 
+        |  ?dsId renku:originalIdentifier ?original.
+        |  ?dsId renku:topmostDerivedFrom ?topmostDerived.
+        |  ?dsId renku:topmostSameAs ?topmostSameAs.
         |}
-        |GROUP BY ?path
-        |HAVING (COUNT(DISTINCT ?dsId) > 1)
+        |WHERE {
+        |  SELECT ?dsId ?original ?topmostDerived ?topmostSameAs
+        |  WHERE {
+        |    {
+        |      SELECT DISTINCT ?dsId
+        |      WHERE {
+        |        ?dsId a schema:Dataset;
+        |              renku:originalIdentifier ?originalIdentifier.
+        |      }
+        |      GROUP BY ?dsId
+        |      HAVING (COUNT(DISTINCT ?originalIdentifier) > 1)
+        |    }
+        |    ?dsId schema:identifier ?identifier;
+        |          renku:originalIdentifier ?original;
+        |          renku:topmostDerivedFrom ?topmostDerived.
+        |    OPTIONAL { 
+        |      ?dsId renku:topmostSameAs ?topmostSameAs
+        |      FILTER (!CONTAINS(STR(?topmostSameAs), ?identifier))
+        |    }
+        |    FILTER (?original = ?identifier)
+        |    FILTER (CONTAINS(STR(?topmostDerived), ?identifier))
+        |  }
+        |}
         |""".stripMargin
   )
 }

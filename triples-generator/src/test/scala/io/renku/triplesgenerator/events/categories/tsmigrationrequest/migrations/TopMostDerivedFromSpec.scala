@@ -21,7 +21,7 @@ package migrations
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
-import io.renku.graph.model.testentities.{anyRenkuProjectEntities, _}
+import io.renku.graph.model.testentities._
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should

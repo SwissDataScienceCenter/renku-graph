@@ -26,7 +26,6 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder
 import io.renku.graph.model.persons.{GitLabId, Name}
 import io.renku.graph.model.projects.Path
-import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s._
@@ -47,8 +46,8 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](gitLabClient: 
       path:                    Path
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] =
     for {
-      users   <- fetch(uri"projects" / urlEncode(path.value) / "users", "users")
-      members <- fetch(uri"projects" / urlEncode(path.value) / "members", "members")
+      users   <- fetch(uri"projects" / path.show / "users", "users")
+      members <- fetch(uri"projects" / path.show / "members", "members")
     } yield users ++ members
 
   private def fetch(

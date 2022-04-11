@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: lucene-config-ttl
+  name: renku-ds-ttl
   labels:
     app: {{ template "jena.name" . }}
     chart: {{ template "jena.chart" . }}

@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations.reprovisioning
 
 import cats.data.NonEmptyList
 import cats.effect.Async
@@ -81,7 +82,7 @@ private class ReProvisionJudgeImpl[F[_]: MonadThrow: Logger](renkuVersionPairFin
   private def logVersions(maybeTSVersionPair: Option[RenkuVersionPair]) = {
 
     implicit val show: Show[(CliVersion, SchemaVersion)] = Show.show { case (cli, schema) =>
-      show"Schema version $schema and CLI version $cli"
+      show"schema version $schema and CLI version $cli"
     }
 
     val expectedVersion = versionCompatibilityPairs.toList match {
@@ -91,9 +92,9 @@ private class ReProvisionJudgeImpl[F[_]: MonadThrow: Logger](renkuVersionPairFin
 
     maybeTSVersionPair match {
       case Some(RenkuVersionPair(cliVersion, schemaVersion)) =>
-        Logger[F].info(show"Triples Store on ${cliVersion -> schemaVersion}; expected $expectedVersion")
+        Logger[F].info(formMessage(show"triples Store on ${cliVersion -> schemaVersion}; expected $expectedVersion"))
       case _ =>
-        Logger[F].info(show"Triples Store on unknown Schema and CLI version; expected $expectedVersion")
+        Logger[F].info(formMessage(show"triples Store on unknown Schema and CLI version; expected $expectedVersion"))
     }
   }
 
@@ -104,15 +105,16 @@ private class ReProvisionJudgeImpl[F[_]: MonadThrow: Logger](renkuVersionPairFin
         case false => false.pure[F]
         case true =>
           reProvisioningStatus.findReProvisioningService() >>= {
-            case None => Logger[F].info("No info about service controlling re-provisioning") >> true.pure[F]
+            case None =>
+              Logger[F].info(formMessage("no info about service controlling re-provisioning")) >> true.pure[F]
             case Some(controllerUrl) =>
               microserviceUrlFinder.findBaseUrl() >>= {
                 case `controllerUrl` =>
-                  Logger[F].info("Re-provisioning started by this service did not finish") >> true.pure[F]
+                  Logger[F].info(formMessage("started by this service did not finish")) >> true.pure[F]
                 case _ =>
                   ping(controllerUrl).map(!_) flatTap {
-                    case true  => Logger[F].info(show"Re-provisioning was started by $controllerUrl which is down")
-                    case false => Logger[F].info(show"Re-provisioning already running on $controllerUrl")
+                    case true  => Logger[F].info(formMessage(show"was started by $controllerUrl which is down"))
+                    case false => Logger[F].info(formMessage(show"already running on $controllerUrl"))
                   }
               }
           }

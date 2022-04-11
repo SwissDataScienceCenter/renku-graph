@@ -23,7 +23,7 @@ import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, TopmostSameAs}
+import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, TopmostDerivedFrom, TopmostSameAs}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, persons}
 import io.renku.rdfstore.SparqlQuery
@@ -93,6 +93,36 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
             dataset1Queries ::: dataset1CleanUpQueries ::: dataset2Queries ::: dataset2CleanUpQueries
         )
       }
+
+    "update topmostDerivedFrom on all derivation hierarchies" in new TestCase {
+      givenExternalCallsPass()
+
+      def topmostDerivedFromFromDerivedFrom(
+          otherDs: Dataset[Dataset.Provenance.Modified]
+      ): Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] =
+        ds => ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(otherDs.entityId)))
+
+      val (_ ::~ modification1, project) =
+        anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+      val (modification2, projectUpdate2) = project.addDataset(
+        modification1.createModification().modify(topmostDerivedFromFromDerivedFrom(modification1))
+      )
+      val finalProject = projectUpdate2.to[entities.Project]
+
+      // at this stage topmostDerivedFrom should be the same as derivedFrom
+      val topDS :: mod1DS :: mod2DS :: Nil = finalProject.datasets
+      mod1DS.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(topDS.identification.resourceId.show)
+      mod2DS.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(mod1DS.identification.resourceId.show)
+
+      val step = transformer.createTransformationStep
+
+      val Success(Right((updatedProject, _))) = step.run(finalProject).value
+
+      val updatedTopDS :: updatedMod1DS :: updatedMod2DS :: Nil = updatedProject.datasets
+      updatedTopDS.provenance.topmostDerivedFrom  shouldBe topDS.provenance.topmostDerivedFrom
+      updatedMod1DS.provenance.topmostDerivedFrom shouldBe updatedTopDS.provenance.topmostDerivedFrom
+      updatedMod2DS.provenance.topmostDerivedFrom shouldBe updatedTopDS.provenance.topmostDerivedFrom
+    }
 
     "prepare updates for deleted datasets" in new TestCase {
       val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _,
@@ -256,5 +286,14 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       ))
       .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
       .returning(returning)
+
+    def givenExternalCallsPass() = {
+      (kgDatasetInfoFinder.findDatasetCreators _)
+        .expects(*)
+        .returning(Set.empty[persons.ResourceId].pure[Try])
+        .anyNumberOfTimes()
+
+      (updatesCreator.queriesUnlinkingCreators _).expects(*, *).returning(List.empty).anyNumberOfTimes()
+    }
   }
 }

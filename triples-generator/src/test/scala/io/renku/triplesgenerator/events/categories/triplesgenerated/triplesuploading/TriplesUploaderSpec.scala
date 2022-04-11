@@ -76,7 +76,7 @@ class TriplesUploaderSpec
         givenUploader(returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
         val Left(error) = triplesUploader.uploadTriples(triples).value.unsafeRunSync()
-        error shouldBe a[AuthRecoverableError]
+        error shouldBe a[SilentRecoverableError]
       }
     }
 

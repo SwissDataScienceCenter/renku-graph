@@ -4,7 +4,7 @@ on:
     tags:
       - '*.*.*'
 env:
-  SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx2G"
+  SBT_OPTS: "-Xmx2G"
 jobs:
   cleanup-previous-runs:
     name: Cleanup previous runs

@@ -23,7 +23,7 @@ Depending on your global configuration of sbt you have installed, you might need
 If such error is raised, try setting the variable with the following:
 
 ```bash
-export SBT_OPTS="-XX:+UseG1GC -XX:+CMSClassUnloadingEnabled -Xmx2G"
+export SBT_OPTS="-Xmx2G -Xss5M"
 ```
 
 #### Releasing

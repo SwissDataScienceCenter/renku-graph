@@ -30,7 +30,7 @@ trait MockedRunnableCollaborators {
 
   private type Runnable[R] = { def run(): IO[R] }
 
-  def given[R](runnable: Runnable[R]) = new RunnableOps[R](runnable)
+  def `given`[R](runnable: Runnable[R]) = new RunnableOps[R](runnable)
 
   class RunnableOps[R](runnable: Runnable[R]) {
     import cats.syntax.all._

@@ -16,14 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations
 
+import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
 import reprovisioning.{ReProvisioning, ReProvisioningStatus}
 
@@ -33,8 +34,29 @@ private[tsmigrationrequest] object Migrations {
       reProvisioningStatus: ReProvisioningStatus[F],
       config:               Config
   ): F[List[Migration[F]]] = for {
-    reProvisioning     <- ReProvisioning[F](reProvisioningStatus, config)
-    topMostDerivedFrom <- TopMostDerivedFrom[F]
-    brokenActivityIds  <- BrokenActivityIds[F]
-  } yield List(reProvisioning, topMostDerivedFrom, brokenActivityIds)
+    reProvisioning            <- ReProvisioning[F](reProvisioningStatus, config)
+    topMostDerivedFrom        <- TopMostDerivedFrom[F]
+    malformedActivityIds      <- MalformedActivityIds[F]
+    deDuplicatePersonNames    <- DeDuplicatePersonNames[F]
+    deDuplicateModifiedDSData <- DeDuplicateModifiedDSData[F]
+    migrations <- validateNames(reProvisioning,
+                                topMostDerivedFrom,
+                                malformedActivityIds,
+                                deDuplicatePersonNames,
+                                deDuplicateModifiedDSData
+                  )
+  } yield migrations
+
+  private[migrations] def validateNames[F[_]: MonadThrow: Logger](migrations: Migration[F]*): F[List[Migration[F]]] = {
+    val groupedByName = migrations.groupBy(_.name)
+    val problematicMigrations = groupedByName.collect {
+      case (name, ms) if ms.size > 1 => name
+    }
+    if (problematicMigrations.nonEmpty) {
+      val error =
+        show"$categoryName: there are multiple migrations with the same name: ${problematicMigrations.mkString("; ")}"
+      Logger[F]
+        .error(error) >> new Exception(error).raiseError[F, List[Migration[F]]].map(_ => List.empty[Migration[F]])
+    } else migrations.toList.pure[F]
+  }
 }

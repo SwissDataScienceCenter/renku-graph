@@ -40,12 +40,13 @@ import io.renku.http.client.RestClientError.{ClientException, ConnectivityExcept
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.json.JsonOps._
-import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
+import org.http4s.implicits._
+import org.http4s.{Method, Request, Response, Status, Uri}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
@@ -57,7 +58,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class ProjectFinderSpec
     extends AnyWordSpec
     with IOSpec
-    with ExternalServiceStubbing
     with should.Matchers
     with MockFactory
     with ScalaCheckPropertyChecks
@@ -91,7 +91,7 @@ class ProjectFinderSpec
     }
 
     val shouldBeLogWorthy = (failure: ProcessingRecoverableError) => failure shouldBe a[LogWorthyRecoverableError]
-    val shouldBeAuth      = (failure: ProcessingRecoverableError) => failure shouldBe a[AuthRecoverableError]
+    val shouldBeSilent    = (failure: ProcessingRecoverableError) => failure shouldBe a[SilentRecoverableError]
     val errorMessage      = nonEmptyStrings().generateOne
 
     forAll(
@@ -101,8 +101,8 @@ class ProjectFinderSpec
         ("client problem", ClientException(errorMessage, exceptions.generateOne), shouldBeLogWorthy),
         ("BadGateway", UnexpectedResponseException(BadGateway, errorMessage), shouldBeLogWorthy),
         ("ServiceUnavailable", UnexpectedResponseException(ServiceUnavailable, errorMessage), shouldBeLogWorthy),
-        ("Forbidden", UnexpectedResponseException(Forbidden, errorMessage), shouldBeAuth),
-        ("Unauthorized", UnexpectedResponseException(Unauthorized, errorMessage), shouldBeAuth)
+        ("Forbidden", UnexpectedResponseException(Forbidden, errorMessage), shouldBeSilent),
+        ("Unauthorized", UnexpectedResponseException(Unauthorized, errorMessage), shouldBeSilent)
       )
     ) { case (problemName, error, failureTypeAssertion) =>
       s"return a Recoverable Failure for $problemName when fetching project info" in new TestCase {
