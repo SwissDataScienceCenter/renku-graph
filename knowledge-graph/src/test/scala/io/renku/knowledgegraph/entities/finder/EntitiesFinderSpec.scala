@@ -353,18 +353,34 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+      val internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .withActivities(activityEntities(planEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(publicProject, nonPublicProject)
+      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
+        .modify(replaceMembers(to = Set(member)))
+        .withActivities(activityEntities(planEntities()))
+        .withDatasets(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(publicProject)
+      loadToStore(internalProject)
+      loadToStore(privateProject)
 
       finder
-        .findEntities(Criteria(Filters(maybeVisibility = projects.Visibility.Public.some)))
+        .findEntities(
+          Criteria(
+            Filters(visibilities = Set(projects.Visibility.Public, projects.Visibility.Private)),
+            maybeUser = member.toAuthUser.some,
+            paging = PagingRequest(Page.first, PerPage(50))
+          )
+        )
         .unsafeRunSync()
         .results shouldBe allEntitiesFrom(publicProject)
-        .addAllPersonsFrom(nonPublicProject)
+        .addAllEntitiesFrom(privateProject)
+        .addAllPersonsFrom(internalProject)
         .sortBy(_.name.value)
     }
 
@@ -377,7 +393,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeVisibility = visibilityNonPublic.generateSome)))
+        .findEntities(Criteria(Filters(visibilities = visibilityNonPublic.generateSome.toSet)))
         .unsafeRunSync()
         .results shouldBe Nil
     }

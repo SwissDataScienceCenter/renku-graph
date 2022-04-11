@@ -147,7 +147,7 @@ Filtering:
 * `query` - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
 * `type` - to filter by entity type; allowed values: `project`, `dataset`, `workflow`, and `person`
 * `creator` - to filter by creator; the filter would require creator's name
-* `visibility` - to filter by visibility (restricted vs. public); allowed values: `public`, `internal`, `private`
+* `visibility` - to filter by visibility(ies) (restricted vs. public); allowed values: `public`, `internal`, `private`
 * `date` - to filter by entity's creation date
 
 **NOTE:** all query parameters have to be url-encoded.

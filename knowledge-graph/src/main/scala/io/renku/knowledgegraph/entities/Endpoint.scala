@@ -25,7 +25,7 @@ import io.circe.Decoder
 import io.renku.config.renku
 import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import io.renku.graph.model.datasets.ImageUri
-import io.renku.graph.model.{GitLabUrl, RenkuBaseUrl, persons, projects}
+import io.renku.graph.model._
 import io.renku.http.rest.Links.Href
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
@@ -36,7 +36,7 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
 import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
 import org.http4s.dsl.Http4sDsl
-import org.http4s.dsl.io.OptionalValidatingQueryParamDecoderMatcher
+import org.http4s.dsl.io.{OptionalMultiQueryParamDecoderMatcher, OptionalValidatingQueryParamDecoderMatcher}
 import org.http4s.{EntityEncoder, Header, ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
@@ -62,7 +62,7 @@ object Endpoint {
     final case class Filters(maybeQuery:      Option[Filters.Query] = None,
                              maybeEntityType: Option[Filters.EntityType] = None,
                              maybeCreator:    Option[persons.Name] = None,
-                             maybeVisibility: Option[projects.Visibility] = None,
+                             visibilities:    Set[projects.Visibility] = Set.empty,
                              maybeDate:       Option[Filters.Date] = None
     )
 
@@ -115,9 +115,12 @@ object Endpoint {
       object Visibility {
         private implicit val visibilityParameterDecoder: QueryParamDecoder[projects.Visibility] =
           (value: QueryParameterValue) =>
-            projects.Visibility.from(value.value).leftMap(_ => parsingFailure(visibility.parameterName)).toValidatedNel
+            projects.Visibility
+              .from(value.value)
+              .leftMap(_ => parsingFailure(visibilities.parameterName))
+              .toValidatedNel
 
-        object visibility extends OptionalValidatingQueryParamDecoderMatcher[projects.Visibility]("visibility") {
+        object visibilities extends OptionalMultiQueryParamDecoderMatcher[projects.Visibility]("visibility") {
           val parameterName: String = "visibility"
         }
       }

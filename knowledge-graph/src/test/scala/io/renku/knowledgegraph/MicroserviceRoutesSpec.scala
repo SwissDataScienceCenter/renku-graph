@@ -22,6 +22,7 @@ import cats.data.EitherT.{leftT, rightT}
 import cats.data.{Kleisli, OptionT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -268,8 +269,15 @@ class MicroserviceRoutesSpec
           .generateOne,
         projectVisibilities
           .map(v =>
-            uri"/knowledge-graph/entities" +? ("visibility" -> v.value) -> Criteria(Filters(maybeVisibility = v.some))
+            uri"/knowledge-graph/entities" +? ("visibility" -> v.value) -> Criteria(Filters(visibilities = Set(v)))
           )
+          .generateOne,
+        projectVisibilities
+          .toGeneratorOfList(minElements = 2)
+          .map { list =>
+            val uri = uri"/knowledge-graph/entities" ++? ("visibility" -> list.map(_.show))
+            uri -> Criteria(Filters(visibilities = list.toSet))
+          }
           .generateOne,
         dateParams
           .map(d =>
