@@ -26,7 +26,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
@@ -100,7 +100,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
           Logger[F]
             .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} $message")
             .map(_ => RecoverableError(triplesGeneratedEvent, error))
-        case error @ AuthRecoverableError(_, _) =>
+        case error @ SilentRecoverableError(_, _) =>
           RecoverableError(triplesGeneratedEvent, error).pure[F].widen[UploadingResult]
       }
     case error: NonRecoverableFailure =>
@@ -127,7 +127,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
       Logger[F]
         .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} ${error.getMessage}")
         .map(_ => RecoverableError(triplesGeneratedEvent, error))
-    case error: AuthRecoverableError =>
+    case error: SilentRecoverableError =>
       RecoverableError(triplesGeneratedEvent, error).pure[F].widen[UploadingResult]
   }
 
@@ -147,7 +147,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
           EventStatus.TransformationRecoverableFailure,
           cause,
           executionDelay = cause match {
-            case _: AuthRecoverableError => ExecutionDelay(Duration.ofHours(1))
+            case _: SilentRecoverableError => ExecutionDelay(Duration.ofHours(1))
             case _ => ExecutionDelay(Duration.ofMinutes(5))
           }
         )
@@ -207,16 +207,12 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
 private object EventProcessor {
 
-  import io.renku.config.GitLab
-  import io.renku.control.Throttler
-
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry](
-      gitLabThrottler: Throttler[F, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[F]
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      gitLabClient: GitLabClient[F]
   ): F[EventProcessor[F]] = for {
-    uploader           <- TransformationStepsRunner(timeRecorder)
+    uploader           <- TransformationStepsRunner[F]
     accessTokenFinder  <- AccessTokenFinder[F]
-    triplesCurator     <- TransformationStepsCreator(timeRecorder)
+    triplesCurator     <- TransformationStepsCreator[F]
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     eventsProcessingTimes <- Histogram(
                                name = "triples_transformation_processing_times",
@@ -225,7 +221,7 @@ private object EventProcessor {
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
-    jsonLDDeserializer    <- JsonLDDeserializer(gitLabThrottler)
+    jsonLDDeserializer    <- JsonLDDeserializer(gitLabClient)
   } yield new EventProcessorImpl(
     accessTokenFinder,
     triplesCurator,

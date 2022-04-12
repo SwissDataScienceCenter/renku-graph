@@ -25,7 +25,7 @@ import io.circe.Decoder
 import io.renku.config.renku
 import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
 import io.renku.graph.model.datasets.ImageUri
-import io.renku.graph.model.{GitLabUrl, RenkuBaseUrl, persons, projects}
+import io.renku.graph.model._
 import io.renku.http.rest.Links.Href
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
@@ -36,7 +36,7 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.tinytypes.constraints.{LocalDateNotInTheFuture, NonBlank}
 import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyTypeFactory}
 import org.http4s.dsl.Http4sDsl
-import org.http4s.dsl.io.OptionalValidatingQueryParamDecoderMatcher
+import org.http4s.dsl.io.{OptionalMultiQueryParamDecoderMatcher, OptionalValidatingQueryParamDecoderMatcher}
 import org.http4s.{EntityEncoder, Header, ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
@@ -59,11 +59,11 @@ object Endpoint {
 
   object Criteria {
 
-    final case class Filters(maybeQuery:      Option[Filters.Query] = None,
-                             maybeEntityType: Option[Filters.EntityType] = None,
-                             maybeCreator:    Option[persons.Name] = None,
-                             maybeVisibility: Option[projects.Visibility] = None,
-                             maybeDate:       Option[Filters.Date] = None
+    final case class Filters(maybeQuery:   Option[Filters.Query] = None,
+                             entityTypes:  Set[Filters.EntityType] = Set.empty,
+                             creators:     Set[persons.Name] = Set.empty,
+                             visibilities: Set[projects.Visibility] = Set.empty,
+                             maybeDate:    Option[Filters.Date] = None
     )
 
     object Filters {
@@ -95,9 +95,9 @@ object Endpoint {
 
         private implicit val entityTypeParameterDecoder: QueryParamDecoder[EntityType] =
           (value: QueryParameterValue) =>
-            EntityType.from(value.value).leftMap(_ => parsingFailure(entityType.parameterName)).toValidatedNel
+            EntityType.from(value.value).leftMap(_ => parsingFailure(entityTypes.parameterName)).toValidatedNel
 
-        object entityType extends OptionalValidatingQueryParamDecoderMatcher[EntityType]("type") {
+        object entityTypes extends OptionalMultiQueryParamDecoderMatcher[EntityType]("type") {
           val parameterName: String = "type"
         }
       }
@@ -105,9 +105,9 @@ object Endpoint {
       object CreatorName {
         private implicit val creatorNameParameterDecoder: QueryParamDecoder[persons.Name] =
           (value: QueryParameterValue) =>
-            persons.Name.from(value.value).leftMap(_ => parsingFailure(creatorName.parameterName)).toValidatedNel
+            persons.Name.from(value.value).leftMap(_ => parsingFailure(creatorNames.parameterName)).toValidatedNel
 
-        object creatorName extends OptionalValidatingQueryParamDecoderMatcher[persons.Name]("creator") {
+        object creatorNames extends OptionalMultiQueryParamDecoderMatcher[persons.Name]("creator") {
           val parameterName: String = "creator"
         }
       }
@@ -115,9 +115,12 @@ object Endpoint {
       object Visibility {
         private implicit val visibilityParameterDecoder: QueryParamDecoder[projects.Visibility] =
           (value: QueryParameterValue) =>
-            projects.Visibility.from(value.value).leftMap(_ => parsingFailure(visibility.parameterName)).toValidatedNel
+            projects.Visibility
+              .from(value.value)
+              .leftMap(_ => parsingFailure(visibilities.parameterName))
+              .toValidatedNel
 
-        object visibility extends OptionalValidatingQueryParamDecoderMatcher[projects.Visibility]("visibility") {
+        object visibilities extends OptionalMultiQueryParamDecoderMatcher[projects.Visibility]("visibility") {
           val parameterName: String = "visibility"
         }
       }
@@ -162,8 +165,8 @@ object Endpoint {
 
   private def parsingFailure(paramName: String) = ParseFailure(s"'$paramName' parameter with invalid value", "")
 
-  def apply[F[_]: Async: NonEmptyParallel: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[Endpoint[F]] = for {
-    entitiesFinder    <- EntitiesFinder(timeRecorder)
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
+    entitiesFinder    <- EntitiesFinder[F]
     renkuBaseUrl      <- RenkuBaseUrlLoader()
     renkuResourcesUrl <- renku.ResourcesUrl()
     gitLabUrl         <- GitLabUrlLoader[F]()

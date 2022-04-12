@@ -40,7 +40,7 @@ import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import io.renku.triplesgenerator.events.categories.{EventStatusUpdater, ProcessingRecoverableError}
-import io.renku.triplesgenerator.generators.ErrorGenerators.{authRecoverableErrors, logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors}
+import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, nonRecoverableMalformedRepoErrors, silentRecoverableErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -137,15 +137,15 @@ class EventProcessorSpec
       logError(commitEvent, exception, exception.getMessage)
     }
 
-    "mark event as RecoverableFailure and refrain from loggin an error " +
-      "if finding triples fails with AuthRecoverableError" in new TestCase {
+    "mark event as RecoverableFailure and refrain from logging an error " +
+      "if finding triples fails with SilentRecoverableError" in new TestCase {
 
         val commitEvent = commitEvents.generateOne
 
         givenFetchingAccessToken(commitEvent.project.path)
           .returning(maybeAccessToken.pure[Try])
 
-        val exception = authRecoverableErrors.generateOne
+        val exception = silentRecoverableErrors.generateOne
         (triplesFinder
           .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
           .expects(commitEvent, maybeAccessToken)
@@ -214,7 +214,7 @@ class EventProcessorSpec
 
     def expectEventMarkedAsRecoverableFailure(commit: CommitEvent, exception: ProcessingRecoverableError) = {
       val executionDelay = exception match {
-        case _: AuthRecoverableError      => ExecutionDelay(Duration ofHours 1)
+        case _: SilentRecoverableError    => ExecutionDelay(Duration ofHours 1)
         case _: LogWorthyRecoverableError => ExecutionDelay(Duration ofMinutes 15)
       }
       (eventStatusUpdater

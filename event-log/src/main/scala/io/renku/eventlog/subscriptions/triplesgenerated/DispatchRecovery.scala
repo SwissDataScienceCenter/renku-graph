@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.DispatchRecovery
+import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.{EventMessage, subscriptions}
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
@@ -39,7 +40,7 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
 ) extends subscriptions.DispatchRecovery[F, TriplesGeneratedEvent]
     with TinyTypeEncoders {
 
-  override def returnToQueue(event: TriplesGeneratedEvent): F[Unit] = eventSender.sendEvent(
+  override def returnToQueue(event: TriplesGeneratedEvent, reason: SendingResult): F[Unit] = eventSender.sendEvent(
     EventRequestContent.NoPayload(json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "id":           ${event.id.id},
@@ -50,7 +51,8 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         "newStatus": $TriplesGenerated
       }"""),
     EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),
-                             errorMessage = s"${SubscriptionCategory.name}: Marking event as $TriplesGenerated failed"
+                             errorMessage =
+                               s"${SubscriptionCategory.categoryName}: Marking event as $TriplesGenerated failed"
     )
   )
 
@@ -70,10 +72,11 @@ private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
         "message":   ${EventMessage(exception)} }"""),
       EventSender.EventContext(
         CategoryName("EVENTS_STATUS_CHANGE"),
-        errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
+        errorMessage =
+          s"${SubscriptionCategory.categoryName}: $event, url = $url -> $TransformationNonRecoverableFailure"
       )
     ) >> Logger[F].error(exception)(
-      s"${SubscriptionCategory.name}: $event, url = $url -> $TransformationNonRecoverableFailure"
+      s"${SubscriptionCategory.categoryName}: $event, url = $url -> $TransformationNonRecoverableFailure"
     )
   }
 }

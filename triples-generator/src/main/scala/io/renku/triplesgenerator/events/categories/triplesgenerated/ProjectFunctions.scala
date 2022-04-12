@@ -18,11 +18,15 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
+import cats.MonadThrow
 import cats.syntax.all._
+import io.renku.graph.model
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternal, Modified}
 import io.renku.graph.model.entities._
 import monocle.{Lens, Traversal}
+
+import scala.annotation.tailrec
 
 private trait ProjectFunctions {
 
@@ -95,6 +99,27 @@ private trait ProjectFunctions {
         case _ => invalidateDatasets
       }
     }
+
+  def findTopmostDerivedFrom[F[_]: MonadThrow](dataset: Dataset[Provenance],
+                                               project: Project
+  ): F[model.datasets.TopmostDerivedFrom] = {
+    import model.datasets.TopmostDerivedFrom
+
+    @tailrec
+    def findParent(topmostDerivedFrom: TopmostDerivedFrom): F[TopmostDerivedFrom] =
+      project.datasets.find(_.identification.resourceId.show == topmostDerivedFrom.show) match {
+        case None =>
+          new IllegalStateException(show"Broken derivation hierarchy for $topmostDerivedFrom")
+            .raiseError[F, TopmostDerivedFrom]
+        case Some(ds) =>
+          ds.provenance match {
+            case prov: Provenance.Modified => findParent(prov.topmostDerivedFrom)
+            case prov => prov.topmostDerivedFrom.pure[F]
+          }
+      }
+
+    findParent(dataset.provenance.topmostDerivedFrom)
+  }
 }
 
 private object ProjectFunctions extends ProjectFunctions {

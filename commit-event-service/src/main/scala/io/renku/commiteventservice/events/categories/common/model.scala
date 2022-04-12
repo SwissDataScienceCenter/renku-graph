@@ -84,7 +84,7 @@ private[categories] sealed trait Person extends Product with Serializable {
 }
 
 private[categories] object Person {
-  sealed trait WithEmail { self: Person =>
+  sealed trait WithEmail extends Person {
     def email: Email
   }
 

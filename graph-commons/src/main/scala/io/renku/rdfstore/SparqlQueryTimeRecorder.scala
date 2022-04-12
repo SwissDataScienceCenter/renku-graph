@@ -31,6 +31,11 @@ object SparqlQueryTimeRecorder {
 
   import io.renku.metrics.MetricsRegistry
 
+  def apply[F[_]](implicit ev: SparqlQueryTimeRecorder[F]): SparqlQueryTimeRecorder[F] = ev
+
+  def apply[F[_]: Sync: Logger](metricsRegistry: MetricsRegistry[F]): F[SparqlQueryTimeRecorder[F]] =
+    SparqlQueryTimeRecorder[F](Sync[F], Logger[F], metricsRegistry)
+
   def apply[F[_]: Sync: Logger: MetricsRegistry]: F[SparqlQueryTimeRecorder[F]] = for {
     histogram <- Histogram[F](
                    name = "sparql_execution_times",

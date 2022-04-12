@@ -33,9 +33,9 @@ import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, BasicAuthCredentials, RestClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.model.HookToken
-import org.http4s.Status.Ok
+import org.http4s.Status.{Accepted, Ok}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
-import org.http4s.{Header, Headers, Method, Status}
+import org.http4s.{Header, Headers, Method, Status, Uri}
 import org.scalatest.Assertions.fail
 import org.scalatest.matchers.should
 import org.typelevel.ci._
@@ -103,17 +103,13 @@ object KnowledgeGraphClient {
 
     private def preparePayload(query: Document, variables: Map[String, String]): IO[Json] = IO {
       variables match {
-        case vars if vars.isEmpty =>
-          json"""{
-            "query": ${query.source.getOrElse("")}
-          }                                                                     
-          """
-        case nonEmptyVars =>
-          json"""{
-            "query": ${query.source.getOrElse("")},
-            "variables": $nonEmptyVars 
-          }                                                                     
-          """
+        case vars if vars.isEmpty => json"""{
+          "query": ${query.source.getOrElse("")}
+        }"""
+        case nonEmptyVars => json"""{
+          "query": ${query.source.getOrElse("")},
+          "variables": $nonEmptyVars 
+        }"""
       }
     }
   }
@@ -124,6 +120,7 @@ object EventLogClient {
   def apply()(implicit logger: Logger[IO]): EventLogClient = new EventLogClient
 
   class EventLogClient(implicit logger: Logger[IO]) extends ServiceClient {
+
     override val baseUrl: String Refined Url = "http://localhost:9005"
 
     def fetchProcessingStatus(projectId: projects.Id)(implicit ioRuntime: IORuntime): ClientResponse =
@@ -131,6 +128,18 @@ object EventLogClient {
 
     def waitForReadiness(implicit ioRuntime: IORuntime): IO[Unit] =
       Monad[IO].whileM_(isRunning)(Temporal[IO] sleep (100 millis))
+
+    def sendEvent(event: Json)(implicit ioRuntime: IORuntime): Unit = {
+      for {
+        uri <- validateUri(s"$baseUrl/events")
+        _   <- send(createRequest(uri, event)) { case (Accepted, _, _) => ().pure[IO] }
+      } yield ()
+    }.unsafeRunSync()
+
+    private def createRequest(uri: Uri, event: Json) =
+      request(Method.POST, uri).withMultipartBuilder
+        .addPart("event", event)
+        .build()
 
     private def isRunning(implicit ioRuntime: IORuntime) = getStatus.flatMap { jsonBody =>
       jsonBody.hcursor

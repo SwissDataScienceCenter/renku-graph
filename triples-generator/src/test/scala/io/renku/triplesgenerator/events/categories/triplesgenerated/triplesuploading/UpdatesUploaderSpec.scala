@@ -29,7 +29,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{FusekiBaseUrl, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -61,13 +61,13 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
     }
 
     Set(Forbidden, Unauthorized) foreach { status =>
-      s"return Auth $RecoverableFailure if remote responds with $status " in new TestCase {
+      s"return a SilentRecoverableFailure if remote responds with $status " in new TestCase {
 
         val errorMessage = nonEmptyStrings().generateOne
         givenStore(forUpdate = query, returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
         val Left(error) = updater.send(query).value.unsafeRunSync()
-        error          shouldBe a[AuthRecoverableError]
+        error          shouldBe a[SilentRecoverableError]
         error.getMessage should startWith("Triples transformation update 'curation update' failed:")
       }
     }
@@ -100,11 +100,10 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
   private trait TestCase {
     val query = sparqlQueries.generateOne
 
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
-    lazy val rdfStoreConfig  = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
-    lazy val updater =
-      new UpdatesUploaderImpl[IO](rdfStoreConfig, timeRecorder, retryInterval = 100 millis, maxRetries = 1)
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    lazy val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
+    lazy val updater        = new UpdatesUploaderImpl[IO](rdfStoreConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) = stubFor {
       post(s"/${rdfStoreConfig.datasetName}/update")

@@ -33,7 +33,7 @@ import io.renku.http.rest.paging._
 import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.JsonLD
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status.{BadRequest, Ok}
@@ -384,6 +384,8 @@ class RdfStoreClientImplSpec
   private trait TestCase {
     val fusekiBaseUrl  = FusekiBaseUrl(externalServiceBaseUrl)
     val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
+    implicit val logger:       Logger[IO]                  = TestLogger[IO]()
+    implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
   }
 
   private trait QueryClientTestCase extends TestCase {
@@ -406,8 +408,8 @@ class RdfStoreClientImplSpec
   private class TestRdfClientImpl(
       val query:      SparqlQuery,
       rdfStoreConfig: RdfStoreConfig
-  )(implicit logger:  Logger[IO] = TestLogger[IO]())
-      extends RdfStoreClientImpl(rdfStoreConfig, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())) {
+  )(implicit logger:  Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
+      extends RdfStoreClientImpl[IO](rdfStoreConfig) {
 
     def sendUpdate: IO[Unit] = updateWithNoResult(query)
 
@@ -419,8 +421,9 @@ class RdfStoreClientImplSpec
   }
 
   private class TestRdfQueryClientImpl(val query: SparqlQuery, rdfStoreConfig: RdfStoreConfig)(implicit
-      logger:                                     Logger[IO] = TestLogger[IO]()
-  ) extends RdfStoreClientImpl(rdfStoreConfig, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]()))
+      logger:                                     Logger[IO],
+      timeRecorder:                               SparqlQueryTimeRecorder[IO]
+  ) extends RdfStoreClientImpl[IO](rdfStoreConfig)
       with Paging[String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)

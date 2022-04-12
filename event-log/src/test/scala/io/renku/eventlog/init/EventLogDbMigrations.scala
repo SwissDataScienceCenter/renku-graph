@@ -46,6 +46,8 @@ trait EventLogDbMigrations {
   protected[init] lazy val payloadTypeChanger:             DbMigrator[IO] = PayloadTypeChanger[IO]
   protected[init] lazy val statusChangeEventsTableCreator: DbMigrator[IO] = StatusChangeEventsTableCreator[IO]
   protected[init] lazy val eventDeliveryEventTypeAdder:    DbMigrator[IO] = EventDeliveryEventTypeAdder[IO]
+  protected[init] lazy val tsMigrationTableCreator:        DbMigrator[IO] = TSMigrationTableCreator[IO]
+  protected[init] lazy val cleanUpEventsTableCreator:      DbMigrator[IO] = CleanUpEventsTableCreator[IO]
 
   protected[init] lazy val allMigrations: List[DbMigrator[IO]] = List(
     eventLogTableCreator,
@@ -64,6 +66,8 @@ trait EventLogDbMigrations {
     timestampZoneAdder,
     payloadTypeChanger,
     statusChangeEventsTableCreator,
-    eventDeliveryEventTypeAdder
+    eventDeliveryEventTypeAdder,
+    tsMigrationTableCreator,
+    cleanUpEventsTableCreator
   )
 }

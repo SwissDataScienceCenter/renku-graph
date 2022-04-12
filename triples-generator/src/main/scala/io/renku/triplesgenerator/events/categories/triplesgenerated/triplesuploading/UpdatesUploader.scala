@@ -37,16 +37,14 @@ private trait UpdatesUploader[F[_]] {
   def send(updateQuery: SparqlQuery): EitherT[F, ProcessingRecoverableError, Unit]
 }
 
-private class UpdatesUploaderImpl[F[_]: Async: Logger](
+private class UpdatesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig:   RdfStoreConfig,
-    timeRecorder:     SparqlQueryTimeRecorder[F],
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:      Duration = 5 minutes,
     requestTimeout:   Duration = 4 minutes
 ) extends RdfStoreClientImpl[F](rdfStoreConfig,
-                                timeRecorder,
                                 retryInterval,
                                 maxRetries,
                                 idleTimeoutOverride = idleTimeout.some,

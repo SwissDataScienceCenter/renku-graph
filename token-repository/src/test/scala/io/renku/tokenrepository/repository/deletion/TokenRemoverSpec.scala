@@ -18,7 +18,6 @@
 
 package io.renku.tokenrepository.repository.deletion
 
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
@@ -34,7 +33,7 @@ class TokenRemoverSpec extends AnyWordSpec with IOSpec with InMemoryProjectsToke
   "delete" should {
 
     "succeed if token does not exist" in new TestCase {
-      remover.delete(projectId).unsafeRunSync() shouldBe ((): Unit)
+      remover.delete(projectId).unsafeRunSync() shouldBe ()
     }
 
     "succeed if token exists" in new TestCase {
@@ -43,7 +42,7 @@ class TokenRemoverSpec extends AnyWordSpec with IOSpec with InMemoryProjectsToke
       insert(projectId, projectPath, encryptedToken)
       findToken(projectId) shouldBe Some(encryptedToken.value)
 
-      remover.delete(projectId).unsafeRunSync() shouldBe ((): Unit)
+      remover.delete(projectId).unsafeRunSync() shouldBe ()
 
       findToken(projectId) shouldBe None
     }

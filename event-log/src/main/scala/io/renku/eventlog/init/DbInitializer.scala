@@ -82,6 +82,8 @@ object DbInitializer {
           StatusChangeEventsTableCreator[F],
           EventDeliveryEventTypeAdder[F],
           EventDeliveryEventTypeAdder[F],
+          TSMigrationTableCreator[F],
+          CleanUpEventsTableCreator[F],
           FailedEventsRestorer[F](
             "%Error: The repository is dirty. Please use the \"git\" command to clean it.%",
             currentStatus = GenerationNonRecoverableFailure,
@@ -121,6 +123,12 @@ object DbInitializer {
           FailedEventsRestorer[F](
             "%fatal: not removing ''.'' recursively without -r%",
             currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%Cannot decode % to Instant: Text % could not be parsed at index%",
+            currentStatus = TransformationNonRecoverableFailure,
             destinationStatus = New,
             discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
           )

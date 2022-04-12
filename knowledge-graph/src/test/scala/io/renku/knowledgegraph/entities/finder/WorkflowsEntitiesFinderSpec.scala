@@ -51,7 +51,7 @@ class WorkflowsEntitiesFinderSpec
       loadToStore(original, fork)
 
       val results = finder
-        .findEntities(Criteria(Filters(maybeEntityType = Filters.EntityType.Workflow.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Workflow))))
         .unsafeRunSync()
         .results
 
@@ -81,7 +81,7 @@ class WorkflowsEntitiesFinderSpec
 
       finder
         .findEntities(
-          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Workflow.some),
+          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
                    maybeUser = member.toAuthUser.some
           )
         )
@@ -107,7 +107,7 @@ class WorkflowsEntitiesFinderSpec
 
       finder
         .findEntities(
-          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Workflow.some),
+          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
                    maybeUser = member.toAuthUser.some
           )
         )
@@ -128,7 +128,7 @@ class WorkflowsEntitiesFinderSpec
 
       finder
         .findEntities(
-          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Workflow.some),
+          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow)),
                    maybeUser = member.toAuthUser.some
           )
         )

@@ -19,6 +19,7 @@
 package io.renku.eventlog.events.categories.statuschange
 
 import cats.data.Kleisli
+import cats.data.Kleisli.liftF
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -37,7 +38,7 @@ import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.{Session, ~}
+import skunk.{Session, SqlState, ~}
 
 import java.time.Instant
 import scala.util.control.NonFatal
@@ -58,19 +59,21 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
 ) extends DbClient(Some(queriesExecTimes))
     with ProjectEventsToNewUpdater[F] {
 
-  override def updateDB(event: ProjectEventsToNew): UpdateResult[F] = for {
-    statuses                 <- updateStatuses(event.project)
-    _                        <- removeProjectProcessingTimes(event.project)
-    _                        <- removeProjectPayloads(event.project)
-    _                        <- removeProjectDeliveryInfo(event.project)
-    removedAwaitingDeletions <- removeProjectEvents(event.project, AwaitingDeletion)
-    removedDeletingEvents    <- removeProjectEvents(event.project, Deleting)
-    maybeLatestEventDate     <- findLatestEventDate(event.project)
-    _                        <- updateLatestEventDate(event.project)(maybeLatestEventDate)
-    _                        <- cleanUpProjectIfGone(event.project)(maybeLatestEventDate)
-  } yield DBUpdateResults.ForProjects(event.project.path,
-                                      eventCountsByStatus(statuses, removedAwaitingDeletions, removedDeletingEvents)
-  )
+  override def updateDB(event: ProjectEventsToNew): UpdateResult[F] = {
+    for {
+      statuses                 <- updateStatuses(event.project)
+      _                        <- removeProjectProcessingTimes(event.project)
+      _                        <- removeProjectPayloads(event.project)
+      _                        <- removeProjectDeliveryInfo(event.project)
+      removedAwaitingDeletions <- removeProjectEvents(event.project, AwaitingDeletion)
+      removedDeletingEvents    <- removeProjectEvents(event.project, Deleting)
+      maybeLatestEventDate     <- findLatestEventDate(event.project)
+      _                        <- updateLatestEventDate(event.project)(maybeLatestEventDate)
+      _                        <- cleanUpProjectIfGone(event.project)(maybeLatestEventDate)
+    } yield DBUpdateResults.ForProjects(event.project.path,
+                                        eventCountsByStatus(statuses, removedAwaitingDeletions, removedDeletingEvents)
+    ): DBUpdateResults
+  }.recoverWith(retryOnDeadlock(event))
 
   private def eventCountsByStatus(statuses:                 List[EventStatus],
                                   removedAwaitingDeletions: Int,
@@ -202,6 +205,13 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
   private def logError(project: Project): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = {
     case NonFatal(error) =>
       Kleisli.liftF(Logger[F].error(error)(s"Clean up project failed: ${project.show}"))
+  }
+
+  private def retryOnDeadlock(event: ProjectEventsToNew): PartialFunction[Throwable, UpdateResult[F]] = {
+    case SqlState.DeadlockDetected(_) =>
+      liftF[F, Session[F], Unit](
+        Logger[F].info(show"$categoryName: deadlock happened while processing $event; retrying")
+      ) >> updateDB(event)
   }
 
   override def onRollback(event: ProjectEventsToNew): Kleisli[F, Session[F], Unit] = Kleisli.pure(())

@@ -65,6 +65,7 @@ private object RenkuVersionPairsReader {
 }
 
 object VersionCompatibilityConfig {
+
   def apply[F[_]: MonadThrow: Logger](config: Config = ConfigFactory.load): F[NonEmptyList[RenkuVersionPair]] = for {
     maybeRenkuDevVersion       <- RenkuPythonDevVersionConfig[F]() recoverWith errorToNone
     versionCompatibilityConfig <- RenkuVersionPairsReader.readRenkuVersionPairs[F](maybeRenkuDevVersion, config)

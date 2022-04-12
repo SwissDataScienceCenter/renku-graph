@@ -48,9 +48,10 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
 
     Set[NonBlank](
       "fatal: could not read Username for",
-      "fatal: Authentication failed for"
+      "fatal: Authentication failed for",
+      "A repository for this project does not exist yet."
     ) foreach { failure =>
-      s"return AuthRecoverableError if command fails with a message '$failure'" in new TestCase {
+      s"return SilentRecoverableError if command fails with a message '$failure'" in new TestCase {
 
         val errorMessage = sentenceContaining(failure).generateOne
         val commandResultException = ShelloutException {
@@ -64,7 +65,7 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
           .throwing(commandResultException)
 
         git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Left(
-          AuthRecoverableError(s"git clone failed with: ${commandResultException.result.toString}")
+          SilentRecoverableError(s"git clone failed with: ${commandResultException.result.toString}")
         )
       }
     }

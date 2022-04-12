@@ -52,10 +52,8 @@ private class CleanUpEventProcessorImpl[F[_]: Async: Logger](triplesRemover: Pro
 }
 
 private object CleanUpEventProcessor {
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      sparqlQueryTimeRecorder: SparqlQueryTimeRecorder[F]
-  ): F[EventProcessor[F]] = for {
+  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[EventProcessor[F]] = for {
     eventStatusUpdater <- EventStatusUpdater(categoryName)
-    triplesRemover     <- ProjectTriplesRemover(sparqlQueryTimeRecorder)
+    triplesRemover     <- ProjectTriplesRemover[F]()
   } yield new CleanUpEventProcessorImpl[F](triplesRemover, eventStatusUpdater)
 }

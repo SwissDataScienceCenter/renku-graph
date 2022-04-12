@@ -50,11 +50,11 @@ private[triplesgenerated] class TransformationStepsCreatorImpl[F[_]: MonadThrow]
 
 private[triplesgenerated] object TransformationStepsCreator {
 
-  def apply[F[_]: Async: Logger](timeRecorder: SparqlQueryTimeRecorder[F]): F[TransformationStepsCreator[F]] = for {
-    personTransformer   <- PersonTransformer(timeRecorder)
-    projectTransformer  <- ProjectTransformer(timeRecorder)
-    datasetTransformer  <- DatasetTransformer(timeRecorder)
-    activityTransformer <- ActivityTransformer(timeRecorder)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsCreator[F]] = for {
+    personTransformer   <- PersonTransformer[F]
+    projectTransformer  <- ProjectTransformer[F]
+    datasetTransformer  <- DatasetTransformer[F]
+    activityTransformer <- ActivityTransformer[F]
   } yield new TransformationStepsCreatorImpl[F](personTransformer,
                                                 projectTransformer,
                                                 datasetTransformer,

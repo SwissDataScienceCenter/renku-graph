@@ -31,7 +31,7 @@ import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.{JsonLD, JsonLDEncoder}
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.testtools.IOSpec
 import org.apache.jena.rdf.model.ModelFactory
@@ -72,9 +72,15 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     authCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
   )
 
+  protected lazy val migrationsStoreConfig: MigrationsStoreConfig = MigrationsStoreConfig(
+    fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort"),
+    authCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
+  )
+
   protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl
 
-  private lazy val rdfStoreServer = new RdfStoreServer(fusekiServerPort, rdfStoreConfig.datasetName)
+  private lazy val rdfStoreServer =
+    new RdfStoreServer(fusekiServerPort, rdfStoreConfig.datasetName, MigrationsStoreConfig.MigrationsDS)
 
   protected lazy val sparqlEndpoint: Uri = Uri
     .fromString(s"$fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql")
@@ -154,11 +160,9 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     objects.map(encoder.apply): _*
   )
 
-  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
-  private lazy val queryRunner = new RdfStoreClientImpl(
-    rdfStoreConfig,
-    new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO]())
-  ) {
+  private implicit lazy val logger:  TestLogger[IO]              = TestLogger[IO]()
+  private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+  private lazy val queryRunner = new RdfStoreClientImpl[IO](rdfStoreConfig) {
 
     import io.circe.Decoder._
     import io.renku.graph.model.Schemas._

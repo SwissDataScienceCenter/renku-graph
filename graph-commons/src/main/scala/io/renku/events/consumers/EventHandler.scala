@@ -23,10 +23,11 @@ import cats.data.EitherT._
 import cats.syntax.all._
 import cats.{Monad, MonadThrow, Show}
 import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
+import io.renku.json.JsonOps.JsonExt
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -51,7 +52,7 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad](processesLimiter: Con
 
   protected def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]]
 
-  implicit class JsonOps(json: Json) {
+  implicit class JsonOps(override val json: Json) extends JsonExt {
 
     import io.renku.tinytypes.json.TinyTypeDecoders._
 

@@ -37,16 +37,14 @@ private trait TriplesUploader[F[_]] {
   def uploadTriples(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit]
 }
 
-private class TriplesUploaderImpl[F[_]: Async: Logger](
+private class TriplesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig:   RdfStoreConfig,
-    timeRecorder:     SparqlQueryTimeRecorder[F],
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:      Duration = 6 minutes,
     requestTimeout:   Duration = 5 minutes
 ) extends RdfStoreClientImpl(rdfStoreConfig,
-                             timeRecorder,
                              retryInterval = retryInterval,
                              maxRetries = maxRetries,
                              idleTimeoutOverride = idleTimeout.some,
@@ -58,7 +56,7 @@ private class TriplesUploaderImpl[F[_]: Async: Logger](
   import org.http4s.{Request, Response, Status}
 
   override def uploadTriples(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    upload[Either[ProcessingRecoverableError, Unit]](triples)(
+    uploadAndMap[Either[ProcessingRecoverableError, Unit]](triples)(
       mapResponse
     ) recoverWith recoveryStrategy.maybeRecoverableError
   }
@@ -70,15 +68,14 @@ private class TriplesUploaderImpl[F[_]: Async: Logger](
 }
 
 private object TriplesUploader {
-  def apply[F[_]: Async: Logger](rdfStoreConfig: RdfStoreConfig,
-                                 timeRecorder:   SparqlQueryTimeRecorder[F],
-                                 retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-                                 maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-                                 idleTimeout:    Duration = 6 minutes,
-                                 requestTimeout: Duration = 5 minutes
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig,
+                                                          retryInterval: FiniteDuration = SleepAfterConnectionIssue,
+                                                          maxRetries: Int Refined NonNegative =
+                                                            MaxRetriesAfterConnectionTimeout,
+                                                          idleTimeout:    Duration = 6 minutes,
+                                                          requestTimeout: Duration = 5 minutes
   ): F[TriplesUploaderImpl[F]] = MonadThrow[F].catchNonFatal(
     new TriplesUploaderImpl[F](rdfStoreConfig,
-                               timeRecorder,
                                RecoverableErrorsRecovery,
                                retryInterval,
                                maxRetries,

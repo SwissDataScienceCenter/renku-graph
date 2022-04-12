@@ -30,6 +30,7 @@ import io.renku.graph.model.testentities.renkuBaseUrl
 import io.renku.jsonld.EntityId
 import io.renku.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
+import org.apache.jena.query.DatasetFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFactory}
 import org.apache.lucene.store.MMapDirectory
 
@@ -46,7 +47,7 @@ object RDFStore {
   // There's a problem with restarting Jena so this whole weirdness comes due to that fact
   private class JenaInstance {
 
-    private lazy val dataset = {
+    private lazy val renkuDataset = {
       import org.apache.jena.graph.NodeFactory
       import org.apache.jena.query.DatasetFactory
       import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
@@ -68,7 +69,7 @@ object RDFStore {
       )
     }
 
-    lazy val connection: RDFConnection = RDFConnectionFactory.connect(dataset)
+    lazy val connection: RDFConnection = RDFConnectionFactory.connect(renkuDataset)
     private val maybeJenaReference = Ref.unsafe[IO, Option[FusekiServer]](None)
 
     def start(): IO[Unit] = for {
@@ -77,7 +78,8 @@ object RDFStore {
                     .create()
                     .loopback(true)
                     .port(jenaPort)
-                    .add("/renku", dataset)
+                    .add("/renku", renkuDataset)
+                    .add("/migrations", DatasetFactory.create())
                     .build
                 }
       _ <- Spawn[IO].start(IO(server.start()))
@@ -87,7 +89,7 @@ object RDFStore {
 
     def stop(): IO[Unit] = {
       connection.close()
-      dataset.close()
+      renkuDataset.close()
       OptionT(maybeJenaReference getAndSet None)
         .map { jena => jena.stop(); logger.info("RDF store stopped") }
         .value

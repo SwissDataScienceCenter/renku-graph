@@ -59,18 +59,16 @@ class LatestCommitFinderSpec
 
       setGitLabClientExpectation(maybePersonalAccessToken, returning = Some(commitInfo))
 
-      latestCommitFinder.findLatestCommit(projectId)(maybePersonalAccessToken).unsafeRunSync() shouldBe Some(
-        commitInfo
-      )
+      latestCommitFinder.findLatestCommit(projectId)(maybePersonalAccessToken).unsafeRunSync() shouldBe
+        Some(commitInfo)
     }
 
     "return latest Commit info if remote responds with OK and valid body - no token case" in new TestCase {
 
       setGitLabClientExpectation(maybeAccessToken = None)
 
-      latestCommitFinder.findLatestCommit(projectId)(maybeAccessToken = None).unsafeRunSync() shouldBe Some(
-        commitInfo
-      )
+      latestCommitFinder.findLatestCommit(projectId)(maybeAccessToken = None).unsafeRunSync() shouldBe
+        Some(commitInfo)
     }
 
     "responseMapping: return None if remote responds with OK and no commits" in new TestCase {
@@ -80,8 +78,10 @@ class LatestCommitFinderSpec
       ).unsafeRunSync() shouldBe None
     }
 
-    "return None if remote responds with NOT_FOUND" in new TestCase {
-      mapResponse((Status.NotFound, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
+    Status.NotFound :: Status.InternalServerError :: Nil foreach { status =>
+      s"return None if remote responds with $status" in new TestCase {
+        mapResponse((status, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
+      }
     }
 
     Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>

@@ -193,11 +193,12 @@ private object Commands {
       %%("git", "status")(repositoryDirectory.value).out.string
     }
 
-    private val authRecoverableErrors = Set(
+    private val silentRecoverableErrors = Set(
       "fatal: Authentication failed for",
-      "fatal: could not read Username for"
+      "fatal: could not read Username for",
+      "A repository for this project does not exist yet."
     )
-    private val nonAuthRecoverableErrors = Set(
+    private val logWorthyRecoverableErrors = Set(
       "SSL_ERROR_SYSCALL",
       "The requested URL returned error: 502",
       "The requested URL returned error: 503",
@@ -215,12 +216,12 @@ private object Commands {
         def errorMessage(message: String) = s"git clone failed with: $message"
 
         MonadThrow[F].catchNonFatal(result.toString()) >>= {
-          case out if authRecoverableErrors exists out.contains =>
-            AuthRecoverableError(errorMessage(result.toString()))
+          case out if silentRecoverableErrors exists out.contains =>
+            SilentRecoverableError(errorMessage(result.toString()))
               .asLeft[Unit]
               .leftWiden[ProcessingRecoverableError]
               .pure[F]
-          case out if nonAuthRecoverableErrors exists out.contains =>
+          case out if logWorthyRecoverableErrors exists out.contains =>
             LogWorthyRecoverableError(errorMessage(result.toString()))
               .asLeft[Unit]
               .leftWiden[ProcessingRecoverableError]
@@ -246,7 +247,7 @@ private object Commands {
 
   class RenkuImpl[F[_]: Async](
       renkuMigrate: Path => CommandResult = %%("renku", "migrate", "--preserve-identifiers")(_),
-      renkuExport:  Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict")(_)
+      renkuExport:  Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict", "--no-indent")(_)
   ) extends Renku[F] {
 
     import cats.syntax.all._

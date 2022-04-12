@@ -31,7 +31,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.lineage.model._
-import io.renku.logging.TestExecutionTimeRecorder
+import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -237,11 +237,9 @@ class EdgesFinderSpec
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val edgesFinder = new EdgesFinderImpl[IO](
-      rdfStoreConfig,
-      renkuBaseUrl,
-      new SparqlQueryTimeRecorder[IO](executionTimeRecorder)
-    )
+    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
+      TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
+    val edgesFinder = new EdgesFinderImpl[IO](rdfStoreConfig, renkuBaseUrl)
   }
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {
