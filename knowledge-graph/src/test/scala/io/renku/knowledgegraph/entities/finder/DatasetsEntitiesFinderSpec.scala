@@ -54,7 +54,7 @@ class DatasetsEntitiesFinderSpec
       loadToStore(originalDSProject, importedDSProject)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = Filters.EntityType.Dataset.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
         .unsafeRunSync()
         .results shouldBe List(originalDSAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
     }
@@ -77,7 +77,7 @@ class DatasetsEntitiesFinderSpec
       loadToStore(project1WithImportedDS, project2WithImportedDS, projectWithDSImportedFromProject)
 
       val results = finder
-        .findEntities(Criteria(Filters(maybeEntityType = Filters.EntityType.Dataset.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
         .unsafeRunSync()
         .results
 
@@ -104,7 +104,7 @@ class DatasetsEntitiesFinderSpec
 
       finder
         .findEntities(
-          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Dataset.some),
+          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)),
                    sorting = Sorting.By(Sorting.ByDate, SortBy.Direction.Asc)
           )
         )
@@ -130,7 +130,7 @@ class DatasetsEntitiesFinderSpec
       loadToStore(originalDSProject, importedDSProject)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = Filters.EntityType.Dataset.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
         .unsafeRunSync()
         .results shouldBe List(importedDSAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
     }
@@ -148,7 +148,7 @@ class DatasetsEntitiesFinderSpec
       loadToStore(original, fork)
 
       val results = finder
-        .findEntities(Criteria(Filters(maybeEntityType = Filters.EntityType.Dataset.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
         .unsafeRunSync()
         .results
 
@@ -178,9 +178,7 @@ class DatasetsEntitiesFinderSpec
 
       finder
         .findEntities(
-          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Dataset.some),
-                   maybeUser = member.toAuthUser.some
-          )
+          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)), maybeUser = member.toAuthUser.some)
         )
         .unsafeRunSync()
         .results shouldBe List(dsAndPublicProject.to[model.Entity.Dataset])
@@ -204,9 +202,7 @@ class DatasetsEntitiesFinderSpec
 
       finder
         .findEntities(
-          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Dataset.some),
-                   maybeUser = member.toAuthUser.some
-          )
+          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)), maybeUser = member.toAuthUser.some)
         )
         .unsafeRunSync()
         .results shouldBe List(dsAndInternalProject.to[model.Entity.Dataset])
@@ -225,9 +221,7 @@ class DatasetsEntitiesFinderSpec
 
       finder
         .findEntities(
-          Criteria(filters = Filters(maybeEntityType = Filters.EntityType.Dataset.some),
-                   maybeUser = member.toAuthUser.some
-          )
+          Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Dataset)), maybeUser = member.toAuthUser.some)
         )
         .unsafeRunSync()
         .results shouldBe List(dsAndProject.to[model.Entity.Dataset])

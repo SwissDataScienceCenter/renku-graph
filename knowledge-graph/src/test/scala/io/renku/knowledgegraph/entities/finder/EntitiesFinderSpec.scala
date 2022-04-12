@@ -250,7 +250,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = EntityType.Project.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Project))))
         .unsafeRunSync()
         .results shouldBe List(project.to[model.Entity.Project]).sortBy(_.name.value)
     }
@@ -264,7 +264,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = EntityType.Dataset.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Dataset))))
         .unsafeRunSync()
         .results shouldBe List(dsAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
     }
@@ -278,12 +278,12 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = EntityType.Workflow.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Workflow))))
         .unsafeRunSync()
         .results shouldBe project.plans.map(_ -> project).map(_.to[model.Entity.Workflow]).toList.sortBy(_.name.value)
     }
 
-    "return only datasets when 'person' type given" in new TestCase {
+    "return entities of many types when multiple types given" in new TestCase {
       val person = personEntities.generateOne
       val project = renkuProjectEntities(visibilityPublic)
         .modify(creatorLens.modify(_ => person.some))
@@ -293,7 +293,25 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = EntityType.Person.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person, EntityType.Project))))
+        .unsafeRunSync()
+        .results shouldBe List(
+        project.to[model.Entity.Project],
+        person.to[model.Entity.Person]
+      ).sortBy(_.name.value)
+    }
+
+    "return multiple types datasets when 'person' type given" in new TestCase {
+      val person = personEntities.generateOne
+      val project = renkuProjectEntities(visibilityPublic)
+        .modify(creatorLens.modify(_ => person.some))
+        .modify(removeMembers())
+        .generateOne
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person))))
         .unsafeRunSync()
         .results shouldBe List(person.to[model.Entity.Person]).sortBy(_.name.value)
     }
@@ -321,12 +339,43 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Criteria(Filters(maybeCreator = creator.name.some)))
+        .findEntities(Criteria(Filters(creators = Set(creator.name))))
         .unsafeRunSync()
         .results shouldBe List(
         soleProject.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset],
         creator.to[model.Entity.Person]
+      ).sortBy(_.name.value)
+    }
+
+    "return entities that matches at least one of the given creators" in new TestCase {
+
+      val projectCreator = personEntities.generateOne
+      val soleProject = renkuProjectEntities(visibilityPublic)
+        .modify(creatorLens.modify(_ => projectCreator.some))
+        .generateOne
+
+      val dsCreator = personEntities.generateOne
+      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceNonModified).modify(
+            provenanceLens.modify(
+              creatorsLens.modify(_ => Set(personEntities.generateOne, dsCreator))
+            )
+          )
+        )
+        .generateOne
+
+      loadToStore(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+
+      finder
+        .findEntities(Criteria(Filters(creators = Set(projectCreator.name, dsCreator.name))))
+        .unsafeRunSync()
+        .results shouldBe List(
+        soleProject.to[model.Entity.Project],
+        dsAndProject.to[model.Entity.Dataset],
+        projectCreator.to[model.Entity.Person],
+        dsCreator.to[model.Entity.Person]
       ).sortBy(_.name.value)
     }
 
@@ -338,7 +387,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeCreator = personNames.generateSome)))
+        .findEntities(Criteria(Filters(creators = Set(personNames.generateOne))))
         .unsafeRunSync()
         .results shouldBe Nil
     }
@@ -353,18 +402,32 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      val nonPublicProject = renkuProjectEntities(visibilityNonPublic)
+      val internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .withActivities(activityEntities(planEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(publicProject, nonPublicProject)
+      val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
+      val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
+        .modify(replaceMembers(to = Set(member)))
+        .withActivities(activityEntities(planEntities()))
+        .withDatasets(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      loadToStore(publicProject, internalProject, privateProject)
 
       finder
-        .findEntities(Criteria(Filters(maybeVisibility = projects.Visibility.Public.some)))
+        .findEntities(
+          Criteria(
+            Filters(visibilities = Set(projects.Visibility.Public, projects.Visibility.Private)),
+            maybeUser = member.toAuthUser.some,
+            paging = PagingRequest(Page.first, PerPage(50))
+          )
+        )
         .unsafeRunSync()
         .results shouldBe allEntitiesFrom(publicProject)
-        .addAllPersonsFrom(nonPublicProject)
+        .addAllEntitiesFrom(privateProject)
+        .addAllPersonsFrom(internalProject)
         .sortBy(_.name.value)
     }
 
@@ -377,7 +440,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeVisibility = visibilityNonPublic.generateSome)))
+        .findEntities(Criteria(Filters(visibilities = visibilityNonPublic.generateSome.toSet)))
         .unsafeRunSync()
         .results shouldBe Nil
     }

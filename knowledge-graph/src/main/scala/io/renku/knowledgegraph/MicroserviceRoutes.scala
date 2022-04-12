@@ -96,19 +96,19 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   // format: off
   private lazy val `GET /entities routes`: AuthedRoutes[Option[AuthUser], F] = {
     import io.renku.knowledgegraph.entities.Endpoint.Criteria._
-    import Filters.CreatorName.creatorName
+    import Filters.CreatorName.creatorNames
     import Filters.Date.date
-    import Filters.EntityType.entityType
+    import Filters.EntityType.entityTypes
     import Filters.Query.query
-    import Filters.Visibility.visibility
+    import Filters.Visibility.visibilities
     import Sorting.sort
 
     AuthedRoutes.of {
       case req @ GET -> Root / "knowledge-graph" / "entities"
-        :? query(maybeQuery) +& entityType(maybeType) +& creatorName(maybeCreator)
-        +& visibility(maybeVisibility) +& date(maybeDate) +& sort(maybeSort)
+        :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators)
+        +& visibilities(maybeVisibilities) +& date(maybeDate) +& sort(maybeSort)
         +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
-        searchForEntities(maybeQuery, maybeType, maybeCreator, maybeVisibility,
+        searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeVisibilities,
           maybeDate, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
     }
   }
@@ -143,16 +143,16 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   }
 
   private def searchForEntities(
-      maybeQuery:      Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Query]],
-      maybeType:       Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.EntityType]],
-      maybeCreator:    Option[ValidatedNel[ParseFailure, persons.Name]],
-      maybeVisibility: Option[ValidatedNel[ParseFailure, model.projects.Visibility]],
-      maybeDate:       Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Date]],
-      maybeSort:       Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Sorting.By]],
-      maybePage:       Option[ValidatedNel[ParseFailure, Page]],
-      maybePerPage:    Option[ValidatedNel[ParseFailure, PerPage]],
-      maybeUser:       Option[AuthUser],
-      request:         Request[F]
+      maybeQuery:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Query]],
+      types:        ValidatedNel[ParseFailure, List[entities.Endpoint.Criteria.Filters.EntityType]],
+      creators:     ValidatedNel[ParseFailure, List[persons.Name]],
+      visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
+      maybeDate:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Date]],
+      maybeSort:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Sorting.By]],
+      maybePage:    Option[ValidatedNel[ParseFailure, Page]],
+      maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]],
+      maybeUser:    Option[AuthUser],
+      request:      Request[F]
   ): F[Response[F]] = {
     import entities.Endpoint.Criteria
     import entities.Endpoint.Criteria.Filters._
@@ -160,15 +160,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     import entities.Endpoint.Criteria.{Filters, Sorting}
     (
       maybeQuery.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Query])),
-      maybeType.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[EntityType])),
-      maybeCreator.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[persons.Name])),
-      maybeVisibility.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[model.projects.Visibility])),
+      types.map(_.toSet),
+      creators.map(_.toSet),
+      visibilities.map(_.toSet),
       maybeDate.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Date])),
       maybeSort getOrElse Validated.validNel(Sorting.By(ByName, Direction.Asc)),
       PagingRequest(maybePage, maybePerPage)
-    ).mapN { case (maybeQuery, maybeType, maybeCreator, maybeVisibility, maybeDate, sorting, paging) =>
+    ).mapN { case (maybeQuery, types, creators, visibilities, maybeDate, sorting, paging) =>
       `GET /entities`(
-        Criteria(Filters(maybeQuery, maybeType, maybeCreator, maybeVisibility, maybeDate), sorting, paging, maybeUser),
+        Criteria(Filters(maybeQuery, types, creators, visibilities, maybeDate), sorting, paging, maybeUser),
         request
       )
     }.fold(toBadRequest, identity)

@@ -18,10 +18,12 @@
 
 package io.renku.knowledgegraph.entities
 
+import cats.Show
 import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
+import io.renku.tinytypes.TinyType
 
 import java.time.{Instant, ZoneOffset}
 
@@ -50,29 +52,40 @@ package object finder {
 
     lazy val query: String = filters.maybeQuery.map(_.value).getOrElse("*")
 
-    def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] =
-      Option.when(filters.maybeEntityType.forall(_ == entityType) && predicates.forall(_ == true))(query)
+    def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] = {
+      val typeMatching = filters.entityTypes match {
+        case t if t.isEmpty => true
+        case t              => t contains entityType
+      }
+      Option.when(typeMatching && predicates.forall(_ == true))(query)
+    }
 
-    lazy val withNoOrPublicVisibility: Boolean = filters.maybeVisibility forall (_ == projects.Visibility.Public)
+    lazy val withNoOrPublicVisibility: Boolean = filters.visibilities match {
+      case v if v.isEmpty => true
+      case v              => v contains projects.Visibility.Public
+    }
 
     def maybeOnCreatorName(variableName: String): String =
-      filters.maybeCreator
-        .map { creator =>
-          s"FILTER (IF (BOUND($variableName), $variableName = '${sparqlEncode(creator.show)}', false))"
-        }
-        .getOrElse("")
+      filters.creators match {
+        case creators if creators.isEmpty => ""
+        case creators =>
+          s"FILTER (IF (BOUND($variableName), $variableName IN ${creators.map(_.asSparqlEncodedLiteral).mkString("(", ", ", ")")}, false))"
+      }
 
     def maybeOnCreatorsNames(variableName: String): String =
-      filters.maybeCreator
-        .map { creator =>
-          s"FILTER (IF (BOUND($variableName), CONTAINS($variableName, '${sparqlEncode(creator.show)}'), false))"
-        }
-        .getOrElse("")
+      filters.creators match {
+        case creators if creators.isEmpty => ""
+        case creators =>
+          s"""FILTER (IF (BOUND($variableName), ${creators
+            .map(c => s"CONTAINS($variableName, ${c.asSparqlEncodedLiteral})")
+            .mkString(" || ")} , false))"""
+      }
 
     def maybeOnVisibility(variableName: String): String =
-      filters.maybeVisibility
-        .map(visibility => s"FILTER ($variableName = '$visibility')")
-        .getOrElse("")
+      filters.visibilities match {
+        case set if set.isEmpty => ""
+        case set                => s"FILTER ($variableName IN ${set.map(_.asLiteral).mkString("(", ", ", ")")})"
+      }
 
     def maybeOnDateCreated(variableName: String): String =
       filters.maybeDate
@@ -103,6 +116,11 @@ package object finder {
         s"xsd:date(xsd:dateTime('${Instant.from(date.value.atStartOfDay(ZoneOffset.UTC))}'))"
 
       lazy val encodeAsXsdNotZonedDate: String = s"xsd:date('$date')"
+    }
+
+    private implicit class ValueOps[TT <: TinyType](v: TT)(implicit s: Show[TT]) {
+      lazy val asSparqlEncodedLiteral: String = s"'${sparqlEncode(v.show)}'"
+      lazy val asLiteral:              String = show"'$v'"
     }
   }
 
