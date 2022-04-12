@@ -227,7 +227,7 @@ private object MicroserviceRoutes {
     queryEndpoint           <- QueryEndpoint()
     projectEndpoint         <- ProjectEndpoint[IO](gitLabClient)
     projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
-    authenticator           <- GitLabAuthenticator(gitLabThrottler)
+    authenticator           <- GitLabAuthenticator(gitLabClient)
     authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
     projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
     datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
