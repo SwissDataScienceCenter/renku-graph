@@ -31,7 +31,7 @@ import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
-import org.http4s.Method.{GET, POST}
+import org.http4s.Method.{DELETE, GET, POST}
 import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
 import org.http4s.{EntityEncoder, Method, Uri}
 import org.typelevel.log4cats.Logger
@@ -91,7 +91,11 @@ final class GitLabClientImpl[F[_]: Async: Logger](
 
   override def delete[ResultType](path: Uri, endpointName: Refined[String, NonEmpty])(
       mapResponse:                      ResponseMappingF[F, ResultType]
-  )(implicit maybeAccessToken:          Option[AccessToken]): F[ResultType] = ???
+  )(implicit maybeAccessToken:          Option[AccessToken]): F[ResultType] = for {
+    uri     <- validateUri(show"$gitLabApiUrl/$path")
+    request <- secureNamedRequest(DELETE, uri, endpointName)
+    result  <- super.send(request)(mapResponse)
+  } yield result
 
   protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
 

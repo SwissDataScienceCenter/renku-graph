@@ -163,14 +163,44 @@ class GitLabClientSpec
       val payload = jsons.generateOne
 
       stubFor {
-        callMethod(POST, s"/api/v4/$path")
+        post(s"/api/v4/$path")
+          .withAccessToken(maybeAccessToken)
+          .withRequestBody(equalToJson(payload.spaces2))
+          .willReturn(
+            unauthorized()
+          )
+      }
+
+      intercept[Exception] {
+        client.post(path, endpointName, payload)(mapPostResponse).unsafeRunSync()
+      } shouldBe UnauthorizedException
+    }
+  }
+
+  "delete" should {
+
+    "send json to the endpoint" in new TestCase {
+
+      stubFor {
+        delete(s"/api/v4/$path")
+          .withAccessToken(maybeAccessToken)
+          .willReturn(aResponse().withStatus(Accepted.code))
+      }
+
+      client.delete(path, endpointName)(mapDeleteResponse).unsafeRunSync() shouldBe ()
+    }
+
+    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+
+      stubFor {
+        delete(s"/api/v4/$path")
           .willReturn(
             unauthorized()
           )
       }
 
       intercept[UnauthorizedException] {
-        client.post(path, endpointName, payload)(mapPostResponse).unsafeRunSync()
+        client.delete(path, endpointName)(mapDeleteResponse).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
   }
@@ -198,6 +228,11 @@ class GitLabClientSpec
     }
 
     lazy val mapPostResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+      case (Accepted, _, _)     => ().pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Unit]
+    }
+
+    lazy val mapDeleteResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
       case (Accepted, _, _)     => ().pure[IO]
       case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Unit]
     }
