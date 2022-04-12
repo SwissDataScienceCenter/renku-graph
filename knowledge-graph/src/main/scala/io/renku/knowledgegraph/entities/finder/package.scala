@@ -66,18 +66,20 @@ package object finder {
     }
 
     def maybeOnCreatorName(variableName: String): String =
-      filters.maybeCreator
-        .map { creator =>
-          s"FILTER (IF (BOUND($variableName), $variableName = '${sparqlEncode(creator.show)}', false))"
-        }
-        .getOrElse("")
+      filters.creators match {
+        case creators if creators.isEmpty => ""
+        case creators =>
+          s"FILTER (IF (BOUND($variableName), $variableName IN ${creators.map(_.asSparqlEncodedLiteral).mkString("(", ", ", ")")}, false))"
+      }
 
     def maybeOnCreatorsNames(variableName: String): String =
-      filters.maybeCreator
-        .map { creator =>
-          s"FILTER (IF (BOUND($variableName), CONTAINS($variableName, '${sparqlEncode(creator.show)}'), false))"
-        }
-        .getOrElse("")
+      filters.creators match {
+        case creators if creators.isEmpty => ""
+        case creators =>
+          s"""FILTER (IF (BOUND($variableName), ${creators
+            .map(c => s"CONTAINS($variableName, ${c.asSparqlEncodedLiteral})")
+            .mkString(" || ")} , false))"""
+      }
 
     def maybeOnVisibility(variableName: String): String =
       filters.visibilities match {
@@ -116,8 +118,9 @@ package object finder {
       lazy val encodeAsXsdNotZonedDate: String = s"xsd:date('$date')"
     }
 
-    private implicit class ValueOps[TT <: TinyType](v: TT)(implicit show: Show[TT]) {
-      lazy val asLiteral: String = show"'$v'"
+    private implicit class ValueOps[TT <: TinyType](v: TT)(implicit s: Show[TT]) {
+      lazy val asSparqlEncodedLiteral: String = s"'${sparqlEncode(v.show)}'"
+      lazy val asLiteral:              String = show"'$v'"
     }
   }
 

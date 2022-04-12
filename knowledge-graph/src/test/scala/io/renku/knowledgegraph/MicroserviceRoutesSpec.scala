@@ -269,8 +269,15 @@ class MicroserviceRoutesSpec
           .generateOne,
         personNames
           .map(name =>
-            uri"/knowledge-graph/entities" +? ("creator" -> name.value) -> Criteria(Filters(maybeCreator = name.some))
+            uri"/knowledge-graph/entities" +? ("creator" -> name.value) -> Criteria(Filters(creators = Set(name)))
           )
+          .generateOne,
+        personNames
+          .toGeneratorOfList(minElements = 2)
+          .map { list =>
+            val uri = uri"/knowledge-graph/entities" ++? ("creator" -> list.map(_.show))
+            uri -> Criteria(Filters(creators = list.toSet))
+          }
           .generateOne,
         projectVisibilities
           .map(v =>

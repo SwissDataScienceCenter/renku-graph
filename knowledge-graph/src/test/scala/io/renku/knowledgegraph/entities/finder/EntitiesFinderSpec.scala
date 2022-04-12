@@ -339,12 +339,43 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
       finder
-        .findEntities(Criteria(Filters(maybeCreator = creator.name.some)))
+        .findEntities(Criteria(Filters(creators = Set(creator.name))))
         .unsafeRunSync()
         .results shouldBe List(
         soleProject.to[model.Entity.Project],
         dsAndProject.to[model.Entity.Dataset],
         creator.to[model.Entity.Person]
+      ).sortBy(_.name.value)
+    }
+
+    "return entities that matches at least one of the given creators" in new TestCase {
+
+      val projectCreator = personEntities.generateOne
+      val soleProject = renkuProjectEntities(visibilityPublic)
+        .modify(creatorLens.modify(_ => projectCreator.some))
+        .generateOne
+
+      val dsCreator = personEntities.generateOne
+      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceNonModified).modify(
+            provenanceLens.modify(
+              creatorsLens.modify(_ => Set(personEntities.generateOne, dsCreator))
+            )
+          )
+        )
+        .generateOne
+
+      loadToStore(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+
+      finder
+        .findEntities(Criteria(Filters(creators = Set(projectCreator.name, dsCreator.name))))
+        .unsafeRunSync()
+        .results shouldBe List(
+        soleProject.to[model.Entity.Project],
+        dsAndProject.to[model.Entity.Dataset],
+        projectCreator.to[model.Entity.Person],
+        dsCreator.to[model.Entity.Person]
       ).sortBy(_.name.value)
     }
 
@@ -356,7 +387,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeCreator = personNames.generateSome)))
+        .findEntities(Criteria(Filters(creators = Set(personNames.generateOne))))
         .unsafeRunSync()
         .results shouldBe Nil
     }

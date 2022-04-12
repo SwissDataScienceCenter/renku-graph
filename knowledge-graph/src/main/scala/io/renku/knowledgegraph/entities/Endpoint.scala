@@ -61,7 +61,7 @@ object Endpoint {
 
     final case class Filters(maybeQuery:   Option[Filters.Query] = None,
                              entityTypes:  Set[Filters.EntityType] = Set.empty,
-                             maybeCreator: Option[persons.Name] = None,
+                             creators:     Set[persons.Name] = Set.empty,
                              visibilities: Set[projects.Visibility] = Set.empty,
                              maybeDate:    Option[Filters.Date] = None
     )
@@ -105,9 +105,9 @@ object Endpoint {
       object CreatorName {
         private implicit val creatorNameParameterDecoder: QueryParamDecoder[persons.Name] =
           (value: QueryParameterValue) =>
-            persons.Name.from(value.value).leftMap(_ => parsingFailure(creatorName.parameterName)).toValidatedNel
+            persons.Name.from(value.value).leftMap(_ => parsingFailure(creatorNames.parameterName)).toValidatedNel
 
-        object creatorName extends OptionalValidatingQueryParamDecoderMatcher[persons.Name]("creator") {
+        object creatorNames extends OptionalMultiQueryParamDecoderMatcher[persons.Name]("creator") {
           val parameterName: String = "creator"
         }
       }
