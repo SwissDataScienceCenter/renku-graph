@@ -50,10 +50,10 @@ spec:
             httpGet:
               path: /$/ping
               port: jena
-            initialDelaySeconds: 30
+            initialDelaySeconds: 120
             periodSeconds: 120
             successThreshold: 1
-            failureThreshold: 10
+            failureThreshold: 20
           volumeMounts:
             - name: renku-ds
               mountPath: /fuseki/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
