@@ -59,11 +59,11 @@ object Endpoint {
 
   object Criteria {
 
-    final case class Filters(maybeQuery:      Option[Filters.Query] = None,
-                             maybeEntityType: Option[Filters.EntityType] = None,
-                             maybeCreator:    Option[persons.Name] = None,
-                             visibilities:    Set[projects.Visibility] = Set.empty,
-                             maybeDate:       Option[Filters.Date] = None
+    final case class Filters(maybeQuery:   Option[Filters.Query] = None,
+                             entityTypes:  Set[Filters.EntityType] = Set.empty,
+                             maybeCreator: Option[persons.Name] = None,
+                             visibilities: Set[projects.Visibility] = Set.empty,
+                             maybeDate:    Option[Filters.Date] = None
     )
 
     object Filters {
@@ -95,9 +95,9 @@ object Endpoint {
 
         private implicit val entityTypeParameterDecoder: QueryParamDecoder[EntityType] =
           (value: QueryParameterValue) =>
-            EntityType.from(value.value).leftMap(_ => parsingFailure(entityType.parameterName)).toValidatedNel
+            EntityType.from(value.value).leftMap(_ => parsingFailure(entityTypes.parameterName)).toValidatedNel
 
-        object entityType extends OptionalValidatingQueryParamDecoderMatcher[EntityType]("type") {
+        object entityTypes extends OptionalMultiQueryParamDecoderMatcher[EntityType]("type") {
           val parameterName: String = "type"
         }
       }

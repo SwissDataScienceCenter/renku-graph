@@ -250,7 +250,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = EntityType.Project.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Project))))
         .unsafeRunSync()
         .results shouldBe List(project.to[model.Entity.Project]).sortBy(_.name.value)
     }
@@ -264,7 +264,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = EntityType.Dataset.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Dataset))))
         .unsafeRunSync()
         .results shouldBe List(dsAndProject.to[model.Entity.Dataset]).sortBy(_.name.value)
     }
@@ -278,12 +278,12 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = EntityType.Workflow.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Workflow))))
         .unsafeRunSync()
         .results shouldBe project.plans.map(_ -> project).map(_.to[model.Entity.Workflow]).toList.sortBy(_.name.value)
     }
 
-    "return only datasets when 'person' type given" in new TestCase {
+    "return entities of many types when multiple types given" in new TestCase {
       val person = personEntities.generateOne
       val project = renkuProjectEntities(visibilityPublic)
         .modify(creatorLens.modify(_ => person.some))
@@ -293,7 +293,25 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeEntityType = EntityType.Person.some)))
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person, EntityType.Project))))
+        .unsafeRunSync()
+        .results shouldBe List(
+        project.to[model.Entity.Project],
+        person.to[model.Entity.Person]
+      ).sortBy(_.name.value)
+    }
+
+    "return multiple types datasets when 'person' type given" in new TestCase {
+      val person = personEntities.generateOne
+      val project = renkuProjectEntities(visibilityPublic)
+        .modify(creatorLens.modify(_ => person.some))
+        .modify(removeMembers())
+        .generateOne
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person))))
         .unsafeRunSync()
         .results shouldBe List(person.to[model.Entity.Person]).sortBy(_.name.value)
     }
@@ -365,9 +383,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(publicProject)
-      loadToStore(internalProject)
-      loadToStore(privateProject)
+      loadToStore(publicProject, internalProject, privateProject)
 
       finder
         .findEntities(

@@ -98,17 +98,17 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     import io.renku.knowledgegraph.entities.Endpoint.Criteria._
     import Filters.CreatorName.creatorName
     import Filters.Date.date
-    import Filters.EntityType.entityType
+    import Filters.EntityType.entityTypes
     import Filters.Query.query
     import Filters.Visibility.visibilities
     import Sorting.sort
 
     AuthedRoutes.of {
       case req @ GET -> Root / "knowledge-graph" / "entities"
-        :? query(maybeQuery) +& entityType(maybeType) +& creatorName(maybeCreator)
+        :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorName(maybeCreator)
         +& visibilities(maybeVisibilities) +& date(maybeDate) +& sort(maybeSort)
         +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
-        searchForEntities(maybeQuery, maybeType, maybeCreator, maybeVisibilities,
+        searchForEntities(maybeQuery, maybeTypes, maybeCreator, maybeVisibilities,
           maybeDate, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
     }
   }
@@ -144,7 +144,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   private def searchForEntities(
       maybeQuery:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Query]],
-      maybeType:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.EntityType]],
+      types:        ValidatedNel[ParseFailure, List[entities.Endpoint.Criteria.Filters.EntityType]],
       maybeCreator: Option[ValidatedNel[ParseFailure, persons.Name]],
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
       maybeDate:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Date]],
@@ -160,15 +160,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     import entities.Endpoint.Criteria.{Filters, Sorting}
     (
       maybeQuery.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Query])),
-      maybeType.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[EntityType])),
+      types.map(_.toSet),
       maybeCreator.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[persons.Name])),
       visibilities.map(_.toSet),
       maybeDate.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Date])),
       maybeSort getOrElse Validated.validNel(Sorting.By(ByName, Direction.Asc)),
       PagingRequest(maybePage, maybePerPage)
-    ).mapN { case (maybeQuery, maybeType, maybeCreator, visibilities, maybeDate, sorting, paging) =>
+    ).mapN { case (maybeQuery, types, maybeCreator, visibilities, maybeDate, sorting, paging) =>
       `GET /entities`(
-        Criteria(Filters(maybeQuery, maybeType, maybeCreator, visibilities, maybeDate), sorting, paging, maybeUser),
+        Criteria(Filters(maybeQuery, types, maybeCreator, visibilities, maybeDate), sorting, paging, maybeUser),
         request
       )
     }.fold(toBadRequest, identity)

@@ -52,8 +52,13 @@ package object finder {
 
     lazy val query: String = filters.maybeQuery.map(_.value).getOrElse("*")
 
-    def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] =
-      Option.when(filters.maybeEntityType.forall(_ == entityType) && predicates.forall(_ == true))(query)
+    def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] = {
+      val typeMatching = filters.entityTypes match {
+        case t if t.isEmpty => true
+        case t              => t contains entityType
+      }
+      Option.when(typeMatching && predicates.forall(_ == true))(query)
+    }
 
     lazy val withNoOrPublicVisibility: Boolean = filters.visibilities match {
       case v if v.isEmpty => true

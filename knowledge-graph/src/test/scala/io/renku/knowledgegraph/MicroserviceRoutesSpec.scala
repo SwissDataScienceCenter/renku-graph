@@ -258,9 +258,14 @@ class MicroserviceRoutesSpec
           )
           .generateOne,
         typeParams
-          .map(t =>
-            uri"/knowledge-graph/entities" +? ("type" -> t.value) -> Criteria(Filters(maybeEntityType = t.some))
-          )
+          .map(t => uri"/knowledge-graph/entities" +? ("type" -> t.value) -> Criteria(Filters(entityTypes = Set(t))))
+          .generateOne,
+        typeParams
+          .toGeneratorOfList(minElements = 2)
+          .map { list =>
+            val uri = uri"/knowledge-graph/entities" ++? ("type" -> list.map(_.show))
+            uri -> Criteria(Filters(entityTypes = list.toSet))
+          }
           .generateOne,
         personNames
           .map(name =>
