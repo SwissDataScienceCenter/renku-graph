@@ -153,10 +153,12 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val newPerson         = personEntities().generateOne.to[entities.Person]
 
       val dataset1 :: dataset2 :: Nil = update(entitiesOldPerson, newPerson)(project).datasets
-      dataset1.provenance.creators shouldBe project.datasets.head.provenance.creators.map {
-        case creator if creator == entitiesOldPerson => newPerson
-        case creator                                 => creator
-      }
+      dataset1.provenance.creators shouldBe project.datasets.head.provenance.creators
+        .map {
+          case creator if creator == entitiesOldPerson => newPerson
+          case creator                                 => creator
+        }
+        .sortBy(_.name)
       dataset2.provenance.creators shouldBe project.datasets.tail.head.provenance.creators
     }
   }
