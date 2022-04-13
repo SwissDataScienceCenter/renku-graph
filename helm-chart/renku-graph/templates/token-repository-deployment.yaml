@@ -21,12 +21,16 @@ spec:
         app: {{ include "tokenRepository.name" . }}
         release: {{ .Release.Name }}
     spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
         {{- include "certificates.initContainer" . | nindent 8 }}
       containers:
         - name: token-repository
           image: "{{ .Values.tokenRepository.image.repository }}:{{ .Values.tokenRepository.image.tag }}"
           imagePullPolicy: {{ .Values.tokenRepository.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           env:
             - name: RENKU_CLIENT_CERTIFICATE
               valueFrom:

@@ -36,9 +36,9 @@ RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh
 
-ENV GID=90020
+ENV GID=1000
 RUN addgroup -g "$GID" -S tggroup && \
-    adduser --disabled-password -g "$GID" -D -u 9002 tguser && \
+    adduser --disabled-password -g "$GID" -D -u 1000 tguser && \
     chmod 555 -R /opt/triples-generator && \
     chmod 555 -R /entrypoint.sh
 
