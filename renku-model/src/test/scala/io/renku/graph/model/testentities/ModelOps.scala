@@ -214,7 +214,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                 dataset.provenance.topmostDerivedFrom,
                 dataset.provenance.initialVersion,
                 datasets.DateCreated(time.value),
-                dataset.provenance.creators + personEntities.generateOne,
+                (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
                 maybeInvalidationTime = time.some
               )
             ),
@@ -230,7 +230,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                 dataset.provenance.topmostDerivedFrom,
                 dataset.provenance.initialVersion,
                 datasets.DateCreated(time.value),
-                dataset.provenance.creators + personEntities.generateOne,
+                (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
                 maybeInvalidationTime = time.some
               )
             )
@@ -264,7 +264,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
               dataset.provenance.topmostDerivedFrom,
               dataset.provenance.initialVersion,
               datasets.DateCreated(time.value),
-              dataset.provenance.creators + personEntities.generateOne,
+              (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
               maybeInvalidationTime = None
             ),
             parts = dataset.parts.filterNot(_ == part) ::: invalidatedPart :: Nil
@@ -390,32 +390,32 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
   implicit val creatorUsernameUpdaterInternal
       : (persons.Name, Dataset.Provenance.Internal) => Dataset.Provenance.Internal = { case (userName, prov) =>
-    prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
+    prov.copy(creators = (personEntities.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 
   implicit val creatorUsernameUpdaterImportedInternalAncestorInternal
       : (persons.Name,
          Dataset.Provenance.ImportedInternalAncestorInternal
       ) => Dataset.Provenance.ImportedInternalAncestorInternal = { case (userName, prov) =>
-    prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
+    prov.copy(creators = (personEntities.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 
   implicit val creatorUsernameUpdaterImportedInternalAncestorExternal
       : (persons.Name,
          Dataset.Provenance.ImportedInternalAncestorExternal
       ) => Dataset.Provenance.ImportedInternalAncestorExternal = { case (userName, prov) =>
-    prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
+    prov.copy(creators = (personEntities.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 
   implicit val creatorUsernameUpdaterImportedExternal
       : (persons.Name, Dataset.Provenance.ImportedExternal) => Dataset.Provenance.ImportedExternal = {
     case (userName, prov) =>
-      prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
+      prov.copy(creators = (personEntities.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 
   implicit val creatorUsernameUpdaterModified
       : (persons.Name, Dataset.Provenance.Modified) => Dataset.Provenance.Modified = { case (userName, prov) =>
-    prov.copy(creators = prov.creators + personEntities.generateOne.copy(name = userName))
+    prov.copy(creators = (personEntities.generateOne.copy(name = userName) :: prov.creators).sortBy(_.name))
   }
 
   implicit class DatasetPartOps(part: DatasetPart) {

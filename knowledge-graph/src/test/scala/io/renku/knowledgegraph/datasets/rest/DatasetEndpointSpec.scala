@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Decoder._
@@ -196,7 +197,7 @@ class DatasetEndpointSpec
       name             <- cursor.downField("name").as[Name]
       resourceId       <- cursor.downField("url").as[ResourceId]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
-      published        <- cursor.downField("published").as[(Set[DatasetCreator], Option[DatePublished])]
+      published        <- cursor.downField("published").as[(NonEmptyList[DatasetCreator], Option[DatePublished])]
       maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
       parts            <- cursor.downField("hasPart").as[List[model.DatasetPart]]
       project          <- cursor.downField("project").as[DatasetProject]
@@ -221,7 +222,7 @@ class DatasetEndpointSpec
                            sameAs,
                            versions,
                            maybeDescription,
-                           published._1,
+                           published._1.toList,
                            date,
                            parts,
                            project,
@@ -237,7 +238,7 @@ class DatasetEndpointSpec
                         derivedFrom,
                         versions,
                         maybeDescription,
-                        published._1,
+                        published._1.toList,
                         dateCreated,
                         parts,
                         project,
@@ -248,11 +249,18 @@ class DatasetEndpointSpec
       case _ => fail("Cannot decode payload as Dataset")
     }
 
-  private implicit lazy val publishingDecoder: Decoder[(Set[DatasetCreator], Option[DatePublished])] = cursor =>
-    for {
-      maybeDate <- cursor.downField("datePublished").as[Option[DatePublished]]
-      creators  <- cursor.downField("creator").as[List[DatasetCreator]].map(_.toSet)
-    } yield creators -> maybeDate
+  private implicit lazy val publishingDecoder: Decoder[(NonEmptyList[DatasetCreator], Option[DatePublished])] = {
+    cursor =>
+      val failIfNil: List[DatasetCreator] => Either[DecodingFailure, NonEmptyList[DatasetCreator]] = {
+        case Nil          => DecodingFailure("No creators on DS", Nil).asLeft
+        case head :: tail => NonEmptyList.of(head, tail: _*).asRight
+      }
+
+      for {
+        maybeDate <- cursor.downField("datePublished").as[Option[DatePublished]]
+        creators  <- cursor.downField("creator").as[List[DatasetCreator]].flatMap(failIfNil).map(_.sortBy(_.name))
+      } yield creators -> maybeDate
+  }
 
   private implicit lazy val creatorDecoder: Decoder[DatasetCreator] = cursor =>
     for {

@@ -60,7 +60,7 @@ private object DatasetsFinder {
       title:               Title,
       name:                Name,
       maybeDescription:    Option[Description],
-      creators:            Set[DatasetCreator],
+      creators:            List[DatasetCreator],
       date:                Date,
       exemplarProjectPath: projects.Path,
       projectsCount:       ProjectsCount,
@@ -118,9 +118,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
           |""".stripMargin
   }
   private lazy val addCreators: DatasetSearchResult => F[DatasetSearchResult] =
-    dataset =>
-      findCreators(dataset.id)
-        .map(creators => dataset.copy(creators = creators))
+    dataset => findCreators(dataset.id).map(creators => dataset.copy(creators = creators.toList))
 
   private def sparqlQuery(phrase: Phrase, sort: Sort.By, maybeUser: Option[AuthUser]): SparqlQuery = SparqlQuery.of(
     name = "ds free-text search",
@@ -204,7 +202,7 @@ private object DatasetsFinderImpl {
   import DatasetsFinder.ProjectsCount
   import io.circe.Decoder
 
-  implicit val recordDecoder: Decoder[DatasetSearchResult] = { cursor =>
+  implicit val recordsDecoder: Decoder[DatasetSearchResult] = { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     def toListOfImageUrls(urlString: Option[String]): List[ImageUri] =
@@ -251,7 +249,7 @@ private object DatasetsFinderImpl {
                                 title,
                                 name,
                                 maybeDescription,
-                                Set.empty,
+                                List.empty[DatasetCreator],
                                 date,
                                 exemplarProjectPath,
                                 projectsCount,

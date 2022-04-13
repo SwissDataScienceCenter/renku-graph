@@ -312,14 +312,14 @@ object RenkuProject {
 
     private val datasetsLens   = Traversal.fromTraverse[List, Dataset[Provenance]]
     private val provenanceLens = Lens[Dataset[Provenance], Provenance](_.provenance)(p => d => d.copy(provenance = p))
-    private val creatorsLens   = Traversal.fromTraverse[List, Person]
-    private val provCreatorsLens = Lens[Provenance, List[Person]](_.creators.toList) { crts =>
+    private val creatorsLens   = Traversal.fromTraverse[NonEmptyList, Person]
+    private val provCreatorsLens = Lens[Provenance, NonEmptyList[Person]](_.creators) { crts =>
       {
-        case p: Provenance.Internal                         => p.copy(creators = crts.toSet)
-        case p: Provenance.ImportedExternal                 => p.copy(creators = crts.toSet)
-        case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = crts.toSet)
-        case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = crts.toSet)
-        case p: Provenance.Modified                         => p.copy(creators = crts.toSet)
+        case p: Provenance.Internal                         => p.copy(creators = crts.sortBy(_.name))
+        case p: Provenance.ImportedExternal                 => p.copy(creators = crts.sortBy(_.name))
+        case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = crts.sortBy(_.name))
+        case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = crts.sortBy(_.name))
+        case p: Provenance.Modified                         => p.copy(creators = crts.sortBy(_.name))
       }
     }
   }

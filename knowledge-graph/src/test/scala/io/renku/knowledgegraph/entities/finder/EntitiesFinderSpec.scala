@@ -22,6 +22,7 @@ package finder
 import Endpoint._
 import Criteria.Filters._
 import Criteria.{Filters, Sorting}
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sortingDirections
@@ -220,7 +221,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
-            provenanceLens.modify(creatorsLens.modify(_ => Set(dsCreator, personEntities.generateOne)))
+            provenanceLens.modify(creatorsLens.modify(_ => NonEmptyList.of(dsCreator, personEntities.generateOne)))
           )
         )
         .generateOne
@@ -313,7 +314,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person))))
         .unsafeRunSync()
-        .results shouldBe List(person.to[model.Entity.Person]).sortBy(_.name.value)
+        .results shouldBe List(person.to[model.Entity.Person]).sortBy(_.name)
     }
   }
 
@@ -330,7 +331,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             provenanceLens.modify(
-              creatorsLens.modify(_ => Set(personEntities.generateOne, creator))
+              creatorsLens.modify(_ => NonEmptyList.of(personEntities.generateOne, creator))
             )
           )
         )
@@ -360,7 +361,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .addDataset(
           datasetEntities(provenanceNonModified).modify(
             provenanceLens.modify(
-              creatorsLens.modify(_ => Set(personEntities.generateOne, dsCreator))
+              creatorsLens.modify(_ => NonEmptyList.of(personEntities.generateOne, dsCreator))
             )
           )
         )
@@ -624,11 +625,9 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
   "findEntities - with paging" should {
 
     val project = renkuProjectEntities(visibilityPublic)
-      .modify(removeCreator())
-      .modify(removeMembers())
       .withDatasets(
-        datasetEntities(provenanceNonModified).modify(provenanceLens.modify(removeCreators())),
-        datasetEntities(provenanceNonModified).modify(provenanceLens.modify(removeCreators()))
+        datasetEntities(provenanceNonModified),
+        datasetEntities(provenanceNonModified)
       )
       .generateOne
 
@@ -638,11 +637,15 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
 
       val paging = PagingRequest(Page(1), PerPage(3))
 
-      val results = finder.findEntities(Criteria(paging = paging)).unsafeRunSync()
+      val results = finder
+        .findEntities(
+          Criteria(paging = paging, filters = Filters(entityTypes = Set(EntityType.Project, EntityType.Dataset)))
+        )
+        .unsafeRunSync()
 
       results.pagingInfo.pagingRequest shouldBe paging
       results.pagingInfo.total         shouldBe Total(3)
-      results.results                  shouldBe allEntitiesFrom(project).sortBy(_.name.value)
+      results.results shouldBe List(project.to[model.Entity.Project]).addAllDatasetsFrom(project).sortBy(_.name.value)
     }
 
     "return the requested page with info if there are more" in new TestCase {
@@ -652,12 +655,18 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       val paging = PagingRequest(Page(Random.nextInt(3) + 1), PerPage(1))
 
       val results = finder
-        .findEntities(Criteria(paging = paging))
+        .findEntities(
+          Criteria(paging = paging, filters = Filters(entityTypes = Set(EntityType.Project, EntityType.Dataset)))
+        )
         .unsafeRunSync()
 
       results.pagingInfo.pagingRequest shouldBe paging
       results.pagingInfo.total         shouldBe Total(3)
-      results.results shouldBe allEntitiesFrom(project).sortBy(_.name.value).get(paging.page.value - 1).toList
+      results.results shouldBe List(project.to[model.Entity.Project])
+        .addAllDatasetsFrom(project)
+        .sortBy(_.name.value)
+        .get(paging.page.value - 1)
+        .toList
     }
 
     "return no results if non-existing page requested" in new TestCase {
@@ -667,7 +676,9 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       val paging = PagingRequest(Page(4), PerPage(1))
 
       val results = finder
-        .findEntities(Criteria(paging = paging))
+        .findEntities(
+          Criteria(paging = paging, filters = Filters(entityTypes = Set(EntityType.Project, EntityType.Dataset)))
+        )
         .unsafeRunSync()
 
       results.pagingInfo.pagingRequest shouldBe paging

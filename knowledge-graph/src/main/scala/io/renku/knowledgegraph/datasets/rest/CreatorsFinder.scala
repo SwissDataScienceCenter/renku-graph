@@ -19,10 +19,12 @@
 package io.renku.knowledgegraph.datasets.rest
 
 import cats.MonadThrow
+import cats.data.NonEmptyList
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
@@ -32,7 +34,7 @@ import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 private trait CreatorsFinder[F[_]] {
-  def findCreators(identifier: Identifier): F[Set[DatasetCreator]]
+  def findCreators(identifier: Identifier): F[NonEmptyList[DatasetCreator]]
 }
 
 private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
@@ -42,8 +44,10 @@ private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   import CreatorsFinder._
 
-  def findCreators(identifier: Identifier): F[Set[DatasetCreator]] =
-    queryExpecting[List[DatasetCreator]](using = query(identifier)).map(_.toSet)
+  def findCreators(identifier: Identifier): F[NonEmptyList[DatasetCreator]] = {
+    implicit val decoder: Decoder[NonEmptyList[DatasetCreator]] = creatorsDecoder(identifier)
+    queryExpecting[NonEmptyList[DatasetCreator]](using = query(identifier))
+  }
 
   private def query(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - creators",
@@ -71,7 +75,7 @@ private object CreatorsFinder {
 
   import io.circe.Decoder
 
-  private[datasets] implicit val creatorsDecoder: Decoder[List[DatasetCreator]] = {
+  private[datasets] def creatorsDecoder(identifier: Identifier): Decoder[NonEmptyList[DatasetCreator]] = {
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     val creator: Decoder[DatasetCreator] = { cursor =>
@@ -82,6 +86,11 @@ private object CreatorsFinder {
       } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
     }
 
-    _.downField("results").downField("bindings").as(decodeList(creator))
+    def emptyAsFailure: List[DatasetCreator] => Either[DecodingFailure, NonEmptyList[DatasetCreator]] = {
+      case Nil          => DecodingFailure(s"No creators on dataset $identifier", Nil).asLeft
+      case head :: tail => NonEmptyList.of(head, tail: _*).sortBy(_.name).asRight
+    }
+
+    _.downField("results").downField("bindings").as(decodeList(creator)).flatMap(emptyAsFailure).map(_.sortBy(_.name))
   }
 }

@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests.knowledgegraph
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.literal._
@@ -29,11 +30,11 @@ import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
+import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
+import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.testentities.{::~, Dataset, Person}
-import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{projects, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -221,18 +222,18 @@ class DatasetsResourcesSpec
       datasetsSearchResponse.status shouldBe Ok
 
       val Right(foundDatasets) = datasetsSearchResponse.jsonBody.as[List[Json]]
-      foundDatasets.flatMap(sortCreators) should {
+      foundDatasets should {
         contain theSameElementsAs List(
           searchResultJson(dataset1, 1, project1.path, foundDatasets),
           searchResultJson(dataset2, 1, project2.path, foundDatasets),
           searchResultJson(dataset3, 1, project3.path, foundDatasets),
           searchResultJson(dataset4, 2, project4.path, foundDatasets)
-        ).flatMap(sortCreators) or contain theSameElementsAs List(
+        ) or contain theSameElementsAs List(
           searchResultJson(dataset1, 1, project1.path, foundDatasets),
           searchResultJson(dataset2, 1, project2.path, foundDatasets),
           searchResultJson(dataset3, 1, project3.path, foundDatasets),
           searchResultJson(dataset4, 2, project4Fork.path, foundDatasets)
-        ).flatMap(sortCreators)
+        )
       }
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc")
@@ -248,17 +249,15 @@ class DatasetsResourcesSpec
         searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
         searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
         searchResultJson(dataset4, 2, project4.path, foundDatasetsSortedByName)
-      ).flatMap(sortCreators)
-        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+      ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
       val datasetsSortedByNameProj4ForkPath = List(
         searchResultJson(dataset1, 1, project1.path, foundDatasetsSortedByName),
         searchResultJson(dataset2, 1, project2.path, foundDatasetsSortedByName),
         searchResultJson(dataset3, 1, project3.path, foundDatasetsSortedByName),
         searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsSortedByName)
-      ).flatMap(sortCreators)
-        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+      ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
 
-      foundDatasetsSortedByName.flatMap(sortCreators) should {
+      foundDatasetsSortedByName should {
         be(datasetsSortedByNameProj4Path) or be(datasetsSortedByNameProj4ForkPath)
       }
 
@@ -268,9 +267,9 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with the dataset from the requested page")
       val Right(foundDatasetsPage) = searchForPage.jsonBody.as[List[Json]]
-      foundDatasetsPage.flatMap(sortCreators) should {
-        contain theSameElementsAs List(datasetsSortedByNameProj4Path(1)).flatMap(sortCreators) or
-          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath(1)).flatMap(sortCreators)
+      foundDatasetsPage should {
+        contain theSameElementsAs List(datasetsSortedByNameProj4Path(1)) or
+          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath(1))
       }
 
       When("user calls the GET knowledge-graph/datasets?sort=name:asc")
@@ -278,23 +277,21 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with all the datasets")
       val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.jsonBody.as[List[Json]]
-      foundDatasetsWithoutPhrase.flatMap(sortCreators) should {
+      foundDatasetsWithoutPhrase should {
         contain allElementsOf List(
           searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
           searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
           searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
           searchResultJson(dataset4, 2, project4.path, foundDatasetsWithoutPhrase),
           searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
-        ).flatMap(sortCreators)
-          .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found"))) or
+        ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found"))) or
           contain allElementsOf List(
             searchResultJson(dataset1, 1, project1.path, foundDatasetsWithoutPhrase),
             searchResultJson(dataset2, 1, project2.path, foundDatasetsWithoutPhrase),
             searchResultJson(dataset3, 1, project3.path, foundDatasetsWithoutPhrase),
             searchResultJson(dataset4, 2, project4Fork.path, foundDatasetsWithoutPhrase),
             searchResultJson(dataset5WithoutText, 1, project5.path, foundDatasetsWithoutPhrase)
-          ).flatMap(sortCreators)
-            .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
+          ).sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
       }
 
       When("user uses the response header link with the rel='first'")
@@ -303,9 +300,9 @@ class DatasetsResourcesSpec
 
       Then("he should get OK response with the datasets from the first page")
       val foundFirstPage = firstPageResponse.flatMap(_.as[List[Json]]).unsafeRunSync()
-      foundFirstPage.flatMap(sortCreators) should {
-        contain theSameElementsAs List(datasetsSortedByNameProj4Path.head).flatMap(sortCreators) or
-          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath.head).flatMap(sortCreators)
+      foundFirstPage should {
+        contain theSameElementsAs List(datasetsSortedByNameProj4Path.head) or
+          contain theSameElementsAs List(datasetsSortedByNameProj4ForkPath.head)
       }
 
       When("user uses 'details' link of one of the found datasets")
@@ -359,10 +356,10 @@ class DatasetsResourcesSpec
       datasetsSearchResponse.status shouldBe Ok
 
       val Right(foundDatasets) = datasetsSearchResponse.jsonBody.as[List[Json]]
-      foundDatasets.flatMap(sortCreators) should contain theSameElementsAs List(
+      foundDatasets should contain theSameElementsAs List(
         searchResultJson(dataset1, 1, project1.path, foundDatasets),
         searchResultJson(dataset3PrivateWithAccess, 1, project3PrivateWithAccess.path, foundDatasets)
-      ).flatMap(sortCreators)
+      )
     }
 
     def pushToStore(project: testentities.RenkuProject)(implicit accessToken: AccessToken): Project = {
@@ -520,7 +517,7 @@ trait DatasetsResources {
       }
   }
 
-  private implicit def publishedEncoder[P <: Dataset.Provenance]: Encoder[(Set[Person], P#D)] =
+  private implicit def publishedEncoder[P <: Dataset.Provenance]: Encoder[(NonEmptyList[Person], P#D)] =
     Encoder.instance {
       case (creators, DatePublished(date)) => json"""{
           "creator": ${creators.toList},
@@ -556,17 +553,6 @@ trait DatasetsResources {
           }"""
       }: _*)
     }
-
-  def sortCreators(json: Json): Option[Json] = {
-
-    def orderByName(creators: Vector[Json]): Vector[Json] = creators.sortWith { case (json1, json2) =>
-      (json1.hcursor.get[String]("name").toOption -> json2.hcursor.get[String]("name").toOption)
-        .mapN(_ < _)
-        .getOrElse(false)
-    }
-
-    json.hcursor.downField("published").downField("creator").withFocus(_.mapArray(orderByName)).top
-  }
 
   implicit class JsonsOps(jsons: List[Json]) {
 

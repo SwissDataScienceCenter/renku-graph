@@ -242,6 +242,34 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         .cursor
         .as[List[entities.Dataset[entities.Dataset.Provenance]]] shouldBe List(dataset).asRight
     }
+
+    forAll {
+      Table(
+        "DS type"                          -> "ds",
+        "Internal"                         -> datasetEntities(provenanceInternal),
+        "ImportedExternal"                 -> datasetEntities(provenanceImportedExternal),
+        "ImportedInternalAncestorExternal" -> datasetEntities(provenanceImportedInternalAncestorExternal),
+        "ImportedInternalAncestorInternal" -> datasetEntities(provenanceImportedInternalAncestorInternal()),
+        "Modified" -> datasetEntities(provenanceInternal).decoupledFromProject.generateOne.createModification()
+      )
+    } { (dsType, dsGenerator) =>
+      s"fail if no creators - case $dsType DS" in {
+        val dataset = dsGenerator.decoupledFromProject.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+
+        val Left(error) = parse {
+          Json.arr(
+            dataset.asJsonLD.toJson.hcursor
+              .downField((schema / "creator").show)
+              .delete
+              .top
+              .getOrElse(fail("No json after removing creator"))
+          )
+        }.fold(throw _, identity).cursor.as[List[entities.Dataset[entities.Dataset.Provenance]]]
+
+        error            shouldBe a[DecodingFailure]
+        error.getMessage shouldBe s"No creators on dataset with id: ${dataset.identification.identifier}"
+      }
+    }
   }
 
   "from" should {

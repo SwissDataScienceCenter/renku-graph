@@ -91,7 +91,7 @@ private object UpdatesCreator extends UpdatesCreator {
   override def queriesUnlinkingCreators(dataset:      Dataset[Dataset.Provenance],
                                         creatorsInKG: Set[persons.ResourceId]
   ): List[SparqlQuery] = {
-    val dsCreators = dataset.provenance.creators.map(_.resourceId)
+    val dsCreators = dataset.provenance.creators.map(_.resourceId).toList.toSet
     Option
       .when(dsCreators != creatorsInKG) {
         SparqlQuery.of(

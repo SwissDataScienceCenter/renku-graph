@@ -19,7 +19,7 @@
 package io.renku.tinytypes
 
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
+import cats.{MonadThrow, Order, Show}
 import io.circe.Json
 import io.renku.tinytypes.constraints.PathSegment
 
@@ -135,6 +135,8 @@ trait TinyTypeOrdering[TT <: TinyType] {
 
   implicit def ordering(implicit valueOrdering: Ordering[TT#V]): Ordering[TT] =
     Ordering.by(_.value)
+
+  implicit def order(implicit ordering: Ordering[TT]): Order[TT] = Order.fromOrdering
 }
 
 trait Constraints[V] extends TypeName {
