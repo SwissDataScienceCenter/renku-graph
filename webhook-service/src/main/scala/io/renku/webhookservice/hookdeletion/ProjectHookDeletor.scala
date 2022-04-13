@@ -57,7 +57,9 @@ private class ProjectHookDeletorImpl[F[_]: Async: Logger](
   }
 
   def delete(projectId: projects.Id, projectHookId: HookIdAndUrl, accessToken: AccessToken): F[DeletionResult] =
-    gitLabClient.delete(uri"projects" / projectId.show / "hooks" / projectHookId.id.show, "project hooks")(mapResponse)(
+    gitLabClient.delete(uri"projects" / projectId.show / "hooks" / projectHookId.id.show, "delete hook")(
+      mapResponse
+    )(
       accessToken.some
     )
 }

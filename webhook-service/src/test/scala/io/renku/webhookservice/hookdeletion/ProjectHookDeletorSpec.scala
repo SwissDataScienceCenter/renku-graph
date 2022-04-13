@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import eu.timepit.refined.types.all.NonEmptyString
-import io.renku.generators.CommonGraphGenerators.{accessTokens, personalAccessTokens}
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
@@ -53,17 +53,17 @@ class ProjectHookDeletorSpec
   "delete" should {
 
     "return the DeletionResult from GitLabClient" in new TestCase {
-      val personalAccessToken = personalAccessTokens.generateOne
+      val accessToken = accessTokens.generateOne
 
       val result = deletionResults.generateOne
 
       (gitLabClient
         .delete(_: Uri, _: NES)(_: ResponseMappingF[IO, DeletionResult])(_: Option[AccessToken]))
-        .expects(uri, endpointName, *, personalAccessToken.some)
+        .expects(uri, endpointName, *, accessToken.some)
         .returning(result.pure[IO])
 
       hookDeletor
-        .delete(projectId, hookIdAndUrl, personalAccessToken)
+        .delete(projectId, hookIdAndUrl, accessToken)
         .unsafeRunSync() shouldBe result
 
     }
@@ -97,7 +97,7 @@ class ProjectHookDeletorSpec
     val hookIdAndUrl = hookIdAndUrls.generateOne
     val projectId    = projectIds.generateOne
     val uri          = uri"projects" / projectId.show / "hooks" / hookIdAndUrl.id.show
-    val endpointName:    NES            = "project hooks"
+    val endpointName:    NES            = "delete hook"
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
     val gitLabClient = mock[GitLabClient[IO]]

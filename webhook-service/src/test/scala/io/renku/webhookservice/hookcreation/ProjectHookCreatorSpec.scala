@@ -106,7 +106,7 @@ class ProjectHookCreatorSpec
     type NES = String Refined NonEmpty
     val projectHook = projectHooks.generateOne
     val uri         = uri"projects" / projectHook.projectId.show / "hooks"
-    val endpointName: NES = "project hooks"
+    val endpointName: NES = "create hook"
 
     val accessToken: AccessToken = personalAccessTokens.generateOne
 

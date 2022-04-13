@@ -50,7 +50,7 @@ private class ProjectHookCreatorImpl[F[_]: Async: Logger](
 
   def create(projectHook: ProjectHook, accessToken: AccessToken): F[Unit] = {
     val uri = uri"projects" / projectHook.projectId.show / "hooks"
-    gitLabClient.post(uri, "project hooks", payload(projectHook))(mapResponse)(
+    gitLabClient.post(uri, "create hook", payload(projectHook))(mapResponse)(
       Some(accessToken)
     )
   }

@@ -54,25 +54,9 @@ class ProjectInfoFinderSpec
 
   "findProjectInfo" should {
 
-    "return fetched project info if service responds with 200 and a valid body - personal access token case" in new TestCase {
+    "return fetched project info if service responds with 200 and a valid body" in new TestCase {
 
-      implicit override val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
-
-      (gitLabClient
-        .get(_: Uri, _: NES)(_: ResponseMappingF[IO, ProjectInfo])(_: Option[AccessToken]))
-        .expects(uri, endpointName, *, maybeAccessToken)
-        .returning(projectInfo.pure[IO])
-
-      projectInfoFinder.findProjectInfo(projectId).unsafeRunSync() shouldBe ProjectInfo(
-        projectId,
-        projectVisibility,
-        projectPath
-      )
-    }
-
-    "return fetched project info if service responds with 200 and a valid body - oauth token case" in new TestCase {
-
-      implicit override val maybeAccessToken: Option[AccessToken] = oauthAccessTokens.generateSome
+      implicit override val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
 
       (gitLabClient
         .get(_: Uri, _: NES)(_: ResponseMappingF[IO, ProjectInfo])(_: Option[AccessToken]))

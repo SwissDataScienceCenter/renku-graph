@@ -39,6 +39,7 @@ import org.http4s.Method.{GET, _}
 import org.http4s.Status.{Accepted, NotFound, Ok, Unauthorized}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.{Method, Request, Response, Status, Uri}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -65,32 +66,25 @@ class GitLabClientSpec
       client.get(path, endpointName)(mapGetResponse).unsafeRunSync().toString() shouldBe result
     }
 
-    "fetch commits using the given access token" in new TestCase {
+    "use the given access token and call mapResponse" in new TestCase {
+
+      val returnValue = Gen
+        .oneOf(
+          notFound()                                                                        -> List.empty[Json],
+          okJson(result).withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse("")) -> List(result)
+        )
+        .generateOne
+
       implicit val accessToken = accessTokens.generateOne.some
       stubFor {
         callMethod(GET, s"/api/v4/$path")
           .withAccessToken(accessToken)
           .willReturn(
-            okJson(result)
-              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
+            returnValue._1
           )
       }
 
-      client.get(path, endpointName)(mapGetResponse).unsafeRunSync().toString() shouldBe result
-    }
-
-    "Handle empty JSON" in new TestCase {
-      override val result: String = Json.fromString("{}").toString()
-      stubFor {
-        callMethod(GET, s"/api/v4/$path")
-          .willReturn(
-            okJson(result)
-              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
-          )
-      }
-
-      client.get(path, endpointName)(mapGetResponse).unsafeRunSync().toString() shouldBe result
-
+      client.get(path, endpointName)(mapGetResponse).unsafeRunSync().toString() shouldBe returnValue._2
     }
 
     "Handle 404 NOT FOUND without throwing" in new TestCase {
@@ -221,10 +215,10 @@ class GitLabClientSpec
       .fold(throw _, identity)
       .withQueryParams(queryParams)
 
-    implicit lazy val mapGetResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {
-      case (Ok, _, response)    => response.as[Json]
-      case (NotFound, _, _)     => Json.fromString("Not Found").pure[IO]
-      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Json]
+    implicit lazy val mapGetResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[List[String]]] = {
+      case (Ok, _, response)    => response.as[List[String]]
+      case (NotFound, _, _)     => List.empty[String].pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, List[String]]
     }
 
     lazy val mapPostResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {

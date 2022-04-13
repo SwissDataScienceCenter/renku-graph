@@ -47,7 +47,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class ProjectHookFetcherSpec
-  extends AnyWordSpec
+    extends AnyWordSpec
     with MockFactory
     with ExternalServiceStubbing
     with GitLabClientTools[IO]
@@ -56,36 +56,22 @@ class ProjectHookFetcherSpec
 
   "fetchProjectHooks" should {
 
-    "return the list of hooks of the project - personal access token case" in new TestCase {
+    "return the list of hooks of the project" in new TestCase {
 
-      val personalAccessToken = personalAccessTokens.generateOne
       val idAndUrls = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne.toList
 
       (gitLabClient
         .get(_: Uri, _: NES)(_: ResponseMappingF[IO, List[HookIdAndUrl]])(_: Option[AccessToken]))
-        .expects(uri, endpointName, *, Some(personalAccessToken))
+        .expects(uri, endpointName, *, Some(accessToken))
         .returning(IO.pure(idAndUrls))
 
-      fetcher.fetchProjectHooks(projectId, personalAccessToken).unsafeRunSync() shouldBe idAndUrls
-    }
-
-    "return the list of hooks of the project - oauth token case" in new TestCase {
-
-      val oauthAccessToken = oauthAccessTokens.generateOne
-      val idAndUrls = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne.toList
-
-      (gitLabClient
-        .get(_: Uri, _: NES)(_: ResponseMappingF[IO, List[HookIdAndUrl]])(_: Option[AccessToken]))
-        .expects(uri, endpointName, *, Some(oauthAccessToken))
-        .returning(IO.pure(idAndUrls))
-
-      fetcher.fetchProjectHooks(projectId, oauthAccessToken).unsafeRunSync() shouldBe idAndUrls.toList
+      fetcher.fetchProjectHooks(projectId, accessToken).unsafeRunSync() shouldBe idAndUrls
     }
 
     // mapResponse
 
     "return the list of hooks if the response is Ok" in new TestCase {
-      val id = nonNegativeInts().generateOne.value
+      val id  = nonNegativeInts().generateOne.value
       val url = projectHookUrls.generateOne
       mapResponse((Status.Ok, Request(), Response().withEntity(json"""[{"id":$id, "url":${url.value}}]""")))
         .unsafeRunSync() shouldBe List(HookIdAndUrl(id.toString(), url))
@@ -123,21 +109,21 @@ class ProjectHookFetcherSpec
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectId = projectIds.generateOne
-    val uri = uri"projects" / projectId.show / "hooks"
+    val uri       = uri"projects" / projectId.show / "hooks"
     val endpointName: NES = "project hooks"
-    val accessToken = oauthAccessTokens.generateOne
+    val accessToken = accessTokens.generateOne
 
     val gitLabClient = mock[GitLabClient[IO]]
-    val fetcher = new ProjectHookFetcherImpl[IO](gitLabClient)
+    val fetcher      = new ProjectHookFetcherImpl[IO](gitLabClient)
     implicit val idsAndUrlsEncoder: Encoder[HookIdAndUrl] = Encoder.instance { idAndUrl =>
       Json.obj(
-        "id" -> idAndUrl.id.asJson,
+        "id"  -> idAndUrl.id.asJson,
         "url" -> idAndUrl.url.value.asJson
       )
     }
 
     val mapResponse = captureMapping(fetcher, gitLabClient)(_.fetchProjectHooks(projectId, accessToken).unsafeRunSync(),
-      Gen.const(List.empty[HookIdAndUrl])
+                                                            Gen.const(List.empty[HookIdAndUrl])
     )
   }
 }
