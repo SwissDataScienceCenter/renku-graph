@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.datasets
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
@@ -328,7 +329,7 @@ class UpdatesCreatorSpec
     "prepare delete queries for all dataset creators existing in KG but not in the model" in {
       forAll(
         datasetEntities(provenanceNonModified)
-          .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateSet())))
+          .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateNonEmptyList())))
           .decoupledFromProject
       ) { kgDataset =>
         val kgDatasetEntities = kgDataset.to[entities.Dataset[entities.Dataset.Provenance]]
@@ -336,31 +337,33 @@ class UpdatesCreatorSpec
         loadToStore(kgDatasetEntities)
 
         val creators = kgDataset.provenance.creators
-        findCreators(kgDatasetEntities.resourceId) shouldBe creators.map(_.resourceId)
+        findCreators(kgDatasetEntities.resourceId) shouldBe creators.map(_.resourceId).toList.toSet
 
-        val creatorsNotChanged = creators -- Random.shuffle(creators.toList).headOption.toSet
-        val newCreators        = creatorsNotChanged ++ personEntities.generateSet()
+        val someCreator        = Random.shuffle(creators.toList).head
+        val creatorsNotChanged = creators.filterNot(_ == someCreator)
+        val newCreators =
+          NonEmptyList.fromListUnsafe(creatorsNotChanged ::: personEntities.generateNonEmptyList().toList)
         val model = provenanceLens[Dataset.Provenance.NonModified]
           .modify(creatorsLens.modify(_ => newCreators))(kgDataset)
           .to[entities.Dataset[entities.Dataset.Provenance]]
 
         UpdatesCreator
-          .queriesUnlinkingCreators(model, creators.map(_.resourceId))
+          .queriesUnlinkingCreators(model, creators.map(_.resourceId).toList.toSet)
           .runAll
           .unsafeRunSync()
 
-        findCreators(kgDatasetEntities.resourceId) shouldBe creatorsNotChanged.map(_.resourceId)
+        findCreators(kgDatasetEntities.resourceId) shouldBe creatorsNotChanged.map(_.resourceId).toSet
       }
     }
 
     "prepare no queries if there's no change in DS creators" in {
       val ds = datasetEntities(provenanceNonModified)
-        .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateSet())))
+        .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateNonEmptyList())))
         .decoupledFromProject
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      UpdatesCreator.queriesUnlinkingCreators(ds, ds.provenance.creators.map(_.resourceId)) shouldBe Nil
+      UpdatesCreator.queriesUnlinkingCreators(ds, ds.provenance.creators.map(_.resourceId).toList.toSet) shouldBe Nil
     }
   }
 

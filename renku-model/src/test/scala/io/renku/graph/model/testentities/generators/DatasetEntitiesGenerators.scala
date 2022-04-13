@@ -19,6 +19,7 @@
 package io.renku.graph.model.testentities
 package generators
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -102,7 +103,7 @@ trait DatasetEntitiesGenerators {
         original.provenance.topmostDerivedFrom,
         original.provenance.initialVersion,
         date,
-        original.provenance.creators + modifyingPerson,
+        (modifyingPerson :: original.provenance.creators).sortBy(_.name),
         maybeInvalidationTime = None
       ),
       additionalInfo,
@@ -122,8 +123,12 @@ trait DatasetEntitiesGenerators {
     implicit renkuBaseUrl =>
       for {
         date     <- datasetCreatedDates(projectDateCreated.value)
-        creators <- personEntities.toGeneratorOfSet(maxElements = 1)
-      } yield Dataset.Provenance.Internal(Dataset.entityId(identifier), InitialVersion(identifier), date, creators)
+        creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+      } yield Dataset.Provenance.Internal(Dataset.entityId(identifier),
+                                          InitialVersion(identifier),
+                                          date,
+                                          creators.sortBy(_.name)
+      )
 
   val provenanceImportedExternal: ProvenanceGen[Dataset.Provenance.ImportedExternal] =
     provenanceImportedExternal(datasetExternalSameAs)
@@ -135,12 +140,12 @@ trait DatasetEntitiesGenerators {
       for {
         date     <- datasetPublishedDates()
         sameAs   <- sameAsGen
-        creators <- personEntities.toGeneratorOfSet(maxElements = 1)
+        creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
       } yield Dataset.Provenance.ImportedExternal(Dataset.entityId(identifier),
                                                   sameAs,
                                                   InitialVersion(identifier),
                                                   date,
-                                                  creators
+                                                  creators.sortBy(_.name)
       )
 
   val provenanceImportedInternalAncestorExternal: ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorExternal] =
@@ -150,13 +155,13 @@ trait DatasetEntitiesGenerators {
           date           <- datasetPublishedDates()
           sameAs         <- datasetInternalSameAs
           initialVersion <- datasetInitialVersions
-          creators       <- personEntities.toGeneratorOfSet(maxElements = 1)
+          creators       <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorExternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     TopmostSameAs(sameAs),
                                                                     initialVersion,
                                                                     date,
-                                                                    creators
+                                                                    creators.sortBy(_.name)
         )
 
   def provenanceImportedInternalAncestorInternal(
@@ -167,13 +172,13 @@ trait DatasetEntitiesGenerators {
         for {
           date     <- datasetCreatedDates(projectDateCreated.value)
           sameAs   <- sameAsGen
-          creators <- personEntities.toGeneratorOfSet(maxElements = 1)
+          creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     TopmostSameAs(sameAs),
                                                                     InitialVersion(identifier),
                                                                     date,
-                                                                    creators
+                                                                    creators.sortBy(_.name)
         )
 
   def provenanceImportedInternalAncestorInternal(
@@ -184,13 +189,13 @@ trait DatasetEntitiesGenerators {
       implicit renkuBaseUrl =>
         for {
           date     <- datasetCreatedDates(projectDateCreated.value)
-          creators <- personEntities.toGeneratorOfSet(maxElements = 1)
+          creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     topmostSameAs,
                                                                     InitialVersion(identifier),
                                                                     date,
-                                                                    creators
+                                                                    creators.sortBy(_.name)
         )
   val provenanceImportedInternal: ProvenanceGen[Dataset.Provenance.ImportedInternal] = Random.shuffle {
     List(
@@ -269,18 +274,16 @@ trait DatasetEntitiesGenerators {
   implicit def additionalInfoLens[P <: Dataset.Provenance]: Lens[Dataset[P], AdditionalInfo] =
     Lens[Dataset[P], AdditionalInfo](_.additionalInfo)(additionalInfo => ds => ds.copy(additionalInfo = additionalInfo))
 
-  implicit def creatorsLens[P <: Dataset.Provenance]: Lens[P, Set[Person]] =
-    Lens[P, Set[Person]](_.creators) { creators =>
+  implicit def creatorsLens[P <: Dataset.Provenance]: Lens[P, NonEmptyList[Person]] =
+    Lens[P, NonEmptyList[Person]](_.creators) { crts =>
       {
-        case p: Provenance.Internal                         => p.copy(creators = creators).asInstanceOf[P]
-        case p: Provenance.ImportedExternal                 => p.copy(creators = creators).asInstanceOf[P]
-        case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = creators).asInstanceOf[P]
-        case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = creators).asInstanceOf[P]
-        case p: Provenance.Modified                         => p.copy(creators = creators).asInstanceOf[P]
+        case p: Provenance.Internal                         => p.copy(creators = crts.sortBy(_.name)).asInstanceOf[P]
+        case p: Provenance.ImportedExternal                 => p.copy(creators = crts.sortBy(_.name)).asInstanceOf[P]
+        case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = crts.sortBy(_.name)).asInstanceOf[P]
+        case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = crts.sortBy(_.name)).asInstanceOf[P]
+        case p: Provenance.Modified                         => p.copy(creators = crts.sortBy(_.name)).asInstanceOf[P]
       }
     }
-
-  def removeCreators[P <: Dataset.Provenance](): P => P = creatorsLens.modify(_ => Set.empty)
 
   def replaceDSName[P <: Dataset.Provenance](to: datasets.Name): Dataset[P] => Dataset[P] =
     identificationLens[P].modify(_.copy(name = to))

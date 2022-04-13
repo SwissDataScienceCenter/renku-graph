@@ -90,7 +90,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
 
     "return all creators' resourceIds" in new TestCase {
       val dataset = datasetEntities(provenanceNonModified)
-        .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateSet())))
+        .modify(provenanceLens.modify(creatorsLens.modify(_ => personEntities.generateNonEmptyList())))
         .decoupledFromProject
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
@@ -98,23 +98,11 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
       loadToStore(dataset)
 
       kgDatasetInfoFinder.findDatasetCreators(dataset.resourceId).unsafeRunSync() shouldBe
-        dataset.provenance.creators.map(_.resourceId)
+        dataset.provenance.creators.map(_.resourceId).toList.toSet
     }
 
     "return no creators if there's no DS with the given id" in new TestCase {
       kgDatasetInfoFinder.findDatasetCreators(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
-    }
-
-    "return no creators if there are no creators on the DS with the given id" in new TestCase {
-      val dataset = datasetEntities(provenanceNonModified)
-        .modify(provenanceLens.modify(creatorsLens.modify(_ => Set.empty)))
-        .decoupledFromProject
-        .generateOne
-        .to[entities.Dataset[entities.Dataset.Provenance]]
-
-      loadToStore(dataset)
-
-      kgDatasetInfoFinder.findDatasetCreators(dataset.resourceId).unsafeRunSync() shouldBe Set.empty
     }
   }
 

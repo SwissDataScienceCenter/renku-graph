@@ -50,8 +50,8 @@ spec:
             httpGet:
               path: /$/ping
               port: jena
-            initialDelaySeconds: 120
-            periodSeconds: 120
+            initialDelaySeconds: 60
+            periodSeconds: 300
             successThreshold: 1
             failureThreshold: 20
           volumeMounts:

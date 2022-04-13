@@ -185,8 +185,8 @@ class DatasetsSearchEndpointSpec
         }""" addIfDefined "description" -> maybeDescription
     }
 
-    private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
-      Encoder.instance[(Set[DatasetCreator], Date)] {
+    private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] =
+      Encoder.instance[(List[DatasetCreator], Date)] {
         case (creators, DatePublished(date)) => json"""{
           "creator": $creators,
           "datePublished": $date
@@ -234,18 +234,18 @@ class DatasetsSearchEndpointSpec
     id                  <- datasetIdentifiers
     title               <- datasetTitles
     name                <- datasetNames
-    maybeDescription    <- Gen.option(datasetDescriptions)
-    creators            <- nonEmptySet(personEntities, maxElements = 4)
+    maybeDescription    <- datasetDescriptions.toGeneratorOfOptions
+    creators            <- personEntities.toGeneratorOfNonEmptyList(maxElements = 4)
     dates               <- datasetDates
     exemplarProjectPath <- projectPaths
     projectsCount       <- nonNegativeInts() map (_.value) map ProjectsCount.apply
-    keywords            <- listOf(datasetKeywords)
-    images              <- listOf(datasetImageUris)
+    keywords            <- datasetKeywords.toGeneratorOfList()
+    images              <- datasetImageUris.toGeneratorOfList()
   } yield DatasetSearchResult(id,
                               title,
                               name,
                               maybeDescription,
-                              creators.map(_.to[DatasetCreator]),
+                              creators.map(_.to[DatasetCreator]).toList,
                               dates,
                               exemplarProjectPath,
                               projectsCount,

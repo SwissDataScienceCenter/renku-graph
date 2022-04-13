@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.datasets.rest
 
 import cats.MonadThrow
+import cats.data.NonEmptyList
 import cats.effect.{Async, Spawn}
 import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
@@ -43,41 +44,43 @@ private class DatasetFinderImpl[F[_]: Spawn](
   import partsFinder._
   import projectsFinder._
 
-  def findDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] = for {
-    usedInFiber       <- Spawn[F].start(findUsedIn(identifier, authContext))
-    maybeDetailsFiber <- Spawn[F].start(findBaseDetails(identifier, authContext))
-    keywordsFiber     <- Spawn[F].start(findKeywords(identifier))
-    imagesFiber       <- Spawn[F].start(findImages(identifier))
-    creatorsFiber     <- Spawn[F].start(findCreators(identifier))
-    partsFiber        <- Spawn[F].start(findParts(identifier))
-    usedIn <- usedInFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder usedIn fiber canceled")))
-    maybeDetails <-
-      maybeDetailsFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder maybeDetails fiber canceled")))
-    keywords <- keywordsFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder keywords fiber canceled")))
-    imageUrls <- imagesFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder imageUrls fiber canceled")))
-    creators <- creatorsFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder creators fiber canceled")))
-    parts    <- partsFiber.joinWith(MonadThrow[F].raiseError(new Exception("DatasetFinder parts fiber canceled")))
-  } yield maybeDetails map { details =>
-    details.copy(
-      creators = creators,
-      parts = parts,
-      usedIn = usedIn,
-      keywords = keywords,
-      images = imageUrls
-    )
-  }
+  def findDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] =
+    findBaseDetails(identifier, authContext) >>= {
+      case None => Option.empty[Dataset].pure[F]
+      case Some(dataset) =>
+        for {
+          usedInFiber   <- Spawn[F].start(findUsedIn(identifier, authContext))
+          keywordsFiber <- Spawn[F].start(findKeywords(identifier))
+          imagesFiber   <- Spawn[F].start(findImages(identifier))
+          creatorsFiber <- Spawn[F].start(findCreators(identifier))
+          partsFiber    <- Spawn[F].start(findParts(identifier))
+          usedIn   <- usedInFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset usedIn fiber canceled")))
+          keywords <- keywordsFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset keywords fiber canceled")))
+          imageUrls <- imagesFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset imageUrls fiber canceled")))
+          creators <- creatorsFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset creators fiber canceled")))
+          parts    <- partsFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset parts fiber canceled")))
+        } yield dataset
+          .copy(
+            creators = creators,
+            parts = parts,
+            usedIn = usedIn,
+            keywords = keywords,
+            images = imageUrls
+          )
+          .some
+    }
 
   private implicit class DatasetOps(dataset: Dataset) {
-    def copy(creators: Set[DatasetCreator],
+    def copy(creators: NonEmptyList[DatasetCreator],
              parts:    List[DatasetPart],
              usedIn:   List[DatasetProject],
              keywords: List[Keyword],
              images:   List[ImageUri]
     ): Dataset = dataset match {
       case ds: NonModifiedDataset =>
-        ds.copy(creators = creators, parts = parts, usedIn = usedIn, keywords = keywords, images = images)
+        ds.copy(creators = creators.toList, parts = parts, usedIn = usedIn, keywords = keywords, images = images)
       case ds: ModifiedDataset =>
-        ds.copy(creators = creators, parts = parts, usedIn = usedIn, keywords = keywords, images = images)
+        ds.copy(creators = creators.toList, parts = parts, usedIn = usedIn, keywords = keywords, images = images)
     }
   }
 }

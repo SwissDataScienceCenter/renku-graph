@@ -19,11 +19,11 @@
 package io.renku.graph.model.testentities
 
 import Dataset._
-import cats.data.{Validated, ValidatedNel}
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.graph.model._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.testentities.Dataset.Provenance._
-import io.renku.graph.model._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.InstantTinyType
@@ -54,7 +54,7 @@ object Dataset {
     val initialVersion:     InitialVersion
     val topmostDerivedFrom: TopmostDerivedFrom
     val date:               D
-    val creators:           Set[Person]
+    val creators:           NonEmptyList[Person]
   }
 
   object Provenance extends ProvenanceOps {
@@ -63,7 +63,7 @@ object Dataset {
       val entityId:      EntityId
       val topmostSameAs: TopmostSameAs
       val date:          D
-      val creators:      Set[Person]
+      val creators:      NonEmptyList[Person]
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
     }
 
@@ -74,7 +74,7 @@ object Dataset {
     final case class Internal(entityId:       EntityId,
                               initialVersion: InitialVersion,
                               date:           DateCreated,
-                              creators:       Set[Person]
+                              creators:       NonEmptyList[Person]
     ) extends NonModified {
       override type D = DateCreated
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
@@ -84,7 +84,7 @@ object Dataset {
                                       sameAs:         ExternalSameAs,
                                       initialVersion: InitialVersion,
                                       date:           DatePublished,
-                                      creators:       Set[Person]
+                                      creators:       NonEmptyList[Person]
     ) extends NonModified {
       override type D = DatePublished
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(sameAs)
@@ -95,7 +95,7 @@ object Dataset {
                                                       topmostSameAs:  TopmostSameAs,
                                                       initialVersion: InitialVersion,
                                                       date:           DatePublished,
-                                                      creators:       Set[Person]
+                                                      creators:       NonEmptyList[Person]
     ) extends ImportedInternal {
       override type D = DatePublished
     }
@@ -104,7 +104,7 @@ object Dataset {
                                                       topmostSameAs:  TopmostSameAs,
                                                       initialVersion: InitialVersion,
                                                       date:           DateCreated,
-                                                      creators:       Set[Person]
+                                                      creators:       NonEmptyList[Person]
     ) extends ImportedInternal {
       override type D = DateCreated
     }
@@ -114,7 +114,7 @@ object Dataset {
                               topmostDerivedFrom:    TopmostDerivedFrom,
                               initialVersion:        InitialVersion,
                               date:                  DateCreated,
-                              creators:              Set[Person],
+                              creators:              NonEmptyList[Person],
                               maybeInvalidationTime: Option[InvalidationTime]
     ) extends Provenance {
       override type D = DateCreated
@@ -154,7 +154,7 @@ object Dataset {
         entities.Dataset.Provenance.Internal(identification.resourceId,
                                              identification.identifier,
                                              date,
-                                             creators.map(_.to[entities.Person])
+                                             creators.map(_.to[entities.Person]).sortBy(_.name)
         )
       }
 
@@ -166,7 +166,7 @@ object Dataset {
                                                      identification.identifier,
                                                      sameAs,
                                                      date,
-                                                     creators.map(_.to[entities.Person])
+                                                     creators.map(_.to[entities.Person]).sortBy(_.name)
         )
       }
 
@@ -179,7 +179,7 @@ object Dataset {
                                                                      sameAs,
                                                                      topmostSameAs,
                                                                      date,
-                                                                     creators.map(_.to[entities.Person])
+                                                                     creators.map(_.to[entities.Person]).sortBy(_.name)
         )
       }
 
@@ -192,7 +192,7 @@ object Dataset {
                                                                      sameAs,
                                                                      topmostSameAs,
                                                                      date,
-                                                                     creators.map(_.to[entities.Person])
+                                                                     creators.map(_.to[entities.Person]).sortBy(_.name)
         )
       }
 
@@ -206,7 +206,7 @@ object Dataset {
                                                topmostDerivedFrom,
                                                initialVersion,
                                                date,
-                                               creators.map(_.to[entities.Person]),
+                                               creators.map(_.to[entities.Person]).sortBy(_.name),
                                                maybeInvalidationTime
           )
       }
@@ -253,13 +253,9 @@ object Dataset {
                                                       minDate:           InstantTinyType
   ): ValidatedNel[String, Unit] = List(
     validateDateCreated(identifier, provenance, minDate),
-    validateCreators(identifier, provenance.creators),
     validateParts(identifier, provenance, parts),
     validatePublicationEvents(identifier, provenance, publicationEvents, minDate)
   ).sequence.void
-
-  private[Dataset] def validateCreators(identifier: Identifier, creators: Set[Person]): ValidatedNel[String, Unit] =
-    Validated.condNel(creators.nonEmpty, (), s"No creators on dataset with id: $identifier")
 
   private[Dataset] def validateDateCreated[P <: Provenance](identifier: Identifier,
                                                             provenance: P,

@@ -117,18 +117,15 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
   }
   // format: on
 
-  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
-    Encoder.instance {
-      case (creators, DatePublished(date)) =>
-        Json.obj(
-          "datePublished" -> date.asJson,
-          "creator"       -> creators.toList.asJson
-        )
-      case (creators, _) =>
-        Json.obj(
-          "creator" -> creators.toList.asJson
-        )
-    }
+  private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] = Encoder.instance {
+    case (creators, DatePublished(date)) => json"""{
+      "datePublished": $date,
+      "creator"      : $creators
+    }"""
+    case (creators, _) => json"""{
+      "creator": $creators
+    }"""
+  }
 
   // format: off
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] { creator =>

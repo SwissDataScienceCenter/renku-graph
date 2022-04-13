@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated
 
 import cats.MonadThrow
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.graph.model
 import io.renku.graph.model.entities.Dataset.Provenance
@@ -37,7 +38,7 @@ private trait ProjectFunctions {
     project.members ++
       project.maybeCreator ++
       project.activities.map(_.author) ++
-      project.datasets.flatMap(_.provenance.creators) ++
+      project.datasets.flatMap(_.provenance.creators.toList.toSet) ++
       project.activities.flatMap(_.association.agent match {
         case p: Person => Option(p)
         case _ => Option.empty[Person]
@@ -219,14 +220,14 @@ private object ProjectFunctions extends ProjectFunctions {
     })
     val datasetsLens   = Traversal.fromTraverse[List, Dataset[Provenance]]
     val provenanceLens = Lens[Dataset[Provenance], Provenance](_.provenance)(p => d => d.copy(provenance = p))
-    val creatorsLens   = Traversal.fromTraverse[List, Person]
-    val provCreatorsLens = Lens[Provenance, List[Person]](_.creators.toList) { crts =>
+    val creatorsLens   = Traversal.fromTraverse[NonEmptyList, Person]
+    val provCreatorsLens = Lens[Provenance, NonEmptyList[Person]](_.creators) { crts =>
       {
-        case p: Provenance.Internal                         => p.copy(creators = crts.toSet)
-        case p: Provenance.ImportedExternal                 => p.copy(creators = crts.toSet)
-        case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = crts.toSet)
-        case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = crts.toSet)
-        case p: Provenance.Modified                         => p.copy(creators = crts.toSet)
+        case p: Provenance.Internal                         => p.copy(creators = crts.sortBy(_.name))
+        case p: Provenance.ImportedExternal                 => p.copy(creators = crts.sortBy(_.name))
+        case p: Provenance.ImportedInternalAncestorExternal => p.copy(creators = crts.sortBy(_.name))
+        case p: Provenance.ImportedInternalAncestorInternal => p.copy(creators = crts.sortBy(_.name))
+        case p: Provenance.Modified                         => p.copy(creators = crts.sortBy(_.name))
       }
     }
   }

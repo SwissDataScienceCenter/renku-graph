@@ -22,6 +22,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.datasetTopmostDerivedFroms
+import cats.data.NonEmptyList
 import io.renku.graph.model.datasets.TopmostDerivedFrom
 import io.renku.graph.model.testentities.{::~, activityEntities, anyRenkuProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, provenanceInternal, provenanceLens, provenanceNonModified, renkuProjectEntities, renkuProjectWithParentEntities, _}
 import org.scalatest.matchers.should
@@ -46,7 +47,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       ) { project =>
         findAllPersons(project) shouldBe project.members ++
           project.maybeCreator ++
-          project.datasets.flatMap(_.provenance.creators) ++
+          project.datasets.flatMap(_.provenance.creators.toList) ++
           project.activities.map(_.author) ++
           project.activities.flatMap(_.association.agent match {
             case p: entities.Person => List(p)
@@ -141,7 +142,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val project = anyRenkuProjectEntities
         .withDatasets(
           datasetEntities(provenanceNonModified).modify(
-            provenanceLens.modify(creatorsLens.modify(_ => Set(oldPerson, personEntities.generateOne)))
+            provenanceLens.modify(creatorsLens.modify(_ => NonEmptyList.of(oldPerson, personEntities.generateOne)))
           ),
           datasetEntities(provenanceNonModified)
         )
@@ -152,10 +153,12 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val newPerson         = personEntities().generateOne.to[entities.Person]
 
       val dataset1 :: dataset2 :: Nil = update(entitiesOldPerson, newPerson)(project).datasets
-      dataset1.provenance.creators shouldBe project.datasets.head.provenance.creators.map {
-        case creator if creator == entitiesOldPerson => newPerson
-        case creator                                 => creator
-      }
+      dataset1.provenance.creators shouldBe project.datasets.head.provenance.creators
+        .map {
+          case creator if creator == entitiesOldPerson => newPerson
+          case creator                                 => creator
+        }
+        .sortBy(_.name)
       dataset2.provenance.creators shouldBe project.datasets.tail.head.provenance.creators
     }
   }
