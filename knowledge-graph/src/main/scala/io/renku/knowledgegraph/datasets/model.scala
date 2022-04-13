@@ -19,9 +19,9 @@
 package io.renku.knowledgegraph.datasets
 
 import io.renku.graph.model.datasets._
+import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
-import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 
 object model {
 
@@ -31,7 +31,7 @@ object model {
     val title:            Title
     val name:             Name
     val maybeDescription: Option[Description]
-    val creators:         Set[DatasetCreator]
+    val creators:         List[DatasetCreator]
     val date:             Date
     val parts:            List[DatasetPart]
     val project:          DatasetProject
@@ -49,7 +49,7 @@ object model {
                                       sameAs:           SameAs,
                                       versions:         DatasetVersions,
                                       maybeDescription: Option[Description],
-                                      creators:         Set[DatasetCreator],
+                                      creators:         List[DatasetCreator],
                                       date:             Date,
                                       parts:            List[DatasetPart],
                                       project:          DatasetProject,
@@ -65,7 +65,7 @@ object model {
                                    derivedFrom:      DerivedFrom,
                                    versions:         DatasetVersions,
                                    maybeDescription: Option[Description],
-                                   creators:         Set[DatasetCreator],
+                                   creators:         List[DatasetCreator],
                                    date:             DateCreated,
                                    parts:            List[DatasetPart],
                                    project:          DatasetProject,

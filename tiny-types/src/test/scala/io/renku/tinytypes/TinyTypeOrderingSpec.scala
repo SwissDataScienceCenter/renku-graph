@@ -18,6 +18,7 @@
 
 package io.renku.tinytypes
 
+import cats.Order
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.tinytypes.TestTinyTypes.{InstantTestType, IntTestType, StringTestType}
@@ -87,6 +88,42 @@ class TinyTypeOrderingSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
       val uuid2 = uuid.generateOne
 
       implicitly[Ordering[UUIDTinyType]].compare(
+        UUIDTinyType(uuid1),
+        UUIDTinyType(uuid2)
+      ) shouldBe (uuid1.toString compareTo uuid2.toString)
+    }
+  }
+
+  "an implicit instance of Order[TinyType]" should {
+
+    "be available for TinyTypes which values of type having standard Ordering" in {
+      forAll(timestamps, timestamps) { (instant1, instant2) =>
+        implicitly[Order[InstantTestType]].compare(InstantTestType(instant1),
+                                                   InstantTestType(instant2)
+        ) shouldBe (instant1 compareTo instant2)
+      }
+
+      forAll(negativeInts(), negativeInts()) { (value1, value2) =>
+        implicitly[Order[IntTestType]].compare(
+          IntTestType(value1),
+          IntTestType(value2)
+        ) shouldBe (value1 compareTo value2)
+      }
+
+      forAll(nonBlankStrings(), nonBlankStrings()) { (value1, value2) =>
+        implicitly[Order[StringTestType]].compare(
+          StringTestType(value1.value),
+          StringTestType(value2.value)
+        ) shouldBe (value1.value compareTo value2.value)
+      }
+    }
+
+    "be available for TinyTypes requiring custom value Ordering" in {
+
+      val uuid1 = uuid.generateOne
+      val uuid2 = uuid.generateOne
+
+      implicitly[Order[UUIDTinyType]].compare(
         UUIDTinyType(uuid1),
         UUIDTinyType(uuid2)
       ) shouldBe (uuid1.toString compareTo uuid2.toString)

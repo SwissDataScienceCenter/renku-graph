@@ -37,7 +37,7 @@ import io.renku.knowledgegraph.datasets.model.DatasetCreator
 import io.renku.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort.{DateProperty, DatePublishedProperty, ProjectsCountProperty, TitleProperty}
+import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
@@ -922,7 +922,7 @@ class DatasetsFinderSpec
       dataset.identification.title,
       dataset.identification.name,
       dataset.additionalInfo.maybeDescription,
-      dataset.provenance.creators.map(_.to[DatasetCreator]),
+      dataset.provenance.creators.map(_.to[DatasetCreator]).toList.sortBy(_.name),
       dataset.provenance.date,
       project.path,
       ProjectsCount(projectsCount),
@@ -947,7 +947,7 @@ class DatasetsFinderSpec
         dataset.identification.title,
         dataset.identification.name,
         dataset.additionalInfo.maybeDescription,
-        dataset.provenance.creators.map(_.to[DatasetCreator]),
+        dataset.provenance.creators.map(_.to[DatasetCreator]).toList,
         dataset.provenance.date,
         matchProjectFrom
           .find(_.path == matchingResult.exemplarProjectPath)

@@ -18,6 +18,7 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
@@ -44,6 +45,7 @@ import scala.util.Random
 class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "ProjectMember.add" should {
+
     "add the given email to the Project without an email" in {
       val member = projectMembersNoEmail.generateOne
       val email  = personEmails.generateOne
@@ -72,9 +74,10 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           val activity2 =
             activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
           val activity3 = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
-          val dataset1  = datasetWith(Set(creatorAsCliPerson, member3.toCLIPayloadPerson))(info.dateCreated)
-          val dataset2 =
-            datasetWith(Set(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(info.dateCreated)
+          val dataset1  = datasetWith(NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson))(info.dateCreated)
+          val dataset2 = datasetWith(NonEmptyList.of(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(
+            info.dateCreated
+          )
 
           val jsonLD = cliLikeJsonLD(resourceId,
                                      cliVersion,
@@ -105,7 +108,9 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
               schemaVersion,
               (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
                 .sortBy(_.startTime),
-              addTo(dataset1, Set(mergedCreator.some, mergedMember3).flatten) :: dataset2 :: Nil
+              addTo(dataset1,
+                    mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
+              ) :: dataset2 :: Nil
             )
           ).asRight
       }
@@ -127,9 +132,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         val activity2 =
           activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
         val activity3 = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
-        val dataset1  = datasetWith(Set(creatorAsCliPerson, member3.toCLIPayloadPerson))(info.dateCreated)
+        val dataset1  = datasetWith(NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson))(info.dateCreated)
         val dataset2 =
-          datasetWith(Set(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(info.dateCreated)
+          datasetWith(NonEmptyList.of(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(
+            info.dateCreated
+          )
 
         val jsonLD = cliLikeJsonLD(resourceId,
                                    cliVersion,
@@ -160,7 +167,9 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             schemaVersion,
             (activity1.copy(author = mergedMember2) :: activity2 :: replaceAgent(activity3, mergedCreator) :: Nil)
               .sortBy(_.startTime),
-            addTo(dataset1, Set(mergedCreator.some, mergedMember3).flatten) :: dataset2 :: Nil,
+            addTo(dataset1,
+                  mergedMember3.fold(NonEmptyList.of(mergedCreator))(_ :: NonEmptyList.of(mergedCreator))
+            ) :: dataset2 :: Nil,
             projects.ResourceId(info.maybeParentPath.getOrElse(fail("No parent project")))
           )
         ).asRight
@@ -830,29 +839,29 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
   private def datasetWith(
-      creators: Set[entities.Person]
+      creators: NonEmptyList[entities.Person]
   ): projects.DateCreated => entities.Dataset[entities.Dataset.Provenance] = dateCreated => {
     val ds = datasetEntities(provenanceNonModified)(renkuBaseUrl)(dateCreated).generateOne
       .to[entities.Dataset[entities.Dataset.Provenance]]
     ds.copy(provenance = ds.provenance match {
-      case p: entities.Dataset.Provenance.Internal                         => p.copy(creators = creators)
-      case p: entities.Dataset.Provenance.ImportedExternal                 => p.copy(creators = creators)
-      case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal => p.copy(creators = creators)
-      case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal => p.copy(creators = creators)
-      case p: entities.Dataset.Provenance.Modified                         => p.copy(creators = creators)
+      case p: entities.Dataset.Provenance.Internal                         => p.copy(creators = creators.sortBy(_.name))
+      case p: entities.Dataset.Provenance.ImportedExternal                 => p.copy(creators = creators.sortBy(_.name))
+      case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal => p.copy(creators = creators.sortBy(_.name))
+      case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal => p.copy(creators = creators.sortBy(_.name))
+      case p: entities.Dataset.Provenance.Modified                         => p.copy(creators = creators.sortBy(_.name))
     })
   }
 
   private def addTo(
       dataset:  entities.Dataset[entities.Dataset.Provenance],
-      creators: Set[entities.Person]
+      creators: NonEmptyList[entities.Person]
   ): entities.Dataset[entities.Dataset.Provenance] =
     dataset.copy(provenance = dataset.provenance match {
-      case p: entities.Dataset.Provenance.Internal                         => p.copy(creators = creators)
-      case p: entities.Dataset.Provenance.ImportedExternal                 => p.copy(creators = creators)
-      case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal => p.copy(creators = creators)
-      case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal => p.copy(creators = creators)
-      case p: entities.Dataset.Provenance.Modified                         => p.copy(creators = creators)
+      case p: entities.Dataset.Provenance.Internal                         => p.copy(creators = creators.sortBy(_.name))
+      case p: entities.Dataset.Provenance.ImportedExternal                 => p.copy(creators = creators.sortBy(_.name))
+      case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal => p.copy(creators = creators.sortBy(_.name))
+      case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal => p.copy(creators = creators.sortBy(_.name))
+      case p: entities.Dataset.Provenance.Modified                         => p.copy(creators = creators.sortBy(_.name))
     })
 
   private def replaceAgent(activity: entities.Activity, newAgent: entities.Person): entities.Activity =

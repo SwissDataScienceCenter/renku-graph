@@ -129,16 +129,15 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
         .deepMerge(_links(Link(Rel("details") -> DatasetEndpoint.href(renkuResourcesUrl, id))))
   }
 
-  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Date)] =
-    Encoder.instance {
-      case (creators, DatePublished(date)) => json"""{
-        "creator": $creators,
-        "datePublished": $date
-      }"""
-      case (creators, _) => json"""{
-        "creator": $creators
-      }"""
-    }
+  private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] = Encoder.instance {
+    case (creators, DatePublished(date)) => json"""{
+      "creator": $creators,
+      "datePublished": $date
+    }"""
+    case (creators, _) => json"""{
+      "creator": $creators
+    }"""
+  }
 
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
     case DatasetCreator(maybeEmail, name, _) => json"""{

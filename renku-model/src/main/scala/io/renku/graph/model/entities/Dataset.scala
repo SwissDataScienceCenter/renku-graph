@@ -18,7 +18,7 @@
 
 package io.renku.graph.model.entities
 
-import cats.data.ValidatedNel
+import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.datasets._
@@ -134,14 +134,17 @@ object Dataset {
     val initialVersion:     InitialVersion
     val topmostDerivedFrom: TopmostDerivedFrom
     val date:               D
-    val creators:           Set[Person]
+    val creators:           NonEmptyList[Person]
   }
 
   object Provenance {
 
     implicit object Internal
-    final case class Internal(resourceId: ResourceId, identifier: Identifier, date: DateCreated, creators: Set[Person])
-        extends Provenance {
+    final case class Internal(resourceId: ResourceId,
+                              identifier: Identifier,
+                              date:       DateCreated,
+                              creators:   NonEmptyList[Person]
+    ) extends Provenance {
       override type D = DateCreated
       override lazy val initialVersion:     InitialVersion     = InitialVersion(identifier)
       override lazy val topmostSameAs:      TopmostSameAs      = TopmostSameAs(resourceId.asEntityId)
@@ -153,7 +156,7 @@ object Dataset {
                                       identifier: Identifier,
                                       sameAs:     ExternalSameAs,
                                       date:       DatePublished,
-                                      creators:   Set[Person]
+                                      creators:   NonEmptyList[Person]
     ) extends Provenance {
       override type D = DatePublished
       override lazy val initialVersion:     InitialVersion     = InitialVersion(identifier)
@@ -168,7 +171,7 @@ object Dataset {
       val sameAs:        InternalSameAs
       val topmostSameAs: TopmostSameAs
       val date:          D
-      val creators:      Set[Person]
+      val creators:      NonEmptyList[Person]
 
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(resourceId.asEntityId)
       override lazy val initialVersion:     InitialVersion     = InitialVersion(identifier)
@@ -179,7 +182,7 @@ object Dataset {
                                                       sameAs:        InternalSameAs,
                                                       topmostSameAs: TopmostSameAs,
                                                       date:          DatePublished,
-                                                      creators:      Set[Person]
+                                                      creators:      NonEmptyList[Person]
     ) extends ImportedInternal {
       override type D = DatePublished
     }
@@ -189,7 +192,7 @@ object Dataset {
                                                       sameAs:        InternalSameAs,
                                                       topmostSameAs: TopmostSameAs,
                                                       date:          DateCreated,
-                                                      creators:      Set[Person]
+                                                      creators:      NonEmptyList[Person]
     ) extends ImportedInternal {
       override type D = DateCreated
     }
@@ -199,7 +202,7 @@ object Dataset {
                               topmostDerivedFrom:    TopmostDerivedFrom,
                               initialVersion:        InitialVersion,
                               date:                  DateCreated,
-                              creators:              Set[Person],
+                              creators:              NonEmptyList[Person],
                               maybeInvalidationTime: Option[InvalidationTime]
     ) extends Provenance {
       override type D = DateCreated
@@ -218,7 +221,7 @@ object Dataset {
       case provenance @ Internal(_, _, date, creators) =>
         Map(
           schema / "dateCreated"       -> date.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
+          schema / "creator"           -> creators.toList.asJsonLD,
           renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
           renku / "originalIdentifier" -> provenance.initialVersion.asJsonLD
@@ -227,7 +230,7 @@ object Dataset {
         Map(
           schema / "datePublished"     -> date.asJsonLD,
           schema / "sameAs"            -> sameAs.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
+          schema / "creator"           -> creators.toList.asJsonLD,
           renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
           renku / "originalIdentifier" -> provenance.initialVersion.asJsonLD
@@ -236,7 +239,7 @@ object Dataset {
         Map(
           schema / "datePublished"     -> date.asJsonLD,
           schema / "sameAs"            -> sameAs.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
+          schema / "creator"           -> creators.toList.asJsonLD,
           renku / "topmostSameAs"      -> topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
           renku / "originalIdentifier" -> provenance.initialVersion.asJsonLD
@@ -245,7 +248,7 @@ object Dataset {
         Map(
           schema / "dateCreated"       -> date.asJsonLD,
           schema / "sameAs"            -> sameAs.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
+          schema / "creator"           -> creators.toList.asJsonLD,
           renku / "topmostSameAs"      -> topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
           renku / "originalIdentifier" -> provenance.initialVersion.asJsonLD
@@ -261,7 +264,7 @@ object Dataset {
         Map(
           schema / "dateCreated"       -> date.asJsonLD,
           prov / "wasDerivedFrom"      -> derivedFrom.asJsonLD,
-          schema / "creator"           -> creators.asJsonLD,
+          schema / "creator"           -> creators.toList.asJsonLD,
           renku / "topmostSameAs"      -> provenance.topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> topmostDerivedFrom.asJsonLD,
           renku / "originalIdentifier" -> initialVersion.asJsonLD,
@@ -272,8 +275,14 @@ object Dataset {
     private[Dataset] def decoder(identification: Identification): JsonLDDecoder[(Provenance, Option[FixableFailure])] =
       JsonLDDecoder.entity(entityTypes) { cursor =>
         import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
+
+        def failIfNoCreators(creators: List[Person]) = Either.fromOption(
+          NonEmptyList.fromList(creators),
+          DecodingFailure(s"No creators on dataset with id: ${identification.identifier}", Nil)
+        )
+
         for {
-          creators           <- cursor.downField(schema / "creator").as[List[Person]]
+          creators           <- cursor.downField(schema / "creator").as[List[Person]] >>= failIfNoCreators
           maybeDateCreated   <- cursor.downField(schema / "dateCreated").as[Option[DateCreated]]
           maybeDatePublished <- cursor.downField(schema / "datePublished").as[Option[DatePublished]]
           maybeInternalSameAs <- cursor
@@ -290,37 +299,37 @@ object Dataset {
             cursor.downField(prov / "wasDerivedFrom").as[Option[DerivedFrom]](decodeOption(DerivedFrom.jsonLDDecoder))
           maybeOriginalIdentifier <- cursor.downField(renku / "originalIdentifier").as[Option[InitialVersion]]
           maybeInvalidationTime   <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-          provenanceAndFixableFailure <- createProvenance(identification, creators.toSet)(maybeDateCreated,
-                                                                                          maybeDatePublished,
-                                                                                          maybeInternalSameAs,
-                                                                                          maybeExternalSameAs,
-                                                                                          maybeDerivedFrom,
-                                                                                          maybeOriginalIdentifier,
-                                                                                          maybeInvalidationTime
+          provenanceAndFixableFailure <- createProvenance(identification, creators)(maybeDateCreated,
+                                                                                    maybeDatePublished,
+                                                                                    maybeInternalSameAs,
+                                                                                    maybeExternalSameAs,
+                                                                                    maybeDerivedFrom,
+                                                                                    maybeOriginalIdentifier,
+                                                                                    maybeInvalidationTime
                                          )
         } yield provenanceAndFixableFailure
       }
 
-    private def createProvenance(id: Identification, creators: Set[Person]): (Option[DateCreated],
-                                                                              Option[DatePublished],
-                                                                              Option[InternalSameAs],
-                                                                              Option[ExternalSameAs],
-                                                                              Option[DerivedFrom],
-                                                                              Option[InitialVersion],
-                                                                              Option[InvalidationTime]
+    private def createProvenance(id: Identification, creators: NonEmptyList[Person]): (Option[DateCreated],
+                                                                                       Option[DatePublished],
+                                                                                       Option[InternalSameAs],
+                                                                                       Option[ExternalSameAs],
+                                                                                       Option[DerivedFrom],
+                                                                                       Option[InitialVersion],
+                                                                                       Option[InvalidationTime]
     ) => Result[(Provenance, Option[FixableFailure])] = {
       case (Some(dateCreated), None, None, None, None, maybeOriginalId, None)
           if originalIdEqualCurrentId(maybeOriginalId, id) =>
-        (Internal(id.resourceId, id.identifier, dateCreated, creators) -> None).asRight
+        (Internal(id.resourceId, id.identifier, dateCreated, creators.sortBy(_.name)) -> None).asRight
       case (Some(dateCreated), None, None, None, None, Some(_), None) =>
         (Internal(id.resourceId,
                   id.identifier,
                   dateCreated,
-                  creators
+                  creators.sortBy(_.name)
         ) -> FixableFailure.MissingDerivedFrom.some).asRight
       case (None, Some(datePublished), None, Some(sameAs), None, maybeOriginalId, None)
           if originalIdEqualCurrentId(maybeOriginalId, id) =>
-        (ImportedExternal(id.resourceId, id.identifier, sameAs, datePublished, creators) -> None).asRight
+        (ImportedExternal(id.resourceId, id.identifier, sameAs, datePublished, creators.sortBy(_.name)) -> None).asRight
       case (Some(dateCreated), None, Some(sameAs), None, None, maybeOriginalId, None)
           if originalIdEqualCurrentId(maybeOriginalId, id) =>
         (ImportedInternalAncestorInternal(id.resourceId,
@@ -328,7 +337,7 @@ object Dataset {
                                           sameAs,
                                           TopmostSameAs(sameAs),
                                           dateCreated,
-                                          creators
+                                          creators.sortBy(_.name)
         ) -> None).asRight
       case (None, Some(datePublished), Some(sameAs), None, None, maybeOriginalId, None)
           if originalIdEqualCurrentId(maybeOriginalId, id) =>
@@ -337,7 +346,7 @@ object Dataset {
                                           sameAs,
                                           TopmostSameAs(sameAs),
                                           datePublished,
-                                          creators
+                                          creators.sortBy(_.name)
         ) -> None).asRight
       case (Some(dateCreated), None, None, None, Some(derivedFrom), Some(originalId), maybeInvalidationTime) =>
         (Modified(id.resourceId,

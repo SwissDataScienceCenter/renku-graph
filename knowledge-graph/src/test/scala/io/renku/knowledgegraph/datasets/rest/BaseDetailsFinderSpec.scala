@@ -64,7 +64,7 @@ class BaseDetailsFinderSpec
         nonModifiedToResultSet(project, dataset, blankStrings().generateOne)
           .as[List[model.Dataset]](datasetsDecoder) shouldBe List(
           nonModifiedDataset
-            .copy(creators = Set.empty)
+            .copy(creators = List.empty)
             .copy(maybeDescription = None)
             .copy(parts = Nil)
             .copy(usedIn = Nil)
@@ -84,7 +84,7 @@ class BaseDetailsFinderSpec
       ) { case ((_ ::~ dataset, project), description) =>
         modifiedToResultSet(project, dataset, description).as[List[model.Dataset]](datasetsDecoder) shouldBe List(
           modifiedToModified(dataset, project)
-            .copy(creators = Set.empty)
+            .copy(creators = List.empty)
             .copy(maybeDescription = None)
             .copy(parts = Nil)
             .copy(usedIn = Nil)

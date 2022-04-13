@@ -18,7 +18,10 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
+import cats.data.NonEmptyList
+import io.circe.Decoder
 import io.circe.literal._
+import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.blankStrings
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.persons.{Email, Name}
@@ -35,23 +38,22 @@ class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
 
     "decode result-set with a blank affiliation to a DatasetCreator object" in {
       forAll(personEmails, personNames, blankStrings()) { (email, name, affiliation) =>
-        resultSet(email, name, affiliation).as[List[DatasetCreator]] shouldBe Right {
-          List(DatasetCreator(Some(email), name, None))
+        resultSet(email, name, affiliation).as[NonEmptyList[DatasetCreator]] shouldBe Right {
+          NonEmptyList.of(DatasetCreator(Some(email), name, None))
         }
       }
     }
 
     "decode result-set with a non-blank affiliation to a DatasetCreator object" in {
       forAll(personEmails, personNames, personAffiliations) { (email, name, affiliation) =>
-        resultSet(email, name, affiliation.toString).as[List[DatasetCreator]] shouldBe Right {
-          List(DatasetCreator(Some(email), name, Some(affiliation)))
+        resultSet(email, name, affiliation.toString).as[NonEmptyList[DatasetCreator]] shouldBe Right {
+          NonEmptyList.of(DatasetCreator(Some(email), name, Some(affiliation)))
         }
       }
     }
   }
 
-  private def resultSet(email: Email, name: Name, blank: String) = json"""
-  {
+  private def resultSet(email: Email, name: Name, blank: String) = json"""{
     "results": {
       "bindings": [
         {
@@ -62,4 +64,7 @@ class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
       ]
     }
   }"""
+
+  private implicit lazy val decoder: Decoder[NonEmptyList[DatasetCreator]] =
+    creatorsDecoder(datasetIdentifiers.generateOne)
 }
