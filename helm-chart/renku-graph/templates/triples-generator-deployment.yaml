@@ -74,7 +74,7 @@ spec:
               value: {{ .Values.sentry.sentryDsnRenkuPython }}
             - name: SENTRY_GRAPH_DSN
               value: {{ .Values.sentry.dsn }}
-            - name: SENTRY_ENVIRONMENT
+            - name: SENTRY_ENV
               value: {{ .Values.sentry.environment }}
               {{- end }}
             - name: GENERATION_PROCESSES_NUMBER
