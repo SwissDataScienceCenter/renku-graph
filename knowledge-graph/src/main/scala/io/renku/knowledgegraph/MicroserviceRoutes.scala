@@ -40,6 +40,7 @@ import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
+import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
@@ -106,7 +107,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     import Sorting.sort
 
     AuthedRoutes.of {
-      case req @ GET -> Root / "knowledge-graph" / "entities"
+      case req@GET -> Root / "knowledge-graph" / "entities"
         :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators)
         +& visibilities(maybeVisibilities) +& date(maybeDate) +& sort(maybeSort)
         +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
@@ -119,8 +120,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   private lazy val otherAuthRoutes: AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
     case authReq @ POST -> Root / "knowledge-graph" / "graphql" as maybeUser => handleQuery(authReq.req, maybeUser)
     case GET -> "knowledge-graph" /: "projects" /: path as maybeUser => routeToProjectsEndpoints(path, maybeUser)
-    case GET -> "knowledge-graph" /: "projects" /: ProjectId(projectId) /: "resource" /: resourcePath :/ "lineage" =>
-      `GET /lineage`(projectId, resourcePath)
+
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
@@ -193,6 +193,11 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(getProjectDatasets)
         .merge
+    case projectPathParts :+ "files" :+ Location(location) :+ "lineage" =>
+      projectPathParts.toProjectPath
+        .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
+        .semiflatMap(`GET /lineage`(_, location, maybeAuthUser))
+        .merge
     case projectPathParts =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
@@ -201,6 +206,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   }
 
   private implicit class PathPartsOps(parts: List[String]) {
+
     import io.renku.http.InfoMessage
     import io.renku.http.InfoMessage._
     import org.http4s.{Response, Status}

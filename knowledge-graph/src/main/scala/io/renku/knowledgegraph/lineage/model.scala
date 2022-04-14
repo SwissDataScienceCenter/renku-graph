@@ -86,7 +86,10 @@ object model {
     object Type                                  extends TinyTypeFactory[Type](new Type(_)) with NonBlank
 
     final class Location private (val value: String) extends AnyVal with StringTinyType
-    object Location                                  extends TinyTypeFactory[Location](new Location(_))
+    // TODO: add test
+    object Location extends TinyTypeFactory[Location](new Location(_)) {
+      def unapply(value: String): Option[Location] = Location.from(value).toOption
+    }
 
     sealed trait SingleWordType extends Product with Serializable {
       val name: String
