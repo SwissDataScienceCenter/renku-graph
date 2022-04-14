@@ -18,8 +18,12 @@
 
 package io.renku.knowledgegraph.datasets.rest
 
-import io.renku.graph.model.datasets
+import io.renku.graph.model.{datasets, projects}
 
 object DatasetId {
   def unapply(value: String): Option[datasets.Identifier] = datasets.Identifier.from(value).toOption
+}
+
+object ProjectId {
+  def unapply(value: String): Option[projects.Id] = value.toIntOption.flatMap(projects.Id.from(_).toOption)
 }

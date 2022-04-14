@@ -27,7 +27,7 @@ import io.renku.config.GitLab
 import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
-import io.renku.graph.model.persons
+import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
@@ -55,6 +55,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     datasetEndpoint:         DatasetEndpoint[F],
     entitiesEndpoint:        entities.Endpoint[F],
     queryEndpoint:           QueryEndpoint[F],
+    lineageEndpoint:         lineage.Endpoint[F],
     projectEndpoint:         ProjectEndpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
@@ -73,6 +74,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import projectPathAuthorizer.{authorize => authorizePath}
   import queryEndpoint._
   import routesMetrics._
+  import lineageEndpoint._
 
   lazy val routes: Resource[F, HttpRoutes[F]] =
     (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
@@ -117,6 +119,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   private lazy val otherAuthRoutes: AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
     case authReq @ POST -> Root / "knowledge-graph" / "graphql" as maybeUser => handleQuery(authReq.req, maybeUser)
     case GET -> "knowledge-graph" /: "projects" /: path as maybeUser => routeToProjectsEndpoints(path, maybeUser)
+    case GET -> "knowledge-graph" /: "projects" /: ProjectId(projectId) /: "resource" /: resourcePath :/ "lineage" =>
+      `GET /lineage`(projectId, resourcePath)
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
@@ -225,6 +229,7 @@ private object MicroserviceRoutes {
     entitiesEndpoint        <- entities.Endpoint[IO]
     gitLabClient            <- GitLabClient(gitLabThrottler)
     queryEndpoint           <- QueryEndpoint()
+    lineageEndpoint         <- lineage.Endpoint[IO]
     projectEndpoint         <- ProjectEndpoint[IO](gitLabClient)
     projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
     authenticator           <- GitLabAuthenticator(gitLabThrottler)
@@ -236,6 +241,7 @@ private object MicroserviceRoutes {
                                  datasetEndpoint,
                                  entitiesEndpoint,
                                  queryEndpoint,
+                                 lineageEndpoint,
                                  projectEndpoint,
                                  projectDatasetsEndpoint,
                                  authMiddleware,
