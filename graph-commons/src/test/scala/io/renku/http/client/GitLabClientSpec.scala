@@ -43,6 +43,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import eu.timepit.refined.auto._
 
 class GitLabClientSpec
     extends AnyWordSpec
@@ -54,6 +55,8 @@ class GitLabClientSpec
   "get" should {
 
     "fetch json from a given page" in new TestCase {
+
+      override val result = nonEmptyStringsList(10).generateOne
 
       stubFor {
         callMethod(GET, s"/api/v4/$path")
