@@ -30,8 +30,7 @@ RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
 ENV GID=1000
-RUN addgroup -g "$GID" -S cesgroup && \
-    adduser --disabled-password -g "$GID" -D -u 1000 cesuser && \
+RUN adduser --disabled-password -g "$GID" -D -u 1000 cesuser && \
     chmod 555 -R /opt/commit-event-service
 
 USER cesuser

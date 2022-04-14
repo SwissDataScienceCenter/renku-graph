@@ -160,3 +160,4 @@ podSecurityContext:
 
 securityContext:
   allowPrivilegeEscalation: false
+  runAsNonRoot: true
