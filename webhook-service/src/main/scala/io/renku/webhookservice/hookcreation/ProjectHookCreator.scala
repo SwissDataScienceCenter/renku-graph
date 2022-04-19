@@ -21,16 +21,14 @@ package io.renku.webhookservice.hookcreation
 import cats.Applicative
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.GitLabUrl
+import eu.timepit.refined.auto._
 import io.renku.graph.model.projects.Id
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import io.renku.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import io.renku.webhookservice.model.ProjectHookUrl
 import org.http4s.Status
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private trait ProjectHookCreator[F[_]] {
@@ -41,25 +39,21 @@ private trait ProjectHookCreator[F[_]] {
 }
 
 private class ProjectHookCreatorImpl[F[_]: Async: Logger](
-    gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[F, GitLab]
-) extends RestClient(gitLabThrottler)
-    with ProjectHookCreator[F] {
+    gitLabClient: GitLabClient[F]
+) extends ProjectHookCreator[F] {
 
   import cats.effect._
   import io.circe.Json
   import io.renku.http.client.RestClientError.UnauthorizedException
-  import org.http4s.Method.POST
   import org.http4s.Status.{Created, Unauthorized}
-  import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  def create(projectHook: ProjectHook, accessToken: AccessToken): F[Unit] =
-    for {
-      uri <- validateUri(s"$gitLabUrl/api/v4/projects/${projectHook.projectId}/hooks")
-      requestWithPayload = request(POST, uri, accessToken).withEntity(payload(projectHook))
-      result <- send(requestWithPayload)(mapResponse)
-    } yield result
+  def create(projectHook: ProjectHook, accessToken: AccessToken): F[Unit] = {
+    val uri = uri"projects" / projectHook.projectId.show / "hooks"
+    gitLabClient.post(uri, "create hook", payload(projectHook))(mapResponse)(
+      Some(accessToken)
+    )
+  }
 
   private def payload(projectHook: ProjectHook) =
     Json.obj(
@@ -82,8 +76,6 @@ private object ProjectHookCreator {
       serializedHookToken: SerializedHookToken
   )
 
-  def apply[F[_]: Async: Logger](gitLabThrottler: Throttler[F, GitLab]): F[ProjectHookCreator[F]] =
-    for {
-      gitLabUrl <- GitLabUrlLoader[F]()
-    } yield new ProjectHookCreatorImpl(gitLabUrl, gitLabThrottler)
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[ProjectHookCreator[F]] =
+    new ProjectHookCreatorImpl(gitLabClient).pure[F].widen[ProjectHookCreator[F]]
 }

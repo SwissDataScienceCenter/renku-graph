@@ -40,14 +40,12 @@ private class LatestCommitFinderImpl[F[_]: Async: Logger](
 ) extends LatestCommitFinder[F] {
 
   import CommitInfo._
-  import org.http4s.Method.GET
   import org.http4s.Status._
   import org.http4s.{Request, Response}
 
   override def findLatestCommit(projectId: Id)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitInfo]] =
-    gitLabClient.send(GET,
-                      uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
-                      "commits"
+    gitLabClient.get(uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
+                     "commits"
     )(mapResponse(projectId))
 
   private def mapResponse(projectId: Id): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {

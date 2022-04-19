@@ -21,33 +21,26 @@ package io.renku.graph.http.server.security
 import cats.effect.Async
 import cats.effect.kernel.Temporal
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.GitLabApiUrl
-import io.renku.http.client.{AccessToken, RestClient}
+import eu.timepit.refined.auto._
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.security.{Authenticator, EndpointSecurityException}
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 class GitLabAuthenticatorImpl[F[_]: Async: Temporal: Logger](
-    gitLabApiUrl:    GitLabApiUrl,
-    gitLabThrottler: Throttler[F, GitLab]
-) extends RestClient(gitLabThrottler)
-    with Authenticator[F] {
+    gitLabClient: GitLabClient[F]
+) extends Authenticator[F] {
 
   import cats.syntax.all._
   import io.circe._
-  import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def authenticate(accessToken: AccessToken): F[Either[EndpointSecurityException, AuthUser]] = for {
-    uri      <- validateUri(s"$gitLabApiUrl/user")
-    authUser <- send(request(GET, uri, accessToken))(mapResponse(accessToken))
-  } yield authUser
+  override def authenticate(accessToken: AccessToken): F[Either[EndpointSecurityException, AuthUser]] =
+    gitLabClient.get(uri"user", "user")(mapResponse(accessToken))(accessToken.some)
 
   private def mapResponse(
       accessToken: AccessToken
@@ -74,9 +67,6 @@ class GitLabAuthenticatorImpl[F[_]: Async: Temporal: Logger](
 
 object GitLabAuthenticator {
 
-  def apply[F[_]: Async: Temporal: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
-  ): F[Authenticator[F]] = for {
-    gitLabApiUrl <- GitLabUrlLoader[F]().map(_.apiV4)
-  } yield new GitLabAuthenticatorImpl(gitLabApiUrl, gitLabThrottler)
+  def apply[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F]): F[Authenticator[F]] =
+    new GitLabAuthenticatorImpl(gitLabClient).pure[F].widen[Authenticator[F]]
 }

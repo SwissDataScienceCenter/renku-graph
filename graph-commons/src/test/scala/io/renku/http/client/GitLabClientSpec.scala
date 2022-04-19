@@ -24,6 +24,7 @@ import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
+import io.circe.syntax._
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -36,13 +37,14 @@ import io.renku.metrics.GitLabApiCallRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Method.{GET, _}
-import org.http4s.Status.{NotFound, Ok, Unauthorized}
+import org.http4s.Status.{Accepted, NotFound, Ok, Unauthorized}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.{Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import eu.timepit.refined.auto._
 
 class GitLabClientSpec
     extends AnyWordSpec
@@ -51,96 +53,152 @@ class GitLabClientSpec
     with should.Matchers
     with MockFactory {
 
-  "send" should {
+  "get" should {
 
     "fetch json from a given page" in new TestCase {
 
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(
-            okJson(result)
+            okJson(result.asJson.toString())
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
           )
       }
 
-      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
+      client.get(path, endpointName)(mapGetResponse).unsafeRunSync() shouldBe result
     }
 
-    "fetch commits using the given access token" in new TestCase {
+    "use the given access token and call mapResponse" in new TestCase {
+
+      val returnValue = Gen
+        .oneOf(
+          notFound() -> List.empty[Json],
+          okJson(result.asJson.toString()).withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse("")) ->
+            result
+        )
+        .generateOne
+
       implicit val accessToken = accessTokens.generateOne.some
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .withAccessToken(accessToken)
           .willReturn(
-            okJson(result)
-              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
+            returnValue._1
           )
       }
 
-      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
-    }
-
-    "Handle empty JSON" in new TestCase {
-      override val result: String = Json.fromString("{}").toString()
-      stubFor {
-        callMethod(method, s"/api/v4/$path")
-          .willReturn(
-            okJson(result)
-              .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
-          )
-      }
-
-      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe result
-
+      client.get(path, endpointName)(mapGetResponse).unsafeRunSync() shouldBe returnValue._2
     }
 
     "Handle 404 NOT FOUND without throwing" in new TestCase {
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(
             notFound()
           )
       }
 
-      client.send(method, path, endpointName)(mapResponse).unsafeRunSync().toString() shouldBe "\"Not Found\""
+      client.get(path, endpointName)(mapGetResponse).unsafeRunSync() shouldBe List()
 
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(
             unauthorized()
           )
       }
 
       intercept[UnauthorizedException] {
-        client.send(method, path, endpointName)(mapResponse).unsafeRunSync()
+        client.get(path, endpointName)(mapGetResponse).unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(
             badRequest()
           )
       }
 
-      intercept[Exception](client.send(method, path, endpointName)(mapResponse).unsafeRunSync())
+      intercept[Exception](client.get(path, endpointName)(mapGetResponse).unsafeRunSync())
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
       stubFor {
-        callMethod(method, s"/api/v4/$path")
+        callMethod(GET, s"/api/v4/$path")
           .willReturn(okJson("not json"))
       }
 
       intercept[Exception] {
-        client.send(method, path, endpointName)(mapResponse).unsafeRunSync()
+        client.get(path, endpointName)(mapGetResponse).unsafeRunSync()
       }.getMessage should startWith(
-        s"$method $gitLabApiUrl/$path returned 200 OK; error: Malformed message body: Invalid JSON"
+        s"$GET $gitLabApiUrl/$path returned 200 OK; error: Malformed message body: Invalid JSON"
       )
+    }
+  }
+
+  "post" should {
+
+    "send json to the endpoint" in new TestCase {
+
+      val payload = jsons.generateOne
+      stubFor {
+        post(s"/api/v4/$path")
+          .withAccessToken(maybeAccessToken)
+          .withRequestBody(equalToJson(payload.spaces2))
+          .willReturn(aResponse().withStatus(Accepted.code))
+      }
+
+      client.post(path, endpointName, payload)(mapPostResponse).unsafeRunSync() shouldBe ()
+    }
+
+    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+
+      val payload = jsons.generateOne
+
+      stubFor {
+        post(s"/api/v4/$path")
+          .withAccessToken(maybeAccessToken)
+          .withRequestBody(equalToJson(payload.spaces2))
+          .willReturn(
+            unauthorized()
+          )
+      }
+
+      intercept[Exception] {
+        client.post(path, endpointName, payload)(mapPostResponse).unsafeRunSync()
+      } shouldBe UnauthorizedException
+    }
+  }
+
+  "delete" should {
+
+    "send json to the endpoint" in new TestCase {
+
+      stubFor {
+        delete(s"/api/v4/$path")
+          .withAccessToken(maybeAccessToken)
+          .willReturn(aResponse().withStatus(Accepted.code))
+      }
+
+      client.delete(path, endpointName)(mapDeleteResponse).unsafeRunSync() shouldBe ()
+    }
+
+    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+
+      stubFor {
+        delete(s"/api/v4/$path")
+          .willReturn(
+            unauthorized()
+          )
+      }
+
+      intercept[UnauthorizedException] {
+        client.delete(path, endpointName)(mapDeleteResponse).unsafeRunSync()
+      } shouldBe UnauthorizedException
     }
   }
 
@@ -152,7 +210,6 @@ class GitLabClientSpec
     val gitLabApiUrl    = GitLabUrl(externalServiceBaseUrl).apiV4
     val client          = new GitLabClientImpl[IO](gitLabApiUrl, apiCallRecorder, Throttler.noThrottling)
 
-    val method       = Gen.oneOf(GET, PUT, DELETE, POST).generateOne
     val endpointName = nonBlankStrings().generateOne
     val queryParams =
       nonBlankStrings().generateList().map(key => (key.value, nonBlankStrings().generateOne.value)).toMap
@@ -161,15 +218,25 @@ class GitLabClientSpec
       .fold(throw _, identity)
       .withQueryParams(queryParams)
 
-    implicit lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {
-      case (Ok, _, response)    => response.as[Json]
-      case (NotFound, _, _)     => Json.fromString("Not Found").pure[IO]
-      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Json]
+    implicit lazy val mapGetResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[List[String]]] = {
+      case (Ok, _, response)    => response.as[List[String]]
+      case (NotFound, _, _)     => List.empty[String].pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, List[String]]
+    }
+
+    lazy val mapPostResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+      case (Accepted, _, _)     => ().pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Unit]
+    }
+
+    lazy val mapDeleteResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+      case (Accepted, _, _)     => ().pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Unit]
     }
 
     val maybeNextPage = pages.generateOption
 
-    val result = jsons.generateOne.toString()
+    val result = nonEmptyStringsList(5, 10).generateOne
 
   }
 
@@ -179,4 +246,5 @@ class GitLabClientSpec
     case DELETE => delete(uri)
     case POST   => post(uri)
   }
+
 }

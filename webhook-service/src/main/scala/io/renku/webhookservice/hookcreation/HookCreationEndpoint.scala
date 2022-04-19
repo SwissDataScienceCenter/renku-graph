@@ -21,10 +21,9 @@ package io.renku.webhookservice.hookcreation
 import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage._
+import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClientError.UnauthorizedException
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
@@ -76,9 +75,9 @@ class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
 object HookCreationEndpoint {
   def apply[F[_]: Async: Logger: MetricsRegistry](
       projectHookUrl:  ProjectHookUrl,
-      gitLabThrottler: Throttler[F, GitLab],
+      gitLabClient:    GitLabClient[F],
       hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookCreationEndpoint[F]] = for {
-    hookCreator <- hookcreation.HookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto)
+    hookCreator <- hookcreation.HookCreator(projectHookUrl, gitLabClient, hookTokenCrypto)
   } yield new HookCreationEndpointImpl[F](hookCreator)
 }

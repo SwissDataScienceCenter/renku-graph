@@ -54,7 +54,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id, _: Option[AccessToken]))
+        .findProjectInfo(_: Id)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -118,7 +118,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       val exception = exceptions.generateOne
       (projectInfoFinder
-        .findProjectInfo(_: Id, _: Option[AccessToken]))
+        .findProjectInfo(_: Id)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(exception.raiseError[IO, ProjectInfo])
 
@@ -137,7 +137,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id, _: Option[AccessToken]))
+        .findProjectInfo(_: Id)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -162,7 +162,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id, _: Option[AccessToken]))
+        .findProjectInfo(_: Id)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -192,7 +192,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id, _: Option[AccessToken]))
+        .findProjectInfo(_: Id)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 
@@ -227,7 +227,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .returning(HookMissing.pure[IO])
 
       (projectInfoFinder
-        .findProjectInfo(_: Id, _: Option[AccessToken]))
+        .findProjectInfo(_: Id)(_: Option[AccessToken]))
         .expects(projectId, Some(accessToken))
         .returning(projectInfo.pure[IO])
 

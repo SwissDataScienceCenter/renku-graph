@@ -21,8 +21,6 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.projectinfo
 import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
-import org.http4s.{Header, Headers}
-import org.typelevel.ci.CIStringSyntax
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
@@ -45,14 +43,14 @@ import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
-import org.http4s.Method.GET
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.{Header, Headers, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import org.typelevel.ci.CIStringSyntax
 
 import scala.util.Random
 
@@ -75,11 +73,10 @@ class ProjectEventsFinderSpec
       val expectation = (events.map(_.asNormalPushEvent), PagingInfo(None, None))
 
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(
+        .get(_: Uri, _: String Refined NonEmpty)(
           _: ResponseMappingF[IO, (List[PushEvent], PagingInfo)]
         )(_: Option[AccessToken]))
         .expects(
-          GET,
           uri"projects" / project.id.show / "events" withQueryParams Map("action" -> "pushed", "page" -> page.toString),
           endpointName,
           *,

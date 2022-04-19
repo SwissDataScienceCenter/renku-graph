@@ -44,10 +44,9 @@ import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
-import org.http4s.Method.GET
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
-import org.http4s.implicits._
-import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -180,10 +179,10 @@ class ProjectFinderSpec
     ) = {
       val endpointStart = if (endpointName.value == "project") uri"projects" else uri"users"
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(
+        .get(_: Uri, _: String Refined NonEmpty)(
           _: ResponseMappingF[IO, ResultType]
         )(_: Option[AccessToken]))
-        .expects(GET, endpointStart / id, endpointName, *, maybeAccessToken)
+        .expects(endpointStart / id, endpointName, *, maybeAccessToken)
         .returning(returning)
     }
 

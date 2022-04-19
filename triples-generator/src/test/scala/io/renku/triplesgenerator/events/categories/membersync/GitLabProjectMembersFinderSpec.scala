@@ -55,10 +55,9 @@ import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.triplesgenerator.events.categories.membersync.Generators._
-import org.http4s.Method.GET
 import org.http4s.Status.{Forbidden, Unauthorized}
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Header, Headers, Method, Request, Response, Status, Uri}
+import org.http4s.{Header, Headers, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -186,10 +185,10 @@ class GitLabProjectMembersFinderSpec
       }
 
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(
+        .get(_: Uri, _: String Refined NonEmpty)(
           _: ResponseMappingF[IO, (Set[GitLabProjectMember], Option[Int])]
         )(_: Option[AccessToken]))
-        .expects(GET, uri, endpointName, *, maybeAccessTokenOverride)
+        .expects(uri, endpointName, *, maybeAccessTokenOverride)
         .returning(returning.pure[IO])
     }
 
