@@ -24,6 +24,7 @@ import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.MappingBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
+import io.circe.syntax._
 import io.renku.control.Throttler
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -56,25 +57,24 @@ class GitLabClientSpec
 
     "fetch json from a given page" in new TestCase {
 
-      override val result = nonEmptyStringsList(10).generateOne
-
       stubFor {
         callMethod(GET, s"/api/v4/$path")
           .willReturn(
-            okJson(result)
+            okJson(result.asJson.toString())
               .withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse(""))
           )
       }
 
-      client.get(path, endpointName)(mapGetResponse).unsafeRunSync().toString() shouldBe result
+      client.get(path, endpointName)(mapGetResponse).unsafeRunSync() shouldBe result
     }
 
     "use the given access token and call mapResponse" in new TestCase {
 
       val returnValue = Gen
         .oneOf(
-          notFound()                                                                        -> List.empty[Json],
-          okJson(result).withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse("")) -> List(result)
+          notFound() -> List.empty[Json],
+          okJson(result.asJson.toString()).withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse("")) ->
+            result
         )
         .generateOne
 
@@ -87,7 +87,7 @@ class GitLabClientSpec
           )
       }
 
-      client.get(path, endpointName)(mapGetResponse).unsafeRunSync().toString() shouldBe returnValue._2
+      client.get(path, endpointName)(mapGetResponse).unsafeRunSync() shouldBe returnValue._2
     }
 
     "Handle 404 NOT FOUND without throwing" in new TestCase {
@@ -98,7 +98,7 @@ class GitLabClientSpec
           )
       }
 
-      client.get(path, endpointName)(mapGetResponse).unsafeRunSync().toString() shouldBe "\"Not Found\""
+      client.get(path, endpointName)(mapGetResponse).unsafeRunSync() shouldBe List()
 
     }
 
@@ -236,7 +236,7 @@ class GitLabClientSpec
 
     val maybeNextPage = pages.generateOption
 
-    val result = jsons.generateOne.toString()
+    val result = nonEmptyStringsList(5, 10).generateOne
 
   }
 
