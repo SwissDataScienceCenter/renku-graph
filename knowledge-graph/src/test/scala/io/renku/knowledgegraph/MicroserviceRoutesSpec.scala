@@ -542,6 +542,7 @@ class MicroserviceRoutesSpec
     val datasetEndpoint         = mock[DatasetEndpoint[IO]]
     val entitiesEndpoint        = mock[entities.Endpoint[IO]]
     val queryEndpoint           = mock[QueryEndpoint[IO]]
+    val lineageEndpoint         = mock[lineage.Endpoint[IO]]
     val projectEndpoint         = mock[ProjectEndpoint[IO]]
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
     val projectPathAuthorizer   = mock[Authorizer[IO, model.projects.Path]]
@@ -559,6 +560,7 @@ class MicroserviceRoutesSpec
         datasetEndpoint,
         entitiesEndpoint,
         queryEndpoint,
+        lineageEndpoint,
         projectEndpoint,
         projectDatasetsEndpoint,
         middleware,

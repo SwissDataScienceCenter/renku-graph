@@ -164,9 +164,5 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
         }
       }
 
-  private class IOLineageQueryContext(override val lineageFinder: LineageFinder[IO],
-                                      override val maybeUser:     Option[AuthUser]
-  ) extends LineageQueryContext[IO](lineageFinder, maybeUser)
-
   private trait IOQueryRunner extends QueryRunner[IO, LineageQueryContext[IO]]
 }

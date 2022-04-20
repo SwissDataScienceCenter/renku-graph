@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.lineage
 
 import cats.MonadThrow
 import cats.syntax.all._
+import io.circe.generic.JsonCodec
 import io.renku.jsonld.{EntityId, EntityType}
 import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
@@ -61,8 +62,10 @@ object model {
     def getNode(location: Location): Option[Node] = nodes.find(_.location == location)
   }
 
+  @JsonCodec
   final case class Edge(source: Node.Location, target: Node.Location)
 
+  @JsonCodec
   final case class Node(location: Node.Location, label: Node.Label, types: Set[Node.Type])
 
   object Node {

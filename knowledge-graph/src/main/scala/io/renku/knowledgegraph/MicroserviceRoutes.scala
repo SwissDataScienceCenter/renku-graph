@@ -27,7 +27,7 @@ import io.renku.config.GitLab
 import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.persons
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
@@ -69,13 +69,13 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import datasetEndpoint._
   import datasetIdAuthorizer.{authorize => authorizeDatasetId}
   import entitiesEndpoint._
+  import lineageEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
   import projectEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
   import queryEndpoint._
   import routesMetrics._
-  import lineageEndpoint._
 
   lazy val routes: Resource[F, HttpRoutes[F]] =
     (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
