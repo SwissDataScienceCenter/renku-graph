@@ -154,10 +154,11 @@ tolerations: []
 affinity: {}
 
 podSecurityContext:
+  # Please note that the certificates init container needs to run as root
+  allowPrivilegeEscalation: false
+
+securityContext:
   runAsUser: 1000
   runAsGroup: 1000
   fsGroup: 1000
   runAsNonRoot: true
-
-securityContext:
-  allowPrivilegeEscalation: false
