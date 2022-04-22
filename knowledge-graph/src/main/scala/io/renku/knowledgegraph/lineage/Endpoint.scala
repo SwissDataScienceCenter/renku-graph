@@ -30,9 +30,12 @@ private class EndpointImpl[F[_]: Async: Logger](lineageFinder: LineageFinder[F])
   override def `GET /lineage`(projectPath: projects.Path,
                               location:    Location,
                               maybeUser:   Option[AuthUser]
-  ): F[Response[F]] = lineageFinder.find(projectPath, location, maybeUser) flatMap toHttpResult(projectPath,
-                                                                                                location
-  ) recoverWith httpResult
+  ): F[Response[F]] = {
+    println("GET /lineage")
+    lineageFinder.find(projectPath, location, maybeUser) flatMap toHttpResult(projectPath,
+                                                                              location
+    ) recoverWith httpResult
+  }
 
   private def toHttpResult(projectPath: projects.Path, location: Location): Option[Lineage] => F[Response[F]] = {
     case None          => NotFound(InfoMessage(show"No lineage for project: $projectPath file: $location"))

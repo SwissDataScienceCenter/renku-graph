@@ -193,16 +193,33 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(getProjectDatasets)
         .merge
-    case projectPathParts :+ "files" :+ Location(location) :+ "lineage" =>
-      projectPathParts.toProjectPath
-        .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-        .semiflatMap(`GET /lineage`(_, location, maybeAuthUser))
+    case LineageEndpoint(projectPathParts, locationParts) =>
+      (for { // TODO: use some nice monad transformers
+        projectPath <- projectPathParts.toProjectPath
+        location    <- locationParts.toLocation
+      } yield (projectPath, location))
+        .flatTap { case (projectPath, _) => authorizePath(projectPath, maybeAuthUser).leftMap(_.toHttpResponse) }
+        .semiflatMap { case (projectPath, location) => `GET /lineage`(projectPath, location, maybeAuthUser) }
         .merge
+
     case projectPathParts =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(getProject(_, maybeAuthUser))
         .merge
+  }
+
+  object LineageEndpoint {
+    def unapply(segments: List[String]): Option[(List[String], List[String])] =
+      if (segments.contains("lineage") && segments.contains("files")) {
+
+        val indexOfFiles = segments.indexOf("files")
+        val projectPath  = segments.take(indexOfFiles)
+        val location     = segments.drop(indexOfFiles + 1).takeWhile(!_.contains("lineage"))
+        if (projectPath.nonEmpty && location.nonEmpty)
+          Some((projectPath, location))
+        else None
+      } else None
   }
 
   private implicit class PathPartsOps(parts: List[String]) {
@@ -212,7 +229,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     import org.http4s.{Response, Status}
 
     lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
+      println(s"parts: $parts")
       model.projects.Path
+        .from(parts mkString "/")
+        .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
+    }
+
+    lazy val toLocation: EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
+      println(s"parts: $parts")
+      Location
         .from(parts mkString "/")
         .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
     }
