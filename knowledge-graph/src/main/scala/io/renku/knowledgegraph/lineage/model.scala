@@ -20,7 +20,6 @@ package io.renku.knowledgegraph.lineage
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.circe.generic.JsonCodec
 import io.renku.jsonld.{EntityId, EntityType}
 import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
@@ -30,8 +29,11 @@ import java.time.Instant
 object model {
 
   private[lineage] final case class ExecutionInfo(entityId: EntityId, date: RunDate)
-  private[lineage] final class RunDate private (val value: Instant) extends AnyVal with InstantTinyType
-  private[lineage] implicit object RunDate                          extends TinyTypeFactory[RunDate](new RunDate(_))
+
+  private[lineage] trait RunDate extends Any with InstantTinyType
+
+  private[lineage] final case class RunDateImpl(value: Instant) extends AnyVal with RunDate
+  private[lineage] implicit object RunDate                      extends TinyTypeFactory[RunDate](RunDateImpl)
   private[lineage] type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
   private[lineage] type EdgeMapEntry   = (ExecutionInfo, FromAndToNodes)
   private[lineage] type EdgeMap        = Map[ExecutionInfo, FromAndToNodes]
@@ -62,18 +64,19 @@ object model {
     def getNode(location: Location): Option[Node] = nodes.find(_.location == location)
   }
 
-  @JsonCodec
   final case class Edge(source: Node.Location, target: Node.Location)
 
-  @JsonCodec
   final case class Node(location: Node.Location, label: Node.Label, types: Set[Node.Type])
 
   object Node {
     import io.renku.tinytypes.constraints.NonBlank
     import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
-    final class Id private (val value: String) extends AnyVal with StringTinyType
-    object Id extends TinyTypeFactory[Id](new Id(_)) with NonBlank {
+    sealed trait Id extends Any with StringTinyType
+
+    private[lineage] final case class IdImpl(value: String) extends AnyVal with Id
+    object Id extends TinyTypeFactory[Id](IdImpl) with NonBlank {
+
       import io.renku.graph.model.views.RdfResource
       import io.renku.tinytypes.Renderer
 
@@ -82,15 +85,20 @@ object model {
       }
     }
 
-    final class Label private (val value: String) extends AnyVal with StringTinyType
-    object Label                                  extends TinyTypeFactory[Label](new Label(_)) with NonBlank
+    sealed trait Label extends Any with StringTinyType
 
-    final class Type private (val value: String) extends AnyVal with StringTinyType
-    object Type                                  extends TinyTypeFactory[Type](new Type(_)) with NonBlank
+    private[lineage] final case class LabelImpl private (value: String) extends AnyVal with Label
+    object Label extends TinyTypeFactory[Label](LabelImpl) with NonBlank
 
-    final class Location private (val value: String) extends AnyVal with StringTinyType
-    // TODO: add test
-    object Location extends TinyTypeFactory[Location](new Location(_)) {
+    sealed trait Type extends Any with StringTinyType
+
+    private[lineage] final case class TypeImpl private (value: String) extends AnyVal with Type
+    object Type extends TinyTypeFactory[Type](TypeImpl) with NonBlank
+
+    sealed trait Location extends Any with StringTinyType
+
+    private[lineage] final case class LocationImpl private (value: String) extends AnyVal with Location
+    object Location extends TinyTypeFactory[Location](LocationImpl) {
       def unapply(value: String): Option[Location] = Location.from(value).toOption
     }
 

@@ -24,6 +24,7 @@ libraryDependencies += "eu.timepit" %% "refined" % "0.9.27"
 val circeVersion = "0.14.1"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
+libraryDependencies += "io.circe" %% "circe-generic" % circeVersion
 libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 

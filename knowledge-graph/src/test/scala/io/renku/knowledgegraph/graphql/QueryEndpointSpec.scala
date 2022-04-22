@@ -29,7 +29,6 @@ import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.lineage.LineageFinder
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status._
