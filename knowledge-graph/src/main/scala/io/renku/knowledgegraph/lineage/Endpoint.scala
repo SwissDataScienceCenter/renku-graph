@@ -5,18 +5,18 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.generic.semiauto._
+import io.circe.literal.JsonStringContext
 import io.circe.syntax._
+import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.projects
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.http.InfoMessage.infoMessageEntityEncoder
-import io.renku.knowledgegraph.lineage.model.{Edge, Node}
-import io.renku.knowledgegraph.lineage.model.Node.{Label, Type}
-import org.http4s.circe.jsonEncoder
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.lineage.model.Lineage
-import io.renku.knowledgegraph.lineage.model.Node.Location
+import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.knowledgegraph.lineage.model.Node.{Location, Type}
+import io.renku.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.Response
+import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
 
@@ -47,13 +47,32 @@ private class EndpointImpl[F[_]: Async: Logger](lineageFinder: LineageFinder[F])
     Logger[F].error(exception)(errorMessage.value) >> InternalServerError(errorMessage)
   }
 
-  implicit val lineageEncoder:  Encoder[Lineage]  = deriveEncoder
-  implicit val edgeEncoder:     Encoder[Edge]     = deriveEncoder
-  implicit val nodeEncoder:     Encoder[Node]     = deriveEncoder
-  implicit val locationEncoder: Encoder[Location] = deriveEncoder
-  implicit val typeEncoder:     Encoder[Type]     = deriveEncoder
-  implicit val labelEncoder:    Encoder[Label]    = deriveEncoder
+  implicit val lineageEncoder: Encoder[Lineage] = deriveEncoder
+  implicit val edgeEncoder: Encoder[Edge] = Encoder.instance { edge =>
+    json"""{
+          "source": ${edge.source.value},
+          "target": ${edge.target.value}
+          }"""
+  }
+  implicit val nodeEncoder: Encoder[Node] = Encoder.instance { node =>
+    json"""{
+          "id": ${node.location.value},
+          "location": ${node.location.value},
+          "label": ${node.label.value},
+          "type": ${node.singleWordType}
+          }"""
+  }
 
+  private implicit class NodeOps(node: Node) {
+
+    private lazy val FileTypes = Set(Type((prov / "Entity").show))
+
+    lazy val singleWordType: String = node.types match {
+      case types if types contains Type((prov / "Activity").show)   => "ProcessRun"
+      case types if types contains Type((prov / "Collection").show) => "Directory"
+      case FileTypes                                                => "File"
+    }
+  }
 }
 
 object Endpoint {

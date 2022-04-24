@@ -229,7 +229,6 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     import org.http4s.{Response, Status}
 
     lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
-      println(s"parts: $parts")
       model.projects.Path
         .from(parts mkString "/")
         .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
