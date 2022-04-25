@@ -89,7 +89,7 @@ class ProjectInfoFinderSpec
     // mapResponse tests
     "return project info if gitLabClient returns Ok" in new TestCase {
 
-      mapResponse(Status.Ok, Request(), Response().withEntity(projectJson(maybeAccessToken)))
+      mapResponse(Status.Ok, Request(), Response().withEntity(projectJson(accessTokens.generateSome)))
         .unsafeRunSync() shouldBe projectInfo
     }
 
