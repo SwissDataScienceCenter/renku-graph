@@ -361,6 +361,6 @@ object Dataset {
   def entityId(identifier: DatasetIdentifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
     EntityId of (renkuBaseUrl / "datasets" / identifier)
 
-  private def imageEntityId(datasetEntityId: EntityId, position: ImagePosition): UrlfiedEntityId =
+  def imageEntityId(datasetEntityId: EntityId, position: ImagePosition): UrlfiedEntityId =
     datasetEntityId.asUrlEntityId / "images" / position.toString
 }

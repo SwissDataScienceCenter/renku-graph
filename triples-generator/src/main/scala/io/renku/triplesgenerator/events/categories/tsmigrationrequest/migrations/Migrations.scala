@@ -39,11 +39,13 @@ private[tsmigrationrequest] object Migrations {
     malformedActivityIds      <- MalformedActivityIds[F]
     deDuplicatePersonNames    <- DeDuplicatePersonNames[F]
     deDuplicateModifiedDSData <- DeDuplicateModifiedDSData[F]
+    malformedDSImageIds       <- MalformedDSImageIds[F]
     migrations <- validateNames(reProvisioning,
                                 topMostDerivedFrom,
                                 malformedActivityIds,
                                 deDuplicatePersonNames,
-                                deDuplicateModifiedDSData
+                                deDuplicateModifiedDSData,
+                                malformedDSImageIds
                   )
   } yield migrations
 
