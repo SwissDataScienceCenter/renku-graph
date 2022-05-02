@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.statuschange.projectCleaner
+package io.renku.eventlog.events.categories.statuschange
+package projectCleaner
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -27,7 +28,7 @@ import io.renku.graph.webhookservice.WebhookServiceUrl
 import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.EntityDecoder
 import org.http4s.Method.DELETE
-import org.http4s.Status.{Forbidden, NoContent, NotFound, Ok, Unauthorized}
+import org.http4s.Status.{Forbidden, InternalServerError, NoContent, NotFound, Ok, Unauthorized}
 import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
 
@@ -71,8 +72,10 @@ private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](accessToken
 
   private def mapWebhookResponse(project: Project): ResponseMapping[Unit] = {
     case (Ok | NotFound | Unauthorized | Forbidden, _, _) => ().pure[F]
+    case (status @ InternalServerError, _, _) =>
+      Logger[F].warn(show"$categoryName: removing webhook for project: $project got $status")
     case (status, _, _) =>
-      new Exception(show"Removing project webhook failed with status: $status for project: $project")
+      new Exception(show"removing webhook failed with status: $status for project: $project")
         .raiseError[F, Unit]
   }
 
