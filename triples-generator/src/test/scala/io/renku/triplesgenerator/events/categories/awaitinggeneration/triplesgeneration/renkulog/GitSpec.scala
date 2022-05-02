@@ -72,6 +72,7 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
 
     Set[NonBlank](
       "SSL_ERROR_SYSCALL",
+      "OpenSSL SSL_read: Connection reset by peer, errno 104",
       "fetch-pack: unexpected disconnect while reading sideband packet",
       "The requested URL returned error: 502",
       "The requested URL returned error: 503",

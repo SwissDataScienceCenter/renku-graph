@@ -200,6 +200,7 @@ private object Commands {
     )
     private val logWorthyRecoverableErrors = Set(
       "SSL_ERROR_SYSCALL",
+      "OpenSSL SSL_read: Connection reset by peer",
       "unexpected disconnect while reading sideband packet",
       "The requested URL returned error: 502",
       "The requested URL returned error: 503",
