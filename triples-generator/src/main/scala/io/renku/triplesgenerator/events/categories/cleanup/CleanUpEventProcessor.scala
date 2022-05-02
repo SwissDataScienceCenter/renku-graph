@@ -33,12 +33,14 @@ private trait EventProcessor[F[_]] {
 }
 
 private class CleanUpEventProcessorImpl[F[_]: Async: Logger](triplesRemover: ProjectTriplesRemover[F],
-                                                             eventStatusUpdater: EventStatusUpdater[F]
+                                                             statusUpdater: EventStatusUpdater[F]
 ) extends EventProcessor[F] {
+
+  import triplesRemover._
+
   override def process(project: Project): F[Unit] = for {
-    _ <- triplesRemover.removeTriples(of = project.path) recoverWith logErrorAndThrow(project, " failed")
-    _ <-
-      eventStatusUpdater.projectToNew(project) recoverWith logErrorAndThrow(project, ", event log notification failed")
+    _ <- removeTriples(of = project.path) recoverWith logErrorAndThrow(project, " failed")
+    _ <- statusUpdater.projectToNew(project) recoverWith logErrorAndThrow(project, ", event log notification failed")
   } yield ()
 
   private def logErrorAndThrow(project: Project, message: String): PartialFunction[Throwable, F[Unit]] = {
