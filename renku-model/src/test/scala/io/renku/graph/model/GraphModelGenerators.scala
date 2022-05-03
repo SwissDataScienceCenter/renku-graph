@@ -126,7 +126,7 @@ object GraphModelGenerators {
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIdentifiers: Gen[Identifier] = uuid
-    .map(_.toString)
+    .map(_.toString.replace("-", ""))
     .map(Identifier.apply)
 
   implicit val datasetInitialVersions: Gen[InitialVersion] = datasetIdentifiers map (id => InitialVersion(id.toString))
