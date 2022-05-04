@@ -22,9 +22,9 @@ import cats.MonadThrow
 import cats.data.Kleisli
 import cats.syntax.all._
 import io.circe.Json
+import io.renku.config.ServiceVersion
 import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionPayloadComposer}
-import io.renku.http.server.version.ServiceVersion
 import io.renku.microservices.MicroserviceIdentifier
 
 private class PayloadComposer[F[_]: MonadThrow](subscriberUrl: SubscriberUrl,

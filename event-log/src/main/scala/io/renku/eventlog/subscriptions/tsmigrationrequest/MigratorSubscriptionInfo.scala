@@ -20,9 +20,9 @@ package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.Show
 import cats.syntax.all._
+import io.renku.config.ServiceVersion
 import io.renku.eventlog.subscriptions.{Capacity, SubscriptionInfo}
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import io.renku.http.server.version.ServiceVersion
 
 private final case class MigratorSubscriptionInfo(subscriberUrl:     SubscriberUrl,
                                                   subscriberId:      SubscriberId,

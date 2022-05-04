@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.http.server.version
+package io.renku.config
 
 import cats.MonadThrow
 import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.config.ConfigLoader
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}

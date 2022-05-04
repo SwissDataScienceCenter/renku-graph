@@ -18,7 +18,7 @@
 
 package io.renku.eventlog
 
-import io.renku.http.server.version.ServiceVersion
+import io.renku.config.ServiceVersion
 import skunk.codec.all.{text, timestamptz, varchar}
 import skunk.{Decoder, Encoder}
 

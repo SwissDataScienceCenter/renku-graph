@@ -20,6 +20,7 @@ package io.renku.http.server.version
 
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.config.{ServiceName, ServiceVersion}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityEncoder, Response, Status}
 

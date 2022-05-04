@@ -23,12 +23,12 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.config.ServiceVersion
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.Done
 import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers, subscriptions}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits._

@@ -24,7 +24,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.renku.config.certificates.Certificate
 import io.renku.config.sentry.SentryConfig
 import io.renku.config.sentry.SentryConfig.{Dsn, Environment, Service}
-import io.renku.config.{ServiceUrl, renku}
+import io.renku.config.{ServiceUrl, ServiceVersion, renku}
 import io.renku.control.{RateLimit, RateLimitUnit}
 import io.renku.crypto.AesCrypto
 import io.renku.generators.Generators.Implicits._
@@ -42,7 +42,6 @@ import io.renku.http.rest.{Links, SortBy, paging}
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.server.version.ServiceVersion
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}

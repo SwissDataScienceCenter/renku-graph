@@ -22,6 +22,7 @@ import cats.data.EitherT.fromEither
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.config.ServiceVersion
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.events.categories.migrationstatuschange.Event.{ToDone, ToNonRecoverableFailure, ToRecoverableFailure}
@@ -30,7 +31,6 @@ import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 

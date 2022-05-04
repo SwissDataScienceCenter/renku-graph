@@ -22,13 +22,13 @@ import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{Id, MonadThrow}
+import io.renku.config.ServiceVersion
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers, subscriptions}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.codec.all.int8

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.http.server.version
+package io.renku.config
 
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
