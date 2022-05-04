@@ -29,7 +29,7 @@ import io.renku.events.consumers.subscriptions._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info, Warn}
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
@@ -154,8 +154,8 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
 
         eventually {
           logger.loggedOnly(
-            Warn(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
-            Warn(s"$categoryName: $event, subscriber = $otherSubscriber -> $Misdelivered"),
+            Info(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+            Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Misdelivered"),
             Info(s"$categoryName: $event, subscriber = $yetAnotherSubscriber -> $Delivered")
           )
         }
@@ -362,7 +362,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
 
       eventually {
         logger.loggedOnly(
-          Warn(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
           Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
         )
       }
@@ -396,7 +396,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
 
       eventually {
         logger.loggedOnly(
-          Warn(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
           Error(s"$categoryName: $event -> returning an event to the queue failed", backToTheQueueException),
           Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
         )

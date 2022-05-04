@@ -87,7 +87,7 @@ private class EventsDistributorImpl[F[_]: MonadThrow: Temporal: Logger, Category
     case result @ TemporarilyUnavailable =>
       (markBusy(subscriber) recover withNothing) >> (returnToQueue(event, result) recoverWith logError(event))
     case result @ Misdelivered =>
-      Logger[F].warn(show"$categoryName: $event, subscriber = $subscriber -> $result")
+      Logger[F].info(show"$categoryName: $event, subscriber = $subscriber -> $result")
       (delete(subscriber) recover withNothing) >> (returnToQueue(event, result) recoverWith logError(event))
   }
 
