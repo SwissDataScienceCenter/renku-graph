@@ -54,7 +54,7 @@ spec:
               value: {{ .Values.global.graph.jena.dataset }}
               {{- else }}
               value: {{ .Release.Namespace }}
-             {{- end }}
+              {{- end }}
             - name: JENA_BASE_URL
               value: "http://{{ template "jena.fullname" . }}-master:{{ .Values.jena.service.port }}"
             - name: JENA_ADMIN_PASSWORD
