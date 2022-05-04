@@ -42,12 +42,13 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
 
       val sentryConfig = sentryConfigs.generateOne
 
-      sentryInitializer(Some(sentryConfig)).run() shouldBe ().pure[Try]
+      sentryInitializer(sentryConfig.some).run() shouldBe ().pure[Try]
 
       val options = optionsCapture.value
       options.getDsn         shouldBe sentryConfig.baseUrl.value
       options.getServerName  shouldBe sentryConfig.serviceName.value
       options.getEnvironment shouldBe sentryConfig.environmentName.value
+      options.getRelease     shouldBe show"renku-graph@${sentryConfig.serviceVersion}"
     }
 
     "do nothing if no config given" in new TestCase {
@@ -61,7 +62,7 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
       val exception = exceptions.generateOne
       initSentry.expects(*).throwing(exception)
 
-      sentryInitializer(Some(sentryConfig)).run() shouldBe exception.raiseError[Try, Unit]
+      sentryInitializer(sentryConfig.some).run() shouldBe exception.raiseError[Try, Unit]
     }
   }
 

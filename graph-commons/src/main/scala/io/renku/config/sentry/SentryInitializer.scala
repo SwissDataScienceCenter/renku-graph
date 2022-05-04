@@ -22,8 +22,6 @@ import cats.MonadThrow
 import cats.syntax.all._
 import io.sentry.SentryOptions
 
-import scala.util.Try
-
 trait SentryInitializer[F[_]] {
   def run(): F[Unit]
 }
@@ -34,16 +32,17 @@ class SentryInitializerImpl[F[_]: MonadThrow](
 ) extends SentryInitializer[F] {
 
   override def run(): F[Unit] = maybeSentryConfig.map(toSentryOptions) match {
-    case Some(options) => MonadThrow[F].fromTry(Try(initSentry(options)))
+    case Some(options) => MonadThrow[F].catchNonFatal(initSentry(options))
     case _             => MonadThrow[F].unit
   }
 
   private lazy val toSentryOptions: SentryConfig => SentryOptions = {
-    case SentryConfig(baseUrl, environment, service) =>
+    case SentryConfig(baseUrl, environment, serviceName, serviceVersion) =>
       val options = new SentryOptions()
       options.setDsn(baseUrl.value)
-      options.setServerName(service.value)
+      options.setServerName(serviceName.value)
       options.setEnvironment(environment.value)
+      options.setRelease(show"renku-graph@$serviceVersion")
       options
   }
 }
