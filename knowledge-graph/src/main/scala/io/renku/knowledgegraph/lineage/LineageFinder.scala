@@ -45,8 +45,7 @@ class LineageFinderImpl[F[_]: MonadThrow: Logger](
 
   import scala.util.control.NonFatal
 
-  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): F[Option[Lineage]] = {
-    println("find EDGES")
+  def find(projectPath: Path, location: Location, maybeUser: Option[AuthUser]): F[Option[Lineage]] =
     findEdges(projectPath, maybeUser) flatMap {
       case edges if edges.isEmpty => Option.empty[Lineage].pure[F]
       case edges =>
@@ -55,7 +54,6 @@ class LineageFinderImpl[F[_]: MonadThrow: Logger](
           case trimmedEdges                         => findDetailsAndLineage(trimmedEdges, projectPath)
         }
     } recoverWith loggingError(projectPath, location)
-  }
 
   private def findDetailsAndLineage(edges: EdgeMap, projectPath: Path) = for {
     edgesSet         <- edges.toEdgesSet

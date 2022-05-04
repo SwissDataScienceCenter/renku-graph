@@ -194,14 +194,11 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .semiflatMap(getProjectDatasets)
         .merge
     case LineageEndpoint(projectPathParts, locationParts) =>
-      (for { // TODO: use some nice monad transformers
-        projectPath <- projectPathParts.toProjectPath
-        location    <- locationParts.toLocation
-      } yield (projectPath, location))
+      (projectPathParts.toProjectPath -> locationParts.toLocation)
+        .mapN(_ -> _)
         .flatTap { case (projectPath, _) => authorizePath(projectPath, maybeAuthUser).leftMap(_.toHttpResponse) }
         .semiflatMap { case (projectPath, location) => `GET /lineage`(projectPath, location, maybeAuthUser) }
         .merge
-
     case projectPathParts =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
@@ -235,7 +232,6 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     }
 
     lazy val toLocation: EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
-      println(s"parts: $parts")
       Location
         .from(parts mkString "/")
         .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))

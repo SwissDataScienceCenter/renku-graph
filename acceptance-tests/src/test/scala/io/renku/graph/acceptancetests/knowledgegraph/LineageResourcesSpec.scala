@@ -124,8 +124,7 @@ class LineageResourcesSpec
       When("user posts a graphql query to fetch lineage of the project he is not a member of")
       val response =
         knowledgeGraphClient.GET(
-          s"knowledge-graph/projects/${project.path}/files/${privateExemplarData.`grid_plot entity`.location}/lineage",
-          user.accessToken
+          s"knowledge-graph/projects/${project.path}/files/${privateExemplarData.`grid_plot entity`.location}/lineage"
         )
 
       Then("he should get a NotFound response without lineage")
