@@ -20,6 +20,7 @@ package io.renku.http.server.version
 
 import cats.effect.IO
 import io.circe.{Decoder, Json}
+import io.renku.config.{ServiceName, ServiceVersion}
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

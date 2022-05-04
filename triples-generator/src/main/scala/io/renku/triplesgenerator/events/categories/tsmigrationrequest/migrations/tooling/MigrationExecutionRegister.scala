@@ -22,10 +22,10 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
+import io.renku.config.ServiceVersion
 import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.RenkuBaseUrl
 import io.renku.graph.model.Schemas.renku
-import io.renku.http.server.version.ServiceVersion
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.rdfstore.SparqlQuery.Prefixes

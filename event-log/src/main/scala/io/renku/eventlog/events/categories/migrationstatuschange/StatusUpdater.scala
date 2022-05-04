@@ -20,13 +20,13 @@ package io.renku.eventlog.events.categories.migrationstatuschange
 
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.config.ServiceVersion
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.Sent
 import io.renku.eventlog.events.categories.migrationstatuschange.Event.{ToNonRecoverableFailure, ToRecoverableFailure}
 import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
 
 import java.time.Instant

@@ -24,6 +24,7 @@ import Generators._
 import QueryBasedMigration.EventData
 import cats.MonadThrow
 import cats.syntax.all._
+import io.renku.config.ServiceVersion
 import io.renku.events.EventRequestContent
 import io.renku.events.Generators._
 import io.renku.events.producers.EventSender
@@ -32,7 +33,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.projects
-import io.renku.http.server.version.ServiceVersion
 import io.renku.interpreters.TestLogger
 import io.renku.triplesgenerator.generators.ErrorGenerators._
 import org.scalamock.scalatest.MockFactory
