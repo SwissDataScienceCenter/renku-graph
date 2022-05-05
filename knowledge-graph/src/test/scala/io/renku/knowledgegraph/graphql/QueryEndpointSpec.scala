@@ -29,7 +29,6 @@ import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.lineage.LineageFinder
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType._
 import org.http4s.Status._
@@ -163,10 +162,6 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
           override def exceptionHandler = ExceptionHandler.empty
         }
       }
-
-  private class IOLineageQueryContext(override val lineageFinder: LineageFinder[IO],
-                                      override val maybeUser:     Option[AuthUser]
-  ) extends LineageQueryContext[IO](lineageFinder, maybeUser)
 
   private trait IOQueryRunner extends QueryRunner[IO, LineageQueryContext[IO]]
 }
