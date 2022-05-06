@@ -16,21 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.rdfstore
 
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.relativePaths
-import io.renku.knowledgegraph.lineage.model.Node.Location
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import io.circe.Decoder.{Result, decodeList}
+import io.circe.{Decoder, HCursor}
 
-class modelSpec extends AnyWordSpec with should.Matchers {
+trait ResultsDecoding {
 
-  "Location.unapply" should {
-    "correctly extract the arguments" in {
-      val path     = relativePaths().generateOne
-      val location = Location(path)
-      Location.unapply(location) shouldBe Some(path)
-    }
+  protected object ResultsDecoder {
+    def apply[OUT](rowDecoder: Decoder[OUT]): Decoder[List[OUT]] =
+      _.downField("results").downField("bindings").as(decodeList(rowDecoder))
   }
+
+  protected def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
+    cursor.downField(property).downField("value").as[T]
 }

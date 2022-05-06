@@ -50,18 +50,19 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
                      maxRetries,
                      idleTimeoutOverride,
                      requestTimeoutOverride
-    ) {
+    )
+    with ResultsDecoding {
 
   import RdfStoreClientImpl._
+  import eu.timepit.refined.auto._
   import io.renku.http.client.UrlEncoder.urlEncode
   import org.http4s.MediaType.application._
   import org.http4s.Method.POST
   import org.http4s.Status._
+  import org.http4s.circe._
   import org.http4s.headers._
   import org.http4s.{Request, Response, Status}
   import triplesStoreConfig._
-  import org.http4s.circe._
-  import eu.timepit.refined.auto._
 
   protected def updateWithNoResult(using: SparqlQuery): F[Unit] =
     updateWitMapping[Unit](using, toFullResponseMapper(_ => ().pure[F]))

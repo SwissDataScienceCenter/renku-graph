@@ -196,6 +196,8 @@ object datasets {
     }
   }
 
+  object ExternalSameAs extends TinyTypeFactory[ExternalSameAs](new ExternalSameAs(_)) with constraints.Url
+
   implicit object SameAs extends TinyTypeFactory[SameAs](new ExternalSameAs(_)) with constraints.Url {
 
     final def internal(value: RenkuBaseUrl): Either[IllegalArgumentException, InternalSameAs] =
@@ -206,8 +208,10 @@ object datasets {
 
     def apply(datasetEntityId: EntityId): InternalSameAs = new InternalSameAs(datasetEntityId.toString)
 
-    implicit def jsonLdEncoder[S <: SameAs](implicit sameAsEncoder: JsonLDEncoder[S]): JsonLDEncoder[S] =
-      sameAsEncoder
+    implicit lazy val jsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
+      case sameAs @ InternalSameAs(_) => internalSameAsEncoder(sameAs)
+      case sameAs @ ExternalSameAs(_) => externalSameAsEncoder(sameAs)
+    }
 
     private val urlEntityTypes = EntityTypes of (schema / "URL")
 
