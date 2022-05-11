@@ -70,7 +70,7 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
   }
 
   private def collectDSsProjects: F[List[projects.Path]] = {
-    implicit val decoder: Decoder[List[projects.Path]] = ResultsDecoder[projects.Path] { implicit cursor =>
+    implicit val decoder: Decoder[List[projects.Path]] = ListResultsDecoder[projects.Path] { implicit cursor =>
       extract[projects.Path]("path")
     }
 
@@ -92,7 +92,7 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
   }
 
   private def collectDSInfos: Nested[F, List, DSInfo] = Nested {
-    implicit val decoder: Decoder[List[DSInfo]] = ResultsDecoder[DSInfo] { implicit cursor =>
+    implicit val decoder: Decoder[List[DSInfo]] = ListResultsDecoder[DSInfo] { implicit cursor =>
       for {
         id            <- extract[ResourceId]("datasetId")
         topmostSameAs <- extract[TopmostSameAs]("topmostSameAs")
@@ -129,7 +129,7 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
     val (dsId, _, _) = dsInfo
 
     implicit val decoder: Decoder[List[DirectDescendantInfo]] =
-      ResultsDecoder[DirectDescendantInfo] { implicit cursor =>
+      ListResultsDecoder[DirectDescendantInfo] { implicit cursor =>
         for {
           id                  <- extract[ResourceId]("descendantId")
           topmostSameAs       <- extract[TopmostSameAs]("descendantTopmostSameAs")
@@ -280,7 +280,7 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
 
   private def collectDescendantsThroughTopmost(dsInfo: DSInfo): Nested[F, List, DescendantInfo] = Nested {
     implicit val decoder: Decoder[List[DescendantInfo]] =
-      ResultsDecoder[DescendantInfo](implicit cursor =>
+      ListResultsDecoder[DescendantInfo](implicit cursor =>
         (extract[ResourceId]("descendantId") -> extract[SameAs]("descendantSameAs")).mapN(_ -> _)
       )
 
@@ -372,10 +372,12 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
     }.sequence
 
   private def findTopmostSameAsOnDsWith(sameAs: SameAs): F[TopmostSameAs] = {
-    implicit val decoder: Decoder[List[TopmostSameAs]] =
-      ResultsDecoder[TopmostSameAs](implicit cursor => extract[TopmostSameAs]("topmostSameAs"))
+    val decoder: Decoder[TopmostSameAs] = UniqueResultDecoder[TopmostSameAs](
+      onEmpty = show"No topmostSameAs on DS with sameAs $sameAs",
+      onMultiple = show"Multiple topmostSameAs on DS with sameAs $sameAs"
+    )(implicit cursor => extract[TopmostSameAs]("topmostSameAs"))
 
-    queryExpecting[List[TopmostSameAs]] {
+    queryExpecting[TopmostSameAs] {
       SparqlQuery.of(
         name = "find TopmostSameAs by SameAs",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -388,11 +390,7 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
         LIMIT 1
         """
       )
-    } >>= {
-      case Nil         => new Exception(show"No topmostSameAs on DS with sameAs $sameAs").raiseError[F, TopmostSameAs]
-      case head :: Nil => head.pure[F]
-      case _ => new Exception(show"Multiple topmostSameAs on DS with sameAs $sameAs").raiseError[F, TopmostSameAs]
-    }
+    }(decoder)
   }
 
   private implicit class NestedOps[O](nested: Nested[F, List, F[O]]) {

@@ -18,14 +18,33 @@
 
 package io.renku.rdfstore
 
+import cats.syntax.all._
 import io.circe.Decoder.{Result, decodeList}
 import io.circe.{Decoder, HCursor}
 
 trait ResultsDecoding {
 
-  protected object ResultsDecoder {
+  protected object ListResultsDecoder {
     def apply[OUT](rowDecoder: Decoder[OUT]): Decoder[List[OUT]] =
       _.downField("results").downField("bindings").as(decodeList(rowDecoder))
+  }
+
+  protected object OptionalResultDecoder {
+    def apply[OUT](onMultiple: String)(rowDecoder: Decoder[OUT]): Decoder[Option[OUT]] =
+      ListResultsDecoder[OUT](rowDecoder).emap {
+        case Nil           => Option.empty[OUT].asRight
+        case single :: Nil => Option(single).asRight
+        case _             => onMultiple.asLeft
+      }
+  }
+
+  protected object UniqueResultDecoder {
+    def apply[OUT](onEmpty: String, onMultiple: String)(rowDecoder: Decoder[OUT]): Decoder[OUT] =
+      ListResultsDecoder[OUT](rowDecoder).emap {
+        case Nil           => onEmpty.asLeft
+        case single :: Nil => single.asRight
+        case _             => onMultiple.asLeft
+      }
   }
 
   protected def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
