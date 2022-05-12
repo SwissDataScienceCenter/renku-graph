@@ -34,7 +34,7 @@ import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DuplicateDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MultipleDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
 
   // there are three cases:
   // * no derivedFrom, there's topmostSameAs not matching sameAs (topmostSameAs needs to be taken from sameAs's topmostSameAs)
@@ -68,7 +68,7 @@ class DuplicateDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with
         findTopmostSameAs(importedDS1.identification.identifier).size shouldBe 2
         findTopmostSameAs(importedD2.identification.identifier)       shouldBe Set(TopmostSameAs(originalDS.entityId))
 
-        runUpdate(DuplicateDSTopmostSameAs.query).unsafeRunSync() shouldBe ()
+        runUpdate(MultipleDSTopmostSameAs.query).unsafeRunSync() shouldBe ()
 
         findTopmostSameAs(originalDS.identification.identifier)  shouldBe Set(TopmostSameAs(originalDS.entityId))
         findTopmostSameAs(importedDS1.identification.identifier) shouldBe Set(TopmostSameAs(originalDS.entityId))
@@ -81,7 +81,7 @@ class DuplicateDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with
       implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
       implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
       implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
-      DuplicateDSTopmostSameAs[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
+      MultipleDSTopmostSameAs[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }
   }
 

@@ -34,7 +34,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import tooling.UpdateQueryMigration
 
-class DuplicateModifiedDSDataSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MultipleModifiedDSDataSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
 
   "query" should {
 
@@ -107,7 +107,7 @@ class DuplicateModifiedDSDataSpec extends AnyWordSpec with should.Matchers with 
         findTopmostDerivedFrom(project3DS.identification.identifier).size  shouldBe 1
         findTopmostSameAs(project3DS.identification.identifier).size       shouldBe 1
 
-        runUpdate(DuplicateModifiedDSData.query).unsafeRunSync() shouldBe ()
+        runUpdate(MultipleModifiedDSData.query).unsafeRunSync() shouldBe ()
 
         findOriginalIdentifiers(project1DS.identification.identifier) shouldBe Set(project1DS.provenance.initialVersion)
         findTopmostDerivedFrom(project1DS.identification.identifier) shouldBe Set(
@@ -132,7 +132,7 @@ class DuplicateModifiedDSDataSpec extends AnyWordSpec with should.Matchers with 
       implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
       implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
       implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
-      DuplicateModifiedDSData[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
+      MultipleModifiedDSData[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }
   }
 

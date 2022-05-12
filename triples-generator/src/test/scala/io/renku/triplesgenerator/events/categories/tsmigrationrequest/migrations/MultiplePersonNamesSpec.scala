@@ -31,7 +31,7 @@ import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DuplicatePersonNamesSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MultiplePersonNamesSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
 
   "query" should {
 
@@ -44,7 +44,7 @@ class DuplicatePersonNamesSpec extends AnyWordSpec with should.Matchers with IOS
 
       findNames(personDuplicateName.resourceId) shouldBe Set(person.name, personDuplicateName.name)
 
-      runUpdate(DuplicatePersonNames.query).unsafeRunSync() shouldBe ()
+      runUpdate(MultiplePersonNames.query).unsafeRunSync() shouldBe ()
 
       findNames(personDuplicateName.resourceId) should (be(Set(person.name)) or be(Set(personDuplicateName.name)))
       findNames(otherPerson.resourceId)       shouldBe Set(otherPerson.name)
@@ -55,7 +55,7 @@ class DuplicatePersonNamesSpec extends AnyWordSpec with should.Matchers with IOS
     "return an UpdateQueryMigration" in {
       implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
       implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-      DuplicatePersonNames[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
+      MultiplePersonNames[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }
   }
 

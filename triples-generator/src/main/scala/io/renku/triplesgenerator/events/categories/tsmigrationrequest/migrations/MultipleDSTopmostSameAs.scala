@@ -23,49 +23,45 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import tooling.UpdateQueryMigration
 
-private object DuplicateModifiedDSData {
+private object MultipleDSTopmostSameAs {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Duplicate Modified DS data")
+  private lazy val name = Migration.Name("Multiple DS TopmostSameAs only")
   private[migrations] lazy val query = SparqlQuery.of(
     Refined.unsafeApply(name.show),
-    Prefixes.of(schema -> "schema", renku -> "renku"),
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|DELETE { 
-        |  ?dsId renku:originalIdentifier ?original.
-        |  ?dsId renku:topmostDerivedFrom ?topmostDerived.
-        |  ?dsId renku:topmostSameAs ?topmostSameAs.
+        |  ?dsId renku:topmostSameAs ?top.
         |}
         |WHERE {
-        |  SELECT ?dsId ?original ?topmostDerived ?topmostSameAs
+        |  SELECT ?dsId ?top
         |  WHERE {
         |    {
-        |      SELECT DISTINCT ?dsId
+        |      SELECT ?dsId ?orig
         |      WHERE {
         |        ?dsId a schema:Dataset;
-        |              renku:originalIdentifier ?originalIdentifier.
+        |                renku:topmostSameAs ?top;
+        |                schema:sameAs/schema:url ?orig;
+        |                renku:topmostSameAs ?orig.
+        |        FILTER NOT EXISTS { ?dsId prov:wasDerivedFrom ?de }
         |      }
-        |      GROUP BY ?dsId
-        |      HAVING (COUNT(DISTINCT ?originalIdentifier) > 1)
+        |      GROUP BY ?dsId ?orig
+        |      HAVING (COUNT(?top) > 1)
         |    }
-        |    ?dsId schema:identifier ?identifier;
-        |          renku:originalIdentifier ?original;
-        |          renku:topmostDerivedFrom ?topmostDerived.
-        |    OPTIONAL { 
-        |      ?dsId renku:topmostSameAs ?topmostSameAs
-        |      FILTER (!CONTAINS(STR(?topmostSameAs), ?identifier))
-        |    }
-        |    FILTER (?original = ?identifier)
-        |    FILTER (CONTAINS(STR(?topmostDerived), ?identifier))
+        |    ?dsId a schema:Dataset;
+        |          renku:topmostSameAs ?top.
+        |    FILTER ( ?top != ?orig )
         |  }
+        |  ORDER BY ?dsId
         |}
         |""".stripMargin
   )

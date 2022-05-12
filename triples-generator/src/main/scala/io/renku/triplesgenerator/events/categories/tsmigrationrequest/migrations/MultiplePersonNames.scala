@@ -29,12 +29,12 @@ import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
 import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.tooling.UpdateQueryMigration
 import org.typelevel.log4cats.Logger
 
-private object DuplicatePersonNames {
+private object MultiplePersonNames {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Duplicate Person Names")
+  private lazy val name = Migration.Name("Multiple Person Names")
   private[migrations] lazy val query = SparqlQuery.of(
     Refined.unsafeApply(name.show),
     Prefixes of schema -> "schema",
