@@ -49,5 +49,6 @@ class PositiveIntSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 }
 
 private class PositiveIntTest private (val value: Int) extends AnyVal with IntTinyType
-
-private object PositiveIntTest extends TinyTypeFactory[PositiveIntTest](new PositiveIntTest(_)) with PositiveInt
+private object PositiveIntTest
+    extends TinyTypeFactory[PositiveIntTest](new PositiveIntTest(_))
+    with PositiveInt[PositiveIntTest]

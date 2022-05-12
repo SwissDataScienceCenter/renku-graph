@@ -24,7 +24,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string
 import io.circe._
 import io.circe.syntax._
-import io.renku.graph.model.views.{EntityIdJsonLdOps, RdfResource, TinyTypeJsonLDOps}
+import io.renku.graph.model.views._
 import io.renku.jsonld.JsonLDDecoder.{decodeEntityId, decodeString}
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld._
@@ -39,15 +39,9 @@ object datasets {
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with UrlConstraint
-      with EntityIdJsonLdOps[ResourceId] {
-
-    import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
-
-    implicit object RdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
-      override def render(id: ResourceId): String = s"<${sparqlEncode(id.show)}>"
-    }
-  }
+      with UrlConstraint[ResourceId]
+      with EntityIdJsonLdOps[ResourceId]
+      with AnyResourceRenderer[ResourceId]
 
   sealed trait DatasetIdentifier extends Any with StringTinyType
 
@@ -61,46 +55,55 @@ object datasets {
       extends TinyTypeFactory[Identifier](new Identifier(_))
       with DatasetIdentifierFactory[Identifier]
       with TinyTypeJsonLDOps[Identifier]
-      with NonBlank
+      with NonBlank[Identifier]
 
   final class InitialVersion private (val value: String) extends AnyVal with DatasetIdentifier
   implicit object InitialVersion
       extends TinyTypeFactory[InitialVersion](new InitialVersion(_))
       with DatasetIdentifierFactory[InitialVersion]
       with TinyTypeJsonLDOps[InitialVersion]
-      with NonBlank
+      with NonBlank[InitialVersion]
 
   final class Title private (val value: String) extends AnyVal with StringTinyType
-  implicit object Title extends TinyTypeFactory[Title](new Title(_)) with NonBlank with TinyTypeJsonLDOps[Title]
+  implicit object Title extends TinyTypeFactory[Title](new Title(_)) with NonBlank[Title] with TinyTypeJsonLDOps[Title]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
-      with NonBlank
+      with NonBlank[Description]
       with TinyTypeJsonLDOps[Description]
 
   final class License private (val value: String) extends AnyVal with StringTinyType
-  implicit object License extends TinyTypeFactory[License](new License(_)) with NonBlank with TinyTypeJsonLDOps[License]
+  implicit object License
+      extends TinyTypeFactory[License](new License(_))
+      with NonBlank[License]
+      with TinyTypeJsonLDOps[License]
 
   final class Version private (val value: String) extends AnyVal with StringTinyType
-  implicit object Version extends TinyTypeFactory[Version](new Version(_)) with NonBlank with TinyTypeJsonLDOps[Version]
+  implicit object Version
+      extends TinyTypeFactory[Version](new Version(_))
+      with NonBlank[Version]
+      with TinyTypeJsonLDOps[Version]
 
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
-  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank with TinyTypeJsonLDOps[Keyword]
+  implicit object Keyword
+      extends TinyTypeFactory[Keyword](new Keyword(_))
+      with NonBlank[Keyword]
+      with TinyTypeJsonLDOps[Keyword]
 
   class ImageResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ImageResourceId
       extends TinyTypeFactory[ImageResourceId](new ImageResourceId(_))
-      with UrlConstraint
+      with UrlConstraint[ImageResourceId]
       with EntityIdJsonLdOps[ImageResourceId]
 
   final class ImagePosition private (val value: Int) extends AnyVal with IntTinyType
   implicit object ImagePosition
       extends TinyTypeFactory[ImagePosition](new ImagePosition(_))
-      with NonNegativeInt
+      with NonNegativeInt[ImagePosition]
       with TinyTypeJsonLDOps[ImagePosition]
 
   trait ImageUri extends Any with TinyType { type V = String }
@@ -114,12 +117,12 @@ object datasets {
     final class Relative private (val value: String) extends AnyVal with ImageUri with RelativePathTinyType {
       override type V = String
     }
-    implicit object Relative extends TinyTypeFactory[Relative](new Relative(_)) with constraints.RelativePath
+    implicit object Relative extends TinyTypeFactory[Relative](new Relative(_)) with constraints.RelativePath[Relative]
 
     final class Absolute private (val value: String) extends AnyVal with ImageUri with UrlTinyType {
       override type V = String
     }
-    implicit object Absolute extends TinyTypeFactory[Absolute](new Absolute(_)) with constraints.Url
+    implicit object Absolute extends TinyTypeFactory[Absolute](new Absolute(_)) with constraints.Url[Absolute]
 
     import io.renku.tinytypes.json.TinyTypeEncoders._
 
@@ -136,11 +139,13 @@ object datasets {
   final class PartLocation private (val value: String) extends AnyVal with StringTinyType
   implicit object PartLocation
       extends TinyTypeFactory[PartLocation](new PartLocation(_))
-      with constraints.RelativePath
+      with constraints.RelativePath[PartLocation]
       with TinyTypeJsonLDOps[PartLocation]
 
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
-  implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url {
+  implicit object DerivedFrom
+      extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_))
+      with constraints.Url[DerivedFrom] {
 
     def apply(datasetEntityId: EntityId): DerivedFrom = DerivedFrom(datasetEntityId.toString)
 
@@ -163,7 +168,7 @@ object datasets {
 
   implicit object TopmostDerivedFrom
       extends TinyTypeFactory[TopmostDerivedFrom](new TopmostDerivedFrom(_))
-      with constraints.Url {
+      with constraints.Url[TopmostDerivedFrom] {
 
     final def apply(derivedFrom: DerivedFrom): TopmostDerivedFrom = apply(derivedFrom.value)
 
@@ -187,7 +192,9 @@ object datasets {
   final class InternalSameAs private[datasets] (val value: String) extends SameAs
   final class ExternalSameAs private[datasets] (val value: String) extends SameAs
 
-  implicit object InternalSameAs extends TinyTypeFactory[InternalSameAs](new InternalSameAs(_)) with constraints.Url {
+  implicit object InternalSameAs
+      extends TinyTypeFactory[InternalSameAs](new InternalSameAs(_))
+      with constraints.Url[InternalSameAs] {
     implicit class InternalSameAsOps(internalSameAs: InternalSameAs) {
       lazy val asIdentifier: Identifier = internalSameAs.value match {
         case s"$_/datasets/$identifier" => Identifier(identifier)
@@ -196,9 +203,11 @@ object datasets {
     }
   }
 
-  object ExternalSameAs extends TinyTypeFactory[ExternalSameAs](new ExternalSameAs(_)) with constraints.Url
+  object ExternalSameAs
+      extends TinyTypeFactory[ExternalSameAs](new ExternalSameAs(_))
+      with constraints.Url[ExternalSameAs]
 
-  implicit object SameAs extends TinyTypeFactory[SameAs](new ExternalSameAs(_)) with constraints.Url {
+  implicit object SameAs extends TinyTypeFactory[SameAs](new ExternalSameAs(_)) with constraints.Url[SameAs] {
 
     final def internal(value: RenkuBaseUrl): Either[IllegalArgumentException, InternalSameAs] =
       from(value.value) map (sameAs => new InternalSameAs(sameAs.value))
@@ -243,7 +252,10 @@ object datasets {
   }
 
   final class TopmostSameAs private[datasets] (val value: String) extends AnyVal with UrlTinyType
-  implicit object TopmostSameAs extends TinyTypeFactory[TopmostSameAs](new TopmostSameAs(_)) with constraints.Url {
+  implicit object TopmostSameAs
+      extends TinyTypeFactory[TopmostSameAs](new TopmostSameAs(_))
+      with constraints.Url[TopmostSameAs]
+      with UrlResourceRenderer[TopmostSameAs] {
 
     final def apply(sameAs: SameAs): TopmostSameAs = apply(sameAs.value)
 
@@ -256,7 +268,7 @@ object datasets {
   class PartResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object PartResourceId
       extends TinyTypeFactory[PartResourceId](new PartResourceId(_))
-      with UrlConstraint
+      with UrlConstraint[PartResourceId]
       with EntityIdJsonLdOps[PartResourceId]
 
   sealed trait Date extends Any with TinyType {
@@ -276,7 +288,7 @@ object datasets {
   }
   implicit object DateCreated
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
-      with InstantNotInTheFuture
+      with InstantNotInTheFuture[DateCreated]
       with TinyTypeJsonLDOps[DateCreated]
 
   final class DatePublished private (val value: LocalDate) extends AnyVal with Date with LocalDateTinyType {
@@ -284,11 +296,14 @@ object datasets {
   }
   implicit object DatePublished
       extends TinyTypeFactory[DatePublished](new DatePublished(_))
-      with LocalDateNotInTheFuture
+      with LocalDateNotInTheFuture[DatePublished]
       with TinyTypeJsonLDOps[DatePublished]
 
   final class PartId private (val value: String) extends AnyVal with StringTinyType
-  implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID with TinyTypeJsonLDOps[PartId] {
+  implicit object PartId
+      extends TinyTypeFactory[PartId](new PartId(_))
+      with UUID[PartId]
+      with TinyTypeJsonLDOps[PartId] {
     def generate: PartId = PartId {
       java.util.UUID.randomUUID.toString
     }

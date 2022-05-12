@@ -21,7 +21,6 @@ package migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.metrics.MetricsRegistry
@@ -37,7 +36,7 @@ private object MultipleDSTopmostSameAs {
 
   private lazy val name = Migration.Name("Multiple DS TopmostSameAs only")
   private[migrations] lazy val query = SparqlQuery.of(
-    Refined.unsafeApply(name.show),
+    name.asRefined,
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|DELETE { 
         |  ?dsId renku:topmostSameAs ?top.

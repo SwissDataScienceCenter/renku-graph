@@ -21,7 +21,6 @@ package migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
 import io.renku.metrics.MetricsRegistry
@@ -37,7 +36,7 @@ private object TopMostDerivedFrom {
 
   private lazy val name = Migration.Name("Broken TopmostDerivedFrom")
   private[migrations] lazy val query = SparqlQuery.of(
-    Refined.unsafeApply(name.show),
+    name.asRefined,
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
     s"""|SELECT ?path
         |WHERE {

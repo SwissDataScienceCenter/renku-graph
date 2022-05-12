@@ -60,9 +60,9 @@ class NonNegativeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 private class TestNonNegativeInt private (val value: Int) extends AnyVal with IntTinyType
 private object TestNonNegativeInt
     extends TinyTypeFactory[TestNonNegativeInt](new TestNonNegativeInt(_))
-    with NonNegativeInt
+    with NonNegativeInt[TestNonNegativeInt]
 
 private class TestNonNegativeLong private (val value: Long) extends AnyVal with LongTinyType
 private object TestNonNegativeLong
     extends TinyTypeFactory[TestNonNegativeLong](new TestNonNegativeLong(_))
-    with NonNegativeLong
+    with NonNegativeLong[TestNonNegativeLong]

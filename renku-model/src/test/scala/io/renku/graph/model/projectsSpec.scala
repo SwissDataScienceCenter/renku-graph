@@ -57,7 +57,7 @@ class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
 
   "Path" should {
     "be a RelativePath" in {
-      Path shouldBe a[RelativePath]
+      Path shouldBe a[RelativePath[_]]
     }
   }
 
@@ -147,7 +147,7 @@ class ProjectResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   "ResourceId" should {
 
     "be a RelativePath" in {
-      ResourceId shouldBe an[Url]
+      ResourceId shouldBe an[Url[ResourceId]]
     }
   }
 
@@ -184,8 +184,10 @@ class ProjectResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   "showAs[RdfResource]" should {
 
     "wrap the ResourceId in <>" in {
+      import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+
       forAll { resourceId: ResourceId =>
-        resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value}>"
+        resourceId.showAs[RdfResource] shouldBe s"<${sparqlEncode(resourceId.value)}>"
       }
     }
   }

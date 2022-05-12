@@ -28,7 +28,7 @@ import pureconfig.ConfigReader
 final class WebhookServiceUrl private (val value: String) extends AnyVal with UrlTinyType
 object WebhookServiceUrl
     extends TinyTypeFactory[WebhookServiceUrl](new WebhookServiceUrl(_))
-    with Url
+    with Url[WebhookServiceUrl]
     with UrlOps[WebhookServiceUrl] {
 
   private implicit val configReader: ConfigReader[WebhookServiceUrl] = urlTinyTypeReader(WebhookServiceUrl)

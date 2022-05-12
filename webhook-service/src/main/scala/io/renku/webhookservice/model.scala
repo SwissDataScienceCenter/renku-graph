@@ -54,8 +54,7 @@ object model {
   }
 
   final class SelfUrl private (val value: String) extends AnyVal with UrlTinyType
-
-  object SelfUrl extends TinyTypeFactory[SelfUrl](new SelfUrl(_)) with Url with UrlOps[SelfUrl] {
+  object SelfUrl extends TinyTypeFactory[SelfUrl](new SelfUrl(_)) with Url[SelfUrl] with UrlOps[SelfUrl] {
 
     private implicit val configReader: ConfigReader[SelfUrl] = urlTinyTypeReader(SelfUrl)
 
@@ -64,6 +63,6 @@ object model {
     ): F[SelfUrl] =
       find[F, SelfUrl]("services.self.url", config)
   }
-  final case class HookIdentifier(projectId: Id, projectHookUrl: ProjectHookUrl)
 
+  final case class HookIdentifier(projectId: Id, projectHookUrl: ProjectHookUrl)
 }

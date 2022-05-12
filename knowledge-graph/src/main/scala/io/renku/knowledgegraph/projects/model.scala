@@ -57,10 +57,12 @@ private object model {
   object Project {
 
     final class StarsCount private (val value: Int) extends AnyVal with IntTinyType
-    implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt
+    implicit object StarsCount extends TinyTypeFactory[StarsCount](new StarsCount(_)) with NonNegativeInt[StarsCount]
 
     final class DateUpdated private (val value: Instant) extends AnyVal with InstantTinyType
-    implicit object DateUpdated extends TinyTypeFactory[DateUpdated](new DateUpdated(_)) with InstantNotInTheFuture
+    implicit object DateUpdated
+        extends TinyTypeFactory[DateUpdated](new DateUpdated(_))
+        with InstantNotInTheFuture[DateUpdated]
   }
 
   final case class Creation(date: DateCreated, maybeCreator: Option[Creator])
@@ -71,7 +73,7 @@ private object model {
 
   object Forking {
     final class ForksCount private (val value: Int) extends AnyVal with IntTinyType
-    implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt
+    implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt[ForksCount]
   }
 
   final case class ParentProject(path: Path, name: Name, created: Creation)
@@ -135,21 +137,29 @@ private object model {
 
   object Statistics {
     final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
-    implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong
+    implicit object CommitsCount
+        extends TinyTypeFactory[CommitsCount](new CommitsCount(_))
+        with NonNegativeLong[CommitsCount]
 
     final class StorageSize private (val value: Long) extends AnyVal with LongTinyType
-    implicit object StorageSize extends TinyTypeFactory[StorageSize](new StorageSize(_)) with NonNegativeLong
+    implicit object StorageSize
+        extends TinyTypeFactory[StorageSize](new StorageSize(_))
+        with NonNegativeLong[StorageSize]
 
     final class RepositorySize private (val value: Long) extends AnyVal with LongTinyType
-    implicit object RepositorySize extends TinyTypeFactory[RepositorySize](new RepositorySize(_)) with NonNegativeLong
+    implicit object RepositorySize
+        extends TinyTypeFactory[RepositorySize](new RepositorySize(_))
+        with NonNegativeLong[RepositorySize]
 
     final class LsfObjectsSize private (val value: Long) extends AnyVal with LongTinyType
-    implicit object LsfObjectsSize extends TinyTypeFactory[LsfObjectsSize](new LsfObjectsSize(_)) with NonNegativeLong
+    implicit object LsfObjectsSize
+        extends TinyTypeFactory[LsfObjectsSize](new LsfObjectsSize(_))
+        with NonNegativeLong[LsfObjectsSize]
 
     final class JobArtifactsSize private (val value: Long) extends AnyVal with LongTinyType
     implicit object JobArtifactsSize
         extends TinyTypeFactory[JobArtifactsSize](new JobArtifactsSize(_))
-        with NonNegativeLong
+        with NonNegativeLong[JobArtifactsSize]
   }
 
   final case class Urls(ssh: SshUrl, http: HttpUrl, web: WebUrl, maybeReadme: Option[ReadmeUrl])
@@ -157,7 +167,7 @@ private object model {
   object Urls {
 
     final class SshUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object SshUrl extends TinyTypeFactory[SshUrl](new SshUrl(_)) with NonBlank {
+    implicit object SshUrl extends TinyTypeFactory[SshUrl](new SshUrl(_)) with NonBlank[SshUrl] {
       addConstraint(
         check = _ matches "^git@.*\\.git$",
         message = url => s"$url is not a valid repository ssh url"
@@ -165,7 +175,7 @@ private object model {
     }
 
     final class HttpUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object HttpUrl extends TinyTypeFactory[HttpUrl](new HttpUrl(_)) with NonBlank {
+    implicit object HttpUrl extends TinyTypeFactory[HttpUrl](new HttpUrl(_)) with NonBlank[HttpUrl] {
       addConstraint(
         check = url =>
           (url endsWith ".git") && Validated
@@ -176,9 +186,9 @@ private object model {
     }
 
     final class WebUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object WebUrl                         extends TinyTypeFactory[WebUrl](new WebUrl(_)) with Url
+    implicit object WebUrl                         extends TinyTypeFactory[WebUrl](new WebUrl(_)) with Url[WebUrl]
 
     final class ReadmeUrl private (val value: String) extends AnyVal with StringTinyType
-    implicit object ReadmeUrl                         extends TinyTypeFactory[ReadmeUrl](new ReadmeUrl(_)) with Url
+    implicit object ReadmeUrl extends TinyTypeFactory[ReadmeUrl](new ReadmeUrl(_)) with Url[ReadmeUrl]
   }
 }

@@ -24,7 +24,7 @@ import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
 final class Certificate private (val value: String) extends AnyVal with StringTinyType
-object Certificate extends TinyTypeFactory[Certificate](new Certificate(_)) with NonBlank {
+object Certificate extends TinyTypeFactory[Certificate](new Certificate(_)) with NonBlank[Certificate] {
 
   import com.typesafe.config.{Config, ConfigFactory}
   import io.renku.config.ConfigLoader.find

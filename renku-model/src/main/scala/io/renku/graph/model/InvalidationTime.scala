@@ -27,7 +27,7 @@ import java.time.Instant
 final class InvalidationTime private (val value: Instant) extends AnyVal with InstantTinyType
 object InvalidationTime
     extends TinyTypeFactory[InvalidationTime](new InvalidationTime(_))
-    with BoundedInstant
+    with BoundedInstant[InvalidationTime]
     with TinyTypeJsonLDOps[InvalidationTime] {
 
   import cats.syntax.all._

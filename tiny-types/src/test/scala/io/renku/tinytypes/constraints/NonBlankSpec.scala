@@ -49,5 +49,6 @@ class NonBlankSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 }
 
 private class NonBlankString private (val value: String) extends AnyVal with StringTinyType
-
-private object NonBlankString extends TinyTypeFactory[NonBlankString](new NonBlankString(_)) with NonBlank
+private object NonBlankString
+    extends TinyTypeFactory[NonBlankString](new NonBlankString(_))
+    with NonBlank[NonBlankString]

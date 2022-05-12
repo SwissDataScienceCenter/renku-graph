@@ -28,7 +28,7 @@ object associations {
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with Url
+      with Url[ResourceId]
       with EntityIdJsonLdOps[ResourceId] {
     implicit object RdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
       override def render(id: ResourceId): String = s"<${sparqlEncode(id.show)}>"

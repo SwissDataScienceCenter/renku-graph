@@ -100,7 +100,7 @@ object model {
   }
 
   final class MatchingScore private (val value: Float) extends AnyVal with FloatTinyType
-  object MatchingScore extends TinyTypeFactory[MatchingScore](new MatchingScore(_)) with FiniteFloat {
+  object MatchingScore extends TinyTypeFactory[MatchingScore](new MatchingScore(_)) with FiniteFloat[MatchingScore] {
     val min:                  MatchingScore          = MatchingScore(1.0f)
     implicit val jsonEncoder: Encoder[MatchingScore] = TinyTypeEncoders.floatEncoder
     implicit val jsonDecoder: Decoder[MatchingScore] = TinyTypeDecoders.floatDecoder(MatchingScore)

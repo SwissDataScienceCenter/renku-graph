@@ -18,11 +18,11 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.Constraints
+import io.renku.tinytypes.{Constraints, InstantTinyType}
 
 import java.time.Instant
 
-trait InstantNotInTheFuture extends Constraints[Instant] {
+trait InstantNotInTheFuture[TT <: InstantTinyType] extends Constraints[TT] {
   protected[this] def now: Instant = Instant.now()
 
   addConstraint(

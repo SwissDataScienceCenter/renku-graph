@@ -23,7 +23,9 @@ import cats.syntax.all._
 import io.renku.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 
 final class PathSegment private (val value: String) extends AnyVal with RelativePathTinyType
-object PathSegment extends TinyTypeFactory[PathSegment](new PathSegment(_)) with RelativePath {
+object PathSegment extends TinyTypeFactory[PathSegment](new PathSegment(_)) with RelativePath[PathSegment] {
+  self: TinyTypeFactory[RelativePathTinyType] =>
+
   override val transform: String => Either[Throwable, String] =
     value => Either.catchNonFatal(urlEncode(value))
 }

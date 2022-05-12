@@ -75,7 +75,7 @@ object model {
     sealed trait Id extends Any with StringTinyType
 
     private[lineage] final case class IdImpl(value: String) extends AnyVal with Id
-    object Id extends TinyTypeFactory[Id](IdImpl) with NonBlank {
+    object Id extends TinyTypeFactory[Id](IdImpl) with NonBlank[Id] {
 
       import io.renku.graph.model.views.RdfResource
       import io.renku.tinytypes.Renderer
@@ -88,12 +88,12 @@ object model {
     sealed trait Label extends Any with StringTinyType
 
     private[lineage] final case class LabelImpl private (value: String) extends AnyVal with Label
-    object Label extends TinyTypeFactory[Label](LabelImpl) with NonBlank
+    object Label extends TinyTypeFactory[Label](LabelImpl) with NonBlank[Label]
 
     sealed trait Type extends Any with StringTinyType
 
     private[lineage] final case class TypeImpl private (value: String) extends AnyVal with Type
-    object Type extends TinyTypeFactory[Type](TypeImpl) with NonBlank
+    object Type extends TinyTypeFactory[Type](TypeImpl) with NonBlank[Type]
 
     sealed trait Location extends Any with StringTinyType
 

@@ -142,7 +142,7 @@ class EventBodySpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
   "EventBody" should {
 
     "have the NonBlank constraint" in {
-      EventBody shouldBe an[NonBlank]
+      EventBody shouldBe an[NonBlank[_]]
     }
 
     "be instantiatable from any non-blank string" in {
@@ -192,7 +192,7 @@ class EventProcessingTimeSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
   "EventProcessingTime" should {
 
     "have the DurationNotNegative constraint" in {
-      EventProcessingTime shouldBe an[DurationNotNegative]
+      EventProcessingTime shouldBe an[DurationNotNegative[_]]
     }
 
     "be instantiatable from any non negative finite durations" in {

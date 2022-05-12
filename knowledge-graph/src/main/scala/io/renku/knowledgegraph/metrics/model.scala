@@ -34,7 +34,7 @@ private object Count extends TinyTypeFactory[Count](new Count(_)) {
 }
 
 private final class EntityLabel private (val value: String) extends AnyVal with StringTinyType
-private object EntityLabel extends TinyTypeFactory[EntityLabel](new EntityLabel(_)) with NonBlank {
+private object EntityLabel extends TinyTypeFactory[EntityLabel](new EntityLabel(_)) with NonBlank[EntityLabel] {
   private val allSchemas = Schemas.all.map(_.toString)
   override val transform: String => Either[Throwable, String] = entityType =>
     allSchemas

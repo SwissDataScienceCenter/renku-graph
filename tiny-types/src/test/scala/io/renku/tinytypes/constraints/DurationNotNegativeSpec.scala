@@ -49,4 +49,4 @@ private class DurationNotNegativeType private (val value: Duration) extends AnyV
 
 private object DurationNotNegativeType
     extends TinyTypeFactory[DurationNotNegativeType](new DurationNotNegativeType(_))
-    with DurationNotNegative
+    with DurationNotNegative[DurationNotNegativeType]

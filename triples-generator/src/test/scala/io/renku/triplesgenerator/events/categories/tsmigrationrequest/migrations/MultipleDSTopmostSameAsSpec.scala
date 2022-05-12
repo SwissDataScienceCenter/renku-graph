@@ -30,21 +30,11 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.tooling.UpdateQueryMigration
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import tooling.UpdateQueryMigration
 
 class MultipleDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
-
-  // there are three cases:
-  // * no derivedFrom, there's topmostSameAs not matching sameAs (topmostSameAs needs to be taken from sameAs's topmostSameAs)
-  // * no derivedFrom, no sameAs (internal DS)
-  // * derivedFrom matching topmostDerivedFrom (all wrong multiple topmostSameAs, multiple topmostDerivedFrom)
-  // * multiple topmostDerivedFrom only (and single wasDerivedFrom matching one of the topmostDerivedFrom)
-  // * multiple derivedFrom and topmostDerivedFrom (not sure which one is correct - maybe remove both derivedFrom and topmostDerivedFrom and re-provision the project )
-  // * multiple originalIdentifier only (looks like the right one can be matched from wasDerivedFrom)
-  // * multiple schema:sameAs only (looks like the right one can be matched from topmostSameAs)
-  // * multiple dateCreated only (maybe try to schedule re-provisioning? maybe we need to do an update query on transformation?)
 
   "query" should {
 
@@ -58,7 +48,8 @@ class MultipleDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with 
         val (importedDS1, importedDS1Project) =
           renkuProjectEntities(anyVisibility).importDataset(originalDS).generateOne
 
-        val (importedD2, importedDS2Project) = renkuProjectEntities(anyVisibility).importDataset(originalDS).generateOne
+        val (importedDS2, importedDS2Project) =
+          renkuProjectEntities(anyVisibility).importDataset(originalDS).generateOne
 
         loadToStore(originalDSProject, importedDS1Project, importedDS2Project)
 
@@ -66,13 +57,13 @@ class MultipleDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with 
 
         findTopmostSameAs(originalDS.identification.identifier)       shouldBe Set(TopmostSameAs(originalDS.entityId))
         findTopmostSameAs(importedDS1.identification.identifier).size shouldBe 2
-        findTopmostSameAs(importedD2.identification.identifier)       shouldBe Set(TopmostSameAs(originalDS.entityId))
+        findTopmostSameAs(importedDS2.identification.identifier)      shouldBe Set(TopmostSameAs(originalDS.entityId))
 
         runUpdate(MultipleDSTopmostSameAs.query).unsafeRunSync() shouldBe ()
 
         findTopmostSameAs(originalDS.identification.identifier)  shouldBe Set(TopmostSameAs(originalDS.entityId))
         findTopmostSameAs(importedDS1.identification.identifier) shouldBe Set(TopmostSameAs(originalDS.entityId))
-        findTopmostSameAs(importedD2.identification.identifier)  shouldBe Set(TopmostSameAs(originalDS.entityId))
+        findTopmostSameAs(importedDS2.identification.identifier) shouldBe Set(TopmostSameAs(originalDS.entityId))
       }
   }
 

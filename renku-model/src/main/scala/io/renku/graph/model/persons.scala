@@ -29,7 +29,7 @@ object persons {
   sealed trait ResourceId extends Any with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](ResourceIdFactory)
-      with Constraints[String]
+      with Constraints[ResourceId]
       with EntityIdJsonLdOps[ResourceId] {
 
     addConstraint(
@@ -44,8 +44,8 @@ object persons {
     object GitLabIdBased
         extends TinyTypeFactory[GitLabIdBased](new GitLabIdBased(_))
         with EntityIdJsonLdOps[GitLabIdBased]
-        with Constraints[String]
-        with NonBlank {
+        with Constraints[GitLabIdBased]
+        with NonBlank[GitLabIdBased] {
       private[persons] val validator = "^http(s)?://.*/persons/(\\d+)$"
       addConstraint(
         check = _.trim.matches(validator),
@@ -57,8 +57,8 @@ object persons {
     object EmailBased
         extends TinyTypeFactory[EmailBased](new EmailBased(_))
         with EntityIdJsonLdOps[EmailBased]
-        with Constraints[String]
-        with NonBlank {
+        with Constraints[EmailBased]
+        with NonBlank[EmailBased] {
       private[persons] val validator = "^mailto:(.*)@.*$"
       addConstraint(
         check = _.trim.matches(validator),
@@ -70,8 +70,8 @@ object persons {
     object NameBased
         extends TinyTypeFactory[NameBased](new NameBased(_))
         with EntityIdJsonLdOps[NameBased]
-        with Constraints[String]
-        with NonBlank {
+        with Constraints[NameBased]
+        with NonBlank[NameBased] {
       private[persons] val validator = "^http(s)?://.*/persons/.+$"
       addConstraint(
         check = _.trim.matches(validator),
@@ -109,7 +109,7 @@ object persons {
   final class GitLabId private (val value: Int) extends AnyVal with IntTinyType
   implicit object GitLabId
       extends TinyTypeFactory[GitLabId](new GitLabId(_))
-      with NonNegativeInt
+      with NonNegativeInt[GitLabId]
       with TinyTypeJsonLDOps[GitLabId] {
 
     def parse(value: String): Either[IllegalArgumentException, GitLabId] =
@@ -119,7 +119,10 @@ object persons {
   }
 
   final class Email private (val value: String) extends AnyVal with StringTinyType
-  implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank with TinyTypeJsonLDOps[Email] {
+  implicit object Email
+      extends TinyTypeFactory[Email](new Email(_))
+      with NonBlank[Email]
+      with TinyTypeJsonLDOps[Email] {
 
     addConstraint(
       check = _.split('@').toList match {
@@ -135,14 +138,14 @@ object persons {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 
   final class Username private (val value: String) extends AnyVal with StringTinyType
-  implicit object Username                         extends TinyTypeFactory[Username](new Username(_)) with NonBlank
+  implicit object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank[Username]
 
   final class Affiliation private (val value: String) extends AnyVal with StringTinyType
   implicit object Affiliation
       extends TinyTypeFactory[Affiliation](new Affiliation(_))
-      with NonBlank
+      with NonBlank[Affiliation]
       with TinyTypeJsonLDOps[Affiliation]
 }

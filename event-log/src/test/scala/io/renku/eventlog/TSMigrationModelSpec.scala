@@ -99,7 +99,7 @@ class MigrationMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
   "MigrationMessage" should {
 
     "have the NonBlank constraint" in {
-      MigrationMessage shouldBe an[NonBlank]
+      MigrationMessage shouldBe an[NonBlank[_]]
     }
 
     "be instantiatable from any non-blank string" in {

@@ -31,7 +31,7 @@ import scala.util.Random
 final class MicroserviceIdentifier private (val value: String) extends AnyVal with StringTinyType
 object MicroserviceIdentifier
     extends TinyTypeFactory[MicroserviceIdentifier](new MicroserviceIdentifier(_))
-    with NonBlank
+    with NonBlank[MicroserviceIdentifier]
     with TinyTypeJsonLDOps[MicroserviceIdentifier] {
 
   def generate: MicroserviceIdentifier = generate(LocalDateTime.now _)

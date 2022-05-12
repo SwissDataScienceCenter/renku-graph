@@ -108,7 +108,7 @@ object ParameterValue {
     EntityIdEncoder.instance(value => value.activity.asEntityId.asUrlEntityId / "parameter" / value.id)
 
   final class Id private (val value: String) extends AnyVal with StringTinyType
-  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID {
+  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID[Id] {
     def generate: Id = Id(java.util.UUID.randomUUID.toString)
   }
 }

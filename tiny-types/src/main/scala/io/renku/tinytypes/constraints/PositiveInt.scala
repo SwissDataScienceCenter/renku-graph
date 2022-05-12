@@ -18,9 +18,9 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.Constraints
+import io.renku.tinytypes.{Constraints, IntTinyType}
 
-trait PositiveInt extends Constraints[Int] {
+trait PositiveInt[TT <: IntTinyType] extends Constraints[TT] {
   addConstraint(
     check = _ > 0,
     message = _ => s"$typeName cannot be <= 0"

@@ -30,7 +30,8 @@ class UUIDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
   "UUID" should {
 
     "be a NonBlank" in {
-      new UUID {} shouldBe a[NonBlank]
+      UUIDString shouldBe a[UUID[_]]
+      UUIDString shouldBe a[NonBlank[_]]
     }
 
     "be instantiatable when values are valid UUIDs" in {
@@ -51,4 +52,4 @@ class UUIDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
 }
 
 private class UUIDString private (val value: String) extends AnyVal with StringTinyType
-private object UUIDString                            extends TinyTypeFactory[UUIDString](new UUIDString(_)) with UUID
+private object UUIDString extends TinyTypeFactory[UUIDString](new UUIDString(_)) with UUID[UUIDString]

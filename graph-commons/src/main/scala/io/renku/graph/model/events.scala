@@ -53,22 +53,26 @@ object events {
   }
 
   final class CommitId private (val value: String) extends AnyVal with StringTinyType
-  implicit object CommitId                         extends TinyTypeFactory[CommitId](new CommitId(_)) with GitSha
+  implicit object CommitId extends TinyTypeFactory[CommitId](new CommitId(_)) with GitSha[CommitId]
 
   final class CommitMessage private (val value: String) extends AnyVal with StringTinyType
-  implicit object CommitMessage extends TinyTypeFactory[CommitMessage](new CommitMessage(_)) with NonBlank
+  implicit object CommitMessage
+      extends TinyTypeFactory[CommitMessage](new CommitMessage(_))
+      with NonBlank[CommitMessage]
 
   final class CommittedDate private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object CommittedDate extends TinyTypeFactory[CommittedDate](new CommittedDate(_)) with BoundedInstant {
+  implicit object CommittedDate
+      extends TinyTypeFactory[CommittedDate](new CommittedDate(_))
+      with BoundedInstant[CommittedDate] {
     import java.time.temporal.ChronoUnit.HOURS
     protected[this] override def maybeMax: Option[Instant] = instantNow.plus(24, HOURS).some
   }
 
   final class EventId private (val value: String) extends AnyVal with StringTinyType
-  implicit object EventId                         extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank
+  implicit object EventId extends TinyTypeFactory[EventId](new EventId(_)) with NonBlank[EventId]
 
   final class EventBody private (val value: String) extends AnyVal with StringTinyType
-  implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank {
+  implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank[EventBody] {
 
     implicit class EventBodyOps(eventBody: EventBody) {
 
@@ -92,7 +96,7 @@ object events {
 
   final class BatchDate private (val value: Instant) extends AnyVal with InstantTinyType
 
-  implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) with InstantNotInTheFuture {
+  implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) with InstantNotInTheFuture[BatchDate] {
     def apply(clock: Clock): BatchDate = apply(clock.instant())
   }
 
@@ -115,7 +119,7 @@ object events {
       Deleting
     )
 
-    val statusesOrdered = List(
+    val statusesOrdered: Seq[EventStatus] = List(
       Skipped,
       New,
       GeneratingTriples,
@@ -213,7 +217,7 @@ object events {
   final class EventProcessingTime private (val value: Duration) extends AnyVal with DurationTinyType
   object EventProcessingTime
       extends TinyTypeFactory[EventProcessingTime](new EventProcessingTime(_))
-      with DurationNotNegative {
+      with DurationNotNegative[EventProcessingTime] {
 
     implicit val decoder: Decoder[EventProcessingTime] = durationDecoder(EventProcessingTime)
     implicit val encoder: Encoder[EventProcessingTime] = durationEncoder
@@ -229,7 +233,9 @@ object events {
   }
 
   final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
-  object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture {
+  object LastSyncedDate
+      extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_))
+      with InstantNotInTheFuture[LastSyncedDate] {
     implicit val decoder: Decoder[LastSyncedDate] = instantDecoder(LastSyncedDate)
   }
 }

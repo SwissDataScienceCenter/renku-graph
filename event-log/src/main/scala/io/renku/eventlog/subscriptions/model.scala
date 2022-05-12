@@ -30,7 +30,7 @@ import io.renku.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
 private final case class ProjectIds(id: projects.Id, path: projects.Path)
 
 private final class Capacity private (val value: Int) extends AnyVal with IntTinyType
-private object Capacity extends TinyTypeFactory[Capacity](new Capacity(_)) with NonNegativeInt {
+private object Capacity extends TinyTypeFactory[Capacity](new Capacity(_)) with NonNegativeInt[Capacity] {
   implicit val decoder: Decoder[Capacity] = intDecoder(Capacity)
 }
 
@@ -63,6 +63,6 @@ private object UrlAndIdSubscriptionInfo {
 }
 
 private final class SourceUrl private (val value: String) extends AnyVal with StringTinyType
-private object SourceUrl extends TinyTypeFactory[SourceUrl](new SourceUrl(_)) with Url {
+private object SourceUrl extends TinyTypeFactory[SourceUrl](new SourceUrl(_)) with Url[SourceUrl] {
   implicit val decoder: Decoder[SourceUrl] = stringDecoder(SourceUrl)
 }

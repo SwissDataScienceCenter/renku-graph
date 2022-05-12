@@ -21,7 +21,6 @@ package migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.metrics.MetricsRegistry
@@ -37,7 +36,7 @@ private object MultipleModifiedDSData {
 
   private lazy val name = Migration.Name("Duplicate Modified DS data")
   private[migrations] lazy val query = SparqlQuery.of(
-    Refined.unsafeApply(name.show),
+    name.asRefined,
     Prefixes.of(schema -> "schema", renku -> "renku"),
     s"""|DELETE { 
         |  ?dsId renku:originalIdentifier ?original.

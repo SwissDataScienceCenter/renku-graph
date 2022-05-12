@@ -39,7 +39,7 @@ private trait Migration[F[_]] {
 
 private object Migration {
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name] {
+  object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name] {
     implicit val decoder: Decoder[Name] = stringDecoder(Name)
   }
 }

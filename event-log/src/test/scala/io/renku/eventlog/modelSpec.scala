@@ -53,7 +53,7 @@ class CreatedDateSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
   "CreatedDate" should {
 
     "have the InstantNotInTheFuture constraint" in {
-      CreatedDate shouldBe an[InstantNotInTheFuture]
+      CreatedDate shouldBe an[InstantNotInTheFuture[_]]
     }
 
     "be instantiatable from any Instant not from the future" in {
@@ -81,7 +81,7 @@ class EventMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
   "EventMessage" should {
 
     "have the NonBlank constraint" in {
-      EventMessage shouldBe an[NonBlank]
+      EventMessage shouldBe an[NonBlank[_]]
     }
 
     "be instantiatable from any non-blank string" in {

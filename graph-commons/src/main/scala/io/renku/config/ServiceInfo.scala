@@ -26,7 +26,7 @@ import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import pureconfig.ConfigReader
 
 final class ServiceName private (val value: String) extends AnyVal with StringTinyType
-object ServiceName extends TinyTypeFactory[ServiceName](new ServiceName(_)) with NonBlank {
+object ServiceName extends TinyTypeFactory[ServiceName](new ServiceName(_)) with NonBlank[ServiceName] {
   import ConfigLoader._
   implicit val reader: ConfigReader[ServiceName] = stringTinyTypeReader(ServiceName)
 
@@ -37,7 +37,7 @@ object ServiceName extends TinyTypeFactory[ServiceName](new ServiceName(_)) with
 final class ServiceVersion private (val value: String) extends AnyVal with StringTinyType
 object ServiceVersion
     extends TinyTypeFactory[ServiceVersion](new ServiceVersion(_))
-    with NonBlank
+    with NonBlank[ServiceVersion]
     with TinyTypeJsonLDOps[ServiceVersion] {
 
   import ConfigLoader._

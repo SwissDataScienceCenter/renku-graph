@@ -38,7 +38,10 @@ object TestTinyTypes {
   implicit object RelativePathTestType extends TinyTypeFactory[RelativePathTestType](new RelativePathTestType(_))
 
   class UrlTestType private (val value: String) extends AnyVal with UrlTinyType
-  implicit object UrlTestType extends TinyTypeFactory[UrlTestType](new UrlTestType(_)) with Url with UrlOps[UrlTestType]
+  implicit object UrlTestType
+      extends TinyTypeFactory[UrlTestType](new UrlTestType(_))
+      with Url[UrlTestType]
+      with UrlOps[UrlTestType]
 
   class IntTestType private (val value: Int) extends AnyVal with IntTinyType
   implicit object IntTestType                extends TinyTypeFactory[IntTestType](new IntTestType(_))
@@ -47,7 +50,9 @@ object TestTinyTypes {
   implicit object LongTestType                 extends TinyTypeFactory[LongTestType](new LongTestType(_))
 
   class FloatTestType private (val value: Float) extends AnyVal with FloatTinyType
-  implicit object FloatTestType extends TinyTypeFactory[FloatTestType](new FloatTestType(_)) with FiniteFloat
+  implicit object FloatTestType
+      extends TinyTypeFactory[FloatTestType](new FloatTestType(_))
+      with FiniteFloat[FloatTestType]
 
   class LocalDateTestType private (val value: LocalDate) extends AnyVal with LocalDateTinyType
 

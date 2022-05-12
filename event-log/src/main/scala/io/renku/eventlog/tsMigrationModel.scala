@@ -73,13 +73,15 @@ private object MigrationStatusInstantiator extends (String => MigrationStatus) {
 }
 
 final class ChangeDate private (val value: Instant) extends AnyVal with InstantTinyType
-object ChangeDate extends TinyTypeFactory[ChangeDate](new ChangeDate(_)) with InstantNotInTheFuture {
+object ChangeDate extends TinyTypeFactory[ChangeDate](new ChangeDate(_)) with InstantNotInTheFuture[ChangeDate] {
   import io.renku.tinytypes.json.TinyTypeDecoders.instantDecoder
   implicit val decoder: Decoder[ChangeDate] = instantDecoder(ChangeDate)
 }
 
 final class MigrationMessage private (val value: String) extends AnyVal with StringTinyType
-object MigrationMessage extends TinyTypeFactory[MigrationMessage](new MigrationMessage(_)) with NonBlank {
+object MigrationMessage
+    extends TinyTypeFactory[MigrationMessage](new MigrationMessage(_))
+    with NonBlank[MigrationMessage] {
 
   def apply(exception: Throwable): MigrationMessage = MigrationMessage(ErrorMessage.withStackTrace(exception).value)
 

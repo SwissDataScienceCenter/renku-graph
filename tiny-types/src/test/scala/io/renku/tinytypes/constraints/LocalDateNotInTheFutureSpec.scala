@@ -53,10 +53,9 @@ class LocalDateNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyChe
 }
 
 private class LocalDateNotInTheFutureType private (val value: LocalDate) extends AnyVal with LocalDateTinyType
-
 private object LocalDateNotInTheFutureType
     extends TinyTypeFactory[LocalDateNotInTheFutureType](new LocalDateNotInTheFutureType(_))
-    with LocalDateNotInTheFuture {
+    with LocalDateNotInTheFuture[LocalDateNotInTheFutureType] {
 
   var fetchNow:               () => LocalDate = () => LocalDate.now()
   protected override def now: LocalDate       = fetchNow()

@@ -203,7 +203,9 @@ private object EventStatusUpdater {
   } yield new EventStatusUpdaterImpl(eventSender, categoryName, Zip)
 
   final class ExecutionDelay private (val value: Duration) extends AnyVal with DurationTinyType
-  object ExecutionDelay extends TinyTypeFactory[ExecutionDelay](new ExecutionDelay(_)) with DurationNotNegative {
+  object ExecutionDelay
+      extends TinyTypeFactory[ExecutionDelay](new ExecutionDelay(_))
+      with DurationNotNegative[ExecutionDelay] {
 
     implicit val encoder: Encoder[ExecutionDelay] = durationEncoder
 

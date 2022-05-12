@@ -31,10 +31,10 @@ import java.time.Instant
 object projects {
 
   final class Id private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt with TinyTypeJsonLDOps[Id]
+  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt[Id] with TinyTypeJsonLDOps[Id]
 
   final class Path private (val value: String) extends AnyVal with RelativePathTinyType
-  implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath with TinyTypeJsonLDOps[Path] {
+  implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath[Path] with TinyTypeJsonLDOps[Path] {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
 
@@ -51,12 +51,15 @@ object projects {
   }
 
   final class Namespace private (val value: String) extends AnyVal with StringTinyType
-  object Namespace extends TinyTypeFactory[Namespace](new Namespace(_)) with NonBlank with TinyTypeJsonLDOps[Namespace]
+  object Namespace
+      extends TinyTypeFactory[Namespace](new Namespace(_))
+      with NonBlank[Namespace]
+      with TinyTypeJsonLDOps[Namespace]
 
   final class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with Url
+      with Url[ResourceId]
       with AnyResourceRenderer[ResourceId]
       with EntityIdJsonLdOps[ResourceId] {
 
@@ -80,25 +83,25 @@ object projects {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 
   final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object DateCreated
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
-      with InstantNotInTheFuture
+      with InstantNotInTheFuture[DateCreated]
       with TinyTypeJsonLDOps[DateCreated]
 
   final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
   object FilePath
       extends TinyTypeFactory[FilePath](new FilePath(_))
-      with RelativePath
+      with RelativePath[FilePath]
       with RelativePathOps[FilePath]
       with TinyTypeJsonLDOps[FilePath]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
-      with NonBlank
+      with NonBlank[Description]
       with TinyTypeJsonLDOps[Description]
 
   sealed trait Visibility extends StringTinyType with Product with Serializable
@@ -162,9 +165,12 @@ object projects {
     type Zero = Zero.type
 
     final class NonZero private (val value: Int) extends AnyVal with ForksCount
-    object NonZero                               extends TinyTypeFactory[NonZero](new NonZero(_)) with PositiveInt
+    object NonZero extends TinyTypeFactory[NonZero](new NonZero(_)) with PositiveInt[NonZero]
   }
 
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
-  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank with TinyTypeJsonLDOps[Keyword]
+  implicit object Keyword
+      extends TinyTypeFactory[Keyword](new Keyword(_))
+      with NonBlank[Keyword]
+      with TinyTypeJsonLDOps[Keyword]
 }

@@ -26,7 +26,10 @@ import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
 import pureconfig.ConfigReader
 
 final class EventLogUrl private (val value: String) extends AnyVal with UrlTinyType
-object EventLogUrl extends TinyTypeFactory[EventLogUrl](new EventLogUrl(_)) with Url with UrlOps[EventLogUrl] {
+object EventLogUrl
+    extends TinyTypeFactory[EventLogUrl](new EventLogUrl(_))
+    with Url[EventLogUrl]
+    with UrlOps[EventLogUrl] {
 
   implicit val eventLogUrlOps: EventLogUrl.type = this
 

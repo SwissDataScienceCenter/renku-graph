@@ -32,7 +32,9 @@ private final case class GlobalCommitSyncEvent(project:             Project,
 )
 private object GlobalCommitSyncEvent {
   final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
-  implicit object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong
+  implicit object CommitsCount
+      extends TinyTypeFactory[CommitsCount](new CommitsCount(_))
+      with NonNegativeLong[CommitsCount]
 
   final case class CommitsInfo(count: CommitsCount, latest: CommitId)
 

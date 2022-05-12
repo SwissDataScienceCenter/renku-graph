@@ -70,7 +70,9 @@ private object DatasetsFinder {
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
 
-  implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegativeInt
+  implicit object ProjectsCount
+      extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_))
+      with NonNegativeInt[ProjectsCount]
 }
 
 private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](
