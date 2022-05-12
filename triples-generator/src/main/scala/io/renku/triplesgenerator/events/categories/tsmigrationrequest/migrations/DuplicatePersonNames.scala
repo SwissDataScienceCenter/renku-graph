@@ -29,7 +29,7 @@ import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
 import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.tooling.UpdateQueryMigration
 import org.typelevel.log4cats.Logger
 
-private object DeDuplicatePersonNames {
+private object DuplicatePersonNames {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen

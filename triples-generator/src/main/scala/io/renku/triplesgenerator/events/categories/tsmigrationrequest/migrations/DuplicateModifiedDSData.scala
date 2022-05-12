@@ -30,7 +30,7 @@ import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import tooling.UpdateQueryMigration
 
-private object DeDuplicateModifiedDSData {
+private object DuplicateModifiedDSData {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen
