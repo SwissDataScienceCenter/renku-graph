@@ -167,6 +167,13 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       }
       .unsafeRunSync()
 
+  protected def deleteTriple(entityId: EntityId, p: String, o: String): Unit =
+    queryRunner
+      .runUpdate {
+        show"DELETE DATA { <$entityId> $p $o }"
+      }
+      .unsafeRunSync()
+
   private implicit lazy val logger:  TestLogger[IO]              = TestLogger[IO]()
   private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
   private lazy val queryRunner = new RdfStoreClientImpl[IO](rdfStoreConfig) {
