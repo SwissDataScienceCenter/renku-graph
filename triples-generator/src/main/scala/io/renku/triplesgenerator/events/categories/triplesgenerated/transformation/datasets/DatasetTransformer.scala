@@ -62,14 +62,17 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
   private lazy val fixDerivationHierarchies: ((Project, Queries)) => F[(Project, Queries)] = {
     case (project, queries) =>
       findModifiedDatasets(project)
-        .foldLeft(project.pure[F]) { (projF, originalDS) =>
-          projF >>= { proj =>
+        .foldLeft((project -> queries).pure[F]) { (projectAndQueriesF, originalDS) =>
+          projectAndQueriesF >>= { case (proj, quers) =>
             findTopmostDerivedFrom[F](originalDS, proj)
               .map(originalDS.update)
-              .map(update(originalDS, _)(proj))
+              .map(updatedDS => update(originalDS, updatedDS)(proj) -> updatedDS)
+              .map { case (updatedProj, updatedDS) =>
+                val deletions = updatesCreator.deleteOtherTopmostDerivedFrom(updatedDS)
+                updatedProj -> (quers |+| Queries.postDataQueriesOnly(deletions))
+              }
           }
         }
-        .map(_ -> queries)
   }
 
   private lazy val updateTopmostSameAs: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>

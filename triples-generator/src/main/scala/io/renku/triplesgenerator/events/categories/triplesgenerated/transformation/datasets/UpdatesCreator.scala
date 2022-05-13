@@ -53,6 +53,8 @@ private trait UpdatesCreator {
   def queriesUnlinkingCreators(dataset:      Dataset[Dataset.Provenance],
                                creatorsInKG: Set[persons.ResourceId]
   ): List[SparqlQuery]
+
+  def deleteOtherTopmostDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
@@ -110,6 +112,24 @@ private object UpdatesCreator extends UpdatesCreator {
       }
       .toList
   }
+
+  override def deleteOtherTopmostDerivedFrom(
+      dataset: Dataset[Dataset.Provenance.Modified]
+  ): List[SparqlQuery] = List(
+    SparqlQuery.of(
+      name = "transformation - delete other topmostDerivedFrom",
+      Prefixes of (renku -> "renku", schema -> "schema"),
+      s"""|DELETE {
+          |  ${dataset.resourceId.showAs[RdfResource]} renku:topmostDerivedFrom ?topmostDerived
+          |}
+          |WHERE {
+          |  ${dataset.resourceId.showAs[RdfResource]} a schema:Dataset;
+          |                                            renku:topmostDerivedFrom ?topmostDerived.
+          |  FILTER (?topmostDerived != ${dataset.provenance.topmostDerivedFrom.showAs[RdfResource]})
+          |}
+          |""".stripMargin
+    )
+  )
 
   private def deleteSameAs(dataset: Dataset[Provenance.Internal]) = SparqlQuery.of(
     name = "transformation - delete sameAs",

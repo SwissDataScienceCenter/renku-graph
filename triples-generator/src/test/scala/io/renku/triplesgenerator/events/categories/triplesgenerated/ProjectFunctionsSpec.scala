@@ -177,7 +177,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val dataset2New = datasetEntities(provenanceNonModified)(renkuBaseUrl)(project.dateCreated).generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      update(dataset2Old, dataset2New)(project).datasets should contain theSameElementsAs List(dataset1, dataset2New)
+      update(dataset2Old, dataset2New)(project).datasets shouldBe List(dataset1, dataset2New)
     }
   }
 

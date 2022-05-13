@@ -367,6 +367,30 @@ class UpdatesCreatorSpec
     }
   }
 
+  "deleteOtherTopmostDerivedFrom" should {
+
+    "prepare queries that removes other topmostDerivedFrom from the given DS" in {
+      val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .createModification()
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+
+      loadToStore(ds)
+
+      val otherTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
+      insertTriple(ds.resourceId, "renku:topmostDerivedFrom", otherTopmostDerivedFrom.showAs[RdfResource])
+
+      findTopmostDerivedFrom(ds.identification.identifier) shouldBe Set(ds.provenance.topmostDerivedFrom,
+                                                                        otherTopmostDerivedFrom
+      )
+
+      UpdatesCreator.deleteOtherTopmostDerivedFrom(ds).runAll.unsafeRunSync()
+
+      findTopmostDerivedFrom(ds.identification.identifier) shouldBe Set(ds.provenance.topmostDerivedFrom)
+    }
+  }
+
   private def setTopmostSameAs[P <: entities.Dataset.Provenance.ImportedInternal](dataset:       entities.Dataset[P],
                                                                                   topmostSameAs: TopmostSameAs
   ) = {
@@ -420,5 +444,16 @@ class UpdatesCreatorSpec
       .map(row => persons.ResourceId.from(row("personId")))
       .sequence
       .fold(throw _, identity)
+      .toSet
+
+  private def findTopmostDerivedFrom(id: datasets.Identifier): Set[datasets.TopmostDerivedFrom] =
+    runQuery(s"""|SELECT ?topmostDerivedFrom 
+                 |WHERE { 
+                 |  ?id a schema:Dataset;
+                 |  schema:identifier '$id';
+                 |  renku:topmostDerivedFrom ?topmostDerivedFrom
+                 |}""".stripMargin)
+      .unsafeRunSync()
+      .map(row => datasets.TopmostDerivedFrom(row("topmostDerivedFrom")))
       .toSet
 }

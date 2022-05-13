@@ -94,35 +94,55 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         )
       }
 
-    "update topmostDerivedFrom on all derivation hierarchies" in new TestCase {
-      givenExternalCallsPass()
+    "update topmostDerivedFrom on all derivation hierarchies " +
+      "and remove existing topmostDerivedFrom if different" in new TestCase {
+        givenExternalCallsPass()
 
-      def topmostDerivedFromFromDerivedFrom(
-          otherDs: Dataset[Dataset.Provenance.Modified]
-      ): Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] =
-        ds => ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(otherDs.entityId)))
+        def topmostDerivedFromFromDerivedFrom(
+            otherDs: Dataset[Dataset.Provenance.Modified]
+        ): Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] =
+          ds => ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(otherDs.entityId)))
 
-      val (_ ::~ modification1, project) =
-        anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
-      val (modification2, projectUpdate2) = project.addDataset(
-        modification1.createModification().modify(topmostDerivedFromFromDerivedFrom(modification1))
-      )
-      val finalProject = projectUpdate2.to[entities.Project]
+        val (_ ::~ modification1, project) =
+          anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
+        val (d, projectUpdate2) = project.addDataset(
+          modification1.createModification().modify(topmostDerivedFromFromDerivedFrom(modification1))
+        )
+        val finalProject = projectUpdate2.to[entities.Project]
 
-      // at this stage topmostDerivedFrom should be the same as derivedFrom
-      val topDS :: mod1DS :: mod2DS :: Nil = finalProject.datasets
-      mod1DS.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(topDS.identification.resourceId.show)
-      mod2DS.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(mod1DS.identification.resourceId.show)
+        // at this stage topmostDerivedFrom should be the same as derivedFrom
+        val topDS :: mod1DS :: mod2DS :: Nil = finalProject.datasets
+        mod1DS.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(topDS.identification.resourceId.show)
+        mod2DS.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(mod1DS.identification.resourceId.show)
 
-      val step = transformer.createTransformationStep
+        def dataset(expectedDS: entities.Dataset[entities.Dataset.Provenance]) = where {
+          (ds: entities.Dataset[entities.Dataset.Provenance.Modified]) =>
+            ds.identification.identifier == expectedDS.identification.identifier &&
+            ds.provenance.topmostDerivedFrom == topDS.provenance.topmostDerivedFrom
+        }
+        val mod1DSQueries = sparqlQueries.generateList()
+        (updatesCreator
+          .deleteOtherTopmostDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
+          .expects(dataset(mod1DS))
+          .returning(mod1DSQueries)
+        val mod2DSQueries = sparqlQueries.generateList()
+        (updatesCreator
+          .deleteOtherTopmostDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
+          .expects(dataset(mod2DS))
+          .returning(mod2DSQueries)
 
-      val Success(Right((updatedProject, _))) = step.run(finalProject).value
+        val step = transformer.createTransformationStep
 
-      val updatedTopDS :: updatedMod1DS :: updatedMod2DS :: Nil = updatedProject.datasets
-      updatedTopDS.provenance.topmostDerivedFrom  shouldBe topDS.provenance.topmostDerivedFrom
-      updatedMod1DS.provenance.topmostDerivedFrom shouldBe updatedTopDS.provenance.topmostDerivedFrom
-      updatedMod2DS.provenance.topmostDerivedFrom shouldBe updatedTopDS.provenance.topmostDerivedFrom
-    }
+        val Success(Right((updatedProject, queries))) = (step run finalProject).value
+
+        val updatedTopDS :: updatedMod1DS :: updatedMod2DS :: Nil = updatedProject.datasets
+        updatedTopDS.provenance.topmostDerivedFrom  shouldBe topDS.provenance.topmostDerivedFrom
+        updatedMod1DS.provenance.topmostDerivedFrom shouldBe updatedTopDS.provenance.topmostDerivedFrom
+        updatedMod2DS.provenance.topmostDerivedFrom shouldBe updatedTopDS.provenance.topmostDerivedFrom
+
+        queries.preDataUploadQueries shouldBe Nil
+        queries.postDataUploadQueries  should contain theSameElementsAs (mod1DSQueries ::: mod2DSQueries)
+      }
 
     "prepare updates for deleted datasets" in new TestCase {
       val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _,

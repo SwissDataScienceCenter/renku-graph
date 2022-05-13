@@ -56,8 +56,8 @@ private trait ProjectFunctions {
     else
       project.updateDatasets(
         datasetsLens modify {
-          case dataset if dataset.resourceId == oldDataset.resourceId => newDataset
-          case dataset                                                => dataset
+          case `oldDataset` => newDataset
+          case dataset      => dataset
         }
       )
 

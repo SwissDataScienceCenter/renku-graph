@@ -165,10 +165,10 @@ object datasets {
   }
 
   final class TopmostDerivedFrom private[datasets] (val value: String) extends AnyVal with UrlTinyType
-
   implicit object TopmostDerivedFrom
       extends TinyTypeFactory[TopmostDerivedFrom](new TopmostDerivedFrom(_))
-      with constraints.Url[TopmostDerivedFrom] {
+      with constraints.Url[TopmostDerivedFrom]
+      with UrlResourceRenderer[TopmostDerivedFrom] {
 
     final def apply(derivedFrom: DerivedFrom): TopmostDerivedFrom = apply(derivedFrom.value)
 
