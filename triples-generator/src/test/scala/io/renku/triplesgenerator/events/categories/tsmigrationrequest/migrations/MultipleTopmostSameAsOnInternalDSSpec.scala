@@ -34,43 +34,40 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import tooling.UpdateQueryMigration
 
-class MultipleAllWrongTopmostSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MultipleTopmostSameAsOnInternalDSSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+
+  // there are three cases:
+  // * derivedFrom matching topmostDerivedFrom (all wrong multiple topmostSameAs, multiple topmostDerivedFrom)
+  // * multiple topmostDerivedFrom only (and single wasDerivedFrom matching one of the topmostDerivedFrom)
+  // * multiple derivedFrom and topmostDerivedFrom (not sure which one is correct - maybe remove both derivedFrom and topmostDerivedFrom and re-provision the project )
+  // * multiple originalIdentifier only (looks like the right one can be matched from wasDerivedFrom)
+  // * multiple schema:sameAs only (looks like the right one can be matched from topmostSameAs)
+  // * multiple dateCreated only (maybe try to schedule re-provisioning? maybe we need to do an update query on transformation?)
 
   "query" should {
 
-    "find all datasets having multiple topmostSameAs " +
-      "while one of them points to the correct parent dataset (sameAs/url == topmostSameAs) " +
+    "find all Internal datasets having multiple topmostSameAs " +
+      "while one of them points to the DS it belongs to (it's correct) " +
       "and remove all the excessive ones" in {
-        val (originalDS, originalDSProject) = renkuProjectEntities(anyVisibility)
+        val (ds, dsProject) = renkuProjectEntities(anyVisibility)
           .addDataset(datasetEntities(provenanceInternal))
           .generateOne
 
-        val (importedDS1, importedDS1Project) =
-          renkuProjectEntities(anyVisibility).importDataset(originalDS).generateOne
+        loadToStore(dsProject)
 
-        val (importedDS2, importedDS2Project) =
-          renkuProjectEntities(anyVisibility).importDataset(originalDS).generateOne
-
-        loadToStore(originalDSProject, importedDS1Project, importedDS2Project)
-
-        deleteTriple(importedDS1.entityId,
-                     "renku:topmostSameAs",
-                     originalDS.provenance.topmostSameAs.showAs[RdfResource]
-        )
         val illegalTopmost1 = datasetTopmostSameAs.generateOne
-        insertTriple(importedDS1.entityId, "renku:topmostSameAs", illegalTopmost1.showAs[RdfResource])
+        insertTriple(ds.entityId, "renku:topmostSameAs", illegalTopmost1.showAs[RdfResource])
         val illegalTopmost2 = datasetTopmostSameAs.generateOne
-        insertTriple(importedDS1.entityId, "renku:topmostSameAs", illegalTopmost2.showAs[RdfResource])
+        insertTriple(ds.entityId, "renku:topmostSameAs", illegalTopmost2.showAs[RdfResource])
 
-        findTopmostSameAs(originalDS.identification.identifier)  shouldBe Set(TopmostSameAs(originalDS.entityId))
-        findTopmostSameAs(importedDS1.identification.identifier) shouldBe Set(illegalTopmost1, illegalTopmost2)
-        findTopmostSameAs(importedDS2.identification.identifier) shouldBe Set(TopmostSameAs(originalDS.entityId))
+        findTopmostSameAs(ds.identification.identifier) shouldBe Set(illegalTopmost1,
+                                                                     illegalTopmost2,
+                                                                     ds.provenance.topmostSameAs
+        )
 
-        runUpdate(MultipleAllWrongTopmostSameAs.query).unsafeRunSync() shouldBe ()
+        runUpdate(MultipleTopmostSameAsOnInternalDS.query).unsafeRunSync() shouldBe ()
 
-        findTopmostSameAs(originalDS.identification.identifier)  shouldBe Set(TopmostSameAs(originalDS.entityId))
-        findTopmostSameAs(importedDS1.identification.identifier) shouldBe Set(TopmostSameAs(originalDS.entityId))
-        findTopmostSameAs(importedDS2.identification.identifier) shouldBe Set(TopmostSameAs(originalDS.entityId))
+        findTopmostSameAs(ds.identification.identifier) shouldBe Set(TopmostSameAs(ds.entityId))
       }
   }
 
@@ -79,7 +76,7 @@ class MultipleAllWrongTopmostSameAsSpec extends AnyWordSpec with should.Matchers
       implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
       implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
       implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
-      MultipleAllWrongTopmostSameAs[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
+      MultipleTopmostSameAsOnInternalDS[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }
   }
 

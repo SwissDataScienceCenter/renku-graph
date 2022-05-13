@@ -34,14 +34,15 @@ private[tsmigrationrequest] object Migrations {
       reProvisioningStatus: ReProvisioningStatus[F],
       config:               Config
   ): F[List[Migration[F]]] = for {
-    reProvisioning                <- ReProvisioning[F](reProvisioningStatus, config)
-    topMostDerivedFrom            <- TopMostDerivedFrom[F]
-    malformedActivityIds          <- MalformedActivityIds[F]
-    multiplePersonNames           <- MultiplePersonNames[F]
-    multipleModifiedDSData        <- MultipleModifiedDSData[F]
-    malformedDSImageIds           <- MalformedDSImageIds[F]
-    multipleDSTopmostSameAs       <- MultipleDSTopmostSameAs[F]
-    multipleAllWrongTopmostSameAs <- MultipleAllWrongTopmostSameAs[F]
+    reProvisioning                    <- ReProvisioning[F](reProvisioningStatus, config)
+    topMostDerivedFrom                <- TopMostDerivedFrom[F]
+    malformedActivityIds              <- MalformedActivityIds[F]
+    multiplePersonNames               <- MultiplePersonNames[F]
+    multipleModifiedDSData            <- MultipleModifiedDSData[F]
+    malformedDSImageIds               <- MalformedDSImageIds[F]
+    multipleDSTopmostSameAs           <- MultipleDSTopmostSameAs[F]
+    multipleAllWrongTopmostSameAs     <- MultipleAllWrongTopmostSameAs[F]
+    multipleTopmostSameAsOnInternalDS <- MultipleTopmostSameAsOnInternalDS[F]
     migrations <- validateNames(
                     reProvisioning,
                     topMostDerivedFrom,
@@ -50,7 +51,8 @@ private[tsmigrationrequest] object Migrations {
                     multipleModifiedDSData,
                     malformedDSImageIds,
                     multipleDSTopmostSameAs,
-                    multipleAllWrongTopmostSameAs
+                    multipleAllWrongTopmostSameAs,
+                    multipleTopmostSameAsOnInternalDS
                   )
   } yield migrations
 
