@@ -26,6 +26,7 @@ import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{datasets, entities, persons}
+import io.renku.jsonld.syntax._
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -367,6 +368,31 @@ class UpdatesCreatorSpec
     }
   }
 
+  "deleteOtherDerivedFrom" should {
+
+    "prepare queries that removes other wasDerivedFrom from the given DS" in {
+      val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .createModification()
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
+
+      loadToStore(ds)
+
+      val otherDerivedFrom       = datasetDerivedFroms.generateOne
+      val otherDerivedFromJsonLD = otherDerivedFrom.asJsonLD
+      loadToStore(otherDerivedFromJsonLD)
+      val derivedFromId = otherDerivedFromJsonLD.entityId.getOrElse(fail(" Cannot obtain EntityId for DerivedFrom"))
+      insertTriple(ds.resourceId, "prov:wasDerivedFrom", s"<$derivedFromId>")
+
+      findDerivedFrom(ds.identification.identifier) shouldBe Set(ds.provenance.derivedFrom, otherDerivedFrom)
+
+      UpdatesCreator.deleteOtherDerivedFrom(ds).runAll.unsafeRunSync()
+
+      findDerivedFrom(ds.identification.identifier) shouldBe Set(ds.provenance.derivedFrom)
+    }
+  }
+
   "deleteOtherTopmostDerivedFrom" should {
 
     "prepare queries that removes other topmostDerivedFrom from the given DS" in {
@@ -450,10 +476,21 @@ class UpdatesCreatorSpec
     runQuery(s"""|SELECT ?topmostDerivedFrom 
                  |WHERE { 
                  |  ?id a schema:Dataset;
-                 |  schema:identifier '$id';
-                 |  renku:topmostDerivedFrom ?topmostDerivedFrom
+                 |      schema:identifier '$id';
+                 |      renku:topmostDerivedFrom ?topmostDerivedFrom
                  |}""".stripMargin)
       .unsafeRunSync()
       .map(row => datasets.TopmostDerivedFrom(row("topmostDerivedFrom")))
+      .toSet
+
+  private def findDerivedFrom(id: datasets.Identifier): Set[datasets.DerivedFrom] =
+    runQuery(s"""|SELECT ?derivedFrom 
+                 |WHERE { 
+                 |  ?id a schema:Dataset;
+                 |      schema:identifier '$id';
+                 |      prov:wasDerivedFrom/schema:url ?derivedFrom
+                 |}""".stripMargin)
+      .unsafeRunSync()
+      .map(row => datasets.DerivedFrom(row("derivedFrom")))
       .toSet
 }

@@ -68,8 +68,9 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
               .map(originalDS.update)
               .map(updatedDS => update(originalDS, updatedDS)(proj) -> updatedDS)
               .map { case (updatedProj, updatedDS) =>
-                val deletions = updatesCreator.deleteOtherTopmostDerivedFrom(updatedDS)
-                updatedProj -> (quers |+| Queries.postDataQueriesOnly(deletions))
+                val derivedFromDeletions = updatesCreator.deleteOtherDerivedFrom(updatedDS)
+                val topmostDeletions     = updatesCreator.deleteOtherTopmostDerivedFrom(updatedDS)
+                updatedProj -> (quers |+| Queries.postDataQueriesOnly(topmostDeletions ::: derivedFromDeletions))
               }
           }
         }

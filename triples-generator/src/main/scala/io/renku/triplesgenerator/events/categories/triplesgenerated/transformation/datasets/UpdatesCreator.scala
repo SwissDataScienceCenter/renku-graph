@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.datasets
 
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.datasets.{ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
@@ -53,6 +53,8 @@ private trait UpdatesCreator {
   def queriesUnlinkingCreators(dataset:      Dataset[Dataset.Provenance],
                                creatorsInKG: Set[persons.ResourceId]
   ): List[SparqlQuery]
+
+  def deleteOtherDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
 
   def deleteOtherTopmostDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
 }
@@ -112,6 +114,23 @@ private object UpdatesCreator extends UpdatesCreator {
       }
       .toList
   }
+
+  override def deleteOtherDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery] = List(
+    SparqlQuery.of(
+      name = "transformation - delete other derivedFrom",
+      Prefixes of (prov -> "prov", schema -> "schema"),
+      s"""|DELETE {
+          |  ${dataset.resourceId.showAs[RdfResource]} prov:wasDerivedFrom ?derivedId
+          |}
+          |WHERE {
+          |  ${dataset.resourceId.showAs[RdfResource]} a schema:Dataset;
+          |                                            prov:wasDerivedFrom ?derivedId.
+          |  ?derivedId schema:url ?derived. 
+          |  FILTER (?derived != ${dataset.provenance.derivedFrom.showAs[RdfResource]})
+          |}
+          |""".stripMargin
+    )
+  )
 
   override def deleteOtherTopmostDerivedFrom(
       dataset: Dataset[Dataset.Provenance.Modified]

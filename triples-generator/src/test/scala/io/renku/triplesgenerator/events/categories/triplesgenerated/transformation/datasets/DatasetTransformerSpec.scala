@@ -95,7 +95,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       }
 
     "update topmostDerivedFrom on all derivation hierarchies " +
-      "and remove existing topmostDerivedFrom if different" in new TestCase {
+      "and remove existing wasDerivedFrom and topmostDerivedFrom" in new TestCase {
         givenExternalCallsPass()
 
         def topmostDerivedFromFromDerivedFrom(
@@ -105,7 +105,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
         val (_ ::~ modification1, project) =
           anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
-        val (d, projectUpdate2) = project.addDataset(
+        val (_, projectUpdate2) = project.addDataset(
           modification1.createModification().modify(topmostDerivedFromFromDerivedFrom(modification1))
         )
         val finalProject = projectUpdate2.to[entities.Project]
@@ -120,16 +120,26 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
             ds.identification.identifier == expectedDS.identification.identifier &&
             ds.provenance.topmostDerivedFrom == topDS.provenance.topmostDerivedFrom
         }
-        val mod1DSQueries = sparqlQueries.generateList()
+        val mod1DSDerivedQueries = sparqlQueries.generateList()
+        (updatesCreator
+          .deleteOtherDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
+          .expects(dataset(mod1DS))
+          .returning(mod1DSDerivedQueries)
+        val mod1DSTopmostQueries = sparqlQueries.generateList()
         (updatesCreator
           .deleteOtherTopmostDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
           .expects(dataset(mod1DS))
-          .returning(mod1DSQueries)
-        val mod2DSQueries = sparqlQueries.generateList()
+          .returning(mod1DSTopmostQueries)
+        val mod2DSDerivedQueries = sparqlQueries.generateList()
+        (updatesCreator
+          .deleteOtherDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
+          .expects(dataset(mod2DS))
+          .returning(mod2DSDerivedQueries)
+        val mod2DSTopmostQueries = sparqlQueries.generateList()
         (updatesCreator
           .deleteOtherTopmostDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
           .expects(dataset(mod2DS))
-          .returning(mod2DSQueries)
+          .returning(mod2DSTopmostQueries)
 
         val step = transformer.createTransformationStep
 
@@ -141,7 +151,9 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         updatedMod2DS.provenance.topmostDerivedFrom shouldBe updatedTopDS.provenance.topmostDerivedFrom
 
         queries.preDataUploadQueries shouldBe Nil
-        queries.postDataUploadQueries  should contain theSameElementsAs (mod1DSQueries ::: mod2DSQueries)
+        queries.postDataUploadQueries  should contain theSameElementsAs (
+          mod1DSDerivedQueries ::: mod1DSTopmostQueries ::: mod2DSDerivedQueries ::: mod2DSTopmostQueries
+        )
       }
 
     "prepare updates for deleted datasets" in new TestCase {

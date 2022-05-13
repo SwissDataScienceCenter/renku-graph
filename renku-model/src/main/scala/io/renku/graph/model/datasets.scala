@@ -145,7 +145,8 @@ object datasets {
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
   implicit object DerivedFrom
       extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_))
-      with constraints.Url[DerivedFrom] {
+      with constraints.Url[DerivedFrom]
+      with AnyResourceRenderer[DerivedFrom] {
 
     def apply(datasetEntityId: EntityId): DerivedFrom = DerivedFrom(datasetEntityId.toString)
 
