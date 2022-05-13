@@ -36,14 +36,6 @@ import tooling.UpdateQueryMigration
 
 class MultipleTopmostSameAsOnInternalDSSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
 
-  // there are three cases:
-  // * derivedFrom matching topmostDerivedFrom (all wrong multiple topmostSameAs, multiple topmostDerivedFrom)
-  // * multiple topmostDerivedFrom only (and single wasDerivedFrom matching one of the topmostDerivedFrom)
-  // * multiple derivedFrom and topmostDerivedFrom (not sure which one is correct - maybe remove both derivedFrom and topmostDerivedFrom and re-provision the project )
-  // * multiple originalIdentifier only (looks like the right one can be matched from wasDerivedFrom)
-  // * multiple schema:sameAs only (looks like the right one can be matched from topmostSameAs)
-  // * multiple dateCreated only (maybe try to schedule re-provisioning? maybe we need to do an update query on transformation?)
-
   "query" should {
 
     "find all Internal datasets having multiple topmostSameAs " +

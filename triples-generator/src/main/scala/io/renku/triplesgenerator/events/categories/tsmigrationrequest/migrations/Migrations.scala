@@ -43,6 +43,7 @@ private[tsmigrationrequest] object Migrations {
     multipleDSTopmostSameAs           <- MultipleDSTopmostSameAs[F]
     multipleAllWrongTopmostSameAs     <- MultipleAllWrongTopmostSameAs[F]
     multipleTopmostSameAsOnInternalDS <- MultipleTopmostSameAsOnInternalDS[F]
+    multipleTopmostDerivedFromOnly    <- MultipleTopmostDerivedFromOnly[F]
     migrations <- validateNames(
                     reProvisioning,
                     topMostDerivedFrom,
@@ -52,7 +53,8 @@ private[tsmigrationrequest] object Migrations {
                     malformedDSImageIds,
                     multipleDSTopmostSameAs,
                     multipleAllWrongTopmostSameAs,
-                    multipleTopmostSameAsOnInternalDS
+                    multipleTopmostSameAsOnInternalDS,
+                    multipleTopmostDerivedFromOnly
                   )
   } yield migrations
 
