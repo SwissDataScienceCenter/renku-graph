@@ -16,316 +16,148 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.datasets
+package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation
+package datasets
 
+import Generators.{queriesGen, recoverableClientErrors}
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, TopmostDerivedFrom, TopmostSameAs}
+import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, persons}
-import io.renku.rdfstore.SparqlQuery
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.categories.triplesgenerated.ProjectFunctions
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
-import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "createTransformationStep" should {
 
-    "find all internally imported datasets, " +
-      "find the topmostSameAs for their sameAs and resourceId, " +
-      "update the datasets with the topmostSameAs found for sameAs in KG " +
-      "and create update queries" in new TestCase {
+    "create a step that runs all defined transformations" in new TestCase {
+      val step1Result = generateProjAndQueries
+      (() => derivationHierarchyUpdater.fixDerivationHierarchies)
+        .expects()
+        .returning(transformation(in = initialProjectAndQueries, out = step1Result))
 
-        val (dataset1 ::~ dataset2, project) = anyRenkuProjectEntities
-          .addDataset(datasetEntities(provenanceImportedInternal))
-          .addDataset(datasetEntities(provenanceImportedInternal))
-          .generateOne
-          .bimap(
-            _.bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]],
-                    _.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
-            ),
-            _.to[entities.Project]
-          )
+      val step2Result = generateProjAndQueries
+      (() => topmostSameAsUpdater.updateTopmostSameAs)
+        .expects()
+        .returning(transformation(in = step1Result, out = step2Result))
 
-        val parentTopmostSameAs = datasetTopmostSameAs.generateOne
-        findingParentTopmostSameAsFor(dataset1.provenance.sameAs, returning = parentTopmostSameAs.some.pure[Try])
-        findingTopmostSameAsFor(dataset1.identification.resourceId, returning = Option.empty[TopmostSameAs].pure[Try])
-        val dataset1Queries = sparqlQueries.generateList()
-        prepareQueriesForSameAs(dataset1 -> None, returning = dataset1Queries)
-        val updatedDataset1 = dataset1.update(parentTopmostSameAs)
+      val step3Result = generateProjAndQueries
+      (() => initialVersionsUpdater.updateInitialVersions)
+        .expects()
+        .returning(transformation(in = step2Result, out = step3Result))
 
-        val dataset1CreatorUnlinkingQueries = givenRelevantCreatorsUnlinking(updatedDataset1)
+      val step4Result = generateProjAndQueries
+      (() => personLinksUpdater.updatePersonLinks)
+        .expects()
+        .returning(transformation(in = step3Result, out = step4Result))
 
-        val dataset1CleanUpQueries = sparqlQueries.generateList()
-        prepareQueriesForTopmostSameAsCleanup(updatedDataset1 -> parentTopmostSameAs.some,
-                                              returning = dataset1CleanUpQueries
-        )
-
-        findingParentTopmostSameAsFor(dataset2.provenance.sameAs, returning = None.pure[Try])
-        val dataset2KgTopmostSameAs = datasetTopmostSameAs.generateSome
-        findingTopmostSameAsFor(dataset2.identification.resourceId, returning = dataset2KgTopmostSameAs.pure[Try])
-        val dataset2Queries = sparqlQueries.generateList()
-        prepareQueriesForSameAs(dataset2 -> dataset2KgTopmostSameAs, returning = dataset2Queries)
-
-        val dataset2CreatorUnlinkingQueries = givenRelevantCreatorsUnlinking(dataset2)
-
-        val dataset2CleanUpQueries = sparqlQueries.generateList()
-        prepareQueriesForTopmostSameAsCleanup(dataset2 -> None, returning = dataset2CleanUpQueries)
-
-        val step = transformer.createTransformationStep
-        step.name.value shouldBe "Dataset Details Updates"
-
-        val Success(Right((updatedProject, queries))) = (step run project).value
-        updatedProject shouldBe ProjectFunctions.update(dataset1, updatedDataset1)(project)
-        queries shouldBe Queries(
-          preDataUploadQueries = dataset1CreatorUnlinkingQueries ::: dataset2CreatorUnlinkingQueries,
-          postDataUploadQueries =
-            dataset1Queries ::: dataset1CleanUpQueries ::: dataset2Queries ::: dataset2CleanUpQueries
-        )
-      }
-
-    "update topmostDerivedFrom on all derivation hierarchies " +
-      "and remove existing wasDerivedFrom and topmostDerivedFrom" in new TestCase {
-        givenExternalCallsPass()
-
-        def topmostDerivedFromFromDerivedFrom(
-            otherDs: Dataset[Dataset.Provenance.Modified]
-        ): Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] =
-          ds => ds.copy(provenance = ds.provenance.copy(topmostDerivedFrom = TopmostDerivedFrom(otherDs.entityId)))
-
-        val (_ ::~ modification1, project) =
-          anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
-        val (_, projectUpdate2) = project.addDataset(
-          modification1.createModification().modify(topmostDerivedFromFromDerivedFrom(modification1))
-        )
-        val finalProject = projectUpdate2.to[entities.Project]
-
-        // at this stage topmostDerivedFrom should be the same as derivedFrom
-        val topDS :: mod1DS :: mod2DS :: Nil = finalProject.datasets
-        mod1DS.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(topDS.identification.resourceId.show)
-        mod2DS.provenance.topmostDerivedFrom shouldBe TopmostDerivedFrom(mod1DS.identification.resourceId.show)
-
-        def dataset(expectedDS: entities.Dataset[entities.Dataset.Provenance]) = where {
-          (ds: entities.Dataset[entities.Dataset.Provenance.Modified]) =>
-            ds.identification.identifier == expectedDS.identification.identifier &&
-            ds.provenance.topmostDerivedFrom == topDS.provenance.topmostDerivedFrom
-        }
-        val mod1DSDerivedQueries = sparqlQueries.generateList()
-        (updatesCreator
-          .deleteOtherDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
-          .expects(dataset(mod1DS))
-          .returning(mod1DSDerivedQueries)
-        val mod1DSTopmostQueries = sparqlQueries.generateList()
-        (updatesCreator
-          .deleteOtherTopmostDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
-          .expects(dataset(mod1DS))
-          .returning(mod1DSTopmostQueries)
-        val mod2DSDerivedQueries = sparqlQueries.generateList()
-        (updatesCreator
-          .deleteOtherDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
-          .expects(dataset(mod2DS))
-          .returning(mod2DSDerivedQueries)
-        val mod2DSTopmostQueries = sparqlQueries.generateList()
-        (updatesCreator
-          .deleteOtherTopmostDerivedFrom(_: entities.Dataset[entities.Dataset.Provenance.Modified]))
-          .expects(dataset(mod2DS))
-          .returning(mod2DSTopmostQueries)
-
-        val step = transformer.createTransformationStep
-
-        val Success(Right((updatedProject, queries))) = (step run finalProject).value
-
-        val updatedTopDS :: updatedMod1DS :: updatedMod2DS :: Nil = updatedProject.datasets
-        updatedTopDS.provenance.topmostDerivedFrom  shouldBe topDS.provenance.topmostDerivedFrom
-        updatedMod1DS.provenance.topmostDerivedFrom shouldBe updatedTopDS.provenance.topmostDerivedFrom
-        updatedMod2DS.provenance.topmostDerivedFrom shouldBe updatedTopDS.provenance.topmostDerivedFrom
-
-        queries.preDataUploadQueries shouldBe Nil
-        queries.postDataUploadQueries  should contain theSameElementsAs (
-          mod1DSDerivedQueries ::: mod1DSTopmostQueries ::: mod2DSDerivedQueries ::: mod2DSTopmostQueries
-        )
-      }
-
-    "prepare updates for deleted datasets" in new TestCase {
-      val (internal ::~ _ ::~ importedExternal ::~ _ ::~ ancestorInternal ::~ _ ::~ ancestorExternal ::~ _,
-           projectWithAllDatasets
-      ) = anyRenkuProjectEntities
-        .addDatasetAndInvalidation(datasetEntities(provenanceInternal))
-        .addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal))
-        .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorInternal()))
-        .addDatasetAndInvalidation(datasetEntities(provenanceImportedInternalAncestorExternal))
-        .generateOne
-      val (beforeModification, modification, modificationInvalidated) =
-        datasetAndModificationEntities(provenanceInternal,
-                                       projectDateCreated = projectWithAllDatasets.dateCreated
-        ).map { case internal ::~ modified => (internal, modified, modified.invalidateNow) }.generateOne
-
-      val entitiesProjectWithAllDatasets = projectWithAllDatasets
-        .addDatasets(beforeModification, modification, modificationInvalidated)
-        .to[entities.Project]
-
-      val internalDsQueries = sparqlQueries.generateList()
-      (updatesCreator
-        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.Internal])(
-          _: entities.Dataset.Provenance.Internal.type
-        ))
-        .expects(internal.to[entities.Dataset[entities.Dataset.Provenance.Internal]], *)
-        .returning(internalDsQueries)
-
-      val importedExternalDsQueries = sparqlQueries.generateList()
-      (updatesCreator
-        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.ImportedExternal])(
-          _: entities.Dataset.Provenance.ImportedExternal.type
-        ))
-        .expects(importedExternal.to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]], *)
-        .returning(importedExternalDsQueries)
-
-      val creatorUnlinkingQueries = entitiesProjectWithAllDatasets.datasets >>= givenRelevantCreatorsUnlinking
-
-      val ancestorInternalDsQueries = sparqlQueries.generateList()
-      (updatesCreator
-        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal])(
-          _: entities.Dataset.Provenance.ImportedInternal.type
-        ))
-        .expects(ancestorInternal.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]], *)
-        .returning(ancestorInternalDsQueries)
-
-      val ancestorExternalDsQueries = sparqlQueries.generateList()
-      (updatesCreator
-        .prepareUpdatesWhenInvalidated(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal])(
-          _: entities.Dataset.Provenance.ImportedInternal.type
-        ))
-        .expects(ancestorExternal.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]], *)
-        .returning(ancestorExternalDsQueries)
+      val step5Result = generateProjAndQueries
+      (() => hierarchyOnInvalidationUpdater.updateHierarchyOnInvalidation)
+        .expects()
+        .returning(transformation(in = step4Result, out = step5Result))
 
       val step = transformer.createTransformationStep
+      step.name.value shouldBe "Dataset Details Updates"
 
-      val Success(Right((updatedProject, queries))) = step.run(entitiesProjectWithAllDatasets).value
-
-      updatedProject               shouldBe entitiesProjectWithAllDatasets
-      queries.preDataUploadQueries shouldBe creatorUnlinkingQueries
-      queries.postDataUploadQueries should contain theSameElementsAs (internalDsQueries ::: importedExternalDsQueries ::: ancestorInternalDsQueries ::: ancestorExternalDsQueries)
+      (step run initialProjectAndQueries._1).value shouldBe step5Result.asRight.pure[Try]
     }
 
-    "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error" in new TestCase {
-      val (dataset, project) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceImportedInternal))
-        .generateOne
-        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], _.to[entities.Project])
+    "return the ProcessingRecoverableFailure if one of the steps fails with a recoverable failure" in new TestCase {
+
+      val step1Result = generateProjAndQueries
+      (() => derivationHierarchyUpdater.fixDerivationHierarchies)
+        .expects()
+        .returning(transformation(in = initialProjectAndQueries, out = step1Result))
 
       val exception = recoverableClientErrors.generateOne
-      findingParentTopmostSameAsFor(dataset.provenance.sameAs,
-                                    returning = exception.raiseError[Try, Option[TopmostSameAs]]
-      )
+      (() => topmostSameAsUpdater.updateTopmostSameAs)
+        .expects()
+        .returning(transformation(in = step1Result, out = exception.raiseError[Try, (entities.Project, Queries)]))
+
+      (() => initialVersionsUpdater.updateInitialVersions)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
+
+      (() => personLinksUpdater.updatePersonLinks)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
+
+      (() => hierarchyOnInvalidationUpdater.updateHierarchyOnInvalidation)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
       val step = transformer.createTransformationStep
 
-      val Success(Left(recoverableError)) = step.run(project).value
+      val Success(Left(recoverableError)) = (step run initialProjectAndQueries._1).value
 
       recoverableError          shouldBe a[ProcessingRecoverableError]
       recoverableError.getMessage should startWith("Problem finding dataset details in KG")
     }
 
-    "fail with NonRecoverableFailure if finding calls to KG fails with an unknown exception" in new TestCase {
-      val (dataset, project) = anyRenkuProjectEntities
-        .addDataset(datasetEntities(provenanceImportedInternal))
-        .generateOne
-        .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]], _.to[entities.Project])
+    "fail with NonRecoverableFailure if one of the steps fails with an unknown exception" in new TestCase {
+      val step1Result = generateProjAndQueries
+      (() => derivationHierarchyUpdater.fixDerivationHierarchies)
+        .expects()
+        .returning(transformation(in = initialProjectAndQueries, out = step1Result))
 
       val exception = exceptions.generateOne
-      findingParentTopmostSameAsFor(dataset.provenance.sameAs,
-                                    returning = exception.raiseError[Try, Option[TopmostSameAs]]
-      )
+      (() => topmostSameAsUpdater.updateTopmostSameAs)
+        .expects()
+        .returning(transformation(in = step1Result, out = exception.raiseError[Try, (entities.Project, Queries)]))
+
+      (() => initialVersionsUpdater.updateInitialVersions)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
+
+      (() => personLinksUpdater.updatePersonLinks)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
+
+      (() => hierarchyOnInvalidationUpdater.updateHierarchyOnInvalidation)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
       val step = transformer.createTransformationStep
 
-      val Failure(nonRecoverableError) = step.run(project).value
-      nonRecoverableError shouldBe exception
+      (step run initialProjectAndQueries._1).value shouldBe exception.raiseError[Try, (entities.Project, Queries)]
     }
   }
 
   private trait TestCase {
-    val kgDatasetInfoFinder = mock[KGDatasetInfoFinder[Try]]
-    val updatesCreator      = mock[UpdatesCreator]
-    val transformer         = new DatasetTransformerImpl[Try](kgDatasetInfoFinder, updatesCreator, ProjectFunctions)
+    val initialProjectAndQueries = projectEntities(anyVisibility).generateOne.to[entities.Project] -> Queries.empty
 
-    def givenRelevantCreatorsUnlinking(ds: entities.Dataset[entities.Dataset.Provenance]): List[SparqlQuery] = {
-      val creatorsInKG = personResourceIds.generateSet()
-      findingDatasetCreatorsFor(ds.identification.resourceId, returning = creatorsInKG.pure[Try])
+    def transformation(in:  (entities.Project, Queries),
+                       out: (entities.Project, Queries)
+    ): ((entities.Project, Queries)) => Try[(entities.Project, Queries)] =
+      transformation(in, out.pure[Try])
 
-      val unlinkingQueries = sparqlQueries.generateList()
-      prepareQueriesUnlinkingRelevantCreators(ds, creatorsInKG, returning = unlinkingQueries)
-
-      unlinkingQueries
+    def transformation(in:  (entities.Project, Queries),
+                       out: Try[(entities.Project, Queries)]
+    ): ((entities.Project, Queries)) => Try[(entities.Project, Queries)] = {
+      case `in` => out
+      case _    => fail("Project or Queries different than expected")
     }
 
-    def findingParentTopmostSameAsFor(sameAs: InternalSameAs, returning: Try[Option[TopmostSameAs]]) =
-      (kgDatasetInfoFinder
-        .findParentTopmostSameAs(_: InternalSameAs)(_: InternalSameAs.type))
-        .expects(sameAs, *)
-        .returning(returning)
+    val derivationHierarchyUpdater     = mock[DerivationHierarchyUpdater[Try]]
+    val topmostSameAsUpdater           = mock[TopmostSameAsUpdater[Try]]
+    val initialVersionsUpdater         = mock[InitialVersionsUpdater[Try]]
+    val personLinksUpdater             = mock[PersonLinksUpdater[Try]]
+    val hierarchyOnInvalidationUpdater = mock[HierarchyOnInvalidationUpdater[Try]]
+    val transformer = new DatasetTransformerImpl[Try](derivationHierarchyUpdater,
+                                                      topmostSameAsUpdater,
+                                                      initialVersionsUpdater,
+                                                      personLinksUpdater,
+                                                      hierarchyOnInvalidationUpdater
+    )
 
-    def findingTopmostSameAsFor(resourceId: ResourceId, returning: Try[Option[TopmostSameAs]])(implicit
-        ev:                                 TopmostSameAs.type
-    ) = (kgDatasetInfoFinder
-      .findTopmostSameAs(_: ResourceId)(_: ResourceId.type))
-      .expects(resourceId, *)
-      .returning(returning)
-
-    def findingDatasetCreatorsFor(resourceId: ResourceId, returning: Try[Set[persons.ResourceId]]) =
-      (kgDatasetInfoFinder
-        .findDatasetCreators(_: ResourceId))
-        .expects(resourceId)
-        .returning(returning)
-
-    def prepareQueriesForSameAs(
-        dsAndMaybeTopmostSameAs: (entities.Dataset[entities.Dataset.Provenance.ImportedInternal],
-                                  Option[TopmostSameAs]
-        ),
-        returning: List[SparqlQuery]
-    ) = (updatesCreator
-      .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal], _: Option[TopmostSameAs]))
-      .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
-      .returning(returning)
-
-    def prepareQueriesUnlinkingRelevantCreators(
-        dataset:    entities.Dataset[entities.Dataset.Provenance],
-        kgCreators: Set[persons.ResourceId],
-        returning:  List[SparqlQuery]
-    ) = (updatesCreator
-      .queriesUnlinkingCreators(_: entities.Dataset[entities.Dataset.Provenance], _: Set[persons.ResourceId]))
-      .expects(dataset, kgCreators)
-      .returning(returning)
-
-    def prepareQueriesForTopmostSameAsCleanup(
-        dsAndMaybeTopmostSameAs: (entities.Dataset[entities.Dataset.Provenance.ImportedInternal],
-                                  Option[TopmostSameAs]
-        ),
-        returning: List[SparqlQuery]
-    ) = (updatesCreator
-      .prepareTopmostSameAsCleanup(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal],
-                                   _: Option[TopmostSameAs]
-      ))
-      .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
-      .returning(returning)
-
-    def givenExternalCallsPass() = {
-      (kgDatasetInfoFinder.findDatasetCreators _)
-        .expects(*)
-        .returning(Set.empty[persons.ResourceId].pure[Try])
-        .anyNumberOfTimes()
-
-      (updatesCreator.queriesUnlinkingCreators _).expects(*, *).returning(List.empty).anyNumberOfTimes()
-    }
+    def generateProjAndQueries =
+      projectEntities(anyVisibility).generateOne.to[entities.Project] -> queriesGen.generateOne
   }
 }

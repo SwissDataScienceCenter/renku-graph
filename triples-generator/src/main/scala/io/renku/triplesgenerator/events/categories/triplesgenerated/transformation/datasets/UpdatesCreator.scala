@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
-import io.renku.graph.model.datasets.{ResourceId, TopmostSameAs}
+import io.renku.graph.model.datasets.{InitialVersion, ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.persons
@@ -52,6 +52,10 @@ private trait UpdatesCreator {
 
   def queriesUnlinkingCreators(dataset:      Dataset[Dataset.Provenance],
                                creatorsInKG: Set[persons.ResourceId]
+  ): List[SparqlQuery]
+
+  def removeOtherInitialVersions(dataset:             Dataset[Dataset.Provenance],
+                                 initialVersionsInKG: Set[InitialVersion]
   ): List[SparqlQuery]
 
   def deleteOtherDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
@@ -243,4 +247,19 @@ private object UpdatesCreator extends UpdatesCreator {
         |}
         |""".stripMargin
   )
+
+  override def removeOtherInitialVersions(ds: Dataset[Provenance], initialVersionsInKG: Set[InitialVersion]) =
+    Option
+      .when((initialVersionsInKG - ds.provenance.initialVersion).nonEmpty) {
+        SparqlQuery.of(
+          name = "transformation - originalIdentifier clean-up",
+          Prefixes.of(renku -> "renku", schema -> "schema"),
+          s"""|DELETE { ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version }
+              |WHERE { 
+              |  ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version.
+              |  FILTER ( ?version != '${ds.provenance.initialVersion}' )
+              |}""".stripMargin
+        )
+      }
+      .toList
 }

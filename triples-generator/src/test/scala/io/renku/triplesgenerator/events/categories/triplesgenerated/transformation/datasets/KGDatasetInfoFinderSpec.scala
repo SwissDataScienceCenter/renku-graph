@@ -106,6 +106,26 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
     }
   }
 
+  "findDatasetInitialVersions" should {
+
+    "return all DS' Initial Versions" in new TestCase {
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(dataset)
+
+      val otherInitialVersion = datasetInitialVersions.generateOne
+      insertTriple(dataset.resourceId, "renku:originalIdentifier", show"'$otherInitialVersion'")
+
+      kgDatasetInfoFinder.findDatasetInitialVersions(dataset.resourceId).unsafeRunSync() shouldBe
+        Set(dataset.provenance.initialVersion, otherInitialVersion)
+    }
+
+    "return no Initial Versions if there's no DS with the given id" in new TestCase {
+      kgDatasetInfoFinder.findDatasetInitialVersions(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
+    }
+  }
+
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]

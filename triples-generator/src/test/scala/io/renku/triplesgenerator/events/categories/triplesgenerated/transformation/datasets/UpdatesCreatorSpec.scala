@@ -368,6 +368,47 @@ class UpdatesCreatorSpec
     }
   }
 
+  "removeOtherInitialVersions" should {
+
+    "prepare queries that removes all additional originalIdentifier triples on the DS" in {
+      val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(ds)
+
+      val existingInitialVersion1 = datasetInitialVersions.generateOne
+      insertTriple(ds.resourceId, "renku:originalIdentifier", s"'$existingInitialVersion1'")
+      val existingInitialVersion2 = datasetInitialVersions.generateOne
+      insertTriple(ds.resourceId, "renku:originalIdentifier", s"'$existingInitialVersion2'")
+
+      findInitialVersions(ds.identification.identifier) shouldBe Set(ds.provenance.initialVersion,
+                                                                     existingInitialVersion1,
+                                                                     existingInitialVersion2
+      )
+
+      UpdatesCreator
+        .removeOtherInitialVersions(ds, Set(existingInitialVersion1, existingInitialVersion2))
+        .runAll
+        .unsafeRunSync()
+
+      findInitialVersions(ds.identification.identifier) shouldBe Set(ds.provenance.initialVersion)
+    }
+
+    "prepare no queries if there's only the correct originalIdentifier for the DS in KG" in {
+      val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      UpdatesCreator.removeOtherInitialVersions(ds, Set(ds.provenance.initialVersion)) shouldBe Nil
+    }
+
+    "prepare no queries if there's no originalIdentifier for the DS in KG" in {
+      val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      UpdatesCreator.removeOtherInitialVersions(ds, Set.empty) shouldBe Nil
+    }
+  }
+
   "deleteOtherDerivedFrom" should {
 
     "prepare queries that removes other wasDerivedFrom from the given DS" in {
@@ -470,6 +511,17 @@ class UpdatesCreatorSpec
       .map(row => persons.ResourceId.from(row("personId")))
       .sequence
       .fold(throw _, identity)
+      .toSet
+
+  private def findInitialVersions(id: datasets.Identifier): Set[datasets.InitialVersion] =
+    runQuery(s"""|SELECT ?initial 
+                 |WHERE { 
+                 |  ?id a schema:Dataset;
+                 |      schema:identifier '$id';
+                 |      renku:originalIdentifier ?initial.
+                 |}""".stripMargin)
+      .unsafeRunSync()
+      .map(row => datasets.InitialVersion(row("initial")))
       .toSet
 
   private def findTopmostDerivedFrom(id: datasets.Identifier): Set[datasets.TopmostDerivedFrom] =
