@@ -43,10 +43,6 @@ class MultipleOriginalIdentifiersSpec
     with InMemoryRdfStore
     with MockFactory {
 
-  // there are three cases:
-  // * multiple schema:sameAs only (looks like the right one can be matched from topmostSameAs)
-  // * multiple dateCreated only (maybe try to schedule re-provisioning? maybe we need to do an update query on transformation?)
-
   "run" should {
 
     "find DS records with multiple renku:originalIdentifier and remove the additional ones" in new TestCase {
