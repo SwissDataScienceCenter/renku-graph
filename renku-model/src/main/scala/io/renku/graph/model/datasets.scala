@@ -208,7 +208,10 @@ object datasets {
       extends TinyTypeFactory[ExternalSameAs](new ExternalSameAs(_))
       with constraints.Url[ExternalSameAs]
 
-  implicit object SameAs extends TinyTypeFactory[SameAs](new ExternalSameAs(_)) with constraints.Url[SameAs] {
+  implicit object SameAs
+      extends TinyTypeFactory[SameAs](new ExternalSameAs(_))
+      with constraints.Url[SameAs]
+      with UrlResourceRenderer[SameAs] {
 
     final def internal(value: RenkuBaseUrl): Either[IllegalArgumentException, InternalSameAs] =
       from(value.value) map (sameAs => new InternalSameAs(sameAs.value))

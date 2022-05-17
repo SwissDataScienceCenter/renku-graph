@@ -44,9 +44,6 @@ class MultipleDSDateCreatedSpec
     with InMemoryRdfStore
     with MockFactory {
 
-  // there are three cases:
-  // * multiple schema:sameAs only (looks like the right one can be matched from topmostSameAs)
-
   "query" should {
 
     "find datasets having multiple schema:dateCreated and remove all except the oldest one" in {
