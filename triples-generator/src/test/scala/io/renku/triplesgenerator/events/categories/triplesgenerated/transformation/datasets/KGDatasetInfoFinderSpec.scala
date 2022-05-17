@@ -22,12 +22,14 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
+import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -146,6 +148,29 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
     }
   }
 
+  "findDatasetSameAs" should {
+
+    "return all DS' sameAs" in new TestCase {
+      val originalDS = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+      val importedDS = datasetEntities(
+        provenanceImportedInternalAncestorInternal(fixed(SameAs(originalDS.entityId)))
+      ).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+
+      loadToStore(originalDS.asJsonLD, importedDS.asJsonLD)
+
+      val otherSameAs = datasetSameAs.generateOne.entityId
+      insertTriple(importedDS.resourceId, "schema:sameAs", show"<$otherSameAs>")
+
+      kgDatasetInfoFinder.findDatasetSameAs(importedDS.resourceId).unsafeRunSync().map(_.show) shouldBe
+        Set(importedDS.provenance.sameAs.entityId, otherSameAs).map(_.show)
+    }
+
+    "return no SameAs if there's no DS with the given id" in new TestCase {
+      kgDatasetInfoFinder.findDatasetSameAs(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
+    }
+  }
+
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
@@ -164,4 +189,8 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
                  |""".stripMargin
     )
   }.unsafeRunSync()
+
+  private implicit class SameAsOps(sameAs: SameAs) {
+    lazy val entityId: EntityId = sameAs.asJsonLD.entityId.getOrElse(fail("Cannot obtain sameAs @id"))
+  }
 }

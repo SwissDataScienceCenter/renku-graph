@@ -36,6 +36,7 @@ private[transformation] trait DatasetTransformer[F[_]] {
 
 private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
     derivationHierarchyUpdater:     DerivationHierarchyUpdater[F],
+    sameAsUpdater:                  SameAsUpdater[F],
     topmostSameAsUpdater:           TopmostSameAsUpdater[F],
     initialVersionsUpdater:         InitialVersionsUpdater[F],
     dateCreatedUpdater:             DateCreatedUpdater[F],
@@ -50,6 +51,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
   import initialVersionsUpdater._
   import personLinksUpdater._
   import recoverableErrorsRecovery._
+  import sameAsUpdater._
   import topmostSameAsUpdater._
 
   override def createTransformationStep: TransformationStep[F] =
@@ -58,6 +60,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
   private def createTransformation: Transformation[F] = project =>
     EitherT {
       (fixDerivationHierarchies(project -> Queries.empty) >>=
+        updateSameAs >>=
         updateTopmostSameAs >>=
         updateInitialVersions >>=
         updateDateCreated >>=
@@ -71,12 +74,14 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
 private[transformation] object DatasetTransformer {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetTransformer[F]] = for {
     derivationHierarchyUpdater     <- DerivationHierarchyUpdater[F]
+    sameAsUpdater                  <- SameAsUpdater[F]
     topmostSameAsUpdater           <- TopmostSameAsUpdater[F]
     personLinksUpdater             <- PersonLinksUpdater[F]
     hierarchyOnInvalidationUpdater <- HierarchyOnInvalidationUpdater[F]
     initialVersionsUpdater         <- InitialVersionsUpdater[F]
     dateCreatedUpdater             <- DateCreatedUpdater[F]
   } yield new DatasetTransformerImpl[F](derivationHierarchyUpdater,
+                                        sameAsUpdater,
                                         topmostSameAsUpdater,
                                         initialVersionsUpdater,
                                         dateCreatedUpdater,

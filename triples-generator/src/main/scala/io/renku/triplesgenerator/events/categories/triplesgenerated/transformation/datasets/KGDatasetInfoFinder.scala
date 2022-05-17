@@ -35,6 +35,7 @@ private trait KGDatasetInfoFinder[F[_]] {
   def findDatasetCreators(resourceId:        ResourceId): F[Set[persons.ResourceId]]
   def findDatasetInitialVersions(resourceId: ResourceId): F[Set[InitialVersion]]
   def findDatasetDateCreated(resourceId:     ResourceId): F[Set[DateCreated]]
+  def findDatasetSameAs(resourceId:          ResourceId): F[Set[SameAs]]
 }
 
 private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
@@ -134,6 +135,24 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
             |WHERE {
             |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
             |                                    schema:dateCreated ?date.
+            |}
+            |""".stripMargin
+      )
+    }.map(_.toSet)
+  }
+
+  override def findDatasetSameAs(resourceId: ResourceId): F[Set[SameAs]] = {
+    implicit val decoder: Decoder[List[SameAs]] = ListResultsDecoder[SameAs] { implicit cursor =>
+      extract("sameAs")
+    }
+    queryExpecting[List[SameAs]] {
+      SparqlQuery.of(
+        name = "transformation - find ds sameAs",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?sameAs
+            |WHERE {
+            |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
+            |                                    schema:sameAs ?sameAs.
             |}
             |""".stripMargin
       )

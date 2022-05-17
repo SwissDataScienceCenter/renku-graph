@@ -44,34 +44,39 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(transformation(in = initialProjectAndQueries, out = step1Result))
 
       val step2Result = generateProjAndQueries
-      (() => topmostSameAsUpdater.updateTopmostSameAs)
+      (() => sameAsUpdater.updateSameAs)
         .expects()
         .returning(transformation(in = step1Result, out = step2Result))
 
       val step3Result = generateProjAndQueries
-      (() => initialVersionsUpdater.updateInitialVersions)
+      (() => topmostSameAsUpdater.updateTopmostSameAs)
         .expects()
         .returning(transformation(in = step2Result, out = step3Result))
 
       val step4Result = generateProjAndQueries
-      (() => dateCreatedUpdater.updateDateCreated)
+      (() => initialVersionsUpdater.updateInitialVersions)
         .expects()
         .returning(transformation(in = step3Result, out = step4Result))
 
       val step5Result = generateProjAndQueries
-      (() => personLinksUpdater.updatePersonLinks)
+      (() => dateCreatedUpdater.updateDateCreated)
         .expects()
         .returning(transformation(in = step4Result, out = step5Result))
 
       val step6Result = generateProjAndQueries
-      (() => hierarchyOnInvalidationUpdater.updateHierarchyOnInvalidation)
+      (() => personLinksUpdater.updatePersonLinks)
         .expects()
         .returning(transformation(in = step5Result, out = step6Result))
+
+      val step7Result = generateProjAndQueries
+      (() => hierarchyOnInvalidationUpdater.updateHierarchyOnInvalidation)
+        .expects()
+        .returning(transformation(in = step6Result, out = step7Result))
 
       val step = transformer.createTransformationStep
       step.name.value shouldBe "Dataset Details Updates"
 
-      (step run initialProjectAndQueries._1).value shouldBe step6Result.asRight.pure[Try]
+      (step run initialProjectAndQueries._1).value shouldBe step7Result.asRight.pure[Try]
     }
 
     "return the ProcessingRecoverableFailure if one of the steps fails with a recoverable failure" in new TestCase {
@@ -82,9 +87,13 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(transformation(in = initialProjectAndQueries, out = step1Result))
 
       val exception = recoverableClientErrors.generateOne
-      (() => topmostSameAsUpdater.updateTopmostSameAs)
+      (() => sameAsUpdater.updateSameAs)
         .expects()
         .returning(transformation(in = step1Result, out = exception.raiseError[Try, (entities.Project, Queries)]))
+
+      (() => topmostSameAsUpdater.updateTopmostSameAs)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
       (() => initialVersionsUpdater.updateInitialVersions)
         .expects()
@@ -117,9 +126,13 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(transformation(in = initialProjectAndQueries, out = step1Result))
 
       val exception = exceptions.generateOne
-      (() => topmostSameAsUpdater.updateTopmostSameAs)
+      (() => sameAsUpdater.updateSameAs)
         .expects()
         .returning(transformation(in = step1Result, out = exception.raiseError[Try, (entities.Project, Queries)]))
+
+      (() => topmostSameAsUpdater.updateTopmostSameAs)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
       (() => initialVersionsUpdater.updateInitialVersions)
         .expects()
@@ -159,12 +172,14 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     val derivationHierarchyUpdater     = mock[DerivationHierarchyUpdater[Try]]
+    val sameAsUpdater                  = mock[SameAsUpdater[Try]]
     val topmostSameAsUpdater           = mock[TopmostSameAsUpdater[Try]]
     val initialVersionsUpdater         = mock[InitialVersionsUpdater[Try]]
     val dateCreatedUpdater             = mock[DateCreatedUpdater[Try]]
     val personLinksUpdater             = mock[PersonLinksUpdater[Try]]
     val hierarchyOnInvalidationUpdater = mock[HierarchyOnInvalidationUpdater[Try]]
     val transformer = new DatasetTransformerImpl[Try](derivationHierarchyUpdater,
+                                                      sameAsUpdater,
                                                       topmostSameAsUpdater,
                                                       initialVersionsUpdater,
                                                       dateCreatedUpdater,

@@ -18,13 +18,15 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.datasets
 
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
-import io.renku.graph.model.datasets.{DateCreated, InitialVersion, ResourceId, TopmostSameAs}
+import io.renku.graph.model.datasets.{DateCreated, InitialVersion, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.persons
 import io.renku.graph.model.views.RdfResource
+import io.renku.jsonld.syntax._
 import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
@@ -63,6 +65,8 @@ private trait UpdatesCreator {
   ): List[SparqlQuery]
 
   def removeOtherDateCreated(dataset: Dataset[Dataset.Provenance], dateCreatedInKG: Set[DateCreated]): List[SparqlQuery]
+
+  def removeOtherSameAs(dataset: Dataset[Dataset.Provenance], sameAsInKG: Set[SameAs]): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
@@ -284,4 +288,33 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
     .toList
+
+  override def removeOtherSameAs(ds: Dataset[Dataset.Provenance], sameAsInKG: Set[SameAs]): List[SparqlQuery] = {
+    val maybeSameAs = {
+      ds.provenance match {
+        case p: Dataset.Provenance.ImportedExternal => p.sameAs.some
+        case p: Dataset.Provenance.ImportedInternal => p.sameAs.some
+        case _ => None
+      }
+    }.widen[SameAs] >>= (_.asJsonLD.entityId)
+
+    maybeSameAs match {
+      case None => Nil
+      case Some(dsSameAs) =>
+        Option
+          .when((sameAsInKG.map(_.show) - dsSameAs.show).nonEmpty) {
+            SparqlQuery.of(
+              name = "transformation - sameAs clean-up",
+              Prefixes of schema -> "schema",
+              s"""|DELETE { ?dsId schema:sameAs ?sameAs }
+                  |WHERE {
+                  |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+                  |  ?dsId schema:sameAs ?sameAs.
+                  |  FILTER ( ?sameAs != <${dsSameAs.show}> )
+                  |}""".stripMargin
+            )
+          }
+          .toList
+    }
+  }
 }

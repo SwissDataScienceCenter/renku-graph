@@ -21,11 +21,13 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{datasets, entities, persons}
+import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
@@ -458,6 +460,77 @@ class UpdatesCreatorSpec
     }
   }
 
+  "removeOtherDSSameAs" should {
+
+    "prepare queries that removes all additional Internal SameAs triples on the DS" in {
+
+      val originalDS = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+      val importedDS = datasetEntities(
+        provenanceImportedInternalAncestorInternal(fixed(SameAs(originalDS.entityId)))
+      ).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+
+      loadToStore(originalDS.asJsonLD, importedDS.asJsonLD)
+
+      val otherSameAs = datasetSameAs.generateOne.entityId
+      insertTriple(importedDS.resourceId, "schema:sameAs", show"<$otherSameAs>")
+
+      findSameAs(importedDS.identification.identifier).map(_.show) shouldBe Set(importedDS.provenance.sameAs.entityId,
+                                                                                otherSameAs
+      ).map(_.show)
+
+      UpdatesCreator
+        .removeOtherSameAs(importedDS, Set(SameAs(otherSameAs)))
+        .runAll
+        .unsafeRunSync()
+
+      findSameAs(importedDS.identification.identifier).map(_.show) shouldBe Set(
+        importedDS.provenance.sameAs.entityId.show
+      )
+    }
+
+    "prepare queries that removes all additional External SameAs triples on the DS" in {
+
+      val importedExternalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
+
+      loadToStore(importedExternalDS.asJsonLD)
+
+      val otherSameAs = datasetSameAs.generateOne.entityId
+      insertTriple(importedExternalDS.resourceId, "schema:sameAs", show"<$otherSameAs>")
+
+      findSameAs(importedExternalDS.identification.identifier)
+        .map(_.show) shouldBe Set(importedExternalDS.provenance.sameAs.entityId, otherSameAs).map(_.show)
+
+      UpdatesCreator
+        .removeOtherSameAs(importedExternalDS, Set(SameAs(otherSameAs)))
+        .runAll
+        .unsafeRunSync()
+
+      findSameAs(importedExternalDS.identification.identifier).map(_.show) shouldBe Set(
+        importedExternalDS.provenance.sameAs.entityId.show
+      )
+    }
+
+    "prepare no queries if there's only the correct sameAs for the DS in KG" in {
+      val importedDS = datasetEntities(
+        provenanceImportedInternalAncestorInternal(datasetInternalSameAs.generateOne)
+      ).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+
+      UpdatesCreator.removeOtherSameAs(importedDS, Set(SameAs(importedDS.provenance.sameAs.entityId))) shouldBe Nil
+    }
+
+    "prepare no queries if there's no sameAs for the DS in KG" in {
+      val importedDS = datasetEntities(
+        provenanceImportedInternalAncestorInternal(datasetInternalSameAs.generateOne)
+      ).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
+
+      UpdatesCreator.removeOtherSameAs(importedDS, Set.empty) shouldBe Nil
+    }
+  }
+
   "deleteOtherDerivedFrom" should {
 
     "prepare queries that removes other wasDerivedFrom from the given DS" in {
@@ -584,6 +657,17 @@ class UpdatesCreatorSpec
       .map(row => datasets.DateCreated(Instant.parse(row("date"))))
       .toSet
 
+  private def findSameAs(id: datasets.Identifier): Set[datasets.SameAs] =
+    runQuery(s"""|SELECT ?sameAs
+                 |WHERE { 
+                 |  ?id a schema:Dataset;
+                 |      schema:identifier '$id';
+                 |      schema:sameAs ?sameAs.
+                 |}""".stripMargin)
+      .unsafeRunSync()
+      .map(row => datasets.SameAs(row("sameAs")))
+      .toSet
+
   private def findTopmostDerivedFrom(id: datasets.Identifier): Set[datasets.TopmostDerivedFrom] =
     runQuery(s"""|SELECT ?topmostDerivedFrom 
                  |WHERE { 
@@ -605,4 +689,8 @@ class UpdatesCreatorSpec
       .unsafeRunSync()
       .map(row => datasets.DerivedFrom(row("derivedFrom")))
       .toSet
+
+  private implicit class SameAsOps(sameAs: SameAs) {
+    lazy val entityId: EntityId = sameAs.asJsonLD.entityId.getOrElse(fail("Cannot obtain sameAs @id"))
+  }
 }
