@@ -33,6 +33,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.Instant
 import scala.util.Random
 
 class UpdatesCreatorSpec
@@ -409,6 +410,54 @@ class UpdatesCreatorSpec
     }
   }
 
+  "removeOtherDSDateCreated" should {
+
+    "prepare queries that removes all additional dateCreated triples on the DS" in {
+      val ds = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+
+      loadToStore(ds)
+
+      val existingDateCreated1 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
+      insertTriple(ds.resourceId, "schema:dateCreated", show"'$existingDateCreated1'")
+      val existingDateCreated2 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
+      insertTriple(ds.resourceId, "schema:dateCreated", show"'$existingDateCreated2'")
+
+      findDateCreated(ds.identification.identifier) shouldBe Set(ds.provenance.date,
+                                                                 existingDateCreated1,
+                                                                 existingDateCreated2
+      )
+
+      UpdatesCreator
+        .removeOtherDateCreated(ds, Set(existingDateCreated1, existingDateCreated2))
+        .runAll
+        .unsafeRunSync()
+
+      findDateCreated(ds.identification.identifier) shouldBe Set(ds.provenance.date)
+    }
+
+    "prepare no queries if there's only the correct dateCreated for the DS in KG" in {
+      val ds = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+
+      UpdatesCreator.removeOtherDateCreated(ds, Set(ds.provenance.date)) shouldBe Nil
+    }
+
+    "prepare no queries if it's a DS with datePublished" in {
+      val ds = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
+
+      UpdatesCreator.removeOtherDateCreated(ds, Set.empty) shouldBe Nil
+    }
+
+    "prepare no queries if there's no dateCreated for the DS in KG" in {
+      val ds = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+
+      UpdatesCreator.removeOtherDateCreated(ds, Set.empty) shouldBe Nil
+    }
+  }
+
   "deleteOtherDerivedFrom" should {
 
     "prepare queries that removes other wasDerivedFrom from the given DS" in {
@@ -514,7 +563,7 @@ class UpdatesCreatorSpec
       .toSet
 
   private def findInitialVersions(id: datasets.Identifier): Set[datasets.InitialVersion] =
-    runQuery(s"""|SELECT ?initial 
+    runQuery(s"""|SELECT ?initial
                  |WHERE { 
                  |  ?id a schema:Dataset;
                  |      schema:identifier '$id';
@@ -522,6 +571,17 @@ class UpdatesCreatorSpec
                  |}""".stripMargin)
       .unsafeRunSync()
       .map(row => datasets.InitialVersion(row("initial")))
+      .toSet
+
+  private def findDateCreated(id: datasets.Identifier): Set[datasets.DateCreated] =
+    runQuery(s"""|SELECT ?date
+                 |WHERE { 
+                 |  ?id a schema:Dataset;
+                 |      schema:identifier '$id';
+                 |      schema:dateCreated ?date.
+                 |}""".stripMargin)
+      .unsafeRunSync()
+      .map(row => datasets.DateCreated(Instant.parse(row("date"))))
       .toSet
 
   private def findTopmostDerivedFrom(id: datasets.Identifier): Set[datasets.TopmostDerivedFrom] =

@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
-import io.renku.graph.model.datasets.{InitialVersion, ResourceId, TopmostSameAs}
+import io.renku.graph.model.datasets.{DateCreated, InitialVersion, ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.persons
@@ -54,13 +54,15 @@ private trait UpdatesCreator {
                                creatorsInKG: Set[persons.ResourceId]
   ): List[SparqlQuery]
 
+  def deleteOtherDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
+
+  def deleteOtherTopmostDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
+
   def removeOtherInitialVersions(dataset:             Dataset[Dataset.Provenance],
                                  initialVersionsInKG: Set[InitialVersion]
   ): List[SparqlQuery]
 
-  def deleteOtherDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
-
-  def deleteOtherTopmostDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
+  def removeOtherDateCreated(dataset: Dataset[Dataset.Provenance], dateCreatedInKG: Set[DateCreated]): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
@@ -253,7 +255,7 @@ private object UpdatesCreator extends UpdatesCreator {
       .when((initialVersionsInKG - ds.provenance.initialVersion).nonEmpty) {
         SparqlQuery.of(
           name = "transformation - originalIdentifier clean-up",
-          Prefixes.of(renku -> "renku", schema -> "schema"),
+          Prefixes of renku -> "renku",
           s"""|DELETE { ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version }
               |WHERE { 
               |  ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version.
@@ -262,4 +264,24 @@ private object UpdatesCreator extends UpdatesCreator {
         )
       }
       .toList
+
+  override def removeOtherDateCreated(ds:              Dataset[Dataset.Provenance],
+                                      dateCreatedInKG: Set[DateCreated]
+  ): List[SparqlQuery] = Option
+    .when(
+      ds.provenance.date.isInstanceOf[DateCreated] &&
+        (dateCreatedInKG - ds.provenance.date.asInstanceOf[DateCreated]).nonEmpty
+    ) {
+      SparqlQuery.of(
+        name = "transformation - dateCreated clean-up",
+        Prefixes of schema -> "schema",
+        s"""|DELETE { ?dsId schema:dateCreated ?date }
+            |WHERE {
+            |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+            |  ?dsId schema:dateCreated ?date.
+            |  FILTER ( STR(?date) != '${ds.provenance.date}' )
+            |}""".stripMargin
+      )
+    }
+    .toList
 }

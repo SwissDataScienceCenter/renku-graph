@@ -38,11 +38,13 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
     derivationHierarchyUpdater:     DerivationHierarchyUpdater[F],
     topmostSameAsUpdater:           TopmostSameAsUpdater[F],
     initialVersionsUpdater:         InitialVersionsUpdater[F],
+    dateCreatedUpdater:             DateCreatedUpdater[F],
     personLinksUpdater:             PersonLinksUpdater[F],
     hierarchyOnInvalidationUpdater: HierarchyOnInvalidationUpdater[F],
     recoverableErrorsRecovery:      RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends DatasetTransformer[F] {
 
+  import dateCreatedUpdater._
   import derivationHierarchyUpdater._
   import hierarchyOnInvalidationUpdater._
   import initialVersionsUpdater._
@@ -58,6 +60,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
       (fixDerivationHierarchies(project -> Queries.empty) >>=
         updateTopmostSameAs >>=
         updateInitialVersions >>=
+        updateDateCreated >>=
         updatePersonLinks >>=
         updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
@@ -72,9 +75,11 @@ private[transformation] object DatasetTransformer {
     personLinksUpdater             <- PersonLinksUpdater[F]
     hierarchyOnInvalidationUpdater <- HierarchyOnInvalidationUpdater[F]
     initialVersionsUpdater         <- InitialVersionsUpdater[F]
+    dateCreatedUpdater             <- DateCreatedUpdater[F]
   } yield new DatasetTransformerImpl[F](derivationHierarchyUpdater,
                                         topmostSameAsUpdater,
                                         initialVersionsUpdater,
+                                        dateCreatedUpdater,
                                         personLinksUpdater,
                                         hierarchyOnInvalidationUpdater
   )

@@ -126,6 +126,26 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
     }
   }
 
+  "findDatasetDateCreated" should {
+
+    "return all DS' dateCreated" in new TestCase {
+      val dataset = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+
+      loadToStore(dataset)
+
+      val otherDateCreated = datasetCreatedDates(min = dataset.provenance.date.instant).generateOne
+      insertTriple(dataset.resourceId, "schema:dateCreated", show"'$otherDateCreated'")
+
+      kgDatasetInfoFinder.findDatasetDateCreated(dataset.resourceId).unsafeRunSync() shouldBe
+        Set(dataset.provenance.date, otherDateCreated)
+    }
+
+    "return no Initial Versions if there's no DS with the given id" in new TestCase {
+      kgDatasetInfoFinder.findDatasetDateCreated(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
+    }
+  }
+
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
