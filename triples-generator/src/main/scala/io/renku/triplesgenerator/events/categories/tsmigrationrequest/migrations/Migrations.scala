@@ -35,7 +35,6 @@ private[tsmigrationrequest] object Migrations {
       config:               Config
   ): F[List[Migration[F]]] = for {
     reProvisioning                    <- ReProvisioning[F](reProvisioningStatus, config)
-    topMostDerivedFrom                <- TopMostDerivedFrom[F]
     malformedActivityIds              <- MalformedActivityIds[F]
     multiplePersonNames               <- MultiplePersonNames[F]
     multipleModifiedDSData            <- MultipleModifiedDSData[F]
@@ -46,7 +45,6 @@ private[tsmigrationrequest] object Migrations {
     multipleTopmostDerivedFromOnly    <- MultipleTopmostDerivedFromOnly[F]
     migrations <- validateNames(
                     reProvisioning,
-                    topMostDerivedFrom,
                     malformedActivityIds,
                     multiplePersonNames,
                     multipleModifiedDSData,
