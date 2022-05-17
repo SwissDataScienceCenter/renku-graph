@@ -20,24 +20,30 @@ package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migration
 
 import cats.effect.Async
 import cats.syntax.all._
+import io.circe.Decoder
+import io.renku.graph.model.projects
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-private[migrations] trait UpdateQueryRunner[F[_]] {
-  def run(query: SparqlQuery): F[Unit]
+private trait ProjectsFinder[F[_]] {
+  def findProjects(): F[List[projects.Path]]
 }
 
-private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
+private object ProjectsFinder {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](query: SparqlQuery): F[ProjectsFinder[F]] =
+    RdfStoreConfig[F]().map(new ProjectsFinderImpl(query, _))
+}
+
+private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](query: SparqlQuery,
+                                                                               rdfStoreConfig: RdfStoreConfig
 ) extends RdfStoreClientImpl[F](rdfStoreConfig)
-    with UpdateQueryRunner[F] {
+    with ProjectsFinder[F] {
 
-  def run(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
-}
+  override def findProjects(): F[List[projects.Path]] = queryExpecting[List[projects.Path]](query)
 
-private[migrations] object UpdateQueryRunner {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateQueryRunner[F]] =
-    RdfStoreConfig[F]().map(new UpdateQueryRunnerImpl(_))
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): UpdateQueryRunner[F] =
-    new UpdateQueryRunnerImpl(rdfStoreConfig)
+  private implicit lazy val pathsDecoder: Decoder[List[projects.Path]] = ListResultsDecoder[projects.Path] {
+    implicit cursor =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+      extract[projects.Path]("path")
+  }
 }

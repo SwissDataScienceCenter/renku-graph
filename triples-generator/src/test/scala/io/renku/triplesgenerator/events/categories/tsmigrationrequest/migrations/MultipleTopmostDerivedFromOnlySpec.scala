@@ -35,11 +35,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class MultipleTopmostDerivedFromOnlySpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
 
-  // there are three cases:
-  // * multiple originalIdentifier only (looks like the right one can be matched from wasDerivedFrom)
-  // * multiple schema:sameAs only (looks like the right one can be matched from topmostSameAs)
-  // * multiple dateCreated only (maybe try to schedule re-provisioning? maybe we need to do an update query on transformation?)
-
   "query" should {
 
     "find projects with multiple topmostDerivedFrom" in {

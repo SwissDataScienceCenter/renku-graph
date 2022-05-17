@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 package migrations.tooling
 
-import ConditionedMigration.MigrationRequired
 import QueryBasedMigration.EventData
 import cats.MonadThrow
 import cats.data.EitherT
@@ -34,30 +33,19 @@ import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 
 private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](
-    val name:          Migration.Name,
-    recordsFinder:     RecordsFinder[F],
+    override val name: Migration.Name,
+    projectsFinder:    ProjectsFinder[F],
     eventProducer:     projects.Path => EventData,
     eventSender:       EventSender[F],
     executionRegister: MigrationExecutionRegister[F],
     recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
-) extends ConditionedMigration[F] {
+) extends RegisteredMigration[F](name, executionRegister, recoveryStrategy) {
 
-  import recordsFinder._
+  import projectsFinder._
   import recoveryStrategy._
 
-  protected[tooling] override def required: EitherT[F, ProcessingRecoverableError, MigrationRequired] = EitherT {
-    executionRegister
-      .findExecution(name)
-      .map {
-        case Some(serviceVersion) => MigrationRequired.No(s"was executed on $serviceVersion")
-        case None                 => MigrationRequired.Yes("was not executed yet")
-      }
-      .map(_.asRight[ProcessingRecoverableError])
-      .recoverWith(maybeRecoverableError[F, MigrationRequired])
-  }
-
   protected[tooling] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    (findRecords().map(toEvents) >>= sendEvents)
+    (findProjects().map(toEvents) >>= sendEvents)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(maybeRecoverableError[F, Unit])
   }
@@ -70,13 +58,6 @@ private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](
       EventSender.EventContext(eventCategory, show"$categoryName: $name cannot send event for $path")
     )
   }.sequence.void
-
-  protected[tooling] override def postMigration(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    executionRegister
-      .registerExecution(name)
-      .map(_.asRight[ProcessingRecoverableError])
-      .recoverWith(maybeRecoverableError[F, Unit])
-  }
 }
 
 private[migrations] object QueryBasedMigration {
@@ -88,8 +69,8 @@ private[migrations] object QueryBasedMigration {
       query:         SparqlQuery,
       eventProducer: projects.Path => EventData
   ): F[QueryBasedMigration[F]] = for {
-    recordsFinder     <- RecordsFinder[F](query)
+    projectsFinder    <- ProjectsFinder[F](query)
     eventSender       <- EventSender[F]
     executionRegister <- MigrationExecutionRegister[F]
-  } yield new QueryBasedMigration[F](name, recordsFinder, eventProducer, eventSender, executionRegister)
+  } yield new QueryBasedMigration[F](name, projectsFinder, eventProducer, eventSender, executionRegister)
 }

@@ -49,7 +49,7 @@ import scala.language.reflectiveCalls
 import scala.util.Random.nextInt
 import scala.xml.Elem
 
-trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
+trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with ResultsDecoding {
   this: Suite with IOSpec =>
 
   protected val givenServerRunning: Boolean = false
