@@ -44,7 +44,7 @@ private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: Logger](gitLabCli
   import org.http4s.dsl.io._
 
   def findProjectInfo(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
-    gitLabClient.get(uri"projects" / projectId.show, "project")(mapResponse)
+    gitLabClient.get(uri"projects" / projectId.show, "single-project")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProjectInfo]] = {
     case (Ok, _, response)    => response.as[ProjectInfo]

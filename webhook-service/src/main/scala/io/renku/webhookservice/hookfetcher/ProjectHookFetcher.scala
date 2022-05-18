@@ -60,7 +60,7 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: Logger](
   }
 
   override def fetchProjectHooks(projectId: projects.Id, accessToken: AccessToken): F[List[HookIdAndUrl]] =
-    gitLabClient.get(uri"projects" / projectId.show / "hooks", "project hooks")(mapResponse)(accessToken.some)
+    gitLabClient.get(uri"projects" / projectId.show / "hooks", "project-hooks")(mapResponse)(accessToken.some)
 
   private implicit lazy val hooksIdsAndUrlsDecoder: EntityDecoder[F, List[HookIdAndUrl]] = {
     implicit val hookIdAndUrlDecoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>

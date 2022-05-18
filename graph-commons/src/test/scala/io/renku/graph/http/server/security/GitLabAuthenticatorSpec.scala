@@ -27,7 +27,6 @@ import eu.timepit.refined.types.string.NonEmptyString
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -115,7 +114,6 @@ class GitLabAuthenticatorSpec
     val endpointName: NonEmptyString = "user"
 
     private implicit val logger: TestLogger[IO] = TestLogger()
-    val gitLabApiUrl  = GitLabUrl(externalServiceBaseUrl).apiV4
     val gitLabClient  = mock[GitLabClient[IO]]
     val authenticator = new GitLabAuthenticatorImpl[IO](gitLabClient)
 

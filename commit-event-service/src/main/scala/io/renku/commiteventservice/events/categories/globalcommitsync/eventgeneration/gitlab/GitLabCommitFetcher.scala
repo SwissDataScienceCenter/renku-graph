@@ -57,7 +57,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
       maybeAccessToken:                           Option[AccessToken]
   ): F[Option[CommitId]] = get(
     uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
-    "latest commit"
+    "latest-commit"
   )(mapLatestCommit(projectId))
 
   override def fetchGitLabCommits(

@@ -261,13 +261,11 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
   private trait LatestCommitsEndpointTestCase extends TestCase {
 
     val uri = uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map("per_page" -> "1")
-
-    val endpointName: String Refined NonEmpty = "latest commit"
+    val endpointName: String Refined NonEmpty = "latest-commit"
 
     val responseMapping = {
       val responseMapping = CaptureOne[ResponseMappingF[IO, PageResult]]()
 
-      val endpointName: String Refined NonEmpty = "latest commit"
       (gitLabClient
         .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
           _: Option[AccessToken]

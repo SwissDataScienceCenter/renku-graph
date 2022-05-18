@@ -77,10 +77,9 @@ class GitLabProjectMembersFinderSpec
   "findProjectMembers" should {
 
     "return a set of project members and users" in new TestCase {
-
       forAll { (gitLabProjectUsers: Set[GitLabProjectMember], gitLabProjectMembers: Set[GitLabProjectMember]) =>
-        setGitLabClientExpectation("users", path, None, returning = (gitLabProjectUsers, None))
-        setGitLabClientExpectation("members", path, None, returning = (gitLabProjectMembers, None))
+        setGitLabClientExpectation(path, "users", "project-users", None, returning = (gitLabProjectUsers, None))
+        setGitLabClientExpectation(path, "members", "project-members", None, returning = (gitLabProjectMembers, None))
 
         finder.findProjectMembers(path).unsafeRunSync() shouldBe (gitLabProjectUsers ++ gitLabProjectMembers)
       }
@@ -90,10 +89,15 @@ class GitLabProjectMembersFinderSpec
       val projectUsers   = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList.toSet
       val projectMembers = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList.toSet
 
-      setGitLabClientExpectation("users", path, None, returning = (Set(projectUsers.head), 2.some))
-      setGitLabClientExpectation("users", path, 2.some, returning = (projectUsers.tail, None))
-      setGitLabClientExpectation("members", path, None, returning = (Set(projectMembers.head), 2.some))
-      setGitLabClientExpectation("members", path, 2.some, returning = (projectMembers.tail, None))
+      setGitLabClientExpectation(path, "users", "project-users", None, returning = (Set(projectUsers.head), 2.some))
+      setGitLabClientExpectation(path, "users", "project-users", 2.some, returning = (projectUsers.tail, None))
+      setGitLabClientExpectation(path,
+                                 "members",
+                                 "project-members",
+                                 None,
+                                 returning = (Set(projectMembers.head), 2.some)
+      )
+      setGitLabClientExpectation(path, "members", "project-members", 2.some, returning = (projectMembers.tail, None))
 
       finder.findProjectMembers(path).unsafeRunSync() shouldBe (projectUsers ++ projectMembers)
     }
@@ -106,7 +110,7 @@ class GitLabProjectMembersFinderSpec
       val nextPage   = 2
       val totalPages = 2
       val headers = Headers(
-        List(Header.Raw(ci"X-Next-Page", nextPage.toString()), Header.Raw(ci"X-Total-Pages", totalPages.toString()))
+        List(Header.Raw(ci"X-Next-Page", nextPage.toString), Header.Raw(ci"X-Total-Pages", totalPages.toString))
       )
 
       mapResponse(Status.Ok, Request(), Response().withEntity(projectUsers.asJson).withHeaders(headers))
@@ -114,7 +118,6 @@ class GitLabProjectMembersFinderSpec
     }
 
     "return an empty set when service responds with NOT_FOUND" in new TestCase {
-
       mapResponse(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe (Set
         .empty[GitLabProjectMember], None)
     }
@@ -132,15 +135,15 @@ class GitLabProjectMembersFinderSpec
             expectedNumberOfCalls = 2
           )
 
-        setGitLabClientExpectation("members",
-                                   path,
+        setGitLabClientExpectation(path,
+                                   "members",
+                                   "project-members",
                                    maybePage = None,
                                    maybeAccessTokenOverride = None,
                                    returning = (members, None)
         )
 
         mapResponse(status, Request(), Response()).unsafeRunSync() shouldBe (members, None)
-
       }
 
       s"return an empty set when service responds with $status without access token" in new TestCase {
@@ -169,15 +172,15 @@ class GitLabProjectMembersFinderSpec
     val gitLabClient = mock[GitLabClient[IO]]
     val finder       = new GitLabProjectMembersFinderImpl[IO](gitLabClient)
 
-    def setGitLabClientExpectation(endpointName:             String Refined NonEmpty,
-                                   projectPath:              projects.Path,
+    def setGitLabClientExpectation(projectPath:              projects.Path,
+                                   path:                     String,
+                                   endpointName:             String Refined NonEmpty,
                                    maybePage:                Option[Int] = None,
                                    maybeAccessTokenOverride: Option[AccessToken] = maybeAccessToken,
                                    returning:                (Set[GitLabProjectMember], Option[Int])
     ) = {
-
       val uri = {
-        val uri = uri"projects" / projectPath.show / endpointName
+        val uri = uri"projects" / projectPath.show / path
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri
@@ -198,7 +201,6 @@ class GitLabProjectMembersFinderSpec
         Gen.const((Set.empty[GitLabProjectMember], Option.empty[Int])),
         expectedNumberOfCalls = 2
       )
-
   }
 
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {

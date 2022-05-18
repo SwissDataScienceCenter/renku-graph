@@ -55,7 +55,7 @@ private class CommitAuthorFinderImpl[F[_]: Async: Logger](
       maybeAccessToken:               Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]] = EitherT {
     gitLabClient
-      .get(uri"projects" / path.value / "repository" / "commits" / commitId.show, "commit-detail")(
+      .get(uri"projects" / path.value / "repository" / "commits" / commitId.show, "single-commit")(
         mapTo[(persons.Name, persons.Email)]
       )
       .map(_.asRight[ProcessingRecoverableError])

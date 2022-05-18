@@ -151,21 +151,21 @@ class ProjectMembersFinderSpec
     def setGitLabClientExpectationUsers(projectPath: projects.Path,
                                         maybePage:   Option[Int] = None,
                                         returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
-    ) = setGitLabClientExpectation("users", projectPath, maybePage, returning)
+    ) = setGitLabClientExpectation(projectPath, "users", "project-users", maybePage, returning)
 
     def setGitLabClientExpectationMembers(projectPath: projects.Path,
                                           maybePage:   Option[Int] = None,
                                           returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
-    ) = setGitLabClientExpectation("members", projectPath, maybePage, returning)
+    ) = setGitLabClientExpectation(projectPath, "members", "project-members", maybePage, returning)
 
-    private def setGitLabClientExpectation(endpointName: String Refined NonEmpty,
-                                           projectPath:  projects.Path,
+    private def setGitLabClientExpectation(projectPath:  projects.Path,
+                                           endpoint:     String,
+                                           endpointName: String Refined NonEmpty,
                                            maybePage:    Option[Int] = None,
                                            returning:    IO[(Set[ProjectMemberNoEmail], Option[Int])]
     ) = {
-
       val uri = {
-        val uri = uri"projects" / projectPath.show / endpointName
+        val uri = uri"projects" / projectPath.show / endpoint
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri

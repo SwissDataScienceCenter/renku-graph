@@ -58,14 +58,13 @@ class ProjectHookDeletorSpec
       val result = deletionResults.generateOne
 
       (gitLabClient
-        .delete(_: Uri, _: NES)(_: ResponseMappingF[IO, DeletionResult])(_: Option[AccessToken]))
+        .delete(_: Uri, _: NonEmptyString)(_: ResponseMappingF[IO, DeletionResult])(_: Option[AccessToken]))
         .expects(uri, endpointName, *, accessToken.some)
         .returning(result.pure[IO])
 
       hookDeletor
         .delete(projectId, hookIdAndUrl, accessToken)
         .unsafeRunSync() shouldBe result
-
     }
 
     // mapResponse
@@ -79,14 +78,12 @@ class ProjectHookDeletorSpec
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
-
       intercept[UnauthorizedException] {
         mapResponse(Status.Unauthorized, Request(), Response()).unsafeRunSync()
       }
     }
 
     "return an Exception if remote client responds with status neither OK, NOT_FOUND or UNAUTHORIZED" in new TestCase {
-
       intercept[Exception] {
         mapResponse(Status.ServiceUnavailable, Request(), Response()).unsafeRunSync()
       }
@@ -97,13 +94,11 @@ class ProjectHookDeletorSpec
     val hookIdAndUrl = hookIdAndUrls.generateOne
     val projectId    = projectIds.generateOne
     val uri          = uri"projects" / projectId.show / "hooks" / hookIdAndUrl.id.show
-    val endpointName:    NES            = "delete hook"
+    val endpointName:    NonEmptyString = "delete-hook"
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
     val gitLabClient = mock[GitLabClient[IO]]
     val hookDeletor  = new ProjectHookDeletorImpl[IO](gitLabClient)
-
-    type NES = NonEmptyString
 
     lazy val mapResponse =
       captureMapping(hookDeletor, gitLabClient)(

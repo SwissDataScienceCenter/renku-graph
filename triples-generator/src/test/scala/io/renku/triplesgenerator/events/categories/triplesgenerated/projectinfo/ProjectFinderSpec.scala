@@ -150,12 +150,8 @@ class ProjectFinderSpec
     }
 
     "return no info when there's no project with the given path" in new TestCase {
-
       mapTo(Status.NotFound, Request(), Response()).unsafeRunSync() shouldBe None
     }
-
-    "return the response from the recovery strategy if the response is neither Ok nor NotFound" in new TestCase {}
-
   }
 
   private trait TestCase {
@@ -168,16 +164,16 @@ class ProjectFinderSpec
     private type ProjectAndCreators = (GitLabProjectInfo, Option[persons.GitLabId])
 
     def setGitLabClientExpectationUsers(id: persons.GitLabId, returning: IO[Option[ProjectMember]]) =
-      setGitLabClientExpectation("user", id.show, returning)
+      setGitLabClientExpectation("single-user", id.show, returning)
 
     def setGitLabClientExpectationProjects(id: projects.Path, returning: IO[Option[ProjectAndCreators]]) =
-      setGitLabClientExpectation("project", id.show, returning)
+      setGitLabClientExpectation("single-project", id.show, returning)
 
     private def setGitLabClientExpectation[ResultType](endpointName: String Refined NonEmpty,
                                                        id:           String,
                                                        returning:    IO[ResultType]
     ) = {
-      val endpointStart = if (endpointName.value == "project") uri"projects" else uri"users"
+      val endpointStart = if (endpointName.value == "single-project") uri"projects" else uri"users"
       (gitLabClient
         .get(_: Uri, _: String Refined NonEmpty)(
           _: ResponseMappingF[IO, ResultType]

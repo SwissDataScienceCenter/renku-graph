@@ -26,7 +26,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
@@ -56,14 +56,12 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  private type ProjectAndCreator = (GitLabProjectInfo, Option[persons.GitLabId])
-
   override def findProjectMembers(path: projects.Path)(implicit
       maybeAccessToken:                 Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]] = EitherT {
     (
-      fetchMembers(uri"projects" / path.show / "members", "members"),
-      fetchMembers(uri"projects" / path.show / "users", "users")
+      fetchMembers(uri"projects" / path.show / "members", "project-members"),
+      fetchMembers(uri"projects" / path.show / "users", "project-users")
     ).parMapN(_ ++ _)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)

@@ -68,7 +68,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
   }
 
   private def fetchProject(path: projects.Path)(implicit maybeAccessToken: Option[AccessToken]) = OptionT {
-    gitLabClient.get(uri"projects" / path.show, "project")(mapTo[ProjectAndCreator])
+    gitLabClient.get(uri"projects" / path.show, "single-project")(mapTo[ProjectAndCreator])
   }
 
   private def mapTo[OUT](implicit
@@ -118,7 +118,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
       case None => OptionT.some[F](Option.empty[ProjectMember])
       case Some(creatorId) =>
         OptionT.liftF {
-          gitLabClient.get(uri"users" / creatorId.show, "user")(mapTo[ProjectMember])
+          gitLabClient.get(uri"users" / creatorId.show, "single-user")(mapTo[ProjectMember])
         }
     }
 

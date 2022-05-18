@@ -61,7 +61,7 @@ class ProjectHookFetcherSpec
       val idAndUrls = hookIdAndUrls.toGeneratorOfNonEmptyList(2).generateOne.toList
 
       (gitLabClient
-        .get(_: Uri, _: NES)(_: ResponseMappingF[IO, List[HookIdAndUrl]])(_: Option[AccessToken]))
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, List[HookIdAndUrl]])(_: Option[AccessToken]))
         .expects(uri, endpointName, *, Some(accessToken))
         .returning(IO.pure(idAndUrls))
 
@@ -74,7 +74,7 @@ class ProjectHookFetcherSpec
       val id  = nonNegativeInts().generateOne.value
       val url = projectHookUrls.generateOne
       mapResponse((Status.Ok, Request(), Response().withEntity(json"""[{"id":$id, "url":${url.value}}]""")))
-        .unsafeRunSync() shouldBe List(HookIdAndUrl(id.toString(), url))
+        .unsafeRunSync() shouldBe List(HookIdAndUrl(id.toString, url))
     }
 
     "return an empty list of hooks if the project does not exists" in new TestCase {
@@ -105,12 +105,10 @@ class ProjectHookFetcherSpec
   }
 
   private trait TestCase {
-    type NES = String Refined NonEmpty
-
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectId = projectIds.generateOne
     val uri       = uri"projects" / projectId.show / "hooks"
-    val endpointName: NES = "project hooks"
+    val endpointName: String Refined NonEmpty = "project-hooks"
     val accessToken = accessTokens.generateOne
 
     val gitLabClient = mock[GitLabClient[IO]]

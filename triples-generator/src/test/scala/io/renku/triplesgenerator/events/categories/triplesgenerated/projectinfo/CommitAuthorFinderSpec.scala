@@ -63,7 +63,7 @@ class CommitAuthorFinderSpec
     "return the result from the GitLabClient" in new TestCase {
       forAll { (authorName: persons.Name, authorEmail: persons.Email) =>
         val expectation = (authorName -> authorEmail).some
-        val endpointName: String Refined NonEmpty = "commit-detail"
+        val endpointName: String Refined NonEmpty = "single-commit"
 
         (gitLabClient
           .get(_: Uri, _: String Refined NonEmpty)(
@@ -86,7 +86,7 @@ class CommitAuthorFinderSpec
     "return a ProcessingRecoverableError if the GitLabClient " +
       "throws an exception handled by the recovery strategy" in new TestCase {
 
-        val endpointName: String Refined NonEmpty = "commit-detail"
+        val endpointName: String Refined NonEmpty = "single-commit"
 
         val error = Gen
           .oneOf(

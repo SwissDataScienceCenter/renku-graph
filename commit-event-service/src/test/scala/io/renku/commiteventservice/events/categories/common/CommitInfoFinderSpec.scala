@@ -193,7 +193,7 @@ class CommitInfoFinderSpec
     val gitLabClient = mock[GitLabClient[IO]]
     val finder       = new CommitInfoFinderImpl[IO](gitLabClient)
 
-    val endpointName: String Refined NonEmpty = "commit-details"
+    val endpointName: String Refined NonEmpty = "single-commit"
 
     def setGitLabClientExpectation(maybeAccessToken: Option[AccessToken] = accessTokens.generateSome,
                                    returning:        Option[CommitInfo] = commitInfos.generateOne.some

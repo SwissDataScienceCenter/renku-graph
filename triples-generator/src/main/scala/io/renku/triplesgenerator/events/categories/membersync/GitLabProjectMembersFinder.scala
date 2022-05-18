@@ -46,8 +46,8 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](gitLabClient: 
       path:                    Path
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] =
     for {
-      users   <- fetch(uri"projects" / path.show / "users", "users")
-      members <- fetch(uri"projects" / path.show / "members", "members")
+      users   <- fetch(uri"projects" / path.show / "users", "project-users")
+      members <- fetch(uri"projects" / path.show / "members", "project-members")
     } yield users ++ members
 
   private def fetch(

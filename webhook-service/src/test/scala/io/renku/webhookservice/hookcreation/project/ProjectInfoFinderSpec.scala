@@ -27,7 +27,6 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.Visibility
 import io.renku.http.client.RestClient.ResponseMappingF
@@ -59,7 +58,7 @@ class ProjectInfoFinderSpec
       implicit override val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
 
       (gitLabClient
-        .get(_: Uri, _: NES)(_: ResponseMappingF[IO, ProjectInfo])(_: Option[AccessToken]))
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, ProjectInfo])(_: Option[AccessToken]))
         .expects(uri, endpointName, *, maybeAccessToken)
         .returning(projectInfo.pure[IO])
 
@@ -75,7 +74,7 @@ class ProjectInfoFinderSpec
       override val projectInfo: ProjectInfo = ProjectInfo(projectId, Visibility.Public, projectPath)
 
       (gitLabClient
-        .get(_: Uri, _: NES)(_: ResponseMappingF[IO, ProjectInfo])(_: Option[AccessToken]))
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, ProjectInfo])(_: Option[AccessToken]))
         .expects(uri, endpointName, *, maybeAccessToken)
         .returning(projectInfo.pure[IO])
 
@@ -121,16 +120,13 @@ class ProjectInfoFinderSpec
   }
 
   private trait TestCase {
-    type NES = String Refined NonEmpty
-
-    val gitLabUrl         = GitLabUrl(externalServiceBaseUrl)
     val projectId         = projectIds.generateOne
     val projectVisibility = projectVisibilities.generateOne
     val projectPath       = projectPaths.generateOne
     val projectInfo: ProjectInfo = ProjectInfo(projectId, projectVisibility, projectPath)
 
-    val uri:          Uri = uri"projects" / projectId.show
-    val endpointName: NES = "project"
+    val uri:          Uri                     = uri"projects" / projectId.show
+    val endpointName: String Refined NonEmpty = "single-project"
 
     implicit val logger:           TestLogger[IO]      = TestLogger[IO]()
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
