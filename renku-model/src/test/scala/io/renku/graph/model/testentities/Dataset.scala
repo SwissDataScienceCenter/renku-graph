@@ -173,27 +173,33 @@ object Dataset {
     implicit def toEntitiesImportedInternalAncestorExternal(implicit
         renkuBaseUrl: RenkuBaseUrl
     ): entities.Dataset.Identification => ImportedInternalAncestorExternal => entities.Dataset.Provenance.ImportedInternalAncestorExternal =
-      identification => { case ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, _, date, creators) =>
-        entities.Dataset.Provenance.ImportedInternalAncestorExternal(identification.resourceId,
-                                                                     identification.identifier,
-                                                                     sameAs,
-                                                                     topmostSameAs,
-                                                                     date,
-                                                                     creators.map(_.to[entities.Person]).sortBy(_.name)
-        )
+      identification => {
+        case ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, initialVersion, date, creators) =>
+          entities.Dataset.Provenance.ImportedInternalAncestorExternal(
+            identification.resourceId,
+            identification.identifier,
+            sameAs,
+            topmostSameAs,
+            initialVersion,
+            date,
+            creators.map(_.to[entities.Person]).sortBy(_.name)
+          )
       }
 
     implicit def toEntitiesImportedInternalAncestorInternal(implicit
         renkuBaseUrl: RenkuBaseUrl
     ): entities.Dataset.Identification => ImportedInternalAncestorInternal => entities.Dataset.Provenance.ImportedInternalAncestorInternal =
-      identification => { case ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, _, date, creators) =>
-        entities.Dataset.Provenance.ImportedInternalAncestorInternal(identification.resourceId,
-                                                                     identification.identifier,
-                                                                     sameAs,
-                                                                     topmostSameAs,
-                                                                     date,
-                                                                     creators.map(_.to[entities.Person]).sortBy(_.name)
-        )
+      identification => {
+        case ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, initialVersion, date, creators) =>
+          entities.Dataset.Provenance.ImportedInternalAncestorInternal(
+            identification.resourceId,
+            identification.identifier,
+            sameAs,
+            topmostSameAs,
+            initialVersion,
+            date,
+            creators.map(_.to[entities.Person]).sortBy(_.name)
+          )
       }
 
     implicit def toEntitiesModified(implicit

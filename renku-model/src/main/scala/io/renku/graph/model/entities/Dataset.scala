@@ -166,33 +166,35 @@ object Dataset {
 
     implicit object ImportedInternal
     sealed trait ImportedInternal extends Provenance {
-      val resourceId:    ResourceId
-      val identifier:    Identifier
-      val sameAs:        InternalSameAs
-      val topmostSameAs: TopmostSameAs
-      val date:          D
-      val creators:      NonEmptyList[Person]
+      val resourceId:     ResourceId
+      val identifier:     Identifier
+      val sameAs:         InternalSameAs
+      val topmostSameAs:  TopmostSameAs
+      val date:           D
+      val initialVersion: InitialVersion
+      val creators:       NonEmptyList[Person]
 
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(resourceId.asEntityId)
-      override lazy val initialVersion:     InitialVersion     = InitialVersion(identifier)
     }
 
-    final case class ImportedInternalAncestorExternal(resourceId:    ResourceId,
-                                                      identifier:    Identifier,
-                                                      sameAs:        InternalSameAs,
-                                                      topmostSameAs: TopmostSameAs,
-                                                      date:          DatePublished,
-                                                      creators:      NonEmptyList[Person]
+    final case class ImportedInternalAncestorExternal(resourceId:     ResourceId,
+                                                      identifier:     Identifier,
+                                                      sameAs:         InternalSameAs,
+                                                      topmostSameAs:  TopmostSameAs,
+                                                      initialVersion: InitialVersion,
+                                                      date:           DatePublished,
+                                                      creators:       NonEmptyList[Person]
     ) extends ImportedInternal {
       override type D = DatePublished
     }
 
-    final case class ImportedInternalAncestorInternal(resourceId:    ResourceId,
-                                                      identifier:    Identifier,
-                                                      sameAs:        InternalSameAs,
-                                                      topmostSameAs: TopmostSameAs,
-                                                      date:          DateCreated,
-                                                      creators:      NonEmptyList[Person]
+    final case class ImportedInternalAncestorInternal(resourceId:     ResourceId,
+                                                      identifier:     Identifier,
+                                                      sameAs:         InternalSameAs,
+                                                      topmostSameAs:  TopmostSameAs,
+                                                      initialVersion: InitialVersion,
+                                                      date:           DateCreated,
+                                                      creators:       NonEmptyList[Person]
     ) extends ImportedInternal {
       override type D = DateCreated
     }
@@ -235,23 +237,23 @@ object Dataset {
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
           renku / "originalIdentifier" -> provenance.initialVersion.asJsonLD
         )
-      case provenance @ ImportedInternalAncestorExternal(_, _, sameAs, topmostSameAs, date, creators) =>
+      case provenance @ ImportedInternalAncestorExternal(_, _, sameAs, topmostSameAs, initialVersion, date, creators) =>
         Map(
           schema / "datePublished"     -> date.asJsonLD,
           schema / "sameAs"            -> sameAs.asJsonLD,
           schema / "creator"           -> creators.toList.asJsonLD,
           renku / "topmostSameAs"      -> topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> provenance.initialVersion.asJsonLD
+          renku / "originalIdentifier" -> initialVersion.asJsonLD
         )
-      case provenance @ ImportedInternalAncestorInternal(_, _, sameAs, topmostSameAs, date, creators) =>
+      case provenance @ ImportedInternalAncestorInternal(_, _, sameAs, topmostSameAs, initialVersion, date, creators) =>
         Map(
           schema / "dateCreated"       -> date.asJsonLD,
           schema / "sameAs"            -> sameAs.asJsonLD,
           schema / "creator"           -> creators.toList.asJsonLD,
           renku / "topmostSameAs"      -> topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> provenance.topmostDerivedFrom.asJsonLD,
-          renku / "originalIdentifier" -> provenance.initialVersion.asJsonLD
+          renku / "originalIdentifier" -> initialVersion.asJsonLD
         )
       case provenance @ Modified(_,
                                  derivedFrom,
@@ -330,29 +332,31 @@ object Dataset {
       case (None, Some(datePublished), None, Some(sameAs), None, maybeOriginalId, None)
           if originalIdEqualCurrentId(maybeOriginalId, id) =>
         (ImportedExternal(id.resourceId, id.identifier, sameAs, datePublished, creators.sortBy(_.name)) -> None).asRight
-      case (Some(dateCreated), None, Some(sameAs), None, None, maybeOriginalId, None)
-          if originalIdEqualCurrentId(maybeOriginalId, id) =>
-        (ImportedInternalAncestorInternal(id.resourceId,
-                                          id.identifier,
-                                          sameAs,
-                                          TopmostSameAs(sameAs),
-                                          dateCreated,
-                                          creators.sortBy(_.name)
+      case (Some(dateCreated), None, Some(sameAs), None, None, maybeInitialVersion, None) =>
+        (ImportedInternalAncestorInternal(
+          id.resourceId,
+          id.identifier,
+          sameAs,
+          TopmostSameAs(sameAs),
+          maybeInitialVersion getOrElse InitialVersion(id.identifier),
+          dateCreated,
+          creators.sortBy(_.name)
         ) -> None).asRight
-      case (None, Some(datePublished), Some(sameAs), None, None, maybeOriginalId, None)
-          if originalIdEqualCurrentId(maybeOriginalId, id) =>
-        (ImportedInternalAncestorExternal(id.resourceId,
-                                          id.identifier,
-                                          sameAs,
-                                          TopmostSameAs(sameAs),
-                                          datePublished,
-                                          creators.sortBy(_.name)
+      case (None, Some(datePublished), Some(sameAs), None, None, maybeInitialVersion, None) =>
+        (ImportedInternalAncestorExternal(
+          id.resourceId,
+          id.identifier,
+          sameAs,
+          TopmostSameAs(sameAs),
+          maybeInitialVersion getOrElse InitialVersion(id.identifier),
+          datePublished,
+          creators.sortBy(_.name)
         ) -> None).asRight
-      case (Some(dateCreated), None, None, None, Some(derivedFrom), Some(originalId), maybeInvalidationTime) =>
+      case (Some(dateCreated), None, None, None, Some(derivedFrom), Some(initialVersion), maybeInvalidationTime) =>
         (Modified(id.resourceId,
                   derivedFrom,
                   TopmostDerivedFrom(derivedFrom),
-                  originalId,
+                  initialVersion,
                   dateCreated,
                   creators,
                   maybeInvalidationTime
@@ -378,7 +382,7 @@ object Dataset {
         ).asLeft
     }
 
-    private implicit lazy val creatorsOrdering: Ordering[Person] = Ordering.by(_.name.value)
+    private implicit lazy val creatorsOrdering: Ordering[Person] = Ordering.by(_.name)
   }
 
   private def originalIdEqualCurrentId(maybeOriginalIdentifier: Option[InitialVersion],

@@ -23,7 +23,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{nonBlankStrings, sentences, timestamps}
+import io.renku.generators.Generators.{fixed, nonBlankStrings, sentences, timestamps}
 import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, InternalSameAs, PartId, TopmostSameAs}
@@ -32,6 +32,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGe
 import io.renku.tinytypes.InstantTinyType
 import monocle.Lens
 import org.scalacheck.Gen
+import org.scalacheck.Gen.oneOf
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
@@ -154,7 +155,7 @@ trait DatasetEntitiesGenerators {
         for {
           date           <- datasetPublishedDates()
           sameAs         <- datasetInternalSameAs
-          initialVersion <- datasetInitialVersions
+          initialVersion <- oneOf(fixed(InitialVersion(identifier)), datasetInitialVersions)
           creators       <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorExternal(Dataset.entityId(identifier),
                                                                     sameAs,
@@ -170,13 +171,14 @@ trait DatasetEntitiesGenerators {
     (identifier, projectDateCreated) =>
       implicit renkuBaseUrl =>
         for {
-          date     <- datasetCreatedDates(projectDateCreated.value)
-          sameAs   <- sameAsGen
-          creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+          date           <- datasetCreatedDates(projectDateCreated.value)
+          sameAs         <- sameAsGen
+          initialVersion <- oneOf(fixed(InitialVersion(identifier)), datasetInitialVersions)
+          creators       <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     TopmostSameAs(sameAs),
-                                                                    InitialVersion(identifier),
+                                                                    initialVersion,
                                                                     date,
                                                                     creators.sortBy(_.name)
         )
