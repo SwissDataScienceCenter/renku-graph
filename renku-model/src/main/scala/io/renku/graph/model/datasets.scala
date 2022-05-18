@@ -57,12 +57,12 @@ object datasets {
       with TinyTypeJsonLDOps[Identifier]
       with NonBlank[Identifier]
 
-  final class InitialVersion private (val value: String) extends AnyVal with DatasetIdentifier
-  implicit object InitialVersion
-      extends TinyTypeFactory[InitialVersion](new InitialVersion(_))
-      with DatasetIdentifierFactory[InitialVersion]
-      with TinyTypeJsonLDOps[InitialVersion]
-      with NonBlank[InitialVersion]
+  final class OriginalIdentifier private (val value: String) extends AnyVal with DatasetIdentifier
+  implicit object OriginalIdentifier
+      extends TinyTypeFactory[OriginalIdentifier](new OriginalIdentifier(_))
+      with DatasetIdentifierFactory[OriginalIdentifier]
+      with TinyTypeJsonLDOps[OriginalIdentifier]
+      with NonBlank[OriginalIdentifier]
 
   final class Title private (val value: String) extends AnyVal with StringTinyType
   implicit object Title extends TinyTypeFactory[Title](new Title(_)) with NonBlank[Title] with TinyTypeJsonLDOps[Title]

@@ -23,8 +23,8 @@ import Generators.queriesGen
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.datasetInitialVersions
-import io.renku.graph.model.datasets.InitialVersion
+import io.renku.graph.model.GraphModelGenerators.datasetOriginalIdentifiers
+import io.renku.graph.model.datasets.OriginalIdentifier
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.rdfstore.SparqlQuery
@@ -34,11 +34,11 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class InitialVersionsUpdaterSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class OriginalIdentifierUpdaterSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  "updateInitialVersions" should {
+  "updateOriginalIdentifiers" should {
 
-    "prepare updates for changes to initialVersion" in new TestCase {
+    "prepare updates for changes to originalIdentifier" in new TestCase {
       val (_, project) = anyRenkuProjectEntities
         .addDataset(datasetEntities(provenanceInternal))
         .addDatasetAndModification(datasetEntities(provenanceInternal))
@@ -49,11 +49,11 @@ class InitialVersionsUpdaterSpec extends AnyWordSpec with MockFactory with shoul
 
       val allUpdateQueries = datasets.foldRight(List.empty[SparqlQuery]) { (ds, allQueries) =>
         val updateQueries = sparqlQueries.generateList()
-        givenInitialVersionsUpdates(ds, updateQueries = updateQueries)
+        givenOriginalIdentifiersUpdates(ds, updateQueries = updateQueries)
         updateQueries ::: allQueries
       }
 
-      val Success(updatedProject -> queries) = updater.updateInitialVersions(project -> initialQueries)
+      val Success(updatedProject -> queries) = updater.updateOriginalIdentifiers(project -> initialQueries)
 
       updatedProject                shouldBe project
       queries.preDataUploadQueries  shouldBe initialQueries.preDataUploadQueries ::: allUpdateQueries
@@ -65,17 +65,18 @@ class InitialVersionsUpdaterSpec extends AnyWordSpec with MockFactory with shoul
     val initialQueries      = queriesGen.generateOne
     val kgDatasetInfoFinder = mock[KGDatasetInfoFinder[Try]]
     val updatesCreator      = mock[UpdatesCreator]
-    val updater             = new InitialVersionsUpdaterImpl[Try](kgDatasetInfoFinder, updatesCreator)
+    val updater             = new OriginalIdentifierUpdaterImpl[Try](kgDatasetInfoFinder, updatesCreator)
 
-    def givenInitialVersionsUpdates(ds:                      entities.Dataset[entities.Dataset.Provenance],
-                                    existingInitialVersions: Set[InitialVersion] = datasetInitialVersions.generateSet(),
-                                    updateQueries:           List[SparqlQuery] = sparqlQueries.generateList()
+    def givenOriginalIdentifiersUpdates(ds: entities.Dataset[entities.Dataset.Provenance],
+                                        existingOriginalIdentifiers: Set[OriginalIdentifier] =
+                                          datasetOriginalIdentifiers.generateSet(),
+                                        updateQueries: List[SparqlQuery] = sparqlQueries.generateList()
     ): Unit = {
-      (kgDatasetInfoFinder.findDatasetInitialVersions _)
+      (kgDatasetInfoFinder.findDatasetOriginalIdentifiers _)
         .expects(ds.resourceId)
-        .returning(existingInitialVersions.pure[Try])
-      (updatesCreator.removeOtherInitialVersions _)
-        .expects(ds, existingInitialVersions)
+        .returning(existingOriginalIdentifiers.pure[Try])
+      (updatesCreator.removeOtherOriginalIdentifiers _)
+        .expects(ds, existingOriginalIdentifiers)
         .returning(updateQueries)
       ()
     }

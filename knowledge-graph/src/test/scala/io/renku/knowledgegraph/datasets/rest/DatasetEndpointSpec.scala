@@ -282,7 +282,7 @@ class DatasetEndpointSpec
 
   private implicit lazy val versionsDecoder: Decoder[DatasetVersions] = cursor =>
     for {
-      initial <- cursor.downField("initial").as[InitialVersion]
+      initial <- cursor.downField("initial").as[OriginalIdentifier]
     } yield DatasetVersions(initial)
 
   private lazy val imageUriDecoder: Decoder[ImageUri] = _.downField("location").as[ImageUri]

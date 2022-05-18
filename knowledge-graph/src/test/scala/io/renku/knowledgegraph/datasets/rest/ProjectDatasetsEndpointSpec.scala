@@ -27,7 +27,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{Identifier, ImageUri, InitialVersion, Name, Title}
+import io.renku.graph.model.datasets.{Identifier, ImageUri, Name, OriginalIdentifier, Title}
 import io.renku.graph.model.projects.Path
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
@@ -128,12 +128,12 @@ class ProjectDatasetsEndpointSpec
     val endpoint =
       new ProjectDatasetsEndpointImpl[IO](projectDatasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder)
 
-    lazy val toJson: ((Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])) => Json = {
-      case (id, initialVersion, title, name, Left(sameAs), images) =>
+    lazy val toJson: ((Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])) => Json = {
+      case (id, originalId, title, name, Left(sameAs), images) =>
         json"""{
           "identifier": $id,
           "versions": {
-            "initial": $initialVersion
+            "initial": $originalId
           },
           "title": $title,
           "name": $name,
@@ -144,14 +144,14 @@ class ProjectDatasetsEndpointSpec
             "href": ${renkuResourcesUrl / "datasets" / id}
           }, {
             "rel": "initial-version",
-            "href": ${renkuResourcesUrl / "datasets" / initialVersion}
+            "href": ${renkuResourcesUrl / "datasets" / originalId}
           }]
         }"""
-      case (id, initialVersion, title, name, Right(derivedFrom), images) =>
+      case (id, originalId, title, name, Right(derivedFrom), images) =>
         json"""{
           "identifier": $id,
           "versions" : {
-            "initial": $initialVersion
+            "initial": $originalId
           },
           "title": $title,
           "name": $name,
@@ -162,7 +162,7 @@ class ProjectDatasetsEndpointSpec
             "href": ${renkuResourcesUrl / "datasets" / id}
           }, {
             "rel": "initial-version",
-            "href": ${renkuResourcesUrl / "datasets" / initialVersion}
+            "href": ${renkuResourcesUrl / "datasets" / originalId}
           }]
         }"""
     }
@@ -189,10 +189,10 @@ class ProjectDatasetsEndpointSpec
 
   private implicit lazy val datasetBasicDetails: Gen[ProjectDataset] = for {
     id                      <- datasetIdentifiers
-    initialVersion          <- datasetInitialVersions
+    originalIdentifier      <- datasetOriginalIdentifiers
     title                   <- datasetTitles
     name                    <- datasetNames
     sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
     images                  <- listOf(datasetImageUris)
-  } yield (id, initialVersion, title, name, sameAsEitherDerivedFrom, images)
+  } yield (id, originalIdentifier, title, name, sameAsEitherDerivedFrom, images)
 }

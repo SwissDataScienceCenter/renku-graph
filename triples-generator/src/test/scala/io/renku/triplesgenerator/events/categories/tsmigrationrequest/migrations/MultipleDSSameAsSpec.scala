@@ -20,12 +20,13 @@ package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migration
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.config.ServiceVersion
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.datasetSameAs
+import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
+import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
@@ -38,10 +39,9 @@ import tooling._
 
 class MultipleDSSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore with MockFactory {
 
-  "run" should {
+  "query" should {
 
-    "find DS records with multiple schema:sameAs and remove the additional ones" in new TestCase {
-      satisfyMocks
+    "find DS records with multiple schema:sameAs and remove the ones that do not match the topmostSameAs" in {
 
       val (ds, dsProject) = renkuProjectEntities(anyVisibility)
         .addDataset(datasetEntities(provenanceInternal))
@@ -53,51 +53,42 @@ class MultipleDSSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec 
 
       loadToStore(dsProject, importedDSProject)
 
-      val additionalSameAs       = datasetSameAs.generateOne
-      val additionalSameAsJsonLD = additionalSameAs.asJsonLD
-      loadToStore(additionalSameAsJsonLD)
-      val additionalSameAsId = additionalSameAsJsonLD.entityId.getOrElse(fail("Cannot obtain sameAs @id"))
+      val additionalSameAsId = datasetSameAs.generateOne.entityId
       insertTriple(importedDS.entityId, "schema:sameAs", show"<$additionalSameAsId>")
 
-      findSameAs(importedDS.identification.identifier) shouldBe Set(importedDS.provenance.sameAs, additionalSameAs)
-      findSameAs(ds.identification.identifier)         shouldBe Set.empty
+      findSameAsIds(importedDS.identification.identifier) shouldBe Set(importedDS.provenance.sameAs.entityId,
+                                                                       additionalSameAsId
+      )
+      findSameAsIds(ds.identification.identifier) shouldBe Set.empty
 
-      migration.run().value.unsafeRunSync() shouldBe ().asRight
+      runUpdate(MultipleDSSameAs.query).unsafeRunSync() shouldBe ()
 
-      findSameAs(importedDS.identification.identifier) shouldBe Set(importedDS.provenance.sameAs)
-      findSameAs(ds.identification.identifier)         shouldBe Set.empty
+      findSameAsIds(importedDS.identification.identifier) shouldBe Set(importedDS.provenance.sameAs.entityId)
+      findSameAsIds(ds.identification.identifier)         shouldBe Set.empty
     }
   }
 
   "apply" should {
-    "return an QueryBasedMigration" in new TestCase {
-      migration.getClass.getSuperclass shouldBe classOf[RegisteredMigration[IO]]
+    "return an UpdateQueryMigration" in {
+      implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
+      implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+      implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
+      MultipleModifiedDSData[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }
   }
 
-  private trait TestCase {
-    implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
-    implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
-    val executionRegister = mock[MigrationExecutionRegister[IO]]
-    val recordsFinder     = RecordsFinder[IO](rdfStoreConfig)
-    val updateRunner      = UpdateQueryRunner[IO](rdfStoreConfig)
-    val migration         = new MultipleDSSameAs[IO](executionRegister, recordsFinder, updateRunner)
-
-    lazy val satisfyMocks = {
-      (executionRegister.findExecution _).expects(migration.name).returning(Option.empty[ServiceVersion].pure[IO])
-      (executionRegister.registerExecution _).expects(migration.name).returning(().pure[IO])
-    }
-  }
-
-  private def findSameAs(id: datasets.Identifier): Set[datasets.SameAs] =
+  private def findSameAsIds(id: datasets.Identifier): Set[EntityId] =
     runQuery(s"""|SELECT ?sameAs
                  |WHERE { 
                  |  ?id a schema:Dataset;
                  |      schema:identifier '$id';
-                 |      schema:sameAs/schema:url ?sameAs
+                 |      schema:sameAs ?sameAs
                  |}""".stripMargin)
       .unsafeRunSync()
-      .map(row => datasets.SameAs(row("sameAs")))
+      .map(row => EntityId.of(row("sameAs")))
       .toSet
+
+  private implicit class SameAsOps(sameAs: SameAs) {
+    lazy val entityId: EntityId = sameAs.asJsonLD.entityId.getOrElse(fail("Cannot obtain sameAs @id"))
+  }
 }

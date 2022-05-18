@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
-import io.renku.graph.model.datasets.{DateCreated, InitialVersion, ResourceId, SameAs, TopmostSameAs}
+import io.renku.graph.model.datasets.{DateCreated, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.persons
@@ -60,8 +60,8 @@ private trait UpdatesCreator {
 
   def deleteOtherTopmostDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
 
-  def removeOtherInitialVersions(dataset:             Dataset[Dataset.Provenance],
-                                 initialVersionsInKG: Set[InitialVersion]
+  def removeOtherOriginalIdentifiers(dataset:                 Dataset[Dataset.Provenance],
+                                     originalIdentifiersInKG: Set[OriginalIdentifier]
   ): List[SparqlQuery]
 
   def removeOtherDateCreated(dataset: Dataset[Dataset.Provenance], dateCreatedInKG: Set[DateCreated]): List[SparqlQuery]
@@ -254,16 +254,18 @@ private object UpdatesCreator extends UpdatesCreator {
         |""".stripMargin
   )
 
-  override def removeOtherInitialVersions(ds: Dataset[Provenance], initialVersionsInKG: Set[InitialVersion]) =
+  override def removeOtherOriginalIdentifiers(ds:                      Dataset[Provenance],
+                                              originalIdentifiersInKG: Set[OriginalIdentifier]
+  ) =
     Option
-      .when((initialVersionsInKG - ds.provenance.initialVersion).nonEmpty) {
+      .when((originalIdentifiersInKG - ds.provenance.originalIdentifier).nonEmpty) {
         SparqlQuery.of(
           name = "transformation - originalIdentifier clean-up",
           Prefixes of renku -> "renku",
           s"""|DELETE { ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version }
               |WHERE { 
               |  ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version.
-              |  FILTER ( ?version != '${ds.provenance.initialVersion}' )
+              |  FILTER ( ?version != '${ds.provenance.originalIdentifier}' )
               |}""".stripMargin
         )
       }

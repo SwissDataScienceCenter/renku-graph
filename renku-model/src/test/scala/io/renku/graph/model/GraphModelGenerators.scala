@@ -129,11 +129,12 @@ object GraphModelGenerators {
     .map(_.toString.replace("-", ""))
     .map(Identifier.apply)
 
-  implicit val datasetInitialVersions: Gen[InitialVersion] = datasetIdentifiers map (id => InitialVersion(id.toString))
-  implicit val datasetTitles:          Gen[datasets.Title] = nonEmptyStrings() map datasets.Title.apply
-  implicit val datasetNames:           Gen[datasets.Name]  = nonEmptyStrings() map datasets.Name.apply
-  implicit val datasetDescriptions:    Gen[Description]    = paragraphs() map (_.value) map Description.apply
-  implicit val datasetImageUris:       Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
+  implicit val datasetOriginalIdentifiers: Gen[OriginalIdentifier] =
+    datasetIdentifiers map (id => OriginalIdentifier(id.toString))
+  implicit val datasetTitles:       Gen[datasets.Title] = nonEmptyStrings() map datasets.Title.apply
+  implicit val datasetNames:        Gen[datasets.Name]  = nonEmptyStrings() map datasets.Name.apply
+  implicit val datasetDescriptions: Gen[Description]    = paragraphs() map (_.value) map Description.apply
+  implicit val datasetImageUris:    Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
   implicit val datasetExternalSameAs: Gen[ExternalSameAs] =
     validatedUrls map SameAs.external map (_.fold(throw _, identity))
   def datasetInternalSameAsFrom(renkuBaseUrlGen: Gen[RenkuBaseUrl] = renkuBaseUrls,

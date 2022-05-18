@@ -51,7 +51,7 @@ object Dataset {
   sealed trait Provenance extends Product with Serializable {
     type D <: Date
     val topmostSameAs:      TopmostSameAs
-    val initialVersion:     InitialVersion
+    val originalIdentifier: OriginalIdentifier
     val topmostDerivedFrom: TopmostDerivedFrom
     val date:               D
     val creators:           NonEmptyList[Person]
@@ -71,40 +71,40 @@ object Dataset {
       val sameAs: InternalSameAs
     }
 
-    final case class Internal(entityId:       EntityId,
-                              initialVersion: InitialVersion,
-                              date:           DateCreated,
-                              creators:       NonEmptyList[Person]
+    final case class Internal(entityId:           EntityId,
+                              originalIdentifier: OriginalIdentifier,
+                              date:               DateCreated,
+                              creators:           NonEmptyList[Person]
     ) extends NonModified {
       override type D = DateCreated
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
     }
 
-    final case class ImportedExternal(entityId:       EntityId,
-                                      sameAs:         ExternalSameAs,
-                                      initialVersion: InitialVersion,
-                                      date:           DatePublished,
-                                      creators:       NonEmptyList[Person]
+    final case class ImportedExternal(entityId:           EntityId,
+                                      sameAs:             ExternalSameAs,
+                                      originalIdentifier: OriginalIdentifier,
+                                      date:               DatePublished,
+                                      creators:           NonEmptyList[Person]
     ) extends NonModified {
       override type D = DatePublished
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(sameAs)
     }
 
-    final case class ImportedInternalAncestorExternal(entityId:       EntityId,
-                                                      sameAs:         InternalSameAs,
-                                                      topmostSameAs:  TopmostSameAs,
-                                                      initialVersion: InitialVersion,
-                                                      date:           DatePublished,
-                                                      creators:       NonEmptyList[Person]
+    final case class ImportedInternalAncestorExternal(entityId:           EntityId,
+                                                      sameAs:             InternalSameAs,
+                                                      topmostSameAs:      TopmostSameAs,
+                                                      originalIdentifier: OriginalIdentifier,
+                                                      date:               DatePublished,
+                                                      creators:           NonEmptyList[Person]
     ) extends ImportedInternal {
       override type D = DatePublished
     }
-    final case class ImportedInternalAncestorInternal(entityId:       EntityId,
-                                                      sameAs:         InternalSameAs,
-                                                      topmostSameAs:  TopmostSameAs,
-                                                      initialVersion: InitialVersion,
-                                                      date:           DateCreated,
-                                                      creators:       NonEmptyList[Person]
+    final case class ImportedInternalAncestorInternal(entityId:           EntityId,
+                                                      sameAs:             InternalSameAs,
+                                                      topmostSameAs:      TopmostSameAs,
+                                                      originalIdentifier: OriginalIdentifier,
+                                                      date:               DateCreated,
+                                                      creators:           NonEmptyList[Person]
     ) extends ImportedInternal {
       override type D = DateCreated
     }
@@ -112,7 +112,7 @@ object Dataset {
     final case class Modified(entityId:              EntityId,
                               derivedFrom:           DerivedFrom,
                               topmostDerivedFrom:    TopmostDerivedFrom,
-                              initialVersion:        InitialVersion,
+                              originalIdentifier:    OriginalIdentifier,
                               date:                  DateCreated,
                               creators:              NonEmptyList[Person],
                               maybeInvalidationTime: Option[InvalidationTime]
@@ -173,26 +173,31 @@ object Dataset {
     implicit def toEntitiesImportedInternalAncestorExternal(implicit
         renkuBaseUrl: RenkuBaseUrl
     ): entities.Dataset.Identification => ImportedInternalAncestorExternal => entities.Dataset.Provenance.ImportedInternalAncestorExternal =
-      identification => { case ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, _, date, creators) =>
-        entities.Dataset.Provenance.ImportedInternalAncestorExternal(identification.resourceId,
-                                                                     identification.identifier,
-                                                                     sameAs,
-                                                                     topmostSameAs,
-                                                                     date,
-                                                                     creators.map(_.to[entities.Person]).sortBy(_.name)
-        )
+      identification => {
+        case ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, originalIdentifier, date, creators) =>
+          entities.Dataset.Provenance.ImportedInternalAncestorExternal(
+            identification.resourceId,
+            identification.identifier,
+            sameAs,
+            topmostSameAs,
+            originalIdentifier,
+            date,
+            creators.map(_.to[entities.Person]).sortBy(_.name)
+          )
       }
 
     implicit def toEntitiesImportedInternalAncestorInternal(implicit
         renkuBaseUrl: RenkuBaseUrl
     ): entities.Dataset.Identification => ImportedInternalAncestorInternal => entities.Dataset.Provenance.ImportedInternalAncestorInternal =
-      identification => { case ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, _, date, creators) =>
-        entities.Dataset.Provenance.ImportedInternalAncestorInternal(identification.resourceId,
-                                                                     identification.identifier,
-                                                                     sameAs,
-                                                                     topmostSameAs,
-                                                                     date,
-                                                                     creators.map(_.to[entities.Person]).sortBy(_.name)
+      identification => { case ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, originalId, date, creators) =>
+        entities.Dataset.Provenance.ImportedInternalAncestorInternal(
+          identification.resourceId,
+          identification.identifier,
+          sameAs,
+          topmostSameAs,
+          originalId,
+          date,
+          creators.map(_.to[entities.Person]).sortBy(_.name)
         )
       }
 
@@ -200,11 +205,11 @@ object Dataset {
         renkuBaseUrl: RenkuBaseUrl
     ): entities.Dataset.Identification => Provenance.Modified => entities.Dataset.Provenance.Modified =
       identification => {
-        case Modified(_, derivedFrom, topmostDerivedFrom, initialVersion, date, creators, maybeInvalidationTime) =>
+        case Modified(_, derivedFrom, topmostDerivedFrom, originalId, date, creators, maybeInvalidationTime) =>
           entities.Dataset.Provenance.Modified(identification.resourceId,
                                                derivedFrom,
                                                topmostDerivedFrom,
-                                               initialVersion,
+                                               originalId,
                                                date,
                                                creators.map(_.to[entities.Person]).sortBy(_.name),
                                                maybeInvalidationTime

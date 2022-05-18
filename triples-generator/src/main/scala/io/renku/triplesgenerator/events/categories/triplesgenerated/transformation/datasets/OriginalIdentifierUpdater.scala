@@ -26,26 +26,26 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import org.typelevel.log4cats.Logger
 
-private trait InitialVersionsUpdater[F[_]] {
-  def updateInitialVersions: ((Project, Queries)) => F[(Project, Queries)]
+private trait OriginalIdentifierUpdater[F[_]] {
+  def updateOriginalIdentifiers: ((Project, Queries)) => F[(Project, Queries)]
 }
 
-private object InitialVersionsUpdater {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[InitialVersionsUpdater[F]] = for {
+private object OriginalIdentifierUpdater {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[OriginalIdentifierUpdater[F]] = for {
     kgDatasetInfoFinder <- KGDatasetInfoFinder[F]
-  } yield new InitialVersionsUpdaterImpl[F](kgDatasetInfoFinder, UpdatesCreator)
+  } yield new OriginalIdentifierUpdaterImpl[F](kgDatasetInfoFinder, UpdatesCreator)
 }
 
-private class InitialVersionsUpdaterImpl[F[_]: MonadThrow](
+private class OriginalIdentifierUpdaterImpl[F[_]: MonadThrow](
     kgDatasetInfoFinder: KGDatasetInfoFinder[F],
     updatesCreator:      UpdatesCreator
-) extends InitialVersionsUpdater[F] {
+) extends OriginalIdentifierUpdater[F] {
   import kgDatasetInfoFinder._
   import updatesCreator._
 
-  override def updateInitialVersions: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
+  override def updateOriginalIdentifiers: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
     project.datasets
-      .map(ds => findDatasetInitialVersions(ds.resourceId).map(removeOtherInitialVersions(ds, _)))
+      .map(ds => findDatasetOriginalIdentifiers(ds.resourceId).map(removeOtherOriginalIdentifiers(ds, _)))
       .sequence
       .map(_.flatten)
       .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))

@@ -26,7 +26,7 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.datasets.{InitialVersion, ResourceId}
+import io.renku.graph.model.datasets.{OriginalIdentifier, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.ResultsDecoding._
@@ -41,7 +41,10 @@ private class MultipleOriginalIdentifiers[F[_]: MonadThrow: Logger](
     recordsFinder:     RecordsFinder[F],
     updatesRunner:     UpdateQueryRunner[F],
     recoveryStrategy:  RecoverableErrorsRecovery = RecoverableErrorsRecovery
-) extends RegisteredMigration[F](Migration.Name("Multiple DS InitialVersions"), executionRegister, recoveryStrategy) {
+) extends RegisteredMigration[F](Migration.Name("Multiple DS OriginalIdentifiers"),
+                                 executionRegister,
+                                 recoveryStrategy
+    ) {
 
   import recordsFinder._
   import recoveryStrategy._
@@ -92,17 +95,17 @@ private class MultipleOriginalIdentifiers[F[_]: MonadThrow: Logger](
     )
   }
 
-  private type Record = (ResourceId, InitialVersion)
+  private type Record = (ResourceId, OriginalIdentifier)
   private lazy val pickLastVersion: RawRecord => F[Option[Record]] = { case (dsId, versions) =>
     versions
       .split(separator)
       .toList
-      .map(InitialVersion.from)
+      .map(OriginalIdentifier.from)
       .sequence
       .fold(_.raiseError[F, Option[Record]], _.lastOption.map(dsId -> _).pure[F])
   }
 
-  private lazy val updateTS: Record => F[Unit] = { case (dsId, initialVersion) =>
+  private lazy val updateTS: Record => F[Unit] = { case (dsId, originalId) =>
     updatesRunner.run {
       SparqlQuery.of(
         "TS migration: remove spare initial versions",
@@ -112,7 +115,7 @@ private class MultipleOriginalIdentifiers[F[_]: MonadThrow: Logger](
             |  BIND (${dsId.showAs[RdfResource]} AS ?dsId)
             |  ?dsId a schema:Dataset;
             |        renku:originalIdentifier ?version.
-            |  FILTER (?version != '${initialVersion.show}')
+            |  FILTER (?version != '${originalId.show}')
             |}
             |""".stripMargin
       )

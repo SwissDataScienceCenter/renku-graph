@@ -23,15 +23,16 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{nonBlankStrings, sentences, timestamps}
-import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInitialVersions, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
+import io.renku.generators.Generators.{fixed, nonBlankStrings, sentences, timestamps}
+import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetOriginalIdentifiers, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
 import io.renku.graph.model._
-import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InitialVersion, InternalSameAs, PartId, TopmostSameAs}
+import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InternalSameAs, OriginalIdentifier, PartId, TopmostSameAs}
 import io.renku.graph.model.testentities.Dataset.{AdditionalInfo, Identification, Provenance}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.tinytypes.InstantTinyType
 import monocle.Lens
 import org.scalacheck.Gen
+import org.scalacheck.Gen.oneOf
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
@@ -101,7 +102,7 @@ trait DatasetEntitiesGenerators {
         Dataset.entityId(identifier),
         DerivedFrom(original.entityId),
         original.provenance.topmostDerivedFrom,
-        original.provenance.initialVersion,
+        original.provenance.originalIdentifier,
         date,
         (modifyingPerson :: original.provenance.creators).sortBy(_.name),
         maybeInvalidationTime = None
@@ -125,7 +126,7 @@ trait DatasetEntitiesGenerators {
         date     <- datasetCreatedDates(projectDateCreated.value)
         creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
       } yield Dataset.Provenance.Internal(Dataset.entityId(identifier),
-                                          InitialVersion(identifier),
+                                          OriginalIdentifier(identifier),
                                           date,
                                           creators.sortBy(_.name)
       )
@@ -143,7 +144,7 @@ trait DatasetEntitiesGenerators {
         creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
       } yield Dataset.Provenance.ImportedExternal(Dataset.entityId(identifier),
                                                   sameAs,
-                                                  InitialVersion(identifier),
+                                                  OriginalIdentifier(identifier),
                                                   date,
                                                   creators.sortBy(_.name)
       )
@@ -152,14 +153,14 @@ trait DatasetEntitiesGenerators {
     (identifier, _) =>
       implicit renkuBaseUrl =>
         for {
-          date           <- datasetPublishedDates()
-          sameAs         <- datasetInternalSameAs
-          initialVersion <- datasetInitialVersions
-          creators       <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+          date       <- datasetPublishedDates()
+          sameAs     <- datasetInternalSameAs
+          originalId <- oneOf(fixed(OriginalIdentifier(identifier)), datasetOriginalIdentifiers)
+          creators   <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorExternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     TopmostSameAs(sameAs),
-                                                                    initialVersion,
+                                                                    originalId,
                                                                     date,
                                                                     creators.sortBy(_.name)
         )
@@ -170,13 +171,14 @@ trait DatasetEntitiesGenerators {
     (identifier, projectDateCreated) =>
       implicit renkuBaseUrl =>
         for {
-          date     <- datasetCreatedDates(projectDateCreated.value)
-          sameAs   <- sameAsGen
-          creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
+          date       <- datasetCreatedDates(projectDateCreated.value)
+          sameAs     <- sameAsGen
+          originalId <- oneOf(fixed(OriginalIdentifier(identifier)), datasetOriginalIdentifiers)
+          creators   <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     TopmostSameAs(sameAs),
-                                                                    InitialVersion(identifier),
+                                                                    originalId,
                                                                     date,
                                                                     creators.sortBy(_.name)
         )
@@ -193,7 +195,7 @@ trait DatasetEntitiesGenerators {
         } yield Dataset.Provenance.ImportedInternalAncestorInternal(Dataset.entityId(identifier),
                                                                     sameAs,
                                                                     topmostSameAs,
-                                                                    InitialVersion(identifier),
+                                                                    OriginalIdentifier(identifier),
                                                                     date,
                                                                     creators.sortBy(_.name)
         )
