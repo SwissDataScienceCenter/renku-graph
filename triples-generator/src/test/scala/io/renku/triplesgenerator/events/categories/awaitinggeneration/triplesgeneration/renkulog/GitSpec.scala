@@ -103,7 +103,8 @@ class GitSpec extends AnyWordSpec with IOSpec with MockFactory with should.Match
       "fatal: the remote end hung up unexpectedly",
       "The requested URL returned error: 504",
       "Error in the HTTP2 framing layer",
-      "remote: The project you were looking for could not be found or you don't have permission to view it."
+      "remote: The project you were looking for could not be found or you don't have permission to view it.",
+      "error: RPC failed\nfatal: error reading section header 'shallow-info'"
     ) foreach { error =>
       s"return ProcessingNonRecoverableError.MalformedRepository if command fails with a message containing '$error'" in new TestCase {
 
