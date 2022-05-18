@@ -62,7 +62,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         dataset.asJsonLD.toJson
           .deepMerge(
             Json.obj(
-              (renku / "originalIdentifier").show -> json"""{"@value": ${datasetInitialVersions.generateOne.show}}"""
+              (renku / "originalIdentifier").show -> json"""{"@value": ${datasetOriginalIdentifiers.generateOne.show}}"""
             )
           )
       }.fold(throw _, identity)
@@ -88,13 +88,13 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         s"when originalIdentifier on an $dsType dataset is different than its identifier" in {
           val dataset =
             dsGen.decoupledFromProject.generateOne.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
-          val otherInitialVersion = datasetInitialVersions.generateOne
+          val otherOriginalId = datasetOriginalIdentifiers.generateOne
 
           val dsJsonLD = parse {
             dataset.asJsonLD.toJson
               .deepMerge(
                 Json.obj(
-                  (renku / "originalIdentifier").show -> json"""{"@value": ${otherInitialVersion.show}}"""
+                  (renku / "originalIdentifier").show -> json"""{"@value": ${otherOriginalId.show}}"""
                 )
               )
           }.fold(throw _, identity)
@@ -109,9 +109,9 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           actualDS shouldBe dataset.copy(
             provenance = dataset.provenance match {
               case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal =>
-                p.copy(initialVersion = otherInitialVersion)
+                p.copy(originalIdentifier = otherOriginalId)
               case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal =>
-                p.copy(initialVersion = otherInitialVersion)
+                p.copy(originalIdentifier = otherOriginalId)
               case p => fail(s"DS with provenance ${p.getClass} not expected here")
             }
           )
@@ -134,7 +134,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           dataset.asJsonLD.toJson
             .deepMerge(
               Json.obj(
-                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetInitialVersions.generateOne.show}}"""
+                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetOriginalIdentifiers.generateOne.show}}"""
               )
             )
         }.flatMap(_.flatten).fold(throw _, identity)
@@ -162,7 +162,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           dataset.asJsonLD.toJson
             .deepMerge(
               Json.obj(
-                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetInitialVersions.generateOne.show}}"""
+                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetOriginalIdentifiers.generateOne.show}}"""
               )
             )
         }.flatMap(_.flatten).fold(throw _, identity)
@@ -226,10 +226,10 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           .map(_._2)
           .generateOne
           .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-        ds.copy(provenance = ds.provenance.copy(initialVersion = datasetInitialVersions.generateOne))
+        ds.copy(provenance = ds.provenance.copy(originalIdentifier = datasetOriginalIdentifiers.generateOne))
       }
 
-      assume(dataset.identification.identifier.value != dataset.provenance.initialVersion.value)
+      assume(dataset.identification.identifier.value != dataset.provenance.originalIdentifier.value)
 
       dataset.asJsonLD.flatten
         .fold(throw _, identity)

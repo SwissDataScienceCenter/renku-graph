@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.datasets.{InitialVersion, SameAs}
+import io.renku.graph.model.datasets.{OriginalIdentifier, SameAs}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -57,7 +57,7 @@ class ProjectDatasetsFinderSpec
         .findProjectDatasets(projectComplete.path)
         .unsafeRunSync() shouldBe List(
         (modification2.identification.identifier,
-         InitialVersion(original.identification.identifier),
+         OriginalIdentifier(original.identification.identifier),
          modification2.identification.title,
          modification2.identification.name,
          modification2.provenance.derivedFrom.asRight,
@@ -76,14 +76,14 @@ class ProjectDatasetsFinderSpec
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
         (dataset1.identification.identifier,
-         InitialVersion(dataset1.identification.identifier),
+         OriginalIdentifier(dataset1.identification.identifier),
          dataset1.identification.title,
          dataset1.identification.name,
          dataset1.provenance.sameAs.asLeft,
          dataset1.additionalInfo.images
         ),
         (modified2.identification.identifier,
-         InitialVersion(dataset2.identification.identifier),
+         OriginalIdentifier(dataset2.identification.identifier),
          modified2.identification.title,
          modified2.identification.name,
          modified2.provenance.derivedFrom.asRight,
@@ -105,14 +105,14 @@ class ProjectDatasetsFinderSpec
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
         (dataset1.identification.identifier,
-         InitialVersion(dataset1.identification.identifier),
+         OriginalIdentifier(dataset1.identification.identifier),
          dataset1.identification.title,
          original.identification.name,
          dataset1.provenance.sameAs.asLeft,
          original.additionalInfo.images
         ),
         (dataset2.identification.identifier,
-         InitialVersion(dataset2.identification.identifier),
+         OriginalIdentifier(dataset2.identification.identifier),
          dataset2.identification.title,
          original.identification.name,
          dataset2.provenance.sameAs.asLeft,
@@ -135,7 +135,7 @@ class ProjectDatasetsFinderSpec
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
         (dataset2.identification.identifier,
-         InitialVersion(dataset2.identification.identifier),
+         OriginalIdentifier(dataset2.identification.identifier),
          dataset2.identification.title,
          dataset2.identification.name,
          SameAs(dataset2.provenance.topmostSameAs.value).asLeft,

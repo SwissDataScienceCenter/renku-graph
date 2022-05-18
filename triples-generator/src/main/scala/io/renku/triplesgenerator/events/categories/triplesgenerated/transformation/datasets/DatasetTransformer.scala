@@ -38,7 +38,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
     derivationHierarchyUpdater:     DerivationHierarchyUpdater[F],
     sameAsUpdater:                  SameAsUpdater[F],
     topmostSameAsUpdater:           TopmostSameAsUpdater[F],
-    initialVersionsUpdater:         InitialVersionsUpdater[F],
+    originalIdentifierUpdater:      OriginalIdentifierUpdater[F],
     dateCreatedUpdater:             DateCreatedUpdater[F],
     personLinksUpdater:             PersonLinksUpdater[F],
     hierarchyOnInvalidationUpdater: HierarchyOnInvalidationUpdater[F],
@@ -48,7 +48,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
   import dateCreatedUpdater._
   import derivationHierarchyUpdater._
   import hierarchyOnInvalidationUpdater._
-  import initialVersionsUpdater._
+  import originalIdentifierUpdater._
   import personLinksUpdater._
   import recoverableErrorsRecovery._
   import sameAsUpdater._
@@ -62,7 +62,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
       (fixDerivationHierarchies(project -> Queries.empty) >>=
         updateSameAs >>=
         updateTopmostSameAs >>=
-        updateInitialVersions >>=
+        updateOriginalIdentifiers >>=
         updateDateCreated >>=
         updatePersonLinks >>=
         updateHierarchyOnInvalidation)
@@ -78,12 +78,12 @@ private[transformation] object DatasetTransformer {
     topmostSameAsUpdater           <- TopmostSameAsUpdater[F]
     personLinksUpdater             <- PersonLinksUpdater[F]
     hierarchyOnInvalidationUpdater <- HierarchyOnInvalidationUpdater[F]
-    initialVersionsUpdater         <- InitialVersionsUpdater[F]
+    originalIdentifierUpdater      <- OriginalIdentifierUpdater[F]
     dateCreatedUpdater             <- DateCreatedUpdater[F]
   } yield new DatasetTransformerImpl[F](derivationHierarchyUpdater,
                                         sameAsUpdater,
                                         topmostSameAsUpdater,
-                                        initialVersionsUpdater,
+                                        originalIdentifierUpdater,
                                         dateCreatedUpdater,
                                         personLinksUpdater,
                                         hierarchyOnInvalidationUpdater

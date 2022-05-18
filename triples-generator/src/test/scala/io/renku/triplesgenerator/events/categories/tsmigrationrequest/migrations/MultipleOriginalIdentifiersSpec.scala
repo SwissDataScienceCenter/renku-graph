@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.config.ServiceVersion
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
-import io.renku.graph.model.datasets.InitialVersion
+import io.renku.graph.model.datasets.OriginalIdentifier
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -60,16 +60,16 @@ class MultipleOriginalIdentifiersSpec
 
       insertTriple(brokenDS.entityId, "renku:originalIdentifier", show"'${brokenDS.identification.identifier}'")
 
-      findInitialVersions(brokenDS.identification.identifier) shouldBe Set(
-        brokenDS.provenance.initialVersion,
-        InitialVersion(brokenDS.identification.identifier)
+      findOriginalIdentifiers(brokenDS.identification.identifier) shouldBe Set(
+        brokenDS.provenance.originalIdentifier,
+        OriginalIdentifier(brokenDS.identification.identifier)
       )
-      findInitialVersions(correctDS.identification.identifier) shouldBe Set(correctDS.provenance.initialVersion)
+      findOriginalIdentifiers(correctDS.identification.identifier) shouldBe Set(correctDS.provenance.originalIdentifier)
 
       migration.run().value.unsafeRunSync() shouldBe ().asRight
 
-      findInitialVersions(brokenDS.identification.identifier)  shouldBe Set(brokenDS.provenance.initialVersion)
-      findInitialVersions(correctDS.identification.identifier) shouldBe Set(correctDS.provenance.initialVersion)
+      findOriginalIdentifiers(brokenDS.identification.identifier)  shouldBe Set(brokenDS.provenance.originalIdentifier)
+      findOriginalIdentifiers(correctDS.identification.identifier) shouldBe Set(correctDS.provenance.originalIdentifier)
     }
   }
 
@@ -94,7 +94,7 @@ class MultipleOriginalIdentifiersSpec
     }
   }
 
-  private def findInitialVersions(id: datasets.Identifier): Set[datasets.InitialVersion] =
+  private def findOriginalIdentifiers(id: datasets.Identifier): Set[datasets.OriginalIdentifier] =
     runQuery(s"""|SELECT ?version 
                  |WHERE { 
                  |  ?id a schema:Dataset;
@@ -102,6 +102,6 @@ class MultipleOriginalIdentifiersSpec
                  |      renku:originalIdentifier ?version
                  |}""".stripMargin)
       .unsafeRunSync()
-      .map(row => datasets.InitialVersion(row("version")))
+      .map(row => datasets.OriginalIdentifier(row("version")))
       .toSet
 }

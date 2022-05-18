@@ -371,7 +371,7 @@ class UpdatesCreatorSpec
     }
   }
 
-  "removeOtherInitialVersions" should {
+  "removeOtherOriginalIdentifiers" should {
 
     "prepare queries that removes all additional originalIdentifier triples on the DS" in {
       val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
@@ -379,36 +379,36 @@ class UpdatesCreatorSpec
 
       loadToStore(ds)
 
-      val existingInitialVersion1 = datasetInitialVersions.generateOne
-      insertTriple(ds.resourceId, "renku:originalIdentifier", s"'$existingInitialVersion1'")
-      val existingInitialVersion2 = datasetInitialVersions.generateOne
-      insertTriple(ds.resourceId, "renku:originalIdentifier", s"'$existingInitialVersion2'")
+      val existingOriginalId1 = datasetOriginalIdentifiers.generateOne
+      insertTriple(ds.resourceId, "renku:originalIdentifier", s"'$existingOriginalId1'")
+      val existingOriginalId2 = datasetOriginalIdentifiers.generateOne
+      insertTriple(ds.resourceId, "renku:originalIdentifier", s"'$existingOriginalId2'")
 
-      findInitialVersions(ds.identification.identifier) shouldBe Set(ds.provenance.initialVersion,
-                                                                     existingInitialVersion1,
-                                                                     existingInitialVersion2
+      findOriginalIdentifiers(ds.identification.identifier) shouldBe Set(ds.provenance.originalIdentifier,
+                                                                         existingOriginalId1,
+                                                                         existingOriginalId2
       )
 
       UpdatesCreator
-        .removeOtherInitialVersions(ds, Set(existingInitialVersion1, existingInitialVersion2))
+        .removeOtherOriginalIdentifiers(ds, Set(existingOriginalId1, existingOriginalId2))
         .runAll
         .unsafeRunSync()
 
-      findInitialVersions(ds.identification.identifier) shouldBe Set(ds.provenance.initialVersion)
+      findOriginalIdentifiers(ds.identification.identifier) shouldBe Set(ds.provenance.originalIdentifier)
     }
 
     "prepare no queries if there's only the correct originalIdentifier for the DS in KG" in {
       val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      UpdatesCreator.removeOtherInitialVersions(ds, Set(ds.provenance.initialVersion)) shouldBe Nil
+      UpdatesCreator.removeOtherOriginalIdentifiers(ds, Set(ds.provenance.originalIdentifier)) shouldBe Nil
     }
 
     "prepare no queries if there's no originalIdentifier for the DS in KG" in {
       val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      UpdatesCreator.removeOtherInitialVersions(ds, Set.empty) shouldBe Nil
+      UpdatesCreator.removeOtherOriginalIdentifiers(ds, Set.empty) shouldBe Nil
     }
   }
 
@@ -635,7 +635,7 @@ class UpdatesCreatorSpec
       .fold(throw _, identity)
       .toSet
 
-  private def findInitialVersions(id: datasets.Identifier): Set[datasets.InitialVersion] =
+  private def findOriginalIdentifiers(id: datasets.Identifier): Set[datasets.OriginalIdentifier] =
     runQuery(s"""|SELECT ?initial
                  |WHERE { 
                  |  ?id a schema:Dataset;
@@ -643,7 +643,7 @@ class UpdatesCreatorSpec
                  |      renku:originalIdentifier ?initial.
                  |}""".stripMargin)
       .unsafeRunSync()
-      .map(row => datasets.InitialVersion(row("initial")))
+      .map(row => datasets.OriginalIdentifier(row("initial")))
       .toSet
 
   private def findDateCreated(id: datasets.Identifier): Set[datasets.DateCreated] =

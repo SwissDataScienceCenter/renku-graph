@@ -77,7 +77,7 @@ object model {
   final case class DatasetCreator(maybeEmail: Option[Email], name: UserName, maybeAffiliation: Option[Affiliation])
 
   final case class DatasetPart(location: PartLocation)
-  final case class DatasetVersions(initial: InitialVersion)
+  final case class DatasetVersions(initial: OriginalIdentifier)
 
   final case class DatasetProject(path: Path, name: projects.Name)
 }

@@ -50,7 +50,7 @@ class MultipleModifiedDSDataSpec extends AnyWordSpec with should.Matchers with I
 
           val breakingModification = modifiedDS.copy(provenance =
             modifiedDS.provenance.copy(
-              initialVersion = datasets.InitialVersion(modifiedDS.identifier),
+              originalIdentifier = datasets.OriginalIdentifier(modifiedDS.identifier),
               topmostDerivedFrom =
                 datasets.TopmostDerivedFrom(datasets.DerivedFrom(Dataset.entityId(modifiedDS.identifier)))
             )
@@ -69,7 +69,7 @@ class MultipleModifiedDSDataSpec extends AnyWordSpec with should.Matchers with I
 
           val breakingModification = modifiedDS.copy(provenance =
             modifiedDS.provenance.copy(
-              initialVersion = datasets.InitialVersion(modifiedDS.identifier),
+              originalIdentifier = datasets.OriginalIdentifier(modifiedDS.identifier),
               topmostDerivedFrom =
                 datasets.TopmostDerivedFrom(datasets.DerivedFrom(Dataset.entityId(modifiedDS.identifier)))
             )
@@ -109,13 +109,17 @@ class MultipleModifiedDSDataSpec extends AnyWordSpec with should.Matchers with I
 
         runUpdate(MultipleModifiedDSData.query).unsafeRunSync() shouldBe ()
 
-        findOriginalIdentifiers(project1DS.identification.identifier) shouldBe Set(project1DS.provenance.initialVersion)
+        findOriginalIdentifiers(project1DS.identification.identifier) shouldBe Set(
+          project1DS.provenance.originalIdentifier
+        )
         findTopmostDerivedFrom(project1DS.identification.identifier) shouldBe Set(
           project1DS.provenance.topmostDerivedFrom
         )
         findTopmostSameAs(project1DS.identification.identifier) shouldBe Set(project1DS.provenance.topmostSameAs)
 
-        findOriginalIdentifiers(project2DS.identification.identifier) shouldBe Set(project2DS.provenance.initialVersion)
+        findOriginalIdentifiers(project2DS.identification.identifier) shouldBe Set(
+          project2DS.provenance.originalIdentifier
+        )
         findTopmostDerivedFrom(project2DS.identification.identifier) shouldBe Set(
           project2DS.provenance.topmostDerivedFrom
         )
@@ -136,7 +140,7 @@ class MultipleModifiedDSDataSpec extends AnyWordSpec with should.Matchers with I
     }
   }
 
-  private def findOriginalIdentifiers(id: datasets.Identifier): Set[datasets.InitialVersion] =
+  private def findOriginalIdentifiers(id: datasets.Identifier): Set[datasets.OriginalIdentifier] =
     runQuery(s"""|SELECT ?original 
                  |WHERE { 
                  |  ?id a schema:Dataset;
@@ -144,7 +148,7 @@ class MultipleModifiedDSDataSpec extends AnyWordSpec with should.Matchers with I
                  |  renku:originalIdentifier ?original
                  |}""".stripMargin)
       .unsafeRunSync()
-      .map(row => datasets.InitialVersion(row("original")))
+      .map(row => datasets.OriginalIdentifier(row("original")))
       .toSet
 
   private def findTopmostDerivedFrom(id: datasets.Identifier): Set[datasets.TopmostDerivedFrom] =

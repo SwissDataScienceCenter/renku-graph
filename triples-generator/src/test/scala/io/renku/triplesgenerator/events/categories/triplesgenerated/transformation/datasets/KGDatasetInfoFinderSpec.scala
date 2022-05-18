@@ -108,7 +108,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
     }
   }
 
-  "findDatasetInitialVersions" should {
+  "findDatasetOriginalIdentifiers" should {
 
     "return all DS' Initial Versions" in new TestCase {
       val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
@@ -116,15 +116,17 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
 
       loadToStore(dataset)
 
-      val otherInitialVersion = datasetInitialVersions.generateOne
-      insertTriple(dataset.resourceId, "renku:originalIdentifier", show"'$otherInitialVersion'")
+      val otherOriginalId = datasetOriginalIdentifiers.generateOne
+      insertTriple(dataset.resourceId, "renku:originalIdentifier", show"'$otherOriginalId'")
 
-      kgDatasetInfoFinder.findDatasetInitialVersions(dataset.resourceId).unsafeRunSync() shouldBe
-        Set(dataset.provenance.initialVersion, otherInitialVersion)
+      kgDatasetInfoFinder.findDatasetOriginalIdentifiers(dataset.resourceId).unsafeRunSync() shouldBe
+        Set(dataset.provenance.originalIdentifier, otherOriginalId)
     }
 
     "return no Initial Versions if there's no DS with the given id" in new TestCase {
-      kgDatasetInfoFinder.findDatasetInitialVersions(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
+      kgDatasetInfoFinder
+        .findDatasetOriginalIdentifiers(datasetResourceIds.generateOne)
+        .unsafeRunSync() shouldBe Set.empty
     }
   }
 

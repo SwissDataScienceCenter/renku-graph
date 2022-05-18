@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
-import io.renku.graph.model.datasets.{DateCreated, InitialVersion, InternalSameAs, ResourceId, SameAs, TopmostSameAs}
+import io.renku.graph.model.datasets.{DateCreated, InternalSameAs, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.persons
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -30,12 +30,12 @@ import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGDatasetInfoFinder[F[_]] {
-  def findParentTopmostSameAs(idSameAs:      InternalSameAs)(implicit ev: InternalSameAs.type): F[Option[TopmostSameAs]]
-  def findTopmostSameAs(resourceId:          ResourceId)(implicit ev:     ResourceId.type):     F[Option[TopmostSameAs]]
-  def findDatasetCreators(resourceId:        ResourceId): F[Set[persons.ResourceId]]
-  def findDatasetInitialVersions(resourceId: ResourceId): F[Set[InitialVersion]]
-  def findDatasetDateCreated(resourceId:     ResourceId): F[Set[DateCreated]]
-  def findDatasetSameAs(resourceId:          ResourceId): F[Set[SameAs]]
+  def findParentTopmostSameAs(idSameAs: InternalSameAs)(implicit ev: InternalSameAs.type): F[Option[TopmostSameAs]]
+  def findTopmostSameAs(resourceId:     ResourceId)(implicit ev:     ResourceId.type):     F[Option[TopmostSameAs]]
+  def findDatasetCreators(resourceId:   ResourceId): F[Set[persons.ResourceId]]
+  def findDatasetOriginalIdentifiers(resourceId: ResourceId): F[Set[OriginalIdentifier]]
+  def findDatasetDateCreated(resourceId:         ResourceId): F[Set[DateCreated]]
+  def findDatasetSameAs(resourceId:              ResourceId): F[Set[SameAs]]
 }
 
 private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
@@ -105,11 +105,12 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
     }.map(_.toSet)
   }
 
-  override def findDatasetInitialVersions(resourceId: ResourceId): F[Set[InitialVersion]] = {
-    implicit val decoder: Decoder[List[InitialVersion]] = ListResultsDecoder[InitialVersion] { implicit cursor =>
-      extract("originalId")
+  override def findDatasetOriginalIdentifiers(resourceId: ResourceId): F[Set[OriginalIdentifier]] = {
+    implicit val decoder: Decoder[List[OriginalIdentifier]] = ListResultsDecoder[OriginalIdentifier] {
+      implicit cursor =>
+        extract("originalId")
     }
-    queryExpecting[List[InitialVersion]] {
+    queryExpecting[List[OriginalIdentifier]] {
       SparqlQuery.of(
         name = "transformation - find ds originalIdentifiers",
         Prefixes of (renku -> "renku", schema -> "schema"),

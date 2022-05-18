@@ -54,7 +54,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(transformation(in = step2Result, out = step3Result))
 
       val step4Result = generateProjAndQueries
-      (() => initialVersionsUpdater.updateInitialVersions)
+      (() => originalIdentifierUpdater.updateOriginalIdentifiers)
         .expects()
         .returning(transformation(in = step3Result, out = step4Result))
 
@@ -95,7 +95,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
-      (() => initialVersionsUpdater.updateInitialVersions)
+      (() => originalIdentifierUpdater.updateOriginalIdentifiers)
         .expects()
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
@@ -134,7 +134,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
-      (() => initialVersionsUpdater.updateInitialVersions)
+      (() => originalIdentifierUpdater.updateOriginalIdentifiers)
         .expects()
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
@@ -174,14 +174,14 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     val derivationHierarchyUpdater     = mock[DerivationHierarchyUpdater[Try]]
     val sameAsUpdater                  = mock[SameAsUpdater[Try]]
     val topmostSameAsUpdater           = mock[TopmostSameAsUpdater[Try]]
-    val initialVersionsUpdater         = mock[InitialVersionsUpdater[Try]]
+    val originalIdentifierUpdater      = mock[OriginalIdentifierUpdater[Try]]
     val dateCreatedUpdater             = mock[DateCreatedUpdater[Try]]
     val personLinksUpdater             = mock[PersonLinksUpdater[Try]]
     val hierarchyOnInvalidationUpdater = mock[HierarchyOnInvalidationUpdater[Try]]
     val transformer = new DatasetTransformerImpl[Try](derivationHierarchyUpdater,
                                                       sameAsUpdater,
                                                       topmostSameAsUpdater,
-                                                      initialVersionsUpdater,
+                                                      originalIdentifierUpdater,
                                                       dateCreatedUpdater,
                                                       personLinksUpdater,
                                                       hierarchyOnInvalidationUpdater

@@ -464,7 +464,7 @@ trait DatasetsResources {
     json"""{
       "identifier": ${dataset.identification.identifier.value},
       "versions": {
-        "initial": ${dataset.provenance.initialVersion.value}
+        "initial": ${dataset.provenance.originalIdentifier.value}
       },
       "title": ${dataset.identification.title.value},
       "name": ${dataset.identification.name.value},
@@ -473,7 +473,7 @@ trait DatasetsResources {
       .deepMerge(
         _links(
           Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.identification.identifier),
-          Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.provenance.initialVersion)
+          Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.provenance.originalIdentifier)
         )
       )
       .deepMerge(provenanceEncoder(dataset.provenance))

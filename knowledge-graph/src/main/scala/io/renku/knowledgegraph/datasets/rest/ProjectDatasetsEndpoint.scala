@@ -84,11 +84,11 @@ class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
   }
 
   private def datasetEncoder(projectPath: projects.Path): Encoder[ProjectDataset] =
-    Encoder.instance[ProjectDataset] { case (id, initialVersion, title, name, sameAsOrDerived, images) =>
+    Encoder.instance[ProjectDataset] { case (id, originalId, title, name, sameAsOrDerived, images) =>
       json"""{
           "identifier": ${id.toString},
           "versions": {
-            "initial": ${initialVersion.toString}
+            "initial": ${originalId.toString}
           },
           "title": ${title.toString},
           "name": ${name.toString},
@@ -98,7 +98,7 @@ class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
         .deepMerge(
           _links(
             Rel("details")         -> Href(renkuResourcesUrl / "datasets" / id),
-            Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / initialVersion)
+            Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / originalId)
           )
         )
     }
