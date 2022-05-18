@@ -131,6 +131,12 @@ object DbInitializer {
             currentStatus = TransformationNonRecoverableFailure,
             destinationStatus = New,
             discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%DecodingFailure at : Invalid dataset data dateCreated%",
+            currentStatus = TransformationNonRecoverableFailure,
+            destinationStatus = TriplesGenerated,
+            discardingStatuses = TriplesStore :: Nil
           )
         ),
         isMigrating
