@@ -197,7 +197,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
       registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
       val endTime = Instant.now()
 
-      (endTime.toEpochMilli - startTime.toEpochMilli) should be > busySleep.toMillis
+      (endTime.toEpochMilli - startTime.toEpochMilli) should be >= busySleep.toMillis
       (endTime.toEpochMilli - startTime.toEpochMilli) should be < (busySleep + checkupInterval + (300 millis)).toMillis
 
       eventually {
