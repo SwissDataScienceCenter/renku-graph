@@ -75,12 +75,15 @@ object MigrationsStoreConfig {
 
 class FusekiBaseUrl private (val value: String) extends AnyVal with UrlTinyType
 
-object FusekiBaseUrl extends TinyTypeFactory[FusekiBaseUrl](new FusekiBaseUrl(_)) with Url with UrlOps[FusekiBaseUrl] {
+object FusekiBaseUrl
+    extends TinyTypeFactory[FusekiBaseUrl](new FusekiBaseUrl(_))
+    with Url[FusekiBaseUrl]
+    with UrlOps[FusekiBaseUrl] {
   implicit val fusekiBaseUrlReader: ConfigReader[FusekiBaseUrl] = urlTinyTypeReader(FusekiBaseUrl)
 }
 
 class DatasetName private (val value: String) extends AnyVal with StringTinyType
 
-object DatasetName extends TinyTypeFactory[DatasetName](new DatasetName(_)) with NonBlank {
+object DatasetName extends TinyTypeFactory[DatasetName](new DatasetName(_)) with NonBlank[DatasetName] {
   implicit val datasetNameReader: ConfigReader[DatasetName] = stringTinyTypeReader(DatasetName)
 }

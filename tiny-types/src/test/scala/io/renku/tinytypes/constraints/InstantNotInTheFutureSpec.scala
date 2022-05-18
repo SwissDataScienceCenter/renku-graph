@@ -56,10 +56,9 @@ class InstantNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyCheck
 }
 
 private class InstantNotInTheFutureType private (val value: Instant) extends AnyVal with InstantTinyType
-
 private object InstantNotInTheFutureType
     extends TinyTypeFactory[InstantNotInTheFutureType](new InstantNotInTheFutureType(_))
-    with InstantNotInTheFuture {
+    with InstantNotInTheFuture[InstantNotInTheFutureType] {
 
   var clock:                  Clock   = Clock.systemDefaultZone()
   protected override def now: Instant = clock.instant()

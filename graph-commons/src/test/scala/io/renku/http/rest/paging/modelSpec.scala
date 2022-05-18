@@ -29,7 +29,7 @@ class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
   "Page" should {
 
     "be a PositiveInt constrained" in {
-      Page shouldBe a[PositiveInt]
+      Page shouldBe a[PositiveInt[_]]
     }
 
   }
@@ -44,7 +44,7 @@ class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
   "PerPage" should {
     "be a PositiveInt constrained" in {
-      PerPage shouldBe a[PositiveInt]
+      PerPage shouldBe a[PositiveInt[_]]
     }
   }
 
@@ -57,7 +57,7 @@ class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
   "Total" should {
     "be a NonNegative constrained" in {
-      Total shouldBe a[NonNegativeInt]
+      Total shouldBe a[NonNegativeInt[_]]
     }
   }
 }

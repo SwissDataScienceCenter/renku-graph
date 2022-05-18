@@ -21,7 +21,9 @@ package io.renku.tinytypes.constraints
 import UrlEncoder._
 import io.renku.tinytypes._
 
-trait RelativePath extends Constraints[String] with NonBlank {
+trait RelativePath[TT <: TinyType { type V = String }] extends Constraints[TT] with NonBlank[TT] {
+  self: TinyTypeFactory[TT] =>
+
   addConstraint(
     check = value => !value.startsWith("/") && !value.endsWith("/") && !value.matches("^\\w+://.*"),
     message = value => s"'$value' is not a valid $typeName"
@@ -29,7 +31,7 @@ trait RelativePath extends Constraints[String] with NonBlank {
 }
 
 trait RelativePathOps[T <: RelativePathTinyType] {
-  self: TinyTypeFactory[T] with RelativePath =>
+  self: TinyTypeFactory[T] with RelativePath[T] =>
 
   implicit class RelativePathOps(url: T) {
 

@@ -28,19 +28,19 @@ import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 final class RenkuBaseUrl private (val value: String) extends AnyVal with UrlTinyType
 object RenkuBaseUrl
     extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_))
-    with Url
+    with Url[RenkuBaseUrl]
     with UrlOps[RenkuBaseUrl]
     with UrlResourceRenderer[RenkuBaseUrl]
 
 final class GitLabUrl private (val value: String) extends AnyVal with UrlTinyType {
   def apiV4: GitLabApiUrl = GitLabApiUrl(this)
 }
-object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url with UrlOps[GitLabUrl]
+object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url[GitLabUrl] with UrlOps[GitLabUrl]
 
 final class GitLabApiUrl private (val value: String) extends AnyVal with UrlTinyType
 object GitLabApiUrl
     extends TinyTypeFactory[GitLabApiUrl](new GitLabApiUrl(_))
-    with Url
+    with Url[GitLabApiUrl]
     with UrlOps[GitLabApiUrl]
     with UrlResourceRenderer[GitLabApiUrl] {
   def apply(gitLabUrl: GitLabUrl): GitLabApiUrl = new GitLabApiUrl((gitLabUrl / "api" / "v4").value)
@@ -49,7 +49,7 @@ object GitLabApiUrl
 final class CliVersion private (val value: String) extends AnyVal with StringTinyType
 object CliVersion
     extends TinyTypeFactory[CliVersion](new CliVersion(_))
-    with NonBlank
+    with NonBlank[CliVersion]
     with TinyTypeJsonLDOps[CliVersion] {
   implicit val jsonDecoder: Decoder[CliVersion] = TinyTypeDecoders.stringDecoder(this)
 }
@@ -73,7 +73,7 @@ object RenkuVersionPair {
 final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
 object SchemaVersion
     extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_))
-    with NonBlank
+    with NonBlank[SchemaVersion]
     with TinyTypeJsonLDOps[SchemaVersion] {
   implicit val jsonDecoder: Decoder[SchemaVersion] = TinyTypeDecoders.stringDecoder(SchemaVersion)
 }

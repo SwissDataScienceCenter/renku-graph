@@ -60,7 +60,7 @@ trait Subscriber extends Product with Serializable {
 final case class SubscriberBasicInfo(url: SubscriberUrl, id: SubscriberId) extends Subscriber
 
 final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
-object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
+object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url[SubscriberUrl] {
 
   def apply(microserviceBaseUrl: MicroserviceBaseUrl, part: String Refined NonEmpty): SubscriberUrl =
     SubscriberUrl((microserviceBaseUrl / part.toString()).toString)
@@ -75,7 +75,7 @@ object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)
 }
 
 final class SubscriberId private (val value: String) extends AnyVal with StringTinyType
-object SubscriberId extends TinyTypeFactory[SubscriberId](new SubscriberId(_)) with NonBlank {
+object SubscriberId extends TinyTypeFactory[SubscriberId](new SubscriberId(_)) with NonBlank[SubscriberId] {
 
   def apply(microserviceId: MicroserviceIdentifier): SubscriberId = SubscriberId(microserviceId.toString)
 

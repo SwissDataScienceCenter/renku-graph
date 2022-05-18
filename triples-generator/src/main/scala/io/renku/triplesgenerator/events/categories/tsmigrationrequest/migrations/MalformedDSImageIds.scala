@@ -16,17 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
 import tooling.{CleanUpEventsProducer, QueryBasedMigration}
 
@@ -37,7 +36,7 @@ private object MalformedDSImageIds {
 
   private lazy val name = Migration.Name("Malformed DS Image Ids")
   private[migrations] lazy val query = SparqlQuery.of(
-    Refined.unsafeApply(name.show),
+    name.asRefined,
     Prefixes.of(schema -> "schema", renku -> "renku"),
     s"""|SELECT DISTINCT ?path
         |WHERE {

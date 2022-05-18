@@ -38,7 +38,7 @@ class LineageResourcesSpec
         renkuProjectEntities(visibilityPublic)
           .map(
             _.copy(
-              path = projects.Path("public/lineage-project"),
+              path = projects.Path("public/lineage-project-for-rest"),
               agent = cliVersion
             )
           )
@@ -49,7 +49,15 @@ class LineageResourcesSpec
 
     /** Expected data structure when looking for the grid_plot file
      *
-     * zhbikes folder clean_data \ / run plan 1 \ bikesParquet plot_data \ / run plan 2 / grid_plot
+     * zhbikes folder   clean_data
+     *           \      /
+     *          run plan 1
+     *               \
+     *              bikesParquet   plot_data
+     *                       \     /
+     *                      run plan 2
+     *                       /
+     *                grid_plot
      */
     Scenario("As a user I would like to find a public project's lineage") {
       Given("some data in the RDF Store")

@@ -36,16 +36,16 @@ object commandParameters {
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with Url
+      with Url[ResourceId]
       with EntityIdJsonLdOps[ResourceId]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 
   final class Position private (val value: Int) extends AnyVal with IntTinyType
   implicit object Position
       extends TinyTypeFactory[Position](new Position(_))
-      with PositiveInt
+      with PositiveInt[Position]
       with TinyTypeJsonLDOps[Position] {
     val first:  Position = Position(1)
     val second: Position = Position(2)
@@ -55,17 +55,20 @@ object commandParameters {
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
-      with NonBlank
+      with NonBlank[Description]
       with TinyTypeJsonLDOps[Description]
 
   final class EncodingFormat private (val value: String) extends AnyVal with StringTinyType
   implicit object EncodingFormat
       extends TinyTypeFactory[EncodingFormat](new EncodingFormat(_))
-      with NonBlank
+      with NonBlank[EncodingFormat]
       with TinyTypeJsonLDOps[EncodingFormat]
 
   final class Prefix private (val value: String) extends AnyVal with StringTinyType
-  implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank with TinyTypeJsonLDOps[Prefix]
+  implicit object Prefix
+      extends TinyTypeFactory[Prefix](new Prefix(_))
+      with NonBlank[Prefix]
+      with TinyTypeJsonLDOps[Prefix]
 
   final case class InputDefaultValue(value: LocationLike) extends TinyType { type V = LocationLike }
   object InputDefaultValue {
@@ -94,7 +97,7 @@ object commandParameters {
   final class ParameterDefaultValue private (val value: String) extends AnyVal with StringTinyType
   implicit object ParameterDefaultValue
       extends TinyTypeFactory[ParameterDefaultValue](new ParameterDefaultValue(_))
-      with NonBlank
+      with NonBlank[ParameterDefaultValue]
       with TinyTypeJsonLDOps[ParameterDefaultValue]
 
   sealed abstract class IOStream(val resourceId: IOStream.ResourceId, val name: String Refined NonEmpty) {
@@ -105,7 +108,7 @@ object commandParameters {
     class ResourceId private (val value: String) extends AnyVal with StringTinyType
     implicit object ResourceId
         extends TinyTypeFactory[ResourceId](new ResourceId(_))
-        with Url
+        with Url[ResourceId]
         with EntityIdJsonLdOps[ResourceId]
 
     sealed trait In                                       extends IOStream

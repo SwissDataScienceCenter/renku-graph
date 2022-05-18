@@ -18,11 +18,11 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.Constraints
+import io.renku.tinytypes.{Constraints, DurationTinyType}
 
 import java.time.Duration
 
-trait DurationNotNegative extends Constraints[Duration] {
+trait DurationNotNegative[TT <: DurationTinyType] extends Constraints[TT] {
   addConstraint(
     check = _.toMillis >= 0,
     message = (_: Duration) => s"$typeName cannot have a negative duration"

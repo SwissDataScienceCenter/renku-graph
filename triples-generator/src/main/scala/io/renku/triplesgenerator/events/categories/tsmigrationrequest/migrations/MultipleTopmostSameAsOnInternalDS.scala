@@ -21,32 +21,46 @@ package migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas._
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
-import tooling.{CleanUpEventsProducer, QueryBasedMigration}
+import tooling.UpdateQueryMigration
 
-private object TopMostDerivedFrom {
+private object MultipleTopmostSameAsOnInternalDS {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    QueryBasedMigration[F](name, query, CleanUpEventsProducer).widen
+    UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Broken TopmostDerivedFrom")
+  private lazy val name = Migration.Name("Multiple TopmostSameAs on Internal DS")
   private[migrations] lazy val query = SparqlQuery.of(
-    Refined.unsafeApply(name.show),
-    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
-    s"""|SELECT ?path
+    name.asRefined,
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
+    s"""|DELETE { ?dsId renku:topmostSameAs ?top. }
         |WHERE {
-        |  ?dsId a schema:Dataset;
-        |        prov:wasDerivedFrom ?derived;
-        |        ^renku:hasDataset/renku:projectPath ?path
+        |  SELECT ?dsId ?top
+        |  WHERE {
+        |    {
+        |      SELECT ?dsId
+        |      WHERE {
+        |        ?dsId a schema:Dataset;
+        |                renku:topmostSameAs ?topSameAs.
+        |        FILTER EXISTS { ?dsId renku:topmostDerivedFrom ?dsId }
+        |        FILTER EXISTS { ?dsId renku:topmostSameAs ?dsId }
+        |        FILTER NOT EXISTS { ?dsId prov:wasDerivedFrom ?de }
+        |        FILTER NOT EXISTS { ?dsId schema:sameAs ?sa }
+        |      }
+        |      GROUP BY ?dsId ?orig
+        |      HAVING (COUNT(?topSameAs) > 1)
+        |      ORDER BY ?dsId
+        |    }
+        |    ?dsId a schema:Dataset;
+        |          renku:topmostSameAs ?top.
+        |    FILTER ( ?dsId != ?top )
+        |  }
         |}
-        |GROUP BY ?path
-        |HAVING (COUNT(DISTINCT ?dsId) > 1)
         |""".stripMargin
   )
 }

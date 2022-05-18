@@ -49,5 +49,4 @@ class GitShaSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 }
 
 private class SomeGitSha private (val value: String) extends AnyVal with StringTinyType
-
-private object SomeGitSha extends TinyTypeFactory[SomeGitSha](new SomeGitSha(_)) with GitSha
+private object SomeGitSha extends TinyTypeFactory[SomeGitSha](new SomeGitSha(_)) with GitSha[SomeGitSha]

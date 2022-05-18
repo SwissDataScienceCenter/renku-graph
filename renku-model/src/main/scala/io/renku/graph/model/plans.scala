@@ -31,7 +31,7 @@ object plans {
 
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with Url
+      with Url[ResourceId]
       with EntityIdJsonLdOps[ResourceId] {
 
     def apply(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): ResourceId =
@@ -45,42 +45,48 @@ object plans {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 
   final class Identifier private (val value: String) extends AnyVal with StringTinyType
-  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank
+  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank[Identifier]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
-      with NonBlank
+      with NonBlank[Description]
       with TinyTypeJsonLDOps[Description]
 
   final class Command private (val value: String) extends AnyVal with StringTinyType
-  implicit object Command extends TinyTypeFactory[Command](new Command(_)) with NonBlank with TinyTypeJsonLDOps[Command]
+  implicit object Command
+      extends TinyTypeFactory[Command](new Command(_))
+      with NonBlank[Command]
+      with TinyTypeJsonLDOps[Command]
 
   final class Keyword private (val value: String) extends AnyVal with StringTinyType
-  implicit object Keyword extends TinyTypeFactory[Keyword](new Keyword(_)) with NonBlank with TinyTypeJsonLDOps[Keyword]
+  implicit object Keyword
+      extends TinyTypeFactory[Keyword](new Keyword(_))
+      with NonBlank[Keyword]
+      with TinyTypeJsonLDOps[Keyword]
 
   final class ProgrammingLanguage private (val value: String) extends AnyVal with StringTinyType
 
   implicit object ProgrammingLanguage
       extends TinyTypeFactory[ProgrammingLanguage](new ProgrammingLanguage(_))
-      with NonBlank
+      with NonBlank[ProgrammingLanguage]
       with TinyTypeJsonLDOps[ProgrammingLanguage]
 
   final class SuccessCode private (val value: Int) extends AnyVal with IntTinyType
 
   implicit object SuccessCode
       extends TinyTypeFactory[SuccessCode](new SuccessCode(_))
-      with NonNegativeInt
+      with NonNegativeInt[SuccessCode]
       with TinyTypeJsonLDOps[SuccessCode]
 
   final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
 
   implicit object DateCreated
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
-      with InstantNotInTheFuture
+      with InstantNotInTheFuture[DateCreated]
       with TinyTypeJsonLDOps[DateCreated]
 
 }

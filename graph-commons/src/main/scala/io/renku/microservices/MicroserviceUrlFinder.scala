@@ -67,7 +67,7 @@ object MicroserviceUrlFinder {
 final class MicroserviceBaseUrl private (val value: String) extends AnyVal with UrlTinyType
 object MicroserviceBaseUrl
     extends TinyTypeFactory[MicroserviceBaseUrl](new MicroserviceBaseUrl(_))
-    with Url
+    with Url[MicroserviceBaseUrl]
     with UrlOps[MicroserviceBaseUrl]
     with TinyTypeJsonLDOps[MicroserviceBaseUrl] {
   implicit val decoder: Decoder[MicroserviceBaseUrl] = urlDecoder(MicroserviceBaseUrl)

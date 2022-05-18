@@ -28,7 +28,7 @@ class ServiceUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
   "ServiceUrl" should {
 
     "have the Url constraint" in {
-      ServiceUrl shouldBe an[Url]
+      ServiceUrl shouldBe an[Url[_]]
     }
 
     "be the UrlOps" in {

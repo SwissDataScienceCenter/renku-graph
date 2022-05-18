@@ -51,8 +51,8 @@ object SentryConfig {
   }
 
   class Dsn private (val value: String) extends AnyVal with UrlTinyType
-  implicit object Dsn                   extends TinyTypeFactory[Dsn](new Dsn(_)) with Url with UrlOps[Dsn]
+  implicit object Dsn                   extends TinyTypeFactory[Dsn](new Dsn(_)) with Url[Dsn] with UrlOps[Dsn]
 
   class Environment private (val value: String) extends AnyVal with StringTinyType
-  implicit object Environment                   extends TinyTypeFactory[Environment](new Environment(_)) with NonBlank
+  implicit object Environment extends TinyTypeFactory[Environment](new Environment(_)) with NonBlank[Environment]
 }

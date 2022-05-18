@@ -24,7 +24,7 @@ import java.net.URL
 import scala.language.implicitConversions
 import scala.util.Try
 
-trait Url extends Constraints[String] {
+trait Url[TT <: TinyType { type V = String }] extends Constraints[TT] {
   addConstraint(
     check = url => Try(new URL(url)).isSuccess,
     message = (url: String) => s"Cannot instantiate $typeName with '$url'"
@@ -32,7 +32,7 @@ trait Url extends Constraints[String] {
 }
 
 trait UrlOps[T <: UrlTinyType] {
-  self: TinyTypeFactory[T] with Url =>
+  self: TinyTypeFactory[T] with Url[T] =>
 
   import UrlEncoder._
 
@@ -115,7 +115,7 @@ trait UrlOps[T <: UrlTinyType] {
 }
 
 trait BaseUrl[SourceType <: UrlTinyType, DestinationType <: UrlTinyType] {
-  self: TinyTypeFactory[SourceType] with Url =>
+  self: TinyTypeFactory[SourceType] with Url[SourceType] =>
 
   import UrlEncoder._
 

@@ -18,11 +18,11 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.Constraints
+import io.renku.tinytypes.{Constraints, LocalDateTinyType}
 
 import java.time.LocalDate
 
-trait LocalDateNotInTheFuture extends Constraints[LocalDate] {
+trait LocalDateNotInTheFuture[TT <: LocalDateTinyType] extends Constraints[TT] {
   protected[this] def now: LocalDate = LocalDate.now()
 
   addConstraint(

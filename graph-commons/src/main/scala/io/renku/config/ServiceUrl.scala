@@ -23,7 +23,6 @@ import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
 import pureconfig.ConfigReader
 
 class ServiceUrl private (val value: String) extends AnyVal with UrlTinyType
-
-object ServiceUrl extends TinyTypeFactory[ServiceUrl](new ServiceUrl(_)) with Url with UrlOps[ServiceUrl] {
+object ServiceUrl extends TinyTypeFactory[ServiceUrl](new ServiceUrl(_)) with Url[ServiceUrl] with UrlOps[ServiceUrl] {
   implicit val serviceUrlReader: ConfigReader[ServiceUrl] = ConfigLoader.urlTinyTypeReader(this)
 }

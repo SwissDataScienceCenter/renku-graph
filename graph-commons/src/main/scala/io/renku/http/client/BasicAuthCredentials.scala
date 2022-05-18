@@ -24,10 +24,14 @@ import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 case class BasicAuthCredentials(username: BasicAuthUsername, password: BasicAuthPassword)
 
 class BasicAuthUsername private (val value: String) extends AnyVal with StringTinyType
-object BasicAuthUsername extends TinyTypeFactory[BasicAuthUsername](new BasicAuthUsername(_)) with NonBlank
+object BasicAuthUsername
+    extends TinyTypeFactory[BasicAuthUsername](new BasicAuthUsername(_))
+    with NonBlank[BasicAuthUsername]
 
 class BasicAuthPassword private (val value: String) extends AnyVal with StringTinyType
-object BasicAuthPassword extends TinyTypeFactory[BasicAuthPassword](new BasicAuthPassword(_)) with NonBlank
+object BasicAuthPassword
+    extends TinyTypeFactory[BasicAuthPassword](new BasicAuthPassword(_))
+    with NonBlank[BasicAuthPassword]
 
 object BasicAuthConfigReaders {
 

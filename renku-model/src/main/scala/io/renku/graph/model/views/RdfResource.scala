@@ -18,22 +18,21 @@
 
 package io.renku.graph.model.views
 
-import io.renku.tinytypes.constraints.Url
+import cats.syntax.all._
+import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.tinytypes._
+import io.renku.tinytypes.constraints.Url
 
-/*
- * This is a marker trait to be used with TinyTypes so they can be rendered as an RdfResource which is `<url>`
- */
 trait RdfResource
 
 trait UrlResourceRenderer[T <: UrlTinyType] {
-  self: TinyTypeFactory[T] with Url =>
+  self: TinyTypeFactory[T] with Url[T] =>
 
-  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url => s"<$url>"
+  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url => s"<${sparqlEncode(url.show)}>"
 }
 
 trait AnyResourceRenderer[T <: StringTinyType] {
-  self: TinyTypeFactory[T] with Url =>
+  self: TinyTypeFactory[T] with Url[T] =>
 
-  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url => s"<$url>"
+  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url => s"<${sparqlEncode(url.show)}>"
 }

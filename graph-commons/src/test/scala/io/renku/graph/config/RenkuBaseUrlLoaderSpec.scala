@@ -24,7 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.RenkuBaseUrl
-import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.views.{RdfResource, SparqlValueEncoder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -77,8 +77,9 @@ class RenkuBaseUrlLoaderSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
   "showAs[RdfResource]" should {
 
     "wrap the RenkuBaseUrl in <>" in {
+      import SparqlValueEncoder.sparqlEncode
       forAll { url: RenkuBaseUrl =>
-        url.showAs[RdfResource] shouldBe s"<${url.value}>"
+        url.showAs[RdfResource] shouldBe s"<${sparqlEncode(url.value)}>"
       }
     }
   }

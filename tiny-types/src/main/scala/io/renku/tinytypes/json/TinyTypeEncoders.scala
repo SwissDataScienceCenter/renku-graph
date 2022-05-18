@@ -39,7 +39,7 @@ trait TinyTypeEncoders {
   implicit def longEncoder[TT <: LongTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromLong(ttValue.value))
 
-  implicit def floatEncoder[TT <: FloatTinyType, TTF <: TinyTypeFactory[TT] with FiniteFloat]: Encoder[TT] =
+  implicit def floatEncoder[TT <: FloatTinyType, TTF <: TinyTypeFactory[TT] with FiniteFloat[TT]]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromFloatOrString(ttValue.value))
 
   implicit def localDateEncoder[TT <: LocalDateTinyType]: Encoder[TT] =

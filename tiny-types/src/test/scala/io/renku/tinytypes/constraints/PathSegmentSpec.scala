@@ -32,7 +32,7 @@ class PathSegmentSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
   "PathSegment" should {
 
     "be a RelativePath" in {
-      PathSegment shouldBe a[RelativePath]
+      PathSegment shouldBe a[RelativePath[_]]
     }
 
     "be a RelativePathTinyType" in {

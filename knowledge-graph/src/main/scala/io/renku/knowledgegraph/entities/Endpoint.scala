@@ -69,7 +69,7 @@ object Endpoint {
     object Filters {
 
       final class Query private (val value: String) extends AnyVal with StringTinyType
-      object Query extends TinyTypeFactory[Query](new Query(_)) with NonBlank {
+      object Query extends TinyTypeFactory[Query](new Query(_)) with NonBlank[Query] {
         private implicit val queryParameterDecoder: QueryParamDecoder[Query] =
           (value: QueryParameterValue) =>
             Query.from(value.value).leftMap(_ => parsingFailure(query.parameterName)).toValidatedNel
@@ -132,7 +132,7 @@ object Endpoint {
       }
 
       final class Date private (val value: LocalDate) extends AnyVal with LocalDateTinyType
-      object Date extends TinyTypeFactory[Date](new Date(_)) with LocalDateNotInTheFuture {
+      object Date extends TinyTypeFactory[Date](new Date(_)) with LocalDateNotInTheFuture[Date] {
         private implicit val dateParameterDecoder: QueryParamDecoder[Date] =
           (value: QueryParameterValue) =>
             Either

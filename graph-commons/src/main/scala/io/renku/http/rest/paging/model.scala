@@ -24,12 +24,12 @@ import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 object model {
 
   final class Page private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Page extends TinyTypeFactory[Page](new Page(_)) with PositiveInt {
+  implicit object Page extends TinyTypeFactory[Page](new Page(_)) with PositiveInt[Page] {
     val first: Page = Page(1)
   }
 
   final class PerPage private (val value: Int) extends AnyVal with IntTinyType
-  implicit object PerPage extends TinyTypeFactory[PerPage](new PerPage(_)) with PositiveInt {
+  implicit object PerPage extends TinyTypeFactory[PerPage](new PerPage(_)) with PositiveInt[PerPage] {
     addConstraint(_ <= max.value, v => s"'$v' not a valid $typeName value. Max value is ${PerPage.max}")
 
     lazy val default: PerPage = PerPage(20)
@@ -37,5 +37,5 @@ object model {
   }
 
   final class Total private (val value: Int) extends AnyVal with IntTinyType
-  implicit object Total                      extends TinyTypeFactory[Total](new Total(_)) with NonNegativeInt
+  implicit object Total                      extends TinyTypeFactory[Total](new Total(_)) with NonNegativeInt[Total]
 }

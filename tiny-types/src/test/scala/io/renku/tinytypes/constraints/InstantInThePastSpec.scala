@@ -58,10 +58,9 @@ class InstantInThePastSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
 }
 
 private class InstantInThePastType private (val value: Instant) extends AnyVal with InstantTinyType
-
 private object InstantInThePastType
     extends TinyTypeFactory[InstantInThePastType](new InstantInThePastType(_))
-    with InstantInThePast {
+    with InstantInThePast[InstantInThePastType] {
 
   var clock:                  Clock   = Clock.systemDefaultZone()
   protected override def now: Instant = clock.instant()

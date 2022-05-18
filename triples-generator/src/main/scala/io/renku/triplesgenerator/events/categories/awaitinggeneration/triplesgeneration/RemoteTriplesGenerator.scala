@@ -84,4 +84,4 @@ class TriplesGenerationServiceUrl private (val value: String) extends AnyVal wit
 
 object TriplesGenerationServiceUrl
     extends TinyTypeFactory[TriplesGenerationServiceUrl](new TriplesGenerationServiceUrl(_))
-    with Url
+    with Url[TriplesGenerationServiceUrl]
