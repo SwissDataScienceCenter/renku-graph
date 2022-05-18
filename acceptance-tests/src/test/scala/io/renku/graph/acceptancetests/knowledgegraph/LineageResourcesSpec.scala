@@ -1,3 +1,21 @@
+/*
+ * Copyright 2022 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
@@ -86,7 +104,7 @@ class LineageResourcesSpec
     Scenario("As an authenticated user I would like to find lineage of project I am a member of") {
       val accessibleExemplarData = LineageExemplarData(
         renkuProjectEntities(fixed(Visibility.Private)).generateOne.copy(
-          path = model.projects.Path("accessible/member-project"),
+          path = model.projects.Path("accessible/member-project-for-rest"),
           members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
         )
       )
@@ -117,7 +135,7 @@ class LineageResourcesSpec
     Scenario("As an unauthenticated user I should not be able to find a lineage from a private project") {
       val privateExemplarData = LineageExemplarData(
         renkuProjectEntities(fixed(Visibility.Private)).generateOne.copy(
-          path = model.projects.Path("private/secret-project"),
+          path = model.projects.Path("private/secret-project-for-rest"),
           members = Set.empty
         )
       )
