@@ -371,6 +371,7 @@ object Dataset {
           ) =>
         DecodingFailure(
           "Invalid dataset data " +
+            s"identifier: ${id.identifier}, " +
             s"dateCreated: $maybeDateCreated, " +
             s"datePublished: $maybeDatePublished, " +
             s"internalSameAs: $maybeInternalSameAs, " +
