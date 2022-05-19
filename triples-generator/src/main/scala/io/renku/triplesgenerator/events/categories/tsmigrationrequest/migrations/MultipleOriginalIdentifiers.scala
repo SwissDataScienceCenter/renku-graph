@@ -29,7 +29,7 @@ import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.{OriginalIdentifier, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.ResultsDecoding._
+import io.renku.rdfstore.ResultsDecoder._
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
@@ -59,7 +59,7 @@ private class MultipleOriginalIdentifiers[F[_]: MonadThrow: Logger](
 
   private val separator = ","
   private def findRawRows: F[List[RawRecord]] = {
-    implicit val decoder: Decoder[List[RawRecord]] = ListResultsDecoder[RawRecord] { implicit cur =>
+    implicit val decoder: Decoder[List[RawRecord]] = ResultsDecoder[List, RawRecord] { implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
       (extract[ResourceId]("dsId") -> extract[String]("versions")).mapN(_ -> _)
     }

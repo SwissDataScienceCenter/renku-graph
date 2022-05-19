@@ -43,7 +43,8 @@ class RecordsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryRd
       val name     = nonEmptyStrings().generateOne
       insertTriple(entityId, "schema:name", s"'$name'")
 
-      implicit val decoder: Decoder[List[String]] = ListResultsDecoder[String](implicit cur => extract[String]("name"))
+      implicit val decoder: Decoder[List[String]] =
+        ResultsDecoder[List, String](implicit cur => extract[String]("name"))
 
       client
         .findRecords[String](

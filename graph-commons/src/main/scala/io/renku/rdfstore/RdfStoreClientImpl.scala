@@ -51,7 +51,7 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
                      idleTimeoutOverride,
                      requestTimeoutOverride
     )
-    with ResultsDecoding {
+    with ResultsDecoder {
 
   import RdfStoreClientImpl._
   import eu.timepit.refined.auto._

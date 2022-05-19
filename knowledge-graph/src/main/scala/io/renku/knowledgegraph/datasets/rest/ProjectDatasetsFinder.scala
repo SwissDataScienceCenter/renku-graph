@@ -86,10 +86,10 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
 
 private object ProjectDatasetsFinderImpl {
 
-  import ResultsDecoding._
+  import ResultsDecoder._
   import io.circe.Decoder
 
-  private implicit val recordsDecoder: Decoder[List[ProjectDataset]] = ListResultsDecoder[ProjectDataset] {
+  private implicit val recordsDecoder: Decoder[List[ProjectDataset]] = ResultsDecoder[List, ProjectDataset] {
     implicit cur =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
 

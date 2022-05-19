@@ -41,7 +41,7 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](q
 
   override def findProjects(): F[List[projects.Path]] = queryExpecting[List[projects.Path]](query)
 
-  private implicit lazy val pathsDecoder: Decoder[List[projects.Path]] = ListResultsDecoder[projects.Path] {
+  private implicit lazy val pathsDecoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
     implicit cursor =>
       import io.renku.tinytypes.json.TinyTypeDecoders._
       extract[projects.Path]("path")
