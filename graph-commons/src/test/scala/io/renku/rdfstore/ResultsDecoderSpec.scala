@@ -18,6 +18,7 @@
 
 package io.renku.rdfstore
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.literal._
@@ -58,6 +59,70 @@ class ResultsDecoderSpec extends AnyWordSpec with should.Matchers with ResultsDe
 
       json.as(decoder) shouldBe List(stringPropValue1 -> intPropValue1, stringPropValue2 -> intPropValue2).asRight
     }
+  }
+
+  "apply for NonEmptyList of Objects" should {
+
+    val decoder: Decoder[NonEmptyList[(String, Int)]] = ResultsDecoder[NonEmptyList, (String, Int)] { implicit cursor =>
+      (extract[String]("stringProp") -> extract[Int]("intProp")).mapN(_ -> _)
+    }
+
+    "return a circe Decoder for a NonEmptyList of Objects of the defined type that work with the SparQL query response" in new {
+
+      val stringPropValue1 = nonEmptyStrings().generateOne
+      val intPropValue1    = positiveInts().generateOne.value
+      val stringPropValue2 = nonEmptyStrings().generateOne
+      val intPropValue2    = positiveInts().generateOne.value
+
+      val json = json"""{
+        "results": {
+          "bindings": [
+            {
+              "stringProp": { "type": "literal" , "value": $stringPropValue1 },
+              "intProp": { "type": "literal" , "value": $intPropValue1 }
+            },
+            {
+              "stringProp": { "type": "literal" , "value": $stringPropValue2 },
+              "intProp": { "type": "literal" , "value": $intPropValue2 }
+            }
+          ]
+        }      
+      }"""
+
+      json.as(decoder) shouldBe NonEmptyList
+        .of(stringPropValue1 -> intPropValue1, stringPropValue2 -> intPropValue2)
+        .asRight
+    }
+
+    "return a circe Decoder for a NonEmptyList of Objects " +
+      "- case with an empty response" in new {
+
+        val json = json"""{
+          "results": {
+            "bindings": []
+          }      
+        }"""
+
+        json.as(decoder).leftMap(_.message) shouldBe "No records found but expected at least one".asLeft
+      }
+
+    "return a circe Decoder for a NonEmptyList of Objects " +
+      "- case with an empty response and a custom error" in new {
+
+        val json = json"""{
+          "results": {
+            "bindings": []
+          }      
+        }"""
+
+        val error = nonEmptyStrings().generateOne
+        val decoder: Decoder[NonEmptyList[(String, Int)]] = ResultsDecoder[NonEmptyList, (String, Int)] {
+          implicit cursor =>
+            (extract[String]("stringProp") -> extract[Int]("intProp")).mapN(_ -> _)
+        }(toNonEmptyList(error))
+
+        json.as(decoder).leftMap(_.message) shouldBe error.asLeft
+      }
   }
 
   "apply for Option of Objects" should {

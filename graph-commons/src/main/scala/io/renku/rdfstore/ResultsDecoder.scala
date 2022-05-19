@@ -19,6 +19,7 @@
 package io.renku.rdfstore
 
 import cats.Id
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.Decoder.{Result, decodeList}
 import io.circe.{Decoder, HCursor}
@@ -38,6 +39,13 @@ trait ResultsDecoder {
   }
 
   implicit def toList[OUT]: List[OUT] => Either[String, List[OUT]] = _.asRight
+
+  def toNonEmptyList[OUT](onEmpty: => String): List[OUT] => Either[String, NonEmptyList[OUT]] = {
+    case Nil          => onEmpty.asLeft
+    case head :: tail => NonEmptyList.of(head, tail: _*).asRight
+  }
+  implicit def toNonEmptyList[OUT]: List[OUT] => Either[String, NonEmptyList[OUT]] =
+    toNonEmptyList(onEmpty = "No records found but expected at least one")
 
   def toOption[OUT](onMultiple: List[OUT] => String): List[OUT] => Either[String, Option[OUT]] = {
     case Nil           => Option.empty[OUT].asRight
