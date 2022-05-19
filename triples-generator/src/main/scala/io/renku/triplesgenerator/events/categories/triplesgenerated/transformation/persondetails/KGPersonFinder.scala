@@ -66,31 +66,25 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](r
         |  }
         |  OPTIONAL { ?resourceId schema:affiliation ?maybeAffiliation }
         |}
+        |LIMIT 1
         |""".stripMargin
   )
 
-  private def recordsDecoder(person: Person): Decoder[Option[Person]] = { cursor =>
-    import Decoder._
-    import io.renku.tinytypes.json.TinyTypeDecoders._
+  private def recordsDecoder(person: Person): Decoder[Option[Person]] = ResultsDecoder[Option, Person] {
+    implicit cursor =>
+      import Decoder._
+      import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    val personEntities: Decoder[Person] = { cursor =>
       for {
-        resourceId       <- cursor.downField("resourceId").downField("value").as[persons.ResourceId]
-        name             <- cursor.downField("name").downField("value").as[persons.Name]
-        maybeEmail       <- cursor.downField("maybeEmail").downField("value").as[Option[persons.Email]]
-        maybeGitLabId    <- cursor.downField("maybeGitLabId").downField("value").as[Option[persons.GitLabId]]
-        maybeAffiliation <- cursor.downField("maybeAffiliation").downField("value").as[Option[persons.Affiliation]]
+        resourceId       <- extract[persons.ResourceId]("resourceId")
+        name             <- extract[persons.Name]("name")
+        maybeEmail       <- extract[Option[persons.Email]]("maybeEmail")
+        maybeGitLabId    <- extract[Option[persons.GitLabId]]("maybeGitLabId")
+        maybeAffiliation <- extract[Option[persons.Affiliation]]("maybeAffiliation")
         person <- Person
                     .from(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId)
                     .toEither
                     .leftMap(errs => DecodingFailure(errs.nonEmptyIntercalate("; "), Nil))
       } yield person
-    }
-
-    cursor.downField("results").downField("bindings").as(decodeList(personEntities)) >>= {
-      case Nil      => Option.empty[Person].asRight
-      case p :: Nil => p.some.asRight
-      case _        => DecodingFailure(s"Multiple Person entities found for ${person.resourceId}", Nil).asLeft
-    }
-  }
+  }(toOption(onMultiple = s"Multiple Person entities found for ${person.resourceId}"))
 }
