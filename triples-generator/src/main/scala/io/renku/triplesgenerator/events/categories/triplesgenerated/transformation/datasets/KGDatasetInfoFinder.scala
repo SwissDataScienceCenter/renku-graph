@@ -87,7 +87,7 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
   private implicit val resourceIdInfo:    ResourceId => String = _ => "resourceId"
 
   override def findDatasetCreators(resourceId: ResourceId): F[Set[persons.ResourceId]] = {
-    implicit val creatorsDecoder: Decoder[List[persons.ResourceId]] = ListResultsDecoder[persons.ResourceId] {
+    implicit val creatorsDecoder: Decoder[List[persons.ResourceId]] = ResultsDecoder[List, persons.ResourceId] {
       implicit cur => extract[persons.ResourceId]("personId")
     }
 
@@ -106,9 +106,8 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
   }
 
   override def findDatasetOriginalIdentifiers(resourceId: ResourceId): F[Set[OriginalIdentifier]] = {
-    implicit val decoder: Decoder[List[OriginalIdentifier]] = ListResultsDecoder[OriginalIdentifier] {
-      implicit cursor =>
-        extract("originalId")
+    implicit val decoder: Decoder[List[OriginalIdentifier]] = ResultsDecoder[List, OriginalIdentifier] {
+      implicit cursor => extract("originalId")
     }
     queryExpecting[List[OriginalIdentifier]] {
       SparqlQuery.of(
@@ -125,7 +124,7 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
   }
 
   def findDatasetDateCreated(resourceId: ResourceId): F[Set[DateCreated]] = {
-    implicit val decoder: Decoder[List[DateCreated]] = ListResultsDecoder[DateCreated] { implicit cursor =>
+    implicit val decoder: Decoder[List[DateCreated]] = ResultsDecoder[List, DateCreated] { implicit cursor =>
       extract("date")
     }
     queryExpecting[List[DateCreated]] {
@@ -143,7 +142,7 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
   }
 
   override def findDatasetSameAs(resourceId: ResourceId): F[Set[SameAs]] = {
-    implicit val decoder: Decoder[List[SameAs]] = ListResultsDecoder[SameAs] { implicit cursor =>
+    implicit val decoder: Decoder[List[SameAs]] = ResultsDecoder[List, SameAs] { implicit cursor =>
       extract("sameAs")
     }
     queryExpecting[List[SameAs]] {

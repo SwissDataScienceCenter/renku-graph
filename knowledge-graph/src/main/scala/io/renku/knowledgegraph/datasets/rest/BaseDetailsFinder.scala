@@ -142,7 +142,7 @@ private object BaseDetailsFinderImpl {
   import Decoder._
   import io.renku.graph.model.datasets._
   import io.renku.knowledgegraph.datasets.model._
-  import io.renku.rdfstore.ResultsDecoding._
+  import io.renku.rdfstore.ResultsDecoder._
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private lazy val createDataset: (ResourceId,
@@ -198,7 +198,7 @@ private object BaseDetailsFinderImpl {
   }
 
   private[rest] def maybeDatasetDecoder(dsId: Identifier): Decoder[Option[Dataset]] =
-    OptionalResultDecoder[Dataset](show"More than one dataset with $dsId id") { implicit cursor =>
+    ResultsDecoder[Option, Dataset] { implicit cursor =>
       for {
         resourceId       <- extract[ResourceId]("datasetId")
         identifier       <- extract[Identifier]("identifier")
@@ -232,13 +232,13 @@ private object BaseDetailsFinderImpl {
                                  DatasetProject(projectPath, projectName)
                    )
       } yield dataset
-    }
+    }(toOption(show"More than one dataset with $dsId id"))
 
-  private implicit lazy val keywordsDecoder: Decoder[List[Keyword]] = ListResultsDecoder[Keyword] { implicit cur =>
+  private implicit lazy val keywordsDecoder: Decoder[List[Keyword]] = ResultsDecoder[List, Keyword] { implicit cur =>
     extract("keyword")
   }
 
-  private implicit lazy val imagesDecoder: Decoder[List[ImageUri]] = ListResultsDecoder[ImageUri] { implicit cur =>
+  private implicit lazy val imagesDecoder: Decoder[List[ImageUri]] = ResultsDecoder[List, ImageUri] { implicit cur =>
     extract("contentUrl")
   }
 }
