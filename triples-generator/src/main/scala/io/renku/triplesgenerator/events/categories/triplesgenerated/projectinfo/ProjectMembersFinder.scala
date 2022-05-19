@@ -60,8 +60,8 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       maybeAccessToken:                 Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]] = EitherT {
     (
-      fetchMembers(uri"projects" / path.show / "members", "project-members"),
-      fetchMembers(uri"projects" / path.show / "users", "project-users")
+      fetch(uri"projects" / path.show / "members", "project-members"),
+      fetch(uri"projects" / path.show / "users", "project-users")
     ).parMapN(_ ++ _)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
@@ -77,7 +77,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
   private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]
   private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
 
-  private def fetchMembers(
+  private def fetch(
       uri:                     Uri,
       endpointName:            String Refined NonEmpty,
       maybePage:               Option[Int] = None,
@@ -109,7 +109,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
   )(implicit maybeAccessToken:      Option[AccessToken]): F[Set[ProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
       case (fetchedUsers, maybeNextPage @ Some(_)) =>
-        fetchMembers(url, endpointName, maybeNextPage, allMembers ++ fetchedUsers)
+        fetch(url, endpointName, maybeNextPage, allMembers ++ fetchedUsers)
       case (fetchedUsers, None) => (allMembers ++ fetchedUsers).pure[F]
     }
 }
