@@ -22,7 +22,6 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.circe.Decoder.decodeList
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{activities, persons}
@@ -31,8 +30,8 @@ import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGInfoFinder[F[_]] {
-  def findActivityAuthor(resourceId:         activities.ResourceId): F[Option[persons.ResourceId]]
-  def findAssociationPersonAgent(resourceId: activities.ResourceId): F[Option[persons.ResourceId]]
+  def findActivityAuthors(resourceId:         activities.ResourceId): F[Set[persons.ResourceId]]
+  def findAssociationPersonAgents(resourceId: activities.ResourceId): F[Set[persons.ResourceId]]
 }
 
 private object KGInfoFinder {
@@ -45,18 +44,16 @@ private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdf
     extends RdfStoreClientImpl(rdfStoreConfig)
     with KGInfoFinder[F] {
 
-  override def findActivityAuthor(resourceId: activities.ResourceId): F[Option[persons.ResourceId]] =
+  override def findActivityAuthors(resourceId: activities.ResourceId): F[Set[persons.ResourceId]] =
     queryExpecting[Set[persons.ResourceId]](using = queryFindingAuthor(resourceId))
-      .flatMap(toOption(resourceId, "author ResourceId"))
 
-  override def findAssociationPersonAgent(resourceId: activities.ResourceId): F[Option[persons.ResourceId]] =
+  override def findAssociationPersonAgents(resourceId: activities.ResourceId): F[Set[persons.ResourceId]] =
     queryExpecting[Set[persons.ResourceId]](using = queryFindingPersonAgent(resourceId))
-      .flatMap(toOption(resourceId, "person agent ResourceId"))
 
   private def queryFindingAuthor(resourceId: activities.ResourceId) = SparqlQuery.of(
     name = "transformation - find activity author",
     Prefixes of (schema -> "schema", prov -> "prov"),
-    s"""|SELECT ?personId
+    s"""|SELECT DISTINCT ?personId
         |WHERE {
         |  ${resourceId.showAs[RdfResource]} a prov:Activity;
         |                                    prov:wasAssociatedWith ?personId.
@@ -68,7 +65,7 @@ private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdf
   private def queryFindingPersonAgent(resourceId: activities.ResourceId) = SparqlQuery.of(
     name = "transformation - find association agent",
     Prefixes of (schema -> "schema", prov -> "prov"),
-    s"""|SELECT ?personId
+    s"""|SELECT DISTINCT ?personId
         |WHERE {
         |  ${resourceId.showAs[RdfResource]} a prov:Activity;
         |                                    prov:qualifiedAssociation/prov:agent ?personId.
@@ -77,18 +74,9 @@ private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdf
         |""".stripMargin
   )
 
-  private implicit val authorsDecoder: Decoder[Set[persons.ResourceId]] = {
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-
-    val authorId: Decoder[persons.ResourceId] =
-      _.downField("personId").downField("value").as[persons.ResourceId]
-
-    _.downField("results").downField("bindings").as(decodeList(authorId)).map(_.toSet)
-  }
-
-  private def toOption[T, ID](id: ID, entityTypeInfo: String): Set[T] => F[Option[T]] = {
-    case set if set.isEmpty   => Option.empty[T].pure[F]
-    case set if set.size == 1 => set.headOption.pure[F]
-    case _ => new Exception(s"More than one $entityTypeInfo found for activity $id").raiseError[F, Option[T]]
+  private implicit val authorsDecoder: Decoder[Set[persons.ResourceId]] = ResultsDecoder[Set, persons.ResourceId] {
+    implicit cur =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+      extract[persons.ResourceId]("personId")
   }
 }

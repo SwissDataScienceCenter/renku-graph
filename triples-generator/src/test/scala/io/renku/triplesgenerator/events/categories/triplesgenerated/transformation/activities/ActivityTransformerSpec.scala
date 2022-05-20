@@ -64,8 +64,8 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
           .to[entities.RenkuProject]
 
         val exception = recoverableClientErrors.generateOne
-        findingActivityAuthorFor(project.activities.head.resourceId,
-                                 returning = exception.raiseError[Try, Option[persons.ResourceId]]
+        findingActivityAuthorsFor(project.activities.head.resourceId,
+                                  returning = exception.raiseError[Try, Set[persons.ResourceId]]
         )
 
         val step = transformer.createTransformationStep
@@ -86,8 +86,8 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
         project.activities >>= givenAuthorUnlinking
 
         val exception = recoverableClientErrors.generateOne
-        findingAssociationPersonAgentFor(project.activities.head.resourceId,
-                                         returning = exception.raiseError[Try, Option[persons.ResourceId]]
+        findingAssociationPersonAgentsFor(project.activities.head.resourceId,
+                                          returning = exception.raiseError[Try, Set[persons.ResourceId]]
         )
 
         val step = transformer.createTransformationStep
@@ -106,8 +106,8 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
           .to[entities.RenkuProject]
 
         val exception = exceptions.generateOne
-        findingActivityAuthorFor(project.activities.head.resourceId,
-                                 returning = exception.raiseError[Try, Option[persons.ResourceId]]
+        findingActivityAuthorsFor(project.activities.head.resourceId,
+                                  returning = exception.raiseError[Try, Set[persons.ResourceId]]
         )
 
         transformer.createTransformationStep.run(project).value shouldBe
@@ -124,8 +124,8 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
         project.activities >>= givenAuthorUnlinking
 
         val exception = exceptions.generateOne
-        findingAssociationPersonAgentFor(project.activities.head.resourceId,
-                                         returning = exception.raiseError[Try, Option[persons.ResourceId]]
+        findingAssociationPersonAgentsFor(project.activities.head.resourceId,
+                                          returning = exception.raiseError[Try, Set[persons.ResourceId]]
         )
 
         transformer.createTransformationStep.run(project).value shouldBe
@@ -139,55 +139,53 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
     val transformer    = new ActivityTransformerImpl[Try](kgInfoFinder, updatesCreator)
 
     def givenAuthorUnlinking(activity: entities.Activity): List[SparqlQuery] = {
-      val maybeCreatorInKG = personResourceIds.generateOption
-      findingActivityAuthorFor(activity.resourceId, returning = maybeCreatorInKG.pure[Try])
+      val maybeCreatorsInKG = personResourceIds.generateSet()
+      findingActivityAuthorsFor(activity.resourceId, returning = maybeCreatorsInKG.pure[Try])
 
       val unlinkingQueries = sparqlQueries.generateList()
-      prepareQueriesUnlinkingCreator(activity, maybeCreatorInKG, returning = unlinkingQueries)
+      prepareQueriesUnlinkingAuthors(activity, maybeCreatorsInKG, returning = unlinkingQueries)
 
       unlinkingQueries
     }
 
     def givenAgentUnlinking(activity: entities.Activity): List[SparqlQuery] = {
-      val maybePersonAgentInKG = personResourceIds.generateOption
-      findingAssociationPersonAgentFor(activity.resourceId, returning = maybePersonAgentInKG.pure[Try])
+      val maybePersonAgentsInKG = personResourceIds.generateSet()
+      findingAssociationPersonAgentsFor(activity.resourceId, returning = maybePersonAgentsInKG.pure[Try])
 
       val unlinkingQueries = sparqlQueries.generateList()
-      prepareQueriesUnlinkingAgent(activity, maybePersonAgentInKG, returning = unlinkingQueries)
+      prepareQueriesUnlinkingAgents(activity, maybePersonAgentsInKG, returning = unlinkingQueries)
 
       unlinkingQueries
     }
 
-    def findingActivityAuthorFor(resourceId: activities.ResourceId, returning: Try[Option[persons.ResourceId]]) =
+    def findingActivityAuthorsFor(resourceId: activities.ResourceId, returning: Try[Set[persons.ResourceId]]) =
       (kgInfoFinder
-        .findActivityAuthor(_: activities.ResourceId))
+        .findActivityAuthors(_: activities.ResourceId))
         .expects(resourceId)
         .returning(returning)
 
-    def findingAssociationPersonAgentFor(resourceId: activities.ResourceId,
-                                         returning:  Try[Option[persons.ResourceId]]
-    ) =
+    def findingAssociationPersonAgentsFor(resourceId: activities.ResourceId, returning: Try[Set[persons.ResourceId]]) =
       (kgInfoFinder
-        .findAssociationPersonAgent(_: activities.ResourceId))
+        .findAssociationPersonAgents(_: activities.ResourceId))
         .expects(resourceId)
         .returning(returning)
 
-    def prepareQueriesUnlinkingCreator(
-        activity:      entities.Activity,
-        maybeKgAuthor: Option[persons.ResourceId],
-        returning:     List[SparqlQuery]
+    def prepareQueriesUnlinkingAuthors(
+        activity:  entities.Activity,
+        kgAuthors: Set[persons.ResourceId],
+        returning: List[SparqlQuery]
     ) = (updatesCreator
-      .queriesUnlinkingAuthor(_: entities.Activity, _: Option[persons.ResourceId]))
-      .expects(activity, maybeKgAuthor)
+      .queriesUnlinkingAuthors(_: entities.Activity, _: Set[persons.ResourceId]))
+      .expects(activity, kgAuthors)
       .returning(returning)
 
-    def prepareQueriesUnlinkingAgent(
-        activity:      entities.Activity,
-        maybeKgAuthor: Option[persons.ResourceId],
-        returning:     List[SparqlQuery]
+    def prepareQueriesUnlinkingAgents(
+        activity:  entities.Activity,
+        kgAgents:  Set[persons.ResourceId],
+        returning: List[SparqlQuery]
     ) = (updatesCreator
-      .queriesUnlinkingAgent(_: entities.Activity, _: Option[persons.ResourceId]))
-      .expects(activity, maybeKgAuthor)
+      .queriesUnlinkingAgents(_: entities.Activity, _: Set[persons.ResourceId]))
+      .expects(activity, kgAgents)
       .returning(returning)
   }
 }
