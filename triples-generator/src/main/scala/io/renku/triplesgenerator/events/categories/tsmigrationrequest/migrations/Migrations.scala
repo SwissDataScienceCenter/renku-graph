@@ -46,6 +46,7 @@ private[tsmigrationrequest] object Migrations {
     multipleOriginalIdentifiers       <- MultipleOriginalIdentifiers[F]
     multipleDSDateCreated             <- MultipleDSDateCreated[F]
     multipleDSSameAs                  <- MultipleDSSameAs[F]
+    multipleActivityAuthors           <- MultipleActivityAuthors[F]
     migrations <- validateNames(
                     reProvisioning,
                     malformedActivityIds,
@@ -58,7 +59,8 @@ private[tsmigrationrequest] object Migrations {
                     multipleTopmostDerivedFromOnly,
                     multipleOriginalIdentifiers,
                     multipleDSDateCreated,
-                    multipleDSSameAs
+                    multipleDSSameAs,
+                    multipleActivityAuthors
                   )
   } yield migrations
 
