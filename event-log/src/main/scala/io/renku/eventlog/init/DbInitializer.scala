@@ -143,6 +143,12 @@ object DbInitializer {
             currentStatus = TransformationNonRecoverableFailure,
             destinationStatus = TriplesGenerated,
             discardingStatuses = TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%More than one author ResourceId found for activity%",
+            currentStatus = TransformationNonRecoverableFailure,
+            destinationStatus = TriplesGenerated,
+            discardingStatuses = TriplesStore :: Nil
           )
         ),
         isMigrating
