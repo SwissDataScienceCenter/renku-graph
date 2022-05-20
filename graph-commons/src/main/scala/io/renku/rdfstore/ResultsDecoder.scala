@@ -40,6 +40,8 @@ trait ResultsDecoder {
 
   implicit def toList[OUT]: List[OUT] => Either[String, List[OUT]] = _.asRight
 
+  implicit def toSet[OUT]: List[OUT] => Either[String, Set[OUT]] = _.toSet.asRight
+
   def toNonEmptyList[OUT](onEmpty: => String): List[OUT] => Either[String, NonEmptyList[OUT]] = {
     case Nil          => onEmpty.asLeft
     case head :: tail => NonEmptyList.of(head, tail: _*).asRight

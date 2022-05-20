@@ -59,6 +59,17 @@ class ResultsDecoderSpec extends AnyWordSpec with should.Matchers with ResultsDe
 
       json.as(decoder) shouldBe List(stringPropValue1 -> intPropValue1, stringPropValue2 -> intPropValue2).asRight
     }
+
+    "return an empty List of Objects if no rows were found" in new {
+
+      val json = json"""{
+        "results": {
+          "bindings": []
+        }      
+      }"""
+
+      json.as(decoder) shouldBe List.empty.asRight
+    }
   }
 
   "apply for NonEmptyList of Objects" should {
@@ -123,6 +134,49 @@ class ResultsDecoderSpec extends AnyWordSpec with should.Matchers with ResultsDe
 
         json.as(decoder).leftMap(_.message) shouldBe error.asLeft
       }
+  }
+
+  "apply for Set of Objects" should {
+
+    val decoder: Decoder[Set[(String, Int)]] = ResultsDecoder[Set, (String, Int)] { implicit cursor =>
+      (extract[String]("stringProp") -> extract[Int]("intProp")).mapN(_ -> _)
+    }
+
+    "return a circe Decoder for a Set of Objects of the defined type that work with the SparQL query response" in new {
+
+      val stringPropValue1 = nonEmptyStrings().generateOne
+      val intPropValue1    = positiveInts().generateOne.value
+      val stringPropValue2 = nonEmptyStrings().generateOne
+      val intPropValue2    = positiveInts().generateOne.value
+
+      val json = json"""{
+        "results": {
+          "bindings": [
+            {
+              "stringProp": { "type": "literal" , "value": $stringPropValue1 },
+              "intProp": { "type": "literal" , "value": $intPropValue1 }
+            },
+            {
+              "stringProp": { "type": "literal" , "value": $stringPropValue2 },
+              "intProp": { "type": "literal" , "value": $intPropValue2 }
+            }
+          ]
+        }      
+      }"""
+
+      json.as(decoder) shouldBe Set(stringPropValue1 -> intPropValue1, stringPropValue2 -> intPropValue2).asRight
+    }
+
+    "return an empty Set of Objects if no rows were found" in new {
+
+      val json = json"""{
+        "results": {
+          "bindings": []
+        }      
+      }"""
+
+      json.as(decoder) shouldBe Set.empty.asRight
+    }
   }
 
   "apply for Option of Objects" should {
