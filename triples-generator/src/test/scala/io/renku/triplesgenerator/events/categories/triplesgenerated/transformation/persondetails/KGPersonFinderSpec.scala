@@ -24,6 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.personNames
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.graph.model.{entities, persons}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -49,15 +50,16 @@ class KGPersonFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
       loadToStore(person)
 
-      val otherName = personNames.generateOne
-      insertTriple(person.resourceId, "schema:name", show"'$otherName'")
-
-      findNames(person) shouldBe Set(person.name, otherName)
+      val duplicateNames = personNames.generateNonEmptyList().toList.toSet
+      duplicateNames foreach { name =>
+        insertTriple(person.resourceId, "schema:name", show"'${sparqlEncode(name.show)}'")
+      }
+      findNames(person) shouldBe duplicateNames + person.name
 
       val Some(found) = finder.find(person).unsafeRunSync()
 
       found.resourceId       shouldBe person.resourceId
-      found.name               should (be(person.name) or be(otherName))
+      Set(found.name)          should contain oneElementOf (duplicateNames + person.name)
       found.maybeEmail       shouldBe person.maybeEmail
       found.maybeAffiliation shouldBe person.maybeAffiliation
     }
