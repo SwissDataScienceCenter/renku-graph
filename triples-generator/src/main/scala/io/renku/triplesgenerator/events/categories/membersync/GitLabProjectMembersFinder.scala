@@ -113,7 +113,6 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](gitLabClient: 
 }
 
 private object GitLabProjectMembersFinder {
-
   def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[GitLabProjectMembersFinder[F]] =
     new GitLabProjectMembersFinderImpl[F](gitLabClient).pure[F].widen[GitLabProjectMembersFinder[F]]
 }

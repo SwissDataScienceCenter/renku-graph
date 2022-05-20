@@ -22,8 +22,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.RenkuBaseUrlLoader
 import io.renku.graph.model.Schemas.schema
-import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuBaseUrl, persons, projects}
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -46,18 +46,11 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
   def findProjectMembers(path: projects.Path): F[Set[KGProjectMember]] =
     queryExpecting[Set[KGProjectMember]](using = query(path))
 
-  private implicit lazy val recordsDecoder: Decoder[Set[KGProjectMember]] = { cursor =>
-    import Decoder._
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-
-    val member: Decoder[KGProjectMember] = { cursor =>
-      for {
-        memberId <- cursor.downField("memberId").downField("value").as[persons.ResourceId]
-        gitLabId <- cursor.downField("gitLabId").downField("value").as[GitLabId]
-      } yield KGProjectMember(memberId, gitLabId)
-    }
-
-    cursor.downField("results").downField("bindings").as(decodeList(member)).map(_.toSet)
+  private implicit lazy val recordsDecoder: Decoder[Set[KGProjectMember]] = ResultsDecoder[Set, KGProjectMember] {
+    implicit cursor =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+      (extract[persons.ResourceId]("memberId") -> extract[persons.GitLabId]("gitLabId"))
+        .mapN(KGProjectMember)
   }
 
   private def query(path: Path) = SparqlQuery.of(
