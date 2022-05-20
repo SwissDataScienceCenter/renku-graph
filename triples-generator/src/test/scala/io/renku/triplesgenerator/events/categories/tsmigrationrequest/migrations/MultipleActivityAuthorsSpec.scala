@@ -128,7 +128,7 @@ class MultipleActivityAuthorsSpec
   }
 
   "apply" should {
-    "return an QueryBasedMigration" in new TestCase {
+    "return an RegisteredMigration" in new TestCase {
       migration.getClass.getSuperclass shouldBe classOf[RegisteredMigration[IO]]
     }
   }
