@@ -18,20 +18,15 @@
 
 package io.renku.graph.model
 
-import cats.syntax.all._
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
-import io.renku.graph.model.views.{EntityIdJsonLdOps, RdfResource}
+import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLdOps}
 import io.renku.tinytypes.constraints.Url
-import io.renku.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
 object associations {
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with EntityIdJsonLdOps[ResourceId] {
-    implicit object RdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
-      override def render(id: ResourceId): String = s"<${sparqlEncode(id.show)}>"
-    }
-  }
+      with EntityIdJsonLdOps[ResourceId]
+      with AnyResourceRenderer[ResourceId]
 }

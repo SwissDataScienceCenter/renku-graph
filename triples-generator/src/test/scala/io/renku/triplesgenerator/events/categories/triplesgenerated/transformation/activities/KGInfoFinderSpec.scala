@@ -22,6 +22,7 @@ import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpUrls
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{activities, entities}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -32,7 +33,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
 
-  "findActivityAuthor" should {
+  "findActivityAuthors" should {
 
     "return activity author's resourceIds" in new TestCase {
       val project = anyRenkuProjectEntities
@@ -44,18 +45,22 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
 
       loadToStore(project)
 
-      kgInfoFinder.findActivityAuthor(activity.resourceId).unsafeRunSync() shouldBe
-        Some(activity.author.resourceId)
+      val person = personEntities.generateOne.to[entities.Person]
+      loadToStore(person)
+      insertTriple(activity.resourceId, "prov:wasAssociatedWith", person.resourceId.showAs[RdfResource])
+
+      kgInfoFinder.findActivityAuthors(activity.resourceId).unsafeRunSync() shouldBe
+        Set(activity.author.resourceId, person.resourceId)
     }
 
     "return no author if there's no Activity with the given id" in new TestCase {
       kgInfoFinder
-        .findActivityAuthor(activities.ResourceId(httpUrls().generateOne))
-        .unsafeRunSync() shouldBe None
+        .findActivityAuthors(activities.ResourceId(httpUrls().generateOne))
+        .unsafeRunSync() shouldBe Set.empty
     }
   }
 
-  "findAssociationPersonAgent" should {
+  "findAssociationPersonAgents" should {
 
     "return activity association person agent resourceIds" in new TestCase {
       val project = anyRenkuProjectEntities
@@ -67,18 +72,26 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
 
       loadToStore(project)
 
-      val maybeAgentResourceId = activity.association match {
-        case assoc: entities.Association.WithPersonAgent => Some(assoc.agent.resourceId)
+      val person = personEntities.generateOne.to[entities.Person]
+      val updatedAgentActivity = activity.copy(association = activity.association match {
+        case assoc: entities.Association.WithPersonAgent => assoc.copy(agent = person)
+        case _ => fail("Association.WithPersonAgent expected")
+      })
+      loadToStore(updatedAgentActivity)
+
+      val originalAgent = activity.association match {
+        case assoc: entities.Association.WithPersonAgent => assoc.agent
         case _ => fail("expected Person agent")
       }
 
-      kgInfoFinder.findAssociationPersonAgent(activity.resourceId).unsafeRunSync() shouldBe maybeAgentResourceId
+      kgInfoFinder.findAssociationPersonAgents(activity.resourceId).unsafeRunSync() shouldBe
+        Set(originalAgent.resourceId, person.resourceId)
     }
 
     "return no agent if there's no Activity with the given id" in new TestCase {
       kgInfoFinder
-        .findAssociationPersonAgent(activities.ResourceId(httpUrls().generateOne))
-        .unsafeRunSync() shouldBe None
+        .findAssociationPersonAgents(activities.ResourceId(httpUrls().generateOne))
+        .unsafeRunSync() shouldBe Set.empty
     }
 
     "return no agent if there's association with SoftwareAgent agent" in new TestCase {
@@ -92,8 +105,8 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
       loadToStore(project)
 
       kgInfoFinder
-        .findAssociationPersonAgent(activity.resourceId)
-        .unsafeRunSync() shouldBe None
+        .findAssociationPersonAgents(activity.resourceId)
+        .unsafeRunSync() shouldBe Set.empty
     }
   }
 

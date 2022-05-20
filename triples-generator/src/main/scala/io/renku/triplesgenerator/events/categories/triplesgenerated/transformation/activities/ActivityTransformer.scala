@@ -49,6 +49,7 @@ private[transformation] class ActivityTransformerImpl[F[_]: MonadThrow](
   import eu.timepit.refined.auto._
   import kgInfoFinder._
   import recoverableErrorsRecovery._
+  import updatesCreator._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Activity Updates", createTransformation)
@@ -62,7 +63,7 @@ private[transformation] class ActivityTransformerImpl[F[_]: MonadThrow](
 
   private lazy val updateAuthorLinks: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
     project.activities
-      .map(activity => findActivityAuthor(activity.resourceId).map(updatesCreator.queriesUnlinkingAuthor(activity, _)))
+      .map(activity => findActivityAuthors(activity.resourceId).map(queriesUnlinkingAuthors(activity, _)))
       .sequence
       .map(_.flatten)
       .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))
@@ -71,9 +72,7 @@ private[transformation] class ActivityTransformerImpl[F[_]: MonadThrow](
   private lazy val updateAssociationAgentLinks: ((Project, Queries)) => F[(Project, Queries)] = {
     case (project, queries) =>
       project.activities
-        .map(activity =>
-          findAssociationPersonAgent(activity.resourceId).map(updatesCreator.queriesUnlinkingAgent(activity, _))
-        )
+        .map(activity => findAssociationPersonAgents(activity.resourceId).map(queriesUnlinkingAgents(activity, _)))
         .sequence
         .map(_.flatten)
         .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))
