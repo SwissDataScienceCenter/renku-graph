@@ -77,9 +77,9 @@ private[triplesgenerated] class ProjectInfoFinderImpl[F[_]: MonadThrow: Parallel
   private lazy val deduplicateSameIdMembers: List[ProjectMember] => List[ProjectMember] =
     _.foldLeft(List.empty[ProjectMember]) { (deduplicated, member) =>
       deduplicated.find(_.gitLabId == member.gitLabId) match {
-        case None                                => member :: deduplicated
-        case Some(dedup: ProjectMemberWithEmail) => dedup :: deduplicated
-        case Some(_: ProjectMemberNoEmail)       => deduplicated
+        case None                                 => member :: deduplicated
+        case Some(_: ProjectMemberWithEmail)      => deduplicated
+        case Some(existing: ProjectMemberNoEmail) => member :: (deduplicated.filterNot(_ == existing))
       }
     }
 

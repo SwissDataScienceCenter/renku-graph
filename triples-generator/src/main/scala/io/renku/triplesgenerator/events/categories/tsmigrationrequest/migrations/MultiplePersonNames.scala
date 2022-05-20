@@ -37,15 +37,19 @@ private object MultiplePersonNames {
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,
     Prefixes of schema -> "schema",
-    s"""|DELETE { ?id schema:name ?someName }
+    s"""|DELETE { ?id schema:name ?name }
         |WHERE {
-        |  SELECT ?id (SAMPLE(?name) AS ?someName)
-        |  WHERE {
-        |    ?id a schema:Person;
-        |        schema:name ?name.
+        |  {
+        |    SELECT ?id (SAMPLE(?name) AS ?someName)
+        |    WHERE {
+        |      ?id a schema:Person;
+        |          schema:name ?name.
+        |    }
+        |    GROUP BY ?id
+        |    HAVING (COUNT(?name) > 1)
         |  }
-        |  GROUP BY ?id
-        |  HAVING (COUNT(?name) > 1)
+        |  ?id schema:name ?name.
+        |  FILTER (?name != ?someName)
         |}
         |""".stripMargin
   )
