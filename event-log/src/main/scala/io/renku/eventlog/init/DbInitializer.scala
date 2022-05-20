@@ -137,6 +137,12 @@ object DbInitializer {
             currentStatus = TransformationNonRecoverableFailure,
             destinationStatus = TriplesGenerated,
             discardingStatuses = TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%Multiple Person entities found for%",
+            currentStatus = TransformationNonRecoverableFailure,
+            destinationStatus = TriplesGenerated,
+            discardingStatuses = TriplesStore :: Nil
           )
         ),
         isMigrating
