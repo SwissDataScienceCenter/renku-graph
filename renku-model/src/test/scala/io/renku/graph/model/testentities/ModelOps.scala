@@ -26,7 +26,7 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.datasetIdentifiers
+import io.renku.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetPartIds}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title}
 import io.renku.graph.model.projects.ForksCount
@@ -427,7 +427,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
     ): ValidatedNel[String, DatasetPart with HavingInvalidationTime] =
       Validated.condNel(
         test = (time.value compareTo part.dateCreated.value) >= 0,
-        new DatasetPart(datasets.PartId.generate, part.external, part.entity, part.dateCreated, part.maybeSource)
+        new DatasetPart(datasetPartIds.generateOne, part.external, part.entity, part.dateCreated, part.maybeSource)
           with HavingInvalidationTime {
           override val invalidationTime: InvalidationTime = time
         },

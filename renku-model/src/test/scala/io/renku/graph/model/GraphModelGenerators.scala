@@ -23,10 +23,10 @@ import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
-import io.renku.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
 import io.renku.graph.model.persons.{Affiliation, Email, Name, Username}
+import io.renku.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
 import org.scalacheck.Gen
-import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf, uuid}
+import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf}
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
@@ -125,9 +125,7 @@ object GraphModelGenerators {
 
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
-  implicit val datasetIdentifiers: Gen[Identifier] = uuid
-    .map(_.toString.replace("-", ""))
-    .map(Identifier.apply)
+  implicit val datasetIdentifiers: Gen[Identifier] = noDashUuid.toGeneratorOf(Identifier)
 
   implicit val datasetOriginalIdentifiers: Gen[OriginalIdentifier] =
     datasetIdentifiers map (id => OriginalIdentifier(id.toString))
@@ -166,6 +164,7 @@ object GraphModelGenerators {
   implicit val datasetLicenses: Gen[datasets.License] = httpUrls() map License.apply
   implicit val datasetVersions: Gen[datasets.Version] = semanticVersions map Version.apply
 
+  implicit val datasetPartIds:       Gen[PartId]       = noDashUuid.toGeneratorOf(PartId)
   implicit val datasetPartExternals: Gen[PartExternal] = booleans map PartExternal.apply
   implicit val datasetPartSources:   Gen[PartSource]   = httpUrls() map PartSource.apply
   implicit val datasetPartLocations: Gen[PartLocation] =

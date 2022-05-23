@@ -42,6 +42,8 @@ object Generators {
 
   def emptyOptionOf[T]: Gen[Option[T]] = Gen.const(Option.empty[T])
 
+  def noDashUuid: Gen[String] = uuid.map(_.toString.replace("-", ""))
+
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
     nonBlankStrings(maxLength = Refined.unsafeApply(maxLength), charsGenerator = charsGenerator) map (_.value)

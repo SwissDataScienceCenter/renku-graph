@@ -20,6 +20,8 @@ package io.renku.graph.model.testentities
 
 import Usage.Id
 import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.noDashUuid
 import io.renku.graph.model.{RenkuBaseUrl, entities, usages}
 import io.renku.tinytypes.constraints.UUID
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -33,9 +35,7 @@ object Usage {
 
   final class Id private (val value: String) extends AnyVal with StringTinyType
   implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID[Id] {
-    def generate: Id = Id {
-      java.util.UUID.randomUUID.toString
-    }
+    def generate: Id = noDashUuid.generateAs(Id)
   }
 
   import io.renku.jsonld._

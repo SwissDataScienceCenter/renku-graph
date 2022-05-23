@@ -26,8 +26,12 @@ import java.util.UUID.fromString
 trait UUID[TT <: TinyType { type V = String }] extends Constraints[TT] with NonBlank[TT] {
   self: TinyTypeFactory[TT] =>
 
+  private val validationRegexNoDashes: String = "[0-9a-f]{32}"
+
   addConstraint(
-    check = value => Validated.catchOnly[IllegalArgumentException](fromString(value)).isValid,
+    check = v =>
+      if (v contains "-") Validated.catchOnly[IllegalArgumentException](fromString(v)).isValid
+      else v.matches(validationRegexNoDashes),
     message = (value: String) => s"'$value' is not a valid UUID value for $typeName"
   )
 }
