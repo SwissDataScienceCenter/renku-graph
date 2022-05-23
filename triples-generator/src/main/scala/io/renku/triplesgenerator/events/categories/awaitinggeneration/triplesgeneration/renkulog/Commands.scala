@@ -200,6 +200,8 @@ private object Commands {
     )
     private val logWorthyRecoverableErrors = Set(
       "SSL_ERROR_SYSCALL",
+      "OpenSSL SSL_read: Connection reset by peer",
+      "unexpected disconnect while reading sideband packet",
       "The requested URL returned error: 502",
       "The requested URL returned error: 503",
       "Could not resolve host:",
@@ -208,6 +210,7 @@ private object Commands {
     private val malformedRepositoryErrors = Set(
       "the remote end hung up unexpectedly",
       "The requested URL returned error: 504",
+      "fatal: error reading section header 'shallow-info'",
       "Error in the HTTP2 framing layer",
       "remote: The project you were looking for could not be found or you don't have permission to view it."
     )

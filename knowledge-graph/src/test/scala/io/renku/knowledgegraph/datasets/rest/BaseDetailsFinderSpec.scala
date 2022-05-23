@@ -62,7 +62,7 @@ class BaseDetailsFinderSpec
           .generateOne
       ) foreach { case (dataset, project, nonModifiedDataset) =>
         nonModifiedToResultSet(project, dataset, blankStrings().generateOne)
-          .as[List[model.Dataset]](datasetsDecoder) shouldBe List(
+          .as[Option[model.Dataset]](maybeDatasetDecoder(dataset.identification.identifier)) shouldBe
           nonModifiedDataset
             .copy(creators = List.empty)
             .copy(maybeDescription = None)
@@ -70,7 +70,8 @@ class BaseDetailsFinderSpec
             .copy(usedIn = Nil)
             .copy(keywords = Nil)
             .copy(images = Nil)
-        ).asRight
+            .some
+            .asRight
       }
     }
   }
@@ -82,7 +83,8 @@ class BaseDetailsFinderSpec
         anyRenkuProjectEntities.addDatasetAndModification(datasetEntities(provenanceNonModified)),
         blankStrings()
       ) { case ((_ ::~ dataset, project), description) =>
-        modifiedToResultSet(project, dataset, description).as[List[model.Dataset]](datasetsDecoder) shouldBe List(
+        modifiedToResultSet(project, dataset, description)
+          .as[Option[model.Dataset]](maybeDatasetDecoder(dataset.identification.identifier)) shouldBe
           modifiedToModified(dataset, project)
             .copy(creators = List.empty)
             .copy(maybeDescription = None)
@@ -90,7 +92,8 @@ class BaseDetailsFinderSpec
             .copy(usedIn = Nil)
             .copy(keywords = Nil)
             .copy(images = Nil)
-        ).asRight
+            .some
+            .asRight
       }
     }
   }
@@ -100,15 +103,15 @@ class BaseDetailsFinderSpec
                                      description: String
   )(implicit renkuBaseUrl:                        RenkuBaseUrl) = {
     val binding = json"""{
-      "datasetId":          {"value": ${ResourceId(dataset.asEntityId.show)}},
-      "identifier":         {"value": ${dataset.identifier}},
-      "name":               {"value": ${dataset.identification.title}},
-      "slug":               {"value": ${dataset.identification.name}},
-      "description":        {"value": $description},
-      "topmostSameAs":      {"value": ${dataset.provenance.topmostSameAs}},
-      "initialVersion":     {"value": ${dataset.provenance.initialVersion}},
-      "projectPath":        {"value": ${project.path}},
-      "projectName":        {"value": ${project.name}}
+      "datasetId":      {"value": ${ResourceId(dataset.asEntityId.show)}},
+      "identifier":     {"value": ${dataset.identifier}},
+      "name":           {"value": ${dataset.identification.title}},
+      "slug":           {"value": ${dataset.identification.name}},
+      "description":    {"value": $description},
+      "topmostSameAs":  {"value": ${dataset.provenance.topmostSameAs}},
+      "initialVersion": {"value": ${dataset.provenance.originalIdentifier}},
+      "projectPath":    {"value": ${project.path}},
+      "projectName":    {"value": ${project.name}}
     }""" deepMerge {
       dataset.provenance.date match {
         case date: datasets.DatePublished => json"""{
@@ -133,10 +136,10 @@ class BaseDetailsFinderSpec
       "name":             {"value": ${dataset.identification.title}},
       "slug":             {"value": ${dataset.identification.name}},
       "description":      {"value": $description},
-      "topmostSameAs":    {"value": ${dataset.provenance.topmostSameAs} },
+      "topmostSameAs":    {"value": ${dataset.provenance.topmostSameAs}},
       "maybeDerivedFrom": {"value": ${dataset.provenance.derivedFrom}},
       "maybeDateCreated": {"value": ${dataset.provenance.date}},
-      "initialVersion":   {"value": ${dataset.provenance.initialVersion} },
+      "initialVersion":   {"value": ${dataset.provenance.originalIdentifier}},
       "projectPath":      {"value": ${project.path}},
       "projectName":      {"value": ${project.name}}
     }"""

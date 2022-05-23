@@ -71,7 +71,7 @@ trait Sensitive extends Any {
 abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     extends (TT#V => TT)
     with From[TT]
-    with Constraints[TT#V]
+    with Constraints[TT]
     with ValueTransformation[TT#V]
     with TinyTypeOrdering[TT]
     with TypeName {
@@ -139,16 +139,16 @@ trait TinyTypeOrdering[TT <: TinyType] {
   implicit def order(implicit ordering: Ordering[TT]): Order[TT] = Order.fromOrdering
 }
 
-trait Constraints[V] extends TypeName {
+trait Constraints[TT <: TinyType] extends TypeName {
 
   private val constraints: collection.mutable.ListBuffer[Constraint] = collection.mutable.ListBuffer.empty
 
-  def addConstraint(check: V => Boolean, message: V => String): Unit =
+  def addConstraint(check: TT#V => Boolean, message: TT#V => String): Unit =
     constraints += Constraint(check, message)
 
-  private case class Constraint(check: V => Boolean, message: V => String)
+  private case class Constraint(check: TT#V => Boolean, message: TT#V => String)
 
-  protected def validateConstraints(value: V): Seq[String] = constraints.foldLeft(Seq.empty[String]) {
+  protected def validateConstraints(value: TT#V): Seq[String] = constraints.foldLeft(Seq.empty[String]) {
     case (errors, constraint) =>
       if (!constraint.check(value)) errors :+ constraint.message(value)
       else errors
@@ -157,6 +157,16 @@ trait Constraints[V] extends TypeName {
 
 trait ValueTransformation[T] extends TypeName {
   val transform: T => Either[Throwable, T] = value => Right(value)
+}
+
+trait RefinedValue[TT <: TinyType, P] {
+  self: TinyTypeFactory[TT] =>
+
+  import eu.timepit.refined.api.Refined
+
+  implicit class RefinedOps(tt: TT) {
+    val asRefined: Refined[TT#V, P] = Refined.unsafeApply(tt.value)
+  }
 }
 
 trait TypeName {

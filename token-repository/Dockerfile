@@ -29,9 +29,8 @@ ENV TZ UTC
 RUN apk add --no-cache tzdata curl bash tini && \
     chown -R daemon:daemon .
 
-ENV GID=90030
-RUN addgroup -g "$GID" -S trgroup && \
-    adduser --disabled-password -g "$GID" -D -u 9003 truser && \
+ENV GID=1000
+RUN adduser --disabled-password -g "$GID" -D -u 1000 truser && \
     chmod 555 -R /opt/token-repository
 
 USER truser

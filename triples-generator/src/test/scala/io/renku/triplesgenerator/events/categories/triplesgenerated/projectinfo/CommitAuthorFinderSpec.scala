@@ -40,10 +40,9 @@ import io.renku.interpreters.TestLogger
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
-import org.http4s.Method.GET
 import org.http4s.Status.{BadGateway, GatewayTimeout, NotImplemented, ServiceUnavailable}
 import org.http4s.implicits._
-import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -64,14 +63,13 @@ class CommitAuthorFinderSpec
     "return the result from the GitLabClient" in new TestCase {
       forAll { (authorName: persons.Name, authorEmail: persons.Email) =>
         val expectation = (authorName -> authorEmail).some
-        val endpointName: String Refined NonEmpty = "commit-detail"
+        val endpointName: String Refined NonEmpty = "single-commit"
 
         (gitLabClient
-          .send(_: Method, _: Uri, _: String Refined NonEmpty)(
+          .get(_: Uri, _: String Refined NonEmpty)(
             _: ResponseMappingF[IO, Option[(persons.Name, persons.Email)]]
           )(_: Option[AccessToken]))
-          .expects(GET,
-                   uri"projects" / projectPath.show / "repository" / "commits" / commitId.show,
+          .expects(uri"projects" / projectPath.show / "repository" / "commits" / commitId.show,
                    endpointName,
                    *,
                    maybeAccessToken
@@ -88,7 +86,7 @@ class CommitAuthorFinderSpec
     "return a ProcessingRecoverableError if the GitLabClient " +
       "throws an exception handled by the recovery strategy" in new TestCase {
 
-        val endpointName: String Refined NonEmpty = "commit-detail"
+        val endpointName: String Refined NonEmpty = "single-commit"
 
         val error = Gen
           .oneOf(
@@ -101,11 +99,10 @@ class CommitAuthorFinderSpec
           .generateOne
 
         (gitLabClient
-          .send(_: Method, _: Uri, _: String Refined NonEmpty)(
+          .get(_: Uri, _: String Refined NonEmpty)(
             _: ResponseMappingF[IO, Option[(persons.Name, persons.Email)]]
           )(_: Option[AccessToken]))
-          .expects(GET,
-                   uri"projects" / projectPath.show / "repository" / "commits" / commitId.show,
+          .expects(uri"projects" / projectPath.show / "repository" / "commits" / commitId.show,
                    endpointName,
                    *,
                    maybeAccessToken

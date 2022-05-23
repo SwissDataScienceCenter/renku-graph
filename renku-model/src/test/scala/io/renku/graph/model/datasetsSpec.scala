@@ -49,13 +49,13 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
   "Identifier" should {
     "be a NonBlank" in {
-      Identifier shouldBe a[NonBlank]
+      Identifier shouldBe a[NonBlank[_]]
     }
   }
 
   "PartLocation" should {
     "be a RelativePath" in {
-      PartLocation shouldBe a[RelativePath]
+      PartLocation shouldBe a[RelativePath[_]]
     }
   }
 

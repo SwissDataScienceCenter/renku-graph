@@ -16,37 +16,46 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest
+package migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.schema
+import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.tooling.UpdateQueryMigration
 import org.typelevel.log4cats.Logger
+import tooling.UpdateQueryMigration
 
-private object DeDuplicatePersonNames {
+private object MultipleDSDateCreated {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Migration[F]] =
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Duplicate Person Names")
+  private lazy val name = Migration.Name("Multiple DateCreated on DS")
   private[migrations] lazy val query = SparqlQuery.of(
-    Refined.unsafeApply(name.show),
+    name.asRefined,
     Prefixes of schema -> "schema",
-    s"""|DELETE { ?id schema:name ?someName }
+    s"""|DELETE { ?dsId schema:dateCreated ?date }
         |WHERE {
-        |  SELECT ?id (SAMPLE(?name) AS ?someName)
+        |  SELECT ?dsId ?date
         |  WHERE {
-        |    ?id a schema:Person;
-        |        schema:name ?name.
+        |    {
+        |      SELECT ?dsId (MIN(?date) as ?minDate)
+        |      WHERE {
+        |        ?dsId a schema:Dataset;
+        |              schema:dateCreated ?date.
+        |      }
+        |      GROUP BY ?dsId
+        |      HAVING (COUNT(?date) > 1)
+        |      ORDER BY ?dsId
+        |    }
+        |    ?dsId schema:dateCreated ?date.
+        |    FILTER ( ?date != ?minDate )
         |  }
-        |  GROUP BY ?id
-        |  HAVING (COUNT(?name) > 1)
         |}
         |""".stripMargin
   )

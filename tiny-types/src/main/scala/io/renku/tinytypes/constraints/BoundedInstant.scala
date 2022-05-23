@@ -18,11 +18,11 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.Constraints
+import io.renku.tinytypes.{Constraints, InstantTinyType}
 
 import java.time.Instant
 
-trait BoundedInstant extends Constraints[Instant] {
+trait BoundedInstant[TT <: InstantTinyType] extends Constraints[TT] {
   protected[this] def maybeMin:   Option[Instant] = None
   protected[this] def maybeMax:   Option[Instant] = None
   protected[this] def instantNow: Instant         = Instant.now()

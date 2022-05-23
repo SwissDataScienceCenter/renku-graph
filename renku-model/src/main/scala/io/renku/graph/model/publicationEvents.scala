@@ -29,24 +29,24 @@ object publicationEvents {
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with Url
+      with Url[ResourceId]
       with EntityIdJsonLdOps[ResourceId]
 
   class About private (val value: String) extends AnyVal with StringTinyType
-  implicit object About extends TinyTypeFactory[About](new About(_)) with Url with EntityIdJsonLdOps[About]
+  implicit object About extends TinyTypeFactory[About](new About(_)) with Url[About] with EntityIdJsonLdOps[About]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description
       extends TinyTypeFactory[Description](new Description(_))
-      with NonBlank
+      with NonBlank[Description]
       with TinyTypeJsonLDOps[Description]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank with TinyTypeJsonLDOps[Name]
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 
   final class StartDate private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object StartDate
       extends TinyTypeFactory[StartDate](new StartDate(_))
-      with InstantNotInTheFuture
+      with InstantNotInTheFuture[StartDate]
       with TinyTypeJsonLDOps[StartDate]
 }

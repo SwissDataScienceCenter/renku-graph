@@ -31,10 +31,14 @@ sealed trait AccessToken extends Any with StringTinyType with Sensitive
 object AccessToken {
 
   final class PersonalAccessToken private (val value: String) extends AnyVal with AccessToken
-  object PersonalAccessToken extends TinyTypeFactory[PersonalAccessToken](new PersonalAccessToken(_)) with NonBlank
+  object PersonalAccessToken
+      extends TinyTypeFactory[PersonalAccessToken](new PersonalAccessToken(_))
+      with NonBlank[PersonalAccessToken]
 
   final class OAuthAccessToken private (val value: String) extends AnyVal with AccessToken
-  object OAuthAccessToken extends TinyTypeFactory[OAuthAccessToken](new OAuthAccessToken(_)) with NonBlank
+  object OAuthAccessToken
+      extends TinyTypeFactory[OAuthAccessToken](new OAuthAccessToken(_))
+      with NonBlank[OAuthAccessToken]
 
   private val base64Decoder = Base64.getDecoder
   private val base64Encoder = Base64.getEncoder

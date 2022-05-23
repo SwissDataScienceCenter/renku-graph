@@ -28,7 +28,7 @@ import pureconfig.ConfigReader
 final class TokenRepositoryUrl private (val value: String) extends AnyVal with UrlTinyType
 object TokenRepositoryUrl
     extends TinyTypeFactory[TokenRepositoryUrl](new TokenRepositoryUrl(_))
-    with Url
+    with Url[TokenRepositoryUrl]
     with UrlOps[TokenRepositoryUrl] {
 
   private implicit val configReader: ConfigReader[TokenRepositoryUrl] = urlTinyTypeReader(TokenRepositoryUrl)

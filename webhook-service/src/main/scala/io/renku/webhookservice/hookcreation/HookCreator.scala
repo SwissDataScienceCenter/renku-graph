@@ -21,10 +21,8 @@ package io.renku.webhookservice.hookcreation
 import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.MetricsRegistry
 import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
@@ -66,7 +64,7 @@ private class HookCreatorImpl[F[_]: Spawn: Logger](
     for {
       hookValidation      <- right(validateHook(projectId, Some(accessToken)))
       _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
-      projectInfo         <- right(findProjectInfo(projectId, Some(accessToken)))
+      projectInfo         <- right(findProjectInfo(projectId)(Some(accessToken)))
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
       _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
       _                   <- right(associate(projectId, accessToken))
@@ -105,14 +103,14 @@ private object HookCreator {
 
   def apply[F[_]: Async: Logger: MetricsRegistry](
       projectHookUrl:  ProjectHookUrl,
-      gitLabThrottler: Throttler[F, GitLab],
+      gitLabClient:    GitLabClient[F],
       hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookCreator[F]] =
     for {
       commitSyncRequestSender <- CommitSyncRequestSender[F]
-      hookValidator           <- hookvalidation.HookValidator(projectHookUrl, gitLabThrottler)
-      projectInfoFinder       <- ProjectInfoFinder[F](gitLabThrottler)
-      hookCreator             <- ProjectHookCreator[F](gitLabThrottler)
+      hookValidator           <- hookvalidation.HookValidator(projectHookUrl, gitLabClient)
+      projectInfoFinder       <- ProjectInfoFinder[F](gitLabClient)
+      hookCreator             <- ProjectHookCreator[F](gitLabClient)
       tokenAssociator         <- AccessTokenAssociator[F]
     } yield new HookCreatorImpl[F](
       projectHookUrl,

@@ -42,13 +42,12 @@ private class GitLabProjectFinderImpl[F[_]: Async: Logger](
   import cats.syntax.all._
   import io.circe._
   import io.renku.tinytypes.json.TinyTypeDecoders._
-  import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
   def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): F[Option[GitLabProject]] =
-    gitLabClient.send(GET, uri"projects" / projectPath.value withQueryParam ("statistics", "true"), "single project")(
+    gitLabClient.get(uri"projects" / projectPath.value withQueryParam ("statistics", "true"), "single-project")(
       mapResponse
     )(accessToken.some)
 

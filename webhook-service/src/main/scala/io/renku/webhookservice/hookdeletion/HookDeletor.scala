@@ -20,10 +20,8 @@ package io.renku.webhookservice.hookdeletion
 
 import cats.effect._
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.model.projects.Id
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.webhookservice.hookdeletion.HookDeletor.DeletionResult
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher
 import io.renku.webhookservice.hookfetcher.ProjectHookFetcher.HookIdAndUrl
@@ -63,10 +61,10 @@ private class HookDeletorImpl[F[_]: Spawn: Logger](projectHookFetcher: ProjectHo
 private object HookDeletor {
 
   def apply[F[_]: Async: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
+      gitLabClient: GitLabClient[F]
   ): F[HookDeletor[F]] = for {
-    hookDeletor        <- ProjectHookDeletor[F](gitLabThrottler)
-    projectHookFetcher <- ProjectHookFetcher(gitLabThrottler)
+    hookDeletor        <- ProjectHookDeletor[F](gitLabClient)
+    projectHookFetcher <- ProjectHookFetcher(gitLabClient)
   } yield new HookDeletorImpl[F](projectHookFetcher, hookDeletor)
 
   sealed trait DeletionResult extends Product with Serializable

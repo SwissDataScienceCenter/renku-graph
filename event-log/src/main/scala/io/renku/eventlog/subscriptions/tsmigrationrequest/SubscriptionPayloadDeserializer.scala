@@ -21,10 +21,10 @@ package io.renku.eventlog.subscriptions.tsmigrationrequest
 import cats.MonadThrow
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure, Json}
+import io.renku.config.ServiceVersion
 import io.renku.eventlog.subscriptions
 import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import io.renku.http.server.version.ServiceVersion
 
 private class SubscriptionPayloadDeserializer[F[_]: MonadThrow]
     extends subscriptions.SubscriptionPayloadDeserializer[F, MigratorSubscriptionInfo] {

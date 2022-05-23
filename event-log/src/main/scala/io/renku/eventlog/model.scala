@@ -32,7 +32,7 @@ trait CompoundId {
 }
 
 final class EventDate private (val value: Instant) extends AnyVal with InstantTinyType
-object EventDate extends TinyTypeFactory[EventDate](new EventDate(_)) with BoundedInstant {
+object EventDate extends TinyTypeFactory[EventDate](new EventDate(_)) with BoundedInstant[EventDate] {
   import java.time.temporal.ChronoUnit.HOURS
 
   protected[this] override def maybeMax: Option[Instant] = Some(instantNow.plus(24, HOURS))
@@ -41,7 +41,7 @@ object EventDate extends TinyTypeFactory[EventDate](new EventDate(_)) with Bound
 }
 
 final class CreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
-object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture
+object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture[CreatedDate]
 
 final class ExecutionDate private (val value: Instant) extends AnyVal with InstantTinyType
 object ExecutionDate extends TinyTypeFactory[ExecutionDate](new ExecutionDate(_)) {
@@ -49,7 +49,7 @@ object ExecutionDate extends TinyTypeFactory[ExecutionDate](new ExecutionDate(_)
 }
 
 final class EventMessage private (val value: String) extends AnyVal with StringTinyType
-object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) with NonBlank {
+object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) with NonBlank[EventMessage] {
 
   implicit val decoder: Decoder[EventMessage] = stringDecoder(EventMessage)
 

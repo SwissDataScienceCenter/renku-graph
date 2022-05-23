@@ -21,6 +21,7 @@ package io.renku.eventlog.subscriptions.tsmigrationrequest
 import Generators._
 import cats.data.Kleisli
 import cats.effect.IO
+import io.renku.config.ServiceVersion
 import io.renku.db.SqlStatement
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigtationTypeSerializers._
@@ -28,7 +29,6 @@ import io.renku.eventlog._
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory

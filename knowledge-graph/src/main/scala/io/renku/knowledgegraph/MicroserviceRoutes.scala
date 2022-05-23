@@ -40,6 +40,7 @@ import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
+import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
@@ -55,6 +56,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     datasetEndpoint:         DatasetEndpoint[F],
     entitiesEndpoint:        entities.Endpoint[F],
     queryEndpoint:           QueryEndpoint[F],
+    lineageEndpoint:         lineage.Endpoint[F],
     projectEndpoint:         ProjectEndpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
@@ -67,6 +69,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import datasetEndpoint._
   import datasetIdAuthorizer.{authorize => authorizeDatasetId}
   import entitiesEndpoint._
+  import lineageEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
   import projectEndpoint._
@@ -104,7 +107,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     import Sorting.sort
 
     AuthedRoutes.of {
-      case req @ GET -> Root / "knowledge-graph" / "entities"
+      case req@GET -> Root / "knowledge-graph" / "entities"
         :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators)
         +& visibilities(maybeVisibilities) +& date(maybeDate) +& sort(maybeSort)
         +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
@@ -117,6 +120,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   private lazy val otherAuthRoutes: AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
     case authReq @ POST -> Root / "knowledge-graph" / "graphql" as maybeUser => handleQuery(authReq.req, maybeUser)
     case GET -> "knowledge-graph" /: "projects" /: path as maybeUser => routeToProjectsEndpoints(path, maybeUser)
+
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
@@ -189,6 +193,12 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(getProjectDatasets)
         .merge
+    case LineageEndpoint(projectPathParts, locationParts) =>
+      (projectPathParts.toProjectPath -> locationParts.toLocation)
+        .mapN(_ -> _)
+        .flatTap { case (projectPath, _) => authorizePath(projectPath, maybeAuthUser).leftMap(_.toHttpResponse) }
+        .semiflatMap { case (projectPath, location) => `GET /lineage`(projectPath, location, maybeAuthUser) }
+        .merge
     case projectPathParts =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
@@ -196,13 +206,33 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .merge
   }
 
+  object LineageEndpoint {
+    def unapply(segments: List[String]): Option[(List[String], List[String])] =
+      if (segments.contains("lineage") && segments.contains("files")) {
+
+        val indexOfFiles = segments.indexOf("files")
+        val projectPath  = segments.take(indexOfFiles)
+        val location     = segments.drop(indexOfFiles + 1).takeWhile(!_.contains("lineage"))
+        if (projectPath.nonEmpty && location.nonEmpty)
+          Some((projectPath, location))
+        else None
+      } else None
+  }
+
   private implicit class PathPartsOps(parts: List[String]) {
+
     import io.renku.http.InfoMessage
     import io.renku.http.InfoMessage._
     import org.http4s.{Response, Status}
 
     lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
       model.projects.Path
+        .from(parts mkString "/")
+        .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
+    }
+
+    lazy val toLocation: EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
+      Location
         .from(parts mkString "/")
         .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
     }
@@ -225,9 +255,10 @@ private object MicroserviceRoutes {
     entitiesEndpoint        <- entities.Endpoint[IO]
     gitLabClient            <- GitLabClient(gitLabThrottler)
     queryEndpoint           <- QueryEndpoint()
+    lineageEndpoint         <- lineage.Endpoint[IO]
     projectEndpoint         <- ProjectEndpoint[IO](gitLabClient)
     projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
-    authenticator           <- GitLabAuthenticator(gitLabThrottler)
+    authenticator           <- GitLabAuthenticator(gitLabClient)
     authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
     projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
     datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
@@ -236,6 +267,7 @@ private object MicroserviceRoutes {
                                  datasetEndpoint,
                                  entitiesEndpoint,
                                  queryEndpoint,
+                                 lineageEndpoint,
                                  projectEndpoint,
                                  projectDatasetsEndpoint,
                                  authMiddleware,

@@ -42,12 +42,12 @@ object Links {
   def self(href: Href): Links = Links(NonEmptyList.of(Link.self(href)))
 
   final class Rel private (val value: String) extends AnyVal with StringTinyType
-  implicit object Rel extends TinyTypeFactory[Rel](new Rel(_)) with NonBlank {
+  implicit object Rel extends TinyTypeFactory[Rel](new Rel(_)) with NonBlank[Rel] {
     lazy val Self: Rel = Rel("self")
   }
 
   final class Href private (val value: String) extends AnyVal with UrlTinyType
-  implicit object Href extends TinyTypeFactory[Href](new Href(_)) with Url with UrlOps[Href] {
+  implicit object Href extends TinyTypeFactory[Href](new Href(_)) with Url[Href] with UrlOps[Href] {
     def apply(value: UrlTinyType): Href = Href(value.value)
   }
 

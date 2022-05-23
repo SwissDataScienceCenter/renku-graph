@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
-import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, SameAs, TopmostSameAs}
+import io.renku.graph.model.datasets.{DateCreated, InternalSameAs, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.persons
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -33,6 +33,9 @@ private trait KGDatasetInfoFinder[F[_]] {
   def findParentTopmostSameAs(idSameAs: InternalSameAs)(implicit ev: InternalSameAs.type): F[Option[TopmostSameAs]]
   def findTopmostSameAs(resourceId:     ResourceId)(implicit ev:     ResourceId.type):     F[Option[TopmostSameAs]]
   def findDatasetCreators(resourceId:   ResourceId): F[Set[persons.ResourceId]]
+  def findDatasetOriginalIdentifiers(resourceId: ResourceId): F[Set[OriginalIdentifier]]
+  def findDatasetDateCreated(resourceId:         ResourceId): F[Set[DateCreated]]
+  def findDatasetSameAs(resourceId:              ResourceId): F[Set[SameAs]]
 }
 
 private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
@@ -83,24 +86,77 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
   private implicit val topmostSameAsInfo: SameAs => String     = _ => "topmostSameAs"
   private implicit val resourceIdInfo:    ResourceId => String = _ => "resourceId"
 
-  def findDatasetCreators(resourceId: ResourceId): F[Set[persons.ResourceId]] =
-    queryExpecting[Set[persons.ResourceId]](using = queryFindingCreators(resourceId))
+  override def findDatasetCreators(resourceId: ResourceId): F[Set[persons.ResourceId]] = {
+    implicit val creatorsDecoder: Decoder[List[persons.ResourceId]] = ResultsDecoder[List, persons.ResourceId] {
+      implicit cur => extract[persons.ResourceId]("personId")
+    }
 
-  private def queryFindingCreators(resourceId: ResourceId) = SparqlQuery.of(
-    name = "transformation - find ds creators",
-    Prefixes of schema -> "schema",
-    s"""|SELECT ?personId
-        |WHERE {
-        |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
-        |                                    schema:creator ?personId
-        |}
-        |""".stripMargin
-  )
+    queryExpecting[List[persons.ResourceId]] {
+      SparqlQuery.of(
+        name = "transformation - find ds creators",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?personId
+            |WHERE {
+            |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
+            |                                    schema:creator ?personId
+            |}
+            |""".stripMargin
+      )
+    }.map(_.toSet)
+  }
 
-  private implicit val creatorsDecoder: Decoder[Set[persons.ResourceId]] = {
-    val creatorId: Decoder[persons.ResourceId] =
-      _.downField("personId").downField("value").as[persons.ResourceId]
-    _.downField("results").downField("bindings").as(decodeList(creatorId)).map(_.toSet)
+  override def findDatasetOriginalIdentifiers(resourceId: ResourceId): F[Set[OriginalIdentifier]] = {
+    implicit val decoder: Decoder[List[OriginalIdentifier]] = ResultsDecoder[List, OriginalIdentifier] {
+      implicit cursor => extract("originalId")
+    }
+    queryExpecting[List[OriginalIdentifier]] {
+      SparqlQuery.of(
+        name = "transformation - find ds originalIdentifiers",
+        Prefixes of (renku -> "renku", schema -> "schema"),
+        s"""|SELECT ?originalId
+            |WHERE {
+            |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
+            |                                    renku:originalIdentifier ?originalId.
+            |}
+            |""".stripMargin
+      )
+    }.map(_.toSet)
+  }
+
+  def findDatasetDateCreated(resourceId: ResourceId): F[Set[DateCreated]] = {
+    implicit val decoder: Decoder[List[DateCreated]] = ResultsDecoder[List, DateCreated] { implicit cursor =>
+      extract("date")
+    }
+    queryExpecting[List[DateCreated]] {
+      SparqlQuery.of(
+        name = "transformation - find ds originalIdentifiers",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?date
+            |WHERE {
+            |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
+            |                                    schema:dateCreated ?date.
+            |}
+            |""".stripMargin
+      )
+    }.map(_.toSet)
+  }
+
+  override def findDatasetSameAs(resourceId: ResourceId): F[Set[SameAs]] = {
+    implicit val decoder: Decoder[List[SameAs]] = ResultsDecoder[List, SameAs] { implicit cursor =>
+      extract("sameAs")
+    }
+    queryExpecting[List[SameAs]] {
+      SparqlQuery.of(
+        name = "transformation - find ds sameAs",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?sameAs
+            |WHERE {
+            |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
+            |                                    schema:sameAs ?sameAs.
+            |}
+            |""".stripMargin
+      )
+    }.map(_.toSet)
   }
 }
 

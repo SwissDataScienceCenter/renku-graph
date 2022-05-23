@@ -31,14 +31,13 @@ RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py
     python3 -m pip install --ignore-installed packaging && \
     python3 -m pip install --upgrade 'pip==22.0.4' && \
     python3 -m pip install jinja2 && \
-    python3 -m pip install 'renku==1.2.2' 'sentry-sdk==1.5.5'  && \
+    python3 -m pip install 'renku==1.3.0' 'sentry-sdk==1.5.5'  && \
     chown -R daemon:daemon .
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh
 
-ENV GID=90020
-RUN addgroup -g "$GID" -S tggroup && \
-    adduser --disabled-password -g "$GID" -D -u 9002 tguser && \
+ENV GID=1000
+RUN adduser --disabled-password -g "$GID" -D -u 1000 tguser && \
     chmod 555 -R /opt/triples-generator && \
     chmod 555 -R /entrypoint.sh
 

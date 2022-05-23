@@ -21,12 +21,16 @@ spec:
         app: {{ include "triplesGenerator.name" . }}
         release: {{ .Release.Name }}
     spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
         {{- include "certificates.initContainer" . | nindent 8 }}
       containers:
         - name: triples-generator
           image: "{{ .Values.triplesGenerator.image.repository }}:{{ .Values.triplesGenerator.image.tag }}"
           imagePullPolicy: {{ .Values.triplesGenerator.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           env:
             - name: RENKU_CLIENT_CERTIFICATE
               valueFrom:
@@ -50,7 +54,7 @@ spec:
               value: {{ .Values.global.graph.jena.dataset }}
               {{- else }}
               value: {{ .Release.Namespace }}
-             {{- end }}
+              {{- end }}
             - name: JENA_BASE_URL
               value: "http://{{ template "jena.fullname" . }}-master:{{ .Values.jena.service.port }}"
             - name: JENA_ADMIN_PASSWORD
@@ -74,7 +78,7 @@ spec:
               value: {{ .Values.sentry.sentryDsnRenkuPython }}
             - name: SENTRY_GRAPH_DSN
               value: {{ .Values.sentry.dsn }}
-            - name: SENTRY_ENVIRONMENT
+            - name: SENTRY_ENV
               value: {{ .Values.sentry.environment }}
               {{- end }}
             - name: GENERATION_PROCESSES_NUMBER

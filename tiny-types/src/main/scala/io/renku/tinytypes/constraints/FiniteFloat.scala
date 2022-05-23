@@ -18,9 +18,9 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.Constraints
+import io.renku.tinytypes.{Constraints, FloatTinyType}
 
-trait FiniteFloat extends Constraints[Float] {
+trait FiniteFloat[TT <: FloatTinyType] extends Constraints[TT] {
   addConstraint(
     check = java.lang.Float.isFinite,
     message = value => s"$typeName has to be a finite Float number, not $value"

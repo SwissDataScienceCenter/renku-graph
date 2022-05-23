@@ -61,19 +61,12 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |""".stripMargin
   )
 
-  private implicit lazy val recordsDecoder: Decoder[Set[(GitLabId, ResourceId)]] = { cursor =>
-    import Decoder._
-    import io.renku.tinytypes.json.TinyTypeDecoders._
+  private implicit lazy val recordsDecoder: Decoder[Set[(GitLabId, ResourceId)]] =
+    ResultsDecoder[Set, (GitLabId, ResourceId)] { implicit cursor =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    val tuples: Decoder[(GitLabId, ResourceId)] = { cursor =>
-      for {
-        personId <- cursor.downField("personId").downField("value").as[persons.ResourceId]
-        gitLabId <- cursor.downField("gitLabId").downField("value").as[persons.GitLabId]
-      } yield gitLabId -> personId
+      (extract[persons.GitLabId]("gitLabId") -> extract[persons.ResourceId]("personId")).mapN(_ -> _)
     }
-
-    cursor.downField("results").downField("bindings").as(decodeList(tuples)).map(_.toSet)
-  }
 }
 
 private object KGPersonFinder {

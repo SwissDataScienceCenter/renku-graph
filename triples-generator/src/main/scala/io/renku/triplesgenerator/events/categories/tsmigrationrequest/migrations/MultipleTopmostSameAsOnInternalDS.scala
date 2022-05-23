@@ -21,50 +21,44 @@ package migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import tooling.UpdateQueryMigration
 
-private object DeDuplicateModifiedDSData {
+private object MultipleTopmostSameAsOnInternalDS {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Duplicate Modified DS data")
+  private lazy val name = Migration.Name("Multiple TopmostSameAs on Internal DS")
   private[migrations] lazy val query = SparqlQuery.of(
-    Refined.unsafeApply(name.show),
-    Prefixes.of(schema -> "schema", renku -> "renku"),
-    s"""|DELETE { 
-        |  ?dsId renku:originalIdentifier ?original.
-        |  ?dsId renku:topmostDerivedFrom ?topmostDerived.
-        |  ?dsId renku:topmostSameAs ?topmostSameAs.
-        |}
+    name.asRefined,
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
+    s"""|DELETE { ?dsId renku:topmostSameAs ?top. }
         |WHERE {
-        |  SELECT ?dsId ?original ?topmostDerived ?topmostSameAs
+        |  SELECT ?dsId ?top
         |  WHERE {
         |    {
-        |      SELECT DISTINCT ?dsId
+        |      SELECT ?dsId
         |      WHERE {
         |        ?dsId a schema:Dataset;
-        |              renku:originalIdentifier ?originalIdentifier.
+        |                renku:topmostSameAs ?topSameAs.
+        |        FILTER EXISTS { ?dsId renku:topmostDerivedFrom ?dsId }
+        |        FILTER EXISTS { ?dsId renku:topmostSameAs ?dsId }
+        |        FILTER NOT EXISTS { ?dsId prov:wasDerivedFrom ?de }
+        |        FILTER NOT EXISTS { ?dsId schema:sameAs ?sa }
         |      }
-        |      GROUP BY ?dsId
-        |      HAVING (COUNT(DISTINCT ?originalIdentifier) > 1)
+        |      GROUP BY ?dsId ?orig
+        |      HAVING (COUNT(?topSameAs) > 1)
+        |      ORDER BY ?dsId
         |    }
-        |    ?dsId schema:identifier ?identifier;
-        |          renku:originalIdentifier ?original;
-        |          renku:topmostDerivedFrom ?topmostDerived.
-        |    OPTIONAL { 
-        |      ?dsId renku:topmostSameAs ?topmostSameAs
-        |      FILTER (!CONTAINS(STR(?topmostSameAs), ?identifier))
-        |    }
-        |    FILTER (?original = ?identifier)
-        |    FILTER (CONTAINS(STR(?topmostDerived), ?identifier))
+        |    ?dsId a schema:Dataset;
+        |          renku:topmostSameAs ?top.
+        |    FILTER ( ?dsId != ?top )
         |  }
         |}
         |""".stripMargin

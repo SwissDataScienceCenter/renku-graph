@@ -18,9 +18,9 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.Constraints
+import io.renku.tinytypes.{Constraints, StringTinyType}
 
-trait GitSha extends Constraints[String] {
+trait GitSha[TT <: StringTinyType] extends Constraints[TT] {
 
   private val validationRegex: String = "[0-9a-f]{5,40}"
 

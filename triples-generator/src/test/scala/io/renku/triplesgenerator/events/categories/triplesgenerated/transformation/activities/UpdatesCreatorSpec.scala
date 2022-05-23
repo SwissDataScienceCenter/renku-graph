@@ -37,9 +37,9 @@ class UpdatesCreatorSpec
     with should.Matchers
     with ScalaCheckPropertyChecks {
 
-  "queriesUnlinkingCreators" should {
+  "queriesUnlinkingAuthors" should {
 
-    "prepare delete query for activity of which author exists in KG but not on the model" in {
+    "prepare delete query if new activity has different author that it's set in the TS" in {
       val kgProject = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()))
         .map(_.to[entities.RenkuProject])
@@ -54,7 +54,31 @@ class UpdatesCreatorSpec
       val modelActivity = activity.copy(author = newAuthor)
 
       UpdatesCreator
-        .queriesUnlinkingAuthor(modelActivity, activity.author.resourceId.some)
+        .queriesUnlinkingAuthors(modelActivity, Set(activity.author.resourceId))
+        .runAll
+        .unsafeRunSync()
+
+      findAuthors(activity.resourceId) shouldBe Set.empty
+    }
+
+    "prepare delete query if there's more than one author for the activity in the TS" in {
+      val kgProject = anyRenkuProjectEntities
+        .withActivities(activityEntities(planEntities()))
+        .map(_.to[entities.RenkuProject])
+        .generateOne
+
+      loadToStore(kgProject)
+
+      val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
+
+      val person = personEntities.generateOne.to[entities.Person]
+      loadToStore(person)
+      insertTriple(activity.resourceId, "prov:wasAssociatedWith", person.resourceId.showAs[RdfResource])
+
+      findAuthors(activity.resourceId) shouldBe Set(activity.author.resourceId, person.resourceId)
+
+      UpdatesCreator
+        .queriesUnlinkingAuthors(activity, Set(activity.author.resourceId, personResourceIds.generateOne))
         .runAll
         .unsafeRunSync()
 
@@ -69,7 +93,7 @@ class UpdatesCreatorSpec
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
 
-      UpdatesCreator.queriesUnlinkingAuthor(activity, maybeKgAuthor = None) shouldBe Nil
+      UpdatesCreator.queriesUnlinkingAuthors(activity, kgAuthors = Set.empty) shouldBe Nil
     }
 
     "prepare no queries if there's no change in Activity author" in {
@@ -80,13 +104,13 @@ class UpdatesCreatorSpec
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
 
-      UpdatesCreator.queriesUnlinkingAuthor(activity, activity.author.resourceId.some) shouldBe Nil
+      UpdatesCreator.queriesUnlinkingAuthors(activity, Set(activity.author.resourceId)) shouldBe Nil
     }
   }
 
-  "queriesUnlinkingAgent" should {
+  "queriesUnlinkingAgents" should {
 
-    "prepare delete query for association a person agent which exists in KG but not on the model" in {
+    "prepare delete query if the new Association's person agent is different from what's set in the TS" in {
       val kgProject = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
         .map(_.to[entities.RenkuProject])
@@ -104,7 +128,31 @@ class UpdatesCreatorSpec
       }
 
       UpdatesCreator
-        .queriesUnlinkingAgent(modelActivity, activity.association.maybePersonAgentResourceId)
+        .queriesUnlinkingAgents(modelActivity, activity.association.maybePersonAgentResourceId.toSet)
+        .runAll
+        .unsafeRunSync()
+
+      findPersonAgents(activity.association.resourceId) shouldBe Set.empty
+    }
+
+    "prepare delete query if there's more than one person agent for the Association set in the TS" in {
+      val kgProject = anyRenkuProjectEntities
+        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .map(_.to[entities.RenkuProject])
+        .generateOne
+
+      loadToStore(kgProject)
+
+      val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
+      val person   = personEntities.generateOne.to[entities.Person]
+      loadToStore(person)
+      insertTriple(activity.association.resourceId, "prov:agent", person.resourceId.showAs[RdfResource])
+
+      findPersonAgents(activity.association.resourceId) shouldBe
+        activity.association.maybePersonAgentResourceId.toSet + person.resourceId
+
+      UpdatesCreator
+        .queriesUnlinkingAgents(activity, activity.association.maybePersonAgentResourceId.toSet + person.resourceId)
         .runAll
         .unsafeRunSync()
 
@@ -120,7 +168,7 @@ class UpdatesCreatorSpec
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
 
       UpdatesCreator
-        .queriesUnlinkingAgent(activity, maybeKgAgent = personResourceIds.generateOne.some) shouldBe Nil
+        .queriesUnlinkingAgents(activity, kgAgents = Set(personResourceIds.generateOne)) shouldBe Nil
     }
 
     "prepare no queries if there's no Person agent in KG" in {
@@ -131,7 +179,7 @@ class UpdatesCreatorSpec
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
 
-      UpdatesCreator.queriesUnlinkingAgent(activity, maybeKgAgent = None) shouldBe Nil
+      UpdatesCreator.queriesUnlinkingAgents(activity, kgAgents = Set.empty) shouldBe Nil
     }
 
     "prepare no queries if there's no change in association's person agent" in {
@@ -142,7 +190,9 @@ class UpdatesCreatorSpec
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
 
-      UpdatesCreator.queriesUnlinkingAgent(activity, activity.association.maybePersonAgentResourceId) shouldBe Nil
+      UpdatesCreator.queriesUnlinkingAgents(activity,
+                                            activity.association.maybePersonAgentResourceId.toSet
+      ) shouldBe Nil
     }
   }
 

@@ -22,6 +22,7 @@ import cats.data.EitherT.{leftT, liftF, rightT}
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
+import io.renku.config.ServiceVersion
 import io.renku.data.ErrorMessage
 import io.renku.events.consumers.ConcurrentProcessesLimiter
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
@@ -32,7 +33,6 @@ import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.CommonGraphGenerators.{microserviceIdentifiers, serviceVersions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.http.server.version.ServiceVersion
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.json.JsonOps._

@@ -19,13 +19,12 @@
 package io.renku.triplesgenerator.events.categories.cleanup
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits.GenOps
-import io.renku.generators.Generators.fixed
-import io.renku.graph.model.GraphModelGenerators.datasetInternalSameAsFrom
-import io.renku.graph.model.datasets.{Identifier, TopmostSameAs}
-import io.renku.graph.model.projects
+import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
+import io.renku.graph.model.{datasets, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax.JsonEncoderOps
@@ -34,26 +33,25 @@ import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll
-
-import java.time.Instant
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class ProjectTriplesRemoverSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
     with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
     with EntitiesGenerators {
 
   "removeTriples" should {
 
-    "remove all activities, datasets and their dependant entities, of a project and the project itself" in new TestCase {
-      forAll(renkuProjectEntitiesWithDatasetsAndActivities) { projectData =>
-        loadToStore(projectData.asJsonLD)
+    "remove all activities, datasets and their dependant entities of a project and the project itself" in new TestCase {
+      forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
+        loadToStore(project.asJsonLD)
 
-        projectTriplesRemover.removeTriples(projectData.path).unsafeRunSync()
+        projectTriplesRemover.removeTriples(project.path).unsafeRunSync()
 
-        findAllData.unsafeRunSync() shouldBe List.empty[Map[String, String]]
+        findAllData.unsafeRunSync() shouldBe List.empty
       }
     }
 
@@ -70,129 +68,410 @@ class ProjectTriplesRemoverSpec
           findProject(child.path).unsafeRunSync().isEmpty shouldBe false
         }
       }
-    "update the hierarchy of the datasets and remove all entities which are linked only to the current project " +
-      "of a project and the project itself - case when the removed dataset is in the middle of the hierarchy" in new TestCase {
-        val topProject =
-          renkuProjectEntities(anyVisibility).withDatasets(datasetEntities(provenanceNonModified)).generateOne
-        val topDataset = topProject.datasets.head
 
-        val projectToDelete =
-          projectWithImportingDataset(topDataset.identification.identifier)().generateOne
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when project containing a DS which is the first in the sameAs hierarchy is removed " +
+      "while it's an imported DS" in new TestCase {
 
-        val project = projectWithImportingDataset(projectToDelete.datasets.head.identification.identifier)(
-          topDataset.identification.identifier
-        ).generateOne
-        val dataset = project.datasets.head
+        val (topProjectDS, topProject) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceImportedExternal)).generateOne
 
-        loadToStore(projectToDelete.asJsonLD, project.asJsonLD, topProject.asJsonLD)
-        projectTriplesRemover.removeTriples(projectToDelete.path).unsafeRunSync()
+        val (middleProjectDS, middleProject) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        findProject(projectToDelete.path).unsafeRunSync() shouldBe List.empty
+        val (bottomProjectDS, bottomProject) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        val List(sameAsAndTopmostSameAs) = findDatasetSameAs(dataset.entityId).unsafeRunSync()
+        loadToStore(middleProject, bottomProject, topProject)
 
-        sameAsAndTopmostSameAs.get("sameAs")        shouldBe Some(topDataset.entityId.value)
-        sameAsAndTopmostSameAs.get("topmostSameAs") shouldBe Some(topDataset.entityId.value)
+        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
 
+        findProject(topProject.path).unsafeRunSync()       shouldBe List.empty
+        findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
+
+        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
+        middleSameAs              shouldBe topProjectDS.provenance.sameAs.some
+        middleTopmostSameAs.value shouldBe topProjectDS.provenance.sameAs.value
+
+        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
+        bottomSameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+        bottomTopmostSameAs.value shouldBe topProjectDS.provenance.sameAs.value
       }
 
-    "update the hierarchy of the datasets and remove all entities which are linked only to the current project " +
-      "of a project and the project itself - case when the removed dataset is topmost dataset in the hierarchy" in new TestCase {
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when project containing a DS which is the first in the sameAs hierarchy is removed" in new TestCase {
 
-        val projectToDelete =
-          renkuProjectEntities(anyVisibility).withDatasets(datasetEntities(provenanceInternal)).generateOne
-        val topDataset = projectToDelete.datasets.head
+        val (topProjectDS, topProject) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        val project = projectWithImportingDataset(topDataset.identification.identifier)().generateOne
-        val dataset = project.datasets.head
+        val (middleProjectDS, middleProject) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        val childProject = projectWithImportingDataset(dataset.identification.identifier)(
-          topDataset.identification.identifier
-        ).generateOne
+        val (bottomProjectDS, bottomProject) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        loadToStore(projectToDelete.asJsonLD, project.asJsonLD, childProject.asJsonLD)
-        val List(initialChildSameAs) = findDatasetSameAs(childProject.datasets.head.entityId).unsafeRunSync()
+        loadToStore(middleProject, bottomProject, topProject)
 
-        initialChildSameAs.get("sameAs")        shouldBe Some(dataset.entityId.value)
-        initialChildSameAs.get("topmostSameAs") shouldBe Some(topDataset.entityId.value)
+        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
 
-        projectTriplesRemover.removeTriples(projectToDelete.path).unsafeRunSync()
+        findProject(topProject.path).unsafeRunSync()       shouldBe List.empty
+        findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
 
-        findProject(projectToDelete.path).unsafeRunSync() shouldBe List.empty
+        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
+        middleSameAs              shouldBe None
+        middleTopmostSameAs.value shouldBe middleProjectDS.entityId.value
 
-        val List(sameAsAndTopmostSameAs) = findDatasetSameAs(dataset.entityId).unsafeRunSync()
-
-        sameAsAndTopmostSameAs.get("sameAs")        shouldBe None
-        sameAsAndTopmostSameAs.get("topmostSameAs") shouldBe Some(dataset.entityId.value)
-
-        val List(childSameAs) = findDatasetSameAs(childProject.datasets.head.entityId).unsafeRunSync()
-
-        childSameAs.get("sameAs")        shouldBe Some(dataset.entityId.value)
-        childSameAs.get("topmostSameAs") shouldBe Some(dataset.entityId.value)
+        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
+        bottomSameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+        bottomTopmostSameAs.value shouldBe middleProjectDS.entityId.value
       }
-    "update the hierarchy of the datasets and remove all entities which are linked only to the current project " +
-      "of a project and the project itself - case when the removed dataset is modified and imported in a different project" in new TestCase {
-        val topProject =
-          renkuProjectEntities(anyVisibility).withDatasets(datasetEntities(provenanceInternal)).generateOne
-        val topDataset = topProject.datasets.head
 
-        val (_ ::~ modifiedDataset, projectToDelete) = renkuProjectEntities(anyVisibility)
-          .addDatasetAndModification(datasetEntities(provenanceInternal))
-          .generateOne
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when project containing a DS which is in the middle of the sameAs hierarchy is removed" in new TestCase {
 
-        val aProject = projectWithImportingDataset(modifiedDataset.identification.identifier)(
-          topDataset.identification.identifier
-        ).generateOne
-        val dataset = aProject.datasets.head
+        val (topProjectDS, topProject) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        loadToStore(projectToDelete.asJsonLD, aProject.asJsonLD)
-        val List(initialSameAs) = findDatasetSameAs(dataset.entityId).unsafeRunSync()
+        val (middleProjectDS, middleProject) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        initialSameAs.get("sameAs")        shouldBe Some(modifiedDataset.entityId.value)
-        initialSameAs.get("topmostSameAs") shouldBe Some(topDataset.entityId.value)
+        val (bottomProjectDS, bottomProject) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        projectTriplesRemover.removeTriples(projectToDelete.path).unsafeRunSync()
+        loadToStore(middleProject, bottomProject, topProject)
 
-        findProject(projectToDelete.path).unsafeRunSync() shouldBe List.empty
+        projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
 
-        val List(sameAsAndTopmostSameAs) = findDatasetSameAs(dataset.entityId).unsafeRunSync()
+        findProject(middleProject.path).unsafeRunSync() shouldBe List.empty
 
-        sameAsAndTopmostSameAs.get("sameAs")        shouldBe None
-        sameAsAndTopmostSameAs.get("topmostSameAs") shouldBe Some(dataset.entityId.value)
+        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
+        topSameAs              shouldBe None
+        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        findDataset(middleProjectDS.entityId).unsafeRunSync() shouldBe Nil
+
+        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
+        bottomSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+        bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+      }
+
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when project containing a DS which is the last in the sameAs hierarchy is removed" in new TestCase {
+
+        val (topProjectDS, topProject) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+
+        val (middleProjectDS, middleProject) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+
+        val (bottomProjectDS, bottomProject) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
+
+        loadToStore(middleProject, bottomProject, topProject)
+
+        projectTriplesRemover.removeTriples(bottomProject.path).unsafeRunSync()
+
+        findProject(bottomProject.path).unsafeRunSync() shouldBe List.empty
+
+        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
+        topSameAs              shouldBe None
+        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
+        middleSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+        middleTopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        findDataset(bottomProjectDS.entityId).unsafeRunSync() shouldBe Nil
+      }
+
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when there are multiple direct descendants of the DS on project to be removed" in new TestCase {
+
+        val (topProjectDS, topProject) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+
+        val (middleProject1DS, middleProject1) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+
+        val (middleProject2DS, middleProject2) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+
+        val (bottomProjectDS, bottomProject) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProject1DS).generateOne
+
+        loadToStore(middleProject1, middleProject2, bottomProject, topProject)
+
+        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
+
+        findProject(topProject.path).unsafeRunSync()       shouldBe List.empty
+        findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
+
+        val newTopDS = findOutNewlyNominatedTopDS(middleProject1DS, middleProject2DS)
+
+        if (newTopDS == middleProject1DS.entityId) {
+          val Some((newTopSameAs, newTopTopmostSameAs)) = findSameAs(middleProject1DS.entityId).unsafeRunSync()
+          newTopSameAs              shouldBe None
+          newTopTopmostSameAs.value shouldBe middleProject1DS.entityId.value
+
+          val Some((otherMiddleSameAs, otherMiddleTopmostSameAs)) =
+            findSameAs(middleProject2DS.entityId).unsafeRunSync()
+          otherMiddleSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
+          otherMiddleTopmostSameAs.value shouldBe middleProject1DS.entityId.value
+
+          val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
+          bottomSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
+          bottomTopmostSameAs.value shouldBe middleProject1DS.entityId.value
+        } else if (newTopDS == middleProject2DS.entityId) {
+          val Some((newTopSameAs, newTopTopmostSameAs)) = findSameAs(middleProject2DS.entityId).unsafeRunSync()
+          newTopSameAs              shouldBe None
+          newTopTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+
+          val Some((otherMiddleSameAs, otherMiddleTopmostSameAs)) =
+            findSameAs(middleProject1DS.entityId).unsafeRunSync()
+          otherMiddleSameAs.map(_.value) shouldBe middleProject2DS.entityId.value.some
+          otherMiddleTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+
+          val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
+          bottomSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
+          bottomTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+        } else fail("No descendant DS has been nominated as the new top DS")
+      }
+
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when there are multiple direct descendants of the DS on project to be removed " +
+      "and some of the descendants have been modified" in new TestCase {
+
+        val (topProjectDS, topProject) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+
+        val (middleProject1DS, middleProject1BeforeModif) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+        val (middleProject1ModifDS, middleProject1) =
+          middleProject1BeforeModif.addDataset(middleProject1DS.createModification())
+
+        val (middleProject2DS, middleProject2) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+
+        val (bottomProjectDS, bottomProject) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProject1DS).generateOne
+
+        loadToStore(topProject, middleProject1, middleProject2, bottomProject)
+
+        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
+
+        findProject(topProject.path).unsafeRunSync()       shouldBe List.empty
+        findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
+
+        val Some((middleProject1DSSameAs, middleProject1DSTopmostSameAs)) =
+          findSameAs(middleProject1DS.entityId).unsafeRunSync()
+        middleProject1DSSameAs.map(_.value) shouldBe middleProject2DS.entityId.value.some
+        middleProject1DSTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+
+        val Some((middleProject1ModifDSSameAs, middleProject1ModifDSTopmostSameAs)) =
+          findSameAs(middleProject1ModifDS.entityId).unsafeRunSync()
+        middleProject1ModifDSSameAs              shouldBe None
+        middleProject1ModifDSTopmostSameAs.value shouldBe middleProject1ModifDS.entityId.value
+
+        val Some((newTopSameAs, newTopTopmostSameAs)) = findSameAs(middleProject2DS.entityId).unsafeRunSync()
+        newTopSameAs              shouldBe None
+        newTopTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+
+        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
+        // It's a question if this SameAs should be middleProject2DS too.
+        // However, leaving things this way preserves the 'real' import hierarchy and middleProject1DS points to the new top DS anyway.
+        bottomSameAs.map(_.value) shouldBe middleProject1DS.entityId.value.some
+        bottomTopmostSameAs.value shouldBe middleProject2DS.entityId.value
+      }
+
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when project containing a fork and containing a DS which is the top in the sameAs hierarchy is removed" in new TestCase {
+
+        val (topProjectDS, topProjectBeforeForking) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+
+        val (topProject, topProjectFork) = topProjectBeforeForking.forkOnce()
+
+        val (bottomProjectDS, bottomProject) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+
+        loadToStore(bottomProject.asJsonLD, topProject.asJsonLD, topProjectFork.asJsonLD)
+
+        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
+
+        findProject(topProject.path).unsafeRunSync()        shouldBe List.empty
+        findProject(topProjectFork.path).unsafeRunSync().size should be > 0
+
+        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
+        topSameAs              shouldBe None
+        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
+        bottomSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+        bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+      }
+
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when project containing a fork and containing a DS which is the middle in the sameAs hierarchy is removed" in new TestCase {
+
+        val (topProjectDS, topProject) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+
+        val (middleProjectDS, middleProjectBeforeForking) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+
+        val (middleProject, middleProjectFork) = middleProjectBeforeForking.forkOnce()
+
+        val (bottomProjectDS, bottomProject) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
+
+        loadToStore(topProject.asJsonLD, middleProject.asJsonLD, middleProjectFork.asJsonLD, bottomProject.asJsonLD)
+
+        projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
+
+        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
+        topSameAs              shouldBe None
+        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        findProject(middleProject.path).unsafeRunSync()        shouldBe List.empty
+        findProject(middleProjectFork.path).unsafeRunSync().size should be > 0
+
+        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
+        middleSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+        middleTopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
+        bottomSameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+        bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+      }
+
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when both the project and its fork get deleted" in new TestCase {
+
+        val (topProjectDS, topProject) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+
+        val (middleProjectDS, middleProjectBeforeForking) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+
+        val (middleProject, middleProjectFork) = middleProjectBeforeForking.forkOnce()
+
+        val (bottomProjectDS, bottomProject) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
+
+        loadToStore(topProject.asJsonLD, middleProject.asJsonLD, middleProjectFork.asJsonLD, bottomProject.asJsonLD)
+
+        projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
+        projectTriplesRemover.removeTriples(middleProjectFork.path).unsafeRunSync()
+
+        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
+        topSameAs              shouldBe None
+        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        findProject(middleProject.path).unsafeRunSync()      shouldBe List.empty
+        findProject(middleProjectFork.path).unsafeRunSync()  shouldBe List.empty
+        findSameAs(middleProjectDS.entityId).unsafeRunSync() shouldBe None
+
+        val Some((bottomSameAs, bottomTopmostSameAs)) = findSameAs(bottomProjectDS.entityId).unsafeRunSync()
+        bottomSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+        bottomTopmostSameAs.value shouldBe topProjectDS.entityId.value
+      }
+
+    "remove the project and all entities which are linked to it " +
+      "and update the sameAs hierarchy " +
+      "when project containing a fork and a DS with multiple direct descendants is removed" in new TestCase {
+
+        val (topProjectDS, topProject) =
+          renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceInternal)).generateOne
+
+        val (middleProjectDS, middleProjectBeforeForking) =
+          renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
+
+        val (middleProject, middleProjectFork) = middleProjectBeforeForking.forkOnce()
+
+        val (bottomProject1DS, bottomProject1) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
+
+        val (bottomProject2DS, bottomProject2) =
+          renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
+
+        loadToStore(topProject, middleProject, middleProjectFork, bottomProject1, bottomProject2)
+
+        projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
+
+        val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
+        topSameAs              shouldBe None
+        topTopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        findProject(middleProject.path).unsafeRunSync()        shouldBe List.empty
+        findProject(middleProjectFork.path).unsafeRunSync().size should be > 0
+
+        val Some((middleSameAs, middleTopmostSameAs)) = findSameAs(middleProjectDS.entityId).unsafeRunSync()
+        middleSameAs.map(_.value) shouldBe topProjectDS.entityId.value.some
+        middleTopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        val Some((bottom1SameAs, bottom1TopmostSameAs)) = findSameAs(bottomProject1DS.entityId).unsafeRunSync()
+        bottom1SameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+        bottom1TopmostSameAs.value shouldBe topProjectDS.entityId.value
+
+        val Some((bottom2SameAs, bottom2TopmostSameAs)) = findSameAs(bottomProject2DS.entityId).unsafeRunSync()
+        bottom2SameAs.map(_.value) shouldBe middleProjectDS.entityId.value.some
+        bottom2TopmostSameAs.value shouldBe topProjectDS.entityId.value
       }
   }
 
-  private def projectWithImportingDataset(sameAs:         Identifier,
-                                          minDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
-  )(topmostSameAs:                                        Identifier = sameAs) =
-    renkuProjectEntities(anyVisibility, minDateCreated)
-      .withDatasets(
-        datasetEntities(
-          provenanceImportedInternalAncestorInternal(
-            datasetInternalSameAsFrom(fixed(renkuBaseUrl), fixed(sameAs)).generateOne,
-            datasetInternalSameAsFrom(fixed(renkuBaseUrl), fixed(topmostSameAs))
-              .map(sameAs => TopmostSameAs(sameAs.value))
-              .generateOne
-          )
-        )
-      )
+  private def findAllData = runQuery(s"""SELECT ?s ?p ?o WHERE { ?s ?p ?o }""").map(_.map(_.values.toList))
 
-  private def findAllData = runQuery(s"""SELECT ?s ?p ?o WHERE { ?s ?p ?o .}""")
   private def findProject(projectPath: projects.Path) = runQuery(
-    s"""SELECT ?p ?o WHERE { 
-       <$renkuBaseUrl/projects/$projectPath> ?p ?o .
-       } """
-  )
-  private def findDatasetSameAs(datasetId: EntityId) = runQuery(
-    s"""SELECT ?sameAs ?topmostSameAs WHERE {
-        <$datasetId> renku:topmostSameAs ?topmostSameAs . 
-        OPTIONAL {<$datasetId> schema:sameAs/schema:url ?sameAs .}                                  
+    s"""SELECT ?p ?o 
+        WHERE { 
+          <$renkuBaseUrl/projects/$projectPath> ?p ?o .
+        } """
+  ).map(_.map(_.values.toList))
+
+  private def findDataset(datasetId: EntityId) = runQuery(
+    s"""SELECT ?p ?o 
+        WHERE { 
+          <$datasetId> ?p ?o .
+        } """
+  ).map(_.map(_.values.toList))
+
+  private def findSameAs(datasetId: EntityId): IO[Option[(Option[datasets.SameAs], TopmostSameAs)]] = runQuery(
+    s"""SELECT ?sameAs ?topmostSameAs 
+        WHERE {
+          <$datasetId> renku:topmostSameAs ?topmostSameAs . 
+          OPTIONAL {<$datasetId> schema:sameAs/schema:url ?sameAs .}                                  
         }
        """
-  )
+  ) map {
+    case Nil => None
+    case props :: Nil =>
+      Some(props.get("sameAs").map(datasets.SameAs) -> datasets.TopmostSameAs(props("topmostSameAs")))
+    case _ => fail(s"There multiple (SameAs, TopmostSameAs) tuples for the DS $datasetId")
+  }
+
   private trait TestCase {
-    implicit val logger:               TestLogger[IO]              = TestLogger[IO]()
+    private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](rdfStoreConfig, renkuBaseUrl)
   }
+
+  private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance]): EntityId =
+    findSameAs(ds1.entityId).unsafeRunSync() match {
+      case Some(None -> _) => ds1.entityId
+      case Some(Some(_) -> _) =>
+        findSameAs(ds2.entityId).unsafeRunSync() match {
+          case Some(None -> _) => ds2.entityId
+          case _               => fail("No descendant DS has been nominated")
+        }
+      case None => fail("No descendant DS has been nominated")
+    }
 }

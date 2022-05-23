@@ -20,8 +20,8 @@ package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.Show
 import cats.syntax.all._
+import io.renku.config.ServiceVersion
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.http.server.version.ServiceVersion
 
 private final case class MigrationRequestEvent(subscriberUrl: SubscriberUrl, subscriberVersion: ServiceVersion)
 

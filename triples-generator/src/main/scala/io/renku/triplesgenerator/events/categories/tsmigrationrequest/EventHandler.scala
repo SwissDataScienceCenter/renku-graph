@@ -25,13 +25,13 @@ import cats.effect.{Async, Concurrent}
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.circe.Json
+import io.renku.config.ServiceVersion
 import io.renku.data.ErrorMessage
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionMechanism}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
 import io.renku.rdfstore.SparqlQueryTimeRecorder

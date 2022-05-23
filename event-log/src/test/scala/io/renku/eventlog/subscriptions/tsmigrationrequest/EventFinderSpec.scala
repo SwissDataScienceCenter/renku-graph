@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.effect.IO
 import cats.syntax.all._
+import io.renku.config.ServiceVersion
 import io.renku.db.SqlStatement
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigrationGenerators.changeDates
@@ -28,7 +29,6 @@ import io.renku.events.consumers.subscriptions.{SubscriberUrl, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory

@@ -34,7 +34,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import tooling.UpdateQueryMigration
 
-class DeDuplicateModifiedDSDataSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MultipleModifiedDSDataSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
 
   "query" should {
 
@@ -50,7 +50,7 @@ class DeDuplicateModifiedDSDataSpec extends AnyWordSpec with should.Matchers wit
 
           val breakingModification = modifiedDS.copy(provenance =
             modifiedDS.provenance.copy(
-              initialVersion = datasets.InitialVersion(modifiedDS.identifier),
+              originalIdentifier = datasets.OriginalIdentifier(modifiedDS.identifier),
               topmostDerivedFrom =
                 datasets.TopmostDerivedFrom(datasets.DerivedFrom(Dataset.entityId(modifiedDS.identifier)))
             )
@@ -69,7 +69,7 @@ class DeDuplicateModifiedDSDataSpec extends AnyWordSpec with should.Matchers wit
 
           val breakingModification = modifiedDS.copy(provenance =
             modifiedDS.provenance.copy(
-              initialVersion = datasets.InitialVersion(modifiedDS.identifier),
+              originalIdentifier = datasets.OriginalIdentifier(modifiedDS.identifier),
               topmostDerivedFrom =
                 datasets.TopmostDerivedFrom(datasets.DerivedFrom(Dataset.entityId(modifiedDS.identifier)))
             )
@@ -107,15 +107,19 @@ class DeDuplicateModifiedDSDataSpec extends AnyWordSpec with should.Matchers wit
         findTopmostDerivedFrom(project3DS.identification.identifier).size  shouldBe 1
         findTopmostSameAs(project3DS.identification.identifier).size       shouldBe 1
 
-        runUpdate(DeDuplicateModifiedDSData.query).unsafeRunSync() shouldBe ()
+        runUpdate(MultipleModifiedDSData.query).unsafeRunSync() shouldBe ()
 
-        findOriginalIdentifiers(project1DS.identification.identifier) shouldBe Set(project1DS.provenance.initialVersion)
+        findOriginalIdentifiers(project1DS.identification.identifier) shouldBe Set(
+          project1DS.provenance.originalIdentifier
+        )
         findTopmostDerivedFrom(project1DS.identification.identifier) shouldBe Set(
           project1DS.provenance.topmostDerivedFrom
         )
         findTopmostSameAs(project1DS.identification.identifier) shouldBe Set(project1DS.provenance.topmostSameAs)
 
-        findOriginalIdentifiers(project2DS.identification.identifier) shouldBe Set(project2DS.provenance.initialVersion)
+        findOriginalIdentifiers(project2DS.identification.identifier) shouldBe Set(
+          project2DS.provenance.originalIdentifier
+        )
         findTopmostDerivedFrom(project2DS.identification.identifier) shouldBe Set(
           project2DS.provenance.topmostDerivedFrom
         )
@@ -132,11 +136,11 @@ class DeDuplicateModifiedDSDataSpec extends AnyWordSpec with should.Matchers wit
       implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
       implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
       implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
-      DeDuplicateModifiedDSData[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
+      MultipleModifiedDSData[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }
   }
 
-  private def findOriginalIdentifiers(id: datasets.Identifier): Set[datasets.InitialVersion] =
+  private def findOriginalIdentifiers(id: datasets.Identifier): Set[datasets.OriginalIdentifier] =
     runQuery(s"""|SELECT ?original 
                  |WHERE { 
                  |  ?id a schema:Dataset;
@@ -144,7 +148,7 @@ class DeDuplicateModifiedDSDataSpec extends AnyWordSpec with should.Matchers wit
                  |  renku:originalIdentifier ?original
                  |}""".stripMargin)
       .unsafeRunSync()
-      .map(row => datasets.InitialVersion(row("original")))
+      .map(row => datasets.OriginalIdentifier(row("original")))
       .toSet
 
   private def findTopmostDerivedFrom(id: datasets.Identifier): Set[datasets.TopmostDerivedFrom] =

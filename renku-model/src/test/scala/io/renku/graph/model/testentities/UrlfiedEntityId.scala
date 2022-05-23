@@ -33,7 +33,7 @@ final case class UrlfiedEntityId(value: String) extends EntityId with UrlTinyTyp
 
 object UrlfiedEntityId
     extends TinyTypeFactory[UrlfiedEntityId](new UrlfiedEntityId(_))
-    with Url
+    with Url[UrlfiedEntityId]
     with UrlOps[UrlfiedEntityId]
     with UrlResourceRenderer[UrlfiedEntityId] {
 

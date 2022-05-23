@@ -45,21 +45,23 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: Logger](
     executionTimeRecorder:      ExecutionTimeRecorder[F]
 ) extends MembersSynchronizer[F] {
 
+  import accessTokenFinder._
   import executionTimeRecorder._
   import io.renku.graph.tokenrepository.AccessTokenFinder._
 
   override def synchronizeMembers(projectPath: projects.Path): F[Unit] = measureExecutionTime {
-    for {
-      maybeAccessToken <- accessTokenFinder.findAccessToken(projectPath)
-      membersInGitLab  <- gitLabProjectMembersFinder.findProjectMembers(projectPath)(maybeAccessToken)
-      membersInKG      <- kGProjectMembersFinder.findProjectMembers(projectPath)
-      membersToAdd = findMembersToAdd(membersInGitLab, membersInKG)
-      membersToAddWithIds <- kGPersonFinder.findPersonIds(membersToAdd)
-      insertionUpdates = updatesCreator.insertion(projectPath, membersToAddWithIds)
-      membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
-      removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
-      _ <- (insertionUpdates ::: removalUpdates).map(querySender.send).sequence
-    } yield SyncSummary(projectPath, membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
+    findAccessToken(projectPath) >>= { implicit maybeAccessToken =>
+      for {
+        membersInGitLab <- gitLabProjectMembersFinder.findProjectMembers(projectPath)
+        membersInKG     <- kGProjectMembersFinder.findProjectMembers(projectPath)
+        membersToAdd = findMembersToAdd(membersInGitLab, membersInKG)
+        membersToAddWithIds <- kGPersonFinder.findPersonIds(membersToAdd)
+        insertionUpdates = updatesCreator.insertion(projectPath, membersToAddWithIds)
+        membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
+        removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
+        _ <- (insertionUpdates ::: removalUpdates).map(querySender.send).sequence
+      } yield SyncSummary(projectPath, membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
+    }
   } flatMap logSummary recoverWith { case NonFatal(exception) =>
     Logger[F].error(exception)(s"$categoryName: Members synchronized for project $projectPath FAILED")
   }

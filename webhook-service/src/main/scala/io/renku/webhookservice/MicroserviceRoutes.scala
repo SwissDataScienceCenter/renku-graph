@@ -21,10 +21,9 @@ package io.renku.webhookservice
 import cats.MonadThrow
 import cats.effect.{Async, Clock, Resource}
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
 import io.renku.graph.http.server.binders.ProjectId
 import io.renku.graph.http.server.security.GitLabAuthenticator
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
@@ -83,22 +82,22 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
 private object MicroserviceRoutes {
   def apply[F[_]: Async: Logger: MetricsRegistry](
-      gitLabThrottler:       Throttler[F, GitLab],
+      gitLabClient:          GitLabClient[F],
       executionTimeRecorder: ExecutionTimeRecorder[F]
   ): F[MicroserviceRoutes[F]] = for {
     projectHookUrl      <- ProjectHookUrl.fromConfig[F]()
     hookTokenCrypto     <- HookTokenCrypto[F]()
     hookEventEndpoint   <- HookEventEndpoint(hookTokenCrypto)
-    hookCreatorEndpoint <- HookCreationEndpoint(projectHookUrl, gitLabThrottler, hookTokenCrypto)
+    hookCreatorEndpoint <- HookCreationEndpoint(projectHookUrl, gitLabClient, hookTokenCrypto)
     processingStatusEndpoint <-
       eventprocessing.ProcessingStatusEndpoint(
         projectHookUrl,
-        gitLabThrottler,
+        gitLabClient,
         executionTimeRecorder
       )
-    hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl, gitLabThrottler)
-    hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl, gitLabThrottler)
-    authenticator          <- GitLabAuthenticator(gitLabThrottler)
+    hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl, gitLabClient)
+    hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl, gitLabClient)
+    authenticator          <- GitLabAuthenticator(gitLabClient)
     authMiddleware         <- Authentication.middleware(authenticator)
     versionRoutes          <- version.Routes[F]
   } yield new MicroserviceRoutes[F](

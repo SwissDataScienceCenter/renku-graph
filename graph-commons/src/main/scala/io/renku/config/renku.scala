@@ -27,7 +27,7 @@ object renku {
   class ResourcesUrl private (val value: String) extends AnyVal with UrlTinyType
   object ResourcesUrl
       extends TinyTypeFactory[ResourcesUrl](new ResourcesUrl(_))
-      with Url
+      with Url[ResourcesUrl]
       with BaseUrl[ResourcesUrl, ResourceUrl] {
     import ConfigLoader._
     import com.typesafe.config.{Config, ConfigFactory}
@@ -40,5 +40,8 @@ object renku {
   }
 
   class ResourceUrl private (val value: String) extends AnyVal with UrlTinyType
-  implicit object ResourceUrl extends TinyTypeFactory[ResourceUrl](new ResourceUrl(_)) with Url with UrlOps[ResourceUrl]
+  implicit object ResourceUrl
+      extends TinyTypeFactory[ResourceUrl](new ResourceUrl(_))
+      with Url[ResourceUrl]
+      with UrlOps[ResourceUrl]
 }

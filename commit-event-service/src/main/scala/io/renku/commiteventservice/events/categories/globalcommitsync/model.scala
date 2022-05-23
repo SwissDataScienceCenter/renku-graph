@@ -38,7 +38,7 @@ private object GlobalCommitSyncEvent {
 }
 
 final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
-object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong {
+object CommitsCount extends TinyTypeFactory[CommitsCount](new CommitsCount(_)) with NonNegativeLong[CommitsCount] {
   import io.circe.Decoder
   import io.renku.tinytypes.json.TinyTypeDecoders.longDecoder
 

@@ -22,8 +22,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import eu.timepit.refined.auto._
+import io.renku.config.ServiceVersion
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionMechanism}
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
 import io.renku.rdfstore.SparqlQueryTimeRecorder

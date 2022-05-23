@@ -22,13 +22,15 @@ import cats.Applicative
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.http.client.{AccessToken, GitLabClient}
+import io.circe.Json
+import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.http.client.{AccessToken, GitLabClient}
+import org.http4s.Method.{DELETE, GET, POST}
 import org.http4s.{Method, Uri}
 import org.scalacheck.Gen
 import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
-import io.renku.generators.Generators.Implicits._
 
 trait GitLabClientTools[F[_]] {
   self: MockFactory =>
@@ -36,17 +38,37 @@ trait GitLabClientTools[F[_]] {
   def captureMapping[FinderType, ResultType, A](finder: FinderType, gitLabClient: GitLabClient[F])(
       findingMethod:                                    FinderType => A,
       resultGenerator:                                  Gen[ResultType],
+      method:                                           Method = GET,
       expectedNumberOfCalls:                            Int = 1
   )(implicit applicative:                               Applicative[F]): ResponseMappingF[F, ResultType] = {
     val responseMapping = CaptureOne[ResponseMappingF[F, ResultType]]()
 
-    (gitLabClient
-      .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
-        _: Option[AccessToken]
-      ))
-      .expects(*, *, *, capture(responseMapping), *)
-      .returning(resultGenerator.generateOne.pure[F])
-      .repeat(expectedNumberOfCalls)
+    method match {
+      case GET =>
+        (gitLabClient
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
+            _: Option[AccessToken]
+          ))
+          .expects(*, *, capture(responseMapping), *)
+          .returning(resultGenerator.generateOne.pure[F])
+          .repeat(expectedNumberOfCalls)
+      case POST =>
+        (gitLabClient
+          .post(_: Uri, _: String Refined NonEmpty, _: Json)(_: ResponseMappingF[F, ResultType])(
+            _: Option[AccessToken]
+          ))
+          .expects(*, *, *, capture(responseMapping), *)
+          .returning(resultGenerator.generateOne.pure[F])
+          .repeat(expectedNumberOfCalls)
+      case DELETE =>
+        (gitLabClient
+          .delete(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
+            _: Option[AccessToken]
+          ))
+          .expects(*, *, capture(responseMapping), *)
+          .returning(resultGenerator.generateOne.pure[F])
+          .repeat(expectedNumberOfCalls)
+    }
 
     findingMethod(finder)
     responseMapping.value

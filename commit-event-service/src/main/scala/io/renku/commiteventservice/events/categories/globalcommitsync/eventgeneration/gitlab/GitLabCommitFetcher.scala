@@ -29,7 +29,6 @@ import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.Page
-import org.http4s.Method.GET
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
@@ -56,18 +55,16 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
 
   override def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
       maybeAccessToken:                           Option[AccessToken]
-  ): F[Option[CommitId]] = send(
-    GET,
+  ): F[Option[CommitId]] = get(
     uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
-    "latest commit"
+    "latest-commit"
   )(mapLatestCommit(projectId))
 
   override def fetchGitLabCommits(
       projectId:               projects.Id,
       dateCondition:           DateCondition,
       pageRequest:             PagingRequest
-  )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = send(
-    GET,
+  )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = get(
     uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
       "page"     -> pageRequest.page.show,
       "per_page" -> pageRequest.perPage.show

@@ -220,17 +220,17 @@ class BaseUrlSpec extends AnyWordSpec with should.Matchers {
 private object UrlTypes {
 
   class UrlType private (val value: String) extends AnyVal with UrlTinyType
-  object UrlType extends TinyTypeFactory[UrlType](new UrlType(_)) with Url with UrlOps[UrlType]
+  object UrlType extends TinyTypeFactory[UrlType](new UrlType(_)) with Url[UrlType] with UrlOps[UrlType]
 
   class BaseUrlType private (val value: String) extends AnyVal with UrlTinyType
   object BaseUrlType
       extends TinyTypeFactory[BaseUrlType](new BaseUrlType(_))
-      with Url
+      with Url[BaseUrlType]
       with BaseUrl[BaseUrlType, ExtendedUrlType]
 
   class ExtendedUrlType private (val value: String) extends AnyVal with UrlTinyType
   implicit object ExtendedUrlType
       extends TinyTypeFactory[ExtendedUrlType](new ExtendedUrlType(_))
-      with Url
+      with Url[ExtendedUrlType]
       with UrlOps[ExtendedUrlType]
 }

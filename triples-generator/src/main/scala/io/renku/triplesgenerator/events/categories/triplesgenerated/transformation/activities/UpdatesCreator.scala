@@ -27,27 +27,24 @@ import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
-  def queriesUnlinkingAuthor(activity: entities.Activity, maybeKgAuthor: Option[persons.ResourceId]): List[SparqlQuery]
-  def queriesUnlinkingAgent(activity:  entities.Activity, maybeKgAuthor: Option[persons.ResourceId]): List[SparqlQuery]
+  def queriesUnlinkingAuthors(activity: entities.Activity, kgAuthors: Set[persons.ResourceId]): List[SparqlQuery]
+  def queriesUnlinkingAgents(activity:  entities.Activity, kgAgents:  Set[persons.ResourceId]): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
 
-  override def queriesUnlinkingAuthor(activity:      Activity,
-                                      maybeKgAuthor: Option[persons.ResourceId]
-  ): List[SparqlQuery] = {
+  override def queriesUnlinkingAuthors(activity: Activity, kgAuthors: Set[persons.ResourceId]): List[SparqlQuery] = {
     val activityAuthor = activity.author.resourceId
     Option
-      .when(maybeKgAuthor.exists(_ != activityAuthor)) {
+      .when((kgAuthors.size > 1) || !(kgAuthors forall (_ == activityAuthor))) {
         SparqlQuery.of(
           name = "transformation - delete activity author link",
           Prefixes of (schema -> "schema", prov -> "prov"),
-          s"""|DELETE {
-              |  ${activity.resourceId.showAs[RdfResource]} prov:wasAssociatedWith ?personId
-              |}
+          s"""|DELETE { ?activityId prov:wasAssociatedWith ?personId }
               |WHERE {
-              |  ${activity.resourceId.showAs[RdfResource]} a prov:Activity;
-              |                                             prov:wasAssociatedWith ?personId.
+              |  BIND (${activity.resourceId.showAs[RdfResource]} AS ?activityId)
+              |  ?activityId a prov:Activity;
+              |              prov:wasAssociatedWith ?personId.
               |  ?personId a schema:Person.
               |}
               |""".stripMargin
@@ -56,21 +53,20 @@ private object UpdatesCreator extends UpdatesCreator {
       .toList
   }
 
-  override def queriesUnlinkingAgent(activity: Activity, maybeKgAgent: Option[persons.ResourceId]): List[SparqlQuery] =
+  override def queriesUnlinkingAgents(activity: Activity, kgAgents: Set[persons.ResourceId]): List[SparqlQuery] =
     activity.association match {
       case _:     Association.WithRenkuAgent => List.empty
       case assoc: Association.WithPersonAgent =>
         Option
-          .when(maybeKgAgent.exists(_ != assoc.agent.resourceId)) {
+          .when((kgAgents.size > 1) || !(kgAgents forall (_ == assoc.agent.resourceId))) {
             SparqlQuery.of(
               name = "transformation - delete association agent link",
               Prefixes of (schema -> "schema", prov -> "prov"),
-              s"""|DELETE {
-                  |  ${assoc.resourceId.showAs[RdfResource]} prov:agent ?agentId
-                  |}
+              s"""|DELETE { ?assocId prov:agent ?agentId }
                   |WHERE {
-                  |  ${assoc.resourceId.showAs[RdfResource]} a prov:Association;
-                  |                                          prov:agent ?agentId.
+                  |  BIND (${assoc.resourceId.showAs[RdfResource]} AS ?assocId)
+                  |  ?assocId a prov:Association;
+                  |           prov:agent ?agentId.
                   |  ?agentId a schema:Person.
                   |}
                   |""".stripMargin

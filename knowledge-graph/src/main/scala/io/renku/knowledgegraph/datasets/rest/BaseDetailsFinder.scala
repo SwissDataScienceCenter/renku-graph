@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.circe.{DecodingFailure, HCursor}
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import io.renku.graph.model.projects
@@ -46,13 +46,16 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   import BaseDetailsFinderImpl._
   import io.renku.graph.model.Schemas._
 
-  def findBaseDetails(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] =
-    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier, authContext)) >>= toSingleDataset
+  def findBaseDetails(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] = {
+    implicit val decoder: Decoder[Option[Dataset]] = maybeDatasetDecoder(identifier)
+    queryExpecting[Option[Dataset]](using = queryForDatasetDetails(identifier, authContext))
+  }
 
   private def queryForDatasetDetails(identifier: Identifier, authContext: AuthContext[Identifier]) = SparqlQuery.of(
     name = "ds by id - details",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?maybeDateCreated ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName
+    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?maybeDateCreated ?slug 
+        |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName
         |WHERE {        
         |  {
         |    SELECT ?projectId ?projectPath ?projectName
@@ -125,13 +128,6 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |ORDER BY ASC(?position)
         |""".stripMargin
   )
-
-  private lazy val toSingleDataset: List[Dataset] => F[Option[Dataset]] = {
-    case Nil            => Option.empty[Dataset].pure[F]
-    case dataset :: Nil => Option(dataset).pure[F]
-    case dataset :: _ =>
-      new Exception(s"More than one dataset with ${dataset.id} id").raiseError[F, Option[Dataset]]
-  }
 }
 
 private object BaseDetailsFinder {
@@ -146,6 +142,7 @@ private object BaseDetailsFinderImpl {
   import Decoder._
   import io.renku.graph.model.datasets._
   import io.renku.knowledgegraph.datasets.model._
+  import io.renku.rdfstore.ResultsDecoder._
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private lazy val createDataset: (ResourceId,
@@ -154,7 +151,7 @@ private object BaseDetailsFinderImpl {
                                    Name,
                                    Option[DerivedFrom],
                                    SameAs,
-                                   InitialVersion,
+                                   OriginalIdentifier,
                                    Date,
                                    Option[Description],
                                    DatasetProject
@@ -200,8 +197,8 @@ private object BaseDetailsFinderImpl {
       ).asLeft[Dataset]
   }
 
-  private[rest] implicit lazy val datasetsDecoder: Decoder[List[Dataset]] = {
-    val dataset: Decoder[Dataset] = { implicit cursor =>
+  private[rest] def maybeDatasetDecoder(dsId: Identifier): Decoder[Option[Dataset]] =
+    ResultsDecoder[Option, Dataset] { implicit cursor =>
       for {
         resourceId       <- extract[ResourceId]("datasetId")
         identifier       <- extract[Identifier]("identifier")
@@ -209,7 +206,7 @@ private object BaseDetailsFinderImpl {
         name             <- extract[Name]("slug")
         maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs           <- extract[SameAs]("topmostSameAs")
-        initialVersion   <- extract[InitialVersion]("initialVersion")
+        initialVersion   <- extract[OriginalIdentifier]("initialVersion")
         date <- maybeDerivedFrom match {
                   case Some(_) => extract[DateCreated]("maybeDateCreated").widen[Date]
                   case _ =>
@@ -235,27 +232,13 @@ private object BaseDetailsFinderImpl {
                                  DatasetProject(projectPath, projectName)
                    )
       } yield dataset
-    }
+    }(toOption(show"More than one dataset with $dsId id"))
 
-    _.downField("results").downField("bindings").as(decodeList(dataset))
+  private implicit lazy val keywordsDecoder: Decoder[List[Keyword]] = ResultsDecoder[List, Keyword] { implicit cur =>
+    extract("keyword")
   }
 
-  private implicit lazy val keywordsDecoder: Decoder[List[Keyword]] = {
-
-    implicit val keywordDecoder: Decoder[Keyword] =
-      _.downField("keyword").downField("value").as[String].map(Keyword.apply)
-
-    _.downField("results").downField("bindings").as(decodeList[Keyword])
+  private implicit lazy val imagesDecoder: Decoder[List[ImageUri]] = ResultsDecoder[List, ImageUri] { implicit cur =>
+    extract("contentUrl")
   }
-
-  private implicit lazy val imagesDecoder: Decoder[List[ImageUri]] = {
-
-    implicit val imageDecoder: Decoder[ImageUri] =
-      _.downField("contentUrl").downField("value").as[String].map(ImageUri.apply)
-
-    _.downField("results").downField("bindings").as(decodeList[ImageUri])
-  }
-
-  private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
-    cursor.downField(property).downField("value").as[T]
 }

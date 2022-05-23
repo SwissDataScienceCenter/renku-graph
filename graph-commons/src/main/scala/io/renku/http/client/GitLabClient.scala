@@ -18,11 +18,12 @@
 
 package io.renku.http.client
 
-import cats.effect.Async
+import cats.effect.{Async, IO}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
+import io.circe.Json
 import io.renku.config.GitLab
 import io.renku.control.Throttler
 import io.renku.graph.config.GitLabUrlLoader
@@ -30,18 +31,27 @@ import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.metrics.{GitLabApiCallRecorder, MetricsRegistry}
-import org.http4s.{Method, Uri}
+import org.http4s.Method.{DELETE, GET, POST}
+import org.http4s.circe.{jsonEncoder, jsonEncoderOf}
+import org.http4s.{EntityEncoder, Method, Uri}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait GitLabClient[F[_]] {
 
-  def send[ResultType](method: Method, path: Uri, endpointName: String Refined NonEmpty)(
+  def get[ResultType](path:    Uri, endpointName: String Refined NonEmpty)(
       mapResponse:             ResponseMappingF[F, ResultType]
-  )(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): F[ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
+
+  def post[ResultType](path:   Uri, endpointName: String Refined NonEmpty, payload: Json)(
+      mapResponse:             ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
+
+  def delete[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
+      mapResponse:             ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType]
+
 }
 
 final class GitLabClientImpl[F[_]: Async: Logger](
@@ -59,15 +69,35 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     )
     with GitLabClient[F] {
 
-  def send[ResultType](method: Method, path: Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:             ResponseMapping[ResultType]
+  def get[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
+      mapResponse:          ResponseMapping[ResultType]
   )(implicit
       maybeAccessToken: Option[AccessToken]
   ): F[ResultType] = for {
     uri     <- validateUri(show"$gitLabApiUrl/$path")
-    request <- secureNamedRequest(method, uri, endpointName)
+    request <- secureNamedRequest(GET, uri, endpointName)
     result  <- super.send(request)(mapResponse)
   } yield result
+
+  def post[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Json)(
+      mapResponse:           ResponseMappingF[F, ResultType]
+  )(implicit
+      maybeAccessToken: Option[AccessToken]
+  ): F[ResultType] = for {
+    uri     <- validateUri(show"$gitLabApiUrl/$path")
+    request <- secureNamedRequest(uri, endpointName, payload)
+    result  <- super.send(request)(mapResponse)
+  } yield result
+
+  override def delete[ResultType](path: Uri, endpointName: Refined[String, NonEmpty])(
+      mapResponse:                      ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken:          Option[AccessToken]): F[ResultType] = for {
+    uri     <- validateUri(show"$gitLabApiUrl/$path")
+    request <- secureNamedRequest(DELETE, uri, endpointName)
+    result  <- super.send(request)(mapResponse)
+  } yield result
+
+  protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
 
   private def secureNamedRequest(method: Method, uri: Uri, endpointName: String Refined NonEmpty)(implicit
       maybeAccessToken:                  Option[AccessToken]
@@ -75,6 +105,13 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     super.secureRequest(method, uri),
     endpointName
   ).pure[F]
+
+  private def secureNamedRequest(uri: Uri, endpointName: String Refined NonEmpty, payload: Json)(implicit
+      maybeAccessToken:               Option[AccessToken]
+  ): F[NamedRequest[F]] =
+    secureNamedRequest(POST, uri, endpointName).map(originalRequest =>
+      originalRequest.copy(request = originalRequest.request.withEntity(payload))
+    )
 
 }
 

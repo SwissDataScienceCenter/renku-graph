@@ -20,39 +20,31 @@ package io.renku.webhookservice.hookcreation.project
 
 import cats.effect.{Async, MonadCancelThrow}
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.Throttler
-import io.renku.graph.config.GitLabUrlLoader
+import eu.timepit.refined.auto._
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.projects.Visibility.Public
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.client.{AccessToken, RestClient}
+import io.renku.http.client.{AccessToken, GitLabClient}
+import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private[hookcreation] trait ProjectInfoFinder[F[_]] {
-  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[ProjectInfo]
+  def findProjectInfo(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo]
 }
 
-private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: Logger](
-    gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[F, GitLab]
-) extends RestClient(gitLabThrottler)
-    with ProjectInfoFinder[F] {
+private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: Logger](gitLabClient: GitLabClient[F])
+    extends ProjectInfoFinder[F] {
 
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
   import io.renku.tinytypes.json.TinyTypeDecoders._
-  import org.http4s.Method.GET
   import org.http4s.Status.Unauthorized
   import org.http4s._
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findProjectInfo(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
-    for {
-      uri         <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
-      projectInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-    } yield projectInfo
+  def findProjectInfo(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
+    gitLabClient.get(uri"projects" / projectId.show, "single-project")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProjectInfo]] = {
     case (Ok, _, response)    => response.as[ProjectInfo]
@@ -75,9 +67,7 @@ private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: Logger](
 }
 
 private[hookcreation] object ProjectInfoFinder {
-  def apply[F[_]: Async: Logger](
-      gitLabThrottler: Throttler[F, GitLab]
-  ): F[ProjectInfoFinder[F]] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-  } yield new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler)
+  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[ProjectInfoFinder[F]] = new ProjectInfoFinderImpl(
+    gitLabClient
+  ).pure[F].widen[ProjectInfoFinder[F]]
 }

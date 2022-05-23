@@ -30,7 +30,8 @@ class RelativePathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
   "RelativePath" should {
 
     "be a NonBlank" in {
-      new RelativePath {} shouldBe a[NonBlank]
+      RelativePathString shouldBe a[RelativePath[_]]
+      RelativePathString shouldBe a[NonBlank[_]]
     }
 
     "be instantiatable when values are not starting and ending with '/'" in {
@@ -79,5 +80,5 @@ class RelativePathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
 private class RelativePathString private (val value: String) extends AnyVal with RelativePathTinyType
 private object RelativePathString
     extends TinyTypeFactory[RelativePathString](new RelativePathString(_))
-    with RelativePath
+    with RelativePath[RelativePathString]
     with RelativePathOps[RelativePathString]

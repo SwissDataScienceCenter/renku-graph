@@ -177,8 +177,7 @@ object DatasetsSearchEndpoint {
 
   object Query {
     final class Phrase private (val value: String) extends AnyVal with StringTinyType
-
-    implicit object Phrase extends TinyTypeFactory[Phrase](new Phrase(_)) with NonBlank
+    implicit object Phrase                         extends TinyTypeFactory[Phrase](new Phrase(_)) with NonBlank[Phrase]
 
     private implicit val queryParameterDecoder: QueryParamDecoder[Phrase] =
       (value: QueryParameterValue) =>

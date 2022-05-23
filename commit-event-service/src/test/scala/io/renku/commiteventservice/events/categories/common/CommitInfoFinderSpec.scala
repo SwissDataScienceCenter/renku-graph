@@ -34,9 +34,8 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import org.http4s.Method.GET
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Header, Method, Request, Response, Status, Uri}
+import org.http4s.{Header, Request, Response, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -75,10 +74,10 @@ class CommitInfoFinderSpec
 
         val result = commitInfos.generateOne
         (gitLabClient
-          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, CommitInfo])(
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, CommitInfo])(
             _: Option[AccessToken]
           ))
-          .expects(*, *, *, *, Option.empty[AccessToken])
+          .expects(*, *, *, Option.empty[AccessToken])
           .returning(result.pure[IO])
 
         mapToCommitOrThrow((status, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe result
@@ -154,10 +153,10 @@ class CommitInfoFinderSpec
       val result = commitInfos.generateOption
 
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
           _: Option[AccessToken]
         ))
-        .expects(*, *, *, *, Option.empty[AccessToken])
+        .expects(*, *, *, Option.empty[AccessToken])
         .returning(result.pure[IO])
 
       mapToMaybeCommit((status, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe result
@@ -194,17 +193,16 @@ class CommitInfoFinderSpec
     val gitLabClient = mock[GitLabClient[IO]]
     val finder       = new CommitInfoFinderImpl[IO](gitLabClient)
 
-    val endpointName: String Refined NonEmpty = "commit-details"
+    val endpointName: String Refined NonEmpty = "single-commit"
 
     def setGitLabClientExpectation(maybeAccessToken: Option[AccessToken] = accessTokens.generateSome,
                                    returning:        Option[CommitInfo] = commitInfos.generateOne.some
     ) =
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
           _: Option[AccessToken]
         ))
-        .expects(GET,
-                 uri"projects" / projectId.show / "repository" / "commits" / commitId.show,
+        .expects(uri"projects" / projectId.show / "repository" / "commits" / commitId.show,
                  endpointName,
                  *,
                  maybeAccessToken

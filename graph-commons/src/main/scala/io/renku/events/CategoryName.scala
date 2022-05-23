@@ -22,7 +22,7 @@ import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
 final class CategoryName private (val value: String) extends AnyVal with StringTinyType
-object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank {
+object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank[CategoryName] {
   import io.circe.{Decoder, Encoder}
   import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
   import io.renku.tinytypes.json.TinyTypeEncoders.stringEncoder

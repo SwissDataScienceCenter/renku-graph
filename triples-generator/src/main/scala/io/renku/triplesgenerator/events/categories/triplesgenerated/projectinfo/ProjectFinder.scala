@@ -28,7 +28,6 @@ import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
-import org.http4s.Method.GET
 import org.http4s.dsl.io.{NotFound, Ok}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{EntityDecoder, Request, Response, Status}
@@ -69,7 +68,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
   }
 
   private def fetchProject(path: projects.Path)(implicit maybeAccessToken: Option[AccessToken]) = OptionT {
-    gitLabClient.send(GET, uri"projects" / path.show, "project")(mapTo[ProjectAndCreator])
+    gitLabClient.get(uri"projects" / path.show, "single-project")(mapTo[ProjectAndCreator])
   }
 
   private def mapTo[OUT](implicit
@@ -119,7 +118,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
       case None => OptionT.some[F](Option.empty[ProjectMember])
       case Some(creatorId) =>
         OptionT.liftF {
-          gitLabClient.send(GET, uri"users" / creatorId.show, "user")(mapTo[ProjectMember])
+          gitLabClient.get(uri"users" / creatorId.show, "single-user")(mapTo[ProjectMember])
         }
     }
 

@@ -154,8 +154,8 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
 
         eventually {
           logger.loggedOnly(
-            Error(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
-            Error(s"$categoryName: $event, subscriber = $otherSubscriber -> $Misdelivered"),
+            Info(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+            Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Misdelivered"),
             Info(s"$categoryName: $event, subscriber = $yetAnotherSubscriber -> $Delivered")
           )
         }
@@ -362,7 +362,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
 
       eventually {
         logger.loggedOnly(
-          Error(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
           Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
         )
       }
@@ -396,7 +396,7 @@ class EventsDistributorSpec extends AnyWordSpec with IOSpec with MockFactory wit
 
       eventually {
         logger.loggedOnly(
-          Error(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
+          Info(s"$categoryName: $event, subscriber = $subscriber -> $Misdelivered"),
           Error(s"$categoryName: $event -> returning an event to the queue failed", backToTheQueueException),
           Info(s"$categoryName: $event, subscriber = $otherSubscriber -> $Delivered")
         )

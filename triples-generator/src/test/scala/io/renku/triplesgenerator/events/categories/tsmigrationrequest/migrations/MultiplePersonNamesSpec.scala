@@ -19,35 +19,41 @@
 package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.personNames
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.tooling.UpdateQueryMigration
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import tooling.UpdateQueryMigration
 
-class DeDuplicatePersonNamesSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MultiplePersonNamesSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
 
   "query" should {
 
     "remove duplicate Person names" in {
-      val person              = personEntities(withGitLabId).generateOne
-      val personDuplicateName = person.copy(name = personNames.generateOne).to[entities.Person]
-      val otherPerson         = personEntities(withGitLabId).generateOne.to[entities.Person]
+      val person      = personEntities(withGitLabId).generateOne.to[entities.Person]
+      val otherPerson = personEntities(withGitLabId).generateOne.to[entities.Person]
 
-      loadToStore(person.to[entities.Person], personDuplicateName, otherPerson)
+      loadToStore(person, otherPerson)
 
-      findNames(personDuplicateName.resourceId) shouldBe Set(person.name, personDuplicateName.name)
+      val duplicateNames = personNames.generateNonEmptyList().toList.toSet
+      duplicateNames foreach { name =>
+        insertTriple(person.resourceId, "schema:name", show"'${sparqlEncode(name.show)}'")
+      }
 
-      runUpdate(DeDuplicatePersonNames.query).unsafeRunSync() shouldBe ()
+      findNames(person.resourceId) shouldBe duplicateNames + person.name
 
-      findNames(personDuplicateName.resourceId) should (be(Set(person.name)) or be(Set(personDuplicateName.name)))
-      findNames(otherPerson.resourceId)       shouldBe Set(otherPerson.name)
+      runUpdate(MultiplePersonNames.query).unsafeRunSync() shouldBe ()
+
+      findNames(person.resourceId)        should contain oneElementOf (duplicateNames + person.name)
+      findNames(otherPerson.resourceId) shouldBe Set(otherPerson.name)
     }
   }
 
@@ -55,7 +61,7 @@ class DeDuplicatePersonNamesSpec extends AnyWordSpec with should.Matchers with I
     "return an UpdateQueryMigration" in {
       implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
       implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-      DeDuplicatePersonNames[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
+      MultiplePersonNames[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }
   }
 

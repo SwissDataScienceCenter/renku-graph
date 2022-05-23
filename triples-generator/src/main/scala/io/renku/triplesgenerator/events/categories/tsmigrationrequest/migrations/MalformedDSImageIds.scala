@@ -21,32 +21,31 @@ package migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas._
+import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 import tooling.{CleanUpEventsProducer, QueryBasedMigration}
 
-private object TopMostDerivedFrom {
+private object MalformedDSImageIds {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
     QueryBasedMigration[F](name, query, CleanUpEventsProducer).widen
 
-  private lazy val name = Migration.Name("Broken TopmostDerivedFrom")
+  private lazy val name = Migration.Name("Malformed DS Image Ids")
   private[migrations] lazy val query = SparqlQuery.of(
-    Refined.unsafeApply(name.show),
-    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
-    s"""|SELECT ?path
+    name.asRefined,
+    Prefixes.of(schema -> "schema", renku -> "renku"),
+    s"""|SELECT DISTINCT ?path
         |WHERE {
-        |  ?dsId a schema:Dataset;
-        |        prov:wasDerivedFrom ?derived;
-        |        ^renku:hasDataset/renku:projectPath ?path
+        |  ?id a schema:Dataset;
+        |      ^renku:hasDataset/renku:projectPath ?path;
+        |      schema:image ?imageId.
+        |  BIND (STR(?imageId) AS ?imageIdString)
+        |  FILTER REGEX(?imageIdString, '(.*/datasets/([a-zA-Z0-9]+[-]+[a-zA-Z0-9]+)+(/.*)*)')
         |}
-        |GROUP BY ?path
-        |HAVING (COUNT(DISTINCT ?dsId) > 1)
         |""".stripMargin
   )
 }

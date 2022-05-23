@@ -34,16 +34,35 @@ private[tsmigrationrequest] object Migrations {
       reProvisioningStatus: ReProvisioningStatus[F],
       config:               Config
   ): F[List[Migration[F]]] = for {
-    reProvisioning            <- ReProvisioning[F](reProvisioningStatus, config)
-    topMostDerivedFrom        <- TopMostDerivedFrom[F]
-    malformedActivityIds      <- MalformedActivityIds[F]
-    deDuplicatePersonNames    <- DeDuplicatePersonNames[F]
-    deDuplicateModifiedDSData <- DeDuplicateModifiedDSData[F]
-    migrations <- validateNames(reProvisioning,
-                                topMostDerivedFrom,
-                                malformedActivityIds,
-                                deDuplicatePersonNames,
-                                deDuplicateModifiedDSData
+    reProvisioning                    <- ReProvisioning[F](reProvisioningStatus, config)
+    malformedActivityIds              <- MalformedActivityIds[F]
+    multiplePersonNames               <- MultiplePersonNames[F]
+    multipleModifiedDSData            <- MultipleModifiedDSData[F]
+    malformedDSImageIds               <- MalformedDSImageIds[F]
+    multipleDSTopmostSameAs           <- MultipleDSTopmostSameAs[F]
+    multipleAllWrongTopmostSameAs     <- MultipleAllWrongTopmostSameAs[F]
+    multipleTopmostSameAsOnInternalDS <- MultipleTopmostSameAsOnInternalDS[F]
+    multipleTopmostDerivedFromOnly    <- MultipleTopmostDerivedFromOnly[F]
+    multipleOriginalIdentifiers       <- MultipleOriginalIdentifiers[F]
+    multipleDSDateCreated             <- MultipleDSDateCreated[F]
+    multipleDSSameAs                  <- MultipleDSSameAs[F]
+    multipleActivityAuthors           <- MultipleActivityAuthors[F]
+    removeNotLinkedPersons            <- RemoveNotLinkedPersons[F]
+    migrations <- validateNames(
+                    reProvisioning,
+                    malformedActivityIds,
+                    multiplePersonNames,
+                    multipleModifiedDSData,
+                    malformedDSImageIds,
+                    multipleDSTopmostSameAs,
+                    multipleAllWrongTopmostSameAs,
+                    multipleTopmostSameAsOnInternalDS,
+                    multipleTopmostDerivedFromOnly,
+                    multipleOriginalIdentifiers,
+                    multipleDSDateCreated,
+                    multipleDSSameAs,
+                    multipleActivityAuthors,
+                    removeNotLinkedPersons
                   )
   } yield migrations
 

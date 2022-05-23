@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.events.categories.tsmigrationrequest
 package migrations.tooling
 
-import ConditionedMigration.MigrationRequired
 import Generators._
 import QueryBasedMigration.EventData
 import cats.MonadThrow
@@ -27,12 +26,10 @@ import cats.syntax.all._
 import io.renku.events.EventRequestContent
 import io.renku.events.Generators._
 import io.renku.events.producers.EventSender
-import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.projects
-import io.renku.http.server.version.ServiceVersion
 import io.renku.interpreters.TestLogger
 import io.renku.triplesgenerator.generators.ErrorGenerators._
 import org.scalamock.scalatest.MockFactory
@@ -43,41 +40,19 @@ import scala.util.Try
 
 class QueryBasedMigrationSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  "required" should {
+  "QueryBasedMigration" should {
 
-    "return Yes if Migration Execution Register cannot find any past executions" in new TestCase {
-      (executionRegister.findExecution _)
-        .expects(migration.name)
-        .returning(None.pure[Try])
-
-      migration.required.value shouldBe MigrationRequired.Yes("was not executed yet").asRight.pure[Try]
-    }
-
-    "return No if Migration Execution Register finds a past version" in new TestCase {
-      val version = serviceVersions.generateOne
-      (executionRegister.findExecution _)
-        .expects(migration.name)
-        .returning(version.some.pure[Try])
-
-      migration.required.value shouldBe MigrationRequired.No(s"was executed on $version").asRight.pure[Try]
-    }
-
-    "return a Recoverable Error if in case of an exception the given strategy returns one" in new TestCase {
-      val exception = exceptions.generateOne
-      (executionRegister.findExecution _)
-        .expects(migration.name)
-        .returning(exception.raiseError[Try, Option[ServiceVersion]])
-
-      migration.required.value shouldBe recoverableError.asLeft.pure[Try]
+    "be the RegisteredMigration" in new TestCase {
+      migration.getClass.getSuperclass shouldBe classOf[RegisteredMigration[Try]]
     }
   }
 
   "migrate" should {
 
-    "run find records and send an event for each of the records" in new TestCase {
+    "run find records and send an event for each of the found projects" in new TestCase {
       val records = projectPaths.generateNonEmptyList().toList
 
-      (recordsFinder.findRecords _).expects().returning(records.pure[Try])
+      (projectsFinder.findProjects _).expects().returning(records.pure[Try])
 
       records foreach { record =>
         val event = eventRequestContentNoPayloads.generateOne
@@ -97,11 +72,11 @@ class QueryBasedMigrationSpec extends AnyWordSpec with MockFactory with should.M
       migration.migrate().value shouldBe ().asRight.pure[Try]
     }
 
-    "return a Recoverable Error if in case of an exception while finding record " +
+    "return a Recoverable Error if in case of an exception while finding project " +
       "the given strategy returns one" in new TestCase {
         val exception = exceptions.generateOne
 
-        (recordsFinder.findRecords _).expects().returning(exception.raiseError[Try, List[projects.Path]])
+        (projectsFinder.findProjects _).expects().returning(exception.raiseError[Try, List[projects.Path]])
 
         migration.migrate().value shouldBe recoverableError.asLeft.pure[Try]
       }
@@ -110,7 +85,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with MockFactory with should.M
       "the given strategy returns one" in new TestCase {
 
         val record = projectPaths.generateOne
-        (recordsFinder.findRecords _).expects().returning(List(record).pure[Try])
+        (projectsFinder.findProjects _).expects().returning(List(record).pure[Try])
 
         val event = eventRequestContentNoPayloads.generateOne
         eventProducer.expects(record).returning((record, event, eventCategoryName))
@@ -130,34 +105,12 @@ class QueryBasedMigrationSpec extends AnyWordSpec with MockFactory with should.M
       }
   }
 
-  "postMigration" should {
-
-    "update the Execution Register" in new TestCase {
-
-      (executionRegister.registerExecution _)
-        .expects(migration.name)
-        .returning(().pure[Try])
-
-      migration.postMigration().value shouldBe ().asRight.pure[Try]
-    }
-
-    "return a Recoverable Error if in case of an exception " +
-      "the given strategy returns one" in new TestCase {
-        val exception = exceptions.generateOne
-        (executionRegister.registerExecution _)
-          .expects(migration.name)
-          .returning(exception.raiseError[Try, Unit])
-
-        migration.postMigration().value shouldBe recoverableError.asLeft.pure[Try]
-      }
-  }
-
   private trait TestCase {
 
     val eventCategoryName = categoryNames.generateOne
 
     private implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val recordsFinder     = mock[RecordsFinder[Try]]
+    val projectsFinder    = mock[ProjectsFinder[Try]]
     val eventProducer     = mockFunction[projects.Path, EventData]
     val eventSender       = mock[EventSender[Try]]
     val executionRegister = mock[MigrationExecutionRegister[Try]]
@@ -168,7 +121,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with MockFactory with should.M
       }
     }
     val migration = new QueryBasedMigration[Try](migrationNames.generateOne,
-                                                 recordsFinder,
+                                                 projectsFinder,
                                                  eventProducer,
                                                  eventSender,
                                                  executionRegister,

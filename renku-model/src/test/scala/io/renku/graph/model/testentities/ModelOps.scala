@@ -28,7 +28,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.datasetIdentifiers
 import io.renku.graph.model._
-import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InitialVersion, InternalSameAs, Keyword, Name, SameAs, Title}
+import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title}
 import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.Dataset.Provenance
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
@@ -131,7 +131,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
           Dataset.entityId(newIdentifier),
           SameAs(dataset.entityId),
           dataset.provenance,
-          InitialVersion(newIdentifier)
+          OriginalIdentifier(newIdentifier)
         )
       )
       importedDS -> (project addDatasets importedDS)
@@ -212,7 +212,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                 Dataset.entityId(newIdentifier),
                 DerivedFrom(dataset.entityId),
                 dataset.provenance.topmostDerivedFrom,
-                dataset.provenance.initialVersion,
+                dataset.provenance.originalIdentifier,
                 datasets.DateCreated(time.value),
                 (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
                 maybeInvalidationTime = time.some
@@ -228,7 +228,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                 Dataset.entityId(newIdentifier),
                 DerivedFrom(dataset.entityId),
                 dataset.provenance.topmostDerivedFrom,
-                dataset.provenance.initialVersion,
+                dataset.provenance.originalIdentifier,
                 datasets.DateCreated(time.value),
                 (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
                 maybeInvalidationTime = time.some
@@ -262,7 +262,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
               Dataset.entityId(newIdentifier),
               DerivedFrom(dataset.entityId),
               dataset.provenance.topmostDerivedFrom,
-              dataset.provenance.initialVersion,
+              dataset.provenance.originalIdentifier,
               datasets.DateCreated(time.value),
               (personEntities.generateOne :: dataset.provenance.creators).sortBy(_.name),
               maybeInvalidationTime = None
@@ -307,36 +307,36 @@ trait ModelOps extends Dataset.ProvenanceOps {
   }
 
   type ProvenanceImportFactory[OldProvenance <: Dataset.Provenance, NewProvenance <: Dataset.Provenance] =
-    (EntityId, InternalSameAs, OldProvenance, InitialVersion) => NewProvenance
+    (EntityId, InternalSameAs, OldProvenance, OriginalIdentifier) => NewProvenance
 
   lazy val importedInternal: ProvenanceImportFactory[Dataset.Provenance, Dataset.Provenance.ImportedInternal] = {
-    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.Internal, initialVersion) =>
-      fromInternalToImportedInternalAncestorInternal(newEntityId, sameAs, oldProvenance, initialVersion)
-    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.ImportedExternal, initialVersion) =>
-      fromImportedExternalToImportedInternalAncestorExternal(newEntityId, sameAs, oldProvenance, initialVersion)
-    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.ImportedInternalAncestorInternal, initialVersion) =>
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.Internal, originalId) =>
+      fromInternalToImportedInternalAncestorInternal(newEntityId, sameAs, oldProvenance, originalId)
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.ImportedExternal, originalId) =>
+      fromImportedExternalToImportedInternalAncestorExternal(newEntityId, sameAs, oldProvenance, originalId)
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.ImportedInternalAncestorInternal, originalId) =>
       fromImportedInternalAncestorInternalToImportedInternalAncestorInternal(newEntityId,
                                                                              sameAs,
                                                                              oldProvenance,
-                                                                             initialVersion
+                                                                             originalId
       )
-    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.ImportedInternalAncestorExternal, initialVersion) =>
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.ImportedInternalAncestorExternal, originalId) =>
       fromImportedInternalAncestorExternalToImportedInternalAncestorExternal(newEntityId,
                                                                              sameAs,
                                                                              oldProvenance,
-                                                                             initialVersion
+                                                                             originalId
       )
-    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.Modified, initialVersion) =>
-      importFromModifiedToImportedInternalAncestorInternal(newEntityId, sameAs, oldProvenance, initialVersion)
+    case (newEntityId, sameAs, oldProvenance: Dataset.Provenance.Modified, originalId) =>
+      importFromModifiedToImportedInternalAncestorInternal(newEntityId, sameAs, oldProvenance, originalId)
   }
 
   implicit lazy val fromInternalToImportedInternalAncestorInternal
       : ProvenanceImportFactory[Dataset.Provenance.Internal, Dataset.Provenance.ImportedInternalAncestorInternal] =
-    (newEntityId, sameAs, oldProvenance, initialVersion) =>
+    (newEntityId, sameAs, oldProvenance, originalId) =>
       Dataset.Provenance.ImportedInternalAncestorInternal(newEntityId,
                                                           sameAs,
                                                           oldProvenance.topmostSameAs,
-                                                          initialVersion,
+                                                          originalId,
                                                           oldProvenance.date,
                                                           oldProvenance.creators
       )
@@ -344,11 +344,11 @@ trait ModelOps extends Dataset.ProvenanceOps {
   implicit lazy val fromImportedExternalToImportedInternalAncestorExternal
       : ProvenanceImportFactory[Dataset.Provenance.ImportedExternal,
                                 Dataset.Provenance.ImportedInternalAncestorExternal
-      ] = (newEntityId, sameAs, oldProvenance, initialVersion) =>
+      ] = (newEntityId, sameAs, oldProvenance, originalId) =>
     Dataset.Provenance.ImportedInternalAncestorExternal(newEntityId,
                                                         sameAs,
                                                         oldProvenance.topmostSameAs,
-                                                        initialVersion,
+                                                        originalId,
                                                         oldProvenance.date,
                                                         oldProvenance.creators
     )
@@ -356,11 +356,11 @@ trait ModelOps extends Dataset.ProvenanceOps {
   implicit lazy val fromImportedInternalAncestorExternalToImportedInternalAncestorExternal
       : ProvenanceImportFactory[Dataset.Provenance.ImportedInternalAncestorExternal,
                                 Dataset.Provenance.ImportedInternalAncestorExternal
-      ] = (newEntityId, sameAs, oldProvenance, initialVersion) =>
+      ] = (newEntityId, sameAs, oldProvenance, originalId) =>
     Dataset.Provenance.ImportedInternalAncestorExternal(newEntityId,
                                                         sameAs,
                                                         oldProvenance.topmostSameAs,
-                                                        initialVersion,
+                                                        originalId,
                                                         oldProvenance.date,
                                                         oldProvenance.creators
     )
@@ -368,22 +368,22 @@ trait ModelOps extends Dataset.ProvenanceOps {
   implicit lazy val fromImportedInternalAncestorInternalToImportedInternalAncestorInternal
       : ProvenanceImportFactory[Dataset.Provenance.ImportedInternalAncestorInternal,
                                 Dataset.Provenance.ImportedInternalAncestorInternal
-      ] = (newEntityId, sameAs, oldProvenance, initialVersion) =>
+      ] = (newEntityId, sameAs, oldProvenance, originalId) =>
     Dataset.Provenance.ImportedInternalAncestorInternal(newEntityId,
                                                         sameAs,
                                                         oldProvenance.topmostSameAs,
-                                                        initialVersion,
+                                                        originalId,
                                                         oldProvenance.date,
                                                         oldProvenance.creators
     )
 
   implicit lazy val importFromModifiedToImportedInternalAncestorInternal
       : ProvenanceImportFactory[Dataset.Provenance.Modified, Dataset.Provenance.ImportedInternalAncestorInternal] =
-    (newEntityId, sameAs, oldProvenance, initialVersion) =>
+    (newEntityId, sameAs, oldProvenance, originalId) =>
       Dataset.Provenance.ImportedInternalAncestorInternal(newEntityId,
                                                           sameAs,
                                                           oldProvenance.topmostSameAs,
-                                                          initialVersion,
+                                                          originalId,
                                                           oldProvenance.date,
                                                           oldProvenance.creators
       )

@@ -32,7 +32,7 @@ object entityModel {
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with Url
+      with Url[ResourceId]
       with EntityIdJsonLdOps[ResourceId]
 
   sealed trait LocationLike extends Any with RelativePathTinyType {
@@ -57,15 +57,18 @@ object entityModel {
   object Location {
 
     final class File private (val value: String) extends Location
-    object File extends TinyTypeFactory[File](new File(_)) with RelativePath with TinyTypeJsonLDOps[File] {
+    object File extends TinyTypeFactory[File](new File(_)) with RelativePath[File] with TinyTypeJsonLDOps[File] {
       def apply(folder: Location.Folder, filename: String): Location.File = Location.File(s"$folder/$filename")
     }
 
     final class Folder private (val value: String) extends Location
-    object Folder extends TinyTypeFactory[Folder](new Folder(_)) with RelativePath with TinyTypeJsonLDOps[Folder]
+    object Folder
+        extends TinyTypeFactory[Folder](new Folder(_))
+        with RelativePath[Folder]
+        with TinyTypeJsonLDOps[Folder]
 
     final class FileOrFolder private (val value: String) extends LocationLike
-    object FileOrFolder extends TinyTypeFactory[FileOrFolder](new FileOrFolder(_)) with RelativePath {
+    object FileOrFolder extends TinyTypeFactory[FileOrFolder](new FileOrFolder(_)) with RelativePath[FileOrFolder] {
       implicit lazy val jsonLDDecoder: JsonLDDecoder[FileOrFolder] =
         decodeString.emap(value => from(value).leftMap(_.getMessage))
     }
@@ -76,6 +79,6 @@ object entityModel {
   final class Checksum private (val value: String) extends AnyVal with StringTinyType
   implicit object Checksum
       extends TinyTypeFactory[Checksum](new Checksum(_))
-      with NonBlank
+      with NonBlank[Checksum]
       with TinyTypeJsonLDOps[Checksum]
 }

@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.MonadThrow
 import cats.effect.Async
+import io.renku.config.ServiceVersion
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.{New, NonRecoverableFailure, Sent}
@@ -27,7 +28,6 @@ import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog._
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.http.server.version.ServiceVersion
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 

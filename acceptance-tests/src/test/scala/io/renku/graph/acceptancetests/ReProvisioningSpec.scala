@@ -20,6 +20,7 @@ package io.renku.graph.acceptancetests
 
 import cats.syntax.all._
 import io.circe.Json
+import io.renku.config.ServiceVersion
 import io.renku.generators.CommonGraphGenerators.{authUsers, serviceVersions}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
@@ -30,7 +31,6 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
-import io.renku.http.server.version.ServiceVersion
 import io.renku.jsonld.syntax._
 import org.http4s.Status.Ok
 import org.scalactic.source.Position

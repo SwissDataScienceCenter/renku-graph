@@ -41,11 +41,10 @@ import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
-import org.http4s.Method.GET
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
 import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{Method, Request, Response, Status, Uri}
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -152,21 +151,21 @@ class ProjectMembersFinderSpec
     def setGitLabClientExpectationUsers(projectPath: projects.Path,
                                         maybePage:   Option[Int] = None,
                                         returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
-    ) = setGitLabClientExpectation("users", projectPath, maybePage, returning)
+    ) = setGitLabClientExpectation(projectPath, "users", "project-users", maybePage, returning)
 
     def setGitLabClientExpectationMembers(projectPath: projects.Path,
                                           maybePage:   Option[Int] = None,
                                           returning:   IO[(Set[ProjectMemberNoEmail], Option[Int])]
-    ) = setGitLabClientExpectation("members", projectPath, maybePage, returning)
+    ) = setGitLabClientExpectation(projectPath, "members", "project-members", maybePage, returning)
 
-    private def setGitLabClientExpectation(endpointName: String Refined NonEmpty,
-                                           projectPath:  projects.Path,
+    private def setGitLabClientExpectation(projectPath:  projects.Path,
+                                           endpoint:     String,
+                                           endpointName: String Refined NonEmpty,
                                            maybePage:    Option[Int] = None,
                                            returning:    IO[(Set[ProjectMemberNoEmail], Option[Int])]
     ) = {
-
       val uri = {
-        val uri = uri"projects" / projectPath.show / endpointName
+        val uri = uri"projects" / projectPath.show / endpoint
         maybePage match {
           case Some(page) => uri withQueryParam ("page", page.toString)
           case None       => uri
@@ -174,10 +173,10 @@ class ProjectMembersFinderSpec
       }
 
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(
+        .get(_: Uri, _: String Refined NonEmpty)(
           _: ResponseMappingF[IO, (Set[ProjectMemberNoEmail], Option[Int])]
         )(_: Option[AccessToken]))
-        .expects(GET, uri, endpointName, *, maybeAccessToken)
+        .expects(uri, endpointName, *, maybeAccessToken)
         .returning(returning)
     }
 

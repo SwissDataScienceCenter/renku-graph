@@ -21,12 +21,16 @@ spec:
         app: {{ include "eventLog.name" . }}
         release: {{ .Release.Name }}
     spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
         {{- include "certificates.initContainer" . | nindent 8 }}
       containers:
         - name: event-log
           image: "{{ .Values.eventLog.image.repository }}:{{ .Values.eventLog.image.tag }}"
           imagePullPolicy: {{ .Values.eventLog.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           env:
             - name: RENKU_CLIENT_CERTIFICATE
               valueFrom:

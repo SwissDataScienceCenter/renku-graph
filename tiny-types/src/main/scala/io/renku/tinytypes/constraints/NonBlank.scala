@@ -18,9 +18,12 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.Constraints
+import eu.timepit.refined.collection.NonEmpty
+import io.renku.tinytypes._
 
-trait NonBlank extends Constraints[String] {
+trait NonBlank[TT <: TinyType { type V = String }] extends Constraints[TT] with RefinedValue[TT, NonEmpty] {
+  self: TinyTypeFactory[TT] =>
+
   addConstraint(
     check = _.trim.nonEmpty,
     message = (_: String) => s"$typeName cannot be blank"

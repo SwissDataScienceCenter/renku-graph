@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.http.server.version
+package io.renku.config
 
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
-import io.renku.generators.CommonGraphGenerators.serviceVersions
+import io.renku.generators.CommonGraphGenerators.{serviceNames, serviceVersions}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -61,7 +60,7 @@ class ServiceNameSpec extends AnyWordSpec with should.Matchers with IOSpec {
   "readFromConfig" should {
 
     "read the value from the 'service-name' property in the config and turn it into ServiceVersion" in {
-      val serviceName = nonEmptyStrings().generateAs(ServiceName)
+      val serviceName = serviceNames.generateOne
       val config      = ConfigFactory.parseMap(Map("service-name" -> serviceName.show).asJava)
 
       ServiceName.readFromConfig[Try](config) shouldBe serviceName.pure[Try]

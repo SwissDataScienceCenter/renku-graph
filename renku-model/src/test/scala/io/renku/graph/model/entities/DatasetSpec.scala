@@ -54,35 +54,68 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       }
     }
 
+    "fail if originalIdentifier on an Imported External dataset is different than its identifier" in {
+      val dataset = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
+
+      val Left(error) = parse {
+        dataset.asJsonLD.toJson
+          .deepMerge(
+            Json.obj(
+              (renku / "originalIdentifier").show -> json"""{"@value": ${datasetOriginalIdentifiers.generateOne.show}}"""
+            )
+          )
+      }.fold(throw _, identity)
+        .flatten
+        .fold(throw _, identity)
+        .cursor
+        .as[List[entities.Dataset[entities.Dataset.Provenance]]]
+
+      error shouldBe a[DecodingFailure]
+      error.getMessage should startWith(
+        s"Cannot decode entity with ${dataset.resourceId}: DecodingFailure at : Invalid dataset data"
+      )
+    }
+
     forAll {
       Table(
         "DS generator"                                                -> "DS type",
-        datasetEntities(provenanceImportedExternal)                   -> "Imported External",
         datasetEntities(provenanceImportedInternalAncestorInternal()) -> "Imported Internal Ancestor External",
         datasetEntities(provenanceImportedInternalAncestorExternal)   -> "Imported Internal Ancestor Internal"
       )
     } { case (dsGen: DatasetGenFactory[Dataset.Provenance], dsType: String) =>
-      s"fail if originalIdentifier on an $dsType dataset is different than its identifier" in {
-        val dataset = dsGen.decoupledFromProject.generateOne.to[entities.Dataset[entities.Dataset.Provenance]]
+      "turn JsonLD Dataset entity into the Dataset object " +
+        s"when originalIdentifier on an $dsType dataset is different than its identifier" in {
+          val dataset =
+            dsGen.decoupledFromProject.generateOne.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+          val otherOriginalId = datasetOriginalIdentifiers.generateOne
 
-        val illegalInitialVersion = datasetInitialVersions.generateOne
+          val dsJsonLD = parse {
+            dataset.asJsonLD.toJson
+              .deepMerge(
+                Json.obj(
+                  (renku / "originalIdentifier").show -> json"""{"@value": ${otherOriginalId.show}}"""
+                )
+              )
+          }.fold(throw _, identity)
 
-        val Left(error) = parse {
-          dataset.asJsonLD.toJson
-            .deepMerge(
-              Json.obj((renku / "originalIdentifier").show -> json"""{"@value": ${illegalInitialVersion.value}}""")
-            )
-        }.fold(throw _, identity)
-          .flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[entities.Dataset[entities.Dataset.Provenance]]]
+          val Right(actualDS :: Nil) = JsonLD
+            .arr(dsJsonLD :: dataset.publicationEvents.map(_.asJsonLD): _*)
+            .flatten
+            .fold(throw _, identity)
+            .cursor
+            .as[List[entities.Dataset[entities.Dataset.Provenance]]]
 
-        error shouldBe a[DecodingFailure]
-        error.getMessage should startWith(
-          s"Cannot decode entity with ${dataset.resourceId}: DecodingFailure at : Invalid dataset data"
-        )
-      }
+          actualDS shouldBe dataset.copy(
+            provenance = dataset.provenance match {
+              case p: entities.Dataset.Provenance.ImportedInternalAncestorExternal =>
+                p.copy(originalIdentifier = otherOriginalId)
+              case p: entities.Dataset.Provenance.ImportedInternalAncestorInternal =>
+                p.copy(originalIdentifier = otherOriginalId)
+              case p => fail(s"DS with provenance ${p.getClass} not expected here")
+            }
+          )
+        }
     }
 
     "treat DS with originalIdentifier but no derivedFrom as Internal -" +
@@ -101,7 +134,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           dataset.asJsonLD.toJson
             .deepMerge(
               Json.obj(
-                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetInitialVersions.generateOne.show}}"""
+                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetOriginalIdentifiers.generateOne.show}}"""
               )
             )
         }.flatMap(_.flatten).fold(throw _, identity)
@@ -129,7 +162,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           dataset.asJsonLD.toJson
             .deepMerge(
               Json.obj(
-                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetInitialVersions.generateOne.show}}"""
+                (renku / "originalIdentifier").show -> json"""{"@value": ${datasetOriginalIdentifiers.generateOne.show}}"""
               )
             )
         }.flatMap(_.flatten).fold(throw _, identity)
@@ -193,10 +226,10 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           .map(_._2)
           .generateOne
           .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
-        ds.copy(provenance = ds.provenance.copy(initialVersion = datasetInitialVersions.generateOne))
+        ds.copy(provenance = ds.provenance.copy(originalIdentifier = datasetOriginalIdentifiers.generateOne))
       }
 
-      assume(dataset.identification.identifier.value != dataset.provenance.initialVersion.value)
+      assume(dataset.identification.identifier.value != dataset.provenance.originalIdentifier.value)
 
       dataset.asJsonLD.flatten
         .fold(throw _, identity)

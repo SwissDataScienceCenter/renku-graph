@@ -19,10 +19,10 @@
 package io.renku.eventlog.subscriptions.tsmigrationrequest
 
 import cats.data.Kleisli
+import io.renku.config.ServiceVersion
 import io.renku.eventlog.TSMigtationTypeSerializers._
 import io.renku.eventlog._
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.http.server.version.ServiceVersion
 import skunk.implicits._
 import skunk.{Command, Query, ~}
 

@@ -24,11 +24,10 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.entities.{Dataset, Project}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.{Queries, Transformation}
-import io.renku.triplesgenerator.events.categories.triplesgenerated.{ProjectFunctions, RecoverableErrorsRecovery, TransformationStep}
+import io.renku.triplesgenerator.events.categories.triplesgenerated.{RecoverableErrorsRecovery, TransformationStep}
 import org.typelevel.log4cats.Logger
 
 private[transformation] trait DatasetTransformer[F[_]] {
@@ -36,15 +35,24 @@ private[transformation] trait DatasetTransformer[F[_]] {
 }
 
 private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
-    kgDatasetInfoFinder:       KGDatasetInfoFinder[F],
-    updatesCreator:            UpdatesCreator,
-    projectFunctions:          ProjectFunctions,
-    recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
+    derivationHierarchyUpdater:     DerivationHierarchyUpdater[F],
+    sameAsUpdater:                  SameAsUpdater[F],
+    topmostSameAsUpdater:           TopmostSameAsUpdater[F],
+    originalIdentifierUpdater:      OriginalIdentifierUpdater[F],
+    dateCreatedUpdater:             DateCreatedUpdater[F],
+    personLinksUpdater:             PersonLinksUpdater[F],
+    hierarchyOnInvalidationUpdater: HierarchyOnInvalidationUpdater[F],
+    recoverableErrorsRecovery:      RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends DatasetTransformer[F] {
 
-  import kgDatasetInfoFinder._
-  import projectFunctions._
+  import dateCreatedUpdater._
+  import derivationHierarchyUpdater._
+  import hierarchyOnInvalidationUpdater._
+  import originalIdentifierUpdater._
+  import personLinksUpdater._
   import recoverableErrorsRecovery._
+  import sameAsUpdater._
+  import topmostSameAsUpdater._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Dataset Details Updates", createTransformation)
@@ -52,81 +60,32 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
   private def createTransformation: Transformation[F] = project =>
     EitherT {
       (fixDerivationHierarchies(project -> Queries.empty) >>=
+        updateSameAs >>=
         updateTopmostSameAs >>=
+        updateOriginalIdentifiers >>=
+        updateDateCreated >>=
         updatePersonLinks >>=
         updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
         .recoverWith(maybeRecoverableError("Problem finding dataset details in KG"))
     }
-
-  private lazy val fixDerivationHierarchies: ((Project, Queries)) => F[(Project, Queries)] = {
-    case (project, queries) =>
-      findModifiedDatasets(project)
-        .foldLeft(project.pure[F]) { (projF, originalDS) =>
-          projF >>= { proj =>
-            findTopmostDerivedFrom[F](originalDS, proj)
-              .map(originalDS.update)
-              .map(update(originalDS, _)(proj))
-          }
-        }
-        .map(_ -> queries)
-  }
-
-  private lazy val updateTopmostSameAs: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
-    findInternallyImportedDatasets(project)
-      .foldLeft((project -> queries).pure[F]) { (projectAndQueriesF, dataset) =>
-        for {
-          projectAndQueries        <- projectAndQueriesF
-          maybeParentTopmostSameAs <- findParentTopmostSameAs(dataset.provenance.sameAs)
-          maybeKGTopmostSameAs     <- findTopmostSameAs(dataset.identification.resourceId)
-          updatedDataset = maybeParentTopmostSameAs.map(dataset.update) getOrElse dataset
-        } yield (
-          update(dataset, updatedDataset)(projectAndQueries._1),
-          projectAndQueries._2 |+| Queries.postDataQueriesOnly(
-            updatesCreator.prepareUpdates(dataset, maybeKGTopmostSameAs) :::
-              updatesCreator.prepareTopmostSameAsCleanup(updatedDataset, maybeParentTopmostSameAs)
-          )
-        )
-      }
-  }
-
-  private lazy val updatePersonLinks: ((Project, Queries)) => F[(Project, Queries)] = { case (project, queries) =>
-    project.datasets
-      .map(ds => findDatasetCreators(ds.resourceId).map(updatesCreator.queriesUnlinkingCreators(ds, _)))
-      .sequence
-      .map(_.flatten)
-      .map(quers => project -> (queries |+| Queries.preDataQueriesOnly(quers)))
-  }
-
-  private lazy val updateHierarchyOnInvalidation: ((Project, Queries)) => F[(Project, Queries)] = {
-    case (project, queries) =>
-      findInvalidatedDatasets(project)
-        .foldLeft((project -> queries).pure[F]) { (projectAndQueriesF, dataset) =>
-          projectAndQueriesF map { case (project, queries) =>
-            val preDataUploadQueries = dataset.provenance match {
-              case _: Dataset.Provenance.Internal =>
-                updatesCreator.prepareUpdatesWhenInvalidated(
-                  dataset.asInstanceOf[Dataset[Dataset.Provenance.Internal]]
-                )
-              case _: Dataset.Provenance.ImportedExternal =>
-                updatesCreator.prepareUpdatesWhenInvalidated(
-                  dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedExternal]]
-                )
-              case _: Dataset.Provenance.ImportedInternal =>
-                updatesCreator.prepareUpdatesWhenInvalidated(
-                  dataset.asInstanceOf[Dataset[Dataset.Provenance.ImportedInternal]]
-                )
-              case _ => Nil
-            }
-            project -> (queries |+| Queries.postDataQueriesOnly(preDataUploadQueries))
-          }
-        }
-  }
 }
 
 private[transformation] object DatasetTransformer {
-
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetTransformer[F]] = for {
-    kgDatasetInfoFinder <- KGDatasetInfoFinder[F]
-  } yield new DatasetTransformerImpl[F](kgDatasetInfoFinder, UpdatesCreator, ProjectFunctions)
+    derivationHierarchyUpdater     <- DerivationHierarchyUpdater[F]
+    sameAsUpdater                  <- SameAsUpdater[F]
+    topmostSameAsUpdater           <- TopmostSameAsUpdater[F]
+    personLinksUpdater             <- PersonLinksUpdater[F]
+    hierarchyOnInvalidationUpdater <- HierarchyOnInvalidationUpdater[F]
+    originalIdentifierUpdater      <- OriginalIdentifierUpdater[F]
+    dateCreatedUpdater             <- DateCreatedUpdater[F]
+  } yield new DatasetTransformerImpl[F](derivationHierarchyUpdater,
+                                        sameAsUpdater,
+                                        topmostSameAsUpdater,
+                                        originalIdentifierUpdater,
+                                        dateCreatedUpdater,
+                                        personLinksUpdater,
+                                        hierarchyOnInvalidationUpdater
+  )
 }

@@ -71,7 +71,7 @@ object SparqlQuery {
   ): SparqlQuery = SparqlQuery(name, prefixes.map(p => Prefix(p.value)), body, pagingRequest.some)
 
   final class Prefix private (val value: String) extends AnyVal with StringTinyType
-  implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank {
+  implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank[Prefix] {
     def apply(name: String Refined NonEmpty, schema: Schema): Prefix = Prefix(schema asPrefix name.value)
   }
 

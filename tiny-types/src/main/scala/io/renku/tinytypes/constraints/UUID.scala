@@ -19,11 +19,13 @@
 package io.renku.tinytypes.constraints
 
 import cats.data.Validated
-import io.renku.tinytypes.Constraints
+import io.renku.tinytypes.{Constraints, TinyType, TinyTypeFactory}
 
 import java.util.UUID.fromString
 
-trait UUID extends Constraints[String] with NonBlank {
+trait UUID[TT <: TinyType { type V = String }] extends Constraints[TT] with NonBlank[TT] {
+  self: TinyTypeFactory[TT] =>
+
   addConstraint(
     check = value => Validated.catchOnly[IllegalArgumentException](fromString(value)).isValid,
     message = (value: String) => s"'$value' is not a valid UUID value for $typeName"

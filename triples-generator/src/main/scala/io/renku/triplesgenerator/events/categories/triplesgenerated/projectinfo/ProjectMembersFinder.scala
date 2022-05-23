@@ -26,12 +26,11 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder
-import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
+import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.RecoverableErrorsRecovery
-import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
@@ -57,14 +56,12 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  private type ProjectAndCreator = (GitLabProjectInfo, Option[persons.GitLabId])
-
   override def findProjectMembers(path: projects.Path)(implicit
       maybeAccessToken:                 Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Set[ProjectMember]] = EitherT {
     (
-      fetchMembers(uri"projects" / path.show / "members", "members"),
-      fetchMembers(uri"projects" / path.show / "users", "users")
+      fetch(uri"projects" / path.show / "members", "project-members"),
+      fetch(uri"projects" / path.show / "users", "project-users")
     ).parMapN(_ ++ _)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(recoveryStrategy.maybeRecoverableError)
@@ -80,14 +77,14 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
   private implicit lazy val memberEntityDecoder: EntityDecoder[F, ProjectMember]       = jsonOf[F, ProjectMember]
   private implicit lazy val membersDecoder:      EntityDecoder[F, List[ProjectMember]] = jsonOf[F, List[ProjectMember]]
 
-  private def fetchMembers(
+  private def fetch(
       uri:                     Uri,
       endpointName:            String Refined NonEmpty,
       maybePage:               Option[Int] = None,
       allMembers:              Set[ProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] = for {
     uri                     <- uriWithPage(uri, maybePage).pure[F]
-    fetchedUsersAndNextPage <- gitLabClient.send(GET, uri, endpointName)(mapResponse)
+    fetchedUsersAndNextPage <- gitLabClient.get(uri, endpointName)(mapResponse)
     allMembers              <- addNextPage(uri, endpointName, allMembers, fetchedUsersAndNextPage)
   } yield allMembers
 
@@ -112,7 +109,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
   )(implicit maybeAccessToken:      Option[AccessToken]): F[Set[ProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
       case (fetchedUsers, maybeNextPage @ Some(_)) =>
-        fetchMembers(url, endpointName, maybeNextPage, allMembers ++ fetchedUsers)
+        fetch(url, endpointName, maybeNextPage, allMembers ++ fetchedUsers)
       case (fetchedUsers, None) => (allMembers ++ fetchedUsers).pure[F]
     }
 }

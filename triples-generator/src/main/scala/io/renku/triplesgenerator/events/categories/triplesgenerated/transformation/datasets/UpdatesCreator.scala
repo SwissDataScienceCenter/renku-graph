@@ -18,13 +18,15 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.datasets
 
+import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.{renku, schema}
-import io.renku.graph.model.datasets.{ResourceId, TopmostSameAs}
+import io.renku.graph.model.Schemas.{prov, renku, schema}
+import io.renku.graph.model.datasets.{DateCreated, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.persons
 import io.renku.graph.model.views.RdfResource
+import io.renku.jsonld.syntax._
 import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
@@ -53,6 +55,18 @@ private trait UpdatesCreator {
   def queriesUnlinkingCreators(dataset:      Dataset[Dataset.Provenance],
                                creatorsInKG: Set[persons.ResourceId]
   ): List[SparqlQuery]
+
+  def deleteOtherDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
+
+  def deleteOtherTopmostDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery]
+
+  def removeOtherOriginalIdentifiers(dataset:                 Dataset[Dataset.Provenance],
+                                     originalIdentifiersInKG: Set[OriginalIdentifier]
+  ): List[SparqlQuery]
+
+  def removeOtherDateCreated(dataset: Dataset[Dataset.Provenance], dateCreatedInKG: Set[DateCreated]): List[SparqlQuery]
+
+  def removeOtherSameAs(dataset: Dataset[Dataset.Provenance], sameAsInKG: Set[SameAs]): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
@@ -110,6 +124,41 @@ private object UpdatesCreator extends UpdatesCreator {
       }
       .toList
   }
+
+  override def deleteOtherDerivedFrom(dataset: Dataset[Dataset.Provenance.Modified]): List[SparqlQuery] = List(
+    SparqlQuery.of(
+      name = "transformation - delete other derivedFrom",
+      Prefixes of (prov -> "prov", schema -> "schema"),
+      s"""|DELETE {
+          |  ${dataset.resourceId.showAs[RdfResource]} prov:wasDerivedFrom ?derivedId
+          |}
+          |WHERE {
+          |  ${dataset.resourceId.showAs[RdfResource]} a schema:Dataset;
+          |                                            prov:wasDerivedFrom ?derivedId.
+          |  ?derivedId schema:url ?derived. 
+          |  FILTER (?derived != ${dataset.provenance.derivedFrom.showAs[RdfResource]})
+          |}
+          |""".stripMargin
+    )
+  )
+
+  override def deleteOtherTopmostDerivedFrom(
+      dataset: Dataset[Dataset.Provenance.Modified]
+  ): List[SparqlQuery] = List(
+    SparqlQuery.of(
+      name = "transformation - delete other topmostDerivedFrom",
+      Prefixes of (renku -> "renku", schema -> "schema"),
+      s"""|DELETE {
+          |  ${dataset.resourceId.showAs[RdfResource]} renku:topmostDerivedFrom ?topmostDerived
+          |}
+          |WHERE {
+          |  ${dataset.resourceId.showAs[RdfResource]} a schema:Dataset;
+          |                                            renku:topmostDerivedFrom ?topmostDerived.
+          |  FILTER (?topmostDerived != ${dataset.provenance.topmostDerivedFrom.showAs[RdfResource]})
+          |}
+          |""".stripMargin
+    )
+  )
 
   private def deleteSameAs(dataset: Dataset[Provenance.Internal]) = SparqlQuery.of(
     name = "transformation - delete sameAs",
@@ -204,4 +253,70 @@ private object UpdatesCreator extends UpdatesCreator {
         |}
         |""".stripMargin
   )
+
+  override def removeOtherOriginalIdentifiers(ds:                      Dataset[Provenance],
+                                              originalIdentifiersInKG: Set[OriginalIdentifier]
+  ) =
+    Option
+      .when((originalIdentifiersInKG - ds.provenance.originalIdentifier).nonEmpty) {
+        SparqlQuery.of(
+          name = "transformation - originalIdentifier clean-up",
+          Prefixes of renku -> "renku",
+          s"""|DELETE { ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version }
+              |WHERE { 
+              |  ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version.
+              |  FILTER ( ?version != '${ds.provenance.originalIdentifier}' )
+              |}""".stripMargin
+        )
+      }
+      .toList
+
+  override def removeOtherDateCreated(ds:              Dataset[Dataset.Provenance],
+                                      dateCreatedInKG: Set[DateCreated]
+  ): List[SparqlQuery] = Option
+    .when(
+      ds.provenance.date.isInstanceOf[DateCreated] &&
+        (dateCreatedInKG - ds.provenance.date.asInstanceOf[DateCreated]).nonEmpty
+    ) {
+      SparqlQuery.of(
+        name = "transformation - dateCreated clean-up",
+        Prefixes of schema -> "schema",
+        s"""|DELETE { ?dsId schema:dateCreated ?date }
+            |WHERE {
+            |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+            |  ?dsId schema:dateCreated ?date.
+            |  FILTER ( STR(?date) != '${ds.provenance.date}' )
+            |}""".stripMargin
+      )
+    }
+    .toList
+
+  override def removeOtherSameAs(ds: Dataset[Dataset.Provenance], sameAsInKG: Set[SameAs]): List[SparqlQuery] = {
+    val maybeSameAs = {
+      ds.provenance match {
+        case p: Dataset.Provenance.ImportedExternal => p.sameAs.some
+        case p: Dataset.Provenance.ImportedInternal => p.sameAs.some
+        case _ => None
+      }
+    }.widen[SameAs] >>= (_.asJsonLD.entityId)
+
+    maybeSameAs match {
+      case None => Nil
+      case Some(dsSameAs) =>
+        Option
+          .when((sameAsInKG.map(_.show) - dsSameAs.show).nonEmpty) {
+            SparqlQuery.of(
+              name = "transformation - sameAs clean-up",
+              Prefixes of schema -> "schema",
+              s"""|DELETE { ?dsId schema:sameAs ?sameAs }
+                  |WHERE {
+                  |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+                  |  ?dsId schema:sameAs ?sameAs.
+                  |  FILTER ( ?sameAs != <${dsSameAs.show}> )
+                  |}""".stripMargin
+            )
+          }
+          .toList
+    }
+  }
 }

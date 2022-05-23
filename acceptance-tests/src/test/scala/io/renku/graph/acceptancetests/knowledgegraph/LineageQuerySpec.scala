@@ -65,9 +65,16 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
 
     /** Expected data structure when looking for the grid_plot file
       *
-      * zhbikes folder clean_data \ / run plan 1 \ bikesParquet plot_data \ / run plan 2 / grid_plot
+      * zhbikes folder   clean_data
+      *           \      /
+      *          run plan 1
+      *               \
+      *              bikesParquet   plot_data
+      *                       \     /
+      *                      run plan 2
+      *                       /
+      *                grid_plot
       */
-
     Scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
       Given("some data in the RDF Store")
@@ -134,14 +141,8 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       val response = knowledgeGraphClient.POST(
         namedLineageQuery,
         variables = Map(
-          "projectPath" -> renkuProjectEntities(fixed(Visibility.Private)).generateOne
-            .copy(
-              path = model.projects.Path("accessible/member-project"),
-              members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))
-            )
-            .path
-            .toString,
-          "filePath" -> accessibleExemplarData.`grid_plot entity`.location
+          "projectPath" -> accessibleExemplarData.project.path.toString,
+          "filePath"    -> accessibleExemplarData.`grid_plot entity`.location
         ),
         maybeAccessToken = accessToken.some
       )

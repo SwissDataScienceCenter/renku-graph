@@ -18,18 +18,16 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.Constraints
+import io.renku.tinytypes.{Constraints, IntTinyType, LongTinyType}
 
-trait NonNegativeInt extends Constraints[Int] {
-
+trait NonNegativeInt[TT <: IntTinyType] extends Constraints[TT] {
   addConstraint(
     check = _ >= 0,
     message = _ => s"$typeName cannot be < 0"
   )
 }
 
-trait NonNegativeLong extends Constraints[Long] {
-
+trait NonNegativeLong[TT <: LongTinyType] extends Constraints[TT] {
   addConstraint(
     check = _ >= 0L,
     message = _ => s"$typeName cannot be < 0"

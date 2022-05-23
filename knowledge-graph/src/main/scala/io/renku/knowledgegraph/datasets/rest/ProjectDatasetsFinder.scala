@@ -20,7 +20,7 @@ package io.renku.knowledgegraph.datasets.rest
 
 import cats.MonadThrow
 import cats.effect.kernel.Async
-import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
+import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, Name, OriginalIdentifier, SameAs, Title}
 import io.renku.graph.model.projects.Path
 import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -33,7 +33,7 @@ private trait ProjectDatasetsFinder[F[_]] {
 
 private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
-  type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])
+  type ProjectDataset  = (Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig) =
     MonadThrow[F].catchNonFatal(
@@ -55,8 +55,9 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
 
   private def query(path: Path) = SparqlQuery.of(
     name = "ds projects",
-    Prefixes.of(renku -> "renku", schema -> "schema", prov -> "prov"),
-    s"""|SELECT ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+    Prefixes of (renku -> "renku", schema -> "schema", prov -> "prov"),
+    s"""|SELECT ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?originalId
+        | (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
         |   ?projectId a schema:Project;
         |              renku:projectPath '$path';
@@ -66,7 +67,7 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
         |               schema:name ?name;
         |               renku:slug ?slug;
         |               renku:topmostSameAs ?topmostSameAs;
-        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
+        |               renku:topmostDerivedFrom/schema:identifier ?originalId.
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
         |    FILTER NOT EXISTS { ?datasetId prov:invalidatedAtTime ?invalidationTime. }
@@ -77,7 +78,7 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
         |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
         |    }
         |}
-        |GROUP BY ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?initialVersion 
+        |GROUP BY ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?originalId
         |ORDER BY ?name
         |""".stripMargin
   )
@@ -85,42 +86,39 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
 
 private object ProjectDatasetsFinderImpl {
 
+  import ResultsDecoder._
   import io.circe.Decoder
-  import io.circe.Decoder.decodeList
 
-  private implicit val recordsDecoder: Decoder[List[ProjectDataset]] = {
-    import io.renku.tinytypes.json.TinyTypeDecoders._
+  private implicit val recordsDecoder: Decoder[List[ProjectDataset]] = ResultsDecoder[List, ProjectDataset] {
+    implicit cur =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    def sameAsOrDerived(from: SameAs, and: Option[DerivedFrom]): SameAsOrDerived = from -> and match {
-      case (_, Some(derivedFrom)) => Right(derivedFrom)
-      case (sameAs, _)            => Left(sameAs)
-    }
+      def sameAsOrDerived(from: SameAs, and: Option[DerivedFrom]): SameAsOrDerived = from -> and match {
+        case (_, Some(derivedFrom)) => Right(derivedFrom)
+        case (sameAs, _)            => Left(sameAs)
+      }
 
-    def toListOfImageUrls(urlString: Option[String]): List[ImageUri] =
-      urlString
-        .map(
-          _.split(",")
-            .map(_.trim)
-            .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUri(url) }
-            .toSet[(Int, ImageUri)]
-            .toList
-            .sortBy(_._1)
-            .map(_._2)
-        )
-        .getOrElse(Nil)
+      def toListOfImageUrls(urlString: Option[String]): List[ImageUri] =
+        urlString
+          .map(
+            _.split(",")
+              .map(_.trim)
+              .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUri(url) }
+              .toSet[(Int, ImageUri)]
+              .toList
+              .sortBy(_._1)
+              .map(_._2)
+          )
+          .getOrElse(Nil)
 
-    implicit val recordDecoder: Decoder[ProjectDataset] = { cursor =>
       for {
-        id               <- cursor.downField("identifier").downField("value").as[Identifier]
-        title            <- cursor.downField("name").downField("value").as[Title]
-        name             <- cursor.downField("slug").downField("value").as[Name]
-        sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
-        maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
-        initialVersion   <- cursor.downField("initialVersion").downField("value").as[InitialVersion]
-        images           <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
-      } yield (id, initialVersion, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom), images)
-    }
-
-    _.downField("results").downField("bindings").as(decodeList[ProjectDataset])
+        id               <- extract[Identifier]("identifier")
+        title            <- extract[Title]("name")
+        name             <- extract[Name]("slug")
+        sameAs           <- extract[SameAs]("topmostSameAs")
+        maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
+        originalId       <- extract[OriginalIdentifier]("originalId")
+        images           <- extract[Option[String]]("images").map(toListOfImageUrls)
+      } yield (id, originalId, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom), images)
   }
 }

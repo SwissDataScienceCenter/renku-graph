@@ -4,18 +4,19 @@ This is a microservice which provides API for the Graph DB.
 
 ## API
 
-| Method |  Path                                                     | Description                                                    |
-|--------|-----------------------------------------------------------|----------------------------------------------------------------|
-| GET    | ```/knowledge-graph/datasets```                           | Returns datasets filtered by the given predicates.             |
-| GET    | ```/knowledge-graph/datasets/:id```                       | Returns details of the dataset with the given `id`             |
-| GET    | ```/knowledge-graph/entities```                           | Returns entities filtered by the given predicates`             |
-| GET    | ```/knowledge-graph/graphql```                            | Returns GraphQL endpoint schema                                |
-| POST   | ```/knowledge-graph/graphql```                            | GraphQL query endpoint                                         |
-| GET    | ```/knowledge-graph/projects/:namespace/:name```          | Returns details of the project with the given `namespace/name` |
-| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets``` | Returns datasets of the project with the given `path`          |
-| GET    | ```/metrics```                                            | Serves Prometheus metrics                                      |
-| GET    | ```/ping```                                               | To check if service is healthy                                 |
-| GET    | ```/version```                                            | Returns info about service version                             |
+| Method | Path                                                                     | Description                                                          |
+|--------|--------------------------------------------------------------------------|----------------------------------------------------------------------|
+| GET    | ```/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                   |
+| GET    | ```/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                   |
+| GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                   |
+| GET    | ```/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                      |
+| POST   | ```/knowledge-graph/graphql```                                           | GraphQL query endpoint                                               |
+| GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`       |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project |
+| GET    | ```/metrics```                                                           | Serves Prometheus metrics                                            |
+| GET    | ```/ping```                                                              | To check if service is healthy                                       |
+| GET    | ```/version```                                                           | Returns info about service version                                   |
 
 #### GET /knowledge-graph/datasets
 
@@ -646,6 +647,57 @@ Response body example:
       ]
    }
 ]
+```
+
+#### GET /knowledge-graph/projects/:namespace/:name/files/:location/lineage
+
+Fetches lineage for a given project `namespace`/`name` and file `location` (relative path). This endpoint is intended to replace the graphql endpoint.
+
+| Status                     | Description                                                       |
+|----------------------------|-------------------------------------------------------------------|
+| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                      |
+| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access this project |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
+
+
+Response body example:
+
+```json
+{
+  "lineage": {
+    "edges": [
+      {
+        "source": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+        "target": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87"
+      },
+      {
+        "source": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+        "target": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+        "location": "data/zhbikes",
+        "label": "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297",
+        "type": "Directory"
+      },
+      {
+        "id": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+        "location": ".renku/workflow/3144e9aa470441cf905f94105e1d27ca_python.cwl",
+        "label": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet",
+        "type": "ProcessRun"
+      },
+      {
+        "id": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
+        "location": "data/preprocessed/zhbikes.parquet",
+        "label": "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87",
+        "type": "File"
+      }
+    ]
+  }
+}
 ```
 
 #### GET /metrics

@@ -19,6 +19,9 @@
 package io.renku.tinytypes
 
 import cats.syntax.all._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
+import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.tinytypes.constraints.PathSegment
 import org.scalacheck.Gen
@@ -177,6 +180,25 @@ class TypeNameSpec extends AnyWordSpec with should.Matchers {
   }
 
   private object TestTypeName extends TypeName
+}
+
+class RefinedValueSpec extends AnyWordSpec with should.Matchers {
+
+  private class RefinedTinyTypeTest private (val value: String) extends StringTinyType
+  private object RefinedTinyTypeTest
+      extends TinyTypeFactory[RefinedTinyTypeTest](new RefinedTinyTypeTest(_))
+      with RefinedValue[RefinedTinyTypeTest, NonEmpty]
+
+  "RefinedValue" should {
+
+    "add asRefined extension method on a TinyType instance for which Factory it's mixed in" in {
+      val tt = nonEmptyStrings().generateAs(RefinedTinyTypeTest)
+
+      val v: String Refined NonEmpty = tt.asRefined
+
+      v.value shouldBe tt.value
+    }
+  }
 }
 
 private class TinyTypeTest private (val value: String) extends AnyVal with StringTinyType

@@ -19,9 +19,13 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.persondetails
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.entities
+import io.renku.graph.model.GraphModelGenerators.personNames
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import io.renku.graph.model.{entities, persons}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
@@ -41,6 +45,25 @@ class KGPersonFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       finder.find(person).unsafeRunSync() shouldBe Some(person)
     }
 
+    "pick-up one of the Person names if there multiple" in new TestCase {
+      val person = personEntities().generateOne.to[entities.Person]
+
+      loadToStore(person)
+
+      val duplicateNames = personNames.generateNonEmptyList().toList.toSet
+      duplicateNames foreach { name =>
+        insertTriple(person.resourceId, "schema:name", show"'${sparqlEncode(name.show)}'")
+      }
+      findNames(person) shouldBe duplicateNames + person.name
+
+      val Some(found) = finder.find(person).unsafeRunSync()
+
+      found.resourceId       shouldBe person.resourceId
+      Set(found.name)          should contain oneElementOf (duplicateNames + person.name)
+      found.maybeEmail       shouldBe person.maybeEmail
+      found.maybeAffiliation shouldBe person.maybeAffiliation
+    }
+
     "return no Person if it doesn't exist" in new TestCase {
       finder
         .find(personEntities().generateOne.to[entities.Person])
@@ -53,4 +76,13 @@ class KGPersonFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val finder = new KGPersonFinderImpl[IO](rdfStoreConfig)
   }
+
+  private def findNames(id: entities.Person): Set[persons.Name] =
+    runQuery(s"""|SELECT ?name 
+                 |WHERE { 
+                 |  ${id.resourceId.showAs[RdfResource]} schema:name ?name
+                 |}""".stripMargin)
+      .unsafeRunSync()
+      .map(row => persons.Name(row("name")))
+      .toSet
 }

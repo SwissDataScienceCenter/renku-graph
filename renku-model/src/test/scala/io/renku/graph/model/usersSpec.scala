@@ -38,7 +38,7 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
   "Email" should {
 
     "be a NonBlank" in {
-      Email shouldBe a[NonBlank]
+      Email shouldBe a[NonBlank[_]]
     }
   }
 

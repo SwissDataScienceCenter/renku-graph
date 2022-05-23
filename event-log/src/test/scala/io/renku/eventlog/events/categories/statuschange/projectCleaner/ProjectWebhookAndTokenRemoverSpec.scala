@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.statuschange.projectCleaner
+package io.renku.eventlog.events.categories.statuschange
+package projectCleaner
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -30,6 +31,7 @@ import io.renku.graph.tokenrepository.{AccessTokenFinder, TokenRepositoryUrl}
 import io.renku.graph.webhookservice.WebhookServiceUrl
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status
@@ -107,6 +109,22 @@ class ProjectWebhookAndTokenRemoverSpec
       }.getMessage shouldBe exception.getMessage
     }
 
+    s"do nothing when the webhook deletion ends with $InternalServerError" in new TestCase {
+      (accesTokenFinder
+        .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
+        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .returns(accessToken.some.pure[IO])
+      stubFor {
+        delete(s"/projects/${project.id}/webhooks")
+          .withAccessToken(accessToken.some)
+          .willReturn(aResponse().withStatus(InternalServerError.code))
+      }
+
+      webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(Warn(show"$categoryName: removing webhook for project: $project got $InternalServerError"))
+    }
+
     "fail when the webhook deletion fails" in new TestCase {
       (accesTokenFinder
         .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
@@ -119,7 +137,7 @@ class ProjectWebhookAndTokenRemoverSpec
       }
       intercept[Exception] {
         webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync()
-      }.getMessage shouldBe s"DELETE $webhookServiceUrl/projects/${project.id}/webhooks returned $ServiceUnavailable; error: Removing project webhook failed with status: $ServiceUnavailable for project: ${project.show}"
+      }.getMessage shouldBe s"DELETE $webhookServiceUrl/projects/${project.id}/webhooks returned $ServiceUnavailable; error: removing webhook failed with status: $ServiceUnavailable for project: ${project.show}"
     }
 
     "fail when the token deletion fails" in new TestCase {

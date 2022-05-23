@@ -23,6 +23,7 @@ import io.renku.config.GitLab
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.control.{RateLimit, Throttler}
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import io.renku.metrics.MetricsRegistry
@@ -38,8 +39,9 @@ object Microservice extends IOMicroservice {
       sentryInitializer     <- SentryInitializer[IO]
       gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+      gitLabClient          <- GitLabClient(gitLabThrottler)
       executionTimeRecorder <- ExecutionTimeRecorder[IO]()
-      microserviceRoutes    <- MicroserviceRoutes(gitLabThrottler, executionTimeRecorder)
+      microserviceRoutes    <- MicroserviceRoutes(gitLabClient, executionTimeRecorder)
       exitcode <- microserviceRoutes.routes.use { routes =>
                     val httpServer = HttpServer[IO](serverPort = 9001, routes)
                     new MicroserviceRunner(

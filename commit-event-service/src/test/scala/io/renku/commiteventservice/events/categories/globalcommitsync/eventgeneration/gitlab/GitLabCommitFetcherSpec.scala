@@ -37,9 +37,8 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
-import org.http4s.Method.GET
 import org.http4s.implicits.http4sLiteralsSyntax
-import org.http4s.{EmptyBody, Header, Method, Request, Response, Status, Uri}
+import org.http4s.{EmptyBody, Header, Request, Response, Status, Uri}
 import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -56,10 +55,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       val condition   = dateConditions.generateOne
 
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
           _: Option[AccessToken]
         ))
-        .expects(GET, uri(condition), endpointName, *, maybeAccessToken)
+        .expects(uri(condition), endpointName, *, maybeAccessToken)
         .returning(expectation.pure[IO])
 
       gitLabCommitFetcher
@@ -73,10 +72,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       val pageResult = PageResult(commits = Nil, maybeNextPage = None)
 
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
           _: Option[AccessToken]
         ))
-        .expects(GET, uri(condition), endpointName, *, maybeAccessToken)
+        .expects(uri(condition), endpointName, *, maybeAccessToken)
         .returning(pageResult.pure[IO])
 
       gitLabCommitFetcher
@@ -115,10 +114,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         val pageResult = PageResult(commits = commitIds.generateFixedSizeList(1), maybeNextPage = None)
 
         (gitLabClient
-          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
             _: Option[AccessToken]
           ))
-          .expects(GET, uri(condition), endpointName, *, Option.empty[AccessToken])
+          .expects(uri(condition), endpointName, *, Option.empty[AccessToken])
           .returning(pageResult.pure[IO])
 
         responseMapping(condition)
@@ -151,10 +150,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
       val pageResult = pageResults().generateOne
 
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
           _: Option[AccessToken]
         ))
-        .expects(GET, uri, endpointName, *, maybeAccessToken)
+        .expects(uri, endpointName, *, maybeAccessToken)
         .returning(pageResult.pure[IO])
 
       gitLabCommitFetcher
@@ -190,10 +189,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
         val pageResult = pageResults().generateOne
 
         (gitLabClient
-          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
             _: Option[AccessToken]
           ))
-          .expects(GET, uri, endpointName, *, Option.empty[AccessToken])
+          .expects(uri, endpointName, *, Option.empty[AccessToken])
           .returning(pageResult.pure[IO])
 
         responseMapping
@@ -245,10 +244,10 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
 
       val endpointName: String Refined NonEmpty = "commits"
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
           _: Option[AccessToken]
         ))
-        .expects(*, *, endpointName, capture(responseMapping), maybeAccessToken)
+        .expects(*, endpointName, capture(responseMapping), maybeAccessToken)
         .returning(pageResults().generateOne.pure[IO])
 
       gitLabCommitFetcher
@@ -262,18 +261,16 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
   private trait LatestCommitsEndpointTestCase extends TestCase {
 
     val uri = uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map("per_page" -> "1")
-
-    val endpointName: String Refined NonEmpty = "latest commit"
+    val endpointName: String Refined NonEmpty = "latest-commit"
 
     val responseMapping = {
       val responseMapping = CaptureOne[ResponseMappingF[IO, PageResult]]()
 
-      val endpointName: String Refined NonEmpty = "latest commit"
       (gitLabClient
-        .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, PageResult])(
           _: Option[AccessToken]
         ))
-        .expects(*, *, endpointName, capture(responseMapping), maybeAccessToken)
+        .expects(*, endpointName, capture(responseMapping), maybeAccessToken)
         .returning(pageResults(1).generateOne.pure[IO])
 
       gitLabCommitFetcher

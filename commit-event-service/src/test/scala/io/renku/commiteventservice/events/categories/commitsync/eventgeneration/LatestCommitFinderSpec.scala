@@ -36,9 +36,8 @@ import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import org.http4s.Method.GET
 import org.http4s.implicits._
-import org.http4s.{Header, Method, Request, Response, Status, Uri}
+import org.http4s.{Header, Request, Response, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -87,10 +86,10 @@ class LatestCommitFinderSpec
     Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
       s"fallback to fetching the latest commit without an access token for $status" in new TestCase {
         (gitLabClient
-          .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
             _: Option[AccessToken]
           ))
-          .expects(*, *, *, *, *)
+          .expects(*, *, *, *)
           .returning(None.pure[IO])
 
         mapResponse((status, Request[IO](), Response[IO]())).unsafeRunSync() shouldBe None
@@ -127,11 +126,10 @@ class LatestCommitFinderSpec
     def setGitLabClientExpectation(maybeAccessToken: Option[AccessToken] = accessTokens.generateSome,
                                    returning:        Option[CommitInfo] = Some(commitInfo)
     ) = (gitLabClient
-      .send(_: Method, _: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
+      .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitInfo]])(
         _: Option[AccessToken]
       ))
-      .expects(GET,
-               uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
+      .expects(uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
                endpointName,
                *,
                maybeAccessToken

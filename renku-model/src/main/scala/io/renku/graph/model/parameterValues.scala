@@ -27,12 +27,12 @@ object parameterValues {
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
-      with Url
+      with Url[ResourceId]
       with EntityIdJsonLdOps[ResourceId]
 
   final class ValueOverride private (val value: String) extends AnyVal with StringTinyType
   implicit object ValueOverride
       extends TinyTypeFactory[ValueOverride](new ValueOverride(_))
-      with NonBlank
+      with NonBlank[ValueOverride]
       with TinyTypeJsonLDOps[ValueOverride]
 }

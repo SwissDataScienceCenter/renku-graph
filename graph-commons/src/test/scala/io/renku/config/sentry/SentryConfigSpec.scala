@@ -18,6 +18,7 @@
 
 package io.renku.config.sentry
 
+import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.ConfigLoadingException
 import io.renku.generators.CommonGraphGenerators._
@@ -27,7 +28,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
 class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -43,27 +44,34 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
           ).asJava
         ).asJava
       )
+      val versionConfig = ConfigFactory.parseMap(
+        Map("version" -> serviceVersions.generateOne.value).asJava
+      )
 
-      SentryConfig[Try](config) shouldBe Success(None)
+      SentryConfig[Try](config, versionConfig.some) shouldBe None.pure[Try]
     }
 
     "return a SentryConfig if 'services.sentry.enabled' is 'true' and all " +
-      "'services.sentry.url', 'services.sentry.service' and 'services.sentry.environment' are set" in {
+      "'services.sentry.url', 'services.sentry.environment', 'service-name' and 'version' are set" in {
         forAll { sentryConfig: SentryConfig =>
           val config = ConfigFactory.parseMap(
             Map(
+              "service-name" -> sentryConfig.serviceName.value,
               "services" -> Map(
                 "sentry" -> Map(
                   "enabled"     -> "true",
                   "dsn"         -> sentryConfig.baseUrl.value,
-                  "service"     -> sentryConfig.serviceName.value,
                   "environment" -> sentryConfig.environmentName.value
                 ).asJava
               ).asJava
             ).asJava
           )
 
-          SentryConfig[Try](config) shouldBe Success(Some(sentryConfig))
+          val versionConfig = ConfigFactory.parseMap(
+            Map("version" -> sentryConfig.serviceVersion.value).asJava
+          )
+
+          SentryConfig[Try](config, versionConfig.some) shouldBe sentryConfig.some.pure[Try]
         }
       }
 
@@ -71,38 +79,44 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
         Map(
+          "service-name" -> sentryConfig.serviceName.value,
           "services" -> Map(
             "sentry" -> Map(
               "enabled"     -> "true",
               "dsn"         -> "",
-              "service"     -> sentryConfig.serviceName.value,
               "environment" -> sentryConfig.environmentName.value
             ).asJava
           ).asJava
         ).asJava
       )
+      val versionConfig = ConfigFactory.parseMap(
+        Map("version" -> sentryConfig.serviceVersion.value).asJava
+      )
 
-      val Failure(exception) = SentryConfig[Try](config)
+      val Failure(exception) = SentryConfig[Try](config, versionConfig.some)
 
       exception shouldBe a[ConfigLoadingException]
     }
 
-    "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.service' is invalid" in {
+    "fail if 'services.sentry.enabled' is 'true' but 'service-name' is invalid" in {
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
         Map(
+          "service-name" -> "",
           "services" -> Map(
             "sentry" -> Map(
               "enabled"     -> "true",
               "dsn"         -> sentryConfig.baseUrl.value,
-              "service"     -> "",
               "environment" -> sentryConfig.environmentName.value
             ).asJava
           ).asJava
         ).asJava
       )
+      val versionConfig = ConfigFactory.parseMap(
+        Map("version" -> sentryConfig.serviceVersion.value).asJava
+      )
 
-      val Failure(exception) = SentryConfig[Try](config)
+      val Failure(exception) = SentryConfig[Try](config, versionConfig.some)
 
       exception shouldBe a[ConfigLoadingException]
     }
@@ -111,18 +125,44 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
         Map(
+          "service-name" -> sentryConfig.serviceName.value,
           "services" -> Map(
             "sentry" -> Map(
               "enabled"     -> "true",
               "dsn"         -> sentryConfig.baseUrl.value,
-              "service"     -> sentryConfig.serviceName.value,
               "environment" -> ""
             ).asJava
           ).asJava
         ).asJava
       )
+      val versionConfig = ConfigFactory.parseMap(
+        Map("version" -> sentryConfig.serviceVersion.value).asJava
+      )
 
-      val Failure(exception) = SentryConfig[Try](config)
+      val Failure(exception) = SentryConfig[Try](config, versionConfig.some)
+
+      exception shouldBe a[ConfigLoadingException]
+    }
+
+    "fail if 'services.sentry.enabled' is 'true' but 'version' is invalid" in {
+      val sentryConfig = sentryConfigs.generateOne
+      val config = ConfigFactory.parseMap(
+        Map(
+          "service-name" -> sentryConfig.serviceName.value,
+          "services" -> Map(
+            "sentry" -> Map(
+              "enabled"     -> "true",
+              "dsn"         -> sentryConfig.baseUrl.value,
+              "environment" -> sentryConfig.environmentName.value
+            ).asJava
+          ).asJava
+        ).asJava
+      )
+      val versionConfig = ConfigFactory.parseMap(
+        Map("version" -> "").asJava
+      )
+
+      val Failure(exception) = SentryConfig[Try](config, versionConfig.some)
 
       exception shouldBe a[ConfigLoadingException]
     }

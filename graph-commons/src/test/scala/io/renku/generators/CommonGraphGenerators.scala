@@ -23,8 +23,8 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.config.certificates.Certificate
 import io.renku.config.sentry.SentryConfig
-import io.renku.config.sentry.SentryConfig.{Dsn, Environment, Service}
-import io.renku.config.{ServiceUrl, renku}
+import io.renku.config.sentry.SentryConfig.{Dsn, Environment}
+import io.renku.config._
 import io.renku.control.{RateLimit, RateLimitUnit}
 import io.renku.crypto.AesCrypto
 import io.renku.generators.Generators.Implicits._
@@ -42,7 +42,6 @@ import io.renku.http.rest.{Links, SortBy, paging}
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import io.renku.http.server.security.model.AuthUser
-import io.renku.http.server.version.ServiceVersion
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
@@ -117,7 +116,9 @@ object CommonGraphGenerators {
   implicit val microserviceIdentifiers: Gen[MicroserviceIdentifier] =
     Gen.uuid map (_ => MicroserviceIdentifier.generate)
 
-  implicit val serviceVersions: Gen[ServiceVersion] = for {
+  implicit lazy val serviceNames: Gen[ServiceName] = nonEmptyStrings().toGeneratorOf(ServiceName)
+
+  implicit lazy val serviceVersions: Gen[ServiceVersion] = for {
     version       <- semanticVersions
     commitsNumber <- positiveInts(999)
     commitPart    <- shas.toGeneratorOfOptions.map(_.map(_.take(8)).map(sha => s"-$commitsNumber-g$sha").getOrElse(""))
@@ -139,13 +140,13 @@ object CommonGraphGenerators {
     projectName <- nonEmptyList(nonEmptyStrings()).map(_.toList.mkString("."))
     projectId   <- positiveInts(max = 100)
   } yield Dsn(s"$url@$projectName/$projectId")
-  private implicit val sentryServices:     Gen[Service]     = nonEmptyStrings() map Service.apply
   private implicit val sentryEnvironments: Gen[Environment] = nonEmptyStrings() map Environment.apply
   implicit val sentryConfigs: Gen[SentryConfig] = for {
-    dsn         <- sentryDsns
-    service     <- sentryServices
-    environment <- sentryEnvironments
-  } yield SentryConfig(dsn, environment, service)
+    dsn            <- sentryDsns
+    environment    <- sentryEnvironments
+    serviceName    <- serviceNames
+    serviceVersion <- serviceVersions
+  } yield SentryConfig(dsn, environment, serviceName, serviceVersion)
 
   implicit val rels: Gen[Rel] = nonEmptyStrings() map Rel.apply
   implicit val hrefs: Gen[Href] = for {

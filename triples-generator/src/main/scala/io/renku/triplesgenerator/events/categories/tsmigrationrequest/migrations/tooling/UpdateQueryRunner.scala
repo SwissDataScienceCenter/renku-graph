@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
-private trait UpdateQueryRunner[F[_]] {
+private[migrations] trait UpdateQueryRunner[F[_]] {
   def run(query: SparqlQuery): F[Unit]
 }
 
@@ -35,7 +35,9 @@ private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   def run(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
 }
 
-private object UpdateQueryRunner {
+private[migrations] object UpdateQueryRunner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateQueryRunner[F]] =
     RdfStoreConfig[F]().map(new UpdateQueryRunnerImpl(_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): UpdateQueryRunner[F] =
+    new UpdateQueryRunnerImpl(rdfStoreConfig)
 }

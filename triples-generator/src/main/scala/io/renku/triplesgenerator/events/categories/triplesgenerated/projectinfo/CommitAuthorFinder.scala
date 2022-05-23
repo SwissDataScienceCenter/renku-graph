@@ -49,14 +49,13 @@ private class CommitAuthorFinderImpl[F[_]: Async: Logger](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends CommitAuthorFinder[F] {
 
-  import org.http4s.Method.GET
   import org.http4s.dsl.io.{NotFound, Ok}
 
   override def findCommitAuthor(path: projects.Path, commitId: CommitId)(implicit
       maybeAccessToken:               Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]] = EitherT {
     gitLabClient
-      .send(GET, uri"projects" / path.value / "repository" / "commits" / commitId.show, "commit-detail")(
+      .get(uri"projects" / path.value / "repository" / "commits" / commitId.show, "single-commit")(
         mapTo[(persons.Name, persons.Email)]
       )
       .map(_.asRight[ProcessingRecoverableError])
