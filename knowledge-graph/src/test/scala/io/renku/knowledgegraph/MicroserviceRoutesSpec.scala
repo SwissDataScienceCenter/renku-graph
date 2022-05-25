@@ -368,9 +368,9 @@ class MicroserviceRoutesSpec
             uri -> Criteria(Filters(visibilities = list.toSet))
           }
           .generateOne,
-        dateParams
+        sinceParams
           .map(d =>
-            uri"/knowledge-graph/entities" +? ("date" -> d.value.toString) -> Criteria(Filters(maybeDate = d.some))
+            uri"/knowledge-graph/entities" +? ("since" -> d.value.toString) -> Criteria(Filters(maybeSince = d.some))
           )
           .generateOne,
         sortingDirections

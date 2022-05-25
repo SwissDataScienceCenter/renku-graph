@@ -88,29 +88,29 @@ package object finder {
       }
 
     def maybeOnDateCreated(variableName: String): String =
-      filters.maybeDate
+      filters.maybeSince
         .map(date => s"""|BIND (${date.encodeAsXsdZonedDate} AS ?dateZoned)
-                         |FILTER (xsd:date($variableName) = ?dateZoned)""".stripMargin)
+                         |FILTER (xsd:date($variableName) >= ?dateZoned)""".stripMargin)
         .getOrElse("")
 
     def maybeOnDatasetDates(dateCreatedVariable: String, datePublishedVariable: String): String =
-      filters.maybeDate
+      filters.maybeSince
         .map(date => s"""|BIND (${date.encodeAsXsdZonedDate} AS ?dateZoned)
                          |BIND (${date.encodeAsXsdNotZonedDate} AS ?dateNotZoned)
                          |FILTER (
                          |  IF (
                          |    BOUND($dateCreatedVariable), 
-                         |      xsd:date($dateCreatedVariable) = ?dateZoned, 
+                         |      xsd:date($dateCreatedVariable) >= ?dateZoned, 
                          |      (IF (
                          |        BOUND($datePublishedVariable), 
-                         |          xsd:date($datePublishedVariable) = ?dateNotZoned, 
+                         |          xsd:date($datePublishedVariable) >= ?dateNotZoned, 
                          |          false
                          |      ))
                          |  )
                          |)""".stripMargin)
         .getOrElse("")
 
-    private implicit class DateOps(date: Filters.Date) {
+    private implicit class DateOps(date: Filters.Since) {
 
       lazy val encodeAsXsdZonedDate: String =
         s"xsd:date(xsd:dateTime('${Instant.from(date.value.atStartOfDay(ZoneOffset.UTC))}'))"

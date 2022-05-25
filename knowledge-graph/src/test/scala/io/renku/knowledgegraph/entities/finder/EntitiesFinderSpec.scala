@@ -40,7 +40,8 @@ import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.{Duration, Instant, ZoneOffset}
+import java.time.temporal.ChronoUnit.DAYS
+import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
 
 class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matchers with InMemoryRdfStore with IOSpec {
@@ -447,23 +448,19 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
     }
   }
 
-  "findEntities - with date filter" should {
+  "findEntities - with 'since' filter" should {
 
-    "return entities with matching date only" in new TestCase {
-      val date = Filters.Date(dateParams.generateOne.value minusDays 1)
-      val dateAsInstant = Instant
-        .from(date.value atStartOfDay ZoneOffset.UTC)
-        .plusSeconds(positiveInts(60 * 60 * 24 - 1).generateOne.value)
+    "return entities with date >= 'since'" in new TestCase {
+      val since          = Filters.Since(sinceParams.generateOne.value minusDays 1)
+      val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
-      val matchingDS ::~ _ ::~ project = renkuProjectEntities(visibilityPublic)
-        .modify(replaceProjectDateCreated(to = projects.DateCreated(dateAsInstant)))
+      val matchingDS ::~ project = renkuProjectEntities(visibilityPublic)
+        .modify(replaceProjectDateCreated(to = projects.DateCreated(sinceAsInstant)))
         .withActivities(
-          activityEntities(planEntities().modify(replacePlanDateCreated(to = plans.DateCreated(dateAsInstant)))),
           activityEntities(
             planEntities().modify(
               replacePlanDateCreated(to =
-                timestampsNotInTheFuture(butYoungerThan = dateAsInstant.plus(Duration ofDays 1))
-                  .generateAs(plans.DateCreated)
+                timestampsNotInTheFuture(butYoungerThan = sinceAsInstant).generateAs[plans.DateCreated]
               )
             )
           )
@@ -471,18 +468,12 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .addDataset(
           datasetEntities(provenanceInternal)
             .modify(
-              provenanceLens[Dataset.Provenance.Internal].modify(_.copy(date = datasets.DateCreated(dateAsInstant)))
-            )
-        )
-        .addDataset(
-          datasetEntities(provenanceInternal).modify(
-            provenanceLens[Dataset.Provenance.Internal].modify(
-              _.copy(date =
-                timestampsNotInTheFuture(butYoungerThan = dateAsInstant.plus(Duration ofDays 1))
-                  .generateAs(datasets.DateCreated)
+              provenanceLens[Dataset.Provenance.Internal].modify(
+                _.copy(date =
+                  timestampsNotInTheFuture(butYoungerThan = sinceAsInstant).generateAs[datasets.DateCreated]
+                )
               )
             )
-          )
         )
         .generateOne
       val plan :: _ = project.plans.toList
@@ -490,7 +481,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeDate = date.some)))
+        .findEntities(Criteria(Filters(maybeSince = since.some)))
         .unsafeRunSync()
         .results shouldBe List(
         project.to[model.Entity.Project],
@@ -499,42 +490,89 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       ).sortBy(_.name.value)
     }
 
-    "return entities with matching date only - case of DatePublished" in new TestCase {
-      val date = dateParams.generateOne
+    "return no entities with date < 'since'" in new TestCase {
+      val since          = sinceParams.generateOne
+      val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
-      val matchingDS ::~ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+      val projectDateCreated = timestamps(max = sinceAsInstant minus (2, DAYS)).generateAs(projects.DateCreated)
+      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .modify(replaceProjectDateCreated(to = projectDateCreated))
+        .withActivities(
+          activityEntities(
+            planEntities().modify(
+              replacePlanDateCreated(to =
+                timestamps(min = projectDateCreated.value, max = sinceAsInstant minus (1, DAYS))
+                  .generateAs[plans.DateCreated]
+              )
+            )
+          )
+        )
+        .addDataset(
+          datasetEntities(provenanceInternal).modify(
+            provenanceLens[Dataset.Provenance.Internal].modify(
+              _.copy(date =
+                timestamps(min = projectDateCreated.value, max = sinceAsInstant minus (1, DAYS))
+                  .generateAs[datasets.DateCreated]
+              )
+            )
+          )
+        )
         .addDataset(
           datasetEntities(provenanceImportedExternal)
             .modify(
               provenanceLens[Dataset.Provenance.ImportedExternal]
-                .modify(_.copy(date = datasets.DatePublished(date.value)))
+                .modify(
+                  _.copy(date =
+                    timestamps(max = sinceAsInstant minus (1, DAYS))
+                      .map(LocalDate.ofInstant(_, ZoneOffset.UTC))
+                      .generateAs[datasets.DatePublished]
+                  )
+                )
             )
         )
-        .addDataset(datasetEntities(provenanceNonModified))
-        .generateOne
-
-      loadToStore(dsProject, projectEntities(visibilityPublic).generateOne)
-
-      finder
-        .findEntities(Criteria(Filters(maybeDate = date.some)))
-        .unsafeRunSync()
-        .results shouldBe List(
-        (matchingDS -> dsProject).to[model.Entity.Dataset]
-      ).sortBy(_.name.value)
-    }
-
-    "return no entities when no match on date" in new TestCase {
-      val _ ::~ project = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
-        .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
       loadToStore(project)
 
       finder
-        .findEntities(Criteria(Filters(maybeDate = dateParams.generateSome)))
+        .findEntities(Criteria(Filters(maybeSince = since.some)))
         .unsafeRunSync()
         .results shouldBe Nil
+    }
+
+    "return entities with date >= 'since' - case of DatePublished" in new TestCase {
+      val since          = sinceParams.generateOne
+      val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
+
+      val matchingDS ::~ dsProject = renkuProjectEntities(visibilityPublic)
+        .modify(
+          replaceProjectDateCreated(to =
+            timestamps(max = sinceAsInstant minus (2, DAYS)).generateAs(projects.DateCreated)
+          )
+        )
+        .addDataset(
+          datasetEntities(provenanceImportedExternal)
+            .modify(
+              provenanceLens[Dataset.Provenance.ImportedExternal]
+                .modify(
+                  _.copy(date =
+                    timestampsNotInTheFuture(butYoungerThan = sinceAsInstant)
+                      .map(LocalDate.ofInstant(_, ZoneOffset.UTC))
+                      .generateAs[datasets.DatePublished]
+                  )
+                )
+            )
+        )
+        .generateOne
+
+      loadToStore(dsProject)
+
+      finder
+        .findEntities(Criteria(Filters(maybeSince = since.some)))
+        .unsafeRunSync()
+        .results shouldBe List(
+        (matchingDS -> dsProject).to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
     }
   }
 

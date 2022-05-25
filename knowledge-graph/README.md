@@ -145,11 +145,11 @@ Response body example:
 Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 
 Filtering:
-* `query` - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
-* `type` - to filter by entity type(s); allowed values: `project`, `dataset`, `workflow`, and `person`; multiple `type` parameters allowed
-* `creator` - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
+* `query`      - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
+* `type`       - to filter by entity type(s); allowed values: `project`, `dataset`, `workflow`, and `person`; multiple `type` parameters allowed
+* `creator`    - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
 * `visibility` - to filter by visibility(ies) (restricted vs. public); allowed values: `public`, `internal`, `private`; multiple `visibility` parameters allowed
-* `date` - to filter by entity's creation date
+* `since`      - to filter by entity's creation date to >= the given date
 
 **NOTE:** all query parameters have to be url-encoded.
 

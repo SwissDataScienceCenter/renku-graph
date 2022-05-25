@@ -63,7 +63,7 @@ object Endpoint {
                              entityTypes:  Set[Filters.EntityType] = Set.empty,
                              creators:     Set[persons.Name] = Set.empty,
                              visibilities: Set[projects.Visibility] = Set.empty,
-                             maybeDate:    Option[Filters.Date] = None
+                             maybeSince:   Option[Filters.Since] = None
     )
 
     object Filters {
@@ -131,18 +131,18 @@ object Endpoint {
         }
       }
 
-      final class Date private (val value: LocalDate) extends AnyVal with LocalDateTinyType
-      object Date extends TinyTypeFactory[Date](new Date(_)) with LocalDateNotInTheFuture[Date] {
-        private implicit val dateParameterDecoder: QueryParamDecoder[Date] =
+      final class Since private (val value: LocalDate) extends AnyVal with LocalDateTinyType
+      object Since extends TinyTypeFactory[Since](new Since(_)) with LocalDateNotInTheFuture[Since] {
+        private implicit val dateParameterDecoder: QueryParamDecoder[Since] =
           (value: QueryParameterValue) =>
             Either
               .catchNonFatal(LocalDate.parse(value.value))
-              .flatMap(Date.from)
-              .leftMap(_ => parsingFailure(date.parameterName))
+              .flatMap(Since.from)
+              .leftMap(_ => parsingFailure(since.parameterName))
               .toValidatedNel
 
-        object date extends OptionalValidatingQueryParamDecoderMatcher[Date]("date") {
-          val parameterName: String = "date"
+        object since extends OptionalValidatingQueryParamDecoderMatcher[Since]("since") {
+          val parameterName: String = "since"
         }
       }
     }
