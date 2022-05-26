@@ -75,38 +75,54 @@ private class EventFinderImpl[F[_]: Async: SessionResource](
   } yield maybeProject -> maybeBody
 
   private def findProjectsWithEventsInQueue = measureExecutionTime {
-    SqlStatement(
-      name = Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find projects")
-    ).select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
-      sql"""
+    SqlStatement
+      .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find projects")
+      .select[ExecutionDate ~ ExecutionDate ~ Int, ProjectInfo](
+        sql"""
         SELECT p.project_id, p.project_path, p.latest_event_date,
-  	      (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = p.project_id AND evt_int.status = '#${TransformingTriples.value}') AS current_occupancy
+          (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = p.project_id AND evt_int.status = '#${TransformingTriples.value}') AS current_occupancy
         FROM (
-          SELECT DISTINCT evt.project_id
+          SELECT DISTINCT evt.project_id, MAX(evt.event_date) AS max_event_date
           FROM event evt
           JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id AND evt.project_id = evt_payload.project_id
           WHERE evt.status IN ('#${TriplesGenerated.value}', '#${TransformationRecoverableFailure.value}')
             AND evt.execution_date <= $executionDateEncoder
+          GROUP BY evt.project_id
         ) candidate_projects
         JOIN project p ON p.project_id = candidate_projects.project_id
-        JOIN event e ON e.project_id = candidate_projects.project_id 
-          AND e.event_date = p.latest_event_date
-          AND e.execution_date <= $executionDateEncoder
-          AND e.status IN ('#${TriplesGenerated.value}', '#${GenerationNonRecoverableFailure.value}', '#${TransformationRecoverableFailure.value}', '#${TransformationNonRecoverableFailure.value}', '#${Skipped.value}')
+        JOIN LATERAL (
+          SELECT COUNT(ee.event_id) AS count
+          FROM event ee
+          WHERE ee.project_id = candidate_projects.project_id
+            AND ee.event_date > candidate_projects.max_event_date
+            AND ee.status IN ('#${TransformingTriples.value}', '#${TriplesStore.value}', '#${TransformationRecoverableFailure.value}', '#${AwaitingDeletion.value}', '#${Deleting.value}')
+        ) younger_statuses_final ON 1 = 1
+        JOIN LATERAL (
+          SELECT COUNT(ee.event_id) AS count
+          FROM event ee
+          WHERE ee.project_id = candidate_projects.project_id
+            AND ee.execution_date <= $executionDateEncoder
+            AND ee.event_date = candidate_projects.max_event_date
+            AND ee.status IN ('#${TriplesGenerated.value}', '#${TransformationRecoverableFailure.value}')
+        ) same_date_statuses_to_do ON 1 = 1
+        WHERE younger_statuses_final.count = 0
+          AND same_date_statuses_to_do.count > 0
         ORDER BY p.latest_event_date DESC
-        LIMIT $int4;
-      """
-        .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
-        .map { case (id: projects.Id) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
-          ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
-        }
-    ).arguments(ExecutionDate(now()) ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
+        LIMIT $int4
+        """
+          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
+          .map { case (id: projects.Id) ~ (path: projects.Path) ~ (eventDate: EventDate) ~ (currentOccupancy: Long) =>
+            ProjectInfo(id, path, eventDate, Refined.unsafeApply(currentOccupancy.toInt))
+          }
+      )
+      .arguments(ExecutionDate(now()) ~ ExecutionDate(now()) ~ projectsFetchingLimit.value)
       .build(_.toList)
   }
 
   private def findNewestEvent(idAndPath: ProjectIds) = measureExecutionTime {
     val executionDate = ExecutionDate(now())
-    SqlStatement(name = Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find oldest"))
+    SqlStatement
+      .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find oldest")
       .select[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, TriplesGeneratedEvent](sql"""
          SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt_payload.payload
          FROM (
@@ -146,9 +162,8 @@ private class EventFinderImpl[F[_]: Async: SessionResource](
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
-  private lazy val markAsTransformingTriples: Option[TriplesGeneratedEvent] => Kleisli[F, Session[F], Option[
-    TriplesGeneratedEvent
-  ]] = {
+  private lazy val markAsTransformingTriples
+      : Option[TriplesGeneratedEvent] => Kleisli[F, Session[F], Option[TriplesGeneratedEvent]] = {
     case None =>
       Kleisli.pure(Option.empty[TriplesGeneratedEvent])
     case Some(event @ TriplesGeneratedEvent(id, _, _)) =>
@@ -156,7 +171,8 @@ private class EventFinderImpl[F[_]: Async: SessionResource](
   }
 
   private def updateStatus(commitEventId: CompoundEventId) =
-    SqlStatement(name = Refined.unsafeApply(s"${SubscriptionCategory.categoryName.value.toLowerCase} - update status"))
+    SqlStatement
+      .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - update status")
       .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
         sql"""UPDATE event
               SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
