@@ -22,7 +22,6 @@ import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventFinder
@@ -46,22 +45,25 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource](
     with ZombieEventSubProcess
     with TypeSerializers {
 
+  override val processName: ZombieEventProcess = ZombieEventProcess("lze")
+
   override def popEvent(): F[Option[ZombieEvent]] = SessionResource[F].useK {
     findEvent >>= markEventTaken
   }
   private val maxDurationForEvent = EventProcessingTime(Duration.ofMinutes(5))
 
   private def findEvent = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - find event"))
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - lze - find event")
       .select[EventStatus ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent](
         sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
-                FROM event evt
-                JOIN project proj ON evt.project_id = proj.project_id
-                WHERE (evt.status = $eventStatusEncoder
-                  OR evt.status = $eventStatusEncoder)
-                  AND evt.message = $text
-                  AND  (($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder)
-                LIMIT 1
+              FROM event evt
+              JOIN project proj ON evt.project_id = proj.project_id
+              WHERE 
+                (evt.status = $eventStatusEncoder OR evt.status = $eventStatusEncoder)
+                AND evt.message = $text
+                AND  (($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder)
+              LIMIT 1
           """
           .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
           .map { case eventId ~ projectId ~ path ~ status =>
@@ -83,13 +85,13 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource](
   }
 
   private def updateExecutionDate(eventId: CompoundEventId) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - update execution date"))
-      .command[ExecutionDate ~ EventId ~ projects.Id ~ String](
-        sql"""UPDATE event
-                  SET execution_date = $executionDateEncoder
-                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text
-            """.command
-      )
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - lze - update execution date")
+      .command[ExecutionDate ~ EventId ~ projects.Id ~ String](sql"""
+        UPDATE event
+        SET execution_date = $executionDateEncoder
+        WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text
+        """.command)
       .arguments(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage)
       .build
       .flatMapResult {
@@ -101,8 +103,6 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource](
           ).raiseError[F, Boolean]
       }
   }
-
-  override val processName: ZombieEventProcess = ZombieEventProcess("lze")
 }
 
 private object LostZombieEventFinder {

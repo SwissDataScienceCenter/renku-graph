@@ -22,7 +22,6 @@ import cats.Parallel
 import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
@@ -57,7 +56,8 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource](
   }
 
   private lazy val findPotentialZombieRecords = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find zombie sources"))
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - find zombie sources")
       .select[Void, (MicroserviceBaseUrl, SubscriberUrl)](
         sql"""SELECT DISTINCT source_url, delivery_url FROM subscriber"""
           .query(microserviceBaseUrlDecoder ~ subscriberUrlDecoder)
@@ -94,7 +94,8 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource](
   }
 
   private def checkIfExist(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - check source & delivery exists"))
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - check source & delivery exists")
       .select[MicroserviceBaseUrl ~ SubscriberUrl, MicroserviceBaseUrl](
         sql"""
             SELECT source_url
@@ -108,7 +109,8 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource](
   }
 
   private def delete(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete zombie source"))
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - delete zombie source")
       .command[MicroserviceBaseUrl ~ SubscriberUrl](sql"""
           DELETE
           FROM subscriber
@@ -119,7 +121,8 @@ private class ZombieNodesCleanerImpl[F[_]: Async: Parallel: SessionResource](
   }
 
   private def move(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - move subscriber"))
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - move subscriber")
       .command[MicroserviceBaseUrl ~ MicroserviceBaseUrl ~ SubscriberUrl](sql"""
          UPDATE subscriber
          SET source_url = $microserviceBaseUrlEncoder
