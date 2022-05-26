@@ -454,13 +454,14 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       val since          = Filters.Since(sinceParams.generateOne.value minusDays 1)
       val sinceAsInstant = Instant.from(since.value atStartOfDay ZoneOffset.UTC)
 
-      val matchingDS ::~ project = renkuProjectEntities(visibilityPublic)
-        .modify(replaceProjectDateCreated(to = projects.DateCreated(sinceAsInstant)))
+      val projectDateCreated = timestamps(min = sinceAsInstant, max = Instant.now()).generateAs[projects.DateCreated]
+      val ds ::~ project = renkuProjectEntities(visibilityPublic)
+        .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
             planEntities().modify(
               replacePlanDateCreated(to =
-                timestampsNotInTheFuture(butYoungerThan = sinceAsInstant).generateAs[plans.DateCreated]
+                timestampsNotInTheFuture(butYoungerThan = projectDateCreated.value).generateAs[plans.DateCreated]
               )
             )
           )
@@ -470,7 +471,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
             .modify(
               provenanceLens[Dataset.Provenance.Internal].modify(
                 _.copy(date =
-                  timestampsNotInTheFuture(butYoungerThan = sinceAsInstant).generateAs[datasets.DateCreated]
+                  timestampsNotInTheFuture(butYoungerThan = projectDateCreated.value).generateAs[datasets.DateCreated]
                 )
               )
             )
@@ -485,8 +486,8 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .unsafeRunSync()
         .results shouldBe List(
         project.to[model.Entity.Project],
-        (matchingDS -> project).to[model.Entity.Dataset],
-        (plan       -> project).to[model.Entity.Workflow]
+        (ds   -> project).to[model.Entity.Dataset],
+        (plan -> project).to[model.Entity.Workflow]
       ).sortBy(_.name.value)
     }
 
@@ -569,6 +570,133 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
+        .unsafeRunSync()
+        .results shouldBe List(
+        (matchingDS -> dsProject).to[model.Entity.Dataset]
+      ).sortBy(_.name.value)
+    }
+  }
+
+  "findEntities - with 'until' filter" should {
+
+    "return entities with date <= 'until'" in new TestCase {
+      val until          = untilParams.generateOne
+      val untilAsInstant = Instant.from(until.value atStartOfDay ZoneOffset.UTC)
+
+      val projectDateCreated = timestamps(max = untilAsInstant).generateAs[projects.DateCreated]
+      val ds ::~ project = renkuProjectEntities(visibilityPublic)
+        .modify(replaceProjectDateCreated(to = projectDateCreated))
+        .withActivities(
+          activityEntities(
+            planEntities().modify(
+              replacePlanDateCreated(to =
+                timestamps(min = projectDateCreated.value, max = untilAsInstant).generateAs[plans.DateCreated]
+              )
+            )
+          )
+        )
+        .addDataset(
+          datasetEntities(provenanceInternal)
+            .modify(
+              provenanceLens[Dataset.Provenance.Internal].modify(
+                _.copy(date =
+                  timestamps(min = projectDateCreated.value, max = untilAsInstant).generateAs[datasets.DateCreated]
+                )
+              )
+            )
+        )
+        .generateOne
+      val plan :: _ = project.plans.toList
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Criteria(Filters(maybeUntil = until.some)))
+        .unsafeRunSync()
+        .results shouldBe List(
+        project.to[model.Entity.Project],
+        (ds   -> project).to[model.Entity.Dataset],
+        (plan -> project).to[model.Entity.Workflow]
+      ).sortBy(_.name.value)
+    }
+
+    "return no entities with date > 'until'" in new TestCase {
+      val until          = Until(untilParams.generateOne.value minusDays 2)
+      val untilAsInstant = Instant.from(until.value atStartOfDay ZoneOffset.UTC)
+
+      val projectDateCreated = timestamps(min = untilAsInstant plus (1, DAYS)).generateAs(projects.DateCreated)
+      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .modify(replaceProjectDateCreated(to = projectDateCreated))
+        .withActivities(
+          activityEntities(
+            planEntities().modify(
+              replacePlanDateCreated(to =
+                timestampsNotInTheFuture(butYoungerThan = projectDateCreated.value).generateAs[plans.DateCreated]
+              )
+            )
+          )
+        )
+        .addDataset(
+          datasetEntities(provenanceInternal).modify(
+            provenanceLens[Dataset.Provenance.Internal].modify(
+              _.copy(date =
+                timestampsNotInTheFuture(butYoungerThan = projectDateCreated.value).generateAs[datasets.DateCreated]
+              )
+            )
+          )
+        )
+        .addDataset(
+          datasetEntities(provenanceImportedExternal)
+            .modify(
+              provenanceLens[Dataset.Provenance.ImportedExternal]
+                .modify(
+                  _.copy(date =
+                    timestampsNotInTheFuture(butYoungerThan = projectDateCreated.value)
+                      .map(LocalDate.ofInstant(_, ZoneOffset.UTC))
+                      .generateAs[datasets.DatePublished]
+                  )
+                )
+            )
+        )
+        .generateOne
+
+      loadToStore(project)
+
+      finder
+        .findEntities(Criteria(Filters(maybeUntil = until.some)))
+        .unsafeRunSync()
+        .results shouldBe Nil
+    }
+
+    "return entities with date <= 'until' - case of DatePublished" in new TestCase {
+      val until          = Until(untilParams.generateOne.value minusDays 2)
+      val untilAsInstant = Instant.from(until.value atStartOfDay ZoneOffset.UTC)
+
+      val matchingDS ::~ dsProject = renkuProjectEntities(visibilityPublic)
+        .modify(
+          replaceProjectDateCreated(to =
+            timestampsNotInTheFuture(butYoungerThan = untilAsInstant plus (1, DAYS)).generateAs(projects.DateCreated)
+          )
+        )
+        .addDataset(
+          datasetEntities(provenanceImportedExternal)
+            .modify(
+              provenanceLens[Dataset.Provenance.ImportedExternal]
+                .modify(
+                  _.copy(date =
+                    timestamps(max = untilAsInstant)
+                      .map(LocalDate.ofInstant(_, ZoneOffset.UTC))
+                      .generateAs[datasets.DatePublished]
+                  )
+                )
+            )
+        )
+        .generateOne
+
+      loadToStore(dsProject)
+
+      finder
+        .findEntities(Criteria(Filters(maybeUntil = until.some)))
         .unsafeRunSync()
         .results shouldBe List(
         (matchingDS -> dsProject).to[model.Entity.Dataset]

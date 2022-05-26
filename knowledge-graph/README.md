@@ -150,6 +150,7 @@ Filtering:
 * `creator`    - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
 * `visibility` - to filter by visibility(ies) (restricted vs. public); allowed values: `public`, `internal`, `private`; multiple `visibility` parameters allowed
 * `since`      - to filter by entity's creation date to >= the given date
+* `until`      - to filter by entity's creation date to <= the given date
 
 **NOTE:** all query parameters have to be url-encoded.
 

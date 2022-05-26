@@ -254,6 +254,12 @@ object Generators {
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
 
+  def localDates(min: LocalDate = LocalDate.EPOCH,
+                 max: LocalDate = LocalDate.now().plus(2000, JAVA_DAYS)
+  ): Gen[LocalDate] = Gen
+    .choose(min.toEpochDay, max.toEpochDay)
+    .map(LocalDate.ofEpochDay)
+
   val localDatesNotInTheFuture: Gen[LocalDate] =
     timestampsNotInTheFuture
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))

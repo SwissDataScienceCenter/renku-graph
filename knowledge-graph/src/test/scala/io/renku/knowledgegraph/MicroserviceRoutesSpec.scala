@@ -316,7 +316,6 @@ class MicroserviceRoutesSpec
         .call(Request[IO](Method.GET, lineageUri(projectPaths.generateOne, nodeLocations.generateOne)))
         .status shouldBe Unauthorized
     }
-
   }
 
   "GET /knowledge-graph/entities" should {
@@ -371,6 +370,11 @@ class MicroserviceRoutesSpec
         sinceParams
           .map(d =>
             uri"/knowledge-graph/entities" +? ("since" -> d.value.toString) -> Criteria(Filters(maybeSince = d.some))
+          )
+          .generateOne,
+        untilParams
+          .map(d =>
+            uri"/knowledge-graph/entities" +? ("until" -> d.value.toString) -> Criteria(Filters(maybeUntil = d.some))
           )
           .generateOne,
         sortingDirections
@@ -431,6 +435,18 @@ class MicroserviceRoutesSpec
       response.status             shouldBe BadRequest
       response.contentType        shouldBe Some(`Content-Type`(application.json))
       response.body[ErrorMessage] shouldBe ErrorMessage("'visibility' parameter with invalid value")
+    }
+
+    s"return $BadRequest for if since > until" in new TestCase {
+      val since = sinceParams.generateOne
+      val until = localDates(max = since.value.minusDays(1)).generateAs(Filters.Until)
+      val response = routes().call {
+        Request[IO](Method.GET, uri"/knowledge-graph/entities" +? ("since" -> since.show) +? ("until" -> until.show))
+      }
+
+      response.status             shouldBe BadRequest
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe ErrorMessage("'since' parameter > 'until'")
     }
 
     "authenticate user from the request if given" in new TestCase {

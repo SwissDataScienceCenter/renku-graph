@@ -63,7 +63,8 @@ object Endpoint {
                              entityTypes:  Set[Filters.EntityType] = Set.empty,
                              creators:     Set[persons.Name] = Set.empty,
                              visibilities: Set[projects.Visibility] = Set.empty,
-                             maybeSince:   Option[Filters.Since] = None
+                             maybeSince:   Option[Filters.Since] = None,
+                             maybeUntil:   Option[Filters.Until] = None
     )
 
     object Filters {
@@ -143,6 +144,21 @@ object Endpoint {
 
         object since extends OptionalValidatingQueryParamDecoderMatcher[Since]("since") {
           val parameterName: String = "since"
+        }
+      }
+
+      final class Until private (val value: LocalDate) extends AnyVal with LocalDateTinyType
+      object Until extends TinyTypeFactory[Until](new Until(_)) with LocalDateNotInTheFuture[Until] {
+        private implicit val dateParameterDecoder: QueryParamDecoder[Until] =
+          (value: QueryParameterValue) =>
+            Either
+              .catchNonFatal(LocalDate.parse(value.value))
+              .flatMap(Until.from)
+              .leftMap(_ => parsingFailure(until.parameterName))
+              .toValidatedNel
+
+        object until extends OptionalValidatingQueryParamDecoderMatcher[Until]("until") {
+          val parameterName: String = "until"
         }
       }
     }
