@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph
 
 import cats.MonadThrow
+import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
@@ -100,19 +101,20 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   private lazy val `GET /entities routes`: AuthedRoutes[Option[AuthUser], F] = {
     import io.renku.knowledgegraph.entities.Endpoint.Criteria._
     import Filters.CreatorName.creatorNames
-    import Filters.Date.date
     import Filters.EntityType.entityTypes
     import Filters.Query.query
+    import Filters.Since.since
+    import Filters.Until.until
     import Filters.Visibility.visibilities
     import Sorting.sort
 
     AuthedRoutes.of {
       case req@GET -> Root / "knowledge-graph" / "entities"
         :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators)
-        +& visibilities(maybeVisibilities) +& date(maybeDate) +& sort(maybeSort)
-        +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
+        +& visibilities(maybeVisibilities) +& since(maybeSince) +& until(maybeUntil) 
+        +& sort(maybeSort) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
         searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeVisibilities,
-          maybeDate, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
+          maybeSince, maybeUntil, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
     }
   }
   // format: on
@@ -151,7 +153,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
       types:        ValidatedNel[ParseFailure, List[entities.Endpoint.Criteria.Filters.EntityType]],
       creators:     ValidatedNel[ParseFailure, List[persons.Name]],
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
-      maybeDate:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Date]],
+      maybeSince:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Since]],
+      maybeUntil:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Until]],
       maybeSort:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Sorting.By]],
       maybePage:    Option[ValidatedNel[ParseFailure, Page]],
       maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]],
@@ -167,12 +170,25 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
       types.map(_.toSet),
       creators.map(_.toSet),
       visibilities.map(_.toSet),
-      maybeDate.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Date])),
+      maybeSince.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Since])),
+      maybeUntil.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Until])),
       maybeSort getOrElse Validated.validNel(Sorting.By(ByName, Direction.Asc)),
-      PagingRequest(maybePage, maybePerPage)
-    ).mapN { case (maybeQuery, types, creators, visibilities, maybeDate, sorting, paging) =>
+      PagingRequest(maybePage, maybePerPage),
+      (maybeSince -> maybeUntil)
+        .mapN(_ -> _)
+        .map {
+          case (Valid(since), Valid(until)) if (since.value compareTo until.value) > 0 =>
+            ParseFailure("'since' parameter > 'until'", "").invalidNel[Unit]
+          case _ => ().validNel[ParseFailure]
+        }
+        .getOrElse(().validNel[ParseFailure])
+    ).mapN { case (maybeQuery, types, creators, visibilities, maybeSince, maybeUntil, sorting, paging, _) =>
       `GET /entities`(
-        Criteria(Filters(maybeQuery, types, creators, visibilities, maybeDate), sorting, paging, maybeUser),
+        Criteria(Filters(maybeQuery, types, creators, visibilities, maybeSince, maybeUntil),
+                 sorting,
+                 paging,
+                 maybeUser
+        ),
         request
       )
     }.fold(toBadRequest, identity)
