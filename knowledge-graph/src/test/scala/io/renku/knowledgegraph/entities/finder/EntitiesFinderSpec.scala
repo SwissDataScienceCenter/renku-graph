@@ -708,11 +708,14 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
   "findEntities - with both 'since' and 'until' filter" should {
 
     "return entities with date >= 'since' && date <= 'until'" in new TestCase {
-      val sinceValue :: untilValue :: Nil = localDatesNotInTheFuture.generateFixedSizeList(ofSize = 2).sorted
-      val since                           = Since(sinceValue)
-      val until                           = Until(untilValue)
-      val sinceAsInstant                  = Instant.from(sinceValue atStartOfDay ZoneOffset.UTC)
-      val untilAsInstant                  = Instant.from(untilValue atStartOfDay ZoneOffset.UTC)
+      val sinceValue :: untilValue :: Nil = localDatesNotInTheFuture
+        .generateFixedSizeList(ofSize = 2)
+        .map(_ minusDays 1) // to prevent other parts of the test not to go into the future
+        .sorted
+      val since          = Since(sinceValue)
+      val until          = Until(untilValue)
+      val sinceAsInstant = Instant.from(sinceValue atStartOfDay ZoneOffset.UTC)
+      val untilAsInstant = Instant.from(untilValue atStartOfDay ZoneOffset.UTC)
 
       val projectDateCreated = timestamps(min = sinceAsInstant, max = untilAsInstant).generateAs[projects.DateCreated]
       val dsInternal ::~ dsExternal ::~ _ ::~ _ ::~ project = renkuProjectEntities(visibilityPublic)
@@ -756,7 +759,9 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
           datasetEntities(provenanceImportedExternal)
             .modify(
               provenanceLens[Dataset.Provenance.ImportedExternal].modify(
-                _.copy(date = localDates(min = untilValue plusDays 1).generateAs[datasets.DatePublished])
+                _.copy(date =
+                  localDates(min = untilValue plusDays 1, max = LocalDate.now()).generateAs[datasets.DatePublished]
+                )
               )
             )
         )
