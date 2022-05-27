@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.MonadThrow
-import cats.data.{Kleisli, Nested}
+import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.implicits._
@@ -49,25 +49,21 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
   override val processName: ZombieEventProcess = ZombieEventProcess("lpe")
 
   override def popEvent(): F[Option[ZombieEvent]] = SessionResource[F].useK {
-    findPotentialZombies >>= lookForZombie >>= markEventTaken
+    queryProjectsToCheck >>= lookForZombie >>= markEventTaken
   }
-
-  private def findPotentialZombies =
-    Nested(queryProjectsToCheck).map { case (id, currentStatus) => id -> currentStatus.toEventStatus }.value
 
   private def queryProjectsToCheck = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lpe - find projects")
-      .select[EventStatus ~ EventStatus, (projects.Id, TransformationStatus)](
+      .select[Void, (projects.Id, EventStatus)](
         sql"""SELECT DISTINCT evt.project_id, evt.status
               FROM event evt
-              WHERE evt.status = $eventStatusEncoder
-                OR evt.status = $eventStatusEncoder
+              WHERE evt.status IN ('#${GeneratingTriples.value}', '#${TransformingTriples.value}', '#${Deleting.value}')
           """
-          .query(projectIdDecoder ~ transformationStatusGet)
+          .query(projectIdDecoder ~ eventStatusDecoder)
           .map { case id ~ status => (id, status) }
       )
-      .arguments(GeneratingTriples ~ TransformingTriples)
+      .arguments(Void)
       .build(_.toList)
   }
 
@@ -80,92 +76,56 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
       }
   }
 
-  private def queryZombieEvent(projectId: projects.Id, status: EventStatus) =
-    measureExecutionTime {
-      SqlStatement
-        .named(s"${categoryName.value.toLowerCase} - lpe - find")
-        .select[projects.Id ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent](
-          sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
-                FROM event evt
-                JOIN project proj ON proj.project_id = evt.project_id
-                LEFT JOIN event_delivery ed ON ed.project_id = evt.project_id AND ed.event_id = evt.event_id
-                WHERE evt.project_id = $projectIdEncoder
-                  AND evt.status = $eventStatusEncoder
-                  AND (evt.message IS NULL OR evt.message <> $text)
-                  AND (ed.delivery_id IS NULL
-                    AND ($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder
-                  )
-                LIMIT 1
-                """
-            .query(compoundEventIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
-            .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
-        )
-        .arguments(
-          projectId ~ status ~ zombieMessage ~ ExecutionDate(now()) ~ EventProcessingTime(Duration.ofMinutes(5))
-        )
-        .build(_.option)
-    }
+  private def queryZombieEvent(projectId: projects.Id, status: EventStatus) = measureExecutionTime {
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - lpe - find")
+      .select[projects.Id ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent](
+        sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
+              FROM event evt
+              JOIN project proj ON proj.project_id = evt.project_id
+              LEFT JOIN event_delivery ed ON ed.project_id = evt.project_id AND ed.event_id = evt.event_id
+              WHERE evt.project_id = $projectIdEncoder
+                AND evt.status = $eventStatusEncoder
+                AND (evt.message IS NULL OR evt.message <> $text)
+                AND (ed.delivery_id IS NULL
+                  AND ($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder
+                )
+              LIMIT 1
+              """
+          .query(compoundEventIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
+          .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
+      )
+      .arguments(
+        projectId ~ status ~ zombieMessage ~ ExecutionDate(now()) ~ EventProcessingTime(Duration.ofMinutes(5))
+      )
+      .build(_.option)
+  }
 
   private lazy val markEventTaken: Option[ZombieEvent] => Kleisli[F, Session[F], Option[ZombieEvent]] = {
     case None        => Kleisli.pure(Option.empty[ZombieEvent])
     case Some(event) => updateMessage(event.eventId) map toNoneIfEventAlreadyTaken(event)
   }
 
-  private def updateMessage(eventId: CompoundEventId) =
-    measureExecutionTime {
-      SqlStatement
-        .named(s"${categoryName.value.toLowerCase} - lpe - update message")
-        .command[String ~ ExecutionDate ~ EventId ~ projects.Id](
-          sql"""UPDATE event
-                  SET message = $text, execution_date = $executionDateEncoder
-                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+  private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - lpe - update message")
+      .command[String ~ ExecutionDate ~ EventId ~ projects.Id](
+        sql"""UPDATE event
+              SET message = $text, execution_date = $executionDateEncoder
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
-        )
-        .arguments(zombieMessage ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId)
-        .build
-    }
+      )
+      .arguments(zombieMessage ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId)
+      .build
+  }
 
   private def toNoneIfEventAlreadyTaken(event: ZombieEvent): Completion => Option[ZombieEvent] = {
     case Completion.Update(1) => Some(event)
     case _                    => None
   }
-
-  private implicit val transformationStatusGet: Decoder[TransformationStatus] = varchar.map {
-    case GeneratingTriples.value   => TransformationStatus.Generating
-    case TransformingTriples.value => TransformationStatus.Transforming
-    case other                     => throw new Exception(s"${getClass.getName} cannot work with $other")
-  }
-
-  private sealed trait TransformationStatus {
-    val toEventStatus: EventStatus
-
-    def processingTimeFindingStatus: EventStatus
-
-    def followingFindingStatuses: Set[EventStatus]
-  }
-
-  private object TransformationStatus {
-    final case object Generating extends TransformationStatus {
-      override val toEventStatus:               EventStatus = GeneratingTriples
-      override val processingTimeFindingStatus: EventStatus = TriplesGenerated
-      override val followingFindingStatuses: Set[EventStatus] = Set(TriplesGenerated,
-                                                                    TransformingTriples,
-                                                                    TransformationRecoverableFailure,
-                                                                    TransformationNonRecoverableFailure,
-                                                                    TriplesStore
-      )
-    }
-
-    final case object Transforming extends TransformationStatus {
-      override val toEventStatus:               EventStatus      = TransformingTriples
-      override val processingTimeFindingStatus: EventStatus      = TriplesStore
-      override val followingFindingStatuses:    Set[EventStatus] = Set(TriplesStore)
-    }
-  }
 }
 
 private object LongProcessingEventFinder {
-
   def apply[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventFinder[F, ZombieEvent]] =
     MonadThrow[F].catchNonFatal {
       new LongProcessingEventFinder(queriesExecTimes)
