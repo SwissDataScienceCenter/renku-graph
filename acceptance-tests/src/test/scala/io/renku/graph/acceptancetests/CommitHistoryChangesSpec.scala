@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests
 
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
@@ -90,7 +91,7 @@ class CommitHistoryChangesSpec
         .POST("webhooks/events", model.HookToken(project.id), GitLab.pushEvent(project, newCommits.last))
         .status shouldBe Accepted
 
-      sleep((3 second).toMillis)
+      sleep((10 seconds).toMillis)
 
       `wait for events to be processed`(project.id)
 
@@ -133,6 +134,8 @@ class CommitHistoryChangesSpec
       And("the global commit sync is triggered")
       EventLog.removeGlobalCommitSyncRow(project.id)
 
+      sleep((1 second).toMillis)
+
       `wait for events to be processed`(project.id)
 
       Then("the project and its datasets should be removed from the knowledge-graph")
@@ -157,11 +160,13 @@ class CommitHistoryChangesSpec
     val projectDetails = projectDetailsResponse.jsonBody
     projectDetails shouldBe fullJson(project)
 
-    val datasetsLink = projectDetails._links.fold(throw _, identity).get(Links.Rel("datasets")) getOrElse fail(
-      "No link with rel 'datasets'"
-    )
+    val datasetsLink = projectDetails._links
+      .fold(throw _, identity)
+      .get(Links.Rel("datasets"))
+      .getOrElse(fail("No link with rel 'datasets'"))
+
     val datasetsResponse = restClient
-      .GET(datasetsLink.href.toString, accessToken)
+      .GET(datasetsLink.href.show, accessToken)
       .flatMap(response => response.as[Json].map(json => response.status -> json))
       .unsafeRunSync()
 

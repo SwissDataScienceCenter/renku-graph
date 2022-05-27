@@ -84,10 +84,10 @@ object EventLog extends TypeSerializers {
   )
 
   def removeGlobalCommitSyncRow(projectId: Id)(implicit ioRuntime: IORuntime): Unit = execute { session =>
-    val command: Command[projects.Id] =
-      sql"""DELETE FROM subscription_category_sync_time
-            WHERE project_id = $projectIdEncoder 
-            AND category_name = 'GLOBAL_COMMIT_SYNC' """.command
+    val command: Command[projects.Id] = sql"""
+      DELETE FROM subscription_category_sync_time
+      WHERE project_id = $projectIdEncoder 
+        AND category_name = 'GLOBAL_COMMIT_SYNC' """.command
     session.prepare(command).use(_.execute(projectId)).void
   }
 
