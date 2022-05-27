@@ -137,17 +137,13 @@ class CommitHistoryChangesSpec
 
       Then("the project and its datasets should be removed from the knowledge-graph")
 
-      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
-
-      projectDetailsResponse.status shouldBe NotFound
+      knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken).status shouldBe NotFound
 
       project.entitiesProject.datasets.foreach { dataset =>
-        val datasetsResponse =
-          knowledgeGraphClient.GET(s"knowledge-graph/datasets/${dataset.identification.identifier}", accessToken)
-
-        datasetsResponse shouldBe NotFound
+        knowledgeGraphClient
+          .GET(s"knowledge-graph/datasets/${dataset.identification.identifier}", accessToken)
+          .status shouldBe NotFound
       }
-
     }
   }
 
@@ -172,8 +168,8 @@ class CommitHistoryChangesSpec
     datasetsResponse._1 shouldBe Ok
     val Right(foundDatasets) = datasetsResponse._2.as[List[Json]]
     foundDatasets should contain theSameElementsAs projectEntities.datasets.map(briefJson(_, project.path))
-
   }
+
   private def generateNewActivitiesAndDataset(projectEntities: RenkuProject) =
     renkuProjectEntities(visibilityPublic).generateOne.copy(
       version = projectEntities.version,
