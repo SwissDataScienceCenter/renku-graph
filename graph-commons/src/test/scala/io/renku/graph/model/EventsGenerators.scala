@@ -29,13 +29,14 @@ import java.time.Duration
 
 object EventsGenerators {
 
-  implicit val commitIds:      Gen[CommitId]      = shas map CommitId.apply
-  implicit val commitMessages: Gen[CommitMessage] = nonEmptyStrings() map CommitMessage.apply
-  implicit val committedDates: Gen[CommittedDate] = timestampsNotInTheFuture map CommittedDate.apply
-  implicit val eventIds:       Gen[EventId]       = shas map EventId.apply
-  implicit val batchDates:     Gen[BatchDate]     = timestampsNotInTheFuture map BatchDate.apply
-  implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
-  implicit val eventStatuses:  Gen[EventStatus]   = Gen.oneOf(EventStatus.all)
+  implicit val commitIds:          Gen[CommitId]                     = shas map CommitId.apply
+  implicit val commitMessages:     Gen[CommitMessage]                = nonEmptyStrings() map CommitMessage.apply
+  implicit val committedDates:     Gen[CommittedDate]                = timestampsNotInTheFuture map CommittedDate.apply
+  implicit val eventIds:           Gen[EventId]                      = shas map EventId.apply
+  implicit val batchDates:         Gen[BatchDate]                    = timestampsNotInTheFuture map BatchDate.apply
+  implicit val eventBodies:        Gen[EventBody]                    = jsons.map(_.noSpaces).map(EventBody.apply)
+  implicit val eventStatuses:      Gen[EventStatus]                  = Gen.oneOf(EventStatus.all)
+  implicit val processingStatuses: Gen[EventStatus.ProcessingStatus] = Gen.oneOf(ProcessingStatus.all)
   val failureEventStatuses: Gen[FailureStatus] = Gen.oneOf(
     GenerationNonRecoverableFailure,
     GenerationRecoverableFailure,

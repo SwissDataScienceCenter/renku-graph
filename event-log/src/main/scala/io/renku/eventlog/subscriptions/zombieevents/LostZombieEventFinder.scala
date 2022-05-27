@@ -26,8 +26,8 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{ExecutionDate, TypeSerializers}
-import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.events.EventStatus.ProcessingStatus
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk._
@@ -55,22 +55,22 @@ private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource](
   private def findEvent = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lze - find event")
-      .select[EventStatus ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent](
+      .select[ExecutionDate ~ EventProcessingTime, ZombieEvent](
         sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
               FROM event evt
               JOIN project proj ON evt.project_id = proj.project_id
               WHERE 
-                (evt.status = $eventStatusEncoder OR evt.status = $eventStatusEncoder)
-                AND evt.message = $text
+                evt.status IN (#${ProcessingStatus.all.map(s => show"'$s'").mkString(", ")})
+                AND evt.message = '#$zombieMessage'
                 AND  (($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder)
               LIMIT 1
           """
-          .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
+          .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ processingStatusDecoder)
           .map { case eventId ~ projectId ~ path ~ status =>
             ZombieEvent(processName, CompoundEventId(eventId, projectId), path, status)
           }
       )
-      .arguments(GeneratingTriples ~ TransformingTriples ~ zombieMessage ~ ExecutionDate(now()) ~ maxDurationForEvent)
+      .arguments(ExecutionDate(now()) ~ maxDurationForEvent)
       .build(_.option)
   }
 

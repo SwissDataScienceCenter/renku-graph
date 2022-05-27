@@ -60,7 +60,7 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
       .select[Void, (projects.Id, EventStatus)](
         sql"""SELECT DISTINCT evt.project_id, evt.status
               FROM event evt
-              WHERE evt.status IN ('#${GeneratingTriples.value}', '#${TransformingTriples.value}', '#${Deleting.value}')
+              WHERE evt.status IN (#${ProcessingStatus.all.map(s => show"'$s'").mkString(", ")})
           """
           .query(projectIdDecoder ~ eventStatusDecoder)
           .map { case id ~ status => (id, status) }
@@ -104,7 +104,7 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
                 )
               LIMIT 1
               """
-          .query(compoundEventIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
+          .query(compoundEventIdDecoder ~ projectPathDecoder ~ processingStatusDecoder)
           .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
       )
       .arguments(
