@@ -22,5 +22,4 @@ import io.renku.events.CategoryName
 
 package object zombieevents {
   private[zombieevents] val categoryName: CategoryName = CategoryName("ZOMBIE_CHASING")
-
 }
