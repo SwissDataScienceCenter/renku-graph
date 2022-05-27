@@ -19,7 +19,6 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
@@ -28,7 +27,7 @@ import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
+import io.renku.graph.model.events.EventStatus.ProcessingStatus
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
@@ -39,7 +38,7 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with IOSpec with InMemor
 
   "popEvent" should {
 
-    List(GeneratingTriples, TransformingTriples) foreach { status =>
+    ProcessingStatus.all foreach { status =>
       "return event which belongs to a subscriber not listed in the subscriber table " +
         s"if event's status is $status" in new TestCase {
 
@@ -58,14 +57,13 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with IOSpec with InMemor
         }
     }
 
-    EventStatus.all.filterNot(status => status == GeneratingTriples || status == TransformingTriples) foreach {
-      status =>
-        s"return None when the event has a the status $status" in new TestCase {
-          addEvent(eventId, status)
-          upsertEventDelivery(eventId, subscriberId)
+    EventStatus.all diff ProcessingStatus.all.asInstanceOf[Set[EventStatus]] foreach { status =>
+      s"return None when the event has a the status $status" in new TestCase {
+        addEvent(eventId, status)
+        upsertEventDelivery(eventId, subscriberId)
 
-          finder.popEvent().unsafeRunSync() shouldBe None
-        }
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
     }
   }
 

@@ -92,7 +92,7 @@ private class EventDeliveryImpl[F[_]: MonadCancelThrow: SessionResource, Categor
         SqlStatement(name = "event delivery info - remove")
           .command[EventId ~ projects.Id](
             sql"""DELETE FROM event_delivery
-              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
           """.command
           )
           .arguments(eventId ~ projectId)

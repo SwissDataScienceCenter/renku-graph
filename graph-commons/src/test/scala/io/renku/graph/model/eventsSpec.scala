@@ -100,6 +100,12 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       )
     }
   }
+
+  "ProcessingStatus" should {
+    "group all EventStatuses that are of the ProcessingStatus type" in {
+      ProcessingStatus.all shouldBe EventStatus.all.collect { case s: ProcessingStatus => s }
+    }
+  }
 }
 
 class CompoundEventIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {

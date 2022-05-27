@@ -27,7 +27,7 @@ import io.circe.syntax._
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
-import io.renku.graph.model.EventsGenerators.compoundEventIds
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, processingStatuses}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
@@ -52,88 +52,50 @@ class EventHandlerSpec
   "handle" should {
 
     Updated :: NotUpdated :: Nil foreach { result =>
-      s"decode an event with the $GeneratingTriples status from the request, " +
-        "schedule event update " +
-        s"and return $Accepted if the event status cleaning returned $result" in new TestCase {
+      ProcessingStatus.all foreach { status =>
+        s"decode an event with the $status status from the request, " +
+          "schedule event update " +
+          s"and return $Accepted if the event status cleaning returned $result" in new TestCase {
 
-          val eventId     = compoundEventIds.generateOne
-          val projectPath = projectPaths.generateOne
-          val event       = GeneratingTriplesZombieEvent(eventId, projectPath)
+            val eventId     = compoundEventIds.generateOne
+            val projectPath = projectPaths.generateOne
+            val event       = ZombieEvent(eventId, projectPath, status)
 
-          (zombieStatusCleaner.cleanZombieStatus _)
-            .expects(event)
-            .returning(result.pure[IO])
+            (zombieStatusCleaner.cleanZombieStatus _)
+              .expects(event)
+              .returning(result.pure[IO])
 
-          val waitForGaugeIncrement = Deferred.unsafe[IO, Unit]
-          val waitForGaugeDecrement = Deferred.unsafe[IO, Unit]
-          if (result == Updated) {
-            (awaitingTriplesGenerationGauge.increment _)
-              .expects(event.projectPath)
-              .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeIncrement.complete(())))
-            (underTriplesGenerationGauge.decrement _)
-              .expects(event.projectPath)
-              .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeDecrement.complete(())))
-          } else {
-            waitForGaugeIncrement.complete(()).unsafeRunSync()
-            waitForGaugeDecrement.complete(()).unsafeRunSync()
-          }
+            val waitForGaugeIncrement = Deferred.unsafe[IO, Unit]
+            val waitForGaugeDecrement = Deferred.unsafe[IO, Unit]
+            if (result == Updated) {
+              val (incGauge, decGauge) = gaugesFor(status)
+              (incGauge.increment _)
+                .expects(event.projectPath)
+                .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeIncrement.complete(())))
+              (decGauge.decrement _)
+                .expects(event.projectPath)
+                .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeDecrement.complete(())))
+            } else {
+              waitForGaugeIncrement.complete(()).unsafeRunSync()
+              waitForGaugeDecrement.complete(()).unsafeRunSync()
+            }
 
-          handler
-            .createHandlingProcess(requestContent(event.asJson))
-            .unsafeRunSync()
-            .process
-            .value
-            .unsafeRunSync() shouldBe Right(Accepted)
+            handler
+              .createHandlingProcess(requestContent(event.asJson))
+              .unsafeRunSync()
+              .process
+              .value
+              .unsafeRunSync() shouldBe Right(Accepted)
 
-          (waitForGaugeIncrement.get >> waitForGaugeDecrement.get).unsafeRunSync()
+            (waitForGaugeIncrement.get >> waitForGaugeDecrement.get).unsafeRunSync()
 
-          logger.loggedOnly(
-            Info(
-              s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
+            logger.loggedOnly(
+              Info(
+                s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
+              )
             )
-          )
-        }
-
-      s"decode an event  with the $TransformingTriples status from the request, " +
-        "schedule event update " +
-        s"and return $Accepted if the event status cleaning result is $result" in new TestCase {
-
-          val eventId     = compoundEventIds.generateOne
-          val projectPath = projectPaths.generateOne
-          val event       = TransformingTriplesZombieEvent(eventId, projectPath)
-
-          (zombieStatusCleaner.cleanZombieStatus _)
-            .expects(event)
-            .returning(result.pure[IO])
-
-          val waitForGaugeIncrement = Deferred.unsafe[IO, Unit]
-          val waitForGaugeDecrement = Deferred.unsafe[IO, Unit]
-          if (result == Updated) {
-            (awaitingTriplesTransformationGauge.increment _)
-              .expects(event.projectPath)
-              .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeIncrement.complete(())))
-            (underTriplesTransformationGauge.decrement _)
-              .expects(event.projectPath)
-              .onCall((_: projects.Path) => ().pure[IO] flatTap (_ => waitForGaugeDecrement.complete(())))
-          } else {
-            waitForGaugeIncrement.complete(()).unsafeRunSync()
-            waitForGaugeDecrement.complete(()).unsafeRunSync()
           }
-
-          handler
-            .createHandlingProcess(requestContent(event.asJson))
-            .unsafeRunSync()
-            .process
-            .value
-            .unsafeRunSync() shouldBe Right(Accepted)
-
-          (waitForGaugeIncrement.get >> waitForGaugeDecrement.get).unsafeRunSync()
-          logger.loggedOnly(
-            Info(
-              s"${handler.categoryName}: ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status} -> $Accepted"
-            )
-          )
-        }
+      }
     }
 
     "log an error if event status cleaning fails" in new TestCase {
@@ -208,29 +170,37 @@ class EventHandlerSpec
   private trait TestCase {
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val zombieStatusCleaner                = mock[ZombieStatusCleaner[IO]]
-    val awaitingTriplesGenerationGauge     = mock[LabeledGauge[IO, projects.Path]]
-    val underTriplesGenerationGauge        = mock[LabeledGauge[IO, projects.Path]]
-    val awaitingTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
-    val underTriplesTransformationGauge    = mock[LabeledGauge[IO, projects.Path]]
+    val zombieStatusCleaner         = mock[ZombieStatusCleaner[IO]]
+    val awaitingGenerationGauge     = mock[LabeledGauge[IO, projects.Path]]
+    val underGenerationGauge        = mock[LabeledGauge[IO, projects.Path]]
+    val awaitingTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val underTransformationGauge    = mock[LabeledGauge[IO, projects.Path]]
+    val awaitingDeletionGauge       = mock[LabeledGauge[IO, projects.Path]]
+    val underDeletionGauge          = mock[LabeledGauge[IO, projects.Path]]
     val handler = new EventHandler[IO](categoryName,
                                        zombieStatusCleaner,
-                                       awaitingTriplesGenerationGauge,
-                                       underTriplesGenerationGauge,
-                                       awaitingTriplesTransformationGauge,
-                                       underTriplesTransformationGauge
+                                       awaitingGenerationGauge,
+                                       underGenerationGauge,
+                                       awaitingTransformationGauge,
+                                       underTransformationGauge,
+                                       awaitingDeletionGauge,
+                                       underDeletionGauge
     )
+
+    val gaugesFor: ProcessingStatus => (LabeledGauge[IO, projects.Path], LabeledGauge[IO, projects.Path]) = {
+      case GeneratingTriples   => awaitingGenerationGauge     -> underGenerationGauge
+      case TransformingTriples => awaitingTransformationGauge -> underTransformationGauge
+      case Deleting            => awaitingDeletionGauge       -> underDeletionGauge
+    }
   }
 
   private lazy val events: Gen[ZombieEvent] = for {
     eventId     <- compoundEventIds
     projectPath <- projectPaths
-    event <- Gen.oneOf(GeneratingTriplesZombieEvent(eventId, projectPath),
-                       TransformingTriplesZombieEvent(eventId, projectPath)
-             )
-  } yield event
+    status      <- processingStatuses
+  } yield ZombieEvent(eventId, projectPath, status)
 
-  private implicit def eventEncoder[E <: ZombieEvent]: Encoder[E] = Encoder.instance[E] { event =>
+  private implicit lazy val eventEncoder: Encoder[ZombieEvent] = Encoder.instance { event =>
     json"""{
       "categoryName": "ZOMBIE_CHASING",
       "id":           ${event.eventId.id.value},

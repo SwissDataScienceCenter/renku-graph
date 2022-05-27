@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
@@ -32,6 +31,7 @@ import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
@@ -40,33 +40,52 @@ class LongProcessingEventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
+    with TableDrivenPropertyChecks
     with MockFactory
     with should.Matchers {
 
   "popEvent" should {
 
-    GeneratingTriples +: TransformingTriples +: Nil foreach { status =>
-      "return no event if " +
-        s"it's in the $status status " +
-        "but there's delivery info for it" in new TestCase {
+    forAll {
+      Table(
+        "status"            -> "grace period",
+        GeneratingTriples   -> Duration.ofDays(4 * 7),
+        TransformingTriples -> Duration.ofDays(1),
+        Deleting            -> Duration.ofDays(1)
+      )
+    } { (status, gracePeriod) =>
+      "return an event " +
+        s"if it's in the $status status for more than $gracePeriod " +
+        "and there's info about its delivery" in new TestCase {
 
-          val eventId = compoundEventIds.generateOne
+          val oldEnoughEventId = compoundEventIds.generateOne
           addEvent(
-            eventId,
-            GeneratingTriples,
-            relativeTimestamps().generateAs(ExecutionDate)
+            oldEnoughEventId,
+            status,
+            relativeTimestamps(moreThanAgo = gracePeriod plusHours 1).generateAs(ExecutionDate)
           )
-          upsertEventDeliveryInfo(eventId)
+          upsertEventDeliveryInfo(oldEnoughEventId)
 
+          val tooYoungEventId = compoundEventIds.generateOne
+          addEvent(
+            tooYoungEventId,
+            status,
+            relativeTimestamps(lessThanAgo = gracePeriod minusHours 1).generateAs(ExecutionDate)
+          )
+          upsertEventDeliveryInfo(tooYoungEventId)
+
+          finder.popEvent().unsafeRunSync() shouldBe Some(
+            ZombieEvent(finder.processName, oldEnoughEventId, projectPath, status)
+          )
           finder.popEvent().unsafeRunSync() shouldBe None
         }
     }
 
-    GeneratingTriples +: TransformingTriples +: Nil foreach { status =>
-      "return an event if " +
-        s"it's in the $status status " +
+    GeneratingTriples :: TransformingTriples :: Deleting :: Nil foreach { status =>
+      "return an event " +
+        s"if it's in the $status status " +
         "there's no info about its delivery " +
-        "and it in status for more than 5 minutes" in new TestCase {
+        "and it's in status for more than 5 minutes" in new TestCase {
 
           val eventId = compoundEventIds.generateOne
           addEvent(
@@ -75,9 +94,8 @@ class LongProcessingEventFinderSpec
             relativeTimestamps(moreThanAgo = Duration ofMinutes 6).generateAs(ExecutionDate)
           )
 
-          val eventInProcessingStatusTooShort = compoundEventIds.generateOne
           addEvent(
-            eventInProcessingStatusTooShort,
+            compoundEventIds.generateOne,
             status,
             relativeTimestamps(lessThanAgo = Duration ofMinutes 4).generateAs(ExecutionDate)
           )

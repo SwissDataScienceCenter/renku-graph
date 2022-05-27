@@ -86,6 +86,8 @@ object Microservice extends IOMicroservice {
                                         underTriplesGenerationGauge,
                                         awaitingTransformationGauge,
                                         underTransformationGauge,
+                                        awaitingDeletionGauge,
+                                        deletingGauge,
                                         queriesExecTimes
                                       )
           commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(queriesExecTimes)

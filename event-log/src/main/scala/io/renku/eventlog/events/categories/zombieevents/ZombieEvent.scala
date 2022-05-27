@@ -18,25 +18,8 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
-import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events.CompoundEventId
+import io.renku.graph.model.events.EventStatus.ProcessingStatus
 import io.renku.graph.model.projects
 
-private sealed trait ZombieEvent {
-  type Status <: EventStatus
-  val eventId:     CompoundEventId
-  val projectPath: projects.Path
-  val status:      Status
-}
-
-private final case class GeneratingTriplesZombieEvent(eventId: CompoundEventId, projectPath: projects.Path)
-    extends ZombieEvent {
-  override type Status = GeneratingTriples
-  override val status: GeneratingTriples = GeneratingTriples
-}
-
-private final case class TransformingTriplesZombieEvent(eventId: CompoundEventId, projectPath: projects.Path)
-    extends ZombieEvent {
-  override type Status = TransformingTriples
-  override val status: TransformingTriples = TransformingTriples
-}
+private case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: ProcessingStatus)

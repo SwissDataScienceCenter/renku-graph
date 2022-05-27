@@ -20,7 +20,8 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.Show
 import cats.implicits.showInterpolator
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events.CompoundEventId
+import io.renku.graph.model.events.EventStatus.ProcessingStatus
 import io.renku.graph.model.projects
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -30,7 +31,7 @@ private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](ne
 private case class ZombieEvent(generatedBy: ZombieEventProcess,
                                eventId:     CompoundEventId,
                                projectPath: projects.Path,
-                               status:      EventStatus
+                               status:      ProcessingStatus
 ) {
   override lazy val toString: String =
     s"$ZombieEvent $generatedBy $eventId, projectPath = $projectPath, status = $status"

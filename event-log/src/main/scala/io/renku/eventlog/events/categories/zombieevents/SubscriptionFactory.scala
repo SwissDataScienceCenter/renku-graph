@@ -32,11 +32,13 @@ import org.typelevel.log4cats.Logger
 object SubscriptionFactory {
 
   def apply[F[_]: Async: SessionResource: Logger](
-      awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
-      underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
-      awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
-      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path],
-      queriesExecTimes:                   LabeledHistogram[F]
+      awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
+      underGenerationGauge:        LabeledGauge[F, projects.Path],
+      awaitingTransformationGauge: LabeledGauge[F, projects.Path],
+      underTransformationGauge:    LabeledGauge[F, projects.Path],
+      awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
+      underDeletionGauge:          LabeledGauge[F, projects.Path],
+      queriesExecTimes:            LabeledHistogram[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
@@ -44,10 +46,12 @@ object SubscriptionFactory {
                              )
     handler <- EventHandler(
                  queriesExecTimes,
-                 awaitingTriplesGenerationGauge,
-                 underTriplesGenerationGauge,
-                 awaitingTriplesTransformationGauge,
-                 underTriplesTransformationGauge
+                 awaitingGenerationGauge,
+                 underGenerationGauge,
+                 awaitingTransformationGauge,
+                 underTransformationGauge,
+                 awaitingDeletionGauge,
+                 underDeletionGauge
                )
   } yield handler -> subscriptionMechanism
 }

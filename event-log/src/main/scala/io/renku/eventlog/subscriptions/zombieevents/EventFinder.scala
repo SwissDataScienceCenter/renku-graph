@@ -36,8 +36,10 @@ private class EventFinder[F[_]: MonadThrow: Logger](
     lostZombieEventFinder:      subscriptions.EventFinder[F, ZombieEvent]
 ) extends subscriptions.EventFinder[F, ZombieEvent] {
 
+  import zombieNodesCleaner._
+
   override def popEvent(): F[Option[ZombieEvent]] = for {
-    _ <- zombieNodesCleaner.removeZombieNodes() recoverWith logError
+    _ <- removeZombieNodes() recoverWith logError
     maybeEvent <- OptionT(longProcessingEventsFinder.popEvent())
                     .orElseF(lostSubscriberEventFinder.popEvent())
                     .orElseF(lostZombieEventFinder.popEvent())

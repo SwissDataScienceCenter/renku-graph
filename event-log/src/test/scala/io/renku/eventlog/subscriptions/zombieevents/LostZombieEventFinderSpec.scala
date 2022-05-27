@@ -19,19 +19,16 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates}
 import io.renku.eventlog.{EventMessage, ExecutionDate, InMemoryEventLogDbSpec}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.relativeTimestamps
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses, processingStatuses}
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
-import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -58,7 +55,7 @@ class LostZombieEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEve
       addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne)
 
       val zombieEventId: CompoundEventId = compoundEventIds.generateOne
-      val zombieEventStatus = zombieEventStatuses.generateOne
+      val zombieEventStatus = processingStatuses.generateOne
       addZombieEvent(zombieEventId, lostZombieEventExecutionDate.generateOne, zombieEventStatus)
 
       finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(finder.processName,
@@ -66,17 +63,16 @@ class LostZombieEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEve
                                                              projectPath,
                                                              zombieEventStatus
       ).some
-      finder.popEvent().unsafeRunSync() shouldBe None
 
+      finder.popEvent().unsafeRunSync() shouldBe None
     }
 
     "return None if an event is in the past and the status is GeneratingTriples or TransformingTriples " +
       "but the message is not a zombie message" in new TestCase {
-        addRandomEvent(lostZombieEventExecutionDate.generateOne, zombieEventStatuses.generateOne)
+        addRandomEvent(lostZombieEventExecutionDate.generateOne, processingStatuses.generateOne)
         addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne)
 
         finder.popEvent().unsafeRunSync() shouldBe None
-
       }
   }
 
@@ -95,8 +91,6 @@ class LostZombieEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEve
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val finder           = new LostZombieEventFinder(queriesExecTimes)
 
-    val zombieEventStatuses = Gen.oneOf(GeneratingTriples, TransformingTriples)
-
     def addRandomEvent(executionDate: ExecutionDate = executionDates.generateOne,
                        status:        EventStatus = eventStatuses.generateOne
     ): Unit = storeEvent(
@@ -109,7 +103,7 @@ class LostZombieEventFinderSpec extends AnyWordSpec with IOSpec with InMemoryEve
 
     def addZombieEvent(eventId:       CompoundEventId,
                        executionDate: ExecutionDate,
-                       status:        EventStatus = zombieEventStatuses.generateOne
+                       status:        EventStatus = processingStatuses.generateOne
     ): Unit = storeEvent(
       eventId,
       status,
