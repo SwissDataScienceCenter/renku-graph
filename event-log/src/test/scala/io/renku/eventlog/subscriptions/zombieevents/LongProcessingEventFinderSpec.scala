@@ -31,6 +31,7 @@ import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
@@ -39,20 +40,43 @@ class LongProcessingEventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
+    with TableDrivenPropertyChecks
     with MockFactory
     with should.Matchers {
 
   "popEvent" should {
 
-    GeneratingTriples :: TransformingTriples :: Deleting :: Nil foreach { status =>
-      "return no event " +
-        s"if it's in the $status status " +
-        "and there's delivery info for it" in new TestCase {
+    forAll {
+      Table(
+        "status"            -> "grace period",
+        GeneratingTriples   -> Duration.ofDays(4 * 7),
+        TransformingTriples -> Duration.ofDays(1),
+        Deleting            -> Duration.ofDays(1)
+      )
+    } { (status, gracePeriod) =>
+      "return an event " +
+        s"if it's in the $status status for more than $gracePeriod " +
+        "and there's info about its delivery" in new TestCase {
 
-          val eventId = compoundEventIds.generateOne
-          addEvent(eventId, status, relativeTimestamps().generateAs(ExecutionDate))
-          upsertEventDeliveryInfo(eventId)
+          val oldEnoughEventId = compoundEventIds.generateOne
+          addEvent(
+            oldEnoughEventId,
+            status,
+            relativeTimestamps(moreThanAgo = gracePeriod plusHours 1).generateAs(ExecutionDate)
+          )
+          upsertEventDeliveryInfo(oldEnoughEventId)
 
+          val tooYoungEventId = compoundEventIds.generateOne
+          addEvent(
+            tooYoungEventId,
+            status,
+            relativeTimestamps(lessThanAgo = gracePeriod minusHours 1).generateAs(ExecutionDate)
+          )
+          upsertEventDeliveryInfo(tooYoungEventId)
+
+          finder.popEvent().unsafeRunSync() shouldBe Some(
+            ZombieEvent(finder.processName, oldEnoughEventId, projectPath, status)
+          )
           finder.popEvent().unsafeRunSync() shouldBe None
         }
     }
@@ -70,9 +94,8 @@ class LongProcessingEventFinderSpec
             relativeTimestamps(moreThanAgo = Duration ofMinutes 6).generateAs(ExecutionDate)
           )
 
-          val eventInProcessingStatusTooShort = compoundEventIds.generateOne
           addEvent(
-            eventInProcessingStatusTooShort,
+            compoundEventIds.generateOne,
             status,
             relativeTimestamps(lessThanAgo = Duration ofMinutes 4).generateAs(ExecutionDate)
           )

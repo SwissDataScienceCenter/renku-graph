@@ -27,7 +27,7 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{ExecutionDate, TypeSerializers}
-import io.renku.graph.model.events.EventStatus._
+import io.renku.graph.model.events.EventStatus.{Deleting, GeneratingTriples, TransformingTriples, _}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
@@ -52,6 +52,8 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
     queryProjectsToCheck >>= lookForZombie >>= markEventTaken
   }
 
+  private type Candidate = (projects.Id, ProcessingStatus)
+
   private def queryProjectsToCheck = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lpe - find projects")
@@ -65,9 +67,15 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
       )
       .arguments(Void)
       .build(_.toList)
+      .flatMapResult(_.map {
+        case (id, status: ProcessingStatus) => (id -> status).pure[F]
+        case (_, status: EventStatus) =>
+          new Exception(show"Long Processing Event finder cannot work with $status")
+            .raiseError[F, (projects.Id, ProcessingStatus)]
+      }.sequence)
   }
 
-  private lazy val lookForZombie: List[(projects.Id, EventStatus)] => Kleisli[F, Session[F], Option[ZombieEvent]] = {
+  private lazy val lookForZombie: List[Candidate] => Kleisli[F, Session[F], Option[ZombieEvent]] = {
     case Nil => Kleisli.pure(Option.empty[ZombieEvent])
     case (projectId, status) :: rest =>
       queryZombieEvent(projectId, status) >>= {
@@ -76,10 +84,13 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
       }
   }
 
-  private def queryZombieEvent(projectId: projects.Id, status: EventStatus) = measureExecutionTime {
+  private def queryZombieEvent(projectId: projects.Id, status: ProcessingStatus) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - lpe - find")
-      .select[projects.Id ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent](
+      .select[
+        projects.Id ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime ~ ExecutionDate ~ EventProcessingTime,
+        ZombieEvent
+      ](
         sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
               FROM event evt
               JOIN project proj ON proj.project_id = evt.project_id
@@ -87,8 +98,9 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
               WHERE evt.project_id = $projectIdEncoder
                 AND evt.status = $eventStatusEncoder
                 AND (evt.message IS NULL OR evt.message <> $text)
-                AND (ed.delivery_id IS NULL
-                  AND ($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder
+                AND (
+                  (ed.delivery_id IS NULL AND ($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder)
+                  OR (ed.delivery_id IS NOT NULL AND ($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder)
                 )
               LIMIT 1
               """
@@ -96,9 +108,17 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
           .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
       )
       .arguments(
-        projectId ~ status ~ zombieMessage ~ ExecutionDate(now()) ~ EventProcessingTime(Duration.ofMinutes(5))
+        projectId ~ status ~ zombieMessage ~
+          ExecutionDate(now()) ~ EventProcessingTime(Duration ofMinutes 5) ~
+          ExecutionDate(now()) ~ findGracePeriod(status)
       )
       .build(_.option)
+  }
+
+  private lazy val findGracePeriod: ProcessingStatus => EventProcessingTime = {
+    case GeneratingTriples   => EventProcessingTime(Duration ofDays 4 * 7)
+    case TransformingTriples => EventProcessingTime(Duration ofDays 1)
+    case Deleting            => EventProcessingTime(Duration ofDays 1)
   }
 
   private lazy val markEventTaken: Option[ZombieEvent] => Kleisli[F, Session[F], Option[ZombieEvent]] = {
