@@ -19,6 +19,8 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.noDashUuid
 import io.renku.graph.model.entityModel.LocationLike
 import io.renku.graph.model.parameterValues.ValueOverride
 import io.renku.graph.model.testentities.CommandParameterBase._
@@ -109,6 +111,6 @@ object ParameterValue {
 
   final class Id private (val value: String) extends AnyVal with StringTinyType
   implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID[Id] {
-    def generate: Id = Id(java.util.UUID.randomUUID.toString)
+    def generate: Id = noDashUuid.generateAs(Id)
   }
 }

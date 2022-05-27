@@ -304,14 +304,7 @@ object datasets {
       with TinyTypeJsonLDOps[DatePublished]
 
   final class PartId private (val value: String) extends AnyVal with StringTinyType
-  implicit object PartId
-      extends TinyTypeFactory[PartId](new PartId(_))
-      with UUID[PartId]
-      with TinyTypeJsonLDOps[PartId] {
-    def generate: PartId = PartId {
-      java.util.UUID.randomUUID.toString
-    }
-  }
+  implicit object PartId extends TinyTypeFactory[PartId](new PartId(_)) with UUID[PartId] with TinyTypeJsonLDOps[PartId]
 
   final class PartExternal private (val value: Boolean) extends AnyVal with BooleanTinyType
   implicit object PartExternal
