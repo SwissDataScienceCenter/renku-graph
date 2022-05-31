@@ -26,7 +26,7 @@ import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.{ExecutionDate, TypeSerializers}
-import io.renku.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
+import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, TransformingTriples, TriplesGenerated}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
@@ -52,8 +52,9 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource](
   }
 
   private lazy val updateEventStatus: ZombieEvent => Kleisli[F, Session[F], UpdateResult] = {
-    case GeneratingTriplesZombieEvent(eventId, _)   => updateStatusQuery(eventId, GeneratingTriples, New)
-    case TransformingTriplesZombieEvent(eventId, _) => updateStatusQuery(eventId, TransformingTriples, TriplesGenerated)
+    case ZombieEvent(eventId, _, GeneratingTriples)   => runUpdate(eventId, GeneratingTriples, New)
+    case ZombieEvent(eventId, _, TransformingTriples) => runUpdate(eventId, TransformingTriples, TriplesGenerated)
+    case ZombieEvent(eventId, _, Deleting)            => runUpdate(eventId, Deleting, AwaitingDeletion)
   }
 
   private def cleanEventualDeliveries(eventId: CompoundEventId) = measureExecutionTime {
@@ -67,27 +68,23 @@ private class ZombieStatusCleanerImpl[F[_]: MonadCancelThrow: SessionResource](
       .build
   }
 
-  private def updateStatusQuery(
-      eventId:   CompoundEventId,
-      oldStatus: EventStatus,
-      newStatus: EventStatus
-  ) = measureExecutionTime {
-    SqlStatement(name = "zombie_chasing - update status")
-      .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](
-        sql"""UPDATE event
-              SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
-              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
-          """.command
-      )
-      .arguments(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus)
-      .build
-      .flatMapResult {
-        case Completion.Update(1) => (Updated: UpdateResult).pure[F]
-        case Completion.Update(0) => (NotUpdated: UpdateResult).pure[F]
-        case _ =>
-          new Exception(show"$categoryName: update status - More than one row updated").raiseError[F, UpdateResult]
-      }
-  }
+  private def runUpdate(eventId: CompoundEventId, oldStatus: EventStatus, newStatus: EventStatus) =
+    measureExecutionTime {
+      SqlStatement(name = "zombie_chasing - update status")
+        .command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus](sql"""
+          UPDATE event
+          SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
+          WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+          """.command)
+        .arguments(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus)
+        .build
+        .flatMapResult {
+          case Completion.Update(1) => (Updated: UpdateResult).pure[F]
+          case Completion.Update(0) => (NotUpdated: UpdateResult).pure[F]
+          case _ =>
+            new Exception(show"$categoryName: update status - More than one row updated").raiseError[F, UpdateResult]
+        }
+    }
 }
 
 private object ZombieStatusCleaner {

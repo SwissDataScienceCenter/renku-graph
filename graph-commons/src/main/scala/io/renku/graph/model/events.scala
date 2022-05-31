@@ -142,6 +142,13 @@ object events {
     }
 
     sealed trait ProcessingStatus extends EventStatus
+    object ProcessingStatus {
+      lazy val all: Set[ProcessingStatus] = Set(
+        GeneratingTriples,
+        TransformingTriples,
+        Deleting
+      )
+    }
 
     type GeneratingTriples = GeneratingTriples.type
     final case object GeneratingTriples extends EventStatus with ProcessingStatus {

@@ -22,13 +22,12 @@ import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{ExecutionDate, TypeSerializers}
-import io.renku.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.events.EventStatus.ProcessingStatus
+import io.renku.graph.model.events.{CompoundEventId, EventId}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk._
@@ -45,32 +44,37 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource]
     with ZombieEventSubProcess
     with TypeSerializers {
 
+  override val processName: ZombieEventProcess = ZombieEventProcess("lse")
+
   override def popEvent(): F[Option[ZombieEvent]] = SessionResource[F].useK {
     findEvents >>= markEventTaken()
   }
 
   private lazy val findEvents = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - find events"))
-      .select[EventStatus ~ EventStatus ~ String, ZombieEvent](
-        sql"""SELECT DISTINCT evt.event_id, evt.project_id, proj.project_path, evt.status
-                FROM event_delivery delivery
-                JOIN event evt ON evt.event_id = delivery.event_id
-                  AND evt.project_id = delivery.project_id
-                  AND (evt.status = $eventStatusEncoder OR evt.status = $eventStatusEncoder)
-                  AND (evt.message IS NULL OR evt.message <> $text)
-                JOIN project proj ON evt.project_id = proj.project_id
-                WHERE NOT EXISTS (
-                  SELECT sub.delivery_id
-                  FROM subscriber sub
-                  WHERE sub.delivery_id = delivery.delivery_id
-                )
-                LIMIT 1
-            """.query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ eventStatusDecoder).map {
-          case eventId ~ projectId ~ projectPath ~ status =>
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - lse - find events")
+      .select[Void, ZombieEvent](
+        sql"""
+        SELECT DISTINCT evt.event_id, evt.project_id, proj.project_path, evt.status
+        FROM event_delivery delivery
+        JOIN event evt ON evt.event_id = delivery.event_id
+          AND evt.project_id = delivery.project_id
+          AND evt.status IN (#${ProcessingStatus.all.map(s => show"'$s'").mkString(", ")})
+          AND (evt.message IS NULL OR evt.message <> '#$zombieMessage')
+        JOIN project proj ON evt.project_id = proj.project_id
+        WHERE NOT EXISTS (
+          SELECT sub.delivery_id
+          FROM subscriber sub
+          WHERE sub.delivery_id = delivery.delivery_id
+        )
+        LIMIT 1
+        """
+          .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ processingStatusDecoder)
+          .map { case eventId ~ projectId ~ projectPath ~ status =>
             ZombieEvent(processName, CompoundEventId(eventId, projectId), projectPath, status)
-        }
+          }
       )
-      .arguments(GeneratingTriples ~ TransformingTriples ~ zombieMessage)
+      .arguments(Void)
       .build(_.option)
   }
 
@@ -80,13 +84,13 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource]
   }
 
   private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - update message"))
-      .command[String ~ ExecutionDate ~ EventId ~ projects.Id](
-        sql"""UPDATE event
-                  SET message = $text, execution_date = $executionDateEncoder
-                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
-            """.command
-      )
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - lse - update message")
+      .command[String ~ ExecutionDate ~ EventId ~ projects.Id](sql"""
+        UPDATE event
+        SET message = $text, execution_date = $executionDateEncoder
+        WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+        """.command)
       .arguments(
         zombieMessage ~ ExecutionDate(now) ~ eventId.id ~ eventId.projectId
       )
@@ -105,8 +109,6 @@ private class LostSubscriberEventFinder[F[_]: MonadCancelThrow: SessionResource]
     case true  => Some(event)
     case false => None
   }
-
-  override val processName: ZombieEventProcess = ZombieEventProcess("lse")
 }
 
 private object LostSubscriberEventFinder {

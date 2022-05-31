@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.implicits.toShow
 import io.renku.eventlog.subscriptions.zombieevents.Generators.zombieEventProcessNames
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, processingStatuses}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -34,7 +34,7 @@ class ZombieEventSpec extends AnyWordSpec with should.Matchers {
       val event = ZombieEvent(zombieEventProcessNames.generateOne,
                               compoundEventIds.generateOne,
                               projectPaths.generateOne,
-                              eventStatuses.generateOne
+                              processingStatuses.generateOne
       )
       event.show shouldBe s"${event.generatedBy} ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
     }

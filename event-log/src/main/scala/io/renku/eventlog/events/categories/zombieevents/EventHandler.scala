@@ -23,7 +23,7 @@ import cats.data.EitherT.fromEither
 import cats.effect.Async
 import cats.effect.kernel.Spawn
 import cats.syntax.all._
-import io.circe.{Decoder, DecodingFailure}
+import io.circe.Decoder
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
@@ -37,19 +37,17 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 private class EventHandler[F[_]: Async: Logger](
-    override val categoryName:          CategoryName,
-    zombieStatusCleaner:                ZombieStatusCleaner[F],
-    awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
-    underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
-    awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
-    underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
+    override val categoryName:   CategoryName,
+    zombieStatusCleaner:         ZombieStatusCleaner[F],
+    awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
+    underGenerationGauge:        LabeledGauge[F, projects.Path],
+    awaitingTransformationGauge: LabeledGauge[F, projects.Path],
+    underTransformationGauge:    LabeledGauge[F, projects.Path],
+    awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
+    underDeletionGauge:          LabeledGauge[F, projects.Path]
 ) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
-  import io.renku.graph.model.projects
-
-  override def createHandlingProcess(
-      request: EventRequestContent
-  ): F[EventHandlingProcess[F]] =
+  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess[F](startCleanZombieEvents(request))
 
   private def startCleanZombieEvents(request: EventRequestContent) = for {
@@ -72,16 +70,12 @@ private class EventHandler[F[_]: Async: Logger](
   } recoverWith { case NonFatal(exception) => Logger[F].logError(event, exception) }
 
   private lazy val updateGauges: ZombieEvent => F[Unit] = {
-    case GeneratingTriplesZombieEvent(_, projectPath) =>
-      for {
-        _ <- awaitingTriplesGenerationGauge.increment(projectPath)
-        _ <- underTriplesGenerationGauge.decrement(projectPath)
-      } yield ()
-    case TransformingTriplesZombieEvent(_, projectPath) =>
-      for {
-        _ <- awaitingTriplesTransformationGauge.increment(projectPath)
-        _ <- underTriplesTransformationGauge.decrement(projectPath)
-      } yield ()
+    case ZombieEvent(_, projectPath, GeneratingTriples) =>
+      awaitingGenerationGauge.increment(projectPath) >> underGenerationGauge.decrement(projectPath)
+    case ZombieEvent(_, projectPath, TransformingTriples) =>
+      awaitingTransformationGauge.increment(projectPath) >> underTransformationGauge.decrement(projectPath)
+    case ZombieEvent(_, projectPath, Deleting) =>
+      awaitingDeletionGauge.increment(projectPath) >> underDeletionGauge.decrement(projectPath)
   }
 
   private implicit lazy val eventInfoToString: Show[ZombieEvent] = Show.show { event =>
@@ -91,39 +85,38 @@ private class EventHandler[F[_]: Async: Logger](
   private implicit lazy val eventDecoder: Decoder[ZombieEvent] = { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
+    implicit val processingStatusDecoder: Decoder[EventStatus.ProcessingStatus] = Decoder[EventStatus].emap {
+      case s: ProcessingStatus => s.asRight
+      case s => show"'$s' is not a ProcessingStatus".asLeft
+    }
+
     for {
       id          <- cursor.downField("id").as[EventId]
       projectId   <- cursor.downField("project").downField("id").as[projects.Id]
       projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-      status      <- cursor.downField("status").as[EventStatus]
-      zombieEvent <- status match {
-                       case GeneratingTriples =>
-                         GeneratingTriplesZombieEvent(CompoundEventId(id, projectId), projectPath)
-                           .asRight[DecodingFailure]
-                       case TransformingTriples =>
-                         TransformingTriplesZombieEvent(CompoundEventId(id, projectId), projectPath)
-                           .asRight[DecodingFailure]
-                       case _ =>
-                         DecodingFailure(s"$status is an illegal status for ZombieEvent", Nil).asLeft[ZombieEvent]
-                     }
-    } yield zombieEvent
+      status      <- cursor.downField("status").as[EventStatus.ProcessingStatus]
+    } yield ZombieEvent(CompoundEventId(id, projectId), projectPath, status)
   }
 }
 
 private object EventHandler {
   def apply[F[_]: Async: SessionResource: Logger](
-      queriesExecTimes:                   LabeledHistogram[F],
-      awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
-      underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
-      awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
-      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path]
+      queriesExecTimes:            LabeledHistogram[F],
+      awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
+      underGenerationGauge:        LabeledGauge[F, projects.Path],
+      awaitingTransformationGauge: LabeledGauge[F, projects.Path],
+      underTransformationGauge:    LabeledGauge[F, projects.Path],
+      awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
+      underDeletionGauge:          LabeledGauge[F, projects.Path]
   ): F[EventHandler[F]] = for {
     zombieStatusCleaner <- ZombieStatusCleaner(queriesExecTimes)
   } yield new EventHandler[F](categoryName,
                               zombieStatusCleaner,
-                              awaitingTriplesGenerationGauge,
-                              underTriplesGenerationGauge,
-                              awaitingTriplesTransformationGauge,
-                              underTriplesTransformationGauge
+                              awaitingGenerationGauge,
+                              underGenerationGauge,
+                              awaitingTransformationGauge,
+                              underTransformationGauge,
+                              awaitingDeletionGauge,
+                              underDeletionGauge
   )
 }

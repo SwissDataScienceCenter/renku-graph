@@ -18,6 +18,7 @@
 
 package io.renku.eventlog
 
+import cats.syntax.all._
 import io.renku.eventlog.subscriptions.eventdelivery._
 import io.renku.events.consumers.Project
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
@@ -82,6 +83,10 @@ trait TypeSerializers {
 
   val eventStatusDecoder: Decoder[EventStatus] = varchar.map(EventStatus.apply)
   val eventStatusEncoder: Encoder[EventStatus] = varchar.values.contramap(_.value)
+  val processingStatusDecoder: Decoder[EventStatus.ProcessingStatus] = eventStatusDecoder.emap {
+    case s: EventStatus.ProcessingStatus => s.asRight
+    case s: EventStatus                  => show"'$s' is not a ProcessingStatus".asLeft
+  }
 
   val eventProcessingStatusEncoder: Encoder[EventStatus.ProcessingStatus] =
     eventStatusEncoder.contramap((s: EventStatus.ProcessingStatus) => s: EventStatus)
