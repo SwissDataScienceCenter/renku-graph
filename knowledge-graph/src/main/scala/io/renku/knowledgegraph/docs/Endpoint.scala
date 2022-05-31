@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.docs
 import cats.effect.Async
 import cats.implicits.catsSyntaxApplicativeId
 import io.circe.Encoder
-import io.renku.knowledgegraph.docs.model.{Info, OpenApiDocument, Server, Variable}
+import io.renku.knowledgegraph.docs.model.{Info, OpenApiDocument, Operation, Server, Variable}
 import io.renku.knowledgegraph.lineage
 import org.http4s.Response
 import io.circe.syntax._
@@ -39,12 +39,8 @@ trait Endpoint[F[_]] {
 private class EndpointImpl[F[_]: Async] extends Http4sDsl[F] with Endpoint[F] {
   override def `get /docs`: F[Response[F]] = Ok(doc.asJson)
 
-  lazy val doc: OpenApiDocument = OpenApiDocument(
-    "3.0.3",
-    info,
-    servers = List(localServer),
-    paths = Map(lineage.EndpointDoc.get)
-  )
+  lazy val doc: OpenApiDocument =
+    OpenApiDocument("3.0.3", info).addServer(localServer).addPath(lineage.EndpointDoc.path)
 
   private val info =
     Info("Knowledge Graph API", "Get info about datasets, users, activities, and other entities".some, "1.0.0")
@@ -54,19 +50,33 @@ private class EndpointImpl[F[_]: Async] extends Http4sDsl[F] with Endpoint[F] {
   private val port     = Variable("8080")
 
   private val empty = Json.obj()
-  implicit val docEncoder:      Encoder[OpenApiDocument] = deriveEncoder
-  implicit val infoEncoder:     Encoder[Info]            = deriveEncoder
-  implicit val serverEncoder:   Encoder[Server]          = deriveEncoder
-  implicit val variableEncoder: Encoder[model.Variable]  = deriveEncoder
+  implicit val docEncoder: Encoder[OpenApiDocument] = Encoder.instance { doc =>
+    json"""
+          {
+            "openapi": ${doc.openApiVersion},
+            "info": ${doc.info},
+            "servers": ${doc.servers},
+            "paths": ${doc.paths}
+          }
+        """
+  }
+  implicit val infoEncoder:     Encoder[Info]           = deriveEncoder
+  implicit val serverEncoder:   Encoder[Server]         = deriveEncoder
+  implicit val variableEncoder: Encoder[model.Variable] = deriveEncoder
   implicit val pathEncoder: Encoder[model.Path] = Encoder.instance { path =>
     val summary     = path.summary.map(s => json"""{"summary": $s }""").getOrElse(empty)
     val description = path.description.map(s => json"""{"description": $s }""").getOrElse(empty)
-    val get         = path.get.map(s => json"""{"get": $s }""").getOrElse(empty)
-    val post        = path.post.map(s => json"""{"post": $s }""").getOrElse(empty)
-    val put         = path.put.map(s => json"""{"put": $s }""").getOrElse(empty)
-    val delete      = path.delete.map(s => json"""{"delete": $s }""").getOrElse(empty)
 
-    json"""{"parameters": ${path.parameters}}""" deepMerge summary deepMerge description deepMerge get deepMerge post deepMerge put deepMerge delete
+    val operations: Json = path.operations
+      .map { operation: Operation =>
+        operation match {
+          case _: Operation.Get =>
+            json"""{"get": $operation}"""
+        }
+      }
+      .foldLeft(json"""{}""")((acc, opJson) => acc deepMerge opJson)
+
+    json"""{"parameters": ${path.parameters}}""" deepMerge summary deepMerge description deepMerge operations
   }
   implicit val operationEncoder: Encoder[model.Operation] = Encoder.instance { operation =>
     val summary     = operation.summary.map(s => json"""{"summary": $s }""").getOrElse(empty)

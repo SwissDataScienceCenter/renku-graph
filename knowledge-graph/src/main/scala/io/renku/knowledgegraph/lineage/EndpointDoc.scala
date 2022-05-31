@@ -18,28 +18,25 @@
 
 package io.renku.knowledgegraph.lineage
 import cats.syntax.all._
-import io.renku.knowledgegraph.docs.model.{In, Operation, Parameter, Path, Response, Schema}
-object EndpointDoc {
-  lazy val get: (String, Path) =
-    "/{project path/group namespace}/files/{location}/lineage" -> Path("Lineage".some,
-                                                                       "Get the lineage of a file".some,
-                                                                       getOp.some,
-                                                                       None,
-                                                                       None,
-                                                                       None,
-                                                                       parameters
-    )
-  private lazy val getOp  = Operation("/get".some, Nil, None, Map("200" -> response200), Nil)
-  private val response200 = Response("Success", Map.empty, Map.empty, Map.empty)
+import io.renku.knowledgegraph.docs.model._
 
-  private lazy val parameters = List(
-    Parameter("project path/group namespace",
-              In.Path,
-              "The path of the project with the group (if any). Do not URL encode".some,
-              required = true,
-              Schema("string")
-    ),
-    Parameter("location", In.Path, "The path of the file".some, required = true, Schema("string"))
+object EndpointDoc {
+  lazy val path: Path = Path("Lineage".some, "Get the lineage of a files".some).addUri(uri).addGet(getOp)
+
+  private lazy val uri = Uri / groupParam / projectParam / "files" / locationParam / "lineage"
+  private lazy val groupParam = Parameter(
+    "group(s)",
+    In.Path,
+    "Group name(s). Names are url-encoded, slashes are not. (e.g. group1/group2/.../groupN)".some,
+    required = true,
+    Schema("string")
   )
+  private lazy val projectParam =
+    Parameter("project name", In.Path, "Project name".some, required = true, Schema("string"))
+  private lazy val locationParam =
+    Parameter("location", In.Path, "The path of the file".some, required = true, Schema("string"))
+
+  private lazy val getOp  = Operation.Get("/get".some, Nil, None, Map("200" -> response200), Nil)
+  private val response200 = Response("Success", Map.empty, Map.empty, Map.empty)
 
 }
