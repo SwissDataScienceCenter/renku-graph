@@ -23,13 +23,18 @@ import cats.syntax.all._
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration._
+
 private[migrations] trait UpdateQueryRunner[F[_]] {
   def run(query: SparqlQuery): F[Unit]
 }
 
 private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl[F](rdfStoreConfig)
+) extends RdfStoreClientImpl[F](rdfStoreConfig,
+                                idleTimeoutOverride = (16 minutes).some,
+                                requestTimeoutOverride = (15 minutes).some
+    )
     with UpdateQueryRunner[F] {
 
   def run(query: SparqlQuery): F[Unit] = updateWithNoResult(query)

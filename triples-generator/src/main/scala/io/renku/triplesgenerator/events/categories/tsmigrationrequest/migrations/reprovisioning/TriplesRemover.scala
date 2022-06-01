@@ -37,7 +37,7 @@ private trait TriplesRemover[F[_]] {
 private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     removalBatchSize: Long Refined Positive,
     rdfStoreConfig:   RdfStoreConfig,
-    idleTimeout:      Duration = 10 minutes,
+    idleTimeout:      Duration = 11 minutes,
     requestTimeout:   Duration = 10 minutes
 ) extends RdfStoreClientImpl(rdfStoreConfig,
                              idleTimeoutOverride = idleTimeout.some,
@@ -50,9 +50,9 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.graph.model.Schemas._
 
   override def removeAllTriples(): F[Unit] =
-    queryExpecting(checkIfEmpty)(storeEmptyFlagDecoder) flatMap { isEmpty =>
-      if (isEmpty) MonadThrow[F].unit
-      else
+    queryExpecting(checkIfEmpty)(storeEmptyFlagDecoder) >>= {
+      case true => MonadThrow[F].unit
+      case false =>
         for {
           _ <- updateWithNoResult(removeTriplesBatch)
           _ <- removeAllTriples()
