@@ -24,5 +24,5 @@ package object awaitinggeneration {
   val categoryName: CategoryName = CategoryName("AWAITING_GENERATION")
 
   private[awaitinggeneration] def logMessageCommon(event: CommitEvent): String =
-    s"$categoryName: Commit Event ${event.compoundEventId}, ${event.project.path}"
+    s"$categoryName: ${event.compoundEventId}, ${event.project.path}"
 }
