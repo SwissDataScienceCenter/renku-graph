@@ -62,11 +62,11 @@ trait RenkuProjectEntitiesGenerators {
       )
 
   def renkuProjectEntities(
-      visibilityGen:       Gen[Visibility],
-      minDateCreated:      projects.DateCreated = projects.DateCreated(Instant.EPOCH),
-      activitiesFactories: List[ActivityGenFactory] = Nil,
-      datasetsFactories:   List[DatasetGenFactory[Dataset.Provenance]] = Nil,
-      forksCountGen:       Gen[ForksCount] = anyForksCount
+      visibilityGen:     Gen[Visibility],
+      minDateCreated:    projects.DateCreated = projects.DateCreated(Instant.EPOCH),
+      activityFactories: List[ActivityGenFactory] = Nil,
+      datasetFactories:  List[DatasetGenFactory[Dataset.Provenance]] = Nil,
+      forksCountGen:     Gen[ForksCount] = anyForksCount
   ): Gen[RenkuProject.WithoutParent] = for {
     path             <- projectPaths
     name             <- Gen.const(path.toName)
@@ -79,8 +79,8 @@ trait RenkuProjectEntitiesGenerators {
     keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
     members          <- personEntities(withGitLabId).toGeneratorOfSet(minElements = 0)
     version          <- projectSchemaVersions
-    activities       <- activitiesFactories.map(_.apply(dateCreated)).sequence
-    datasets         <- datasetsFactories.map(_.apply(dateCreated)).sequence
+    activities       <- activityFactories.map(_.apply(dateCreated)).sequence
+    datasets         <- datasetFactories.map(_.apply(dateCreated)).sequence
   } yield RenkuProject.WithoutParent(path,
                                      name,
                                      maybeDescription,

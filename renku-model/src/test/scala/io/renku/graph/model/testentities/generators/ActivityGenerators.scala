@@ -130,7 +130,7 @@ trait ActivityGenerators {
     def generateList(projectDateCreated: projects.DateCreated): List[Activity] =
       factory(projectDateCreated).generateList()
 
-    def many: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne)(factory)
+    def multiple: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne)(factory)
 
     def withDateBefore(max: InstantTinyType): Gen[Activity] =
       factory(projects.DateCreated(max.value))

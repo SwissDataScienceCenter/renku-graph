@@ -22,7 +22,7 @@ package migrations
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
@@ -37,7 +37,7 @@ private object MultipleTopmostDerivedFromOnly {
   private lazy val name = Migration.Name("Multiple topmostDerivedFrom on Modified DS only")
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,
-    Prefixes of (schema -> "schema", renku -> "renku"),
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?path
         |WHERE {
         |  ?dsId a schema:Dataset;

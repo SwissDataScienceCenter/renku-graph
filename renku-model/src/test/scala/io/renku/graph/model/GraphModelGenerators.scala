@@ -33,7 +33,8 @@ import scala.util.Random
 
 object GraphModelGenerators {
 
-  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls() map RenkuBaseUrl.apply
+  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] =
+    httpUrls(hostGenerator = nonEmptyStrings().map(_.toLowerCase)) map RenkuBaseUrl.apply
 
   implicit val gitLabUrls: Gen[GitLabUrl] = for {
     url  <- httpUrls()

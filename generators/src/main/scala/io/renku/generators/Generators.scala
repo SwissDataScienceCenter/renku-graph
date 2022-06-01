@@ -180,24 +180,20 @@ object Generators {
 
   val httpPorts: Gen[Int Refined Positive] = choose(2000, 10000) map Refined.unsafeApply
 
-  def httpUrls(pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)): Gen[String] =
+  def httpUrls(hostGenerator: Gen[String] = nonEmptyStrings(),
+               pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)
+  ): Gen[String] =
     for {
-      protocol <- Arbitrary.arbBool.arbitrary map {
-                    case true  => "http"
-                    case false => "https"
-                  }
-      port <- httpPorts
-      host <- nonEmptyStrings()
-      path <- pathGenerator
+      protocol <- Gen.oneOf("http", "https")
+      port     <- httpPorts
+      host     <- hostGenerator
+      path     <- pathGenerator
       pathValidated = if (path.isEmpty) "" else s"/$path"
     } yield s"$protocol://$host:$port$pathValidated"
 
   val localHttpUrls: Gen[String] = for {
-    protocol <- Arbitrary.arbBool.arbitrary map {
-                  case true  => "http"
-                  case false => "https"
-                }
-    port <- httpPorts
+    protocol <- Gen.oneOf("http", "https")
+    port     <- httpPorts
   } yield s"$protocol://localhost:$port"
 
   lazy val semanticVersions: Gen[String] = Gen.listOfN(3, positiveInts(max = 150)).map(_.mkString("."))

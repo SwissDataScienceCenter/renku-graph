@@ -47,7 +47,6 @@ import java.net.{ServerSocket, SocketException}
 import java.nio.charset.StandardCharsets.UTF_8
 import scala.language.reflectiveCalls
 import scala.util.Random.nextInt
-import scala.xml.Elem
 
 trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with ResultsDecoder {
   this: Suite with IOSpec =>
@@ -88,13 +87,13 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
     .fromString(s"$fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql")
     .fold(throw _, identity)
 
-  private lazy val rdfConnectionResource: Resource[IO, RDFConnection] =
-    Resource.make(openConnection)(connection => IO(connection.close()))
+  private def rdfConnectionResource(dsName: DatasetName): Resource[IO, RDFConnection] =
+    Resource.make(openConnection(dsName))(connection => IO(connection.close()))
 
-  private def openConnection: IO[RDFConnection] = IO {
+  private def openConnection(dsName: DatasetName): IO[RDFConnection] = IO {
     RDFConnectionFuseki
       .create()
-      .destination((fusekiBaseUrl / rdfStoreConfig.datasetName).toString)
+      .destination((fusekiBaseUrl / dsName).toString)
       .build()
   }
 
@@ -116,51 +115,49 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
     super.afterAll()
   }
 
-  protected def loadToStore(triples: Elem): Unit = rdfConnectionResource
+  protected def loadToStore(jsonLD: JsonLD): Unit =
+    loadToStore(rdfStoreConfig.datasetName, "default", jsonLD)
+
+  protected def loadToStore(jsonLDs: JsonLD*): Unit = {
+    val jsonLD = JsonLD.arr(jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD])): _*)
+    loadToStore(rdfStoreConfig.datasetName, "default", jsonLD)
+  }
+
+  protected def loadToStore(graphId: EntityId, jsonLD: JsonLD): Unit =
+    loadToStore(rdfStoreConfig.datasetName, graphId.show, jsonLD)
+
+  protected def loadToStore(graphId: EntityId, jsonLDs: JsonLD*): Unit = {
+    val jsonLD = JsonLD.arr(jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD])): _*)
+    loadToStore(rdfStoreConfig.datasetName, graphId.show, jsonLD)
+  }
+
+  protected def loadToStore(dsName: DatasetName, graphId: EntityId, jsonLD: JsonLD): Unit =
+    loadToStore(dsName, graphId.show, jsonLD)
+
+  private def loadToStore(dsName: DatasetName, graphId: String, jsonLD: JsonLD): Unit = rdfConnectionResource(dsName)
     .use { connection =>
       IO {
-        connection.load {
-          ModelFactory.createDefaultModel.read(new ByteArrayInputStream(triples.toString().getBytes), "")
-        }
-      }
-    }
-    .unsafeRunSync()
-
-  protected def loadToStore(triples: JsonLD): Unit = rdfConnectionResource
-    .use { connection =>
-      IO {
-        connection.load {
-          val model = ModelFactory.createDefaultModel()
-          RDFDataMgr.read(model, new ByteArrayInputStream(triples.toJson.noSpaces.getBytes(UTF_8)), null, Lang.JSONLD)
-          model
-        }
-      }
-    }
-    .unsafeRunSync()
-
-  protected def loadToStore(jsonLDs: JsonLD*): Unit = rdfConnectionResource
-    .use { connection =>
-      IO {
-        connection.load {
-          val model = ModelFactory.createDefaultModel()
-
-          val flattenedJsonLDs: Seq[JsonLD] =
-            jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD]))
+        val model = {
+          val mod = ModelFactory.createDefaultModel()
           RDFDataMgr.read(
-            model,
-            new ByteArrayInputStream(Json.arr(flattenedJsonLDs.map(_.toJson): _*).noSpaces.getBytes(UTF_8)),
+            mod,
+            new ByteArrayInputStream(jsonLD.toJson.noSpaces.getBytes(UTF_8)),
             null,
             Lang.JSONLD
           )
-          model
+          mod
         }
+
+        connection.load(graphId.show, model)
       }
     }
     .unsafeRunSync()
 
-  protected def loadToStore[T](objects: T*)(implicit encoder: JsonLDEncoder[T]): Unit = loadToStore(
-    objects.map(encoder.apply): _*
-  )
+  protected def loadToStore[T](objects: T*)(implicit encoder: JsonLDEncoder[T]): Unit =
+    loadToStore(objects.map(encoder.apply): _*)
+
+  protected def loadToStore[T](graphId: EntityId, objects: T*)(implicit encoder: JsonLDEncoder[T]): Unit =
+    loadToStore(graphId, objects.map(encoder.apply): _*)
 
   protected def insertTriple(entityId: EntityId, p: String, o: String): Unit =
     queryRunner
@@ -190,6 +187,9 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
 
     import io.circe.Decoder._
     import io.renku.graph.model.Schemas._
+
+    def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] =
+      queryExpecting[List[Map[String, String]]](query)
 
     def runQuery(query: String): IO[List[Map[String, String]]] =
       queryExpecting[List[Map[String, String]]] {
@@ -256,6 +256,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
         .as[Option[String]]
         .map(maybeValue => maybeValue map (varName -> _))
   }
+
+  protected def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] = queryRunner.runQuery(query)
 
   protected def runQuery(query: String): IO[List[Map[String, String]]] = queryRunner.runQuery(query)
 
