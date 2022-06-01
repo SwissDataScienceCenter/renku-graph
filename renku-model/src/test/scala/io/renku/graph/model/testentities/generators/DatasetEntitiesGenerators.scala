@@ -23,7 +23,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{fixed, nonBlankStrings, sentences, timestamps}
+import io.renku.generators.Generators.{fixed, nonBlankStrings, positiveInts, sentences, timestamps}
 import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetOriginalIdentifiers, datasetPartExternals, datasetPartIds, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InternalSameAs, OriginalIdentifier, TopmostSameAs}
@@ -243,6 +243,8 @@ trait DatasetEntitiesGenerators {
 
     def generateList(projectDateCreated: projects.DateCreated): List[Dataset[P]] =
       factory(projectDateCreated).generateList()
+
+    def multiple: List[DatasetGenFactory[P]] = List.fill(positiveInts(5).generateOne)(factory)
 
     def createMultiple(max: Int): List[DatasetGenFactory[P]] = List.fill(Random.nextInt(max - 1) + 1)(factory)
 

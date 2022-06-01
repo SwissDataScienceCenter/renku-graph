@@ -154,7 +154,7 @@ class ProjectResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   "instantiation" should {
 
     "be successful for URLs ending with a project path" in {
-      forAll(httpUrls(pathGenerator)) { url =>
+      forAll(httpUrls(pathGenerator = pathGenerator)) { url =>
         ResourceId(url).value shouldBe url
       }
     }
@@ -167,7 +167,7 @@ class ProjectResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
 
     "fail when ending with a /" in {
       an[IllegalArgumentException] shouldBe thrownBy {
-        ResourceId(httpUrls(pathGenerator).generateOne + "/")
+        ResourceId(httpUrls(pathGenerator = pathGenerator).generateOne + "/")
       }
     }
   }
