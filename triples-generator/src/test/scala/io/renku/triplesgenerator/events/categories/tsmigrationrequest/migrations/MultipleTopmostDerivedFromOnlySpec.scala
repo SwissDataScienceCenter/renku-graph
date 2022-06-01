@@ -57,7 +57,7 @@ class MultipleTopmostDerivedFromOnlySpec extends AnyWordSpec with should.Matcher
       val illegalTopmost2 = datasetTopmostDerivedFroms.generateOne
       insertTriple(modifiedDSProject2.entityId, "renku:topmostDerivedFrom", illegalTopmost2.showAs[RdfResource])
 
-      runQuery(MultipleTopmostDerivedFromOnly.query.toString)
+      runQuery(MultipleTopmostDerivedFromOnly.query)
         .unsafeRunSync()
         .map(row => projects.Path(row("path")))
         .toSet shouldBe Set(brokenProject1.path, brokenProject2.path)

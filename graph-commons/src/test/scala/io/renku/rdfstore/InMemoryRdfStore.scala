@@ -191,6 +191,9 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
     import io.circe.Decoder._
     import io.renku.graph.model.Schemas._
 
+    def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] =
+      queryExpecting[List[Map[String, String]]](query)
+
     def runQuery(query: String): IO[List[Map[String, String]]] =
       queryExpecting[List[Map[String, String]]] {
         SparqlQuery.of(

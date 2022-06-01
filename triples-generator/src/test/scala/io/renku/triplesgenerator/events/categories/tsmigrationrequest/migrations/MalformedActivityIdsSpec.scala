@@ -59,7 +59,7 @@ class MalformedActivityIdsSpec extends AnyWordSpec with should.Matchers with IOS
         anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
       )
 
-      runQuery(MalformedActivityIds.query.toString)
+      runQuery(MalformedActivityIds.query)
         .unsafeRunSync()
         .map(row => projects.Path(row("path")))
         .toSet shouldBe Set(project1.path, project2.path)

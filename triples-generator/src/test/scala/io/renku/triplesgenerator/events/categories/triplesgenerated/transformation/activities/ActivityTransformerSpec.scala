@@ -42,7 +42,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
     "create update queries for changed/deleted activities' authors " +
       "and associations' agents" in new TestCase {
         val project = anyRenkuProjectEntities
-          .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent).many: _*)
+          .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent).multiple: _*)
           .generateOne
           .to[entities.RenkuProject]
 
