@@ -61,7 +61,7 @@ class DispatchRecoverySpec
           .returnToQueue(MigrationRequestEvent(url, version), reason = notBusyStatus.generateOne)
           .unsafeRunSync() shouldBe ()
 
-        findRows(url, version) shouldBe New -> ChangeDate(now)
+        findRow(url, version) shouldBe New -> ChangeDate(now)
       }
 
     "leave the status of the corresponding row in the ts_migration table as Sent " +
@@ -73,7 +73,7 @@ class DispatchRecoverySpec
           .returnToQueue(MigrationRequestEvent(url, version), reason = TemporarilyUnavailable)
           .unsafeRunSync() shouldBe ()
 
-        findRows(url, version) shouldBe Sent -> ChangeDate(now)
+        findRow(url, version) shouldBe Sent -> ChangeDate(now)
       }
 
     MigrationStatus.all - Sent foreach { status =>
@@ -84,7 +84,7 @@ class DispatchRecoverySpec
           .returnToQueue(MigrationRequestEvent(url, version), reason = sendingResults.generateOne)
           .unsafeRunSync() shouldBe ()
 
-        findRows(url, version) shouldBe status -> changeDate
+        findRow(url, version) shouldBe status -> changeDate
       }
     }
 
@@ -98,7 +98,7 @@ class DispatchRecoverySpec
         )
         .unsafeRunSync() shouldBe ()
 
-      findRows(url, version) shouldBe status -> changeDate
+      findRow(url, version) shouldBe status -> changeDate
     }
   }
 
@@ -111,7 +111,7 @@ class DispatchRecoverySpec
 
       recovery.recover(url, MigrationRequestEvent(url, version))(exception).unsafeRunSync() shouldBe ()
 
-      findRows(url, version)    shouldBe NonRecoverableFailure -> ChangeDate(now)
+      findRow(url, version)     shouldBe NonRecoverableFailure -> ChangeDate(now)
       findMessage(url, version) shouldBe MigrationMessage(exception).some
 
       logger.loggedOnly(Info("TS_MIGRATION_REQUEST: recovering from NonRecoverable Failure", exception))
@@ -123,7 +123,7 @@ class DispatchRecoverySpec
 
         recovery.recover(url, MigrationRequestEvent(url, version))(exception).unsafeRunSync() shouldBe ()
 
-        findRows(url, version) shouldBe status -> changeDate
+        findRow(url, version) shouldBe status -> changeDate
       }
     }
 
@@ -135,7 +135,7 @@ class DispatchRecoverySpec
 
       recovery.recover(failingEvent.subscriberUrl, failingEvent)(exception).unsafeRunSync() shouldBe ()
 
-      findRows(url, version) shouldBe status -> changeDate
+      findRow(url, version) shouldBe status -> changeDate
     }
   }
 

@@ -46,7 +46,7 @@ trait TsMigrationTableProvisioning {
     }
   }
 
-  protected def findRows(url: SubscriberUrl, version: ServiceVersion): (MigrationStatus, ChangeDate) =
+  protected def findRow(url: SubscriberUrl, version: ServiceVersion): (MigrationStatus, ChangeDate) =
     execute {
       Kleisli { session =>
         val query: Query[SubscriberUrl ~ ServiceVersion, (MigrationStatus, ChangeDate)] = sql"""
@@ -58,6 +58,18 @@ trait TsMigrationTableProvisioning {
         session.prepare(query).use(_.unique(url ~ version))
       }
     }
+
+  protected def findRows(version: ServiceVersion): Set[(SubscriberUrl, MigrationStatus, ChangeDate)] = execute {
+    Kleisli { session =>
+      val query: Query[ServiceVersion, (SubscriberUrl, MigrationStatus, ChangeDate)] = sql"""
+            SELECT subscriber_url, status, change_date
+            FROM ts_migration
+            WHERE subscriber_version = $serviceVersionEncoder"""
+        .query(subscriberUrlDecoder ~ migrationStatusDecoder ~ changeDateDecoder)
+        .map { case url ~ status ~ changeDate => (url, status, changeDate) }
+      session.prepare(query).use(_.stream(version, 32).compile.toList.map(_.toSet))
+    }
+  }
 
   protected def findMessage(url: SubscriberUrl, version: ServiceVersion): Option[MigrationMessage] = execute {
     Kleisli { session =>

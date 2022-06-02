@@ -57,9 +57,9 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
     Kleisli { case (transaction, session) =>
       for {
         sp <- transaction.savepoint
-        result <- insertIfNotDuplicate(event)(session) recoverWith { case error =>
-                    transaction.rollback(sp) >> error.raiseError[F, Result]
-                  }
+        result <- insertIfNotDuplicate(event)(session)
+                    .flatTap(_ => transaction.commit)
+                    .recoverWith { case error => transaction.rollback(sp) >> error.raiseError[F, Result] }
         _ <- whenA(aNewEventIsCreated(result))(waitingEventsGauge.increment(event.project.path))
       } yield result
     }
