@@ -70,7 +70,7 @@ object EventHandler {
       subscriptionMechanism: SubscriptionMechanism[F]
   ): F[EventHandler[F]] = for {
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(singleProcess))
-    eventProcessor           <- CleanUpEventProcessor[F]
+    eventProcessor           <- EventProcessor[F]
   } yield new EventHandler[F](categoryName,
                               eventProcessor,
                               EventBodyDeserializer[F],
