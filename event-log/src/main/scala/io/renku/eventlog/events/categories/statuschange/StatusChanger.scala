@@ -40,8 +40,12 @@ private class StatusChangerImpl[F[_]: MonadCancelThrow: SessionResource](gaugesU
       Kleisli { case (transaction, session) =>
         {
           for {
-            savepoint     <- Kleisli.liftF(transaction.savepoint)
-            updateResults <- dbUpdater.updateDB(event) recoverWith rollback(transaction)(savepoint)(event)
+            savepoint <- Kleisli.liftF(transaction.savepoint)
+            updateResults <-
+              dbUpdater
+                .updateDB(event)
+                .flatMapF(res => transaction.commit.map(_ => res))
+                .recoverWith(rollback(transaction)(savepoint)(event))
             _ <- Kleisli.liftF(updateGauges(updateResults)) recoverWith { case NonFatal(_) => Kleisli.pure(()) }
           } yield ()
         } run session
