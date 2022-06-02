@@ -42,7 +42,7 @@ private class TriplesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:      Duration = 10 minutes,
+    idleTimeout:      Duration = 11 minutes,
     requestTimeout:   Duration = 10 minutes
 ) extends RdfStoreClientImpl(rdfStoreConfig,
                              retryInterval = retryInterval,

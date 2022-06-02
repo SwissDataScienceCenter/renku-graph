@@ -45,7 +45,7 @@ private object SameAsHierarchyFixer {
 private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(
     rdfStoreConfig: RdfStoreConfig
 ) extends RdfStoreClientImpl(rdfStoreConfig,
-                             idleTimeoutOverride = (10 minutes).some,
+                             idleTimeoutOverride = (11 minutes).some,
                              requestTimeoutOverride = (10 minutes).some
     ) {
 

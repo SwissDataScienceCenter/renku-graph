@@ -258,6 +258,6 @@ class EventProcessorSpec
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
 
     def commonLogMessage(event: CommitEvent): String =
-      s"$categoryName: Commit Event ${event.compoundEventId}, ${event.project.path}"
+      s"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.path}"
   }
 }

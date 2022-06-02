@@ -41,8 +41,8 @@ private object ProjectTriplesRemover {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
       maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-      idleTimeout:    Duration = 10 minutes,
-      requestTimeout: Duration = 10 minutes
+      idleTimeout:    Duration = 16 minutes,
+      requestTimeout: Duration = 15 minutes
   ): F[ProjectTriplesRemover[F]] = for {
     rdfStoreConfig <- RdfStoreConfig[F]()
     renkuBaseUrl   <- RenkuBaseUrlLoader[F]()
@@ -60,8 +60,8 @@ private class ProjectTriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeReco
     renkuBaseUrl:   RenkuBaseUrl,
     retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:    Duration = 6 minutes,
-    requestTimeout: Duration = 5 minutes
+    idleTimeout:    Duration = 16 minutes,
+    requestTimeout: Duration = 15 minutes
 ) extends RdfStoreClientImpl(rdfStoreConfig,
                              retryInterval = retryInterval,
                              maxRetries = maxRetries,

@@ -25,6 +25,8 @@ import io.circe.Decoder
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration._
+
 private[migrations] trait RecordsFinder[F[_]] {
   def findRecords[OUT](query: SparqlQuery)(implicit decoder: Decoder[List[OUT]]): F[List[OUT]]
 }
@@ -38,7 +40,10 @@ private[migrations] object RecordsFinder {
 
 private class RecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl[F](rdfStoreConfig)
+) extends RdfStoreClientImpl[F](rdfStoreConfig,
+                                idleTimeoutOverride = (16 minutes).some,
+                                requestTimeoutOverride = (15 minutes).some
+    )
     with RecordsFinder[F] {
 
   override def findRecords[OUT](query: SparqlQuery)(implicit decoder: Decoder[List[OUT]]): F[List[OUT]] =
