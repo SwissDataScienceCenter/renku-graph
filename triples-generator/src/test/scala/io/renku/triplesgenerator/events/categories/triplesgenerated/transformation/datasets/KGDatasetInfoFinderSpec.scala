@@ -27,6 +27,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.views.RdfResource
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
@@ -40,9 +41,6 @@ import org.scalatest.wordspec.AnyWordSpec
 class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
 
   "findTopmostSameAs" should {
-    "return None if there is no dataset with that id" in new TestCase {
-      kgDatasetInfoFinder.findTopmostSameAs(datasetResourceIds.generateOne).unsafeRunSync() shouldBe None
-    }
 
     "return topmostSameAs for the given id" in new TestCase {
       val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
@@ -50,29 +48,43 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
 
       loadToStore(dataset)
 
-      kgDatasetInfoFinder
+      finder
         .findTopmostSameAs(dataset.resourceId)
-        .unsafeRunSync() shouldBe dataset.provenance.topmostSameAs.some
+        .unsafeRunSync() shouldBe Set(dataset.provenance.topmostSameAs)
+    }
+
+    "return all topmostSameAs for the given id" in new TestCase {
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      val otherTopmostSameAs = datasetTopmostSameAs.generateOne
+      insertTriple(dataset.resourceId, "renku:topmostSameAs", otherTopmostSameAs.showAs[RdfResource])
+
+      loadToStore(dataset)
+
+      finder
+        .findTopmostSameAs(dataset.resourceId)
+        .unsafeRunSync() shouldBe Set(dataset.provenance.topmostSameAs, otherTopmostSameAs)
+    }
+
+    "return an empty Set if there is no dataset with the given id" in new TestCase {
+      finder.findTopmostSameAs(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
     }
   }
 
   "findParentTopmostSameAs" should {
-
-    "return None if there's no dataset with the given id" in new TestCase {
-      val sameAs = datasetInternalSameAs.generateOne
-      kgDatasetInfoFinder.findParentTopmostSameAs(sameAs).unsafeRunSync() shouldBe Option.empty[SameAs]
-    }
 
     "return the dataset's topmostSameAs if this dataset has one" in new TestCase {
       val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
       loadToStore(dataset)
 
-      val sameAs = SameAs(dataset.entityId)
+      finder.findParentTopmostSameAs(SameAs(dataset.entityId)).unsafeRunSync() shouldBe
+        Some(dataset.provenance.topmostSameAs)
+    }
 
-      kgDatasetInfoFinder.findParentTopmostSameAs(sameAs).unsafeRunSync() shouldBe Some(
-        dataset.provenance.topmostSameAs
-      )
+    "return None if there's no dataset with the given id" in new TestCase {
+      finder.findParentTopmostSameAs(datasetInternalSameAs.generateOne).unsafeRunSync() shouldBe None
     }
 
     "return None if there's a dataset with the given id but it has no topmostSameAs" in new TestCase {
@@ -82,9 +94,23 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
 
       removeTopmostSameAs(dataset.entityId)
 
+      finder.findParentTopmostSameAs(SameAs(dataset.entityId)).unsafeRunSync() shouldBe None
+    }
+
+    "fail if the dataset has multiple topmostSameAs" in new TestCase {
+      val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+
+      loadToStore(dataset)
+
+      insertTriple(dataset.entityId, "renku:topmostSameAs", datasetTopmostSameAs.generateOne.showAs[RdfResource])
+
       val sameAs = SameAs(dataset.entityId)
 
-      kgDatasetInfoFinder.findParentTopmostSameAs(sameAs).unsafeRunSync() shouldBe None
+      val exception = intercept[Exception] {
+        finder.findParentTopmostSameAs(sameAs).unsafeRunSync()
+      }
+
+      exception.getMessage should include(s"More than one topmostSameAs found for dataset ${sameAs.show}")
     }
   }
 
@@ -99,12 +125,12 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
 
       loadToStore(dataset)
 
-      kgDatasetInfoFinder.findDatasetCreators(dataset.resourceId).unsafeRunSync() shouldBe
+      finder.findDatasetCreators(dataset.resourceId).unsafeRunSync() shouldBe
         dataset.provenance.creators.map(_.resourceId).toList.toSet
     }
 
     "return no creators if there's no DS with the given id" in new TestCase {
-      kgDatasetInfoFinder.findDatasetCreators(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
+      finder.findDatasetCreators(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
     }
   }
 
@@ -119,12 +145,12 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
       val otherOriginalId = datasetOriginalIdentifiers.generateOne
       insertTriple(dataset.resourceId, "renku:originalIdentifier", show"'$otherOriginalId'")
 
-      kgDatasetInfoFinder.findDatasetOriginalIdentifiers(dataset.resourceId).unsafeRunSync() shouldBe
+      finder.findDatasetOriginalIdentifiers(dataset.resourceId).unsafeRunSync() shouldBe
         Set(dataset.provenance.originalIdentifier, otherOriginalId)
     }
 
     "return no Initial Versions if there's no DS with the given id" in new TestCase {
-      kgDatasetInfoFinder
+      finder
         .findDatasetOriginalIdentifiers(datasetResourceIds.generateOne)
         .unsafeRunSync() shouldBe Set.empty
     }
@@ -141,12 +167,12 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
       val otherDateCreated = datasetCreatedDates(min = dataset.provenance.date.instant).generateOne
       insertTriple(dataset.resourceId, "schema:dateCreated", show"'$otherDateCreated'")
 
-      kgDatasetInfoFinder.findDatasetDateCreated(dataset.resourceId).unsafeRunSync() shouldBe
+      finder.findDatasetDateCreated(dataset.resourceId).unsafeRunSync() shouldBe
         Set(dataset.provenance.date, otherDateCreated)
     }
 
     "return no Initial Versions if there's no DS with the given id" in new TestCase {
-      kgDatasetInfoFinder.findDatasetDateCreated(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
+      finder.findDatasetDateCreated(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
     }
   }
 
@@ -164,19 +190,19 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
       val otherSameAs = datasetSameAs.generateOne.entityId
       insertTriple(importedDS.resourceId, "schema:sameAs", show"<$otherSameAs>")
 
-      kgDatasetInfoFinder.findDatasetSameAs(importedDS.resourceId).unsafeRunSync().map(_.show) shouldBe
+      finder.findDatasetSameAs(importedDS.resourceId).unsafeRunSync().map(_.show) shouldBe
         Set(importedDS.provenance.sameAs.entityId, otherSameAs).map(_.show)
     }
 
     "return no SameAs if there's no DS with the given id" in new TestCase {
-      kgDatasetInfoFinder.findDatasetSameAs(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
+      finder.findDatasetSameAs(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
     }
   }
 
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val kgDatasetInfoFinder = new KGDatasetInfoFinderImpl[IO](rdfStoreConfig)
+    val finder = new KGDatasetInfoFinderImpl[IO](rdfStoreConfig)
   }
 
   private def removeTopmostSameAs(datasetId: EntityId): Unit = runUpdate {

@@ -53,12 +53,12 @@ private class TopmostSameAsUpdaterImpl[F[_]: MonadThrow](
         for {
           projectAndQueries        <- projectAndQueriesF
           maybeParentTopmostSameAs <- findParentTopmostSameAs(dataset.provenance.sameAs)
-          maybeKGTopmostSameAs     <- findTopmostSameAs(dataset.identification.resourceId)
+          maybeKGTopmostSameAses   <- findTopmostSameAs(dataset.identification.resourceId)
           updatedDataset = maybeParentTopmostSameAs.map(dataset.update) getOrElse dataset
         } yield (
           update(dataset, updatedDataset)(projectAndQueries._1),
           projectAndQueries._2 |+| Queries.postDataQueriesOnly(
-            prepareUpdates(dataset, maybeKGTopmostSameAs) :::
+            prepareUpdates(dataset, maybeKGTopmostSameAses) :::
               prepareTopmostSameAsCleanup(updatedDataset, maybeParentTopmostSameAs)
           )
         )

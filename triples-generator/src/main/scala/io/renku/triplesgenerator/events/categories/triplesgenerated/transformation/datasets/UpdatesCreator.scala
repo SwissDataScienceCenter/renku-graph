@@ -44,8 +44,8 @@ private trait UpdatesCreator {
       ev:                                    Dataset.Provenance.ImportedInternal.type
   ): List[SparqlQuery]
 
-  def prepareUpdates(dataset:              Dataset[Dataset.Provenance.ImportedInternal],
-                     maybeKGTopmostSameAs: Option[TopmostSameAs]
+  def prepareUpdates(dataset:                Dataset[Dataset.Provenance.ImportedInternal],
+                     maybeKGTopmostSameAses: Set[TopmostSameAs]
   ): List[SparqlQuery]
 
   def prepareTopmostSameAsCleanup(dataset:                  Dataset[Dataset.Provenance.ImportedInternal],
@@ -86,14 +86,24 @@ private object UpdatesCreator extends UpdatesCreator {
   )(implicit ev: Dataset.Provenance.ImportedInternal.type): List[SparqlQuery] =
     List(useDeletedDSSameAsAsChildSameAs(dataset))
 
-  override def prepareUpdates(dataset:              Dataset[Provenance.ImportedInternal],
-                              maybeKGTopmostSameAs: Option[TopmostSameAs]
-  ): List[SparqlQuery] =
-    Option
-      .when(!(maybeKGTopmostSameAs contains dataset.provenance.topmostSameAs))(
-        prepareSameAsUpdate(dataset.resourceId, dataset.provenance.topmostSameAs)
+  override def prepareUpdates(dataset:                Dataset[Provenance.ImportedInternal],
+                              maybeKGTopmostSameAses: Set[TopmostSameAs]
+  ): List[SparqlQuery] = Option
+    .when(!(maybeKGTopmostSameAses equals Set(dataset.provenance.topmostSameAs)))(
+      SparqlQuery.of(
+        name = "transformation - topmostSameAs update",
+        Prefixes of (renku -> "renku", schema -> "schema"),
+        s"""|DELETE { ?dsId renku:topmostSameAs ?oldTopmost }
+            |INSERT { ?dsId renku:topmostSameAs <${dataset.provenance.topmostSameAs}> }
+            |WHERE {
+            |  ?dsId a schema:Dataset;
+            |        renku:topmostSameAs <${dataset.resourceId}>;
+            |        renku:topmostSameAs ?oldTopmost.
+            |}
+            |""".stripMargin
       )
-      .toList
+    )
+    .toList
 
   override def prepareTopmostSameAsCleanup(dataset:                  Dataset[Dataset.Provenance.ImportedInternal],
                                            maybeParentTopmostSameAs: Option[TopmostSameAs]
@@ -228,18 +238,6 @@ private object UpdatesCreator extends UpdatesCreator {
           |""".stripMargin
     )
 
-  private def prepareSameAsUpdate(oldTopmostSameAs: ResourceId, newTopmostSameAs: TopmostSameAs) = SparqlQuery.of(
-    name = "transformation - topmostSameAs update",
-    Prefixes.of(renku -> "renku", schema -> "schema"),
-    s"""|DELETE { ?dsId renku:topmostSameAs <$oldTopmostSameAs> }
-        |INSERT { ?dsId renku:topmostSameAs <$newTopmostSameAs> }
-        |WHERE {
-        |  ?dsId a schema:Dataset;
-        |        renku:topmostSameAs <$oldTopmostSameAs>.
-        |}
-        |""".stripMargin
-  )
-
   private def prepareTopmostSameAsCleanUp(dsId: ResourceId, modelTopmostSameAs: TopmostSameAs) = SparqlQuery.of(
     name = "transformation - topmostSameAs clean-up",
     Prefixes.of(renku -> "renku", schema -> "schema"),
@@ -256,20 +254,20 @@ private object UpdatesCreator extends UpdatesCreator {
 
   override def removeOtherOriginalIdentifiers(ds:                      Dataset[Provenance],
                                               originalIdentifiersInKG: Set[OriginalIdentifier]
-  ) =
-    Option
-      .when((originalIdentifiersInKG - ds.provenance.originalIdentifier).nonEmpty) {
-        SparqlQuery.of(
-          name = "transformation - originalIdentifier clean-up",
-          Prefixes of renku -> "renku",
-          s"""|DELETE { ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version }
-              |WHERE { 
-              |  ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version.
-              |  FILTER ( ?version != '${ds.provenance.originalIdentifier}' )
-              |}""".stripMargin
-        )
-      }
-      .toList
+  ) = Option
+    .when((originalIdentifiersInKG - ds.provenance.originalIdentifier).nonEmpty) {
+      SparqlQuery.of(
+        name = "transformation - originalIdentifier clean-up",
+        Prefixes of renku -> "renku",
+        s"""|DELETE { ?dsId renku:originalIdentifier ?origIdentifier }
+            |WHERE {
+            |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+            |  ?dsId renku:originalIdentifier ?origIdentifier.
+            |  FILTER ( ?origIdentifier != '${ds.provenance.originalIdentifier}' )
+            |}""".stripMargin
+      )
+    }
+    .toList
 
   override def removeOtherDateCreated(ds:              Dataset[Dataset.Provenance],
                                       dateCreatedInKG: Set[DateCreated]

@@ -240,7 +240,7 @@ class UpdatesCreatorSpec
   "prepareUpdates" should {
 
     "generate queries which " +
-      "updates topmostSameAs for all datasets whose topmostSameAs points to the current dataset" +
+      "updates topmostSameAs for all datasets where topmostSameAs points to the current dataset" +
       "when the topmostSameAs on the current dataset is different than the value in KG" in {
         val dataset0AsTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
 
@@ -261,11 +261,54 @@ class UpdatesCreatorSpec
           (dataset2.resourceId.value, TopmostSameAs(dataset1.resourceId.value).value.some)
         )
 
-        UpdatesCreator.prepareUpdates(dataset1, None).runAll.unsafeRunSync()
+        UpdatesCreator.prepareUpdates(dataset1, Set.empty).runAll.unsafeRunSync()
 
         findDatasets.map(onlyTopmostSameAs) shouldBe Set(
           (dataset2.resourceId.value, dataset0AsTopmostSameAs.value.some)
         )
+      }
+
+    "generate queries which " +
+      "updates topmostSameAs for all datasets where topmostSameAs points to the current dataset" +
+      "when the topmostSameAs on the current dataset is different than the value in KG -" +
+      "case when some datasets have multiple topmostSameAs" in {
+        val dataset0AsTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
+
+        val dataset1 = {
+          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+          setTopmostSameAs(ds, dataset0AsTopmostSameAs)
+        }
+        val dataset2 = {
+          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+          setTopmostSameAs(ds, TopmostSameAs(dataset1.resourceId.value))
+        }
+
+        loadToStore(dataset2)
+
+        val otherTopmostSameAs = datasetTopmostSameAs.generateOne
+        insertTriple(dataset2.resourceId, "renku:topmostSameAs", otherTopmostSameAs.showAs[RdfResource])
+
+        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+          (dataset2.resourceId.value, TopmostSameAs(dataset1.resourceId.value).value.some),
+          (dataset2.resourceId.value, otherTopmostSameAs.value.some)
+        )
+
+        UpdatesCreator.prepareUpdates(dataset1, Set.empty).runAll.unsafeRunSync()
+
+        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+          (dataset2.resourceId.value, dataset0AsTopmostSameAs.value.some)
+        )
+      }
+
+    "generate no queries " +
+      "if the topmostSameAs on the current DS is the only topmostSameAs for that DS in KG" in {
+
+        val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+
+        UpdatesCreator.prepareUpdates(ds, Set(ds.provenance.topmostSameAs)) shouldBe Nil
       }
   }
 
