@@ -20,13 +20,14 @@ package io.renku.graph.model.testentities
 
 import cats.syntax.all._
 import io.renku.graph.model._
-import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name}
+import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId}
 
 final case class Person(
     name:             Name,
     maybeEmail:       Option[Email] = None,
-    maybeAffiliation: Option[Affiliation] = None,
-    maybeGitLabId:    Option[GitLabId] = None
+    maybeGitLabId:    Option[GitLabId] = None,
+    maybeOrcidId:     Option[OrcidId] = None,
+    maybeAffiliation: Option[Affiliation] = None
 )
 
 object Person {
@@ -37,33 +38,50 @@ object Person {
   import io.renku.jsonld.syntax._
 
   implicit def toEntitiesPerson(implicit renkuBaseUrl: RenkuBaseUrl): Person => entities.Person = {
-    case Person(name, maybeEmail, maybeAffiliation, Some(gitLabId)) =>
-      entities.Person.WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, maybeEmail, maybeAffiliation)
-    case Person(name, Some(email), maybeAffiliation, None) =>
-      entities.Person.WithEmail(persons.ResourceId(email), name, email, maybeAffiliation)
-    case Person(name, None, maybeAffiliation, None) =>
-      entities.Person.WithNameOnly(persons.ResourceId(name), name, maybeAffiliation)
+    case Person(name, maybeEmail, Some(gitLabId), maybeOrcidId, maybeAffiliation) =>
+      entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
+                                   gitLabId,
+                                   name,
+                                   maybeEmail,
+                                   maybeOrcidId,
+                                   maybeAffiliation
+      )
+    case Person(name, Some(email), None, maybeOrcidId, maybeAffiliation) =>
+      entities.Person.WithEmail(maybeOrcidId.map(persons.ResourceId(_)) getOrElse persons.ResourceId(email),
+                                name,
+                                email,
+                                maybeOrcidId,
+                                maybeAffiliation
+      )
+    case Person(name, None, None, maybeOrcidId, maybeAffiliation) =>
+      entities.Person.WithNameOnly(maybeOrcidId.map(persons.ResourceId(_)) getOrElse persons.ResourceId(name),
+                                   name,
+                                   maybeOrcidId,
+                                   maybeAffiliation
+      )
   }
 
   implicit def toMaybeEntitiesPersonWithGitLabId(implicit
       renkuBaseUrl: RenkuBaseUrl
   ): Person => Option[entities.Person.WithGitLabId] = {
-    case Person(name, maybeEmail, maybeAffiliation, Some(gitLabId)) =>
-      entities.Person.WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, maybeEmail, maybeAffiliation).some
+    case Person(name, maybeEmail, Some(gitLabId), maybeOrcidId, maybeAffiliation) =>
+      entities.Person
+        .WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, maybeEmail, maybeOrcidId, maybeAffiliation)
+        .some
     case _ => None
   }
 
   implicit lazy val toMaybeEntitiesPersonWithEmail: Person => Option[entities.Person.WithEmail] = {
-    case Person(name, Some(email), maybeAffiliation, None) =>
-      entities.Person.WithEmail(persons.ResourceId(email), name, email, maybeAffiliation).some
+    case Person(name, Some(email), None, maybeOrcidId, maybeAffiliation) =>
+      entities.Person.WithEmail(persons.ResourceId(email), name, email, maybeOrcidId, maybeAffiliation).some
     case _ => None
   }
 
   implicit def toMaybeEntitiesPersonWithName(implicit
       renkuBaseUrl: RenkuBaseUrl
   ): Person => Option[entities.Person.WithNameOnly] = {
-    case Person(name, None, maybeAffiliation, None) =>
-      entities.Person.WithNameOnly(persons.ResourceId(name), name, maybeAffiliation).some
+    case Person(name, None, None, maybeOrcidId, maybeAffiliation) =>
+      entities.Person.WithNameOnly(persons.ResourceId(name), name, maybeOrcidId, maybeAffiliation).some
     case _ => None
   }
 
@@ -71,9 +89,5 @@ object Person {
     JsonLDEncoder.instance(_.to[entities.Person].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Person] =
-    EntityIdEncoder.instance {
-      case Person(_, _, _, Some(gitLabId)) => EntityId of persons.ResourceId(gitLabId).show
-      case Person(_, Some(email), _, _)    => EntityId of persons.ResourceId(email).show
-      case Person(name, _, _, _)           => EntityId of persons.ResourceId(name).show
-    }
+    EntityIdEncoder.instance(person => EntityId.of(person.to[entities.Person].resourceId.value))
 }

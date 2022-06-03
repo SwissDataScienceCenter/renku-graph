@@ -67,15 +67,13 @@ object ProjectJsonLDDecoder {
       } yield project
     }
 
-  private def findAllPersons(gitLabInfo: GitLabProjectInfo)(implicit cursor: Cursor) = cursor.focusTop
-    .as[List[Person]]
-    .map(_.toSet)
-    .leftMap(failure =>
-      DecodingFailure(
-        s"Finding Person entities for project ${gitLabInfo.path} failed: ${failure.getMessage()}",
-        Nil
+  private def findAllPersons(gitLabInfo: GitLabProjectInfo)(implicit cursor: Cursor, renkuBaseUrl: RenkuBaseUrl) =
+    cursor.focusTop
+      .as[List[Person]]
+      .map(_.toSet)
+      .leftMap(failure =>
+        DecodingFailure(s"Finding Person entities for project ${gitLabInfo.path} failed: ${failure.getMessage()}", Nil)
       )
-    )
 
   private def newProject(gitLabInfo:       GitLabProjectInfo,
                          resourceId:       ResourceId,
@@ -209,8 +207,20 @@ object ProjectJsonLDDecoder {
   private def toPerson(projectMember: ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person =
     projectMember match {
       case ProjectMemberNoEmail(name, _, gitLabId) =>
-        Person.WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, maybeEmail = None, maybeAffiliation = None)
+        Person.WithGitLabId(persons.ResourceId(gitLabId),
+                            gitLabId,
+                            name,
+                            maybeEmail = None,
+                            maybeOrcidId = None,
+                            maybeAffiliation = None
+        )
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        Person.WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
+        Person.WithGitLabId(persons.ResourceId(gitLabId),
+                            gitLabId,
+                            name,
+                            email.some,
+                            maybeOrcidId = None,
+                            maybeAffiliation = None
+        )
     }
 }

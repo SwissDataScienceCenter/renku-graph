@@ -816,10 +816,17 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                                      gitLabId,
                                      name,
                                      maybeEmail = None,
+                                     maybeOrcidId = None,
                                      maybeAffiliation = None
         )
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        entities.Person.WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
+        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
+                                     gitLabId,
+                                     name,
+                                     email.some,
+                                     maybeOrcidId = None,
+                                     maybeAffiliation = None
+        )
     }
 
     private def nameFromUsernameOrName(member: ProjectMember) =

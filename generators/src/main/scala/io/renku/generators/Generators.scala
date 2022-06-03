@@ -361,7 +361,7 @@ object Generators {
 
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
       def toGeneratorOfNones:   Gen[Option[T]] = Gen.const(None)
-      def toGeneratorOfOptions: Gen[Option[T]] = Gen.option(generator)
+      def toGeneratorOfOptions: Gen[Option[T]] = frequency(3 -> const(None), 7 -> some(generator))
       def toGeneratorOfNonEmptyList(minElements: Int Refined Positive = 1,
                                     maxElements: Int Refined Positive = 5
       ): Gen[NonEmptyList[T]] = nonEmptyList(generator, minElements, maxElements)

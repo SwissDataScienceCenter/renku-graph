@@ -53,7 +53,7 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](r
   private def findByResourceId(resourceId: ResourceId) = SparqlQuery.of(
     name = "transformation - find person by resourceId",
     Prefixes of schema -> "schema",
-    s"""|SELECT DISTINCT ?resourceId ?name ?maybeEmail ?maybeGitLabId ?maybeAffiliation
+    s"""|SELECT DISTINCT ?resourceId ?name ?maybeEmail ?maybeGitLabId ?maybeOrcidId ?maybeAffiliation
         |WHERE {
         |  BIND (${resourceId.showAs[RdfResource]} AS ?resourceId)
         |  ?resourceId a schema:Person;
@@ -63,6 +63,10 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](r
         |    ?resourceId schema:sameAs ?sameAsId.
         |    ?sameAsId schema:additionalType  'GitLab';
         |              schema:identifier      ?maybeGitLabId.
+        |  }
+        |  OPTIONAL {
+        |    ?resourceId schema:sameAs ?maybeOrcidId.
+        |    ?maybeOrcidId schema:additionalType  'Orcid'.
         |  }
         |  OPTIONAL { ?resourceId schema:affiliation ?maybeAffiliation }
         |}
@@ -80,9 +84,10 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](r
         name             <- extract[persons.Name]("name")
         maybeEmail       <- extract[Option[persons.Email]]("maybeEmail")
         maybeGitLabId    <- extract[Option[persons.GitLabId]]("maybeGitLabId")
+        maybeOrcidId     <- extract[Option[persons.OrcidId]]("maybeOrcidId")
         maybeAffiliation <- extract[Option[persons.Affiliation]]("maybeAffiliation")
         person <- Person
-                    .from(resourceId, name, maybeEmail, maybeAffiliation, maybeGitLabId)
+                    .from(resourceId, name, maybeEmail, maybeGitLabId, maybeOrcidId, maybeAffiliation)
                     .toEither
                     .leftMap(errs => DecodingFailure(errs.nonEmptyIntercalate("; "), Nil))
       } yield person

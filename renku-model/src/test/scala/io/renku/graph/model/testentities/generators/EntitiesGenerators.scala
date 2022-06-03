@@ -70,9 +70,10 @@ trait EntitiesGenerators
   ): Gen[Person] = for {
     name             <- personNames
     maybeEmail       <- maybeEmails
-    maybeAffiliation <- personAffiliations.toGeneratorOfOptions
     maybeGitLabId    <- maybeGitLabIds
-  } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
+    maybeOrcidId     <- personOrcidIds.toGeneratorOfOptions
+    maybeAffiliation <- personAffiliations.toGeneratorOfOptions
+  } yield Person(name, maybeEmail, maybeGitLabId, maybeOrcidId, maybeAffiliation)
 
   def replacePersonName(to: persons.Name): Person => Person = _.copy(name = to)
 }

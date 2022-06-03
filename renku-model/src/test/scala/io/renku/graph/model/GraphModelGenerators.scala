@@ -79,14 +79,22 @@ object GraphModelGenerators {
 
   def personGitLabResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[persons.ResourceId.GitLabIdBased] =
     personGitLabIds map persons.ResourceId.apply
+  def personOrcidResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[persons.ResourceId.OrcidIdBased] =
+    personOrcidIds map persons.ResourceId.apply
   val personEmailResourceId: Gen[persons.ResourceId.EmailBased] = personEmails map persons.ResourceId.apply
   def personNameResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[persons.ResourceId.NameBased] =
     personNames map persons.ResourceId.apply
   implicit def personResourceIds(implicit renkuBaseUrl: RenkuBaseUrl): Gen[persons.ResourceId] =
-    Gen.oneOf(personGitLabResourceId, personEmailResourceId, personNameResourceId)
+    Gen.oneOf(personGitLabResourceId, personOrcidResourceId, personEmailResourceId, personNameResourceId)
 
   implicit lazy val personGitLabIds: Gen[persons.GitLabId] =
     Gen.uuid.map(_ => persons.GitLabId(Random.nextInt(100000000) + 1))
+  implicit lazy val personOrcidIds: Gen[persons.OrcidId] =
+    Gen
+      .choose(1000, 9999)
+      .toGeneratorOfList(minElements = 4, maxElements = 4)
+      .map(_.mkString("https://orcid.org/", "-", ""))
+      .toGeneratorOf(persons.OrcidId)
 
   implicit val projectIds:   Gen[Id]            = Gen.uuid.map(_ => Id(Random.nextInt(1000000) + 1))
   implicit val projectNames: Gen[projects.Name] = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))

@@ -112,32 +112,33 @@ object Activity {
       )
     }
 
-  implicit lazy val decoder: JsonLDDecoder[Activity] = JsonLDDecoder.entity(entityTypes) { cursor =>
-    import io.renku.jsonld.JsonLDDecoder.decodeList
+  implicit def decoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Activity] =
+    JsonLDDecoder.entity(entityTypes) { cursor =>
+      import io.renku.jsonld.JsonLDDecoder.decodeList
 
-    for {
-      resourceId    <- cursor.downEntityId.as[ResourceId]
-      generations   <- cursor.focusTop.as(decodeList(Generation.decoder(resourceId)))
-      startedAtTime <- cursor.downField(prov / "startedAtTime").as[StartTime]
-      endedAtTime   <- cursor.downField(prov / "endedAtTime").as[EndTime]
-      agent <- cursor.downField(prov / "wasAssociatedWith").as[List[Agent]] >>= {
-                 case agent :: Nil => Right(agent)
-                 case _ => Left(DecodingFailure(s"Activity $resourceId without or with multiple agents", Nil))
-               }
-      author <- cursor.downField(prov / "wasAssociatedWith").as[List[Person]] >>= {
-                  case author :: Nil => Right(author)
-                  case _ => Left(DecodingFailure(s"Activity $resourceId without or with multiple authors", Nil))
-                }
-      association <- cursor.downField(prov / "qualifiedAssociation").as[Association]
-      usages      <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]
-      parameters <- cursor
-                      .downField(renku / "parameter")
-                      .as[List[ParameterValue]](decodeList(ParameterValue.decoder(association.plan)))
-      activity <-
-        Activity
-          .from(resourceId, startedAtTime, endedAtTime, author, agent, association, usages, generations, parameters)
-          .leftMap(s => DecodingFailure(s.toList.mkString("; "), Nil))
-          .toEither
-    } yield activity
-  }
+      for {
+        resourceId    <- cursor.downEntityId.as[ResourceId]
+        generations   <- cursor.focusTop.as(decodeList(Generation.decoder(resourceId)))
+        startedAtTime <- cursor.downField(prov / "startedAtTime").as[StartTime]
+        endedAtTime   <- cursor.downField(prov / "endedAtTime").as[EndTime]
+        agent <- cursor.downField(prov / "wasAssociatedWith").as[List[Agent]] >>= {
+                   case agent :: Nil => Right(agent)
+                   case _ => Left(DecodingFailure(s"Activity $resourceId without or with multiple agents", Nil))
+                 }
+        author <- cursor.downField(prov / "wasAssociatedWith").as[List[Person]] >>= {
+                    case author :: Nil => Right(author)
+                    case _ => Left(DecodingFailure(s"Activity $resourceId without or with multiple authors", Nil))
+                  }
+        association <- cursor.downField(prov / "qualifiedAssociation").as[Association]
+        usages      <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]
+        parameters <- cursor
+                        .downField(renku / "parameter")
+                        .as[List[ParameterValue]](decodeList(ParameterValue.decoder(association.plan)))
+        activity <-
+          Activity
+            .from(resourceId, startedAtTime, endedAtTime, author, agent, association, usages, generations, parameters)
+            .leftMap(s => DecodingFailure(s.toList.mkString("; "), Nil))
+            .toEither
+      } yield activity
+    }
 }

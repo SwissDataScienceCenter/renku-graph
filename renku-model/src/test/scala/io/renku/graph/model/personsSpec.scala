@@ -95,13 +95,20 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
   }
 }
 
-class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class PersonResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
   private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
   "apply(GitLabId)" should {
     "generate 'renkuBaseUrl/persons/gitLabId' ResourceId" in {
       val gitLabId = personGitLabIds.generateOne
       ResourceId(gitLabId).show shouldBe (renkuBaseUrl / "persons" / gitLabId).show
+    }
+  }
+
+  "apply(OrcidId)" should {
+    "generate 'renkuBaseUrl/persons/orcid/xxxx-xxxx-xxxx-xxxx' ResourceId" in {
+      val orcid = personOrcidIds.generateOne
+      ResourceId(orcid).show shouldBe (renkuBaseUrl / "persons" / "orcid" / orcid.id).show
     }
   }
 
@@ -124,6 +131,10 @@ class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       val resourceId = personGitLabResourceId.generateOne
       ResourceId.from(resourceId.show) shouldBe resourceId.asRight
     }
+    "return ResourceId.OrcidIdBased for strings matching the renku orcid based id like 'renkuBaseUrl/persons/orcid/xxxx-xxxx-xxxx-xxxx'" in {
+      val resourceId = personOrcidResourceId.generateOne
+      ResourceId.from(resourceId.show) shouldBe resourceId.asRight
+    }
     "return ResourceId.EmailBased for strings matching the url" in {
       val resourceId = personEmailResourceId.generateOne
       ResourceId.from(resourceId.show) shouldBe resourceId.asRight
@@ -144,8 +155,9 @@ class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
   "showAs[RdfResource]" should {
 
     "wrap the ResourceId in <> if the id doesn't contain email" in {
-      forAll(Gen.oneOf(personGitLabResourceId, personNameResourceId).widen[persons.ResourceId]) { resourceId =>
-        resourceId.showAs[RdfResource] shouldBe s"<${sparqlEncode(resourceId.show)}>"
+      forAll(Gen.oneOf(personGitLabResourceId, personOrcidResourceId, personNameResourceId).widen[persons.ResourceId]) {
+        resourceId =>
+          resourceId.showAs[RdfResource] shouldBe s"<${sparqlEncode(resourceId.show)}>"
       }
     }
 
@@ -179,6 +191,19 @@ class GitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
       exception            shouldBe an[IllegalArgumentException]
       exception.getMessage shouldBe s"$value not a valid GitLabId"
+    }
+  }
+}
+
+class OrcidIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  import persons.OrcidId
+
+  "id" should {
+
+    "return the 'xxxx-xxxx-xxxx-xxxx' part of the full 'https://renku/orcid/xxxx-xxxx-xxxx-xxxx'" in {
+      val id = Gen.listOfN(4, Gen.listOfN(4, Gen.choose(0, 9)).map(_.mkString(""))).generateOne.mkString("-")
+      OrcidId(s"https://orcid.org/$id").id shouldBe id
     }
   }
 }

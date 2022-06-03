@@ -274,7 +274,9 @@ object Dataset {
         )
     }
 
-    private[Dataset] def decoder(identification: Identification): JsonLDDecoder[(Provenance, Option[FixableFailure])] =
+    private[Dataset] def decoder(
+        identification:      Identification
+    )(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[(Provenance, Option[FixableFailure])] =
       JsonLDDecoder.entity(entityTypes) { cursor =>
         import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
 
@@ -475,36 +477,37 @@ object Dataset {
     }
   }
 
-  implicit lazy val decoder: JsonLDDecoder[Dataset[Provenance]] = JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
-    import Dataset.Provenance.FixableFailure
-    import Dataset.Provenance.FixableFailure.MissingDerivedFrom
+  implicit def decoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Dataset[Provenance]] =
+    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
+      import Dataset.Provenance.FixableFailure
+      import Dataset.Provenance.FixableFailure.MissingDerivedFrom
 
-    def fixProvenanceDate(provenanceAndFixableFailure: (Provenance, Option[FixableFailure]),
-                          parts:                       List[DatasetPart]
-    ): Provenance = provenanceAndFixableFailure match {
-      case (prov: Provenance.Internal, Some(MissingDerivedFrom)) =>
-        prov.copy(date = (prov.date :: parts.map(_.dateCreated)).min)
-      case (prov, _) => prov
+      def fixProvenanceDate(provenanceAndFixableFailure: (Provenance, Option[FixableFailure]),
+                            parts:                       List[DatasetPart]
+      ): Provenance = provenanceAndFixableFailure match {
+        case (prov: Provenance.Internal, Some(MissingDerivedFrom)) =>
+          prov.copy(date = (prov.date :: parts.map(_.dateCreated)).min)
+        case (prov, _) => prov
+      }
+
+      for {
+        identification              <- cursor.as[Identification]
+        provenanceAndFixableFailure <- cursor.as(Provenance.decoder(identification))
+        additionalInfo              <- cursor.as[AdditionalInfo]
+        parts                       <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
+        publicationEvents           <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification)))
+        dataset <-
+          Dataset
+            .from(identification,
+                  fixProvenanceDate(provenanceAndFixableFailure, parts),
+                  additionalInfo,
+                  parts,
+                  publicationEvents
+            )
+            .toEither
+            .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
+      } yield dataset
     }
-
-    for {
-      identification              <- cursor.as[Identification]
-      provenanceAndFixableFailure <- cursor.as(Provenance.decoder(identification))
-      additionalInfo              <- cursor.as[AdditionalInfo]
-      parts                       <- cursor.downField(schema / "hasPart").as[List[DatasetPart]]
-      publicationEvents           <- cursor.focusTop.as(decodeList(PublicationEvent.decoder(identification)))
-      dataset <-
-        Dataset
-          .from(identification,
-                fixProvenanceDate(provenanceAndFixableFailure, parts),
-                additionalInfo,
-                parts,
-                publicationEvents
-          )
-          .toEither
-          .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
-    } yield dataset
-  }
 }
 
 trait DatasetOps[+P <: Provenance] {

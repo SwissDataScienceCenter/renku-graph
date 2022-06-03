@@ -111,7 +111,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
   private lazy val generatePersonTriples: ((persons.ResourceId, GitLabProjectMember)) => String = {
     case (resourceId, member) =>
       val creatorResource = resourceId.showAs[RdfResource]
-      val sameAsId        = entities.Person.toSameAsEntityId(member.gitLabId)(gitLabApiUrl).show
+      val sameAsId        = entities.Person.toGitLabSameAsEntityId(member.gitLabId)(gitLabApiUrl).show
       s"""|$creatorResource a schema:Person;
           |                 schema:name '${sparqlEncode(member.name.value)}';
           |                 schema:sameAs <$sameAsId>.
