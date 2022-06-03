@@ -21,6 +21,7 @@ package datasets
 
 import Generators._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.datasetTopmostSameAs
@@ -40,7 +41,7 @@ class TopmostSameAsUpdaterSpec extends AnyWordSpec with MockFactory with should.
   "updateTopmostSameAs" should {
 
     "find all internally imported datasets, " +
-      "find the topmostSameAs for their sameAs and resourceId, " +
+      "find the topmostSameAs values for their sameAs and resourceId, " +
       "update the datasets with the topmostSameAs found for sameAs in KG " +
       "and create update queries" in new TestCase {
 
@@ -57,9 +58,9 @@ class TopmostSameAsUpdaterSpec extends AnyWordSpec with MockFactory with should.
 
         val parentTopmostSameAs = datasetTopmostSameAs.generateOne
         findingParentTopmostSameAsFor(dataset1.provenance.sameAs, returning = parentTopmostSameAs.some.pure[Try])
-        findingTopmostSameAsFor(dataset1.identification.resourceId, returning = Option.empty[TopmostSameAs].pure[Try])
+        findingTopmostSameAsFor(dataset1.identification.resourceId, returning = Set.empty[TopmostSameAs].pure[Try])
         val dataset1Queries = sparqlQueries.generateList()
-        prepareQueriesForSameAs(dataset1 -> None, returning = dataset1Queries)
+        prepareQueriesForSameAs(dataset1 -> Set.empty, returning = dataset1Queries)
         val updatedDataset1 = dataset1.update(parentTopmostSameAs)
 
         val dataset1CleanUpQueries = sparqlQueries.generateList()
@@ -68,10 +69,10 @@ class TopmostSameAsUpdaterSpec extends AnyWordSpec with MockFactory with should.
         )
 
         findingParentTopmostSameAsFor(dataset2.provenance.sameAs, returning = None.pure[Try])
-        val dataset2KgTopmostSameAs = datasetTopmostSameAs.generateSome
-        findingTopmostSameAsFor(dataset2.identification.resourceId, returning = dataset2KgTopmostSameAs.pure[Try])
+        val dataset2KgTopmostSameAses = datasetTopmostSameAs.generateSet(minElements = 1)
+        findingTopmostSameAsFor(dataset2.identification.resourceId, returning = dataset2KgTopmostSameAses.pure[Try])
         val dataset2Queries = sparqlQueries.generateList()
-        prepareQueriesForSameAs(dataset2 -> dataset2KgTopmostSameAs, returning = dataset2Queries)
+        prepareQueriesForSameAs(dataset2 -> dataset2KgTopmostSameAses, returning = dataset2Queries)
 
         val dataset2CleanUpQueries = sparqlQueries.generateList()
         prepareQueriesForTopmostSameAsCleanup(dataset2 -> None, returning = dataset2CleanUpQueries)
@@ -97,7 +98,7 @@ class TopmostSameAsUpdaterSpec extends AnyWordSpec with MockFactory with should.
         .expects(sameAs, *)
         .returning(returning)
 
-    def findingTopmostSameAsFor(resourceId: ResourceId, returning: Try[Option[TopmostSameAs]])(implicit
+    def findingTopmostSameAsFor(resourceId: ResourceId, returning: Try[Set[TopmostSameAs]])(implicit
         ev:                                 TopmostSameAs.type
     ) = (kgDatasetInfoFinder
       .findTopmostSameAs(_: ResourceId)(_: ResourceId.type))
@@ -105,13 +106,11 @@ class TopmostSameAsUpdaterSpec extends AnyWordSpec with MockFactory with should.
       .returning(returning)
 
     def prepareQueriesForSameAs(
-        dsAndMaybeTopmostSameAs: (entities.Dataset[entities.Dataset.Provenance.ImportedInternal],
-                                  Option[TopmostSameAs]
-        ),
-        returning: List[SparqlQuery]
+        dsAndMaybeTopmostSameAses: (entities.Dataset[entities.Dataset.Provenance.ImportedInternal], Set[TopmostSameAs]),
+        returning:                 List[SparqlQuery]
     ) = (updatesCreator
-      .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal], _: Option[TopmostSameAs]))
-      .expects(dsAndMaybeTopmostSameAs._1, dsAndMaybeTopmostSameAs._2)
+      .prepareUpdates(_: entities.Dataset[entities.Dataset.Provenance.ImportedInternal], _: Set[TopmostSameAs]))
+      .expects(dsAndMaybeTopmostSameAses._1, dsAndMaybeTopmostSameAses._2)
       .returning(returning)
 
     def prepareQueriesForTopmostSameAsCleanup(

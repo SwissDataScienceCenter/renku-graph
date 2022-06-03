@@ -196,6 +196,7 @@ object datasets {
   implicit object InternalSameAs
       extends TinyTypeFactory[InternalSameAs](new InternalSameAs(_))
       with constraints.Url[InternalSameAs] {
+
     implicit class InternalSameAsOps(internalSameAs: InternalSameAs) {
       lazy val asIdentifier: Identifier = internalSameAs.value match {
         case s"$_/datasets/$identifier" => Identifier(identifier)
