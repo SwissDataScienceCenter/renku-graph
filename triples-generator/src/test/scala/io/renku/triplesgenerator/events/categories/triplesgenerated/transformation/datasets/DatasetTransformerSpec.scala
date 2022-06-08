@@ -64,19 +64,24 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(transformation(in = step4Result, out = step5Result))
 
       val step6Result = generateProjAndQueries
-      (() => personLinksUpdater.updatePersonLinks)
+      (() => descriptionUpdater.updateDescriptions)
         .expects()
         .returning(transformation(in = step5Result, out = step6Result))
 
       val step7Result = generateProjAndQueries
-      (() => hierarchyOnInvalidationUpdater.updateHierarchyOnInvalidation)
+      (() => personLinksUpdater.updatePersonLinks)
         .expects()
         .returning(transformation(in = step6Result, out = step7Result))
+
+      val step8Result = generateProjAndQueries
+      (() => hierarchyOnInvalidationUpdater.updateHierarchyOnInvalidation)
+        .expects()
+        .returning(transformation(in = step7Result, out = step8Result))
 
       val step = transformer.createTransformationStep
       step.name.value shouldBe "Dataset Details Updates"
 
-      (step run initialProjectAndQueries._1).value shouldBe step7Result.asRight.pure[Try]
+      (step run initialProjectAndQueries._1).value shouldBe step8Result.asRight.pure[Try]
     }
 
     "return the ProcessingRecoverableFailure if one of the steps fails with a recoverable failure" in new TestCase {
@@ -100,6 +105,10 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
       (() => dateCreatedUpdater.updateDateCreated)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
+
+      (() => descriptionUpdater.updateDescriptions)
         .expects()
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
@@ -142,6 +151,10 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
 
+      (() => descriptionUpdater.updateDescriptions)
+        .expects()
+        .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
+
       (() => personLinksUpdater.updatePersonLinks)
         .expects()
         .returning(transformation(in = generateProjAndQueries, out = generateProjAndQueries))
@@ -176,6 +189,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     val topmostSameAsUpdater           = mock[TopmostSameAsUpdater[Try]]
     val originalIdentifierUpdater      = mock[OriginalIdentifierUpdater[Try]]
     val dateCreatedUpdater             = mock[DateCreatedUpdater[Try]]
+    val descriptionUpdater             = mock[DescriptionUpdater[Try]]
     val personLinksUpdater             = mock[PersonLinksUpdater[Try]]
     val hierarchyOnInvalidationUpdater = mock[HierarchyOnInvalidationUpdater[Try]]
     val transformer = new DatasetTransformerImpl[Try](derivationHierarchyUpdater,
@@ -183,6 +197,7 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
                                                       topmostSameAsUpdater,
                                                       originalIdentifierUpdater,
                                                       dateCreatedUpdater,
+                                                      descriptionUpdater,
                                                       personLinksUpdater,
                                                       hierarchyOnInvalidationUpdater
     )

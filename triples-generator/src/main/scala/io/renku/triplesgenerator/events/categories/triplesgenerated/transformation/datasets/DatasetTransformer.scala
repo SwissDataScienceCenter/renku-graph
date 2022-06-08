@@ -40,6 +40,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
     topmostSameAsUpdater:           TopmostSameAsUpdater[F],
     originalIdentifierUpdater:      OriginalIdentifierUpdater[F],
     dateCreatedUpdater:             DateCreatedUpdater[F],
+    descriptionUpdater:             DescriptionUpdater[F],
     personLinksUpdater:             PersonLinksUpdater[F],
     hierarchyOnInvalidationUpdater: HierarchyOnInvalidationUpdater[F],
     recoverableErrorsRecovery:      RecoverableErrorsRecovery = RecoverableErrorsRecovery
@@ -50,6 +51,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
   import hierarchyOnInvalidationUpdater._
   import originalIdentifierUpdater._
   import personLinksUpdater._
+  import descriptionUpdater._
   import recoverableErrorsRecovery._
   import sameAsUpdater._
   import topmostSameAsUpdater._
@@ -64,6 +66,7 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
         updateTopmostSameAs >>=
         updateOriginalIdentifiers >>=
         updateDateCreated >>=
+        updateDescriptions >>=
         updatePersonLinks >>=
         updateHierarchyOnInvalidation)
         .map(_.asRight[ProcessingRecoverableError])
@@ -80,11 +83,13 @@ private[transformation] object DatasetTransformer {
     hierarchyOnInvalidationUpdater <- HierarchyOnInvalidationUpdater[F]
     originalIdentifierUpdater      <- OriginalIdentifierUpdater[F]
     dateCreatedUpdater             <- DateCreatedUpdater[F]
+    descriptionUpdater             <- DescriptionUpdater[F]
   } yield new DatasetTransformerImpl[F](derivationHierarchyUpdater,
                                         sameAsUpdater,
                                         topmostSameAsUpdater,
                                         originalIdentifierUpdater,
                                         dateCreatedUpdater,
+                                        descriptionUpdater,
                                         personLinksUpdater,
                                         hierarchyOnInvalidationUpdater
   )
