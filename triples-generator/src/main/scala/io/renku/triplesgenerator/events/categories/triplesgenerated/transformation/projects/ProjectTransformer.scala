@@ -40,6 +40,7 @@ private class ProjectTransformerImpl[F[_]: MonadThrow](
     recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ProjectTransformer[F] {
   import recoverableErrorsRecovery._
+  import updatesCreator._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Project Details Updates", createTransformation)
@@ -51,7 +52,7 @@ private class ProjectTransformerImpl[F[_]: MonadThrow](
         .map {
           case None => (project, Queries.empty).asRight[ProcessingRecoverableError]
           case Some(kgProjectInfo) =>
-            (project, Queries.preDataQueriesOnly(updatesCreator.prepareUpdates(project, kgProjectInfo)))
+            (project, Queries.preDataQueriesOnly(prepareUpdates(project, kgProjectInfo)))
               .asRight[ProcessingRecoverableError]
         }
         .recoverWith(maybeRecoverableError("Problem finding project details in KG"))

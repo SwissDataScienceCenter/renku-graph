@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.projects
 
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
@@ -28,7 +29,7 @@ import io.renku.graph.model.testentities._
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep.Queries
 import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.Generators.recoverableClientErrors
-import io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.projects.KGProjectFinder.KGProjectInfo
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -40,12 +41,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
   "createTransformationStep" should {
 
     "create preDataUploadQueries when project is in KG" in new TestCase {
-      val kgProjectInfo = (projectNames.generateOne,
-                           projectResourceIds.generateOption,
-                           projectVisibilities.generateOne,
-                           projectDescriptions.generateOption,
-                           projectKeywords.generateSet()
-      )
+      val kgProjectInfo = projectMutableDataGen.generateOne
 
       (kgProjectFinder.find _)
         .expects(project.resourceId)
@@ -79,7 +75,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val exception = recoverableClientErrors.generateOne
       (kgProjectFinder.find _)
         .expects(project.resourceId)
-        .returning(exception.raiseError[Try, Option[KGProjectInfo]])
+        .returning(exception.raiseError[Try, Option[ProjectMutableData]])
 
       val step = transformer.createTransformationStep
 
@@ -93,7 +89,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val exception = exceptions.generateOne
       (kgProjectFinder.find _)
         .expects(project.resourceId)
-        .returning(exception.raiseError[Try, Option[KGProjectInfo]])
+        .returning(exception.raiseError[Try, Option[ProjectMutableData]])
 
       val step = transformer.createTransformationStep
 
@@ -110,4 +106,13 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     val project = renkuProjectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
   }
+
+  private lazy val projectMutableDataGen: Gen[ProjectMutableData] = for {
+    name          <- projectNames
+    maybeParentId <- projectResourceIds.toGeneratorOfOptions
+    visibility    <- projectVisibilities
+    maybeDesc     <- projectDescriptions.toGeneratorOfOptions
+    keywords      <- projectKeywords.toGeneratorOfSet(minElements = 0)
+    maybeAgent    <- cliVersions.toGeneratorOfOptions
+  } yield ProjectMutableData(name, maybeParentId, visibility, maybeDesc, keywords, maybeAgent)
 }
