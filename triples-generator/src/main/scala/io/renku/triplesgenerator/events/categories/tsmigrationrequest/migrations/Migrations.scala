@@ -48,6 +48,7 @@ private[tsmigrationrequest] object Migrations {
     multipleDSSameAs                  <- MultipleDSSameAs[F]
     multipleActivityAuthors           <- MultipleActivityAuthors[F]
     removeNotLinkedPersons            <- RemoveNotLinkedPersons[F]
+    multipleDSDescriptions            <- MultipleDSDescriptions[F]
     migrations <- validateNames(
                     reProvisioning,
                     malformedActivityIds,
@@ -62,7 +63,8 @@ private[tsmigrationrequest] object Migrations {
                     multipleDSDateCreated,
                     multipleDSSameAs,
                     multipleActivityAuthors,
-                    removeNotLinkedPersons
+                    removeNotLinkedPersons,
+                    multipleDSDescriptions
                   )
   } yield migrations
 
@@ -72,8 +74,7 @@ private[tsmigrationrequest] object Migrations {
       case (name, ms) if ms.size > 1 => name
     }
     if (problematicMigrations.nonEmpty) {
-      val error =
-        show"$categoryName: there are multiple migrations with the same name: ${problematicMigrations.mkString("; ")}"
+      val error = show"$categoryName: there are multiple migrations with name: ${problematicMigrations.mkString("; ")}"
       Logger[F]
         .error(error) >> new Exception(error).raiseError[F, List[Migration[F]]].map(_ => List.empty[Migration[F]])
     } else migrations.toList.pure[F]
