@@ -141,12 +141,11 @@ private object UpdatesCreator extends UpdatesCreator {
     SparqlQuery.of(
       name = "transformation - delete other derivedFrom",
       Prefixes of (prov -> "prov", schema -> "schema"),
-      s"""|DELETE {
-          |  ${dataset.resourceId.showAs[RdfResource]} prov:wasDerivedFrom ?derivedId
-          |}
+      s"""|DELETE { ?dsId prov:wasDerivedFrom ?derivedId }
           |WHERE {
-          |  ${dataset.resourceId.showAs[RdfResource]} a schema:Dataset;
-          |                                            prov:wasDerivedFrom ?derivedId.
+          |  BIND (${dataset.resourceId.showAs[RdfResource]} AS ?dsId)
+          |  ?dsId a schema:Dataset;
+          |        prov:wasDerivedFrom ?derivedId.
           |  ?derivedId schema:url ?derived. 
           |  FILTER (?derived != ${dataset.provenance.derivedFrom.showAs[RdfResource]})
           |}
@@ -160,12 +159,11 @@ private object UpdatesCreator extends UpdatesCreator {
     SparqlQuery.of(
       name = "transformation - delete other topmostDerivedFrom",
       Prefixes of (renku -> "renku", schema -> "schema"),
-      s"""|DELETE {
-          |  ${dataset.resourceId.showAs[RdfResource]} renku:topmostDerivedFrom ?topmostDerived
-          |}
+      s"""|DELETE { ?dsId renku:topmostDerivedFrom ?topmostDerived }
           |WHERE {
-          |  ${dataset.resourceId.showAs[RdfResource]} a schema:Dataset;
-          |                                            renku:topmostDerivedFrom ?topmostDerived.
+          |  BIND (${dataset.resourceId.showAs[RdfResource]} AS ?dsId)
+          |  ?dsId a schema:Dataset;
+          |        renku:topmostDerivedFrom ?topmostDerived.
           |  FILTER (?topmostDerived != ${dataset.provenance.topmostDerivedFrom.showAs[RdfResource]})
           |}
           |""".stripMargin
