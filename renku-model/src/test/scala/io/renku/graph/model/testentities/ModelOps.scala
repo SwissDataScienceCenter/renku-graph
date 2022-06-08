@@ -38,14 +38,8 @@ import io.renku.jsonld.syntax._
 trait ModelOps extends Dataset.ProvenanceOps {
 
   implicit class PersonOps(person: Person) {
-    lazy val resourceId: persons.ResourceId = person.maybeGitLabId match {
-      case Some(gitLabId) => persons.ResourceId(gitLabId)
-      case None =>
-        person.maybeEmail match {
-          case Some(email) => persons.ResourceId(email)
-          case None        => persons.ResourceId(person.name)
-        }
-    }
+
+    lazy val resourceId: persons.ResourceId = person.to[entities.Person].resourceId
 
     def to[T](implicit convert: Person => T):              T         = convert(person)
     def toMaybe[T](implicit convert: Person => Option[T]): Option[T] = convert(person)

@@ -23,11 +23,11 @@ import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.schema
-import io.renku.graph.model.entities.Person.{entityTypes, gitLabIdEncoder}
+import io.renku.graph.model.entities.Person.{entityTypes, gitLabIdEncoder, orcidIdEncoder}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, persons}
-import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityId, JsonLD, JsonLDEncoder}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,6 +48,14 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
         person.asJsonLD.cursor.downEntityId.as[persons.ResourceId] shouldBe persons.ResourceId(gitLabId).asRight
       }
     }
+
+    "use the resourceId based on person's GitLabId if it exists even if there's an orcidId" in {
+      val gitLabId = personGitLabIds.generateOne
+      val person = personEntities()
+        .map(_.copy(maybeGitLabId = gitLabId.some, maybeOrcidId = personOrcidIds.generateSome))
+        .generateOne
+      person.asJsonLD.cursor.downEntityId.as[persons.ResourceId] shouldBe persons.ResourceId(gitLabId).asRight
+    }
   }
 
   "decode" should {
@@ -55,6 +63,28 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
     "turn JsonLD Person entity into the Person object" in {
       forAll { person: Person =>
         person.asJsonLD.cursor.as[entities.Person] shouldBe person.to[entities.Person].asRight
+      }
+    }
+
+    "turn JsonLD of a Person in the CLI shape into the Person object" in {
+
+      val encoder = JsonLDEncoder.instance[entities.Person] { person =>
+        val entityId = person.maybeOrcidId match {
+          case Some(orcid) => EntityId of orcid.show
+          case _           => EntityId of person.resourceId.value
+        }
+
+        JsonLD.entity(
+          entityId,
+          entityTypes,
+          schema / "email"       -> person.maybeEmail.asJsonLD,
+          schema / "name"        -> person.name.asJsonLD,
+          schema / "affiliation" -> person.maybeAffiliation.asJsonLD
+        )
+      }
+
+      forAll(personEntities(withoutGitLabId).map(_.to[entities.Person])) { person =>
+        person.asJsonLD(encoder).cursor.as[entities.Person] shouldBe person.asRight
       }
     }
 
@@ -115,12 +145,33 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
         )
 
         val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
+
         failure shouldBe a[DecodingFailure]
-        failure.message shouldBe show"Invalid Person with $invalidResourceId, gitLabId = ${gitLabId.some}, email = $maybeEmail"
+        failure.message shouldBe
+          show"Invalid Person with $invalidResourceId, gitLabId = ${gitLabId.some}, " +
+          show"orcidId = ${Option.empty[persons.OrcidId]}, email = $maybeEmail"
       }
     }
 
-    "fail if person's ResourceId does not match the Email based ResourceId if no GitLabId but Email given" in {
+    "fail if person's ResourceId does not match the OrcidId based ResourceId if OrcidId given" in {
+      forAll(personOrcidResourceId.widen[persons.ResourceId], personOrcidIds) { (invalidResourceId, orcidId) =>
+        val jsonLDPerson = JsonLD.entity(
+          invalidResourceId.asEntityId,
+          entityTypes,
+          schema / "name"   -> personNames.generateOne.asJsonLD,
+          schema / "sameAs" -> orcidId.asJsonLD(orcidIdEncoder)
+        )
+
+        val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
+
+        failure shouldBe a[DecodingFailure]
+        failure.message shouldBe
+          show"Invalid Person with $invalidResourceId, gitLabId = ${Option.empty[persons.GitLabId]}, " +
+          show"orcidId = ${orcidId.some}, email = ${Option.empty[persons.Email]}"
+      }
+    }
+
+    "fail if person's ResourceId does not match the Email or Orcid based ResourceId if no GitLabId but Email given" in {
       forAll(Gen.oneOf(personGitLabResourceId, personNameResourceId).widen[persons.ResourceId], personEmails) {
         (invalidResourceId, email) =>
           val jsonLDPerson = JsonLD.entity(
@@ -131,13 +182,15 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
           )
 
           val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
+
           failure shouldBe a[DecodingFailure]
-          failure.message shouldBe show"Invalid Person with $invalidResourceId, " +
-            show"gitLabId = ${Option.empty[persons.GitLabId]}, email = ${email.some}"
+          failure.message shouldBe
+            show"Invalid Person with $invalidResourceId, gitLabId = ${Option.empty[persons.GitLabId]}, " +
+            show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${email.some}"
       }
     }
 
-    "fail if person's ResourceId does not match the Name based ResourceId if no GitLabId and Email given" in {
+    "fail if person's ResourceId does not match the Name or Orcid based ResourceId if no GitLabId and Email given" in {
       forAll(Gen.oneOf(personGitLabResourceId, personEmailResourceId).widen[persons.ResourceId]) { invalidResourceId =>
         val jsonLDPerson = JsonLD.entity(
           invalidResourceId.asEntityId,
@@ -146,9 +199,11 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
         )
 
         val Left(failure) = jsonLDPerson.cursor.as[entities.Person]
+
         failure shouldBe a[DecodingFailure]
-        failure.message shouldBe show"Invalid Person with $invalidResourceId, " +
-          show"gitLabId = ${Option.empty[persons.GitLabId]}, email = ${Option.empty[persons.Email]}"
+        failure.message shouldBe
+          show"Invalid Person with $invalidResourceId, gitLabId = ${Option.empty[persons.GitLabId]}, " +
+          show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${Option.empty[persons.Email]}"
       }
     }
   }

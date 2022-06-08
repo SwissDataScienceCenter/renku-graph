@@ -20,16 +20,15 @@ package io.renku.graph.acceptancetests
 
 package object knowledgegraph {
 
+  import io.circe.literal._
   import io.circe.{Encoder, Json}
   import io.renku.graph.acceptancetests.data.Project.Permissions._
   import io.renku.graph.acceptancetests.data.Project.{Urls, _}
+  import io.renku.graph.acceptancetests.data.{Project, _}
   import io.renku.graph.model.projects.{DateCreated, ForksCount}
   import io.renku.graph.model.testentities
-  import io.renku.http.rest.Links.{Href, Link, Rel, _links}
-  import io.circe.literal._
-  import io.renku.graph.acceptancetests.data.{Project, _}
   import io.renku.graph.model.testentities._
-  import eu.timepit.refined.auto._
+  import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 
   def fullJson(project: Project): Json = json"""{
     "identifier":  ${project.id.value}, 
@@ -98,11 +97,11 @@ package object knowledgegraph {
   }
 
   private implicit lazy val personEncoder: Encoder[Person] = Encoder.instance {
-    case Person(name, Some(email), _, _) => json"""{
+    case Person(name, Some(email), _, _, _) => json"""{
       "name": ${name.value},
       "email": ${email.value}
     }"""
-    case Person(name, _, _, _) => json"""{
+    case Person(name, _, _, _, _) => json"""{
       "name": ${name.value}
     }"""
   }

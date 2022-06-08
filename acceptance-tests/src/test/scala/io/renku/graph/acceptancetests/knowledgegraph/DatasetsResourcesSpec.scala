@@ -529,7 +529,7 @@ trait DatasetsResources {
     }
 
   private implicit lazy val personEncoder: Encoder[Person] = Encoder.instance[Person] {
-    case Person(name, maybeEmail, _, _) => json"""{
+    case Person(name, maybeEmail, _, _, _) => json"""{
       "name": $name
     }""" addIfDefined ("email" -> maybeEmail)
   }
