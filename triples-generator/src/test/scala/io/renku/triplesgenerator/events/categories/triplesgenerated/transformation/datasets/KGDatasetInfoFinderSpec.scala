@@ -136,7 +136,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
 
   "findDatasetOriginalIdentifiers" should {
 
-    "return all DS' Initial Versions" in new TestCase {
+    "return all DS' Original Identifiers" in new TestCase {
       val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
@@ -149,7 +149,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
         Set(dataset.provenance.originalIdentifier, otherOriginalId)
     }
 
-    "return no Initial Versions if there's no DS with the given id" in new TestCase {
+    "return an empty Set if there's no DS with the given id" in new TestCase {
       finder
         .findDatasetOriginalIdentifiers(datasetResourceIds.generateOne)
         .unsafeRunSync() shouldBe Set.empty
@@ -171,8 +171,46 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
         Set(dataset.provenance.date, otherDateCreated)
     }
 
-    "return no Initial Versions if there's no DS with the given id" in new TestCase {
+    "return an empty Set if there's no DS with the given id" in new TestCase {
       finder.findDatasetDateCreated(datasetResourceIds.generateOne).unsafeRunSync() shouldBe Set.empty
+    }
+  }
+
+  "findDatasetDescriptions" should {
+
+    "return all DS' descriptions" in new TestCase {
+      val description1 = datasetDescriptions.generateOne
+      val dataset = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(description1.some))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(dataset)
+
+      val description2 = datasetDescriptions.generateOne
+      insertTriple(dataset.resourceId, "schema:description", show"'$description2'")
+
+      finder.findDatasetDescriptions(dataset.resourceId).unsafeRunSync() shouldBe
+        Set(description1, description2)
+    }
+
+    "return an empty Set if requested DS has no description" in new TestCase {
+      val dataset = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(None))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(dataset)
+
+      finder.findDatasetDescriptions(dataset.resourceId).unsafeRunSync() shouldBe Set.empty
+    }
+
+    "return an empty Set if there's no DS with the given id" in new TestCase {
+      finder
+        .findDatasetDescriptions(datasetResourceIds.generateOne)
+        .unsafeRunSync() shouldBe Set.empty
     }
   }
 

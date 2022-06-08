@@ -503,6 +503,84 @@ class UpdatesCreatorSpec
     }
   }
 
+  "removeOtherDescriptions" should {
+
+    "prepare queries that removes all additional description triples on the DS" in {
+      val description1 = datasetDescriptions.generateOne
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(description1.some))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(ds)
+
+      val description2 = datasetDescriptions.generateOne
+      insertTriple(ds.resourceId, "schema:description", s"'$description2'")
+      val description3 = datasetDescriptions.generateOne
+      insertTriple(ds.resourceId, "schema:description", s"'$description3'")
+
+      findDescriptions(ds.identification.identifier) shouldBe Set(description1, description3, description2)
+
+      UpdatesCreator
+        .removeOtherDescriptions(ds, Set(description2, description3))
+        .runAll
+        .unsafeRunSync()
+
+      findDescriptions(ds.identification.identifier) shouldBe Set(description1)
+    }
+
+    "prepare queries that removes all description triples on the DS if there's no description on DS but some in KG" in {
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(None))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(ds)
+
+      val description = datasetDescriptions.generateOne
+      insertTriple(ds.resourceId, "schema:description", s"'$description'")
+
+      findDescriptions(ds.identification.identifier) shouldBe Set(description)
+
+      UpdatesCreator.removeOtherDescriptions(ds, Set(description)).runAll.unsafeRunSync()
+
+      findDescriptions(ds.identification.identifier) shouldBe Set.empty
+    }
+
+    "prepare no queries if there's no description on DS and in KG" in {
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(None))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      UpdatesCreator.removeOtherDescriptions(ds, Set.empty) shouldBe Nil
+    }
+
+    "prepare no queries if there's only the correct description for the DS in KG" in {
+      val description = datasetDescriptions.generateOne
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(description.some))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      UpdatesCreator.removeOtherDescriptions(ds, Set(description)) shouldBe Nil
+    }
+
+    "prepare no queries if there's no description for the DS in KG" in {
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(datasetDescriptions.generateSome))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      UpdatesCreator.removeOtherDescriptions(ds, Set.empty) shouldBe Nil
+    }
+  }
+
   "removeOtherDSSameAs" should {
 
     "prepare queries that removes all additional Internal SameAs triples on the DS" in {
@@ -698,6 +776,17 @@ class UpdatesCreatorSpec
                  |}""".stripMargin)
       .unsafeRunSync()
       .map(row => datasets.DateCreated(Instant.parse(row("date"))))
+      .toSet
+
+  private def findDescriptions(id: datasets.Identifier): Set[datasets.Description] =
+    runQuery(s"""|SELECT ?desc
+                 |WHERE { 
+                 |  ?id a schema:Dataset;
+                 |      schema:identifier '$id';
+                 |      schema:description ?desc.
+                 |}""".stripMargin)
+      .unsafeRunSync()
+      .map(row => datasets.Description(row("desc")))
       .toSet
 
   private def findSameAs(id: datasets.Identifier): Set[datasets.SameAs] =

@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
-import io.renku.graph.model.datasets.{DateCreated, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
+import io.renku.graph.model.datasets.{DateCreated, Description, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.persons
@@ -65,6 +65,8 @@ private trait UpdatesCreator {
   ): List[SparqlQuery]
 
   def removeOtherDateCreated(dataset: Dataset[Dataset.Provenance], dateCreatedInKG: Set[DateCreated]): List[SparqlQuery]
+
+  def removeOtherDescriptions(dataset: Dataset[Dataset.Provenance], descsInKG: Set[Description]): List[SparqlQuery]
 
   def removeOtherSameAs(dataset: Dataset[Dataset.Provenance], sameAsInKG: Set[SameAs]): List[SparqlQuery]
 }
@@ -288,6 +290,36 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
     .toList
+
+  def removeOtherDescriptions(ds: Dataset[Dataset.Provenance], descsInKG: Set[Description]): List[SparqlQuery] =
+    ds.additionalInfo.maybeDescription match {
+      case Some(desc) if (descsInKG - desc).nonEmpty =>
+        List(
+          SparqlQuery.of(
+            name = "transformation - ds desc clean-up",
+            Prefixes of schema -> "schema",
+            s"""|DELETE { ?dsId schema:description ?desc }
+                |WHERE {
+                |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+                |  ?dsId schema:description ?desc.
+                |  FILTER ( ?desc != '$desc' )
+                |}""".stripMargin
+          )
+        )
+      case None if descsInKG.nonEmpty =>
+        List(
+          SparqlQuery.of(
+            name = "transformation - ds desc remove",
+            Prefixes of schema -> "schema",
+            s"""|DELETE { ?dsId schema:description ?desc }
+                |WHERE {
+                |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+                |  ?dsId schema:description ?desc.
+                |}""".stripMargin
+          )
+        )
+      case _ => List.empty
+    }
 
   override def removeOtherSameAs(ds: Dataset[Dataset.Provenance], sameAsInKG: Set[SameAs]): List[SparqlQuery] = {
     val maybeSameAs = {
