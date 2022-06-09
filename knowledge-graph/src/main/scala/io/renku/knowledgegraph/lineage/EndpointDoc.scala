@@ -18,25 +18,35 @@
 
 package io.renku.knowledgegraph.lineage
 import cats.syntax.all._
+import io.circe.literal._
+import io.renku.knowledgegraph.docs.Implicits._
+import io.renku.knowledgegraph.docs.model.Example.JsonExample
+import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
+import org.http4s
 
 object EndpointDoc {
-  lazy val path: Path = Path("Lineage".some, "Get the lineage of a files".some).addUri(uri).addGet(getOp)
+  lazy val path: Path = Path(
+    "Lineage",
+    "Get the lineage of a files".some,
+    GET(
+      Uri / groupParam / projectParam / "files" / locationParam / "lineage",
+      http4s.Status.Ok.asDocStatus,
+      Response(
+        "Lineage found",
+        List(MediaType(http4s.MediaType.application.json.asDocMediaType, JsonExample(json"{}")))
+      )
+    )
+  )
 
-  private lazy val uri = Uri / groupParam / projectParam / "files" / locationParam / "lineage"
-  private lazy val groupParam = Parameter(
+  private lazy val groupParam = Parameter.in(
     "group(s)",
-    In.Path,
-    "Group name(s). Names are url-encoded, slashes are not. (e.g. group1/group2/.../groupN)".some,
-    required = true,
-    Schema("string")
+    Schema.String,
+    description = "Group name(s). Names are url-encoded, slashes are not. (e.g. group1/group2/.../groupN)".some
   )
   private lazy val projectParam =
-    Parameter("project name", In.Path, "Project name".some, required = true, Schema("string"))
+    Parameter.in("project name", Schema.String, "Project name".some)
   private lazy val locationParam =
-    Parameter("location", In.Path, "The path of the file".some, required = true, Schema("string"))
-
-  private lazy val getOp  = Operation.Get("/get".some, Nil, None, Map("200" -> response200), Nil)
-  private val response200 = Response("Success", Map.empty, Map.empty, Map.empty)
+    Parameter.in("location", Schema.String, "The path of the file".some)
 
 }

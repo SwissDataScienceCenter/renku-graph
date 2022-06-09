@@ -19,13 +19,17 @@
 package io.renku.knowledgegraph.docs
 
 import cats.Show
+import cats.syntax.all._
+import io.circe.Json
+import io.renku.knowledgegraph.docs.model.Path.OpMapping
 
 object model {
   trait OpenApiDocument {
-    def openApiVersion: String
-    def info:           Info
-    def servers:        List[Server]
-    def paths:          Map[String, Path]
+    def openApiVersion:  String
+    def info:            Info
+    def servers:         List[Server]
+    def paths:           Map[String, Path]
+    def maybeComponents: Option[Components]
   }
 
   object OpenApiDocument {
@@ -37,22 +41,21 @@ object model {
                                         info:           Info,
                                         servers:        List[Server],
                                         paths:          Map[String, Path]
-  ) extends OpenApiDocument {
-    def addServer(server: Server): DocWithServers = DocWithServers(openApiVersion, info, servers = List(server), paths)
-  }
-
-  private case class DocWithServers(openApiVersion: String,
-                                    info:           Info,
-                                    servers:        List[Server],
-                                    paths:          Map[String, Path]
   ) {
     def addPath(path: Path): CompleteDoc =
-      CompleteDoc(openApiVersion, info, servers, paths + (path.template -> path))
+      CompleteDoc(openApiVersion, info, servers, paths + (path.template -> path), None)
+    def addServer(server: Server): DocWithInfo = copy(openApiVersion, info, servers :+ server, paths)
   }
 
-  private case class CompleteDoc(openApiVersion: String, info: Info, servers: List[Server], paths: Map[String, Path])
-      extends OpenApiDocument {
+  private case class CompleteDoc(openApiVersion:  String,
+                                 info:            Info,
+                                 servers:         List[Server],
+                                 paths:           Map[String, Path],
+                                 maybeComponents: Option[Components]
+  ) extends OpenApiDocument {
     def addPath(path: Path): OpenApiDocument = copy(paths = paths + (path.template -> path))
+
+    def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
   }
 
   case class Info(title: String, description: Option[String], version: String)
@@ -60,16 +63,34 @@ object model {
   case class Server(url: String, description: String, variables: Map[String, Variable])
 
   case class Variable(default: String)
+  object Uri {
+    def /(nextPart: Parameter) = Uri(List(ParameterPart(nextPart)))
+    def /(nextPart: String)    = Uri(List(StringPart(nextPart)))
+    def getTemplate(parts: List[UriPart]): String =
+      parts
+        .map {
+          case ParameterPart(parameter) => s"{${parameter.name}}"
+          case StringPart(value)        => value
+        }
+        .mkString("/")
+        .prepended("/")
+        .mkString("")
 
+  }
   private[model] case class Uri(parts: List[UriPart]) {
     def show: Show[Uri] = Show.show(_ => parts.map(_.show).mkString("/"))
     def /(nextPart: Parameter) = copy(parts :+ ParameterPart(nextPart))
     def /(nextPart: String)    = copy(parts :+ StringPart(nextPart))
   }
 
-  object Uri {
-    def /(firstPart: Parameter) = Uri(List(ParameterPart(firstPart)))
-    def /(firstPart: String)    = Uri(List(StringPart(firstPart)))
+  trait WithOperation {
+    def operation: Operation
+  }
+
+  private[model] case class UriOp(operation: Operation, parts: List[UriPart]) {
+    def show: Show[UriOp] = Show.show(_ => parts.map(_.show).mkString("/"))
+    def /(nextPart: Parameter) = copy(parts = parts :+ ParameterPart(nextPart))
+    def /(nextPart: String)    = copy(parts = parts :+ StringPart(nextPart))
   }
 
   trait UriPart {
@@ -85,7 +106,7 @@ object model {
   }
 
   trait Path {
-    def summary:     Option[String]
+    def summary:     String
     def description: Option[String]
     def operations:  List[Operation]
     def parameters:  List[Parameter]
@@ -93,30 +114,32 @@ object model {
   }
 
   object Path {
-    def apply(summary: Option[String], description: Option[String]): PathWithDescriptors =
-      PathWithDescriptors(summary: Option[String], description: Option[String])
+    def apply(summary: String, description: Option[String] = None, opMapping: OpMapping): Path =
+      PathImpl(summary, description, List(opMapping.operation), opMapping.operation.parameters, opMapping.template)
+
+    def apply(summary: String, description: String): PathWithDescriptors =
+      PathWithDescriptors(summary, description.some)
+
+    case class OpMapping(template: String, operation: Operation)
   }
 
-  private[model] case class PathWithDescriptors(summary: Option[String], description: Option[String]) {
-    def addUri(uri: Uri): PathWithUri = {
+  private[model] case class PathWithDescriptors(summary: String, description: Option[String]) {
 
-      val parameters = uri.parts.flatMap {
+    def addSingleOperation(uriOp: UriOp): PathImpl =
+      PathImpl(summary, description, List(uriOp.operation), getParameters(uriOp.parts), Uri.getTemplate(uriOp.parts))
+
+    def addUri(uri: Uri): PathWithUri =
+      PathWithUri(summary, description, getParameters(uri.parts), Uri.getTemplate(uri.parts))
+
+    private def getParameters(parts: List[UriPart]) =
+      parts.flatMap {
         case ParameterPart(parameter) => Some(parameter)
         case _                        => None
       }
 
-      val template = "/" + uri.parts
-        .map {
-          case ParameterPart(parameter) => s"{${parameter.name}}"
-          case StringPart(value)        => value
-        }
-        .mkString("/")
-
-      PathWithUri(summary, description, parameters, template)
-    }
   }
 
-  private case class PathWithUri(summary:     Option[String],
+  private case class PathWithUri(summary:     String,
                                  description: Option[String],
                                  parameters:  List[Parameter],
                                  template:    String
@@ -125,7 +148,7 @@ object model {
       PathImpl(summary, description, List(operation), parameters, template)
   }
 
-  private case class PathImpl(summary:     Option[String],
+  private case class PathImpl(summary:     String,
                               description: Option[String],
                               operations:  List[Operation],
                               parameters:  List[Parameter],
@@ -139,20 +162,35 @@ object model {
     def summary:     Option[String]
     def parameters:  List[Parameter]
     def requestBody: Option[RequestBody]
-    def responses:   Map[String, Response]
+    def responses:   Map[Status, Response]
     def security:    List[SecurityRequirement]
   }
 
   object Operation {
+    def GET(uri: Uri, status: Status, response: Response): OpMapping = {
+      val template = Uri.getTemplate(uri.parts)
+      val parameters = uri.parts.flatMap {
+        case ParameterPart(parameter) => Some(parameter)
+        case _                        => None
+      }
+
+      OpMapping(template, Get("".some, parameters, None, Map(status -> response), Nil))
+    }
+
     case class Get(summary:     Option[String],
                    parameters:  List[Parameter],
                    requestBody: Option[RequestBody],
-                   responses:   Map[String, Response],
+                   responses:   Map[Status, Response],
                    security:    List[SecurityRequirement]
     ) extends Operation
   }
 
-  case class Parameter(name: String, in: In, description: Option[String], required: Boolean, schema: Schema) {}
+  case class Parameter(name: String, in: In, description: Option[String], required: Boolean, schema: Schema)
+
+  object Parameter {
+    def in(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true) =
+      Parameter(name, In.Path, description, required, schema)
+  }
 
   sealed trait In extends Product with Serializable {
     def value: String
@@ -179,15 +217,87 @@ object model {
   }
 
   final case class RequestBody(description: String, content: Map[String, MediaType])
-  final case class MediaType()
-  final case class Response(description: String,
-                            headers:     Map[String, Header],
-                            content:     Map[String, MediaType],
-                            links:       Map[String, Link]
+  final case class MediaType(name: String, examples: List[Example])
+  object MediaType {
+    def apply(name: String, example: Example): MediaType =
+      MediaType(name, List(example))
+  }
+  final case class Response(
+      description: String,
+      content:     List[MediaType],
+      headers:     Map[String, Header] = Map.empty,
+      links:       Map[String, Link] = Map.empty
   )
+
+  case class Status(code: Int, name: String)
+
   final case class SecurityRequirement()
+  final case class SecurityScheme(name:             String,
+                                  `type`:           TokenType,
+                                  description:      Option[String],
+                                  in:               In,
+                                  scheme:           String,
+                                  flows:            OAuthFlows,
+                                  openIdConnectUrl: String
+  )
   final case class Header()
   final case class Link()
-  final case class Schema(`type`: String)
+
+  sealed trait TokenType extends Product with Serializable {
+    def value: String
+  }
+
+  object TokenType {
+    case object ApiKey extends TokenType {
+      override def value: String = "apiKey"
+    }
+    case object OAuth2 extends TokenType {
+      override def value: String = "oauth2"
+    }
+    case object OpenIdConnect extends TokenType {
+      override def value: String = "openIdConnect"
+    }
+    case object Http extends TokenType {
+      override def value: String = "http"
+    }
+  }
+
+  final case class OAuthFlows(`implicit`:        Option[OAuthFlow] = None,
+                              password:          Option[OAuthFlow] = None,
+                              clientCredentials: Option[OAuthFlow] = None,
+                              authorizationCode: Option[OAuthFlow] = None
+  ) // TODO: make at least one flow required
+
+  final case class OAuthFlow(
+      authorizationUrl: String,
+      tokenUrl:         String,
+      scopes:           Map[String, String],
+      refreshUrl:       Option[String] = None
+  )
+
+  sealed trait Schema {
+    def `type`: String
+  }
+  object Schema {
+    final case object String extends Schema {
+      val `type`: String = "string"
+    }
+  }
+
+  final case class Components(schemas: Map[String, Schema], examples: List[Example])
+
+  trait Example {
+    def value:   T
+    def summary: Option[String]
+    type T
+  }
+  object Example {
+    case class JsonExample(value: Json, summary: Option[String] = None) extends Example {
+      type T = Json
+    }
+    case class StringExample(value: String, summary: Option[String] = None) extends Example {
+      type T = String
+    }
+  }
 
 }
