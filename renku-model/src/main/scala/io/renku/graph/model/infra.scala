@@ -47,11 +47,26 @@ object GitLabApiUrl
 }
 
 final class CliVersion private (val value: String) extends AnyVal with StringTinyType
-object CliVersion
-    extends TinyTypeFactory[CliVersion](new CliVersion(_))
-    with NonBlank[CliVersion]
-    with TinyTypeJsonLDOps[CliVersion] {
+object CliVersion extends TinyTypeFactory[CliVersion](new CliVersion(_)) with TinyTypeJsonLDOps[CliVersion] {
+
+  private val validationRegex: String = raw"\d+\.\d+\.\d+.*"
+
+  addConstraint(
+    check = _ matches validationRegex,
+    message = (value: String) => s"'$value' is not a valid CLI version"
+  )
+
+  implicit class CliVersionAlg(cliVersion: CliVersion) {
+    val s"$major.$minor.$bugfix" = cliVersion.value
+  }
+
   implicit val jsonDecoder: Decoder[CliVersion] = TinyTypeDecoders.stringDecoder(this)
+
+  implicit val ordering: Ordering[CliVersion] = (x: CliVersion, y: CliVersion) =>
+    if ((x.major compareTo y.major) != 0) x.major compareTo y.major
+    else if ((x.minor compareTo y.minor) != 0) x.minor compareTo y.minor
+    else if ((x.bugfix compareTo y.bugfix) != 0) x.bugfix compareTo y.bugfix
+    else x.value compareTo y.value
 }
 
 final case class RenkuVersionPair(cliVersion: CliVersion, schemaVersion: SchemaVersion)
