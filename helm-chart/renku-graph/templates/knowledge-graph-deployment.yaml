@@ -37,7 +37,7 @@ spec:
                 secretKeyRef:
                   name: client-certificate-secret
                   key: client-certificate
-            - name: RENKU_BASE_URL
+            - name: RENKU_URL
               value: https://{{ .Values.global.renku.domain }}
             - name: RENKU_API_URL
               value: https://{{ .Values.global.renku.domain }}{{ .Values.knowledgeGraph.services.renku.resourcesPath }}
