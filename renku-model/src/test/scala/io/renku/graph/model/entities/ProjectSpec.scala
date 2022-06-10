@@ -848,7 +848,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   private def datasetWith(
       creators: NonEmptyList[entities.Person]
   ): projects.DateCreated => entities.Dataset[entities.Dataset.Provenance] = dateCreated => {
-    val ds = datasetEntities(provenanceNonModified)(renkuBaseUrl)(dateCreated).generateOne
+    val ds = datasetEntities(provenanceNonModified)(renkuUrl)(dateCreated).generateOne
       .to[entities.Dataset[entities.Dataset.Provenance]]
     ds.copy(provenance = ds.provenance match {
       case p: entities.Dataset.Provenance.Internal                         => p.copy(creators = creators.sortBy(_.name))

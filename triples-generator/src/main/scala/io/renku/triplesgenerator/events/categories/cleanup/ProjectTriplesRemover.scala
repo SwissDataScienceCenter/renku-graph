@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.graph.config._
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -45,9 +45,9 @@ private object ProjectTriplesRemover {
       requestTimeout: Duration = 15 minutes
   ): F[ProjectTriplesRemover[F]] = for {
     rdfStoreConfig <- RdfStoreConfig[F]()
-    renkuBaseUrl   <- RenkuBaseUrlLoader[F]()
+    renkuUrl       <- RenkuUrlLoader[F]()
   } yield new ProjectTriplesRemoverImpl[F](rdfStoreConfig,
-                                           renkuBaseUrl,
+                                           renkuUrl,
                                            retryInterval,
                                            maxRetries,
                                            idleTimeout,
@@ -57,7 +57,7 @@ private object ProjectTriplesRemover {
 
 private class ProjectTriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig: RdfStoreConfig,
-    renkuBaseUrl:   RenkuBaseUrl,
+    renkuUrl:       RenkuUrl,
     retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:    Duration = 16 minutes,
@@ -72,7 +72,7 @@ private class ProjectTriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeReco
   import SameAsHierarchyFixer._
   import io.renku.graph.model.Schemas._
 
-  private implicit val baseUrl:     RenkuBaseUrl   = renkuBaseUrl
+  private implicit val baseUrl:     RenkuUrl       = renkuUrl
   private implicit val storeConfig: RdfStoreConfig = rdfStoreConfig
 
   override def removeTriples(projectPath: projects.Path): F[Unit] = for {

@@ -20,7 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.{GitLabApiUrl, RenkuBaseUrl}
+import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.associations.ResourceId
 import io.renku.jsonld._
@@ -61,7 +61,7 @@ object Association {
       )
   }
 
-  implicit def decoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Association] =
+  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Association] =
     JsonLDDecoder.entity(entityTypes) { implicit cursor =>
       for {
         resourceId <- cursor.downEntityId.as[ResourceId]
@@ -73,11 +73,9 @@ object Association {
       } yield association
     }
 
-  private def tryAsPersonAgent(resourceId: ResourceId, plan: Plan)(implicit
-      cursor:                              Cursor,
-      renkuBaseUrl:                        RenkuBaseUrl
-  ) = cursor.downField(prov / "agent").as[Option[Person]] >>= {
-    case Some(agent) => Association.WithPersonAgent(resourceId, agent, plan).asRight
-    case None        => DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
-  }
+  private def tryAsPersonAgent(resourceId: ResourceId, plan: Plan)(implicit cursor: Cursor, renkuUrl: RenkuUrl) =
+    cursor.downField(prov / "agent").as[Option[Person]] >>= {
+      case Some(agent) => Association.WithPersonAgent(resourceId, agent, plan).asRight
+      case None        => DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
+    }
 }

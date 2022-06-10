@@ -33,7 +33,7 @@ import io.renku.graph.model.datasets._
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
-import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
@@ -178,7 +178,7 @@ class DatasetEndpointSpec
   }
 
   private trait TestCase {
-    implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+    implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
     val gitLabUrl = gitLabUrls.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()

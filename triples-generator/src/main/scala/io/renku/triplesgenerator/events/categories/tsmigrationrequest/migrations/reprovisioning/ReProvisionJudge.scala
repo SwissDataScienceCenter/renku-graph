@@ -38,7 +38,7 @@ private object ReProvisionJudge {
                                                           reProvisioningStatus:      ReProvisioningStatus[F],
                                                           microserviceUrlFinder:     MicroserviceUrlFinder[F],
                                                           versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
-  )(implicit renkuBaseUrl:                                                           RenkuBaseUrl) = for {
+  )(implicit renkuUrl:                                                               RenkuUrl) = for {
     renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig)
     serviceHealthChecker   <- ServiceHealthChecker[F]
   } yield new ReProvisionJudgeImpl[F](renkuVersionPairFinder,

@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.commandParameters.IOStream.{StdErr, StdIn, StdOut}
 import io.renku.graph.model.commandParameters._
 import io.renku.graph.model.entityModel.Location
-import io.renku.graph.model.{RenkuBaseUrl, commandParameters, entities}
+import io.renku.graph.model.{RenkuUrl, commandParameters, entities}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -69,7 +69,7 @@ object CommandParameterBase {
           )
 
     implicit def toEntitiesCommandParameter(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): CommandParameter => entities.CommandParameterBase.CommandParameter =
       parameter =>
         entities.CommandParameterBase.CommandParameter(
@@ -81,10 +81,10 @@ object CommandParameterBase {
           parameter.defaultValue
         )
 
-    implicit def commandParameterEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter] =
+    implicit def commandParameterEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[CommandParameter] =
       JsonLDEncoder.instance(_.to[entities.CommandParameterBase.CommandParameter].asJsonLD)
 
-    implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[CommandParameter] =
+    implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[CommandParameter] =
       EntityIdEncoder.instance(parameter => parameter.plan.asEntityId.asUrlEntityId / "parameters" / parameter.position)
   }
 
@@ -146,10 +146,10 @@ object CommandParameterBase {
                                         defaultValue:        InputDefaultValue,
                                         maybeEncodingFormat: Option[EncodingFormat],
                                         plan:                Plan
-    )(implicit renkuBaseUrl:                                 RenkuBaseUrl)
+    )(implicit renkuUrl:                                     RenkuUrl)
         extends CommandInput
         with ExplicitCommandParameter {
-      val mappedTo: IOStream.In = IOStream.StdIn(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdIn.name).value))
+      val mappedTo: IOStream.In = IOStream.StdIn(IOStream.ResourceId((renkuUrl / "iostreams" / StdIn.name).value))
     }
 
     final case class ImplicitCommandInput(
@@ -161,7 +161,7 @@ object CommandParameterBase {
     ) extends CommandInput
 
     implicit def toEntitiesCommandInput(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): CommandInput => entities.CommandParameterBase.CommandInput = {
       case parameter: LocationCommandInput =>
         entities.CommandParameterBase.LocationCommandInput(
@@ -194,10 +194,10 @@ object CommandParameterBase {
         )
     }
 
-    implicit def commandInputEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandInput] =
+    implicit def commandInputEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[CommandInput] =
       JsonLDEncoder.instance(_.to[entities.CommandParameterBase.CommandInput].asJsonLD)
 
-    implicit def entityIdEncoder[I <: CommandInput](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[I] =
+    implicit def entityIdEncoder[I <: CommandInput](implicit renkuUrl: RenkuUrl): EntityIdEncoder[I] =
       EntityIdEncoder.instance(input => input.plan.asEntityId.asUrlEntityId / "inputs" / input.name)
   }
 
@@ -229,11 +229,11 @@ object CommandParameterBase {
     def streamedFromLocation(defaultValue: Location, stream: IOStream.Out): Position => Plan => MappedCommandOutput =
       streamedFrom(OutputDefaultValue(defaultValue), stream)
 
-    def stdOut(implicit renkuBaseUrl: RenkuBaseUrl): IOStream.StdOut =
-      IOStream.StdOut(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdOut.name).value))
+    def stdOut(implicit renkuUrl: RenkuUrl): IOStream.StdOut =
+      IOStream.StdOut(IOStream.ResourceId((renkuUrl / "iostreams" / StdOut.name).value))
 
-    def stdErr(implicit renkuBaseUrl: RenkuBaseUrl): IOStream.StdErr =
-      IOStream.StdErr(IOStream.ResourceId((renkuBaseUrl / "iostreams" / StdErr.name).value))
+    def stdErr(implicit renkuUrl: RenkuUrl): IOStream.StdErr =
+      IOStream.StdErr(IOStream.ResourceId((renkuUrl / "iostreams" / StdErr.name).value))
 
     def streamedFrom(defaultValue: OutputDefaultValue, stream: IOStream.Out): Position => Plan => MappedCommandOutput =
       position =>
@@ -283,7 +283,7 @@ object CommandParameterBase {
     ) extends CommandOutput
 
     implicit def toEntitiesCommandOutput(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): CommandOutput => entities.CommandParameterBase.CommandOutput = {
       case parameter: LocationCommandOutput =>
         entities.CommandParameterBase.LocationCommandOutput(
@@ -319,10 +319,10 @@ object CommandParameterBase {
         )
     }
 
-    implicit def commandOutputEncoder[O <: CommandOutput](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[O] =
+    implicit def commandOutputEncoder[O <: CommandOutput](implicit renkuUrl: RenkuUrl): JsonLDEncoder[O] =
       JsonLDEncoder.instance(_.to[entities.CommandParameterBase.CommandOutput].asJsonLD)
 
-    implicit def entityIdEncoder[O <: CommandOutput](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[O] =
+    implicit def entityIdEncoder[O <: CommandOutput](implicit renkuUrl: RenkuUrl): EntityIdEncoder[O] =
       EntityIdEncoder.instance(output => output.plan.asEntityId.asUrlEntityId / "outputs" / output.name)
   }
 }

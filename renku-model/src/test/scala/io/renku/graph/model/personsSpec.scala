@@ -96,19 +96,19 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 }
 
 class PersonResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
-  private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+  private implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
   "apply(GitLabId)" should {
-    "generate 'renkuBaseUrl/persons/gitLabId' ResourceId" in {
+    "generate 'renkuUrl/persons/gitLabId' ResourceId" in {
       val gitLabId = personGitLabIds.generateOne
-      ResourceId(gitLabId).show shouldBe (renkuBaseUrl / "persons" / gitLabId).show
+      ResourceId(gitLabId).show shouldBe (renkuUrl / "persons" / gitLabId).show
     }
   }
 
   "apply(OrcidId)" should {
-    "generate 'renkuBaseUrl/persons/orcid/xxxx-xxxx-xxxx-xxxx' ResourceId" in {
+    "generate 'renkuUrl/persons/orcid/xxxx-xxxx-xxxx-xxxx' ResourceId" in {
       val orcid = personOrcidIds.generateOne
-      ResourceId(orcid).show shouldBe (renkuBaseUrl / "persons" / "orcid" / orcid.id).show
+      ResourceId(orcid).show shouldBe (renkuUrl / "persons" / "orcid" / orcid.id).show
     }
   }
 
@@ -120,9 +120,9 @@ class PersonResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
   }
 
   "apply(Name)" should {
-    "generate 'renkuBaseUrl/persons/name' ResourceId" in {
+    "generate 'renkuUrl/persons/name' ResourceId" in {
       val name = personNames.generateOne
-      ResourceId(name).show shouldBe (renkuBaseUrl / "persons" / name).show
+      ResourceId(name).show shouldBe (renkuUrl / "persons" / name).show
     }
   }
 
@@ -131,7 +131,7 @@ class PersonResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
       val resourceId = personGitLabResourceId.generateOne
       ResourceId.from(resourceId.show) shouldBe resourceId.asRight
     }
-    "return ResourceId.OrcidIdBased for strings matching the renku orcid based id like 'renkuBaseUrl/persons/orcid/xxxx-xxxx-xxxx-xxxx'" in {
+    "return ResourceId.OrcidIdBased for strings matching the renku orcid based id like 'renkuUrl/persons/orcid/xxxx-xxxx-xxxx-xxxx'" in {
       val resourceId = personOrcidResourceId.generateOne
       ResourceId.from(resourceId.show) shouldBe resourceId.asRight
     }

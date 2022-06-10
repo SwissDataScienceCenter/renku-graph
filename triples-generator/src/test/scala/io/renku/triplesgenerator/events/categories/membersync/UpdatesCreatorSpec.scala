@@ -171,7 +171,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       - links are created regardless of the project exists in KG
    */
 
-  private lazy val updatesCreator = new UpdatesCreator(renkuBaseUrl, gitLabApiUrl)
+  private lazy val updatesCreator = new UpdatesCreator(renkuUrl, gitLabApiUrl)
 
   private def findMembers(path: projects.Path): Set[GitLabId] =
     runQuery(

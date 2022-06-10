@@ -36,7 +36,7 @@ object EntitiesGenerators extends EntitiesGenerators {
 }
 
 private object Instances {
-  implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+  implicit val renkuUrl:     RenkuUrl     = renkuUrls.generateOne
   implicit val gitLabUrl:    GitLabUrl    = gitLabUrls.generateOne
   implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
 }
@@ -48,7 +48,7 @@ trait EntitiesGenerators
     with ActivityGenerators
     with DatasetEntitiesGenerators {
 
-  implicit val renkuBaseUrl: RenkuBaseUrl = Instances.renkuBaseUrl
+  implicit val renkuUrl:     RenkuUrl     = Instances.renkuUrl
   implicit val gitLabUrl:    GitLabUrl    = Instances.gitLabUrl
   implicit val gitLabApiUrl: GitLabApiUrl = Instances.gitLabApiUrl
 

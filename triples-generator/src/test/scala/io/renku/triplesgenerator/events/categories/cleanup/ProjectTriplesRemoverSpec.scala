@@ -433,7 +433,7 @@ class ProjectTriplesRemoverSpec
   private def findProject(projectPath: projects.Path) = runQuery(
     s"""SELECT ?p ?o 
         WHERE { 
-          <$renkuBaseUrl/projects/$projectPath> ?p ?o .
+          <$renkuUrl/projects/$projectPath> ?p ?o .
         } """
   ).map(_.map(_.values.toList))
 
@@ -461,7 +461,7 @@ class ProjectTriplesRemoverSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](rdfStoreConfig, renkuBaseUrl)
+    val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](rdfStoreConfig, renkuUrl)
   }
 
   private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance]): EntityId =

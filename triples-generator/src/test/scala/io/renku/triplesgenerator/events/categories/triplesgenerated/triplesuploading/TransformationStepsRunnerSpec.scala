@@ -287,6 +287,6 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
   private trait TestCase {
     val triplesUploader = mock[TriplesUploader[Try]]
     val updatesUploader = mock[UpdatesUploader[Try]]
-    val uploader = new TransformationStepsRunnerImpl[Try](triplesUploader, updatesUploader, renkuBaseUrl, gitLabUrl)
+    val uploader        = new TransformationStepsRunnerImpl[Try](triplesUploader, updatesUploader, renkuUrl, gitLabUrl)
   }
 }

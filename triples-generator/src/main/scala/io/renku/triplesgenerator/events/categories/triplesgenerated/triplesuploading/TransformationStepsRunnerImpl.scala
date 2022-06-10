@@ -22,9 +22,9 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.entities.Project
-import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
+import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuUrl}
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.categories.triplesgenerated.TransformationStep
@@ -40,12 +40,12 @@ private[triplesgenerated] trait TransformationStepsRunner[F[_]] {
 private[triplesgenerated] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
     triplesUploader: TriplesUploader[F],
     updatesUploader: UpdatesUploader[F],
-    renkuBaseUrl:    RenkuBaseUrl,
+    renkuUrl:        RenkuUrl,
     gitLabUrl:       GitLabUrl
 ) extends TransformationStepsRunner[F] {
 
-  private implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
-  private implicit val renkuUrl:     RenkuBaseUrl = renkuBaseUrl
+  private implicit val gitLabApiUrl:     GitLabApiUrl = gitLabUrl.apiV4
+  private implicit val renkuUrlImplicit: RenkuUrl     = renkuUrl
 
   import TriplesUploadResult._
   import io.renku.jsonld.syntax._
@@ -110,11 +110,11 @@ private[triplesgenerated] object TransformationStepsRunner {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsRunnerImpl[F]] = for {
     rdfStoreConfig <- RdfStoreConfig[F]()
-    renkuBaseUrl   <- RenkuBaseUrlLoader[F]()
+    renkuUrl       <- RenkuUrlLoader[F]()
     gitlabUrl      <- GitLabUrlLoader[F]()
   } yield new TransformationStepsRunnerImpl[F](new TriplesUploaderImpl[F](rdfStoreConfig),
                                                new UpdatesUploaderImpl(rdfStoreConfig),
-                                               renkuBaseUrl,
+                                               renkuUrl,
                                                gitlabUrl
   )
 }

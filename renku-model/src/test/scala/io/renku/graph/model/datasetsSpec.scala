@@ -107,7 +107,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     }
 
     "allow to construct InternalSameAs using the internal factory" in {
-      forAll(renkuBaseUrls) { url =>
+      forAll(renkuUrls) { url =>
         val Right(sameAs) = SameAs.internal(url)
         sameAs         should (be(a[SameAs]) and be(a[InternalSameAs]))
         sameAs.value shouldBe url.value
@@ -119,8 +119,8 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
     "return true for two SameAs having equal value regardless of the type - case of InternalSameAs" in {
       forAll { sameAs: InternalSameAs =>
-        SameAs.internal(RenkuBaseUrl(sameAs.value)) shouldBe SameAs.from(sameAs.value)
-        SameAs.from(sameAs.value)                   shouldBe SameAs.internal(RenkuBaseUrl(sameAs.value))
+        SameAs.internal(RenkuUrl(sameAs.value)) shouldBe SameAs.from(sameAs.value)
+        SameAs.from(sameAs.value)               shouldBe SameAs.internal(RenkuUrl(sameAs.value))
       }
     }
 
@@ -136,7 +136,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
     "return same values for two SameAs having equal value regardless of the type" in {
       forAll(datasetSameAs) { sameAs =>
-        SameAs.internal(RenkuBaseUrl(sameAs.value)).map(_.hashCode()) shouldBe SameAs
+        SameAs.internal(RenkuUrl(sameAs.value)).map(_.hashCode()) shouldBe SameAs
           .external(Refined.unsafeApply(sameAs.value))
           .map(_.hashCode())
       }
@@ -148,7 +148,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     "return an instance of InternalSameAs" in {
       val sameAs = datasetInternalSameAs.generateOne
 
-      val Right(instance) = SameAs.internal(RenkuBaseUrl(sameAs.value))
+      val Right(instance) = SameAs.internal(RenkuUrl(sameAs.value))
 
       instance       shouldBe an[InternalSameAs]
       instance.value shouldBe sameAs.value

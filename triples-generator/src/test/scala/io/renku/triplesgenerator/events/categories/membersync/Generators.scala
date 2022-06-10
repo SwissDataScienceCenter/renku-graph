@@ -19,7 +19,7 @@
 package io.renku.triplesgenerator.events.categories.membersync
 
 import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, personNames, personResourceIds}
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.RenkuUrl
 import org.scalacheck.Gen
 
 private object Generators {
@@ -29,7 +29,7 @@ private object Generators {
     name <- personNames
   } yield GitLabProjectMember(id, name)
 
-  implicit def kgProjectMembers(implicit renkuBaseUrl: RenkuBaseUrl): Gen[KGProjectMember] = for {
+  implicit def kgProjectMembers(implicit renkuUrl: RenkuUrl): Gen[KGProjectMember] = for {
     memberId <- personResourceIds
     gitLabId <- personGitLabIds
   } yield KGProjectMember(memberId, gitLabId)

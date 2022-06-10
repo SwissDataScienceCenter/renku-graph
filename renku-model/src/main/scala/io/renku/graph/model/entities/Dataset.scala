@@ -24,7 +24,7 @@ import io.circe.DecodingFailure
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
-import io.renku.graph.model.{GitLabApiUrl, InvalidationTime, RenkuBaseUrl}
+import io.renku.graph.model.{GitLabApiUrl, InvalidationTime, RenkuUrl}
 
 import java.time.Instant
 
@@ -217,7 +217,7 @@ object Dataset {
     }
 
     private[Dataset] implicit def encoder(implicit
-        renkuBaseUrl: RenkuBaseUrl,
+        renkuUrl:     RenkuUrl,
         gitLabApiUrl: GitLabApiUrl
     ): Provenance => Map[Property, JsonLD] = {
       case provenance @ Internal(_, _, date, creators) =>
@@ -275,8 +275,8 @@ object Dataset {
     }
 
     private[Dataset] def decoder(
-        identification:      Identification
-    )(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[(Provenance, Option[FixableFailure])] =
+        identification:  Identification
+    )(implicit renkuUrl: RenkuUrl): JsonLDDecoder[(Provenance, Option[FixableFailure])] =
       JsonLDDecoder.entity(entityTypes) { cursor =>
         import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
 
@@ -455,7 +455,7 @@ object Dataset {
   val entityTypes: EntityTypes = EntityTypes of (schema / "Dataset", prov / "Entity")
 
   implicit def encoder[P <: Provenance](implicit
-      renkuBaseUrl: RenkuBaseUrl,
+      renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl
   ): JsonLDEncoder[Dataset[P]] = {
     implicit class SerializationOps[T](obj: T) {
@@ -477,7 +477,7 @@ object Dataset {
     }
   }
 
-  implicit def decoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Dataset[Provenance]] =
+  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Dataset[Provenance]] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       import Dataset.Provenance.FixableFailure
       import Dataset.Provenance.FixableFailure.MissingDerivedFrom

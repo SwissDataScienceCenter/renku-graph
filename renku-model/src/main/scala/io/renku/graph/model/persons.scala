@@ -93,16 +93,16 @@ object persons {
       )
     }
 
-    def apply(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): GitLabIdBased =
-      new GitLabIdBased((renkuBaseUrl / "persons" / gitLabId).show)
+    def apply(gitLabId: GitLabId)(implicit renkuUrl: RenkuUrl): GitLabIdBased =
+      new GitLabIdBased((renkuUrl / "persons" / gitLabId).show)
 
-    def apply(orcidId: OrcidId)(implicit renkuBaseUrl: RenkuBaseUrl, ev: OrcidId.type): OrcidIdBased =
-      new OrcidIdBased((renkuBaseUrl / "persons" / "orcid" / orcidId.id).show)
+    def apply(orcidId: OrcidId)(implicit renkuUrl: RenkuUrl, ev: OrcidId.type): OrcidIdBased =
+      new OrcidIdBased((renkuUrl / "persons" / "orcid" / orcidId.id).show)
 
     def apply(email: Email): EmailBased = new EmailBased(show"mailto:$email")
 
-    def apply(name: Name)(implicit renkuBaseUrl: RenkuBaseUrl): NameBased =
-      new NameBased((renkuBaseUrl / "persons" / name).show)
+    def apply(name: Name)(implicit renkuUrl: RenkuUrl): NameBased =
+      new NameBased((renkuUrl / "persons" / name).show)
 
     implicit object UsersResourceIdRdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
       private val localPartExtractor = "^mailto:(.*)@.*$".r

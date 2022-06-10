@@ -46,30 +46,30 @@ trait ModelOps extends Dataset.ProvenanceOps {
   }
 
   implicit class ProjectOps(project: Project)(implicit
-      renkuBaseUrl:                  RenkuBaseUrl
+      renkuUrl:                      RenkuUrl
   ) extends AbstractProjectOps[Project](project)
 
   abstract class AbstractProjectOps[P <: Project](project: P)(implicit
-      renkuBaseUrl:                                        RenkuBaseUrl
+      renkuUrl:                                            RenkuUrl
   ) {
 
     def to[T](implicit convert: P => T): T = convert(project)
   }
 
   implicit class RenkuProjectWithParentOps(project: RenkuProject.WithParent)(implicit
-      renkuBaseUrl:                                 RenkuBaseUrl
+      renkuUrl:                                     RenkuUrl
   ) extends AbstractRenkuProjectOps[RenkuProject.WithParent](project)
 
   implicit class RenkuProjectWithoutParentOps(project: RenkuProject.WithoutParent)(implicit
-      renkuBaseUrl:                                    RenkuBaseUrl
+      renkuUrl:                                        RenkuUrl
   ) extends AbstractRenkuProjectOps[RenkuProject.WithoutParent](project)
 
   implicit class RenkuProjectOps(project: RenkuProject)(implicit
-      renkuBaseUrl:                       RenkuBaseUrl
+      renkuUrl:                           RenkuUrl
   ) extends AbstractRenkuProjectOps[RenkuProject](project)
 
   abstract class AbstractRenkuProjectOps[P <: RenkuProject](project: P)(implicit
-      renkuBaseUrl:                                                  RenkuBaseUrl
+      renkuUrl:                                                      RenkuUrl
   ) {
 
     lazy val resourceId: projects.ResourceId = projects.ResourceId(project.asEntityId)
@@ -133,19 +133,19 @@ trait ModelOps extends Dataset.ProvenanceOps {
   }
 
   implicit class NonRenkuProjectWithParentOps(project: NonRenkuProject.WithParent)(implicit
-      renkuBaseUrl:                                    RenkuBaseUrl
+      renkuUrl:                                        RenkuUrl
   ) extends AbstractNonRenkuProjectOps[NonRenkuProject.WithParent](project)
 
   implicit class NonRenkuProjectWithoutParentOps(project: NonRenkuProject.WithoutParent)(implicit
-      renkuBaseUrl:                                       RenkuBaseUrl
+      renkuUrl:                                           RenkuUrl
   ) extends AbstractNonRenkuProjectOps[NonRenkuProject.WithoutParent](project)
 
   implicit class NonRenkuProjectOps(project: NonRenkuProject)(implicit
-      renkuBaseUrl:                          RenkuBaseUrl
+      renkuUrl:                              RenkuUrl
   ) extends AbstractNonRenkuProjectOps[NonRenkuProject](project)
 
   abstract class AbstractNonRenkuProjectOps[P <: NonRenkuProject](project: P)(implicit
-      renkuBaseUrl:                                                        RenkuBaseUrl
+      renkuUrl:                                                            RenkuUrl
   ) {
 
     def to[T](implicit convert: P => T): T = convert(project)
@@ -186,7 +186,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
   }
 
-  implicit class DatasetOps[P <: Dataset.Provenance](dataset: Dataset[P])(implicit renkuBaseUrl: RenkuBaseUrl) {
+  implicit class DatasetOps[P <: Dataset.Provenance](dataset: Dataset[P])(implicit renkuUrl: RenkuUrl) {
 
     lazy val identifier: datasets.Identifier = dataset.identification.identifier
 

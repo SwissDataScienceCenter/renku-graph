@@ -28,7 +28,7 @@ import io.renku.config.renku.ResourceUrl
 import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuBaseUrls}
+import io.renku.graph.model.GraphModelGenerators.{gitLabUrls, renkuUrls}
 import io.renku.graph.model._
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
@@ -115,19 +115,19 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     }
   }
 
-  private lazy val renkuBaseUrl = renkuBaseUrls.generateOne
+  private lazy val renkuUrl = renkuUrls.generateOne
   private lazy val renkuResourcesUrl =
-    renku.ResourcesUrl(s"$renkuBaseUrl/${relativePaths(maxSegments = 1).generateOne}")
+    renku.ResourcesUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
 
   private trait TestCase {
     val criteria = criterias.generateOne
     val request  = Request[IO](GET, Uri.fromString(s"/${relativePaths().generateOne}").fold(throw _, identity))
 
-    implicit val renkuResourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuBaseUrl${request.uri}")
+    implicit val renkuResourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
     implicit val logger:           TestLogger[IO]    = TestLogger[IO]()
     implicit val gitLabUrl:        GitLabUrl         = gitLabUrls.generateOne
     val finder   = mock[EntitiesFinder[IO]]
-    val endpoint = new EndpointImpl[IO](finder, renkuBaseUrl, renkuResourcesUrl, gitLabUrl)
+    val endpoint = new EndpointImpl[IO](finder, renkuUrl, renkuResourcesUrl, gitLabUrl)
   }
 
   private lazy val criterias: Gen[Criteria] = for {

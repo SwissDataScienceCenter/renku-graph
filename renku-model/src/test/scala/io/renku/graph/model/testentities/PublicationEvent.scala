@@ -35,20 +35,20 @@ object PublicationEvent {
   import io.renku.jsonld.syntax._
 
   implicit def toEntitiesPublicationEvent(implicit
-      renkuBaseUrl: RenkuBaseUrl
+      renkuUrl: RenkuUrl
   ): PublicationEvent => entities.PublicationEvent = publicationEvent =>
     entities.PublicationEvent(
       publicationEvents.ResourceId(publicationEvent.asEntityId.show),
-      About((renkuBaseUrl / "urls" / "datasets" / publicationEvent.dataset.identifier).show),
+      About((renkuUrl / "urls" / "datasets" / publicationEvent.dataset.identifier).show),
       datasets.ResourceId(publicationEvent.dataset.asEntityId.show),
       publicationEvent.maybeDescription,
       publicationEvent.name,
       publicationEvent.startDate
     )
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[PublicationEvent] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[PublicationEvent] =
     JsonLDEncoder.instance(_.to[entities.PublicationEvent].asJsonLD)
 
-  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[PublicationEvent] =
-    EntityIdEncoder.instance(event => renkuBaseUrl / "datasettags" / s"${event.name}@${event.dataset.asEntityId.show}")
+  implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[PublicationEvent] =
+    EntityIdEncoder.instance(event => renkuUrl / "datasettags" / s"${event.name}@${event.dataset.asEntityId.show}")
 }

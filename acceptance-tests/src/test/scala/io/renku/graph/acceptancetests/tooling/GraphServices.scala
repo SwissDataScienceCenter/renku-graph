@@ -25,8 +25,8 @@ import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository}
 import io.renku.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
 import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
-import io.renku.graph.config.RenkuBaseUrlLoader
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.RenkuUrl
 import io.renku.rdfstore.FusekiBaseUrl
 import io.renku.testtools.IOSpec
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -38,7 +38,7 @@ trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with 
   self: Suite =>
 
   protected implicit val fusekiBaseUrl: FusekiBaseUrl = RDFStore.fusekiBaseUrl
-  implicit val renkuBaseUrl:            RenkuBaseUrl  = RenkuBaseUrlLoader[Try]().fold(throw _, identity)
+  implicit val renkuUrl:                RenkuUrl      = RenkuUrlLoader[Try]().fold(throw _, identity)
   implicit lazy val logger:             Logger[IO]    = TestLogger()
 
   val restClient:               RestClientImpl                = new RestClientImpl()

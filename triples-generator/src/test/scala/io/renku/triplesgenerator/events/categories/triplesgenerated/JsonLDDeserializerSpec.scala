@@ -262,7 +262,7 @@ class JsonLDDeserializerSpec extends AnyWordSpec with MockFactory with should.Ma
     )
 
     val projectInfoFinder = mock[ProjectInfoFinder[Try]]
-    val deserializer      = new JsonLDDeserializerImpl[Try](projectInfoFinder, renkuBaseUrl)
+    val deserializer      = new JsonLDDeserializerImpl[Try](projectInfoFinder, renkuUrl)
 
     private implicit lazy val toProjectMember: Person => ProjectMember = person => {
       val member = ProjectMember(person.name,
