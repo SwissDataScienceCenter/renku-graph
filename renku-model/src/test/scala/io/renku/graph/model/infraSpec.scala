@@ -80,7 +80,7 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
     "consider the minor only if majors are the same" in {
       forAll(cliVersions, cliVersions) { (version1, version2) =>
-        val version2SameMajor = CliVersion(version2.show.replace(version2.major, version1.major))
+        val version2SameMajor = CliVersion(version2.show.replaceFirst(s"${version2.major}.", s"${version1.major}."))
 
         val list = List(version1, version2SameMajor)
 
@@ -93,8 +93,7 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
       forAll(cliVersions, cliVersions) { (version1, version2) =>
         val version2SameMajorMinor = CliVersion(
           version2.show
-            .replace(version2.major, version1.major)
-            .replace(version2.minor, version1.minor)
+            .replaceFirst(s"${version2.major}.${version2.minor}", s"${version1.major}.${version1.minor}")
         )
 
         val list = List(version1, version2SameMajorMinor)
