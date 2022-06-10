@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{localDatesNotInTheFuture, nonBlankStrings}
 import io.renku.graph.model.testentities.{Entity => _, _}
-import io.renku.graph.model.{RenkuBaseUrl, testentities}
+import io.renku.graph.model.{RenkuUrl, testentities}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 
@@ -78,7 +78,7 @@ package object entities {
 
   private[entities] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance,
                                                      +P <: testentities.Project
-  ](datasetAndProject: (testentities.Dataset[PROV], P))(implicit renkuBaseUrl: RenkuBaseUrl) {
+  ](datasetAndProject: (testentities.Dataset[PROV], P))(implicit renkuUrl: RenkuUrl) {
     def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T = convert(datasetAndProject)
   }
 

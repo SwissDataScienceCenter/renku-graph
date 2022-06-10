@@ -75,7 +75,7 @@ object Plan {
     def of(parameters: CommandParameterFactory*): List[CommandParameterFactory] = parameters.toList
   }
 
-  implicit def toEntitiesPlan(implicit renkuBaseUrl: RenkuBaseUrl): Plan => entities.Plan =
+  implicit def toEntitiesPlan(implicit renkuUrl: RenkuUrl): Plan => entities.Plan =
     plan => {
       val maybeInvalidationTime = plan match {
         case plan: Plan with HavingInvalidationTime => plan.invalidationTime.some
@@ -98,9 +98,9 @@ object Plan {
       )
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Plan] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[Plan] =
     JsonLDEncoder.instance(_.to[entities.Plan].asJsonLD)
 
-  implicit def entityIdEncoder[R <: Plan](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[R] =
+  implicit def entityIdEncoder[R <: Plan](implicit renkuUrl: RenkuUrl): EntityIdEncoder[R] =
     EntityIdEncoder.instance(plan => ResourceId(plan.id).asEntityId)
 }

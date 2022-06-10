@@ -23,8 +23,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow, NonEmptyParallel, Parallel}
 import io.circe.DecodingFailure
-import io.renku.graph.config.RenkuBaseUrlLoader
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.entities.Project.GitLabProjectInfo
 import io.renku.graph.model.entities._
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -41,11 +41,11 @@ private trait JsonLDDeserializer[F[_]] {
 
 private class JsonLDDeserializerImpl[F[_]: MonadThrow](
     projectInfoFinder: ProjectInfoFinder[F],
-    renkuBaseUrl:      RenkuBaseUrl
+    renkuUrl:          RenkuUrl
 ) extends JsonLDDeserializer[F] {
 
-  private implicit val renkuUrl: RenkuBaseUrl   = renkuBaseUrl
-  private val applicative:       Applicative[F] = Applicative[F]
+  private implicit val renkuUrlImplicit: RenkuUrl       = renkuUrl
+  private val applicative:               Applicative[F] = Applicative[F]
 
   import applicative._
   import projectInfoFinder._
@@ -101,7 +101,7 @@ private object JsonLDDeserializer {
   def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
       gitLabClient: GitLabClient[F]
   ): F[JsonLDDeserializer[F]] = for {
-    renkuBaseUrl      <- RenkuBaseUrlLoader[F]()
+    renkuUrl          <- RenkuUrlLoader[F]()
     projectInfoFinder <- ProjectInfoFinder(gitLabClient)
-  } yield new JsonLDDeserializerImpl[F](projectInfoFinder, renkuBaseUrl)
+  } yield new JsonLDDeserializerImpl[F](projectInfoFinder, renkuUrl)
 }

@@ -26,8 +26,8 @@ import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.graph.config.RenkuBaseUrlLoader
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -49,7 +49,7 @@ private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQuer
     statusRefreshInterval: FiniteDuration,
     cacheRefreshInterval:  FiniteDuration,
     lastCacheCheckTimeRef: Ref[F, Long]
-)(implicit renkuBaseUrl:   RenkuBaseUrl)
+)(implicit renkuUrl:       RenkuUrl)
     extends RdfStoreClientImpl(rdfStoreConfig)
     with ReProvisioningStatus[F] {
 
@@ -171,10 +171,10 @@ object ReProvisioningStatus {
       subscriptionFactories: (EventHandler[F], SubscriptionMechanism[F])*
   ): F[ReProvisioningStatus[F]] = for {
     rdfStoreConfig        <- RdfStoreConfig[F]()
-    renkuBaseUrl          <- RenkuBaseUrlLoader[F]()
+    renkuUrl              <- RenkuUrlLoader[F]()
     lastCacheCheckTimeRef <- Ref.of[F, Long](0)
   } yield {
-    implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
+    implicit val baseUrl: RenkuUrl = renkuUrl
     new ReProvisioningStatusImpl(subscriptionFactories.map(_._2).toList,
                                  rdfStoreConfig,
                                  StatusRefreshInterval,

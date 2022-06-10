@@ -26,7 +26,7 @@ import io.renku.graph.model.parameterValues.ValueOverride
 import io.renku.graph.model.testentities.CommandParameterBase._
 import io.renku.graph.model.testentities.ParameterValue.LocationParameterValue.{CommandInputValue, CommandOutputValue}
 import io.renku.graph.model.testentities.ParameterValue._
-import io.renku.graph.model.{RenkuBaseUrl, entities, parameterValues}
+import io.renku.graph.model.{RenkuUrl, entities, parameterValues}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.constraints.UUID
@@ -49,9 +49,7 @@ object ParameterValue {
     override type Value = LocationLike
   }
 
-  implicit def toEntitiesParameterValue(implicit
-      renkuBaseUrl: RenkuBaseUrl
-  ): ParameterValue => entities.ParameterValue = {
+  implicit def toEntitiesParameterValue(implicit renkuUrl: RenkuUrl): ParameterValue => entities.ParameterValue = {
     case p: CommandParameterValue =>
       entities.ParameterValue.CommandParameterValue(parameterValues.ResourceId(p.asEntityId.show),
                                                     p.value,
@@ -103,10 +101,10 @@ object ParameterValue {
       CommandParameterValue(Id.generate, value, valueReference, _)
   }
 
-  implicit def encoder[PV <: ParameterValue](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[PV] =
+  implicit def encoder[PV <: ParameterValue](implicit renkuUrl: RenkuUrl): JsonLDEncoder[PV] =
     JsonLDEncoder.instance(_.to[entities.ParameterValue].asJsonLD)
 
-  implicit def entityIdEncoder[PV <: ParameterValue](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[PV] =
+  implicit def entityIdEncoder[PV <: ParameterValue](implicit renkuUrl: RenkuUrl): EntityIdEncoder[PV] =
     EntityIdEncoder.instance(value => value.activity.asEntityId.asUrlEntityId / "parameter" / value.id)
 
   final class Id private (val value: String) extends AnyVal with StringTinyType

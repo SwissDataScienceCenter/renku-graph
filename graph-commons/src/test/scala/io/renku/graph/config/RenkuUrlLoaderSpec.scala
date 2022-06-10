@@ -23,7 +23,7 @@ import io.renku.config.ConfigLoader.ConfigLoadingException
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.views.{RdfResource, SparqlValueEncoder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -32,11 +32,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class RenkuBaseUrlLoaderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class RenkuUrlLoaderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "apply" should {
 
-    "return a RenkuBaseUrl if there's a value for 'services.renku.url'" in {
+    "return a renkuUrl if there's a value for 'services.renku.url'" in {
       forAll(httpUrls()) { url =>
         val config = ConfigFactory.parseMap(
           Map(
@@ -48,12 +48,12 @@ class RenkuBaseUrlLoaderSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
           ).asJava
         )
 
-        RenkuBaseUrlLoader[Try](config) shouldBe Success(RenkuBaseUrl(url))
+        RenkuUrlLoader[Try](config) shouldBe Success(RenkuUrl(url))
       }
     }
 
     "fail if there's no value for the 'services.renku.url'" in {
-      val Failure(exception) = RenkuBaseUrlLoader[Try](ConfigFactory.empty())
+      val Failure(exception) = RenkuUrlLoader[Try](ConfigFactory.empty())
       exception shouldBe an[ConfigLoadingException]
     }
 
@@ -68,7 +68,7 @@ class RenkuBaseUrlLoaderSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         ).asJava
       )
 
-      val Failure(exception) = RenkuBaseUrlLoader[Try](config)
+      val Failure(exception) = RenkuUrlLoader[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -76,9 +76,9 @@ class RenkuBaseUrlLoaderSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
 
   "showAs[RdfResource]" should {
 
-    "wrap the RenkuBaseUrl in <>" in {
+    "wrap the renkuUrl in <>" in {
       import SparqlValueEncoder.sparqlEncode
-      forAll { url: RenkuBaseUrl =>
+      forAll { url: RenkuUrl =>
         url.showAs[RdfResource] shouldBe s"<${sparqlEncode(url.value)}>"
       }
     }

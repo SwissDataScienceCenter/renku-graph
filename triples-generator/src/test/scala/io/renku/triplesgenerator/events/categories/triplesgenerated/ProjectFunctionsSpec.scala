@@ -174,7 +174,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val dataset1 :: dataset2Old :: Nil = project.datasets
 
-      val dataset2New = datasetEntities(provenanceNonModified)(renkuBaseUrl)(project.dateCreated).generateOne
+      val dataset2New = datasetEntities(provenanceNonModified)(renkuUrl)(project.dateCreated).generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
       update(dataset2Old, dataset2New)(project).datasets shouldBe List(dataset1, dataset2New)
@@ -195,7 +195,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
             .generateOne
 
         val originalImportedInternal =
-          datasetEntities(provenanceImportedInternalAncestorInternal())(renkuBaseUrl)(project.dateCreated).generateOne
+          datasetEntities(provenanceImportedInternalAncestorInternal())(renkuUrl)(project.dateCreated).generateOne
         val projectWithAllDatasets =
           project.addDatasets(originalImportedInternal, originalImportedInternal.invalidateNow).to[entities.Project]
 

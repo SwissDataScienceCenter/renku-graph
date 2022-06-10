@@ -121,12 +121,12 @@ class ProjectDatasetsEndpointSpec
     val projectPath = projectPaths.generateOne
 
     val projectDatasetsFinder = mock[ProjectDatasetsFinder[IO]]
-    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
+    val renkuApiUrl           = renkuApiUrls.generateOne
     val gitLabUrl             = gitLabUrls.generateOne
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     val endpoint =
-      new ProjectDatasetsEndpointImpl[IO](projectDatasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder)
+      new ProjectDatasetsEndpointImpl[IO](projectDatasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
 
     lazy val toJson: ((Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])) => Json = {
       case (id, originalId, title, name, Left(sameAs), images) =>
@@ -141,10 +141,10 @@ class ProjectDatasetsEndpointSpec
           "images": $images,
           "_links": [{
             "rel": "details",
-            "href": ${renkuResourcesUrl / "datasets" / id}
+            "href": ${renkuApiUrl / "datasets" / id}
           }, {
             "rel": "initial-version",
-            "href": ${renkuResourcesUrl / "datasets" / originalId}
+            "href": ${renkuApiUrl / "datasets" / originalId}
           }]
         }"""
       case (id, originalId, title, name, Right(derivedFrom), images) =>
@@ -159,10 +159,10 @@ class ProjectDatasetsEndpointSpec
           "images": $images,
           "_links": [{
             "rel": "details",
-            "href": ${renkuResourcesUrl / "datasets" / id}
+            "href": ${renkuApiUrl / "datasets" / id}
           }, {
             "rel": "initial-version",
-            "href": ${renkuResourcesUrl / "datasets" / originalId}
+            "href": ${renkuApiUrl / "datasets" / originalId}
           }]
         }"""
     }

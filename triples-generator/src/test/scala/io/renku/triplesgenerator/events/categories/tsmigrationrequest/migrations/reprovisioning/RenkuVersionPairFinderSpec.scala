@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
@@ -35,7 +35,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class RenkuVersionPairFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
 
-  private implicit lazy val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+  private implicit lazy val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
   "find" should {
 

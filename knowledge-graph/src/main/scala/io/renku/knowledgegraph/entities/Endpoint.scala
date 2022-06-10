@@ -23,7 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.config.renku
-import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.datasets.ImageUri
 import io.renku.graph.model._
 import io.renku.http.rest.Links.Href
@@ -182,17 +182,17 @@ object Endpoint {
   private def parsingFailure(paramName: String) = ParseFailure(s"'$paramName' parameter with invalid value", "")
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    entitiesFinder    <- EntitiesFinder[F]
-    renkuBaseUrl      <- RenkuBaseUrlLoader()
-    renkuResourcesUrl <- renku.ResourcesUrl()
-    gitLabUrl         <- GitLabUrlLoader[F]()
-  } yield new EndpointImpl(entitiesFinder, renkuBaseUrl, renkuResourcesUrl, gitLabUrl)
+    entitiesFinder <- EntitiesFinder[F]
+    renkuUrl       <- RenkuUrlLoader()
+    renkuApiUrl    <- renku.ApiUrl()
+    gitLabUrl      <- GitLabUrlLoader[F]()
+  } yield new EndpointImpl(entitiesFinder, renkuUrl, renkuApiUrl, gitLabUrl)
 }
 
 private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
-                                                renkuBaseUrl:      RenkuBaseUrl,
-                                                renkuResourcesUrl: renku.ResourcesUrl,
-                                                gitLabUrl:         GitLabUrl
+                                                renkuUrl:    RenkuUrl,
+                                                renkuApiUrl: renku.ApiUrl,
+                                                gitLabUrl:   GitLabUrl
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
@@ -212,7 +212,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
     finder.findEntities(criteria) map toHttpResponse(request) recoverWith httpResult
 
   private def toHttpResponse(request: Request[F])(response: PagingResponse[model.Entity]): Response[F] = {
-    implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuBaseUrl${request.uri}")
+    implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
     Response[F](Status.Ok)
       .withEntity(response.results.asJson)
       .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
@@ -235,7 +235,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
           .addIfDefined("description" -> project.maybeDescription)
           .deepMerge(
             _links(
-              Link(Rel("details") -> ProjectEndpoint.href(renkuResourcesUrl, project.path))
+              Link(Rel("details") -> ProjectEndpoint.href(renkuApiUrl, project.path))
             )
           )
       case ds: model.Entity.Dataset =>
@@ -252,7 +252,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
           .addIfDefined("description" -> ds.maybeDescription)
           .deepMerge(
             _links(
-              Link(Rel("details") -> DatasetEndpoint.href(renkuResourcesUrl, ds.identifier))
+              Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, ds.identifier))
             )
           )
       case workflow: model.Entity.Workflow =>

@@ -23,8 +23,8 @@ import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.config.ServiceVersion
-import io.renku.graph.config.RenkuBaseUrlLoader
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
@@ -39,9 +39,9 @@ private[migrations] trait MigrationExecutionRegister[F[_]] {
 }
 
 private class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    serviceVersion:      ServiceVersion,
-    storeConfig:         MigrationsStoreConfig
-)(implicit renkuBaseUrl: RenkuBaseUrl)
+    serviceVersion:  ServiceVersion,
+    storeConfig:     MigrationsStoreConfig
+)(implicit renkuUrl: RenkuUrl)
     extends RdfStoreClientImpl(storeConfig)
     with MigrationExecutionRegister[F] {
 
@@ -74,7 +74,7 @@ private class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTim
 private[migrations] object MigrationExecutionRegister {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationExecutionRegister[F]] =
-    RenkuBaseUrlLoader[F]() flatMap { implicit renkuBaseUrl =>
+    RenkuUrlLoader[F]() flatMap { implicit renkuUrl =>
       for {
         serviceVersion <- ServiceVersion.readFromConfig[F]()
         storeConfig    <- MigrationsStoreConfig[F]()
@@ -85,16 +85,15 @@ private[migrations] object MigrationExecutionRegister {
 
   private[migrations] object MigrationExecution {
 
-    implicit def jsonLDEncoder(implicit
-        renkuBaseUrl: RenkuBaseUrl
-    ): JsonLDEncoder[MigrationExecution] = JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        EntityId.of((renkuBaseUrl / "migration" / entity.migrationName.asUrlPart).toString),
-        EntityTypes of renku / "Migration",
-        renku / "migrationName"  -> entity.migrationName.asJsonLD,
-        renku / "serviceVersion" -> entity.serviceVersion.asJsonLD
-      )
-    }
+    implicit def jsonLDEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[MigrationExecution] =
+      JsonLDEncoder.instance { entity =>
+        JsonLD.entity(
+          EntityId.of((renkuUrl / "migration" / entity.migrationName.asUrlPart).toString),
+          EntityTypes of renku / "Migration",
+          renku / "migrationName"  -> entity.migrationName.asJsonLD,
+          renku / "serviceVersion" -> entity.serviceVersion.asJsonLD
+        )
+      }
 
     private implicit class MigrationNameOps(name: Migration.Name) {
       lazy val asUrlPart: String = name.show.replace(' ', '-')

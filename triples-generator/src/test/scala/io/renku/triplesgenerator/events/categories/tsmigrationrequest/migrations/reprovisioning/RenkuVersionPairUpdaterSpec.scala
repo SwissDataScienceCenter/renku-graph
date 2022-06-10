@@ -50,7 +50,7 @@ class RenkuVersionPairUpdaterSpec extends AnyWordSpec with IOSpec with InMemoryR
     val currentRenkuVersionPair      = renkuVersionPairs.generateOne
     val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
 
-    private implicit val renkuBaseUrl: RenkuBaseUrl                = renkuBaseUrls.generateOne
+    private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl[IO](rdfStoreConfig)

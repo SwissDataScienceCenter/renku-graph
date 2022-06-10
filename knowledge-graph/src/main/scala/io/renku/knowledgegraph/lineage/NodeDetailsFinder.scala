@@ -23,11 +23,11 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
-import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.knowledgegraph.lineage.model.{ExecutionInfo, Node}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -44,7 +44,7 @@ private trait NodeDetailsFinder[F[_]] {
 
 private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig: RdfStoreConfig,
-    renkuBaseUrl:   RenkuBaseUrl
+    renkuUrl:       RenkuUrl
 ) extends RdfStoreClientImpl[F](rdfStoreConfig)
     with NodeDetailsFinder[F] {
 
@@ -54,7 +54,7 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTi
   )(implicit query: (T, ResourceId) => SparqlQuery): F[Set[Node]] =
     ids.toList
       .map { id =>
-        queryExpecting[Option[Node]](using = query(id, ResourceId(projectPath)(renkuBaseUrl)))
+        queryExpecting[Option[Node]](using = query(id, ResourceId(projectPath)(renkuUrl)))
           .flatMap(failIf(no = id))
       }
       .parSequence
@@ -110,9 +110,9 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTi
 private object NodeDetailsFinder {
 
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder]: F[NodeDetailsFinder[F]] = for {
-    config       <- RdfStoreConfig[F]()
-    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
-  } yield new NodeDetailsFinderImpl[F](config, renkuBaseUrl)
+    config   <- RdfStoreConfig[F]()
+    renkuUrl <- RenkuUrlLoader[F]()
+  } yield new NodeDetailsFinderImpl[F](config, renkuUrl)
 
   implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, path) =>
     SparqlQuery.of(

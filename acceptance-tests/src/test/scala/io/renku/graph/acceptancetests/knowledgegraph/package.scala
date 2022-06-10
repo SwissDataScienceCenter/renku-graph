@@ -52,8 +52,8 @@ package object knowledgegraph {
     "version": ${project.entitiesProject.version.value}
   }""" deepMerge {
     _links(
-      Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
-      Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
+      Link(Rel.Self        -> Href(renkuApiUrl / "projects" / project.path)),
+      Link(Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets"))
     )
   } deepMerge {
     project.entitiesProject.maybeDescription

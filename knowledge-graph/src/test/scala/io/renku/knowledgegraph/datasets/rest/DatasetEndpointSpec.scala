@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.circe.Decoder._
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.generators.CommonGraphGenerators.{authContexts, renkuResourcesUrls}
+import io.renku.generators.CommonGraphGenerators.{authContexts, renkuApiUrls}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
@@ -33,7 +33,7 @@ import io.renku.graph.model.datasets._
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
-import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
@@ -92,8 +92,8 @@ class DatasetEndpointSpec
         response.as[model.Dataset].unsafeRunSync() shouldBe dataset
         response.as[Json].unsafeRunSync()._links shouldBe Links
           .of(
-            Self                   -> Href(renkuResourcesUrl / "datasets" / dataset.id),
-            Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
+            Self                   -> Href(renkuApiUrl / "datasets" / dataset.id),
+            Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.versions.initial)
           )
           .asRight
 
@@ -102,7 +102,7 @@ class DatasetEndpointSpec
         val Right(mainProject) = responseCursor.downField("project").as[Json]
         (mainProject.hcursor.downField("path").as[Path], mainProject._links)
           .mapN { case (path, links) =>
-            links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
+            links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
           }
           .getOrElse(fail("No 'path' or 'project-details' links on the 'project' element"))
 
@@ -111,7 +111,7 @@ class DatasetEndpointSpec
         usedInJsons.foreach { json =>
           (json.hcursor.downField("path").as[Path], json._links)
             .mapN { case (path, links) =>
-              links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
+              links shouldBe Links.of(Rel("project-details") -> Href(renkuApiUrl / "projects" / path))
             }
             .getOrElse(fail("No 'path' or 'project-details' links on the 'usedIn' elements"))
         }
@@ -178,14 +178,14 @@ class DatasetEndpointSpec
   }
 
   private trait TestCase {
-    implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+    implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
     val gitLabUrl = gitLabUrls.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val datasetsFinder        = mock[DatasetFinder[IO]]
-    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
+    val renkuApiUrl           = renkuApiUrls.generateOne
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint = new DatasetEndpointImpl[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder)
+    val endpoint = new DatasetEndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
   }
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, model.Dataset] = jsonOf[IO, model.Dataset]

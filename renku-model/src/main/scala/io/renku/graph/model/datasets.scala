@@ -214,7 +214,7 @@ object datasets {
       with constraints.Url[SameAs]
       with UrlResourceRenderer[SameAs] {
 
-    final def internal(value: RenkuBaseUrl): Either[IllegalArgumentException, InternalSameAs] =
+    final def internal(value: RenkuUrl): Either[IllegalArgumentException, InternalSameAs] =
       from(value.value) map (sameAs => new InternalSameAs(sameAs.value))
 
     final def external(value: String Refined string.Url): Either[IllegalArgumentException, ExternalSameAs] =

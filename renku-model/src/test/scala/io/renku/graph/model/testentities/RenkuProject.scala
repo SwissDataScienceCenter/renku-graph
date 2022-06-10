@@ -158,15 +158,13 @@ object RenkuProject {
     def addDataset[P <: Dataset.Provenance](toAdd: DatasetGenFactory[P]): (Dataset[P], ProjectType)
   }
 
-  implicit def toEntitiesRenkuProject(implicit
-      renkuBaseUrl: RenkuBaseUrl
-  ): RenkuProject => entities.RenkuProject = {
-    case p: RenkuProject.WithParent    => toEntitiesRenkuProjectWithParent(renkuBaseUrl)(p)
-    case p: RenkuProject.WithoutParent => toEntitiesRenkuProjectWithoutParent(renkuBaseUrl)(p)
+  implicit def toEntitiesRenkuProject(implicit renkuUrl: RenkuUrl): RenkuProject => entities.RenkuProject = {
+    case p: RenkuProject.WithParent    => toEntitiesRenkuProjectWithParent(renkuUrl)(p)
+    case p: RenkuProject.WithoutParent => toEntitiesRenkuProjectWithoutParent(renkuUrl)(p)
   }
 
   implicit def toEntitiesRenkuProjectWithoutParent(implicit
-      renkuBaseUrl: RenkuBaseUrl
+      renkuUrl: RenkuUrl
   ): RenkuProject.WithoutParent => entities.RenkuProject.WithoutParent =
     project =>
       entities.RenkuProject.WithoutParent
@@ -188,7 +186,7 @@ object RenkuProject {
         .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
   implicit def toEntitiesRenkuProjectWithParent(implicit
-      renkuBaseUrl: RenkuBaseUrl
+      renkuUrl: RenkuUrl
   ): RenkuProject.WithParent => entities.RenkuProject.WithParent =
     project =>
       entities.RenkuProject.WithParent
@@ -211,7 +209,7 @@ object RenkuProject {
         .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
   implicit def encoder[P <: RenkuProject](implicit
-      renkuBaseUrl: RenkuBaseUrl,
+      renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
     case project: RenkuProject.WithParent    => project.to[entities.RenkuProject.WithParent].asJsonLD

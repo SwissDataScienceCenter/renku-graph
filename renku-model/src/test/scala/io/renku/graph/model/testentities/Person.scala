@@ -37,7 +37,7 @@ object Person {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def toEntitiesPerson(implicit renkuBaseUrl: RenkuBaseUrl): Person => entities.Person = {
+  implicit def toEntitiesPerson(implicit renkuUrl: RenkuUrl): Person => entities.Person = {
     case Person(name, maybeEmail, Some(gitLabId), maybeOrcidId, maybeAffiliation) =>
       entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
                                    gitLabId,
@@ -62,7 +62,7 @@ object Person {
   }
 
   implicit def toMaybeEntitiesPersonWithGitLabId(implicit
-      renkuBaseUrl: RenkuBaseUrl
+      renkuUrl: RenkuUrl
   ): Person => Option[entities.Person.WithGitLabId] = {
     case Person(name, maybeEmail, Some(gitLabId), maybeOrcidId, maybeAffiliation) =>
       entities.Person
@@ -78,16 +78,16 @@ object Person {
   }
 
   implicit def toMaybeEntitiesPersonWithName(implicit
-      renkuBaseUrl: RenkuBaseUrl
+      renkuUrl: RenkuUrl
   ): Person => Option[entities.Person.WithNameOnly] = {
     case Person(name, None, None, maybeOrcidId, maybeAffiliation) =>
       entities.Person.WithNameOnly(persons.ResourceId(name), name, maybeOrcidId, maybeAffiliation).some
     case _ => None
   }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
     JsonLDEncoder.instance(_.to[entities.Person].asJsonLD)
 
-  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Person] =
+  implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Person] =
     EntityIdEncoder.instance(person => EntityId.of(person.to[entities.Person].resourceId.value))
 }

@@ -69,5 +69,5 @@ class MalformedActivityIdsSpec extends AnyWordSpec with should.Matchers with IOS
   private def makeResourceIdBroken(activity: entities.Activity): entities.Activity =
     activity.copy(resourceId = activities.ResourceId(activity.resourceId.value.replace("/activities/", "")))
 
-  implicit val renkuBaseUrl: RenkuBaseUrl = RenkuBaseUrl(s"http://${nonEmptyStrings().generateOne}")
+  implicit val renkuUrl: RenkuUrl = RenkuUrl(s"http://${nonEmptyStrings().generateOne}")
 }

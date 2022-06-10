@@ -21,7 +21,7 @@ package io.renku.graph.model.testentities
 import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword, Name, Path, Visibility}
 import io.renku.graph.model.testentities.NonRenkuProject._
 import io.renku.graph.model.testentities.RenkuProject._
-import io.renku.graph.model.{GitLabApiUrl, RenkuBaseUrl, entities}
+import io.renku.graph.model.{GitLabApiUrl, RenkuUrl, entities}
 import io.renku.jsonld.{EntityIdEncoder, JsonLDEncoder}
 
 trait Project extends Product with Serializable {
@@ -47,23 +47,19 @@ object Project {
 
   import io.renku.jsonld.syntax._
 
-  implicit def toEntitiesProject(implicit
-      renkuBaseUrl: RenkuBaseUrl
-  ): Project => entities.Project = {
-    case p: RenkuProject.WithParent       => toEntitiesRenkuProject(renkuBaseUrl)(p)
-    case p: RenkuProject.WithoutParent    => toEntitiesRenkuProjectWithoutParent(renkuBaseUrl)(p)
-    case p: NonRenkuProject.WithParent    => toEntitiesNonRenkuProjectWithParent(renkuBaseUrl)(p)
-    case p: NonRenkuProject.WithoutParent => toEntitiesNonRenkuProjectWithoutParent(renkuBaseUrl)(p)
+  implicit def toEntitiesProject(implicit renkuUrl: RenkuUrl): Project => entities.Project = {
+    case p: RenkuProject.WithParent       => toEntitiesRenkuProject(renkuUrl)(p)
+    case p: RenkuProject.WithoutParent    => toEntitiesRenkuProjectWithoutParent(renkuUrl)(p)
+    case p: NonRenkuProject.WithParent    => toEntitiesNonRenkuProjectWithParent(renkuUrl)(p)
+    case p: NonRenkuProject.WithoutParent => toEntitiesNonRenkuProjectWithoutParent(renkuUrl)(p)
   }
 
-  implicit def encoder[P <: Project](implicit
-      renkuBaseUrl: RenkuBaseUrl,
-      gitLabApiUrl: GitLabApiUrl
-  ): JsonLDEncoder[P] = JsonLDEncoder.instance {
-    case project: RenkuProject    => project.to[entities.RenkuProject].asJsonLD
-    case project: NonRenkuProject => project.to[entities.NonRenkuProject].asJsonLD
-  }
+  implicit def encoder[P <: Project](implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[P] =
+    JsonLDEncoder.instance {
+      case project: RenkuProject    => project.to[entities.RenkuProject].asJsonLD
+      case project: NonRenkuProject => project.to[entities.NonRenkuProject].asJsonLD
+    }
 
-  implicit def entityIdEncoder[P <: Project](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[P] =
-    EntityIdEncoder.instance(project => renkuBaseUrl / "projects" / project.path)
+  implicit def entityIdEncoder[P <: Project](implicit renkuUrl: RenkuUrl): EntityIdEncoder[P] =
+    EntityIdEncoder.instance(project => renkuUrl / "projects" / project.path)
 }

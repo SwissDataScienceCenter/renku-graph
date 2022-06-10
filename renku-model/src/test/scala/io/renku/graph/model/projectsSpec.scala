@@ -175,8 +175,8 @@ class ProjectResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   "toProjectPath converter" should {
 
     "convert any Project Resource to ProjectPath" in {
-      forAll { (renkuBaseUrl: RenkuBaseUrl, projectPath: Path) =>
-        ResourceId(projectPath)(renkuBaseUrl).as[Try, Path] shouldBe projectPath.pure[Try]
+      forAll { (renkuUrl: RenkuUrl, projectPath: Path) =>
+        ResourceId(projectPath)(renkuUrl).as[Try, Path] shouldBe projectPath.pure[Try]
       }
     }
   }

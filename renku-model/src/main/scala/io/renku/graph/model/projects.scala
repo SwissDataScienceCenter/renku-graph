@@ -70,8 +70,8 @@ object projects {
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
 
-    def apply(projectPath: Path)(implicit renkuBaseUrl: RenkuBaseUrl): ResourceId =
-      ResourceId((renkuBaseUrl / "projects" / projectPath).value)
+    def apply(projectPath: Path)(implicit renkuUrl: RenkuUrl): ResourceId =
+      ResourceId((renkuUrl / "projects" / projectPath).value)
 
     def apply(id: EntityId): ResourceId = ResourceId(id.value.toString)
 

@@ -24,19 +24,16 @@ import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
 
 object renku {
 
-  class ResourcesUrl private (val value: String) extends AnyVal with UrlTinyType
-  object ResourcesUrl
-      extends TinyTypeFactory[ResourcesUrl](new ResourcesUrl(_))
-      with Url[ResourcesUrl]
-      with BaseUrl[ResourcesUrl, ResourceUrl] {
+  class ApiUrl private (val value: String) extends AnyVal with UrlTinyType
+  object ApiUrl extends TinyTypeFactory[ApiUrl](new ApiUrl(_)) with Url[ApiUrl] with BaseUrl[ApiUrl, ResourceUrl] {
     import ConfigLoader._
     import com.typesafe.config.{Config, ConfigFactory}
     import pureconfig.ConfigReader
 
-    private implicit val configReader: ConfigReader[ResourcesUrl] = urlTinyTypeReader(this)
+    private implicit val configReader: ConfigReader[ApiUrl] = urlTinyTypeReader(this)
 
-    def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[ResourcesUrl] =
-      find[F, ResourcesUrl]("services.renku.resources-url", config)
+    def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[ApiUrl] =
+      find[F, ApiUrl]("services.renku.api-url", config)
   }
 
   class ResourceUrl private (val value: String) extends AnyVal with UrlTinyType

@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
+import io.renku.graph.model.{RenkuUrl, RenkuVersionPair}
 import io.renku.jsonld.syntax._
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
@@ -33,8 +33,8 @@ trait RenkuVersionPairUpdater[F[_]] {
 }
 
 private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig:      RdfStoreConfig
-)(implicit renkuBaseUrl: RenkuBaseUrl)
+    rdfStoreConfig:  RdfStoreConfig
+)(implicit renkuUrl: RenkuUrl)
     extends RdfStoreClientImpl(rdfStoreConfig)
     with RenkuVersionPairUpdater[F] {
 

@@ -31,7 +31,7 @@ import io.renku.jsonld.{Cursor, JsonLDDecoder}
 
 object ProjectJsonLDDecoder {
 
-  def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
+  def apply(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
     JsonLDDecoder.entity(entityTypes) { implicit cursor =>
       val maybeDescriptionR = cursor
         .downField(schema / "description")
@@ -67,7 +67,7 @@ object ProjectJsonLDDecoder {
       } yield project
     }
 
-  private def findAllPersons(gitLabInfo: GitLabProjectInfo)(implicit cursor: Cursor, renkuBaseUrl: RenkuBaseUrl) =
+  private def findAllPersons(gitLabInfo: GitLabProjectInfo)(implicit cursor: Cursor, renkuUrl: RenkuUrl) =
     cursor.focusTop
       .as[List[Person]]
       .map(_.toSet)
@@ -85,7 +85,7 @@ object ProjectJsonLDDecoder {
                          allJsonLdPersons: Set[Person],
                          activities:       List[Activity],
                          datasets:         List[Dataset[Dataset.Provenance]]
-  )(implicit renkuBaseUrl:                 RenkuBaseUrl): Either[DecodingFailure, Project] = {
+  )(implicit renkuUrl:                     RenkuUrl): Either[DecodingFailure, Project] = {
     (maybeAgent, maybeVersion, gitLabInfo.maybeParentPath) match {
       case (Some(agent), Some(version), Some(parentPath)) =>
         RenkuProject.WithParent
@@ -168,7 +168,7 @@ object ProjectJsonLDDecoder {
 
   private def maybeCreator(
       allJsonLdPersons: Set[Person]
-  )(gitLabInfo:         GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): Option[Person] =
+  )(gitLabInfo:         GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Option[Person] =
     gitLabInfo.maybeCreator.map { creator =>
       allJsonLdPersons
         .find(byEmailOrUsername(creator))
@@ -178,7 +178,7 @@ object ProjectJsonLDDecoder {
 
   private def members(
       allJsonLdPersons: Set[Person]
-  )(gitLabInfo:         GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): Set[Person] =
+  )(gitLabInfo:         GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Person] =
     gitLabInfo.members.map(member =>
       allJsonLdPersons
         .find(byEmailOrUsername(member))
@@ -196,7 +196,7 @@ object ProjectJsonLDDecoder {
     case member: ProjectMemberNoEmail => person => person.name.value == member.username.value
   }
 
-  private def merge(member: Project.ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person => Person =
+  private def merge(member: Project.ProjectMember)(implicit renkuUrl: RenkuUrl): Person => Person =
     member match {
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
         _.add(gitLabId).copy(name = name, maybeEmail = email.some)
@@ -204,7 +204,7 @@ object ProjectJsonLDDecoder {
         _.add(gitLabId).copy(name = name)
     }
 
-  private def toPerson(projectMember: ProjectMember)(implicit renkuBaseUrl: RenkuBaseUrl): Person =
+  private def toPerson(projectMember: ProjectMember)(implicit renkuUrl: RenkuUrl): Person =
     projectMember match {
       case ProjectMemberNoEmail(name, _, gitLabId) =>
         Person.WithGitLabId(persons.ResourceId(gitLabId),

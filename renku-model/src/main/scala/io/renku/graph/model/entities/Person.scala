@@ -22,7 +22,7 @@ import cats.data.ValidatedNel
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId, ResourceId}
-import io.renku.graph.model.{GitLabApiUrl, RenkuBaseUrl}
+import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.jsonld.JsonLDDecoder.{Result, decodeList}
 import io.renku.jsonld._
 
@@ -36,7 +36,7 @@ sealed trait Person extends PersonAlgebra with Product with Serializable {
 }
 
 sealed trait PersonAlgebra {
-  def add(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): Person.WithGitLabId
+  def add(gitLabId: GitLabId)(implicit renkuUrl: RenkuUrl): Person.WithGitLabId
 }
 
 object Person {
@@ -52,7 +52,7 @@ object Person {
 
     override type Id = ResourceId.GitLabIdBased
 
-    override def add(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): WithGitLabId =
+    override def add(gitLabId: GitLabId)(implicit renkuUrl: RenkuUrl): WithGitLabId =
       copy(resourceId = ResourceId(gitLabId), gitLabId = gitLabId)
   }
 
@@ -67,7 +67,7 @@ object Person {
 
     val maybeEmail: Option[Email] = Some(email)
 
-    override def add(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): WithGitLabId =
+    override def add(gitLabId: GitLabId)(implicit renkuUrl: RenkuUrl): WithGitLabId =
       Person.WithGitLabId(ResourceId(gitLabId), gitLabId, name, email.some, maybeOrcidId, maybeAffiliation)
   }
 
@@ -81,7 +81,7 @@ object Person {
 
     val maybeEmail: Option[Email] = None
 
-    override def add(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): WithGitLabId =
+    override def add(gitLabId: GitLabId)(implicit renkuUrl: RenkuUrl): WithGitLabId =
       Person.WithGitLabId(ResourceId(gitLabId), gitLabId, name, maybeEmail = None, maybeOrcidId, maybeAffiliation)
   }
 
@@ -171,7 +171,7 @@ object Person {
     )
   }
 
-  implicit def decoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Person] =
+  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Person] =
     JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
 

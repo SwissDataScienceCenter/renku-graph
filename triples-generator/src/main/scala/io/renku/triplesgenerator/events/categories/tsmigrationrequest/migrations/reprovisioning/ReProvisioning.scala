@@ -27,7 +27,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.circe.literal._
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
-import io.renku.graph.config.RenkuBaseUrlLoader
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuVersionPair
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
@@ -124,7 +124,7 @@ private[migrations] object ReProvisioning {
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       reProvisioningStatus: ReProvisioningStatus[F],
       config:               Config = ConfigFactory.load()
-  ): F[Migration[F]] = RenkuBaseUrlLoader[F]() flatMap { implicit renkuBaseUrl =>
+  ): F[Migration[F]] = RenkuUrlLoader[F]() flatMap { implicit renkuUrl =>
     for {
       retryDelay            <- find[F, FiniteDuration]("re-provisioning-retry-delay", config)
       rdfStoreConfig        <- RdfStoreConfig[F](config)
@@ -133,11 +133,10 @@ private[migrations] object ReProvisioning {
       compatibilityMatrix   <- VersionCompatibilityConfig[F](config)
       executionTimeRecorder <- ExecutionTimeRecorder[F]()
       triplesRemover        <- TriplesRemoverImpl(rdfStoreConfig)
-      reProvisioningJudge <-
-        ReProvisionJudge[F](rdfStoreConfig, reProvisioningStatus, microserviceUrlFinder, compatibilityMatrix)
+      judge <- ReProvisionJudge[F](rdfStoreConfig, reProvisioningStatus, microserviceUrlFinder, compatibilityMatrix)
     } yield new ReProvisioningImpl[F](
       compatibilityMatrix,
-      reProvisioningJudge,
+      judge,
       triplesRemover,
       eventSender,
       new RenkuVersionPairUpdaterImpl(rdfStoreConfig),

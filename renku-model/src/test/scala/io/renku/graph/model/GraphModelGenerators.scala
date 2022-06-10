@@ -33,8 +33,8 @@ import scala.util.Random
 
 object GraphModelGenerators {
 
-  implicit val renkuBaseUrls: Gen[RenkuBaseUrl] =
-    httpUrls(hostGenerator = nonEmptyStrings().map(_.toLowerCase)) map RenkuBaseUrl.apply
+  implicit val renkuUrls: Gen[RenkuUrl] =
+    httpUrls(hostGenerator = nonEmptyStrings().map(_.toLowerCase)) map RenkuUrl.apply
 
   implicit val gitLabUrls: Gen[GitLabUrl] = for {
     url  <- httpUrls()
@@ -78,14 +78,14 @@ object GraphModelGenerators {
               )
   } yield Name(s"$first $second")
 
-  def personGitLabResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[persons.ResourceId.GitLabIdBased] =
+  def personGitLabResourceId(implicit renkuUrl: RenkuUrl): Gen[persons.ResourceId.GitLabIdBased] =
     personGitLabIds map persons.ResourceId.apply
-  def personOrcidResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[persons.ResourceId.OrcidIdBased] =
+  def personOrcidResourceId(implicit renkuUrl: RenkuUrl): Gen[persons.ResourceId.OrcidIdBased] =
     personOrcidIds map persons.ResourceId.apply
   val personEmailResourceId: Gen[persons.ResourceId.EmailBased] = personEmails map persons.ResourceId.apply
-  def personNameResourceId(implicit renkuBaseUrl: RenkuBaseUrl): Gen[persons.ResourceId.NameBased] =
+  def personNameResourceId(implicit renkuUrl: RenkuUrl): Gen[persons.ResourceId.NameBased] =
     personNames map persons.ResourceId.apply
-  implicit def personResourceIds(implicit renkuBaseUrl: RenkuBaseUrl): Gen[persons.ResourceId] =
+  implicit def personResourceIds(implicit renkuUrl: RenkuUrl): Gen[persons.ResourceId] =
     Gen.oneOf(personGitLabResourceId, personOrcidResourceId, personEmailResourceId, personNameResourceId)
 
   implicit lazy val personGitLabIds: Gen[persons.GitLabId] =
@@ -119,11 +119,9 @@ object GraphModelGenerators {
     partsGenerator = projectNamespaces.map(_.show)
   ) map Path.apply
 
-  implicit val projectResourceIds: Gen[ResourceId] = projectResourceIds()(renkuBaseUrls.generateOne)
-  def projectResourceIds()(implicit renkuBaseUrl: RenkuBaseUrl): Gen[ResourceId] =
-    for {
-      path <- projectPaths
-    } yield ResourceId.from(s"$renkuBaseUrl/projects/$path").fold(throw _, identity)
+  implicit val projectResourceIds: Gen[ResourceId] = projectResourceIds()(renkuUrls.generateOne)
+  def projectResourceIds()(implicit renkuUrl: RenkuUrl): Gen[ResourceId] =
+    projectPaths map (path => ResourceId.from(s"$renkuUrl/projects/$path").fold(throw _, identity))
 
   implicit val projectKeywords: Gen[projects.Keyword] =
     nonBlankStrings(minLength = 5).map(v => projects.Keyword(v.value))
@@ -145,10 +143,10 @@ object GraphModelGenerators {
   implicit val datasetImageUris:    Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
   implicit val datasetExternalSameAs: Gen[ExternalSameAs] =
     validatedUrls map SameAs.external map (_.fold(throw _, identity))
-  def datasetInternalSameAsFrom(renkuBaseUrlGen: Gen[RenkuBaseUrl] = renkuBaseUrls,
-                                datasetIdGen:    Gen[Identifier] = datasetIdentifiers
+  def datasetInternalSameAsFrom(renkuUrlGen:  Gen[RenkuUrl] = renkuUrls,
+                                datasetIdGen: Gen[Identifier] = datasetIdentifiers
   ): Gen[InternalSameAs] = for {
-    url <- renkuBaseUrlGen
+    url <- renkuUrlGen
     id  <- datasetIdGen
   } yield SameAs.internal(url / "datasets" / id).fold(throw _, identity)
   implicit val datasetInternalSameAs: Gen[InternalSameAs] = datasetInternalSameAsFrom()
@@ -157,7 +155,7 @@ object GraphModelGenerators {
   implicit val datasetDerivedFroms:   Gen[DerivedFrom]    = validatedUrls map (_.value) map DerivedFrom.apply
   implicit val datasetTopmostDerivedFroms: Gen[TopmostDerivedFrom] = datasetDerivedFroms.map(TopmostDerivedFrom.apply)
   implicit val datasetResourceIds: Gen[datasets.ResourceId] =
-    datasetIdentifiers.map(id => datasets.ResourceId((renkuBaseUrls.generateOne / "datasets" / id).show))
+    datasetIdentifiers.map(id => datasets.ResourceId((renkuUrls.generateOne / "datasets" / id).show))
 
   def datasetPublishedDates(min: DatePublished = LocalDate.EPOCH): Gen[DatePublished] =
     timestamps(min.value.atStartOfDay().toInstant(ZoneOffset.UTC), max = Instant.now())

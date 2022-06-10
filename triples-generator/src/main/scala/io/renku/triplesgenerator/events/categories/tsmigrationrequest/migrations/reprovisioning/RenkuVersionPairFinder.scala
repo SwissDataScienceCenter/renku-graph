@@ -23,7 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.renku
-import io.renku.graph.model.{RenkuBaseUrl, RenkuVersionPair}
+import io.renku.graph.model.{RenkuUrl, RenkuVersionPair}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -33,8 +33,8 @@ trait RenkuVersionPairFinder[F[_]] {
 }
 
 private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig:      RdfStoreConfig
-)(implicit renkuBaseUrl: RenkuBaseUrl)
+    rdfStoreConfig:  RdfStoreConfig
+)(implicit renkuUrl: RenkuUrl)
     extends RdfStoreClientImpl[F](rdfStoreConfig)
     with RenkuVersionPairFinder[F] {
 
@@ -61,8 +61,8 @@ private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 
 private object RenkuVersionPairFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      rdfStoreConfig:      RdfStoreConfig
-  )(implicit renkuBaseUrl: RenkuBaseUrl): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal {
+      rdfStoreConfig:  RdfStoreConfig
+  )(implicit renkuUrl: RenkuUrl): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal {
     new RenkuVersionPairFinderImpl[F](rdfStoreConfig)
   }
 }

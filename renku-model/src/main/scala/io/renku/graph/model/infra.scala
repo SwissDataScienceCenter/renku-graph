@@ -25,12 +25,12 @@ import io.renku.tinytypes.constraints.{NonBlank, Url, UrlOps}
 import io.renku.tinytypes.json.TinyTypeDecoders
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
 
-final class RenkuBaseUrl private (val value: String) extends AnyVal with UrlTinyType
-object RenkuBaseUrl
-    extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_))
-    with Url[RenkuBaseUrl]
-    with UrlOps[RenkuBaseUrl]
-    with UrlResourceRenderer[RenkuBaseUrl]
+final class RenkuUrl private (val value: String) extends AnyVal with UrlTinyType
+object RenkuUrl
+    extends TinyTypeFactory[RenkuUrl](new RenkuUrl(_))
+    with Url[RenkuUrl]
+    with UrlOps[RenkuUrl]
+    with UrlResourceRenderer[RenkuUrl]
 
 final class GitLabUrl private (val value: String) extends AnyVal with UrlTinyType {
   def apiV4: GitLabApiUrl = GitLabApiUrl(this)

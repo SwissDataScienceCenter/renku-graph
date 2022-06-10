@@ -20,17 +20,16 @@ package io.renku.graph.config
 
 import cats.MonadThrow
 import io.renku.config.ConfigLoader
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.RenkuUrl
 
-object RenkuBaseUrlLoader {
+object RenkuUrlLoader {
 
   import ConfigLoader._
   import com.typesafe.config.{Config, ConfigFactory}
   import pureconfig.ConfigReader
 
-  private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] = urlTinyTypeReader(RenkuBaseUrl)
+  private implicit val renkuUrlReader: ConfigReader[RenkuUrl] = urlTinyTypeReader(RenkuUrl)
 
-  def apply[F[_]: MonadThrow](
-      config: Config = ConfigFactory.load()
-  ): F[RenkuBaseUrl] = find[F, RenkuBaseUrl]("services.renku.url", config)
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[RenkuUrl] =
+    find[F, RenkuUrl]("services.renku.url", config)
 }
