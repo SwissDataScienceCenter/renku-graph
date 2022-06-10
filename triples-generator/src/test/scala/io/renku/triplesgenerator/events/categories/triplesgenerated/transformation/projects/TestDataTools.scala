@@ -23,12 +23,14 @@ import io.renku.graph.model.entities
 
 private object TestDataTools {
 
-  def toProjectMutableData(project: entities.Project): ProjectMutableData = ProjectMutableData(project.name,
-                                                                                               findParent(project),
-                                                                                               project.visibility,
-                                                                                               project.maybeDescription,
-                                                                                               project.keywords,
-                                                                                               findAgent(project)
+  def toProjectMutableData(project: entities.Project): ProjectMutableData = ProjectMutableData(
+    project.name,
+    findParent(project),
+    project.visibility,
+    project.maybeDescription,
+    project.keywords,
+    findAgent(project),
+    project.maybeCreator.map(_.resourceId)
   )
 
   def findParent(project: entities.Project) = project match {

@@ -18,12 +18,13 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.projects
 
-import io.renku.graph.model.{CliVersion, projects}
+import io.renku.graph.model.{CliVersion, persons, projects}
 
 private final case class ProjectMutableData(name:             projects.Name,
                                             maybeParentId:    Option[projects.ResourceId],
                                             visibility:       projects.Visibility,
                                             maybeDescription: Option[projects.Description],
                                             keywords:         Set[projects.Keyword],
-                                            maybeAgent:       Option[CliVersion]
+                                            maybeAgent:       Option[CliVersion],
+                                            maybeCreatorId:   Option[persons.ResourceId]
 )

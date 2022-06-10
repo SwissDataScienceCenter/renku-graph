@@ -27,22 +27,23 @@ import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
-  def prepareUpdates(project: Project, kgProjectInfo: ProjectMutableData): List[SparqlQuery]
+  def prepareUpdates(project: Project, kgData: ProjectMutableData): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
 
-  override def prepareUpdates(project: Project, kgProjectInfo: ProjectMutableData): List[SparqlQuery] = List(
-    nameDeletion(project, kgProjectInfo),
-    maybeParentDeletion(project, kgProjectInfo),
-    visibilityDeletion(project, kgProjectInfo),
-    descriptionDeletion(project, kgProjectInfo),
-    keywordsDeletion(project, kgProjectInfo),
-    agentDeletion(project, kgProjectInfo)
+  override def prepareUpdates(project: Project, kgData: ProjectMutableData): List[SparqlQuery] = List(
+    nameDeletion(project, kgData),
+    maybeParentDeletion(project, kgData),
+    visibilityDeletion(project, kgData),
+    descriptionDeletion(project, kgData),
+    keywordsDeletion(project, kgData),
+    agentDeletion(project, kgData),
+    creatorDeletion(project, kgData)
   ).flatten
 
-  private def nameDeletion(project: Project, kgProjectInfo: ProjectMutableData) =
-    Option.when(project.name != kgProjectInfo.name) {
+  private def nameDeletion(project: Project, kgData: ProjectMutableData) =
+    Option.when(project.name != kgData.name) {
       val resource = project.resourceId.showAs[RdfResource]
       SparqlQuery.of(
         name = "transformation - project name delete",
@@ -53,16 +54,16 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
 
-  private def maybeParentDeletion(project: Project, kgProjectInfo: ProjectMutableData): Option[SparqlQuery] = {
+  private def maybeParentDeletion(project: Project, kgData: ProjectMutableData): Option[SparqlQuery] = {
     val maybeParent = project match {
       case p: Project with Parent => p.parentResourceId.some
       case _ => None
     }
 
     Option.when(
-      kgProjectInfo.maybeParentId match {
-        case Some(kgParent) if kgParent.some != maybeParent => true
-        case _                                              => false
+      kgData.maybeParentId match {
+        case kgParent @ Some(_) if kgParent != maybeParent => true
+        case _                                             => false
       }
     ) {
       val resource = project.resourceId.showAs[RdfResource]
@@ -76,8 +77,8 @@ private object UpdatesCreator extends UpdatesCreator {
     }
   }
 
-  private def visibilityDeletion(project: Project, kgProjectInfo: ProjectMutableData) =
-    Option.when(project.visibility != kgProjectInfo.visibility) {
+  private def visibilityDeletion(project: Project, kgData: ProjectMutableData) =
+    Option.when(project.visibility != kgData.visibility) {
       val resource = project.resourceId.showAs[RdfResource]
       SparqlQuery.of(
         name = "transformation - project visibility delete",
@@ -88,10 +89,10 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
 
-  private def descriptionDeletion(project: Project, kgProjectInfo: ProjectMutableData) = Option.when(
-    kgProjectInfo.maybeDescription match {
-      case Some(kgDescription) if kgDescription.some != project.maybeDescription => true
-      case _                                                                     => false
+  private def descriptionDeletion(project: Project, kgData: ProjectMutableData) = Option.when(
+    kgData.maybeDescription match {
+      case kgDesc @ Some(_) if kgDesc != project.maybeDescription => true
+      case _                                                      => false
     }
   ) {
     val resource = project.resourceId.showAs[RdfResource]
@@ -104,8 +105,8 @@ private object UpdatesCreator extends UpdatesCreator {
     )
   }
 
-  private def keywordsDeletion(project: Project, kgProjectInfo: ProjectMutableData) =
-    Option.when(kgProjectInfo.keywords != project.keywords) {
+  private def keywordsDeletion(project: Project, kgData: ProjectMutableData) =
+    Option.when(kgData.keywords != project.keywords) {
       val resource = project.resourceId.showAs[RdfResource]
       SparqlQuery.of(
         name = "transformation - project keywords delete",
@@ -116,20 +117,20 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
 
-  private def agentDeletion(project: Project, kgProjectInfo: ProjectMutableData) = {
+  private def agentDeletion(project: Project, kgData: ProjectMutableData) = {
     val maybeAgent = project match {
       case _: NonRenkuProject => None
       case p: RenkuProject    => p.agent.some
     }
     Option.when(
-      kgProjectInfo.maybeAgent match {
-        case Some(kgAgent) if kgAgent.some != maybeAgent => true
-        case _                                           => false
+      kgData.maybeAgent match {
+        case kgAgent @ Some(_) if kgAgent != maybeAgent => true
+        case _                                          => false
       }
     ) {
       val resource = project.resourceId.showAs[RdfResource]
       SparqlQuery.of(
-        name = "transformation - project description delete",
+        name = "transformation - project agent delete",
         Prefixes of schema -> "schema",
         s"""|DELETE { $resource schema:agent ?agent }
             |WHERE  { $resource schema:agent ?agent }
@@ -137,4 +138,21 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
   }
+
+  private def creatorDeletion(project: Project, kgData: ProjectMutableData) =
+    Option.when(
+      kgData.maybeCreatorId match {
+        case kgCreator @ Some(_) if kgCreator != project.maybeCreator.map(_.resourceId) => true
+        case _                                                                          => false
+      }
+    ) {
+      val resource = project.resourceId.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "transformation - project creator delete",
+        Prefixes of schema -> "schema",
+        s"""|DELETE { $resource schema:creator ?creator }
+            |WHERE  { $resource schema:creator ?creator }
+            |""".stripMargin
+      )
+    }
 }

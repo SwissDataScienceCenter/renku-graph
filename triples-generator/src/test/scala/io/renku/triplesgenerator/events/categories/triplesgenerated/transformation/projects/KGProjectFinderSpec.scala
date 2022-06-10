@@ -42,7 +42,7 @@ class KGProjectFinderSpec
 
   "find" should {
 
-    "return name, derivedFrom, visibility, description, keywords and agent for a given ResourceId" in new TestCase {
+    "return project's mutable properties for a given ResourceId" in new TestCase {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         loadToStore(project)
 

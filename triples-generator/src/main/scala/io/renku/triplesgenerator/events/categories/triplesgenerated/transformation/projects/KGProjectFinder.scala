@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{CliVersion, projects}
+import io.renku.graph.model.{CliVersion, persons, projects}
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
@@ -48,7 +48,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     name = "transformation - find project",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?name ?maybeParent ?visibility ?maybeDescription
-        |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent
+        |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
         |WHERE {
         |  BIND (${resourceId.showAs[RdfResource]} AS ?id)
         |  ?id a schema:Project;
@@ -58,8 +58,9 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |  OPTIONAL { ?id schema:keywords ?keyword }
         |  OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent }
         |  OPTIONAL { ?id schema:agent ?maybeAgent }
+        |  OPTIONAL { ?id schema:creator ?maybeCreatorId }
         |}
-        |GROUP BY ?name ?maybeParent ?visibility ?maybeDescription ?maybeAgent
+        |GROUP BY ?name ?maybeParent ?visibility ?maybeDescription ?maybeAgent ?maybeCreatorId
         |""".stripMargin
   )
 
@@ -77,7 +78,8 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         maybeDescription <- extract[Option[projects.Description]]("maybeDescription")
         keywords         <- extract[Option[String]]("keywords") >>= toSetOfKeywords
         maybeAgent       <- extract[Option[CliVersion]]("maybeAgent")
-      } yield ProjectMutableData(name, maybeParent, visibility, maybeDescription, keywords, maybeAgent)
+        maybeCreatorId   <- extract[Option[persons.ResourceId]]("maybeCreatorId")
+      } yield ProjectMutableData(name, maybeParent, visibility, maybeDescription, keywords, maybeAgent, maybeCreatorId)
     }(toOption(s"More than one project found for resourceId: '$resourceId'"))
 }
 
