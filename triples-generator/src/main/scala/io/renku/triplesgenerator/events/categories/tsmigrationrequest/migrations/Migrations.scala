@@ -42,14 +42,13 @@ private[tsmigrationrequest] object Migrations {
     multipleDSTopmostSameAs           <- MultipleDSTopmostSameAs[F]
     multipleAllWrongTopmostSameAs     <- MultipleAllWrongTopmostSameAs[F]
     multipleTopmostSameAsOnInternalDS <- MultipleTopmostSameAsOnInternalDS[F]
-    multipleTopmostDerivedFromOnly    <- MultipleTopmostDerivedFromOnly[F]
     multipleOriginalIdentifiers       <- MultipleOriginalIdentifiers[F]
     multipleDSDateCreated             <- MultipleDSDateCreated[F]
     multipleDSSameAs                  <- MultipleDSSameAs[F]
-    multipleActivityAuthors           <- MultipleActivityAuthors[F]
     removeNotLinkedPersons            <- RemoveNotLinkedPersons[F]
     multipleDSDescriptions            <- MultipleDSDescriptions[F]
     multipleTopmostDerivedFroms       <- MultipleTopmostDerivedFroms[F]
+    multipleProjectAgents             <- MultipleProjectAgents[F]
     migrations <- validateNames(
                     reProvisioning,
                     malformedActivityIds,
@@ -59,14 +58,13 @@ private[tsmigrationrequest] object Migrations {
                     multipleDSTopmostSameAs,
                     multipleAllWrongTopmostSameAs,
                     multipleTopmostSameAsOnInternalDS,
-                    multipleTopmostDerivedFromOnly,
                     multipleOriginalIdentifiers,
                     multipleDSDateCreated,
                     multipleDSSameAs,
-                    multipleActivityAuthors,
                     removeNotLinkedPersons,
                     multipleDSDescriptions,
-                    multipleTopmostDerivedFroms
+                    multipleTopmostDerivedFroms,
+                    multipleProjectAgents
                   )
   } yield migrations
 

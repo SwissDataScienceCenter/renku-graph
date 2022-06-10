@@ -43,10 +43,11 @@ object GraphModelGenerators {
 
   implicit val gitLabApiUrls: Gen[GitLabApiUrl] = gitLabUrls.map(_.apiV4)
 
-  implicit val cliVersions: Gen[CliVersion] = Gen
-    .listOfN(3, positiveInts(max = 50))
-    .map(_.mkString("."))
-    .map(CliVersion.apply)
+  implicit val cliVersions: Gen[CliVersion] = for {
+    version       <- semanticVersions
+    commitsNumber <- positiveInts(999)
+    commitPart <- shas.toGeneratorOfOptions.map(_.map(_.take(7)).map(sha => s".dev$commitsNumber+g$sha").getOrElse(""))
+  } yield CliVersion(s"$version$commitPart")
 
   implicit val usernames: Gen[persons.Username] = nonBlankStrings(minLength = 5).map(v => Username(v.value))
   implicit val personAffiliations: Gen[persons.Affiliation] =

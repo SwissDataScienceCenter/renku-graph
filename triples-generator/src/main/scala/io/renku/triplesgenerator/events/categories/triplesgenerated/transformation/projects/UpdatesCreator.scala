@@ -18,30 +18,32 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.projects
 
-import KGProjectFinder.KGProjectInfo
+import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.entities.{Parent, Project}
+import io.renku.graph.model.entities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
-  def prepareUpdates(project: Project, kgProjectInfo: KGProjectInfo): List[SparqlQuery]
+  def prepareUpdates(project: Project, kgData: ProjectMutableData): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
 
-  override def prepareUpdates(project: Project, kgProjectInfo: KGProjectInfo): List[SparqlQuery] = List(
-    nameDeletion(project, kgProjectInfo),
-    maybeParentDeletion(project, kgProjectInfo),
-    visibilityDeletion(project, kgProjectInfo),
-    descriptionDeletion(project, kgProjectInfo),
-    keywordsDeletion(project, kgProjectInfo)
+  override def prepareUpdates(project: Project, kgData: ProjectMutableData): List[SparqlQuery] = List(
+    nameDeletion(project, kgData),
+    maybeParentDeletion(project, kgData),
+    visibilityDeletion(project, kgData),
+    descriptionDeletion(project, kgData),
+    keywordsDeletion(project, kgData),
+    agentDeletion(project, kgData),
+    creatorDeletion(project, kgData)
   ).flatten
 
-  private def nameDeletion(project: Project, kgProjectInfo: KGProjectInfo) =
-    Option.when(project.name != kgProjectInfo._1) {
+  private def nameDeletion(project: Project, kgData: ProjectMutableData) =
+    Option.when(project.name != kgData.name) {
       val resource = project.resourceId.showAs[RdfResource]
       SparqlQuery.of(
         name = "transformation - project name delete",
@@ -52,23 +54,31 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
 
-  private def maybeParentDeletion(project: Project, kgProjectInfo: KGProjectInfo): Option[SparqlQuery] = project match {
-    case p: Project with Parent =>
-      Option.when(kgProjectInfo._2.isEmpty || kgProjectInfo._2.exists(_ != p.parentResourceId)) {
-        val resource = project.resourceId.showAs[RdfResource]
-        SparqlQuery.of(
-          name = "transformation - project maybeParent delete",
-          Prefixes.of(prov -> "prov"),
-          s"""|DELETE { $resource prov:wasDerivedFrom ?maybeParent }
-              |WHERE  { $resource prov:wasDerivedFrom ?maybeParent }
-              |""".stripMargin
-        )
+  private def maybeParentDeletion(project: Project, kgData: ProjectMutableData): Option[SparqlQuery] = {
+    val maybeParent = project match {
+      case p: Project with Parent => p.parentResourceId.some
+      case _ => None
+    }
+
+    Option.when(
+      kgData.maybeParentId match {
+        case kgParent @ Some(_) if kgParent != maybeParent => true
+        case _                                             => false
       }
-    case _ => None
+    ) {
+      val resource = project.resourceId.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "transformation - project parent delete",
+        Prefixes.of(prov -> "prov"),
+        s"""|DELETE { $resource prov:wasDerivedFrom ?maybeParent }
+            |WHERE  { $resource prov:wasDerivedFrom ?maybeParent }
+            |""".stripMargin
+      )
+    }
   }
 
-  private def visibilityDeletion(project: Project, kgProjectInfo: KGProjectInfo) =
-    Option.when(project.visibility != kgProjectInfo._3) {
+  private def visibilityDeletion(project: Project, kgData: ProjectMutableData) =
+    Option.when(project.visibility != kgData.visibility) {
       val resource = project.resourceId.showAs[RdfResource]
       SparqlQuery.of(
         name = "transformation - project visibility delete",
@@ -79,10 +89,10 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
 
-  private def descriptionDeletion(project: Project, kgProjectInfo: KGProjectInfo) = Option.when(
-    (kgProjectInfo._4, project.maybeDescription) match {
-      case (Some(kgDescription), Some(cliDescription)) if kgDescription != cliDescription => true
-      case _                                                                              => false
+  private def descriptionDeletion(project: Project, kgData: ProjectMutableData) = Option.when(
+    kgData.maybeDescription match {
+      case kgDesc @ Some(_) if kgDesc != project.maybeDescription => true
+      case _                                                      => false
     }
   ) {
     val resource = project.resourceId.showAs[RdfResource]
@@ -95,14 +105,53 @@ private object UpdatesCreator extends UpdatesCreator {
     )
   }
 
-  private def keywordsDeletion(project: Project, kgProjectInfo: KGProjectInfo) =
-    Option.when(kgProjectInfo._5 != project.keywords) {
+  private def keywordsDeletion(project: Project, kgData: ProjectMutableData) =
+    Option.when(kgData.keywords != project.keywords) {
       val resource = project.resourceId.showAs[RdfResource]
       SparqlQuery.of(
         name = "transformation - project keywords delete",
         Prefixes.of(schema -> "schema"),
         s"""|DELETE { $resource schema:keywords ?keyword }
             |WHERE  { $resource schema:keywords ?keyword }
+            |""".stripMargin
+      )
+    }
+
+  private def agentDeletion(project: Project, kgData: ProjectMutableData) = {
+    val maybeAgent = project match {
+      case _: NonRenkuProject => None
+      case p: RenkuProject    => p.agent.some
+    }
+    Option.when(
+      kgData.maybeAgent match {
+        case kgAgent @ Some(_) if kgAgent != maybeAgent => true
+        case _                                          => false
+      }
+    ) {
+      val resource = project.resourceId.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "transformation - project agent delete",
+        Prefixes of schema -> "schema",
+        s"""|DELETE { $resource schema:agent ?agent }
+            |WHERE  { $resource schema:agent ?agent }
+            |""".stripMargin
+      )
+    }
+  }
+
+  private def creatorDeletion(project: Project, kgData: ProjectMutableData) =
+    Option.when(
+      kgData.maybeCreatorId match {
+        case kgCreator @ Some(_) if kgCreator != project.maybeCreator.map(_.resourceId) => true
+        case _                                                                          => false
+      }
+    ) {
+      val resource = project.resourceId.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "transformation - project creator delete",
+        Prefixes of schema -> "schema",
+        s"""|DELETE { $resource schema:creator ?creator }
+            |WHERE  { $resource schema:creator ?creator }
             |""".stripMargin
       )
     }
