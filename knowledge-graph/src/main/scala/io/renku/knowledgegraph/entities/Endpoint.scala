@@ -182,17 +182,17 @@ object Endpoint {
   private def parsingFailure(paramName: String) = ParseFailure(s"'$paramName' parameter with invalid value", "")
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    entitiesFinder    <- EntitiesFinder[F]
-    renkuUrl          <- RenkuUrlLoader()
-    renkuResourcesUrl <- renku.ResourcesUrl()
-    gitLabUrl         <- GitLabUrlLoader[F]()
-  } yield new EndpointImpl(entitiesFinder, renkuUrl, renkuResourcesUrl, gitLabUrl)
+    entitiesFinder <- EntitiesFinder[F]
+    renkuUrl       <- RenkuUrlLoader()
+    renkuApiUrl    <- renku.ApiUrl()
+    gitLabUrl      <- GitLabUrlLoader[F]()
+  } yield new EndpointImpl(entitiesFinder, renkuUrl, renkuApiUrl, gitLabUrl)
 }
 
 private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
-                                                renkuUrl:          RenkuUrl,
-                                                renkuResourcesUrl: renku.ResourcesUrl,
-                                                gitLabUrl:         GitLabUrl
+                                                renkuUrl:    RenkuUrl,
+                                                renkuApiUrl: renku.ApiUrl,
+                                                gitLabUrl:   GitLabUrl
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
@@ -235,7 +235,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
           .addIfDefined("description" -> project.maybeDescription)
           .deepMerge(
             _links(
-              Link(Rel("details") -> ProjectEndpoint.href(renkuResourcesUrl, project.path))
+              Link(Rel("details") -> ProjectEndpoint.href(renkuApiUrl, project.path))
             )
           )
       case ds: model.Entity.Dataset =>
@@ -252,7 +252,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
           .addIfDefined("description" -> ds.maybeDescription)
           .deepMerge(
             _links(
-              Link(Rel("details") -> DatasetEndpoint.href(renkuResourcesUrl, ds.identifier))
+              Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, ds.identifier))
             )
           )
       case workflow: model.Entity.Workflow =>

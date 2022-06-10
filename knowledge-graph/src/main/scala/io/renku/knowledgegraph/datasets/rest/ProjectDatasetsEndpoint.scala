@@ -46,7 +46,7 @@ trait ProjectDatasetsEndpoint[F[_]] {
 
 class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
     projectDatasetsFinder: ProjectDatasetsFinder[F],
-    renkuResourcesUrl:     renku.ResourcesUrl,
+    renkuApiUrl:           renku.ApiUrl,
     gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
@@ -97,8 +97,8 @@ class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
         .deepMerge(sameAsOrDerived.asJson)
         .deepMerge(
           _links(
-            Rel("details")         -> Href(renkuResourcesUrl / "datasets" / id),
-            Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / originalId)
+            Rel("details")         -> Href(renkuApiUrl / "datasets" / id),
+            Rel("initial-version") -> Href(renkuApiUrl / "datasets" / originalId)
           )
         )
     }
@@ -127,7 +127,7 @@ object ProjectDatasetsEndpoint {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectDatasetsEndpoint[F]] = for {
     rdfStoreConfig        <- RdfStoreConfig[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
-    renkuResourceUrl      <- renku.ResourcesUrl[F]()
+    renkuResourceUrl      <- renku.ApiUrl[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
     projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig)
   } yield new ProjectDatasetsEndpointImpl[F](
@@ -137,6 +137,6 @@ object ProjectDatasetsEndpoint {
     executionTimeRecorder
   )
 
-  def href(renkuResourcesUrl: renku.ResourcesUrl, projectPath: projects.Path): Href =
-    Href(renkuResourcesUrl / "projects" / projectPath / "datasets")
+  def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
+    Href(renkuApiUrl / "projects" / projectPath / "datasets")
 }

@@ -472,8 +472,8 @@ trait DatasetsResources {
     }"""
       .deepMerge(
         _links(
-          Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.identification.identifier),
-          Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.provenance.originalIdentifier)
+          Rel("details")         -> Href(renkuApiUrl / "datasets" / dataset.identification.identifier),
+          Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.provenance.originalIdentifier)
         )
       )
       .deepMerge(provenanceEncoder(dataset.provenance))
@@ -512,7 +512,7 @@ trait DatasetsResources {
       .addIfDefined("description" -> dataset.additionalInfo.maybeDescription)
       .deepMerge {
         _links(
-          Rel("details") -> Href(renkuResourcesUrl / "datasets" / actualIdentifier)
+          Rel("details") -> Href(renkuApiUrl / "datasets" / actualIdentifier)
         )
       }
   }

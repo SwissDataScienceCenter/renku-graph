@@ -115,9 +115,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     }
   }
 
-  private lazy val renkuUrl = renkuUrls.generateOne
-  private lazy val renkuResourcesUrl =
-    renku.ResourcesUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
+  private lazy val renkuUrl    = renkuUrls.generateOne
+  private lazy val renkuApiUrl = renku.ApiUrl(s"$renkuUrl/${relativePaths(maxSegments = 1).generateOne}")
 
   private trait TestCase {
     val criteria = criterias.generateOne
@@ -127,7 +126,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     implicit val logger:           TestLogger[IO]    = TestLogger[IO]()
     implicit val gitLabUrl:        GitLabUrl         = gitLabUrls.generateOne
     val finder   = mock[EntitiesFinder[IO]]
-    val endpoint = new EndpointImpl[IO](finder, renkuUrl, renkuResourcesUrl, gitLabUrl)
+    val endpoint = new EndpointImpl[IO](finder, renkuUrl, renkuApiUrl, gitLabUrl)
   }
 
   private lazy val criterias: Gen[Criteria] = for {
@@ -184,7 +183,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
           _ <- cursor._links
                  .flatMap(_.get(Links.Rel("details")).toRight(DecodingFailure("No project details link", Nil)))
                  .flatMap { link =>
-                   val expected = renkuResourcesUrl / "projects" / path
+                   val expected = renkuApiUrl / "projects" / path
                    Either.cond(link.href.value == expected.show, (), DecodingFailure(s"$link not equal $expected", Nil))
                  }
         } yield model.Entity.Project(score, path, name, visibility, date, maybeCreator, keywords, maybeDesc)
@@ -215,7 +214,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                          }
           images <- cursor.downField("images").as(decodeList(imagesDecoder(projectPath)))
           _ <- {
-            val expected = renkuResourcesUrl / "datasets" / identifier
+            val expected = renkuApiUrl / "datasets" / identifier
             Either.cond(dsDetailsLink.href.value == expected.show,
                         (),
                         DecodingFailure(s"$dsDetailsLink not equal $expected", Nil)

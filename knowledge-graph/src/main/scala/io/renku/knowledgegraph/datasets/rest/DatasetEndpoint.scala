@@ -48,7 +48,7 @@ trait DatasetEndpoint[F[_]] {
 
 class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
     datasetFinder:         DatasetFinder[F],
-    renkuResourcesUrl:     renku.ResourcesUrl,
+    renkuApiUrl:           renku.ApiUrl,
     gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
@@ -111,8 +111,8 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
         ("images" -> (dataset.images, dataset.project).asJson).some
       ).flatten: _*
     ) deepMerge _links(
-      Rel.Self -> DatasetEndpoint.href(renkuResourcesUrl, dataset.id),
-      Rel("initial-version") -> DatasetEndpoint.href(renkuResourcesUrl, dataset.versions.initial.value)
+      Rel.Self -> DatasetEndpoint.href(renkuApiUrl, dataset.id),
+      Rel("initial-version") -> DatasetEndpoint.href(renkuApiUrl, dataset.versions.initial.value)
     )
   }
   // format: on
@@ -147,7 +147,7 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
     json"""{
       "path": ${project.path},
       "name": ${project.name}
-    }""" deepMerge _links(Link(Rel("project-details") -> ProjectEndpoint.href(renkuResourcesUrl, project.path)))
+    }""" deepMerge _links(Link(Rel("project-details") -> ProjectEndpoint.href(renkuApiUrl, project.path)))
   }
 
   private implicit lazy val versionsEncoder: Encoder[DatasetVersions] = Encoder.instance[DatasetVersions] { versions =>
@@ -179,11 +179,11 @@ object DatasetEndpoint {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetEndpoint[F]] = for {
     datasetFinder         <- DatasetFinder[F]
-    renkuResourceUrl      <- renku.ResourcesUrl[F]()
+    renkuApiUrl           <- renku.ApiUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
-  } yield new DatasetEndpointImpl[F](datasetFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder)
+  } yield new DatasetEndpointImpl[F](datasetFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
 
-  def href(renkuResourcesUrl: renku.ResourcesUrl, identifier: Identifier): Href =
-    Href(renkuResourcesUrl / "datasets" / identifier)
+  def href(renkuApiUrl: renku.ApiUrl, identifier: Identifier): Href =
+    Href(renkuApiUrl / "datasets" / identifier)
 }
