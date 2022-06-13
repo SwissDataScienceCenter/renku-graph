@@ -44,6 +44,17 @@ object Generators {
 
   def noDashUuid: Gen[String] = uuid.map(_.toString.replace("-", ""))
 
+  def randomiseCases(value: String): Gen[String] = {
+    for {
+      itemsNo      <- positiveInts(value.length).map(_.value)
+      itemsIndices <- Gen.pick(itemsNo, value.zipWithIndex.map(_._2))
+    } yield value.zipWithIndex.foldLeft(List.empty[Char]) {
+      case (newChars, char -> idx) if itemsIndices contains idx =>
+        (if (char.isLower) char.toUpper else char.toLower) :: newChars
+      case (newChars, char -> _) => char :: newChars
+    }
+  }.map(_.reverse.mkString)
+
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
     nonBlankStrings(maxLength = Refined.unsafeApply(maxLength), charsGenerator = charsGenerator) map (_.value)
