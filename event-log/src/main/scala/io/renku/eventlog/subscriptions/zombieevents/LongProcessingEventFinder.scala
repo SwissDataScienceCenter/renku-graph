@@ -116,7 +116,7 @@ private class LongProcessingEventFinder[F[_]: Async: SessionResource](
   }
 
   private lazy val findGracePeriod: ProcessingStatus => EventProcessingTime = {
-    case GeneratingTriples   => EventProcessingTime(Duration ofDays 4 * 7)
+    case GeneratingTriples   => EventProcessingTime(Duration ofDays 6 * 7)
     case TransformingTriples => EventProcessingTime(Duration ofDays 1)
     case Deleting            => EventProcessingTime(Duration ofDays 1)
   }
