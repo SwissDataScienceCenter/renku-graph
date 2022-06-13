@@ -71,10 +71,12 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
     "consider the major only if different" in {
       forAll(cliVersions, cliVersions) { (version1, version2) =>
-        val list = List(version1, version2)
+        whenever(version1.major != version2.major) {
+          val list = List(version1, version2)
 
-        if (version1.major < version2.major) list.sorted shouldBe list
-        else list.sorted                                 shouldBe list.reverse
+          if (version1.major < version2.major) list.sorted shouldBe list
+          else list.sorted                                 shouldBe list.reverse
+        }
       }
     }
 
