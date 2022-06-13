@@ -37,7 +37,7 @@ final case class Dataset[+P <: Provenance](identification:            Identifica
 
   val publicationEvents: List[PublicationEvent] = publicationEventFactories.map(_.apply(this))
 
-  def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = Dataset.entityId(identification.identifier)
+  def entityId(implicit renkuUrl: RenkuUrl): EntityId = Dataset.entityId(identification.identifier)
 }
 
 object Dataset {
@@ -125,30 +125,30 @@ object Dataset {
   trait ProvenanceOps {
 
     implicit def toEntitiesProvenance(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): entities.Dataset.Identification => Provenance => entities.Dataset.Provenance =
       identification => {
-        case p: Internal         => toEntitiesInternal(renkuBaseUrl)(identification)(p)
-        case p: ImportedExternal => toEntitiesImportedExternal(renkuBaseUrl)(identification)(p)
+        case p: Internal         => toEntitiesInternal(renkuUrl)(identification)(p)
+        case p: ImportedExternal => toEntitiesImportedExternal(renkuUrl)(identification)(p)
         case p: ImportedInternalAncestorExternal =>
-          toEntitiesImportedInternalAncestorExternal(renkuBaseUrl)(identification)(p)
+          toEntitiesImportedInternalAncestorExternal(renkuUrl)(identification)(p)
         case p: ImportedInternalAncestorInternal =>
-          toEntitiesImportedInternalAncestorInternal(renkuBaseUrl)(identification)(p)
-        case p: Modified => toEntitiesModified(renkuBaseUrl)(identification)(p)
+          toEntitiesImportedInternalAncestorInternal(renkuUrl)(identification)(p)
+        case p: Modified => toEntitiesModified(renkuUrl)(identification)(p)
       }
 
     implicit def toEntitiesImportedInternal(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): entities.Dataset.Identification => ImportedInternal => entities.Dataset.Provenance.ImportedInternal =
       identification => {
         case p: ImportedInternalAncestorExternal =>
-          toEntitiesImportedInternalAncestorExternal(renkuBaseUrl)(identification)(p)
+          toEntitiesImportedInternalAncestorExternal(renkuUrl)(identification)(p)
         case p: ImportedInternalAncestorInternal =>
-          toEntitiesImportedInternalAncestorInternal(renkuBaseUrl)(identification)(p)
+          toEntitiesImportedInternalAncestorInternal(renkuUrl)(identification)(p)
       }
 
     implicit def toEntitiesInternal(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): entities.Dataset.Identification => Provenance.Internal => entities.Dataset.Provenance.Internal =
       identification => { case Internal(_, _, date, creators) =>
         entities.Dataset.Provenance.Internal(identification.resourceId,
@@ -159,7 +159,7 @@ object Dataset {
       }
 
     implicit def toEntitiesImportedExternal(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): entities.Dataset.Identification => Provenance.ImportedExternal => entities.Dataset.Provenance.ImportedExternal =
       identification => { case ImportedExternal(_, sameAs, _, date, creators) =>
         entities.Dataset.Provenance.ImportedExternal(identification.resourceId,
@@ -171,7 +171,7 @@ object Dataset {
       }
 
     implicit def toEntitiesImportedInternalAncestorExternal(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): entities.Dataset.Identification => ImportedInternalAncestorExternal => entities.Dataset.Provenance.ImportedInternalAncestorExternal =
       identification => {
         case ImportedInternalAncestorExternal(_, sameAs, topmostSameAs, originalIdentifier, date, creators) =>
@@ -187,7 +187,7 @@ object Dataset {
       }
 
     implicit def toEntitiesImportedInternalAncestorInternal(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): entities.Dataset.Identification => ImportedInternalAncestorInternal => entities.Dataset.Provenance.ImportedInternalAncestorInternal =
       identification => { case ImportedInternalAncestorInternal(_, sameAs, topmostSameAs, originalId, date, creators) =>
         entities.Dataset.Provenance.ImportedInternalAncestorInternal(
@@ -202,7 +202,7 @@ object Dataset {
       }
 
     implicit def toEntitiesModified(implicit
-        renkuBaseUrl: RenkuBaseUrl
+        renkuUrl: RenkuUrl
     ): entities.Dataset.Identification => Provenance.Modified => entities.Dataset.Provenance.Modified =
       identification => {
         case Modified(_, derivedFrom, topmostDerivedFrom, originalId, date, creators, maybeInvalidationTime) =>
@@ -322,8 +322,8 @@ object Dataset {
   } getOrElse Validated.validNel(())
 
   implicit def toEntitiesDataset[TP <: Provenance, EP <: entities.Dataset.Provenance](implicit
-      convert:      entities.Dataset.Identification => TP => EP,
-      renkuBaseUrl: RenkuBaseUrl
+      convert:  entities.Dataset.Identification => TP => EP,
+      renkuUrl: RenkuUrl
   ): Dataset[TP] => entities.Dataset[EP] = { dataset: Dataset[TP] =>
     val identification = entities.Dataset.Identification(ResourceId((dataset: Dataset[Provenance]).asEntityId.show),
                                                          dataset.identification.identifier,
@@ -356,15 +356,15 @@ object Dataset {
   import io.renku.jsonld.syntax._
 
   implicit def encoder[P <: Provenance](implicit
-      renkuBaseUrl: RenkuBaseUrl,
+      renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl
   ): JsonLDEncoder[Dataset[P]] = JsonLDEncoder.instance(_.to[entities.Dataset[entities.Dataset.Provenance]].asJsonLD)
 
-  implicit def entityIdEncoder[P <: Provenance](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Dataset[P]] =
+  implicit def entityIdEncoder[P <: Provenance](implicit renkuUrl: RenkuUrl): EntityIdEncoder[Dataset[P]] =
     EntityIdEncoder.instance(dataset => entityId(dataset.identification.identifier))
 
-  def entityId(identifier: DatasetIdentifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
-    EntityId of (renkuBaseUrl / "datasets" / identifier)
+  def entityId(identifier: DatasetIdentifier)(implicit renkuUrl: RenkuUrl): EntityId =
+    EntityId of (renkuUrl / "datasets" / identifier)
 
   def imageEntityId(datasetEntityId: EntityId, position: ImagePosition): UrlfiedEntityId =
     datasetEntityId.asUrlEntityId / "images" / position.toString

@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
-import io.renku.graph.model.datasets.{DateCreated, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
+import io.renku.graph.model.datasets.{DateCreated, Description, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.persons
@@ -44,8 +44,8 @@ private trait UpdatesCreator {
       ev:                                    Dataset.Provenance.ImportedInternal.type
   ): List[SparqlQuery]
 
-  def prepareUpdates(dataset:              Dataset[Dataset.Provenance.ImportedInternal],
-                     maybeKGTopmostSameAs: Option[TopmostSameAs]
+  def prepareUpdates(dataset:                Dataset[Dataset.Provenance.ImportedInternal],
+                     maybeKGTopmostSameAses: Set[TopmostSameAs]
   ): List[SparqlQuery]
 
   def prepareTopmostSameAsCleanup(dataset:                  Dataset[Dataset.Provenance.ImportedInternal],
@@ -65,6 +65,8 @@ private trait UpdatesCreator {
   ): List[SparqlQuery]
 
   def removeOtherDateCreated(dataset: Dataset[Dataset.Provenance], dateCreatedInKG: Set[DateCreated]): List[SparqlQuery]
+
+  def removeOtherDescriptions(dataset: Dataset[Dataset.Provenance], descsInKG: Set[Description]): List[SparqlQuery]
 
   def removeOtherSameAs(dataset: Dataset[Dataset.Provenance], sameAsInKG: Set[SameAs]): List[SparqlQuery]
 }
@@ -86,14 +88,24 @@ private object UpdatesCreator extends UpdatesCreator {
   )(implicit ev: Dataset.Provenance.ImportedInternal.type): List[SparqlQuery] =
     List(useDeletedDSSameAsAsChildSameAs(dataset))
 
-  override def prepareUpdates(dataset:              Dataset[Provenance.ImportedInternal],
-                              maybeKGTopmostSameAs: Option[TopmostSameAs]
-  ): List[SparqlQuery] =
-    Option
-      .when(!(maybeKGTopmostSameAs contains dataset.provenance.topmostSameAs))(
-        prepareSameAsUpdate(dataset.resourceId, dataset.provenance.topmostSameAs)
+  override def prepareUpdates(dataset:                Dataset[Provenance.ImportedInternal],
+                              maybeKGTopmostSameAses: Set[TopmostSameAs]
+  ): List[SparqlQuery] = Option
+    .when(!(maybeKGTopmostSameAses equals Set(dataset.provenance.topmostSameAs)))(
+      SparqlQuery.of(
+        name = "transformation - topmostSameAs update",
+        Prefixes of (renku -> "renku", schema -> "schema"),
+        s"""|DELETE { ?dsId renku:topmostSameAs ?oldTopmost }
+            |INSERT { ?dsId renku:topmostSameAs <${dataset.provenance.topmostSameAs}> }
+            |WHERE {
+            |  ?dsId a schema:Dataset;
+            |        renku:topmostSameAs <${dataset.resourceId}>;
+            |        renku:topmostSameAs ?oldTopmost.
+            |}
+            |""".stripMargin
       )
-      .toList
+    )
+    .toList
 
   override def prepareTopmostSameAsCleanup(dataset:                  Dataset[Dataset.Provenance.ImportedInternal],
                                            maybeParentTopmostSameAs: Option[TopmostSameAs]
@@ -129,12 +141,11 @@ private object UpdatesCreator extends UpdatesCreator {
     SparqlQuery.of(
       name = "transformation - delete other derivedFrom",
       Prefixes of (prov -> "prov", schema -> "schema"),
-      s"""|DELETE {
-          |  ${dataset.resourceId.showAs[RdfResource]} prov:wasDerivedFrom ?derivedId
-          |}
+      s"""|DELETE { ?dsId prov:wasDerivedFrom ?derivedId }
           |WHERE {
-          |  ${dataset.resourceId.showAs[RdfResource]} a schema:Dataset;
-          |                                            prov:wasDerivedFrom ?derivedId.
+          |  BIND (${dataset.resourceId.showAs[RdfResource]} AS ?dsId)
+          |  ?dsId a schema:Dataset;
+          |        prov:wasDerivedFrom ?derivedId.
           |  ?derivedId schema:url ?derived. 
           |  FILTER (?derived != ${dataset.provenance.derivedFrom.showAs[RdfResource]})
           |}
@@ -148,12 +159,11 @@ private object UpdatesCreator extends UpdatesCreator {
     SparqlQuery.of(
       name = "transformation - delete other topmostDerivedFrom",
       Prefixes of (renku -> "renku", schema -> "schema"),
-      s"""|DELETE {
-          |  ${dataset.resourceId.showAs[RdfResource]} renku:topmostDerivedFrom ?topmostDerived
-          |}
+      s"""|DELETE { ?dsId renku:topmostDerivedFrom ?topmostDerived }
           |WHERE {
-          |  ${dataset.resourceId.showAs[RdfResource]} a schema:Dataset;
-          |                                            renku:topmostDerivedFrom ?topmostDerived.
+          |  BIND (${dataset.resourceId.showAs[RdfResource]} AS ?dsId)
+          |  ?dsId a schema:Dataset;
+          |        renku:topmostDerivedFrom ?topmostDerived.
           |  FILTER (?topmostDerived != ${dataset.provenance.topmostDerivedFrom.showAs[RdfResource]})
           |}
           |""".stripMargin
@@ -228,18 +238,6 @@ private object UpdatesCreator extends UpdatesCreator {
           |""".stripMargin
     )
 
-  private def prepareSameAsUpdate(oldTopmostSameAs: ResourceId, newTopmostSameAs: TopmostSameAs) = SparqlQuery.of(
-    name = "transformation - topmostSameAs update",
-    Prefixes.of(renku -> "renku", schema -> "schema"),
-    s"""|DELETE { ?dsId renku:topmostSameAs <$oldTopmostSameAs> }
-        |INSERT { ?dsId renku:topmostSameAs <$newTopmostSameAs> }
-        |WHERE {
-        |  ?dsId a schema:Dataset;
-        |        renku:topmostSameAs <$oldTopmostSameAs>.
-        |}
-        |""".stripMargin
-  )
-
   private def prepareTopmostSameAsCleanUp(dsId: ResourceId, modelTopmostSameAs: TopmostSameAs) = SparqlQuery.of(
     name = "transformation - topmostSameAs clean-up",
     Prefixes.of(renku -> "renku", schema -> "schema"),
@@ -256,20 +254,20 @@ private object UpdatesCreator extends UpdatesCreator {
 
   override def removeOtherOriginalIdentifiers(ds:                      Dataset[Provenance],
                                               originalIdentifiersInKG: Set[OriginalIdentifier]
-  ) =
-    Option
-      .when((originalIdentifiersInKG - ds.provenance.originalIdentifier).nonEmpty) {
-        SparqlQuery.of(
-          name = "transformation - originalIdentifier clean-up",
-          Prefixes of renku -> "renku",
-          s"""|DELETE { ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version }
-              |WHERE { 
-              |  ${ds.resourceId.showAs[RdfResource]} renku:originalIdentifier ?version.
-              |  FILTER ( ?version != '${ds.provenance.originalIdentifier}' )
-              |}""".stripMargin
-        )
-      }
-      .toList
+  ) = Option
+    .when((originalIdentifiersInKG - ds.provenance.originalIdentifier).nonEmpty) {
+      SparqlQuery.of(
+        name = "transformation - originalIdentifier clean-up",
+        Prefixes of renku -> "renku",
+        s"""|DELETE { ?dsId renku:originalIdentifier ?origIdentifier }
+            |WHERE {
+            |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+            |  ?dsId renku:originalIdentifier ?origIdentifier.
+            |  FILTER ( ?origIdentifier != '${ds.provenance.originalIdentifier}' )
+            |}""".stripMargin
+      )
+    }
+    .toList
 
   override def removeOtherDateCreated(ds:              Dataset[Dataset.Provenance],
                                       dateCreatedInKG: Set[DateCreated]
@@ -290,6 +288,36 @@ private object UpdatesCreator extends UpdatesCreator {
       )
     }
     .toList
+
+  def removeOtherDescriptions(ds: Dataset[Dataset.Provenance], descsInKG: Set[Description]): List[SparqlQuery] =
+    ds.additionalInfo.maybeDescription match {
+      case Some(desc) if (descsInKG - desc).nonEmpty =>
+        List(
+          SparqlQuery.of(
+            name = "transformation - ds desc clean-up",
+            Prefixes of schema -> "schema",
+            s"""|DELETE { ?dsId schema:description ?desc }
+                |WHERE {
+                |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+                |  ?dsId schema:description ?desc.
+                |  FILTER ( ?desc != '$desc' )
+                |}""".stripMargin
+          )
+        )
+      case None if descsInKG.nonEmpty =>
+        List(
+          SparqlQuery.of(
+            name = "transformation - ds desc remove",
+            Prefixes of schema -> "schema",
+            s"""|DELETE { ?dsId schema:description ?desc }
+                |WHERE {
+                |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
+                |  ?dsId schema:description ?desc.
+                |}""".stripMargin
+          )
+        )
+      case _ => List.empty
+    }
 
   override def removeOtherSameAs(ds: Dataset[Dataset.Provenance], sameAsInKG: Set[SameAs]): List[SparqlQuery] = {
     val maybeSameAs = {

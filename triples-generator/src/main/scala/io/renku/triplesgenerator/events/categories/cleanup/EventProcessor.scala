@@ -32,30 +32,24 @@ private trait EventProcessor[F[_]] {
   def process(project: Project): F[Unit]
 }
 
-private class CleanUpEventProcessorImpl[F[_]: Async: Logger](triplesRemover: ProjectTriplesRemover[F],
-                                                             statusUpdater: EventStatusUpdater[F]
+private class EventProcessorImpl[F[_]: Async: Logger](triplesRemover: ProjectTriplesRemover[F],
+                                                      statusUpdater: EventStatusUpdater[F]
 ) extends EventProcessor[F] {
 
   import triplesRemover._
 
-  override def process(project: Project): F[Unit] = for {
-    _ <- removeTriples(of = project.path) recoverWith logErrorAndThrow(project, " failed")
-    _ <- statusUpdater.projectToNew(project) recoverWith logErrorAndThrow(project, ", event log notification failed")
-  } yield ()
+  override def process(project: Project): F[Unit] =
+    (removeTriples(of = project.path) >> statusUpdater.projectToNew(project))
+      .recoverWith(logError(project))
 
-  private def logErrorAndThrow(project: Project, message: String): PartialFunction[Throwable, F[Unit]] = {
-    case NonFatal(error) =>
-      Logger[F].error(error)(s"${commonLogMessage(project)} - Triples removal$message ${error.getMessage}") >> error
-        .raiseError[F, Unit]
+  private def logError(project: Project): PartialFunction[Throwable, F[Unit]] = { case NonFatal(error) =>
+    Logger[F].error(error)(show"$categoryName: $project - triples removal failed ${error.getMessage}")
   }
-
-  private def commonLogMessage(project: Project): String =
-    s"$categoryName: ${project.show}"
 }
 
-private object CleanUpEventProcessor {
+private object EventProcessor {
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[EventProcessor[F]] = for {
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     triplesRemover     <- ProjectTriplesRemover[F]()
-  } yield new CleanUpEventProcessorImpl[F](triplesRemover, eventStatusUpdater)
+  } yield new EventProcessorImpl[F](triplesRemover, eventStatusUpdater)
 }

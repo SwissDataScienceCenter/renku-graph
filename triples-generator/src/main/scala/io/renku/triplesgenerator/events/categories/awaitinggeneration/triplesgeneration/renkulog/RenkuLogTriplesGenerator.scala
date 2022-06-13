@@ -24,8 +24,8 @@ import cats.data.EitherT._
 import cats.effect.Async
 import cats.effect.implicits._
 import cats.syntax.all._
-import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
-import io.renku.graph.model.{RenkuBaseUrl, entities, projects}
+import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
+import io.renku.graph.model.{RenkuUrl, entities, projects}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.{JsonLD, Property}
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
@@ -38,12 +38,12 @@ import java.security.SecureRandom
 import scala.util.control.NonFatal
 
 private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[renkulog] (
-    gitRepoUrlFinder:    GitLabRepoUrlFinder[F],
-    renku:               Commands.Renku[F],
-    file:                Commands.File[F],
-    git:                 Commands.Git[F],
-    randomLong:          () => Long
-)(implicit renkuBaseUrl: RenkuBaseUrl)
+    gitRepoUrlFinder: GitLabRepoUrlFinder[F],
+    renku:            Commands.Renku[F],
+    file:             Commands.File[F],
+    git:              Commands.Git[F],
+    randomLong:       () => Long
+)(implicit renkuUrl:  RenkuUrl)
     extends TriplesGenerator[F] {
 
   import ammonite.ops.{Path, root}
@@ -164,10 +164,10 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator[F[_]: Async] private[
 private[events] object RenkuLogTriplesGenerator {
 
   def apply[F[_]: Async: Logger](): F[TriplesGenerator[F]] = for {
-    gitLabUrl    <- GitLabUrlLoader[F]()
-    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
+    gitLabUrl <- GitLabUrlLoader[F]()
+    renkuUrl  <- RenkuUrlLoader[F]()
   } yield {
-    implicit val baseUrl: RenkuBaseUrl = renkuBaseUrl
+    implicit val baseUrl: RenkuUrl = renkuUrl
     new RenkuLogTriplesGenerator(
       new GitLabRepoUrlFinderImpl[F](gitLabUrl),
       Commands.Renku[F],

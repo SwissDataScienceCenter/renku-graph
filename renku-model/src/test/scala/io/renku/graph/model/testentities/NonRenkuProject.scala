@@ -55,15 +55,13 @@ object NonRenkuProject {
     override type ProjectType = NonRenkuProject.WithParent
   }
 
-  implicit def toEntitiesNonRenkuProject(implicit
-      renkuBaseUrl: RenkuBaseUrl
-  ): NonRenkuProject => entities.NonRenkuProject = {
-    case p: NonRenkuProject.WithParent    => toEntitiesNonRenkuProjectWithParent(renkuBaseUrl)(p)
-    case p: NonRenkuProject.WithoutParent => toEntitiesNonRenkuProjectWithoutParent(renkuBaseUrl)(p)
+  implicit def toEntitiesNonRenkuProject(implicit renkuUrl: RenkuUrl): NonRenkuProject => entities.NonRenkuProject = {
+    case p: NonRenkuProject.WithParent    => toEntitiesNonRenkuProjectWithParent(renkuUrl)(p)
+    case p: NonRenkuProject.WithoutParent => toEntitiesNonRenkuProjectWithoutParent(renkuUrl)(p)
   }
 
   implicit def toEntitiesNonRenkuProjectWithoutParent(implicit
-      renkuBaseUrl: RenkuBaseUrl
+      renkuUrl: RenkuUrl
   ): NonRenkuProject.WithoutParent => entities.NonRenkuProject.WithoutParent =
     project =>
       entities.NonRenkuProject.WithoutParent(
@@ -79,7 +77,7 @@ object NonRenkuProject {
       )
 
   implicit def toEntitiesNonRenkuProjectWithParent(implicit
-      renkuBaseUrl: RenkuBaseUrl
+      renkuUrl: RenkuUrl
   ): NonRenkuProject.WithParent => entities.NonRenkuProject.WithParent =
     project =>
       entities.NonRenkuProject.WithParent(
@@ -96,7 +94,7 @@ object NonRenkuProject {
       )
 
   implicit def encoder[P <: NonRenkuProject](implicit
-      renkuBaseUrl: RenkuBaseUrl,
+      renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
     case project: NonRenkuProject.WithParent    => project.to[entities.NonRenkuProject.WithParent].asJsonLD

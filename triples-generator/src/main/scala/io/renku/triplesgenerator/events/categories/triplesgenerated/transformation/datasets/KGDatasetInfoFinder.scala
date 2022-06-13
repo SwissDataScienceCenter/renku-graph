@@ -21,8 +21,7 @@ package io.renku.triplesgenerator.events.categories.triplesgenerated.transformat
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
-import io.circe.Decoder.decodeList
-import io.renku.graph.model.datasets.{DateCreated, InternalSameAs, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
+import io.renku.graph.model.datasets.{DateCreated, Description, InternalSameAs, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.persons
 import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery.Prefixes
@@ -31,10 +30,11 @@ import org.typelevel.log4cats.Logger
 
 private trait KGDatasetInfoFinder[F[_]] {
   def findParentTopmostSameAs(idSameAs: InternalSameAs)(implicit ev: InternalSameAs.type): F[Option[TopmostSameAs]]
-  def findTopmostSameAs(resourceId:     ResourceId)(implicit ev:     ResourceId.type):     F[Option[TopmostSameAs]]
+  def findTopmostSameAs(resourceId:     ResourceId)(implicit ev:     ResourceId.type):     F[Set[TopmostSameAs]]
   def findDatasetCreators(resourceId:   ResourceId): F[Set[persons.ResourceId]]
   def findDatasetOriginalIdentifiers(resourceId: ResourceId): F[Set[OriginalIdentifier]]
   def findDatasetDateCreated(resourceId:         ResourceId): F[Set[DateCreated]]
+  def findDatasetDescriptions(resourceId:        ResourceId): F[Set[Description]]
   def findDatasetSameAs(resourceId:              ResourceId): F[Set[SameAs]]
 }
 
@@ -50,9 +50,23 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
 
   override def findParentTopmostSameAs(sameAs: InternalSameAs)(implicit
       ev:                                      InternalSameAs.type
-  ): F[Option[TopmostSameAs]] =
-    queryExpecting[Set[TopmostSameAs]](using = queryFindingSameAs(sameAs.value))
-      .flatMap(toOption[TopmostSameAs, InternalSameAs](sameAs))
+  ): F[Option[TopmostSameAs]] = {
+    implicit val decoder: Decoder[Option[TopmostSameAs]] = ResultsDecoder[Option, TopmostSameAs] { implicit cur =>
+      extract[TopmostSameAs]("topmostSameAs")
+    }(toOption(onMultiple = show"More than one topmostSameAs found for dataset ${sameAs.show}"))
+
+    queryExpecting[Option[TopmostSameAs]](using = queryFindingSameAs(sameAs.value))
+  }
+
+  override def findTopmostSameAs(resourceId: ResourceId)(implicit
+      ev:                                    ResourceId.type
+  ): F[Set[TopmostSameAs]] = {
+    implicit val decoder: Decoder[Set[TopmostSameAs]] = ResultsDecoder[Set, TopmostSameAs] { implicit cur =>
+      extract[TopmostSameAs]("topmostSameAs")
+    }
+
+    queryExpecting[Set[TopmostSameAs]](using = queryFindingSameAs(resourceId.value))
+  }
 
   private def queryFindingSameAs(resourceId: String) = SparqlQuery.of(
     name = "transformation - find topmostSameAs",
@@ -65,33 +79,12 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
         |""".stripMargin
   )
 
-  override def findTopmostSameAs(resourceId: ResourceId)(implicit
-      ev:                                    ResourceId.type
-  ): F[Option[TopmostSameAs]] =
-    queryExpecting[Set[TopmostSameAs]](using = queryFindingSameAs(resourceId.value))
-      .flatMap(toOption[TopmostSameAs, ResourceId](resourceId))
-
-  private implicit val topmostSameAsDecoder: Decoder[Set[TopmostSameAs]] = {
-    val topmostSameAs: Decoder[Option[TopmostSameAs]] =
-      _.downField("topmostSameAs").downField("value").as[Option[TopmostSameAs]]
-    _.downField("results").downField("bindings").as(decodeList(topmostSameAs)).map(_.flatten.toSet)
-  }
-
-  private def toOption[T, ID](id: ID)(implicit entityTypeInfo: ID => String): Set[T] => F[Option[T]] = {
-    case set if set.isEmpty   => Option.empty[T].pure[F]
-    case set if set.size == 1 => set.headOption.pure[F]
-    case _ => new Exception(s"More than one ${entityTypeInfo(id)} found for dataset $id").raiseError[F, Option[T]]
-  }
-
-  private implicit val topmostSameAsInfo: SameAs => String     = _ => "topmostSameAs"
-  private implicit val resourceIdInfo:    ResourceId => String = _ => "resourceId"
-
   override def findDatasetCreators(resourceId: ResourceId): F[Set[persons.ResourceId]] = {
-    implicit val creatorsDecoder: Decoder[List[persons.ResourceId]] = ResultsDecoder[List, persons.ResourceId] {
+    implicit val creatorsDecoder: Decoder[Set[persons.ResourceId]] = ResultsDecoder[Set, persons.ResourceId] {
       implicit cur => extract[persons.ResourceId]("personId")
     }
 
-    queryExpecting[List[persons.ResourceId]] {
+    queryExpecting[Set[persons.ResourceId]] {
       SparqlQuery.of(
         name = "transformation - find ds creators",
         Prefixes of schema -> "schema",
@@ -102,14 +95,14 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
             |}
             |""".stripMargin
       )
-    }.map(_.toSet)
+    }
   }
 
   override def findDatasetOriginalIdentifiers(resourceId: ResourceId): F[Set[OriginalIdentifier]] = {
-    implicit val decoder: Decoder[List[OriginalIdentifier]] = ResultsDecoder[List, OriginalIdentifier] {
+    implicit val decoder: Decoder[Set[OriginalIdentifier]] = ResultsDecoder[Set, OriginalIdentifier] {
       implicit cursor => extract("originalId")
     }
-    queryExpecting[List[OriginalIdentifier]] {
+    queryExpecting[Set[OriginalIdentifier]] {
       SparqlQuery.of(
         name = "transformation - find ds originalIdentifiers",
         Prefixes of (renku -> "renku", schema -> "schema"),
@@ -120,14 +113,14 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
             |}
             |""".stripMargin
       )
-    }.map(_.toSet)
+    }
   }
 
   def findDatasetDateCreated(resourceId: ResourceId): F[Set[DateCreated]] = {
-    implicit val decoder: Decoder[List[DateCreated]] = ResultsDecoder[List, DateCreated] { implicit cursor =>
+    implicit val decoder: Decoder[Set[DateCreated]] = ResultsDecoder[Set, DateCreated] { implicit cursor =>
       extract("date")
     }
-    queryExpecting[List[DateCreated]] {
+    queryExpecting[Set[DateCreated]] {
       SparqlQuery.of(
         name = "transformation - find ds originalIdentifiers",
         Prefixes of schema -> "schema",
@@ -138,14 +131,32 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
             |}
             |""".stripMargin
       )
-    }.map(_.toSet)
+    }
+  }
+
+  override def findDatasetDescriptions(resourceId: ResourceId): F[Set[Description]] = {
+    implicit val decoder: Decoder[Set[Description]] = ResultsDecoder[Set, Description] { implicit cursor =>
+      extract("desc")
+    }
+    queryExpecting[Set[Description]] {
+      SparqlQuery.of(
+        name = "transformation - find ds descriptions",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?desc
+            |WHERE {
+            |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
+            |                                    schema:description ?desc.
+            |}
+            |""".stripMargin
+      )
+    }
   }
 
   override def findDatasetSameAs(resourceId: ResourceId): F[Set[SameAs]] = {
-    implicit val decoder: Decoder[List[SameAs]] = ResultsDecoder[List, SameAs] { implicit cursor =>
+    implicit val decoder: Decoder[Set[SameAs]] = ResultsDecoder[Set, SameAs] { implicit cursor =>
       extract("sameAs")
     }
-    queryExpecting[List[SameAs]] {
+    queryExpecting[Set[SameAs]] {
       SparqlQuery.of(
         name = "transformation - find ds sameAs",
         Prefixes of schema -> "schema",
@@ -156,7 +167,7 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
             |}
             |""".stripMargin
       )
-    }.map(_.toSet)
+    }
   }
 }
 

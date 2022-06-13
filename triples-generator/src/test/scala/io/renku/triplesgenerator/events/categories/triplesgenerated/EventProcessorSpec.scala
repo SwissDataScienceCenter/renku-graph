@@ -361,7 +361,7 @@ class EventProcessorSpec
       logger.loggedOnly(
         Error(
           message =
-            s"$categoryName: Triples Generated Event processing failure: ${triplesGeneratedEvent.compoundEventId}, projectPath: ${triplesGeneratedEvent.project.path}",
+            s"$categoryName: Triples Generated Event processing failure: ${triplesGeneratedEvent.compoundEventId}, projectPath = ${triplesGeneratedEvent.project.path}",
           throwableMatcher = NotRefEqual(new Exception("transformation failure -> Event rolled back", exception))
         )
       )
@@ -457,6 +457,6 @@ class EventProcessorSpec
       logger.logged(Error(s"${commonLogMessage(event)} $message", NotRefEqual(exception)))
 
     def commonLogMessage(event: TriplesGeneratedEvent): String =
-      s"$categoryName: ${event.compoundEventId}, projectPath: ${event.project.path}"
+      s"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.path}"
   }
 }

@@ -239,7 +239,7 @@ class EdgesFinderSpec
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
       TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
-    val edgesFinder = new EdgesFinderImpl[IO](rdfStoreConfig, renkuBaseUrl)
+    val edgesFinder = new EdgesFinderImpl[IO](rdfStoreConfig, renkuUrl)
   }
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {

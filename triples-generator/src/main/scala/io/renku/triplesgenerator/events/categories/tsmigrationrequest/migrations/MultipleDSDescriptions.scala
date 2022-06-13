@@ -16,39 +16,45 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsmigrationrequest
-package migrations
+package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations
 
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.{prov, renku, schema}
+import io.renku.graph.model.Schemas.schema
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesgenerator.events.categories.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
-import tooling.{CleanUpEventsProducer, QueryBasedMigration}
+import tooling.UpdateQueryMigration
 
-private object MultipleTopmostDerivedFromOnly {
+private object MultipleDSDescriptions {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder: MetricsRegistry]: F[Migration[F]] =
-    QueryBasedMigration[F](name, query, CleanUpEventsProducer).widen
+    UpdateQueryMigration[F](name, query).widen
 
-  private lazy val name = Migration.Name("Multiple topmostDerivedFrom on Modified DS only")
+  private lazy val name = Migration.Name("Multiple Descriptions on DS")
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,
-    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?path
+    Prefixes of schema -> "schema",
+    s"""|DELETE { ?dsId schema:description ?desc }
         |WHERE {
-        |  ?dsId a schema:Dataset;
-        |        renku:topmostDerivedFrom ?top.
-        |  FILTER EXISTS { ?dsId prov:wasDerivedFrom ?d }
-        |  ?proj renku:hasDataset ?dsId;
-        |        renku:projectPath ?path.
+        |  SELECT ?dsId ?desc
+        |  WHERE {
+        |    {
+        |      SELECT ?dsId (SAMPLE(?desc) as ?someDesc)
+        |      WHERE {
+        |        ?dsId a schema:Dataset;
+        |              schema:description ?desc.
+        |      }
+        |      GROUP BY ?dsId
+        |      HAVING (COUNT(?desc) > 1)
+        |    }
+        |    ?dsId schema:description ?desc.
+        |    FILTER ( ?desc != ?someDesc )
+        |  }
         |}
-        |GROUP BY ?dsId ?path
-        |HAVING (COUNT(?top) > 1)
-        |ORDER BY ?path
         |""".stripMargin
   )
 }

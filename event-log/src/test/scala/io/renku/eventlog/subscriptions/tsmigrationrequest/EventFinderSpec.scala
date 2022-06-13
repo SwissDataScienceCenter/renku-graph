@@ -59,7 +59,7 @@ class EventFinderSpec
         insertSubscriptionRecord(url, version, New, changeDate)
 
         finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
-        findRows(url, version)            shouldBe MigrationStatus.Sent -> ChangeDate(now)
+        findRow(url, version)             shouldBe MigrationStatus.Sent -> ChangeDate(now)
 
         finder.popEvent().unsafeRunSync() shouldBe None
       }
@@ -185,12 +185,18 @@ class EventFinderSpec
       "and there's one with Sent for more than an hour" in new TestCase {
 
         override val changeDate = more(than = anHour)
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, New, dateAfter(changeDate))
+        val newUrl              = subscriberUrls.generateOne
+        val newUrlDate          = dateAfter(changeDate)
+        insertSubscriptionRecord(newUrl, version, New, newUrlDate)
         insertSubscriptionRecord(url, version, Sent, changeDate)
 
+        findRows(version) shouldBe Set((newUrl, New, newUrlDate), (url, Sent, changeDate))
+
         finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
+        findRows(version)                 shouldBe Set((newUrl, New, newUrlDate), (url, Sent, ChangeDate(now)))
 
         finder.popEvent().unsafeRunSync() shouldBe None
+        findRows(version)                 shouldBe Set((newUrl, New, newUrlDate), (url, Sent, ChangeDate(now)))
       }
 
     "return no Event " +
@@ -210,13 +216,68 @@ class EventFinderSpec
       "one in Sent for more than an hour " +
       "but also one in RecoverableFailure for more than 2 mins" in new TestCase {
 
-        insertSubscriptionRecord(url, version, Sent, more(than = anHour))
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, RecoverableFailure, more(than = twoMins))
-        insertSubscriptionRecord(subscriberUrls.generateOne, version, New, changeDate)
+        val sentUrlDate = more(than = anHour)
+        insertSubscriptionRecord(url, version, Sent, sentUrlDate)
+        val failedUrl     = subscriberUrls.generateOne
+        val failedUrlDate = more(than = twoMins)
+        insertSubscriptionRecord(failedUrl, version, RecoverableFailure, failedUrlDate)
+        val newUrl = subscriberUrls.generateOne
+        insertSubscriptionRecord(newUrl, version, New, changeDate)
+
+        findRows(version) shouldBe Set(
+          (url, Sent, sentUrlDate),
+          (failedUrl, RecoverableFailure, failedUrlDate),
+          (newUrl, New, changeDate)
+        )
 
         finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
+        findRows(version) shouldBe Set(
+          (url, Sent, ChangeDate(now)),
+          (failedUrl, RecoverableFailure, failedUrlDate),
+          (newUrl, New, changeDate)
+        )
 
         finder.popEvent().unsafeRunSync() shouldBe None
+        findRows(version) shouldBe Set(
+          (url, Sent, ChangeDate(now)),
+          (failedUrl, RecoverableFailure, failedUrlDate),
+          (newUrl, New, changeDate)
+        )
+      }
+
+    "return Migration Request Event for the most recent version row with Sent " +
+      "- case when there are multiple rows for the same version " +
+      "one in Sent for more than an hour " +
+      "but also one in RecoverableFailure older than the one in Sent" in new TestCase {
+
+        val sentUrlDate = more(than = anHour)
+        insertSubscriptionRecord(url, version, Sent, sentUrlDate)
+        val failedUrl     = subscriberUrls.generateOne
+        val failedUrlDate = dateBefore(sentUrlDate)
+        insertSubscriptionRecord(failedUrl, version, RecoverableFailure, failedUrlDate)
+        val newUrl  = subscriberUrls.generateOne
+        val newDate = dateBefore(failedUrlDate)
+        insertSubscriptionRecord(newUrl, version, New, newDate)
+
+        findRows(version) shouldBe Set(
+          (url, Sent, sentUrlDate),
+          (failedUrl, RecoverableFailure, failedUrlDate),
+          (newUrl, New, newDate)
+        )
+
+        finder.popEvent().unsafeRunSync() shouldBe MigrationRequestEvent(url, version).some
+        findRows(version) shouldBe Set(
+          (url, Sent, ChangeDate(now)),
+          (failedUrl, RecoverableFailure, failedUrlDate),
+          (newUrl, New, newDate)
+        )
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+        findRows(version) shouldBe Set(
+          (url, Sent, ChangeDate(now)),
+          (failedUrl, RecoverableFailure, failedUrlDate),
+          (newUrl, New, newDate)
+        )
       }
 
     "return no Event " +
@@ -245,7 +306,7 @@ class EventFinderSpec
             be(false -> true) or be(true -> false)
           }
 
-          Set(url1, url2).map(findRows(_, version)._1) shouldBe Set(New, Sent)
+          Set(url1, url2).map(findRow(_, version)._1) shouldBe Set(New, Sent)
 
           prepareDbForTest()
         }

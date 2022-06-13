@@ -25,8 +25,8 @@ import eu.timepit.refined.auto._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.renkuBaseUrls
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.GraphModelGenerators.renkuUrls
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
@@ -151,7 +151,7 @@ class ReProvisioningStatusSpec
     val statusRefreshInterval = 1 second
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    private implicit val renkuBaseUrl: RenkuBaseUrl                = renkuBaseUrls.generateOne
+    private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
     private val statusCacheCheckTimeRef = Ref.unsafe[IO, Long](0L)
     private val subscriptions           = List(mock[SubscriptionMechanism[IO]], mock[SubscriptionMechanism[IO]])
     val reProvisioningStatus = new ReProvisioningStatusImpl[IO](subscriptions,

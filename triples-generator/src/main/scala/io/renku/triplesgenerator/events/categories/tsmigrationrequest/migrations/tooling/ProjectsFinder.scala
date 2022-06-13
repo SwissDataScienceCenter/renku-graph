@@ -25,6 +25,8 @@ import io.renku.graph.model.projects
 import io.renku.rdfstore._
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration._
+
 private trait ProjectsFinder[F[_]] {
   def findProjects(): F[List[projects.Path]]
 }
@@ -36,7 +38,10 @@ private object ProjectsFinder {
 
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](query: SparqlQuery,
                                                                                rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl[F](rdfStoreConfig)
+) extends RdfStoreClientImpl[F](rdfStoreConfig,
+                                idleTimeoutOverride = (16 minutes).some,
+                                requestTimeoutOverride = (15 minutes).some
+    )
     with ProjectsFinder[F] {
 
   override def findProjects(): F[List[projects.Path]] = queryExpecting[List[projects.Path]](query)

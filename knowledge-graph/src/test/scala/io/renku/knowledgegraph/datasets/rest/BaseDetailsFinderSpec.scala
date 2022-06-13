@@ -24,7 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets.ResourceId
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{RenkuBaseUrl, datasets, testentities}
+import io.renku.graph.model.{RenkuUrl, datasets, testentities}
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.datasets.model
 import io.renku.tinytypes.json.TinyTypeEncoders
@@ -101,7 +101,7 @@ class BaseDetailsFinderSpec
   private def nonModifiedToResultSet(project:     testentities.RenkuProject,
                                      dataset:     testentities.Dataset[testentities.Dataset.Provenance.NonModified],
                                      description: String
-  )(implicit renkuBaseUrl:                        RenkuBaseUrl) = {
+  )(implicit renkuUrl:                            RenkuUrl) = {
     val binding = json"""{
       "datasetId":      {"value": ${ResourceId(dataset.asEntityId.show)}},
       "identifier":     {"value": ${dataset.identifier}},

@@ -39,7 +39,7 @@ spec:
                   key: client-certificate
             - name: RENKU_DOMAIN
               value: {{ .Values.global.renku.domain }}
-            - name: RENKU_BASE_URL
+            - name: RENKU_URL
               value: https://{{ .Values.global.renku.domain }}
             - name: EVENT_LOG_BASE_URL
               value: "http://{{ template "eventLog.fullname" . }}:{{ .Values.eventLog.service.port }}"

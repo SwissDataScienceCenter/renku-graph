@@ -31,9 +31,9 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.{projectIds, renkuBaseUrls}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, renkuUrls}
 import io.renku.graph.model.events.{CommitId, EventId}
-import io.renku.graph.model.{RenkuBaseUrl, entities, projects}
+import io.renku.graph.model.{RenkuUrl, entities, projects}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, Property}
@@ -854,7 +854,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
 
   private trait TestCase {
     implicit lazy val maybeAccessToken: Option[AccessToken] = Gen.option(accessTokens).generateOne
-    implicit lazy val renkuBaseUrl:     RenkuBaseUrl        = renkuBaseUrls.generateOne
+    implicit lazy val renkuUrl:         RenkuUrl            = renkuUrls.generateOne
     lazy val repositoryName = nonEmptyStrings().generateOne
     lazy val projectPath    = projects.Path(s"user/$repositoryName")
     lazy val gitRepositoryUrl = serviceUrls.generateOne / maybeAccessToken
@@ -887,5 +887,5 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
   }
 
   private def commonLogMessage(event: CommitEvent): String =
-    s"$categoryName: Commit Event ${event.compoundEventId}, ${event.project.path}"
+    s"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.path}"
 }

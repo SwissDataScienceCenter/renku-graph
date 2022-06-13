@@ -46,7 +46,7 @@ trait ProjectEndpoint[F[_]] {
 
 class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
     projectFinder:         ProjectFinder[F],
-    renkuResourcesUrl:     renku.ResourcesUrl,
+    renkuApiUrl:           renku.ApiUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
     with ProjectEndpoint[F] {
@@ -97,8 +97,8 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
       "permissions":${project.permissions},
       "statistics": ${project.statistics}
     }""" deepMerge _links(
-      Link(Rel.Self        -> ProjectEndpoint.href(renkuResourcesUrl, project.path)),
-      Link(Rel("datasets") -> ProjectDatasetsEndpoint.href(renkuResourcesUrl, project.path))
+      Link(Rel.Self        -> ProjectEndpoint.href(renkuApiUrl, project.path)),
+      Link(Rel("datasets") -> ProjectDatasetsEndpoint.href(renkuApiUrl, project.path))
     ).addIfDefined("description" -> project.maybeDescription)
       .addIfDefined("version" -> project.maybeVersion)
   }
@@ -176,7 +176,7 @@ object ProjectEndpoint {
       gitLabClient: GitLabClient[F]
   ): F[ProjectEndpoint[F]] = for {
     projectFinder         <- ProjectFinder[F](gitLabClient)
-    renkuResourceUrl      <- renku.ResourcesUrl[F]()
+    renkuResourceUrl      <- renku.ApiUrl[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
   } yield new ProjectEndpointImpl[F](
     projectFinder,
@@ -184,6 +184,6 @@ object ProjectEndpoint {
     executionTimeRecorder
   )
 
-  def href(renkuResourcesUrl: renku.ResourcesUrl, projectPath: projects.Path): Href =
-    Href(renkuResourcesUrl / "projects" / projectPath)
+  def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
+    Href(renkuApiUrl / "projects" / projectPath)
 }

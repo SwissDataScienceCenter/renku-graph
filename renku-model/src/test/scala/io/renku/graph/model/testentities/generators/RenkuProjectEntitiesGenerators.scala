@@ -30,7 +30,7 @@ import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects.{ForksCount, Visibility}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{ActivityGenFactory, DatasetGenFactory}
-import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.graph.model.{RenkuUrl, projects}
 import org.scalacheck.Gen
 
 import java.time.Instant
@@ -147,7 +147,7 @@ trait RenkuProjectEntitiesGenerators {
   }
 
   implicit class RenkuProjectGenFactoryOps[FC <: ForksCount](projectGen: Gen[RenkuProject])(implicit
-      renkuBaseUrl:                                                      RenkuBaseUrl
+      renkuUrl:                                                          RenkuUrl
   ) {
 
     def withDatasets[P <: Dataset.Provenance](factories: DatasetGenFactory[P]*): Gen[RenkuProject] = for {
@@ -212,7 +212,7 @@ trait RenkuProjectEntitiesGenerators {
     def forkOnce(): Gen[(RenkuProject, RenkuProject.WithParent)] = projectGen.map(_.forkOnce())
   }
 
-  implicit class DatasetAndProjectOps[T](tupleGen: Gen[(T, RenkuProject)])(implicit renkuBaseUrl: RenkuBaseUrl) {
+  implicit class DatasetAndProjectOps[T](tupleGen: Gen[(T, RenkuProject)])(implicit renkuUrl: RenkuUrl) {
 
     def addDataset[P <: Dataset.Provenance](
         factory: DatasetGenFactory[P]

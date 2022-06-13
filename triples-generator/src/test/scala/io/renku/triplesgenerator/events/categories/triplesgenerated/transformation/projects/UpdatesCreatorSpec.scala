@@ -18,48 +18,42 @@
 
 package io.renku.triplesgenerator.events.categories.triplesgenerated.transformation.projects
 
+import TestDataTools._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
+import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
 import io.renku.rdfstore.InMemoryRdfStore
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryRdfStore
     with should.Matchers
-    with TableDrivenPropertyChecks {
+    with TableDrivenPropertyChecks
+    with ScalaCheckPropertyChecks {
   import UpdatesCreator._
 
   "prepareUpdates" should {
-    "generate queries which deletes the project name when changed" in {
+    "generate queries which delete the project name when changed" in {
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
       loadToStore(project)
 
-      val kgProjectInfo =
-        (projectNames.generateOne, project.maybeParent, project.visibility, project.maybeDescription, project.keywords)
+      prepareUpdates(project, toProjectMutableData(project).copy(name = projectNames.generateOne)).runAll
+        .unsafeRunSync()
 
-      val queries = prepareUpdates(project, kgProjectInfo)
-
-      queries.runAll.unsafeRunSync()
-
-      findProjects shouldBe Set(
-        (None,
-         project.maybeParent.map(_.value),
-         project.visibility.value.some,
-         project.maybeDescription.map(_.value),
-         project.keywords.map(_.value)
-        )
-      )
+      findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeName = None))
     }
 
     val projectWithParentScenarios = Table(
@@ -75,48 +69,37 @@ class UpdatesCreatorSpec
 
         loadToStore(project)
 
-        val kgProjectInfo =
-          (project.name,
-           projectResourceIds.generateSome,
-           project.visibility,
-           project.maybeDescription,
-           project.keywords
-          )
+        val kgProjectInfo = toProjectMutableData(project).copy(maybeParentId = projectResourceIds.generateSome)
 
-        val queries = prepareUpdates(project, kgProjectInfo)
+        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
 
-        queries.runAll.unsafeRunSync()
-
-        findProjects shouldBe Set(
-          (project.name.value.some,
-           None,
-           project.visibility.value.some,
-           project.maybeDescription.map(_.value),
-           project.keywords.map(_.value)
-          )
-        )
+        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = None))
       }
     }
 
-    forAll(projectWithParentScenarios) { case (project, projectType) =>
+    val projectWithoutParentScenarios = Table(
+      "project" -> "type",
+      renkuProjectEntities(anyVisibility).generateOne.to[entities.RenkuProject.WithoutParent] ->
+        "renku project",
+      nonRenkuProjectEntities(anyVisibility).generateOne.to[entities.NonRenkuProject.WithoutParent] ->
+        "non-renku project"
+    )
+
+    forAll(projectWithoutParentScenarios) { case (project, projectType) =>
       s"generate queries which deletes the $projectType's derivedFrom when removed" in {
 
         loadToStore(project)
 
-        val kgProjectInfo = (project.name, None, project.visibility, project.maybeDescription, project.keywords)
+        val parentId = projectResourceIds.generateOne
+        loadToStore(JsonLD.edge(project.resourceId.asEntityId, prov / "wasDerivedFrom", parentId.asEntityId))
 
-        val queries = prepareUpdates(project, kgProjectInfo)
+        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = parentId.show.some))
 
-        queries.runAll.unsafeRunSync()
+        val kgProjectInfo = toProjectMutableData(project).copy(maybeParentId = parentId.some)
 
-        findProjects shouldBe Set(
-          (project.name.value.some,
-           None,
-           project.visibility.value.some,
-           project.maybeDescription.map(_.value),
-           project.keywords.map(_.value)
-          )
-        )
+        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+
+        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = None))
       }
     }
 
@@ -125,147 +108,136 @@ class UpdatesCreatorSpec
 
         loadToStore(project)
 
-        val kgProjectInfo =
-          (project.name, project.maybeParent, project.visibility, project.maybeDescription, project.keywords)
+        prepareUpdates(project, toProjectMutableData(project)).runAll.unsafeRunSync()
 
-        val queries = prepareUpdates(project, kgProjectInfo)
-
-        queries.runAll.unsafeRunSync()
-
-        findProjects shouldBe Set(
-          (project.name.value.some,
-           project.maybeParent.map(_.value),
-           project.visibility.value.some,
-           project.maybeDescription.map(_.value),
-           project.keywords.map(_.value)
-          )
-        )
+        findProjects shouldBe Set(CurrentProjectState.from(project))
       }
     }
 
     "generate queries which deletes the project visibility when changed" in {
       val project = anyProjectEntities.generateOne.to[entities.Project]
-      val kgProjectInfo = (project.name,
-                           project.maybeParent,
-                           Gen.oneOf(projects.Visibility.all.filterNot(_ == project.visibility)).generateOne,
-                           project.maybeDescription,
-                           project.keywords
-      )
+      val kgProjectInfo = toProjectMutableData(project)
+        .copy(visibility = Gen.oneOf(projects.Visibility.all.filterNot(_ == project.visibility)).generateOne)
 
       loadToStore(project)
 
-      val queries = prepareUpdates(project, kgProjectInfo)
+      prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
 
-      queries.runAll.unsafeRunSync()
-
-      findProjects shouldBe Set(
-        (project.name.value.some,
-         project.maybeParent.map(_.value),
-         None,
-         project.maybeDescription.map(_.value),
-         project.keywords.map(_.value)
-        )
-      )
+      findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeVisibility = None))
     }
 
     "generate queries which deletes the project description when changed" in {
-      val project = anyProjectEntities.generateOne.to[entities.Project]
-      val kgProjectInfo =
-        (project.name, project.maybeParent, project.visibility, projectDescriptions.generateSome, project.keywords)
+      forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+        val kgProjectInfo = toProjectMutableData(project).copy(maybeDescription = projectDescriptions.generateSome)
 
-      loadToStore(project)
+        loadToStore(project)
 
-      val queries = prepareUpdates(project, kgProjectInfo)
+        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
 
-      queries.runAll.unsafeRunSync()
+        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeDesc = None))
 
-      findProjects shouldBe Set(
-        (project.name.value.some,
-         project.maybeParent.map(_.value),
-         project.visibility.value.some,
-         None,
-         project.keywords.map(_.value)
-        )
-      )
+        clearDataset()
+      }
     }
 
     "generate queries which deletes the project keywords when changed" in {
-      val project = anyProjectEntities.generateOne.to[entities.Project]
-      val kgProjectInfo =
-        (project.name,
-         project.maybeParent,
-         project.visibility,
-         project.maybeDescription,
-         projectKeywords.generateSet(minElements = 1)
-        )
+      val project       = anyProjectEntities.generateOne.to[entities.Project]
+      val kgProjectInfo = toProjectMutableData(project).copy(keywords = projectKeywords.generateSet(minElements = 1))
 
       loadToStore(project)
 
-      val queries = prepareUpdates(project, kgProjectInfo)
+      prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
 
-      queries.runAll.unsafeRunSync()
+      findProjects shouldBe Set(CurrentProjectState.from(project).copy(keywords = Set.empty))
+    }
 
-      findProjects shouldBe Set(
-        (project.name.value.some,
-         project.maybeParent.map(_.value),
-         project.visibility.value.some,
-         project.maybeDescription.map(_.value),
-         Set.empty
-        )
-      )
+    "generate queries which deletes the project agent when changed" in {
+      forAll(anyRenkuProjectEntities.map(_.to[entities.RenkuProject])) { project =>
+        val kgProjectInfo = toProjectMutableData(project).copy(maybeAgent = cliVersions.generateSome)
+
+        loadToStore(project)
+
+        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+
+        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeAgent = None))
+
+        clearDataset()
+      }
+    }
+
+    "generate queries which deletes the project creator when changed" in {
+      forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
+        val kgProjectInfo = toProjectMutableData(project).copy(maybeCreatorId = personResourceIds.generateSome)
+
+        loadToStore(project)
+
+        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+
+        findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeCreatorId = None))
+
+        clearDataset()
+      }
     }
 
     "not generate queries when nothing changed" in {
       val project = anyProjectEntities.generateOne.to[entities.Project]
-      val kgProjectInfo =
-        (project.name, project.maybeParent, project.visibility, project.maybeDescription, project.keywords)
 
       loadToStore(project)
 
-      val queries = prepareUpdates(project, kgProjectInfo)
+      prepareUpdates(project, toProjectMutableData(project)).runAll.unsafeRunSync()
 
-      queries.runAll.unsafeRunSync()
-
-      findProjects shouldBe Set(
-        (project.name.value.some,
-         project.maybeParent.map(_.value),
-         project.visibility.value.some,
-         project.maybeDescription.map(_.value),
-         project.keywords.map(_.value)
-        )
-      )
+      findProjects shouldBe Set(CurrentProjectState.from(project))
     }
   }
 
-  private implicit class ProjectOps(project: entities.Project) {
-    val maybeParent = project match {
-      case p: entities.Project with entities.Parent => Some(p.parentResourceId)
-      case _ => None
-    }
-  }
+  private case class CurrentProjectState(maybeName:       Option[String],
+                                         maybeParentId:   Option[String],
+                                         maybeVisibility: Option[String],
+                                         maybeDesc:       Option[String],
+                                         keywords:        Set[String],
+                                         maybeAgent:      Option[String],
+                                         maybeCreatorId:  Option[String]
+  )
 
-  private def findProjects: Set[(Option[String], Option[String], Option[String], Option[String], Set[String])] =
-    runQuery(
-      s"""|SELECT ?name ?maybeParent ?visibility ?description (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
-          |WHERE {
-          |  ?id a schema:Project .
-          |  OPTIONAL { ?id schema:name ?name } 
-          |  OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent } 
-          |  OPTIONAL { ?id renku:projectVisibility ?visibility } 
-          |  OPTIONAL { ?id schema:description ?description } 
-          |  OPTIONAL { ?id schema:keywords ?keyword } 
-          |}
-          |GROUP BY ?name ?maybeParent ?visibility ?description
-          |""".stripMargin
+  private object CurrentProjectState {
+    def from(project: entities.Project): CurrentProjectState = CurrentProjectState(
+      project.name.value.some,
+      findParent(project).map(_.value),
+      project.visibility.value.some,
+      project.maybeDescription.map(_.value),
+      project.keywords.map(_.value),
+      findAgent(project).map(_.value),
+      project.maybeCreator.map(_.resourceId.value)
     )
-      .unsafeRunSync()
-      .map(row =>
-        (row.get("name"),
-         row.get("maybeParent"),
-         row.get("visibility"),
-         row.get("description"),
-         row.get("keywords").map(_.split(',').toList).sequence.flatten.toSet
-        )
+  }
+
+  private def findProjects: Set[CurrentProjectState] = runQuery(
+    s"""|SELECT ?name ?maybeParent ?visibility ?maybeDesc 
+        |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
+        |WHERE {
+        |  ?id a schema:Project
+        |  OPTIONAL { ?id schema:name ?name } 
+        |  OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent } 
+        |  OPTIONAL { ?id renku:projectVisibility ?visibility } 
+        |  OPTIONAL { ?id schema:description ?maybeDesc } 
+        |  OPTIONAL { ?id schema:keywords ?keyword } 
+        |  OPTIONAL { ?id schema:agent ?maybeAgent } 
+        |  OPTIONAL { ?id schema:creator ?maybeCreatorId } 
+        |}
+        |GROUP BY ?name ?maybeParent ?visibility ?maybeDesc ?maybeAgent ?maybeCreatorId
+        |""".stripMargin
+  )
+    .unsafeRunSync()
+    .map(row =>
+      CurrentProjectState(
+        maybeName = row.get("name"),
+        maybeParentId = row.get("maybeParent"),
+        maybeVisibility = row.get("visibility"),
+        maybeDesc = row.get("maybeDesc"),
+        keywords = row.get("keywords").map(_.split(',').toList).sequence.flatten.toSet,
+        maybeAgent = row.get("maybeAgent"),
+        maybeCreatorId = row.get("maybeCreatorId")
       )
-      .toSet
+    )
+    .toSet
 }

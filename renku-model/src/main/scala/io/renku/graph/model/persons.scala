@@ -35,6 +35,7 @@ object persons {
     addConstraint(
       check = value =>
         value.trim.matches(GitLabIdBased.validator) ||
+          value.trim.matches(OrcidId.validator) ||
           value.trim.matches(EmailBased.validator) ||
           value.trim.matches(NameBased.validator),
       message = (v: String) => s"$v is not a valid $typeName"
@@ -46,7 +47,20 @@ object persons {
         with EntityIdJsonLdOps[GitLabIdBased]
         with Constraints[GitLabIdBased]
         with NonBlank[GitLabIdBased] {
-      private[persons] val validator = "^http(s)?://.*/persons/(\\d+)$"
+      private[persons] val validator = "^http(s)?://.*/persons/\\d+$"
+      addConstraint(
+        check = _.trim.matches(validator),
+        message = (v: String) => s"$v is not valid $typeName"
+      )
+    }
+
+    final class OrcidIdBased private[persons] (val value: String) extends AnyVal with ResourceId
+    object OrcidIdBased
+        extends TinyTypeFactory[OrcidIdBased](new OrcidIdBased(_))
+        with EntityIdJsonLdOps[OrcidIdBased]
+        with Constraints[OrcidIdBased]
+        with NonBlank[OrcidIdBased] {
+      private[persons] val validator = "^http(s)?://.*/persons\\/orcid\\/\\d{4}-\\d{4}-\\d{4}-\\d{4}$"
       addConstraint(
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
@@ -79,13 +93,16 @@ object persons {
       )
     }
 
-    def apply(gitLabId: GitLabId)(implicit renkuBaseUrl: RenkuBaseUrl): GitLabIdBased =
-      new GitLabIdBased((renkuBaseUrl / "persons" / gitLabId).show)
+    def apply(gitLabId: GitLabId)(implicit renkuUrl: RenkuUrl): GitLabIdBased =
+      new GitLabIdBased((renkuUrl / "persons" / gitLabId).show)
+
+    def apply(orcidId: OrcidId)(implicit renkuUrl: RenkuUrl, ev: OrcidId.type): OrcidIdBased =
+      new OrcidIdBased((renkuUrl / "persons" / "orcid" / orcidId.id).show)
 
     def apply(email: Email): EmailBased = new EmailBased(show"mailto:$email")
 
-    def apply(name: Name)(implicit renkuBaseUrl: RenkuBaseUrl): NameBased =
-      new NameBased((renkuBaseUrl / "persons" / name).show)
+    def apply(name: Name)(implicit renkuUrl: RenkuUrl): NameBased =
+      new NameBased((renkuUrl / "persons" / name).show)
 
     implicit object UsersResourceIdRdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
       private val localPartExtractor = "^mailto:(.*)@.*$".r
@@ -101,6 +118,7 @@ object persons {
     override def apply(value: String): ResourceId =
       ResourceId.GitLabIdBased
         .from(value)
+        .orElse(ResourceId.OrcidIdBased.from(value))
         .orElse(ResourceId.EmailBased.from(value))
         .orElse(ResourceId.NameBased.from(value))
         .getOrElse(throw new IllegalArgumentException(s"$value is not a valid ${ResourceId.typeName}"))
@@ -116,6 +134,31 @@ object persons {
       Either
         .fromOption(value.toIntOption, ifNone = new IllegalArgumentException(s"$value not a valid GitLabId"))
         .flatMap(GitLabId.from)
+  }
+
+  final class OrcidId private[persons] (val value: String) extends AnyVal with StringTinyType {
+    import OrcidId.validatorRegex
+
+    def id: String = validatorRegex
+      .findAllIn(value)
+      .matchData
+      .map(_.group(1))
+      .toList match {
+      case id :: Nil => id
+      case _         => throw new Exception(s"$value is not a valid OrcidId")
+    }
+  }
+  implicit object OrcidId
+      extends TinyTypeFactory[OrcidId](new OrcidId(_))
+      with EntityIdJsonLdOps[OrcidId]
+      with Constraints[OrcidId]
+      with NonBlank[OrcidId] {
+    private[persons] val validator      = "^https:\\/\\/orcid.org\\/(\\d{4}-\\d{4}-\\d{4}-\\d{4})$"
+    private[OrcidId] val validatorRegex = validator.r
+    addConstraint(
+      check = _.trim.matches(validator),
+      message = (v: String) => s"$v is not valid $typeName"
+    )
   }
 
   final class Email private (val value: String) extends AnyVal with StringTinyType

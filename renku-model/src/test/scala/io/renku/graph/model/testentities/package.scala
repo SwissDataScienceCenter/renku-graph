@@ -31,7 +31,7 @@ package object testentities extends Schemas with EntitiesGenerators with ModelOp
     def unapply[A, B](t: A ::~ B): Some[A ::~ B] = Some(t)
   }
 
-  implicit val renkuBaseUrlToEntityId: RenkuBaseUrl => EntityId = url => EntityId of url.value
+  implicit val renkuUrlToEntityId: RenkuUrl => EntityId = url => EntityId of url.value
 
   private implicit lazy val sameAsToPathSegment: SameAs => List[PathSegment] = sameAs => List(PathSegment(sameAs.value))
 

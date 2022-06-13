@@ -40,16 +40,16 @@ object Entity {
       (generation: Generation) => OutputEntity(location, entityChecksums.generateOne, generation)
   }
 
-  implicit def toEntity(implicit renkuBaseUrl: RenkuBaseUrl): Entity => entities.Entity = {
-    case e: InputEntity  => toInputEntity(renkuBaseUrl)(e)
-    case e: OutputEntity => toOutputEntity(renkuBaseUrl)(e)
+  implicit def toEntity(implicit renkuUrl: RenkuUrl): Entity => entities.Entity = {
+    case e: InputEntity  => toInputEntity(renkuUrl)(e)
+    case e: OutputEntity => toOutputEntity(renkuUrl)(e)
   }
 
-  implicit def toInputEntity(implicit renkuBaseUrl: RenkuBaseUrl): InputEntity => entities.Entity.InputEntity =
+  implicit def toInputEntity(implicit renkuUrl: RenkuUrl): InputEntity => entities.Entity.InputEntity =
     entity =>
       entities.Entity.InputEntity(entityModel.ResourceId(entity.asEntityId.show), entity.location, entity.checksum)
 
-  implicit def toOutputEntity(implicit renkuBaseUrl: RenkuBaseUrl): OutputEntity => entities.Entity.OutputEntity =
+  implicit def toOutputEntity(implicit renkuUrl: RenkuUrl): OutputEntity => entities.Entity.OutputEntity =
     entity =>
       entities.Entity.OutputEntity(entityModel.ResourceId(entity.asEntityId.show),
                                    entity.location,
@@ -57,9 +57,9 @@ object Entity {
                                    List(generations.ResourceId(entity.generation.asEntityId.show))
       )
 
-  implicit def encoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[E] =
+  implicit def encoder[E <: Entity](implicit renkuUrl: RenkuUrl): JsonLDEncoder[E] =
     JsonLDEncoder.instance(_.to[entities.Entity].asJsonLD)
 
-  implicit def entityIdEncoder[E <: Entity](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[E] =
-    EntityIdEncoder.instance(entity => EntityId of renkuBaseUrl / "blob" / entity.checksum / entity.location)
+  implicit def entityIdEncoder[E <: Entity](implicit renkuUrl: RenkuUrl): EntityIdEncoder[E] =
+    EntityIdEncoder.instance(entity => EntityId of renkuUrl / "blob" / entity.checksum / entity.location)
 }

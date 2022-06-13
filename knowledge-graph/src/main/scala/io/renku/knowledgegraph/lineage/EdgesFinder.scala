@@ -21,8 +21,8 @@ package io.renku.knowledgegraph.lineage
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.config.RenkuBaseUrlLoader
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
 import io.renku.graph.model.views.RdfResource
@@ -39,7 +39,7 @@ private trait EdgesFinder[F[_]] {
 
 private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     rdfStoreConfig: RdfStoreConfig,
-    renkuBaseUrl:   RenkuBaseUrl
+    renkuUrl:       RenkuUrl
 ) extends RdfStoreClientImpl(rdfStoreConfig)
     with EdgesFinder[F] {
 
@@ -70,9 +70,9 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?activity ?date ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
-        |   ${projectMemberFilterQuery(ResourceId(path)(renkuBaseUrl).showAs[RdfResource])(maybeUser)}
+        |   ${projectMemberFilterQuery(ResourceId(path)(renkuUrl).showAs[RdfResource])(maybeUser)}
         |   ?activity a prov:Activity;
-        |             ^renku:hasActivity ${ResourceId(path)(renkuBaseUrl).showAs[RdfResource]};
+        |             ^renku:hasActivity ${ResourceId(path)(renkuUrl).showAs[RdfResource]};
         |             prov:startedAtTime ?date;
         |             renku:parameter ?paramValue.
         |   ?paramValue schema:valueReference ?parameter.
@@ -158,7 +158,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 private object EdgesFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EdgesFinder[F]] = for {
-    config       <- RdfStoreConfig[F]()
-    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
-  } yield new EdgesFinderImpl[F](config, renkuBaseUrl)
+    config   <- RdfStoreConfig[F]()
+    renkuUrl <- RenkuUrlLoader[F]()
+  } yield new EdgesFinderImpl[F](config, renkuUrl)
 }

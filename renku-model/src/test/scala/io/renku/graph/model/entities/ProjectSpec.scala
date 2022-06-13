@@ -816,10 +816,17 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                                      gitLabId,
                                      name,
                                      maybeEmail = None,
+                                     maybeOrcidId = None,
                                      maybeAffiliation = None
         )
       case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-        entities.Person.WithGitLabId(persons.ResourceId(gitLabId), gitLabId, name, email.some, maybeAffiliation = None)
+        entities.Person.WithGitLabId(persons.ResourceId(gitLabId),
+                                     gitLabId,
+                                     name,
+                                     email.some,
+                                     maybeOrcidId = None,
+                                     maybeAffiliation = None
+        )
     }
 
     private def nameFromUsernameOrName(member: ProjectMember) =
@@ -841,7 +848,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   private def datasetWith(
       creators: NonEmptyList[entities.Person]
   ): projects.DateCreated => entities.Dataset[entities.Dataset.Provenance] = dateCreated => {
-    val ds = datasetEntities(provenanceNonModified)(renkuBaseUrl)(dateCreated).generateOne
+    val ds = datasetEntities(provenanceNonModified)(renkuUrl)(dateCreated).generateOne
       .to[entities.Dataset[entities.Dataset.Provenance]]
     ds.copy(provenance = ds.provenance match {
       case p: entities.Dataset.Provenance.Internal                         => p.copy(creators = creators.sortBy(_.name))

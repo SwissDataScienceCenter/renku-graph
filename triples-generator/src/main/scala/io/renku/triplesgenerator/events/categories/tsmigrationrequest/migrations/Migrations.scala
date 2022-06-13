@@ -42,12 +42,13 @@ private[tsmigrationrequest] object Migrations {
     multipleDSTopmostSameAs           <- MultipleDSTopmostSameAs[F]
     multipleAllWrongTopmostSameAs     <- MultipleAllWrongTopmostSameAs[F]
     multipleTopmostSameAsOnInternalDS <- MultipleTopmostSameAsOnInternalDS[F]
-    multipleTopmostDerivedFromOnly    <- MultipleTopmostDerivedFromOnly[F]
     multipleOriginalIdentifiers       <- MultipleOriginalIdentifiers[F]
     multipleDSDateCreated             <- MultipleDSDateCreated[F]
     multipleDSSameAs                  <- MultipleDSSameAs[F]
-    multipleActivityAuthors           <- MultipleActivityAuthors[F]
     removeNotLinkedPersons            <- RemoveNotLinkedPersons[F]
+    multipleDSDescriptions            <- MultipleDSDescriptions[F]
+    multipleTopmostDerivedFroms       <- MultipleTopmostDerivedFroms[F]
+    multipleProjectAgents             <- MultipleProjectAgents[F]
     migrations <- validateNames(
                     reProvisioning,
                     malformedActivityIds,
@@ -57,12 +58,13 @@ private[tsmigrationrequest] object Migrations {
                     multipleDSTopmostSameAs,
                     multipleAllWrongTopmostSameAs,
                     multipleTopmostSameAsOnInternalDS,
-                    multipleTopmostDerivedFromOnly,
                     multipleOriginalIdentifiers,
                     multipleDSDateCreated,
                     multipleDSSameAs,
-                    multipleActivityAuthors,
-                    removeNotLinkedPersons
+                    removeNotLinkedPersons,
+                    multipleDSDescriptions,
+                    multipleTopmostDerivedFroms,
+                    multipleProjectAgents
                   )
   } yield migrations
 
@@ -72,8 +74,7 @@ private[tsmigrationrequest] object Migrations {
       case (name, ms) if ms.size > 1 => name
     }
     if (problematicMigrations.nonEmpty) {
-      val error =
-        show"$categoryName: there are multiple migrations with the same name: ${problematicMigrations.mkString("; ")}"
+      val error = show"$categoryName: there are multiple migrations with name: ${problematicMigrations.mkString("; ")}"
       Logger[F]
         .error(error) >> new Exception(error).raiseError[F, List[Migration[F]]].map(_ => List.empty[Migration[F]])
     } else migrations.toList.pure[F]

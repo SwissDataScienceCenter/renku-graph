@@ -259,7 +259,7 @@ class NodeDetailsFinderSpec
   private trait TestCase {
     implicit val logger:               TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val nodeDetailsFinder = new NodeDetailsFinderImpl[IO](rdfStoreConfig, renkuBaseUrl)
+    val nodeDetailsFinder = new NodeDetailsFinderImpl[IO](rdfStoreConfig, renkuUrl)
   }
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {

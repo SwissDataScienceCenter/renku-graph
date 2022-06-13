@@ -32,11 +32,11 @@ case class DatasetPart(
 
 object DatasetPart {
 
-  import io.renku.graph.model.RenkuBaseUrl
+  import io.renku.graph.model.RenkuUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def toEntitiesDatasetPart(implicit renkuBaseUrl: RenkuBaseUrl): DatasetPart => entities.DatasetPart = {
+  implicit def toEntitiesDatasetPart(implicit renkuUrl: RenkuUrl): DatasetPart => entities.DatasetPart = {
     case datasetPart: DatasetPart with HavingInvalidationTime =>
       entities.DatasetPart(
         datasets.PartResourceId(datasetPart.asEntityId.show),
@@ -57,9 +57,9 @@ object DatasetPart {
       )
   }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[DatasetPart] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[DatasetPart] =
     JsonLDEncoder.instance(_.to[entities.DatasetPart].asJsonLD)
 
-  implicit def entityIdEncoder[D <: DatasetPart](implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[D] =
-    EntityIdEncoder.instance(part => renkuBaseUrl / "dataset-files" / part.id / part.entity.location)
+  implicit def entityIdEncoder[D <: DatasetPart](implicit renkuUrl: RenkuUrl): EntityIdEncoder[D] =
+    EntityIdEncoder.instance(part => renkuUrl / "dataset-files" / part.id / part.entity.location)
 }

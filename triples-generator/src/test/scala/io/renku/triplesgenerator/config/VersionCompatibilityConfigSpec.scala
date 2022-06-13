@@ -23,7 +23,6 @@ import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 import io.renku.interpreters.TestLogger
@@ -33,7 +32,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
 class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
@@ -44,7 +43,8 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map("compatibility-matrix" -> List.empty[String].asJava).asJava
       )
-      val Failure(exception) = versionCompatibilityWith(config)
+      val Failure(exception) = readVersionPairs(config)
+
       exception            shouldBe a[Exception]
       exception.getMessage shouldBe "No compatibility matrix provided for schema version"
     }
@@ -53,10 +53,9 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
       val cliVersionNumbers    = cliVersions.generateNonEmptyList(2, 10)
       val schemaVersionNumbers = projectSchemaVersions.generateNonEmptyList(2, 10)
 
-      val expected =
-        cliVersionNumbers.toList.zip(schemaVersionNumbers.toList).map { case (cliVersion, schemaVersion) =>
-          RenkuVersionPair(cliVersion, schemaVersion)
-        }
+      val expected = cliVersionNumbers.toList
+        .zip(schemaVersionNumbers.toList)
+        .map { case (cliVersion, schemaVersion) => RenkuVersionPair(cliVersion, schemaVersion) }
 
       val unparsedConfigElements = expected.map { case RenkuVersionPair(cliVersion, schemaVersion) =>
         s"${cliVersion.value} -> ${schemaVersion.value}"
@@ -66,19 +65,17 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
         Map("compatibility-matrix" -> unparsedConfigElements).asJava
       )
 
-      val Success(result) = versionCompatibilityWith(config)
-      result shouldBe NonEmptyList.fromListUnsafe(expected)
+      readVersionPairs(config) shouldBe NonEmptyList.fromListUnsafe(expected).pure[Try]
     }
 
-    "return a list of VersionSchemaPairs, as the first element the RenkuDevVersion if it exists and log a warning" in new TestCase {
+    "return a list of RenkuVersionPairs with the first element of the RenkuDevVersion if it exists and log a warning" in new TestCase {
       val cliVersionNumbers     = cliVersions.generateNonEmptyList(2, 10)
       val renkuPythonDevVersion = renkuPythonDevVersions.generateOne
       val schemaVersionNumbers  = projectSchemaVersions.generateNonEmptyList(2, 10)
 
-      val configVersions =
-        cliVersionNumbers.toList.zip(schemaVersionNumbers.toList).map { case (cliVersion, schemaVersion) =>
-          RenkuVersionPair(cliVersion, schemaVersion)
-        }
+      val configVersions = cliVersionNumbers.toList
+        .zip(schemaVersionNumbers.toList)
+        .map { case (cliVersion, schemaVersion) => RenkuVersionPair(cliVersion, schemaVersion) }
 
       val unparsedConfigElements = configVersions.map { case RenkuVersionPair(cliVersion, schemaVersion) =>
         s"${cliVersion.value} -> ${schemaVersion.value}"
@@ -90,8 +87,8 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
       val expected = renkuPythonDevVersion.toRenkuVersionPair(configVersions.head.schemaVersion) +: configVersions.tail
 
-      val Success(result) = RenkuVersionPairsReader.readRenkuVersionPairs[Try](renkuPythonDevVersion.some, config)
-      result shouldBe NonEmptyList.fromListUnsafe(expected)
+      RenkuVersionPairsReader.readRenkuVersionPairs[Try](renkuPythonDevVersion.some, config) shouldBe
+        NonEmptyList.fromListUnsafe(expected).pure[Try]
 
       logger.loggedOnly(
         Warn(
@@ -105,7 +102,9 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map("compatibility-matrix" -> List(malformedPair).asJava).asJava
       )
-      val Failure(exception) = versionCompatibilityWith(config)
+
+      val Failure(exception) = readVersionPairs(config)
+
       exception.getMessage shouldBe s"Did not find exactly two elements: $malformedPair."
     }
   }
@@ -114,11 +113,11 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
 
-    def versionCompatibilityWith(config: Config) = RenkuVersionPairsReader.readRenkuVersionPairs[Try](None, config)
+    def readVersionPairs(config: Config) =
+      RenkuVersionPairsReader.readRenkuVersionPairs[Try](maybeRenkuDevVersion = None, config)
 
-    implicit lazy val renkuPythonDevVersions: Gen[RenkuPythonDevVersion] = for {
-      version <- nonEmptyStrings()
-    } yield RenkuPythonDevVersion(version)
+    implicit lazy val renkuPythonDevVersions: Gen[RenkuPythonDevVersion] =
+      cliVersions map (v => RenkuPythonDevVersion(v.show))
 
     implicit class RenkuPythonDevVersionOps(devVersion: RenkuPythonDevVersion) {
       def toRenkuVersionPair(schemaVersion: SchemaVersion): RenkuVersionPair =

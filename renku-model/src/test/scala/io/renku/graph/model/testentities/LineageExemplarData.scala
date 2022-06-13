@@ -56,8 +56,8 @@ object LineageExemplarData {
   )
 
   def apply(
-      project: RenkuProject = renkuProjectEntities(visibilityPublic, forksCountGen = anyForksCount).generateOne
-  )(implicit renkuBaseUrl: RenkuBaseUrl): ExemplarData = {
+      project:         RenkuProject = renkuProjectEntities(visibilityPublic, forksCountGen = anyForksCount).generateOne
+  )(implicit renkuUrl: RenkuUrl): ExemplarData = {
 
     val zhbikesFolder = Location.Folder("data/zhbikes")
     val velo2018      = Location.File(zhbikesFolder, "2018velo.csv")
@@ -178,7 +178,7 @@ final case class NodeDef(location: String, label: String, types: Set[String])
 
 object NodeDef {
 
-  def apply(activity: Activity, location: Location)(implicit renkuBaseUrl: RenkuBaseUrl): NodeDef =
+  def apply(activity: Activity, location: Location)(implicit renkuUrl: RenkuUrl): NodeDef =
     activity
       .findEntity(location)
       .map { entity =>
@@ -194,7 +194,7 @@ object NodeDef {
         )
       )
 
-  def apply(activity: Activity)(implicit renkuBaseUrl: RenkuBaseUrl): NodeDef = NodeDef(
+  def apply(activity: Activity)(implicit renkuUrl: RenkuUrl): NodeDef = NodeDef(
     activity.asJsonLD.entityId.getOrElse(throw new Exception("Non entity id found for Activity")).show,
     activity.show,
     activity.asJsonLD.entityTypes.getOrElse(throw new Exception("No entityTypes found")).toList.map(_.show).toSet

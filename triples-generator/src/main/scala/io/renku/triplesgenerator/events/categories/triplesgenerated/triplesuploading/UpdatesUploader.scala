@@ -42,8 +42,8 @@ private class UpdatesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:      Duration = 5 minutes,
-    requestTimeout:   Duration = 4 minutes
+    idleTimeout:      Duration = 11 minutes,
+    requestTimeout:   Duration = 10 minutes
 ) extends RdfStoreClientImpl[F](rdfStoreConfig,
                                 retryInterval,
                                 maxRetries,

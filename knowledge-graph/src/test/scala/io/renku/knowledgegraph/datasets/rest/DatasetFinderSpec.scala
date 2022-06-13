@@ -24,7 +24,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
@@ -630,7 +630,7 @@ class DatasetFinderSpec
   }
 
   private trait TestCase {
-    implicit val renkuBaseUrl:         RenkuBaseUrl                = renkuBaseUrls.generateOne
+    implicit val renkuUrl:             RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val datasetFinder = new DatasetFinderImpl[IO](

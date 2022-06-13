@@ -32,7 +32,7 @@ import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, _}
+import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query._
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
@@ -55,7 +55,7 @@ trait DatasetsSearchEndpoint[F[_]] {
 
 class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
     datasetsFinder:        DatasetsFinder[F],
-    renkuResourcesUrl:     renku.ResourcesUrl,
+    renkuApiUrl:           renku.ApiUrl,
     gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
@@ -82,7 +82,7 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
   } map logExecutionTimeWhen(finishedSuccessfully(maybePhrase))
 
   private def requestedUrl(maybePhrase: Option[Phrase], sort: Sort.By, paging: PagingRequest): renku.ResourceUrl =
-    (renkuResourcesUrl / "datasets") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
+    (renkuApiUrl / "datasets") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
 
   private def httpResult(
       maybePhrase: Option[Phrase]
@@ -126,7 +126,7 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
         "images": ${images -> exemplarProjectPath}
       }"""
         .addIfDefined("description" -> maybeDescription)
-        .deepMerge(_links(Link(Rel("details") -> DatasetEndpoint.href(renkuResourcesUrl, id))))
+        .deepMerge(_links(Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, id))))
   }
 
   private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] = Encoder.instance {
@@ -168,7 +168,7 @@ object DatasetsSearchEndpoint {
 
   def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetsSearchEndpoint[F]] = for {
     rdfStoreConfig        <- RdfStoreConfig[F]()
-    renkuResourceUrl      <- renku.ResourcesUrl[F]()
+    renkuResourceUrl      <- renku.ApiUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
     creatorsFinder        <- CreatorsFinder(rdfStoreConfig)

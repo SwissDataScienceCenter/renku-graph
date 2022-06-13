@@ -20,7 +20,7 @@ package io.renku.config
 
 import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.ConfigLoadingException
-import io.renku.config.renku.{ResourceUrl, ResourcesUrl}
+import io.renku.config.renku.{ApiUrl, ResourceUrl}
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -31,7 +31,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class ResourcesUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class ApiUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "apply" should {
 
@@ -41,17 +41,17 @@ class ResourcesUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
           Map(
             "services" -> Map(
               "renku" -> Map(
-                "resources-url" -> url
+                "api-url" -> url
               ).asJava
             ).asJava
           ).asJava
         )
-        ResourcesUrl[Try](config) shouldBe Success(ResourcesUrl(url))
+        ApiUrl[Try](config) shouldBe Success(ApiUrl(url))
       }
     }
 
     "fail if there's no value for the 'services.renku.url'" in {
-      val Failure(exception) = ResourcesUrl[Try](ConfigFactory.empty())
+      val Failure(exception) = ApiUrl[Try](ConfigFactory.empty())
       exception shouldBe an[ConfigLoadingException]
     }
 
@@ -60,13 +60,13 @@ class ResourcesUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
         Map(
           "services" -> Map(
             "renku" -> Map(
-              "resources-url" -> "abcd"
+              "api-url" -> "abcd"
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = ResourcesUrl[Try](config)
+      val Failure(exception) = ApiUrl[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -75,7 +75,7 @@ class ResourcesUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
   "/" should {
 
     "produce a ResourceUrl" in {
-      val resourcesUrl = renkuResourcesUrls.generateOne
+      val resourcesUrl = renkuApiUrls.generateOne
       val segment      = relativePaths(maxSegments = 1).generateOne
 
       val resourceUrl = resourcesUrl / segment

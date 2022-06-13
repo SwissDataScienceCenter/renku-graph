@@ -240,7 +240,7 @@ class UpdatesCreatorSpec
   "prepareUpdates" should {
 
     "generate queries which " +
-      "updates topmostSameAs for all datasets whose topmostSameAs points to the current dataset" +
+      "updates topmostSameAs for all datasets where topmostSameAs points to the current dataset" +
       "when the topmostSameAs on the current dataset is different than the value in KG" in {
         val dataset0AsTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
 
@@ -261,11 +261,54 @@ class UpdatesCreatorSpec
           (dataset2.resourceId.value, TopmostSameAs(dataset1.resourceId.value).value.some)
         )
 
-        UpdatesCreator.prepareUpdates(dataset1, None).runAll.unsafeRunSync()
+        UpdatesCreator.prepareUpdates(dataset1, Set.empty).runAll.unsafeRunSync()
 
         findDatasets.map(onlyTopmostSameAs) shouldBe Set(
           (dataset2.resourceId.value, dataset0AsTopmostSameAs.value.some)
         )
+      }
+
+    "generate queries which " +
+      "updates topmostSameAs for all datasets where topmostSameAs points to the current dataset" +
+      "when the topmostSameAs on the current dataset is different than the value in KG -" +
+      "case when some datasets have multiple topmostSameAs" in {
+        val dataset0AsTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
+
+        val dataset1 = {
+          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+          setTopmostSameAs(ds, dataset0AsTopmostSameAs)
+        }
+        val dataset2 = {
+          val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+            .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+          setTopmostSameAs(ds, TopmostSameAs(dataset1.resourceId.value))
+        }
+
+        loadToStore(dataset2)
+
+        val otherTopmostSameAs = datasetTopmostSameAs.generateOne
+        insertTriple(dataset2.resourceId, "renku:topmostSameAs", otherTopmostSameAs.showAs[RdfResource])
+
+        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+          (dataset2.resourceId.value, TopmostSameAs(dataset1.resourceId.value).value.some),
+          (dataset2.resourceId.value, otherTopmostSameAs.value.some)
+        )
+
+        UpdatesCreator.prepareUpdates(dataset1, Set.empty).runAll.unsafeRunSync()
+
+        findDatasets.map(onlyTopmostSameAs) shouldBe Set(
+          (dataset2.resourceId.value, dataset0AsTopmostSameAs.value.some)
+        )
+      }
+
+    "generate no queries " +
+      "if the topmostSameAs on the current DS is the only topmostSameAs for that DS in KG" in {
+
+        val ds = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
+
+        UpdatesCreator.prepareUpdates(ds, Set(ds.provenance.topmostSameAs)) shouldBe Nil
       }
   }
 
@@ -457,6 +500,84 @@ class UpdatesCreatorSpec
         .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
 
       UpdatesCreator.removeOtherDateCreated(ds, Set.empty) shouldBe Nil
+    }
+  }
+
+  "removeOtherDescriptions" should {
+
+    "prepare queries that removes all additional description triples on the DS" in {
+      val description1 = datasetDescriptions.generateOne
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(description1.some))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(ds)
+
+      val description2 = datasetDescriptions.generateOne
+      insertTriple(ds.resourceId, "schema:description", s"'$description2'")
+      val description3 = datasetDescriptions.generateOne
+      insertTriple(ds.resourceId, "schema:description", s"'$description3'")
+
+      findDescriptions(ds.identification.identifier) shouldBe Set(description1, description3, description2)
+
+      UpdatesCreator
+        .removeOtherDescriptions(ds, Set(description2, description3))
+        .runAll
+        .unsafeRunSync()
+
+      findDescriptions(ds.identification.identifier) shouldBe Set(description1)
+    }
+
+    "prepare queries that removes all description triples on the DS if there's no description on DS but some in KG" in {
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(None))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      loadToStore(ds)
+
+      val description = datasetDescriptions.generateOne
+      insertTriple(ds.resourceId, "schema:description", s"'$description'")
+
+      findDescriptions(ds.identification.identifier) shouldBe Set(description)
+
+      UpdatesCreator.removeOtherDescriptions(ds, Set(description)).runAll.unsafeRunSync()
+
+      findDescriptions(ds.identification.identifier) shouldBe Set.empty
+    }
+
+    "prepare no queries if there's no description on DS and in KG" in {
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(None))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      UpdatesCreator.removeOtherDescriptions(ds, Set.empty) shouldBe Nil
+    }
+
+    "prepare no queries if there's only the correct description for the DS in KG" in {
+      val description = datasetDescriptions.generateOne
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(description.some))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      UpdatesCreator.removeOtherDescriptions(ds, Set(description)) shouldBe Nil
+    }
+
+    "prepare no queries if there's no description for the DS in KG" in {
+      val ds = datasetEntities(provenanceNonModified)
+        .modify(replaceDSDesc(datasetDescriptions.generateSome))
+        .decoupledFromProject
+        .generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      UpdatesCreator.removeOtherDescriptions(ds, Set.empty) shouldBe Nil
     }
   }
 
@@ -655,6 +776,17 @@ class UpdatesCreatorSpec
                  |}""".stripMargin)
       .unsafeRunSync()
       .map(row => datasets.DateCreated(Instant.parse(row("date"))))
+      .toSet
+
+  private def findDescriptions(id: datasets.Identifier): Set[datasets.Description] =
+    runQuery(s"""|SELECT ?desc
+                 |WHERE { 
+                 |  ?id a schema:Dataset;
+                 |      schema:identifier '$id';
+                 |      schema:description ?desc.
+                 |}""".stripMargin)
+      .unsafeRunSync()
+      .map(row => datasets.Description(row("desc")))
       .toSet
 
   private def findSameAs(id: datasets.Identifier): Set[datasets.SameAs] =

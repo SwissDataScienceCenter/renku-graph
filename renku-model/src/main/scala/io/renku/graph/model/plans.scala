@@ -34,8 +34,8 @@ object plans {
       with Url[ResourceId]
       with EntityIdJsonLdOps[ResourceId] {
 
-    def apply(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): ResourceId =
-      ResourceId((renkuBaseUrl / "plans" / identifier).value)
+    def apply(identifier: Identifier)(implicit renkuUrl: RenkuUrl): ResourceId =
+      ResourceId((renkuUrl / "plans" / identifier).value)
 
     private val identifierExtractor = "^.*\\/plans\\/(.*)$".r
     implicit lazy val toIdentifier: TinyTypeConverter[ResourceId, Identifier] = {

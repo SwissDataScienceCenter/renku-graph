@@ -35,23 +35,24 @@ private[transformation] trait ProjectTransformer[F[_]] {
 }
 
 private class ProjectTransformerImpl[F[_]: MonadThrow](
-    kGProjectFinder:           KGProjectFinder[F],
+    kgProjectFinder:           KGProjectFinder[F],
     updatesCreator:            UpdatesCreator,
     recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ProjectTransformer[F] {
   import recoverableErrorsRecovery._
+  import updatesCreator._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Project Details Updates", createTransformation)
 
   private def createTransformation: Transformation[F] = project =>
     EitherT {
-      kGProjectFinder
+      kgProjectFinder
         .find(project.resourceId)
         .map {
           case None => (project, Queries.empty).asRight[ProcessingRecoverableError]
-          case Some(kgProjectInfo) =>
-            (project, Queries.preDataQueriesOnly(updatesCreator.prepareUpdates(project, kgProjectInfo)))
+          case Some(kgData) =>
+            (project, Queries.preDataQueriesOnly(prepareUpdates(project, kgData)))
               .asRight[ProcessingRecoverableError]
         }
         .recoverWith(maybeRecoverableError("Problem finding project details in KG"))

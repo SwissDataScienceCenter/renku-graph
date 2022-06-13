@@ -61,7 +61,7 @@ class StatusUpdaterSpec
 
         updater.updateStatus(event).unsafeRunSync() shouldBe ()
 
-        findRows(url, version) shouldBe event.newStatus -> ChangeDate(now)
+        findRow(url, version) shouldBe event.newStatus -> ChangeDate(now)
 
         if (Set(RecoverableFailure, NonRecoverableFailure) contains event.newStatus)
           findMessage(url, version) shouldBe message.some
@@ -76,7 +76,7 @@ class StatusUpdaterSpec
 
         updater.updateStatus(ToDone(url, version)).unsafeRunSync() shouldBe ()
 
-        findRows(url, version) shouldBe status -> changeDate
+        findRow(url, version) shouldBe status -> changeDate
       }
     }
 
@@ -95,9 +95,9 @@ class StatusUpdaterSpec
 
       updater.updateStatus(ToDone(url, version)).unsafeRunSync() shouldBe ()
 
-      findRows(url, version)      shouldBe Done -> ChangeDate(now)
-      findRows(otherUrl, version) shouldBe Sent -> changeDate
-      findRows(url, otherVersion) shouldBe Sent -> changeDate
+      findRow(url, version)      shouldBe Done -> ChangeDate(now)
+      findRow(otherUrl, version) shouldBe Sent -> changeDate
+      findRow(url, otherVersion) shouldBe Sent -> changeDate
     }
   }
 

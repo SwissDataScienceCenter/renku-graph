@@ -75,7 +75,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
   private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Unit]] = {
     case NonFatal(exception) =>
       Logger[F].error(exception)(
-        s"$categoryName: Triples Generated Event processing failure: ${event.compoundEventId}, projectPath: ${event.project.path}"
+        s"$categoryName: Triples Generated Event processing failure: ${event.compoundEventId}, projectPath = ${event.project.path}"
       )
   }
 
@@ -175,7 +175,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
   }
 
   private def logMessageCommon(event: TriplesGeneratedEvent): String =
-    s"$categoryName: ${event.compoundEventId}, projectPath: ${event.project.path}"
+    s"$categoryName: ${event.compoundEventId}, projectPath = ${event.project.path}"
 
   private def rollback(
       triplesGeneratedEvent: TriplesGeneratedEvent

@@ -147,15 +147,15 @@ class DatasetsSearchEndpointSpec
 
     val maybeAuthUser = authUsers.generateOption
 
-    private val renkuResourcesUrl = renkuResourcesUrls.generateOne
+    private val renkuApiUrl = renkuApiUrls.generateOne
     implicit val renkuResourceUrl: renku.ResourceUrl =
-      (renkuResourcesUrl / "datasets") ? (page.parameterName -> pagingRequest.page) & (perPage.parameterName -> pagingRequest.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
+      (renkuApiUrl / "datasets") ? (page.parameterName -> pagingRequest.page) & (perPage.parameterName -> pagingRequest.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val datasetsFinder        = mock[DatasetsFinder[IO]]
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     val endpoint =
-      new DatasetsSearchEndpointImpl[IO](datasetsFinder, renkuResourcesUrl, gitLabUrl, executionTimeRecorder)
+      new DatasetsSearchEndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
 
     lazy val toJson: DatasetSearchResult => Json = {
       case DatasetSearchResult(id,
@@ -180,7 +180,7 @@ class DatasetsSearchEndpointSpec
           "images": ${images -> exemplarProjectPath},
           "_links": [{
             "rel": "details",
-            "href": ${(renkuResourcesUrl / "datasets" / id).value}
+            "href": ${(renkuApiUrl / "datasets" / id).value}
           }]
         }""" addIfDefined "description" -> maybeDescription
     }

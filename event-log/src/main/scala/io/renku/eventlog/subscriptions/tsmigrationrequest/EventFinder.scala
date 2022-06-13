@@ -52,14 +52,14 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
           savepoint           <- transaction.savepoint
           maybeEventCandidate <- tryToPop(session)
           maybeEvent <- verifySingleEventTaken(maybeEventCandidate)(session) >>= {
-                          case true  => maybeEventCandidate.pure[F]
+                          case true  => transaction.commit >> maybeEventCandidate.pure[F]
                           case false => (transaction rollback savepoint).map(_ => Option.empty[MigrationRequestEvent])
                         }
         } yield maybeEvent
       }
     }
 
-  private def tryToPop = findEvent.flatMap {
+  private def tryToPop = findEvent >>= {
     case Some(event) => markTaken(event) map toNoneIfTaken(event)
     case _           => Kleisli.pure(Option.empty[MigrationRequestEvent])
   }
@@ -79,7 +79,7 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
                 ORDER BY change_date DESC
                 LIMIT 1
               ) latest 
-              JOIN ts_migration m on m.subscriber_version = latest.subscriber_version 
+              JOIN ts_migration m ON m.subscriber_version = latest.subscriber_version 
               ORDER BY m.change_date DESC
       """.query(subscriberUrlDecoder ~ serviceVersionDecoder ~ migrationStatusDecoder ~ changeDateDecoder)
           .map { case url ~ version ~ status ~ changeDate => (url, version, status, changeDate) }
@@ -154,8 +154,8 @@ private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: Labele
            """
           .query(int8)
           .map {
-            case 0 | 1 => true
-            case _     => false
+            case 0L | 1L => true
+            case _       => false
           }
       )
       .arguments(event.subscriberVersion)

@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
 
-import io.renku.graph.model.RenkuBaseUrl
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.jsonld._
@@ -49,14 +49,13 @@ private object ReProvisioningInfo {
 
   import io.renku.jsonld.syntax._
 
-  implicit def jsonLDEncoder(implicit
-      renkuBaseUrl: RenkuBaseUrl
-  ): JsonLDEncoder[ReProvisioningInfo] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      EntityId.of((renkuBaseUrl / "re-provisioning").toString),
-      EntityTypes of renku / "ReProvisioning",
-      renku / "status"        -> entity.status.asInstanceOf[Status].asJsonLD,
-      renku / "controllerUrl" -> entity.controllerUrl.asJsonLD
-    )
+  implicit def jsonLDEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[ReProvisioningInfo] = JsonLDEncoder.instance {
+    entity =>
+      JsonLD.entity(
+        EntityId.of((renkuUrl / "re-provisioning").toString),
+        EntityTypes of renku / "ReProvisioning",
+        renku / "status"        -> entity.status.asInstanceOf[Status].asJsonLD,
+        renku / "controllerUrl" -> entity.controllerUrl.asJsonLD
+      )
   }
 }

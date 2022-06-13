@@ -37,11 +37,11 @@ object Generation {
     def generate: Id = generationIds.generateOne
   }
 
-  import io.renku.graph.model.RenkuBaseUrl
+  import io.renku.graph.model.RenkuUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def toEntitiesGeneration(implicit renkuBaseUrl: RenkuBaseUrl): Generation => entities.Generation =
+  implicit def toEntitiesGeneration(implicit renkuUrl: RenkuUrl): Generation => entities.Generation =
     generation =>
       entities.Generation(
         generations.ResourceId(generation.asEntityId.show),
@@ -52,10 +52,10 @@ object Generation {
   def factory(entityFactory: Generation => OutputEntity): Activity => Generation =
     activity => Generation(Id.generate, activity, entityFactory)
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Generation] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[Generation] =
     JsonLDEncoder.instance(_.to[entities.Generation].asJsonLD)
 
-  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Generation] =
+  implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Generation] =
     EntityIdEncoder.instance { case generation @ Generation(id, activity, _) =>
       activity.asEntityId.asUrlEntityId / "generation" / id / generation.entity.checksum / generation.entity.location
     }

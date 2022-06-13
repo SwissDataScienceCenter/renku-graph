@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.categories.membersync
 import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import io.renku.graph.model.projects.ResourceId
@@ -31,7 +31,7 @@ import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
-private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl) {
+private class UpdatesCreator(renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl) {
 
   def insertion(projectPath: projects.Path,
                 members:     Set[(GitLabProjectMember, Option[persons.ResourceId])]
@@ -89,7 +89,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
   }
 
   private def generateResourceId(gitLabId: GitLabId): persons.ResourceId =
-    persons.ResourceId(gitLabId)(renkuBaseUrl)
+    persons.ResourceId(gitLabId)(renkuUrl)
 
   private def createMemberLinks(projectPath:        projects.Path,
                                 membersAlreadyInKG: List[(GitLabProjectMember, persons.ResourceId)]
@@ -106,12 +106,12 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
     }
 
   private def generateLinkTriple(projectPath: projects.Path, memberResourceId: persons.ResourceId) =
-    s"${ResourceId(projectPath)(renkuBaseUrl).showAs[RdfResource]} schema:member ${memberResourceId.showAs[RdfResource]}."
+    s"${ResourceId(projectPath)(renkuUrl).showAs[RdfResource]} schema:member ${memberResourceId.showAs[RdfResource]}."
 
   private lazy val generatePersonTriples: ((persons.ResourceId, GitLabProjectMember)) => String = {
     case (resourceId, member) =>
       val creatorResource = resourceId.showAs[RdfResource]
-      val sameAsId        = entities.Person.toSameAsEntityId(member.gitLabId)(gitLabApiUrl).show
+      val sameAsId        = entities.Person.toGitLabSameAsEntityId(member.gitLabId)(gitLabApiUrl).show
       s"""|$creatorResource a schema:Person;
           |                 schema:name '${sparqlEncode(member.name.value)}';
           |                 schema:sameAs <$sameAsId>.
@@ -131,7 +131,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
 
 private object UpdatesCreator {
   def apply[F[_]: MonadThrow]: F[UpdatesCreator] = for {
-    renkuBaseUrl <- RenkuBaseUrlLoader[F]()
-    gitLabUrl    <- GitLabUrlLoader[F]()
-  } yield new UpdatesCreator(renkuBaseUrl, gitLabUrl.apiV4)
+    renkuUrl  <- RenkuUrlLoader[F]()
+    gitLabUrl <- GitLabUrlLoader[F]()
+  } yield new UpdatesCreator(renkuUrl, gitLabUrl.apiV4)
 }

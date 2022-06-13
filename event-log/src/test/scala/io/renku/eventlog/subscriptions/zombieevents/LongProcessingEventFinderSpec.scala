@@ -49,7 +49,7 @@ class LongProcessingEventFinderSpec
     forAll {
       Table(
         "status"            -> "grace period",
-        GeneratingTriples   -> Duration.ofDays(4 * 7),
+        GeneratingTriples   -> Duration.ofDays(6 * 7),
         TransformingTriples -> Duration.ofDays(1),
         Deleting            -> Duration.ofDays(1)
       )
