@@ -21,15 +21,18 @@ package io.renku.knowledgegraph.docs
 import cats.Show
 import cats.syntax.all._
 import io.circe.Json
+import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
+import io.renku.knowledgegraph.docs.model.SecurityScheme.SchemeType
 
 object model {
   trait OpenApiDocument {
-    def openApiVersion:  String
-    def info:            Info
-    def servers:         List[Server]
-    def paths:           Map[String, Path]
-    def maybeComponents: Option[Components]
+    def openApiVersion: String
+    def info:           Info
+    def servers:        List[Server]
+    def paths:          Map[String, Path]
+    def components:     Option[Components]
+    def security:       List[SecurityRequirement]
   }
 
   object OpenApiDocument {
@@ -43,19 +46,23 @@ object model {
                                         paths:          Map[String, Path]
   ) {
     def addPath(path: Path): CompleteDoc =
-      CompleteDoc(openApiVersion, info, servers, paths + (path.template -> path), None)
+      CompleteDoc(openApiVersion, info, servers, paths + (path.template -> path), None, Nil)
     def addServer(server: Server): DocWithInfo = copy(openApiVersion, info, servers :+ server, paths)
   }
 
-  private case class CompleteDoc(openApiVersion:  String,
-                                 info:            Info,
-                                 servers:         List[Server],
-                                 paths:           Map[String, Path],
-                                 maybeComponents: Option[Components]
+  private case class CompleteDoc(openApiVersion: String,
+                                 info:           Info,
+                                 servers:        List[Server],
+                                 paths:          Map[String, Path],
+                                 components:     Option[Components],
+                                 security:       List[SecurityRequirement]
   ) extends OpenApiDocument {
     def addPath(path: Path): OpenApiDocument = copy(paths = paths + (path.template -> path))
 
     def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
+
+    def addSecurity(securityScheme: SecurityScheme) =
+      copy(security = security :+ SecurityRequirement(Map(securityScheme.name -> securityScheme)))
   }
 
   case class Info(title: String, description: Option[String], version: String)
@@ -231,15 +238,29 @@ object model {
 
   case class Status(code: Int, name: String)
 
-  final case class SecurityRequirement()
+  final case class SecurityRequirement(schemes: Map[String, SecurityScheme])
   final case class SecurityScheme(name:             String,
                                   `type`:           TokenType,
                                   description:      Option[String],
                                   in:               In,
-                                  scheme:           String,
+                                  scheme:           SchemeType,
                                   flows:            OAuthFlows,
                                   openIdConnectUrl: String
   )
+  object SecurityScheme {
+    sealed trait SchemeType {
+      def value: String
+    }
+    final case object BearerToken extends SchemeType {
+      def value: String = "Bearer"
+    }
+    final case object BasicToken extends SchemeType {
+      def value: String = "Basic"
+    }
+    final case object OAuth2Token extends SchemeType {
+      def value: String = "OAuth"
+    }
+  }
   final case class Header()
   final case class Link()
 
@@ -262,18 +283,57 @@ object model {
     }
   }
 
-  final case class OAuthFlows(`implicit`:        Option[OAuthFlow] = None,
-                              password:          Option[OAuthFlow] = None,
-                              clientCredentials: Option[OAuthFlow] = None,
-                              authorizationCode: Option[OAuthFlow] = None
-  ) // TODO: make at least one flow required
+  trait OAuthFlows {
+    def `implicit`:        Option[OAuthFlow]
+    def password:          Option[OAuthFlow]
+    def clientCredentials: Option[OAuthFlow]
+    def authorizationCode: Option[OAuthFlow]
+  }
+  private[model] final case class OAuthFlowsImpl(`implicit`:        Option[OAuthFlow] = None,
+                                                 password:          Option[OAuthFlow] = None,
+                                                 clientCredentials: Option[OAuthFlow] = None,
+                                                 authorizationCode: Option[OAuthFlow] = None
+  ) extends OAuthFlows
 
-  final case class OAuthFlow(
-      authorizationUrl: String,
-      tokenUrl:         String,
-      scopes:           Map[String, String],
-      refreshUrl:       Option[String] = None
-  )
+  object OAuthFlows {
+    import OAuthFlowType._
+    def apply(flow: OAuthFlow): OAuthFlows = flow.`type` match {
+      case Implicit          => OAuthFlowsImpl(Some(flow), None, None, None)
+      case Password          => OAuthFlowsImpl(None, Some(flow), None, None)
+      case ClientCredentials => OAuthFlowsImpl(None, None, Some(flow), None)
+      case AuthorizationCode => OAuthFlowsImpl(None, None, None, Some(flow))
+    }
+    final case class OAuthFlow(
+        `type`:           OAuthFlowType,
+        authorizationUrl: String,
+        tokenUrl:         String,
+        scopes:           Map[String, String],
+        refreshUrl:       Option[String] = None
+    )
+
+    sealed trait OAuthFlowType {
+      def value: String
+    }
+
+    object OAuthFlowType {
+      final case object Implicit extends OAuthFlowType {
+        override def value: String = "implicit"
+      }
+
+      final case object Password extends OAuthFlowType {
+        override def value: String = "password"
+      }
+
+      final case object ClientCredentials extends OAuthFlowType {
+        override def value: String = "clientCredentials"
+      }
+
+      final case object AuthorizationCode extends OAuthFlowType {
+        override def value: String = "authorizationCode"
+      }
+    }
+
+  }
 
   sealed trait Schema {
     def `type`: String
@@ -284,7 +344,10 @@ object model {
     }
   }
 
-  final case class Components(schemas: Map[String, Schema], examples: List[Example])
+  final case class Components(schemas:         Map[String, Schema],
+                              examples:        List[Example],
+                              securitySchemes: Map[String, SecurityScheme]
+  )
 
   trait Example {
     def value:   T
