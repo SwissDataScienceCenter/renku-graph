@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
-import io.renku.tinytypes.{LocalDateTinyType, TinyType}
+import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyType, TinyTypeFactory}
 
 import java.time.{Instant, ZoneOffset}
 
@@ -70,7 +70,7 @@ package object finder {
       filters.creators match {
         case creators if creators.isEmpty => ""
         case creators =>
-          s"FILTER (IF (BOUND($variableName), $variableName IN ${creators.map(_.asSparqlEncodedLiteral).mkString("(", ", ", ")")}, false))"
+          s"FILTER (IF (BOUND($variableName), LCASE($variableName) IN ${creators.map(_.toLowerCase.asSparqlEncodedLiteral).mkString("(", ", ", ")")}, false))"
       }
 
     def maybeOnCreatorsNames(variableName: String): String =
@@ -78,7 +78,7 @@ package object finder {
         case creators if creators.isEmpty => ""
         case creators =>
           s"""FILTER (IF (BOUND($variableName), ${creators
-            .map(c => s"CONTAINS($variableName, ${c.asSparqlEncodedLiteral})")
+            .map(c => s"CONTAINS(LCASE($variableName), ${c.toLowerCase.asSparqlEncodedLiteral})")
             .mkString(" || ")} , false))"""
       }
 
@@ -154,6 +154,10 @@ package object finder {
     private implicit class ValueOps[TT <: TinyType](v: TT)(implicit s: Show[TT]) {
       lazy val asSparqlEncodedLiteral: String = s"'${sparqlEncode(v.show)}'"
       lazy val asLiteral:              String = show"'$v'"
+    }
+
+    private implicit class StringValueOps[TT <: StringTinyType](v: TT)(implicit s: Show[TT]) {
+      def toLowerCase(implicit factory: TinyTypeFactory[TT]): TT = factory(v.show.toLowerCase())
     }
   }
 
