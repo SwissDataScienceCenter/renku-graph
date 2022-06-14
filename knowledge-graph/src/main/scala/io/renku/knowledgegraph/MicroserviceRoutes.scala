@@ -29,6 +29,8 @@ import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.persons
+import io.renku.http.InfoMessage
+import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
@@ -41,13 +43,12 @@ import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
-import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
-import org.http4s.{AuthedRoutes, ParseFailure, Request, Response}
+import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -209,12 +210,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(getProjectDatasets)
         .merge
-    case LineageEndpoint(projectPathParts, locationParts) =>
-      (projectPathParts.toProjectPath -> locationParts.toLocation)
-        .mapN(_ -> _)
-        .flatTap { case (projectPath, _) => authorizePath(projectPath, maybeAuthUser).leftMap(_.toHttpResponse) }
-        .semiflatMap { case (projectPath, location) => `GET /lineage`(projectPath, location, maybeAuthUser) }
-        .merge
+    case projectPathParts :+ "files" :+ location :+ "lineage" =>
+      getLineage(projectPathParts, location, maybeAuthUser)
     case projectPathParts =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
@@ -222,33 +219,25 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .merge
   }
 
-  object LineageEndpoint {
-    def unapply(segments: List[String]): Option[(List[String], List[String])] =
-      if (segments.contains("lineage") && segments.contains("files")) {
+  private def getLineage(projectPathParts: List[String], location: String, maybeAuthUser: Option[AuthUser]) = {
+    import io.renku.knowledgegraph.lineage.model.Node.Location
 
-        val indexOfFiles = segments.indexOf("files")
-        val projectPath  = segments.take(indexOfFiles)
-        val location     = segments.drop(indexOfFiles + 1).takeWhile(!_.contains("lineage"))
-        if (projectPath.nonEmpty && location.nonEmpty)
-          Some((projectPath, location))
-        else None
-      } else None
-  }
-
-  private implicit class PathPartsOps(parts: List[String]) {
-
-    import io.renku.http.InfoMessage
-    import io.renku.http.InfoMessage._
-    import org.http4s.{Response, Status}
-
-    lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
-      model.projects.Path
-        .from(parts mkString "/")
+    def toLocation(location: String): EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
+      Location
+        .from(Uri.decode(location))
         .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
     }
 
-    lazy val toLocation: EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
-      Location
+    (projectPathParts.toProjectPath -> toLocation(location))
+      .mapN(_ -> _)
+      .flatTap { case (projectPath, _) => authorizePath(projectPath, maybeAuthUser).leftMap(_.toHttpResponse) }
+      .semiflatMap { case (projectPath, location) => `GET /lineage`(projectPath, location, maybeAuthUser) }
+      .merge
+  }
+
+  private implicit class PathPartsOps(parts: List[String]) {
+    lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
+      model.projects.Path
         .from(parts mkString "/")
         .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
     }
