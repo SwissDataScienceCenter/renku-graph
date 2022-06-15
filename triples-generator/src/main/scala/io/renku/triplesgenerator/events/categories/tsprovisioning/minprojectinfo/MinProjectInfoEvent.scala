@@ -16,18 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsprovisioning.triplesgenerated
+package io.renku.triplesgenerator.events.categories.tsprovisioning.minprojectinfo
 
-import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
-import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
-import io.renku.graph.model.EventsGenerators.eventIds
-import org.scalacheck.Gen
+import cats.Show
+import cats.syntax.all._
+import io.renku.events.consumers.Project
 
-private object TriplesGeneratedGenerators {
+private case class MinProjectInfoEvent(project: Project)
 
-  implicit val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
-    eventId  <- eventIds
-    project  <- consumerProjects
-    entities <- jsonLDEntities
-  } yield TriplesGeneratedEvent(eventId, project, entities)
+private object MinProjectInfoEvent {
+  implicit val show: Show[MinProjectInfoEvent] = Show[Project].contramap(_.project)
 }

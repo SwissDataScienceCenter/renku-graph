@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.categories.tsprovisioning.triplesgenerated
 
-import TriplesGeneratedGenerators._
+import CategoryGenerators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
@@ -31,8 +31,7 @@ import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, zippedEventPayloads}
-import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.EventsGenerators.zippedEventPayloads
 import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
@@ -46,33 +45,27 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
   "handle" should {
 
     "decode an event from the request, " +
-      "schedule triples generation " +
+      "schedule triples transformation " +
       s"and return $Accepted if event processor accepted the event" in new TestCase {
 
-        val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
         (eventBodyDeserializer.toEvent _)
-          .expects(eventId, project, zippedPayload)
-          .returning(triplesGeneratedEvent.pure[IO])
+          .expects(event.compoundEventId, event.project, zippedPayload)
+          .returning(event.pure[IO])
 
         (eventProcessor.process _)
-          .expects(triplesGeneratedEvent)
+          .expects(event)
           .returning(().pure[IO])
 
-        val requestContent: EventRequestContent =
-          requestContent((eventId, project).asJson(eventEncoder), zippedPayload)
+        val requestContent = toRequestContent((event.compoundEventId, event.project).asJson, zippedPayload)
 
         handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
-        logger.loggedOnly(
-          Info(
-            s"${handler.categoryName}: $eventId, projectPath = ${triplesGeneratedEvent.project.path} -> $Accepted"
-          )
-        )
+        logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
       }
 
     s"return $BadRequest if event payload is not present" in new TestCase {
 
-      val requestContent = EventRequestContent.NoPayload((eventId, project).asJson(eventEncoder))
+      val requestContent = EventRequestContent.NoPayload((event.compoundEventId, event.project).asJson)
 
       handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
@@ -82,7 +75,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     s"return $BadRequest if event payload is malformed" in new TestCase {
 
       val requestContent =
-        EventRequestContent.WithPayload((eventId, project).asJson(eventEncoder), jsons.generateOne.noSpaces)
+        EventRequestContent.WithPayload((event.compoundEventId, event.project).asJson, jsons.generateOne.noSpaces)
 
       handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
         BadRequest
@@ -93,33 +86,26 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     s"return $Accepted when event processor fails processing the event" in new TestCase {
 
-      val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
       (eventBodyDeserializer.toEvent _)
-        .expects(eventId, project, zippedPayload)
-        .returning(triplesGeneratedEvent.pure[IO])
+        .expects(event.compoundEventId, event.project, zippedPayload)
+        .returning(event.pure[IO])
 
       (eventProcessor.process _)
-        .expects(triplesGeneratedEvent)
+        .expects(event)
         .returning(exceptions.generateOne.raiseError[IO, Unit])
 
-      val requestContent: EventRequestContent = requestContent((eventId, project).asJson(eventEncoder), zippedPayload)
+      val requestContent = toRequestContent((event.compoundEventId, event.project).asJson, zippedPayload)
 
       handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(Accepted)
 
-      logger.loggedOnly(
-        Info(
-          s"${handler.categoryName}: $eventId, projectPath = ${triplesGeneratedEvent.project.path} -> $Accepted"
-        )
-      )
+      logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
     }
   }
 
   private trait TestCase {
 
-    val eventId       = compoundEventIds.generateOne
+    val event         = triplesGeneratedEvents.generateOne
     val zippedPayload = zippedEventPayloads.generateOne
-    val projectPath   = projectPaths.generateOne
-    val project       = Project(eventId.projectId, projectPath)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val eventProcessor             = mock[EventProcessor[IO]]
@@ -135,7 +121,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
 
-    def requestContent(event: Json, payload: ZippedEventPayload): EventRequestContent =
+    def toRequestContent(event: Json, payload: ZippedEventPayload): EventRequestContent =
       events.EventRequestContent.WithPayload(event, payload)
   }
 
@@ -145,7 +131,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         "categoryName": "TRIPLES_GENERATED",
         "id":           ${eventId.id.value},
         "project": {
-          "id" :        ${eventId.projectId.value},
+          "id" :  ${eventId.projectId.value},
           "path": ${project.path.value}
         }
       }"""

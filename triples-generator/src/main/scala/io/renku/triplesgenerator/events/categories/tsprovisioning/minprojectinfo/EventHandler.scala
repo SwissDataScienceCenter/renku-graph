@@ -16,45 +16,45 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.membersync
+package io.renku.triplesgenerator.events.categories.tsprovisioning.minprojectinfo
 
-import cats.Show
 import cats.data.EitherT.fromEither
 import cats.effect.{Async, Concurrent, Spawn}
 import cats.syntax.all._
+import cats.{NonEmptyParallel, Parallel}
 import io.renku.events.consumers.EventSchedulingResult.Accepted
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.http.client.GitLabClient
+import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: Concurrent: Logger](
     override val categoryName: CategoryName,
-    membersSynchronizer:       MembersSynchronizer[F]
+    eventProcessor:            EventProcessor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
-  import io.renku.graph.model.projects
-  import membersSynchronizer._
+  import eventProcessor._
 
-  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess[F](startSynchronizingMember(request))
+  override def createHandlingProcess(request: EventRequestContent) =
+    EventHandlingProcess[F](startProcessingEvent(request))
 
-  private def startSynchronizingMember(request: EventRequestContent) = for {
-    projectPath <- fromEither[F](request.event.getProjectPath)
+  private def startProcessingEvent(request: EventRequestContent) = for {
+    project <- fromEither(request.event.getProject)
     result <- Spawn[F]
-                .start(synchronizeMembers(projectPath))
+                .start(process(MinProjectInfoEvent(project)))
                 .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(projectPath))
-                .leftSemiflatTap(Logger[F].log(projectPath))
+                .semiflatTap(Logger[F].log(project))
+                .leftSemiflatTap(Logger[F].log(project))
   } yield result
-
-  private implicit lazy val eventInfoToString: Show[projects.Path] = Show.show(path => s"projectPath = $path")
 }
 
 private[events] object EventHandler {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](gitLabClient: GitLabClient[F]): F[EventHandler[F]] = for {
-    membersSynchronizer <- MembersSynchronizer[F](gitLabClient)
-  } yield new EventHandler[F](categoryName, membersSynchronizer)
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
+      gitLabClient: GitLabClient[F]
+  ): F[EventHandler[F]] = for {
+    eventProcessor <- EventProcessor[F](gitLabClient)
+  } yield new EventHandler[F](categoryName, eventProcessor)
 }

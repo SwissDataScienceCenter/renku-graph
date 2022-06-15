@@ -16,9 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsprovisioning.triplesgenerated
+package io.renku.triplesgenerator.events.categories
+package tsprovisioning
+package triplesgenerated
 
-import TriplesGeneratedGenerators._
+import CategoryGenerators._
 import cats.data.EitherT
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -36,11 +38,10 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityG
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.events.categories.tsprovisioning.projectinfo.ProjectInfoFinder
-import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import projectinfo.ProjectInfoFinder
 
 import scala.language.reflectiveCalls
 import scala.util.{Failure, Success, Try}

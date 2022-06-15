@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.categories.tsprovisioning.triplesgenerated
+package io.renku.triplesgenerator.events.categories
+package tsprovisioning
+package triplesgenerated
 
 import cats.data.EitherT
 import cats.effect.Async
@@ -29,9 +31,8 @@ import io.renku.graph.model.entities.Project.GitLabProjectInfo
 import io.renku.graph.model.entities._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.jsonld.JsonLDDecoder.decodeList
-import io.renku.triplesgenerator.events.categories.tsprovisioning.projectinfo.ProjectInfoFinder
-import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.typelevel.log4cats.Logger
+import projectinfo.ProjectInfoFinder
 
 private trait EntityBuilder[F[_]] {
   def buildEntity(event: TriplesGeneratedEvent)(implicit
