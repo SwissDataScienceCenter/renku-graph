@@ -39,6 +39,7 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.categories._
 import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesgenerator.events.categories.tsprovisioning.triplesgenerated
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import org.typelevel.log4cats.Logger
 
