@@ -350,6 +350,35 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       ).sortBy(_.name.value)
     }
 
+    "return entities creator matches in a case-insensitive way" in new TestCase {
+      val creator = personEntities.generateOne
+
+      val soleProject = renkuProjectEntities(visibilityPublic)
+        .modify(creatorLens.modify(_ => creator.some))
+        .generateOne
+
+      val dsAndProject @ _ ::~ dsProject = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceNonModified).modify(
+            provenanceLens.modify(
+              creatorsLens.modify(_ => NonEmptyList.of(personEntities.generateOne, creator))
+            )
+          )
+        )
+        .generateOne
+
+      loadToStore(soleProject, dsProject)
+
+      finder
+        .findEntities(Criteria(Filters(creators = Set(randomiseCases(creator.name.show).generateAs(persons.Name)))))
+        .unsafeRunSync()
+        .results shouldBe List(
+        soleProject.to[model.Entity.Project],
+        dsAndProject.to[model.Entity.Dataset],
+        creator.to[model.Entity.Person]
+      ).sortBy(_.name.value)
+    }
+
     "return entities that matches at least one of the given creators" in new TestCase {
 
       val projectCreator = personEntities.generateOne
@@ -381,7 +410,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
       ).sortBy(_.name.value)
     }
 
-    "return no entities when no match on creator" in new TestCase {
+    "return no entities when there's no match on creator" in new TestCase {
       val _ ::~ project = renkuProjectEntities(visibilityPublic)
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne

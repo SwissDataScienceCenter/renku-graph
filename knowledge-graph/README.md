@@ -652,7 +652,7 @@ Response body example:
 
 #### GET /knowledge-graph/projects/:namespace/:name/files/:location/lineage
 
-Fetches lineage for a given project `namespace`/`name` and file `location` (relative path). This endpoint is intended to replace the graphql endpoint.
+Fetches lineage for a given project `namespace`/`name` and file `location` (URL-encoded relative path to the file). This endpoint is intended to replace the graphql endpoint.
 
 | Status                     | Description                                                       |
 |----------------------------|-------------------------------------------------------------------|

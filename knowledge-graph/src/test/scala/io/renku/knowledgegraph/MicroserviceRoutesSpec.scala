@@ -23,6 +23,7 @@ import cats.data.{Kleisli, OptionT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.http.client.UrlEncoder.urlEncode
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -244,9 +245,10 @@ class MicroserviceRoutesSpec
       response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
     }
   }
+
   "GET /knowledge-graph/projects/:projectId/files/:location/lineage" should {
     def lineageUri(projectPath: ProjectPath, location: Location) =
-      Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.value}/files/${location.value}/lineage")
+      Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.show}/files/${urlEncode(location.show)}/lineage")
 
     s"return $Ok when the lineage is found" in new TestCase {
       val projectPath   = projectPaths.generateOne
