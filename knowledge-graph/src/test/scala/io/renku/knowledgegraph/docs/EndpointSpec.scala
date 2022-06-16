@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.docs
 
 import cats.effect.IO
+import io.renku.config.ServiceVersion
 import io.renku.testtools.IOSpec
 import io.swagger.parser.OpenAPIParser
 import org.scalatest.matchers.should
@@ -35,7 +36,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec {
   }
 
   private trait TestCase {
-    val endpoint = new EndpointImpl[IO]()
+    val endpoint = new EndpointImpl[IO](ServiceVersion("0.0.0"))
 
   }
 }

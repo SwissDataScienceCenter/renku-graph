@@ -268,15 +268,19 @@ object model {
     sealed trait SchemeType {
       def value: String
     }
-    final case object BearerToken extends SchemeType {
-      def value: String = "Bearer"
+
+    object SchemeType {
+      final case object BearerToken extends SchemeType {
+        def value: String = "Bearer"
+      }
+      final case object BasicToken extends SchemeType {
+        def value: String = "Basic"
+      }
+      final case object OAuth2Token extends SchemeType {
+        def value: String = "OAuth"
+      }
     }
-    final case object BasicToken extends SchemeType {
-      def value: String = "Basic"
-    }
-    final case object OAuth2Token extends SchemeType {
-      def value: String = "OAuth"
-    }
+
   }
   final case class Header()
   final case class Link()

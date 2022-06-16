@@ -19,9 +19,9 @@
 package io.renku.knowledgegraph.docs
 
 import cats.effect.Async
-import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.all._
 import io.circe.syntax._
+import io.renku.config.ServiceVersion
 import io.renku.knowledgegraph.docs.Implicits.StatusOps
 import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph.lineage
@@ -33,7 +33,7 @@ trait Endpoint[F[_]] {
   def `get /docs`: F[http4s.Response[F]]
 }
 
-private class EndpointImpl[F[_]: Async] extends Http4sDsl[F] with Endpoint[F] {
+private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends Http4sDsl[F] with Endpoint[F] {
   import Encoders._
 
   override def `get /docs`: F[http4s.Response[F]] = Ok(doc.asJson)
@@ -41,7 +41,10 @@ private class EndpointImpl[F[_]: Async] extends Http4sDsl[F] with Endpoint[F] {
   lazy val doc: OpenApiDocument =
     OpenApiDocument(
       "3.0.3",
-      Info("Knowledge Graph API", "Get info about datasets, users, activities, and other entities".some, "1.0.0")
+      Info("Knowledge Graph API",
+           "Get info about datasets, users, activities, and other entities".some,
+           serviceVersion.value
+      )
     ).addServer(renkuLabServer)
       .addPath(lineage.EndpointDoc.path)
       .addSecurity(securityScheme)
@@ -84,5 +87,8 @@ private class EndpointImpl[F[_]: Async] extends Http4sDsl[F] with Endpoint[F] {
 }
 object Endpoint {
 
-  def apply[F[_]: Async]: F[Endpoint[F]] = new EndpointImpl[F].pure[F].widen[Endpoint[F]]
+  def apply[F[_]: Async]: F[Endpoint[F]] = {
+    val serviceVersion: F[ServiceVersion] = ServiceVersion.readFromConfig[F]()
+    serviceVersion.map(new EndpointImpl[F](_)).widen[Endpoint[F]]
+  }
 }
