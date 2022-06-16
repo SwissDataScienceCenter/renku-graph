@@ -17,7 +17,8 @@ object Encoders {
             "openapi": ${doc.openApiVersion},
             "info": ${doc.info},
             "servers": ${doc.servers},
-            "paths": ${doc.paths}
+            "paths": ${doc.paths},
+            "security": ${doc.security}
           }
         """ deepMerge components
   }
@@ -50,8 +51,8 @@ object Encoders {
                ${status.code}: {
                     "description": ${response.description},
                     "content": ${response.content},
-                    "content": ${response.links},
-                    "content": ${response.headers}
+                    "links": ${response.links},
+                    "headers": ${response.headers}
                } 
              }"""
       }
@@ -68,8 +69,24 @@ object Encoders {
   implicit val schemaEncoder: Encoder[model.Schema] = Encoder.instance { schema =>
     json"""{"type": ${schema.`type`}}"""
   }
-  implicit val requestBodyEncoder: Encoder[model.RequestBody] = deriveEncoder
-  implicit val mediaTypeEncoder:   Encoder[model.MediaType]   = deriveEncoder
+  implicit val requestBodyEncoder: Encoder[model.RequestBody] = Encoder.instance { requestBody =>
+    val content = requestBody.content.foldLeft(empty) { case (acc, (key, mediaType)) =>
+      json"""{$key: $mediaType}""" deepMerge acc // TODO: see why this isn't getting encoded
+    }
+    json"""
+           {
+             "description": ${requestBody.description},
+             "content": $content
+           }
+           """ deepMerge content
+  }
+  implicit val mediaTypeEncoder: Encoder[model.MediaType] = Encoder.instance { mediaType =>
+    json"""
+           {
+             "examples": ${mediaType.examples}
+           }
+           """
+  }
   implicit val responseEncoder: Encoder[model.Response] = Encoder.instance { response =>
     json"""{
              "description": ${response.description}, 
@@ -79,14 +96,8 @@ object Encoders {
   implicit val statusEncoder: Encoder[model.Status] = deriveEncoder
   implicit val headerEncoder: Encoder[model.Header] = deriveEncoder
   implicit val linkEncoder:   Encoder[model.Link]   = deriveEncoder
-  implicit lazy val securityRequirementEncoder: Encoder[model.SecurityRequirement] = Encoder.instance {
-    securityRequirement =>
-      securityRequirement.schemes.foldLeft(empty) { case (acc, (key, scheme)) =>
-        acc deepMerge
-          json"""{
-                   $key: $scheme
-                 }"""
-      }
+  implicit lazy val securityRequirementEncoder: Encoder[model.SecurityRequirement] = Encoder.instance { sR =>
+    json"""{${sR.schemeName}: ${sR.scopeNames}}""" // TODO: add empty object for no auth
   }
   implicit val inEncoder: Encoder[model.In] = Encoder.instance { inType =>
     Json.fromString(inType.value)
@@ -112,7 +123,7 @@ object Encoders {
     json"""{
              "schemas": ${components.schemas},
              "examples": ${components.examples},
-             "security": ${components.securitySchemes}
+             "securitySchemes": ${components.securitySchemes}
            }"""
   }
   implicit val securitySchemeEncoder: Encoder[model.SecurityScheme] = Encoder.instance { scheme =>
@@ -120,10 +131,7 @@ object Encoders {
     json"""{
       "name": ${scheme.name},
       "type": ${scheme.`type`.value},
-      "in": ${scheme.in},
-      "scheme": ${scheme.scheme.value},
-      "flows": ${scheme.flows},
-      "openIdConnectUrl": ${scheme.openIdConnectUrl}
+      "in": ${scheme.in}
     }""" deepMerge description
   }
   implicit def exampleEncoder: Encoder[model.Example] = Encoder.instance { example =>

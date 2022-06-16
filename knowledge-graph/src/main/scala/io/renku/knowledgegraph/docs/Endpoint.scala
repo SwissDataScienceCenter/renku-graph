@@ -22,53 +22,63 @@ import cats.effect.Async
 import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.all._
 import io.circe.syntax._
-import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
-import io.renku.knowledgegraph.docs.model.SecurityScheme.OAuth2Token
+import io.renku.knowledgegraph.docs.Implicits.StatusOps
 import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph.lineage
-import org.http4s.Response
+import org.http4s
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
 
 trait Endpoint[F[_]] {
-  def `get /docs`: F[Response[F]]
+  def `get /docs`: F[http4s.Response[F]]
 }
-// TODO: add authorization info: https://github.com/SwissDataScienceCenter/renku-graph/tree/development/knowledge-graph#get-knowledge-graphprojectsnamespacename
-// specify different responses: e.g. 401, 403, 404, 500, etc.
+
 private class EndpointImpl[F[_]: Async] extends Http4sDsl[F] with Endpoint[F] {
   import Encoders._
 
-  override def `get /docs`: F[Response[F]] = Ok(doc.asJson)
+  override def `get /docs`: F[http4s.Response[F]] = Ok(doc.asJson)
 
   lazy val doc: OpenApiDocument =
     OpenApiDocument(
       "3.0.3",
       Info("Knowledge Graph API", "Get info about datasets, users, activities, and other entities".some, "1.0.0")
-    ).addServer(localServer)
+    ).addServer(renkuLabServer)
       .addPath(lineage.EndpointDoc.path)
       .addSecurity(securityScheme)
+      .addResponsesToAll(authErrorResponses)
 
   private lazy val localServer =
     Server("http://localhost:{port}/{basePath}",
            "Local server",
-           Map("port" -> Variable("8080"), "basePath" -> Variable("knowledge-graph"))
+           Map("port" -> Variable("8080"), "basePath" -> Variable("knowledge-graph/projects"))
     )
+
+  private lazy val devServer =
+    Server("http://dev.renku.ch/{basePath}", "Dev server", Map("basePath" -> Variable("knowledge-graph/projects")))
+
+  private lazy val renkuLabServer =
+    Server("http://renkulab.io/{basePath}", "Renku Lab server", Map("basePath" -> Variable("knowledge-graph/projects")))
 
   private lazy val securityScheme = SecurityScheme(
     "PRIVATE-TOKEN",
     TokenType.ApiKey,
     "User's Personal Access Token in GitLab".some,
-    In.Header,
-    OAuth2Token,
-    model.OAuthFlows(
-      OAuthFlow(
-        `type` = model.OAuthFlows.OAuthFlowType.Password,
-        authorizationUrl = "https://dev.renku.ch/auth/realms/Renku/protocol/openid-connect/auth",
-        tokenUrl = "https://dev.renku.ch/auth/realms/Renku/protocol/openid-connect/token",
-        scopes = Map.empty
-      )
+    In.Header
+  )
+
+  val authErrorResponses = Map(
+    http4s.Status.Unauthorized.asDocStatus -> Response("If given auth header cannot be authenticated",
+                                                       Map.empty,
+                                                       Map.empty,
+                                                       Map.empty
     ),
-    openIdConnectUrl = "/auth/realms/Renku/.well-known/openid-configuration"
+    http4s.Status.NotFound.asDocStatus -> Response(
+      "If there is no project with the given namespace/name or user is not authorised to access this project",
+      Map.empty,
+      Map.empty,
+      Map.empty
+    ),
+    http4s.Status.InternalServerError.asDocStatus -> Response("Otherwise", Map.empty, Map.empty, Map.empty)
   )
 
 }

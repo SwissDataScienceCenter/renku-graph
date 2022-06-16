@@ -23,7 +23,6 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
-import io.renku.knowledgegraph.docs.model.SecurityScheme.SchemeType
 
 object model {
   trait OpenApiDocument {
@@ -61,8 +60,25 @@ object model {
 
     def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
 
-    def addSecurity(securityScheme: SecurityScheme) =
-      copy(security = security :+ SecurityRequirement(Map(securityScheme.name -> securityScheme)))
+    def addSecurity(securityScheme: SecurityScheme) = {
+      val newComponents = {
+        val c = this.components.getOrElse(Components.empty)
+        c.copy(securitySchemes = c.securitySchemes + (securityScheme.name -> securityScheme))
+      }
+      copy(security = security :+ SecurityRequirement(securityScheme.name, Nil), components = newComponents.some)
+    }
+
+    def addResponsesToAll(responses: Map[Status, Response]): CompleteDoc =
+      copy(paths = paths.map { case (template, path) =>
+        (template,
+         PathImpl(path.summary,
+                  path.description,
+                  path.operations.map(op => op.copy(responses = op.responses ++ responses)),
+                  path.parameters,
+                  path.template
+         )
+        )
+      })
   }
 
   case class Info(title: String, description: Option[String], version: String)
@@ -165,12 +181,20 @@ object model {
       PathImpl(summary, description, operations :+ operation, parameters, template)
   }
 
-  sealed trait Operation {
+  sealed trait Operation extends Product with Serializable {
     def summary:     Option[String]
     def parameters:  List[Parameter]
     def requestBody: Option[RequestBody]
     def responses:   Map[Status, Response]
     def security:    List[SecurityRequirement]
+    def copy(summary:     Option[String] = summary, // TODO: make this generic
+             parameters:  List[Parameter] = parameters,
+             requestBody: Option[RequestBody] = requestBody,
+             responses:   Map[Status, Response] = responses,
+             security:    List[SecurityRequirement] = security
+    ) = this match {
+      case _: Operation.Get => Operation.Get(summary, parameters, requestBody, responses, security)
+    }
   }
 
   object Operation {
@@ -224,29 +248,22 @@ object model {
   }
 
   final case class RequestBody(description: String, content: Map[String, MediaType])
-  final case class MediaType(name: String, examples: List[Example])
+  final case class MediaType(name: String, examples: Map[String, Example])
   object MediaType {
-    def apply(name: String, example: Example): MediaType =
-      MediaType(name, List(example))
+    def apply(name: String, exampleName: String, example: Example): MediaType =
+      MediaType(name, Map(exampleName -> example))
   }
   final case class Response(
       description: String,
-      content:     List[MediaType],
+      content:     Map[String, MediaType],
       headers:     Map[String, Header] = Map.empty,
       links:       Map[String, Link] = Map.empty
   )
 
   case class Status(code: Int, name: String)
 
-  final case class SecurityRequirement(schemes: Map[String, SecurityScheme])
-  final case class SecurityScheme(name:             String,
-                                  `type`:           TokenType,
-                                  description:      Option[String],
-                                  in:               In,
-                                  scheme:           SchemeType,
-                                  flows:            OAuthFlows,
-                                  openIdConnectUrl: String
-  )
+  final case class SecurityRequirement(schemeName: String, scopeNames: List[String])
+  final case class SecurityScheme(name: String, `type`: TokenType, description: Option[String], in: In)
   object SecurityScheme {
     sealed trait SchemeType {
       def value: String
@@ -345,9 +362,13 @@ object model {
   }
 
   final case class Components(schemas:         Map[String, Schema],
-                              examples:        List[Example],
+                              examples:        Map[String, Example],
                               securitySchemes: Map[String, SecurityScheme]
   )
+
+  object Components {
+    def empty: Components = Components(Map.empty, Map.empty, Map.empty)
+  }
 
   trait Example {
     def value:   T
