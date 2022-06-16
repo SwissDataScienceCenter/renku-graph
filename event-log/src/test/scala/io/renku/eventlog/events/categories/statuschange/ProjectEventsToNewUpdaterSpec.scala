@@ -27,6 +27,8 @@ import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.categories.statuschange.projectCleaner.ProjectCleaner
+import io.renku.eventlog.subscriptions.minprojectinfo
+import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
@@ -90,17 +92,18 @@ class ProjectEventsToNewUpdaterSpec
         val otherProjectEvent = addEvent(eventStatus, otherProject)
         upsertEventDelivery(otherProjectEvent, subscriberId)
 
-        upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
+        upsertCategorySyncTime(project.id, minprojectinfo.categoryName, lastSyncedDates.generateOne)
+        val otherCategoryName: CategoryName = categoryNames.generateOne
+        upsertCategorySyncTime(project.id, otherCategoryName, lastSyncedDates.generateOne)
 
-        val counts: Map[EventStatus, Int] =
-          eventsStatuses
-            .groupBy(identity)
-            .map { case (eventStatus, statuses) => (eventStatus, -1 * statuses.length) }
-            .updatedWith(EventStatus.New) { maybeNewEvents =>
-              maybeNewEvents.map(_ + events.size).orElse(Some(events.size))
-            }
-            .updated(AwaitingDeletion, -1)
-            .updated(Deleting, -1)
+        val counts: Map[EventStatus, Int] = eventsStatuses
+          .groupBy(identity)
+          .map { case (eventStatus, statuses) => (eventStatus, -1 * statuses.length) }
+          .updatedWith(EventStatus.New) { maybeNewEvents =>
+            maybeNewEvents.map(_ + events.size).orElse(Some(events.size))
+          }
+          .updated(AwaitingDeletion, -1)
+          .updated(Deleting, -1)
 
         sessionResource
           .useK(dbUpdater updateDB ProjectEventsToNew(project))
@@ -117,6 +120,7 @@ class ProjectEventsToNewUpdaterSpec
         findAllEventDeliveries should contain theSameElementsAs List(otherProjectEvent -> subscriberId,
                                                                      generatingTriplesEvent -> subscriberId
         )
+        findProjectCategorySyncTimes(project.id).map(_._1) shouldBe List(otherCategoryName)
 
         val latestEventDate = (skippedEventDate :: generatingTriplesEventDate :: eventsAndDates.map(_._2)).max
 
