@@ -51,24 +51,15 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   override def removeAllTriples(): F[Unit] =
     queryExpecting(checkIfEmpty)(storeEmptyFlagDecoder) >>= {
-      case true => MonadThrow[F].unit
-      case false =>
-        for {
-          _ <- updateWithNoResult(removeTriplesBatch)
-          _ <- removeAllTriples()
-        } yield ()
+      case true  => MonadThrow[F].unit
+      case false => updateWithNoResult(removeTriplesBatch) >> removeAllTriples()
     }
 
   private val checkIfEmpty = SparqlQuery.of(
     name = "triples remove - count",
     Prefixes.of(renku -> "renku"),
     s"""|SELECT ?subject
-        |WHERE { ?subject ?p ?o 
-        |  MINUS {
-        |    ?subject a ?type
-        |    FILTER (?type IN (renku:VersionPair, renku:ReProvisioning)) 
-        |  }
-        |}
+        |WHERE { ?subject ?p ?o }
         |LIMIT 1
         |""".stripMargin
   )
@@ -79,29 +70,15 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     s"""|DELETE { ?s ?p ?o }
         |WHERE { 
         |  SELECT ?s ?p ?o
-        |  WHERE { ?s ?p ?o 
-        |    MINUS {
-        |      ?s a ?type
-        |      FILTER (?type IN (renku:VersionPair, renku:ReProvisioning)) 
-        |    }
-        |  }
+        |  WHERE { ?s ?p ?o }
         |  LIMIT ${removalBatchSize.value}
         |}
         |""".stripMargin
   )
 
-  private implicit val storeEmptyFlagDecoder: Decoder[Boolean] = {
-    import io.circe.Decoder.decodeList
-
-    val subject: Decoder[String] = _.downField("subject")
-      .downField("value")
-      .as[String]
-
-    _.downField("results")
-      .downField("bindings")
-      .as[List[String]](decodeList(subject))
-      .map(_.isEmpty)
-  }
+  private implicit val storeEmptyFlagDecoder: Decoder[Boolean] = ResultsDecoder[List, String] { implicit cur =>
+    extract[String]("subject")
+  }.map(_.isEmpty)
 }
 
 private object TriplesRemoverImpl {

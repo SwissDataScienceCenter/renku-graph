@@ -80,7 +80,7 @@ class StatsFinderSpec
   private trait TestCase {
     implicit val logger:               TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val stats = new StatsFinderImpl[IO](rdfStoreConfig)
+    val stats = new StatsFinderImpl[IO](renkuStoreConfig)
   }
 
   private implicit class MapOps(entitiesByType: Map[EntityLabel, Count]) {

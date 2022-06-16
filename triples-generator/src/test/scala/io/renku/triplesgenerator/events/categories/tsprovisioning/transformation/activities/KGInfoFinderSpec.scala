@@ -113,6 +113,6 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val kgInfoFinder = new KGInfoFinderImpl[IO](rdfStoreConfig)
+    val kgInfoFinder = new KGInfoFinderImpl[IO](renkuStoreConfig)
   }
 }

@@ -24,7 +24,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, TriplesStoreConfig}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalatest.matchers.should.Matchers
@@ -46,6 +46,8 @@ class RenkuVersionPairUpdaterSpec extends AnyWordSpec with IOSpec with InMemoryR
     }
   }
 
+  override lazy val storeConfig: TriplesStoreConfig = migrationsStoreConfig
+
   private trait TestCase {
     val currentRenkuVersionPair      = renkuVersionPairs.generateOne
     val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
@@ -53,7 +55,7 @@ class RenkuVersionPairUpdaterSpec extends AnyWordSpec with IOSpec with InMemoryR
     private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl[IO](rdfStoreConfig)
+    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl[IO](migrationsStoreConfig)
 
     def findPairInDb: Set[RenkuVersionPair] =
       runQuery(s"""|SELECT DISTINCT ?schemaVersion ?cliVersion 

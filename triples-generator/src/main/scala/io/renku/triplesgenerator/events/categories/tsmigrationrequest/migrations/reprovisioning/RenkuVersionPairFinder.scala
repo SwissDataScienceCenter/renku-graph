@@ -33,9 +33,9 @@ trait RenkuVersionPairFinder[F[_]] {
 }
 
 private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig:  RdfStoreConfig
+    storeConfig:     MigrationsStoreConfig
 )(implicit renkuUrl: RenkuUrl)
-    extends RdfStoreClientImpl[F](rdfStoreConfig)
+    extends RdfStoreClientImpl[F](storeConfig)
     with RenkuVersionPairFinder[F] {
 
   override def find(): F[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
@@ -61,8 +61,8 @@ private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 
 private object RenkuVersionPairFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      rdfStoreConfig:  RdfStoreConfig
+      storeConfig:     MigrationsStoreConfig
   )(implicit renkuUrl: RenkuUrl): F[RenkuVersionPairFinderImpl[F]] = MonadThrow[F].catchNonFatal {
-    new RenkuVersionPairFinderImpl[F](rdfStoreConfig)
+    new RenkuVersionPairFinderImpl[F](storeConfig)
   }
 }

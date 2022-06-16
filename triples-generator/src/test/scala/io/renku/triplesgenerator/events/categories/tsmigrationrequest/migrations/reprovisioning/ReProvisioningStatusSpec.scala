@@ -31,7 +31,7 @@ import io.renku.graph.model.Schemas._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningInfo.Status.Running
 import org.scalamock.scalatest.MockFactory
@@ -146,6 +146,8 @@ class ReProvisioningStatusSpec
     }
   }
 
+  override lazy val storeConfig: TriplesStoreConfig = migrationsStoreConfig
+
   private trait TestCase {
     val cacheRefreshInterval  = 1 second
     val statusRefreshInterval = 1 second
@@ -155,7 +157,7 @@ class ReProvisioningStatusSpec
     private val statusCacheCheckTimeRef = Ref.unsafe[IO, Long](0L)
     private val subscriptions           = List(mock[SubscriptionMechanism[IO]], mock[SubscriptionMechanism[IO]])
     val reProvisioningStatus = new ReProvisioningStatusImpl[IO](subscriptions,
-                                                                rdfStoreConfig,
+                                                                migrationsStoreConfig,
                                                                 statusRefreshInterval,
                                                                 cacheRefreshInterval,
                                                                 statusCacheCheckTimeRef

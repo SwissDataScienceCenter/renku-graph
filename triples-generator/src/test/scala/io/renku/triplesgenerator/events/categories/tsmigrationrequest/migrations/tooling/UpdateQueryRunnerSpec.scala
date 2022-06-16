@@ -52,7 +52,7 @@ class UpdateQueryRunnerSpec extends AnyWordSpec with should.Matchers with IOSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val runner = new UpdateQueryRunnerImpl[IO](rdfStoreConfig)
+    val runner = new UpdateQueryRunnerImpl[IO](renkuStoreConfig)
   }
 
   private def findString = runQuery("SELECT ?str WHERE { <http://localhost/test> schema:name ?str }")
