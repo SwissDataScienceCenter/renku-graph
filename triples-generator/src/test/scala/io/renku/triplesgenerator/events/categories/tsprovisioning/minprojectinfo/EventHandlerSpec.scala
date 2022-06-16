@@ -26,7 +26,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.events
 import io.renku.events.EventRequestContent
-import io.renku.events.consumers.EventHandlingProcess
+import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -77,8 +77,9 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
   private trait TestCase {
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventProcessor = mock[EventProcessor[IO]]
-    val handler        = new EventHandler[IO](categoryName, eventProcessor)
+    val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val eventProcessor             = mock[EventProcessor[IO]]
+    val handler                    = new EventHandler[IO](categoryName, concurrentProcessesLimiter, eventProcessor)
 
     def toRequestContent(event: Json): EventRequestContent = events.EventRequestContent.NoPayload(event)
   }

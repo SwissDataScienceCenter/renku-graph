@@ -31,9 +31,10 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: Concurrent: Logger](
-    override val categoryName: CategoryName,
-    eventProcessor:            EventProcessor[F]
-) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
+    override val categoryName:  CategoryName,
+    concurrentProcessesLimiter: ConcurrentProcessesLimiter[F],
+    eventProcessor:             EventProcessor[F]
+) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
 
   import eventProcessor._
 
@@ -52,9 +53,12 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private[events] object EventHandler {
+  import eu.timepit.refined.auto._
+
   def apply[F[_]: Async: NonEmptyParallel: Parallel: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
       gitLabClient: GitLabClient[F]
   ): F[EventHandler[F]] = for {
-    eventProcessor <- EventProcessor[F](gitLabClient)
-  } yield new EventHandler[F](categoryName, eventProcessor)
+    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(processesCount = 2)
+    eventProcessor             <- EventProcessor[F](gitLabClient)
+  } yield new EventHandler[F](categoryName, concurrentProcessesLimiter, eventProcessor)
 }
