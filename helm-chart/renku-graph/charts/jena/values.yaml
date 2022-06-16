@@ -55,6 +55,15 @@ tolerations: []
 
 affinity: {}
 
+podSecurityContext:
+  fsGroup: 65534
+
+securityContext:
+  runAsUser: 65534
+  runAsGroup: 65534
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+
 # Jena configuration
 jvmXmx: 2G
 users:

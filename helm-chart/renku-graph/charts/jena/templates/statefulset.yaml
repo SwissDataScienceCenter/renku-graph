@@ -77,6 +77,8 @@ spec:
               subPath: docker-entrypoint.sh
           resources:
 {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
       volumes:
         - name: docker-entrypoint
           configMap:
@@ -114,3 +116,5 @@ spec:
       tolerations:
 {{ toYaml . | indent 8 }}
     {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
