@@ -39,6 +39,7 @@ import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.categories._
 import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesgenerator.events.categories.tsprovisioning.triplesgenerated
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import org.typelevel.log4cats.Logger
 
@@ -71,17 +72,21 @@ object Microservice extends IOMicroservice {
           awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
           membersSyncSubscription        <- membersync.SubscriptionFactory(gitLabClient)
           triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory(gitLabClient)
-          cleanUpSubscription            <- cleanup.SubscriptionFactory[IO]
-          reProvisioningStatus <- ReProvisioningStatus(awaitingGenerationSubscription,
-                                                       membersSyncSubscription,
-                                                       triplesGeneratedSubscription,
-                                                       cleanUpSubscription
+//          minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory(gitLabClient)
+          cleanUpSubscription <- cleanup.SubscriptionFactory[IO]
+          reProvisioningStatus <- ReProvisioningStatus(
+                                    awaitingGenerationSubscription,
+                                    membersSyncSubscription,
+                                    triplesGeneratedSubscription,
+//                                                       minProjectInfoSubscription,
+                                    cleanUpSubscription
                                   )
           migrationRequestSubscription <- tsmigrationrequest.SubscriptionFactory[IO](reProvisioningStatus, config)
           eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                       awaitingGenerationSubscription,
                                       membersSyncSubscription,
                                       triplesGeneratedSubscription,
+//                                      minProjectInfoSubscription,
                                       cleanUpSubscription,
                                       migrationRequestSubscription
                                     )
