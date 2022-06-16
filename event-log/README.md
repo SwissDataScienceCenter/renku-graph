@@ -660,6 +660,36 @@ or
 }
 ```
 
+- **ADD_MIN_PROJECT_INFO**
+
+Events of the type are issued for all the projects that have no events in the `TRIPLES_STORE` status and for which `ADD_MIN_PROJECT_INFO` has not been sent, yet.
+
+**Request**
+
+```json
+{
+  "categoryName": "ADD_MIN_PROJECT_INFO",
+  "subscriber": {
+    "url": "http://host/path",
+    "id":  "20210302140653-8641"
+  }
+}
+```
+
+**Event example**
+
+`event` part:
+
+```json
+{
+  "categoryName": "ADD_MIN_PROJECT_INFO",
+  "project": {
+    "id":   1,
+    "path": "namespace/project-name"
+  }
+}
+```
+
 - **ZOMBIE_CHASING**
 
 **Request**

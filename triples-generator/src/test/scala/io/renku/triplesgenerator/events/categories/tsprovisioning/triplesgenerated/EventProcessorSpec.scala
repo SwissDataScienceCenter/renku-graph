@@ -46,7 +46,6 @@ import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverabl
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Assertion
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import tsprovisioning.transformation.Generators._
@@ -57,13 +56,7 @@ import tsprovisioning.triplesuploading.{TransformationStepsRunner, TriplesUpload
 import java.time.Duration
 import scala.util.{Success, Try}
 
-class EventProcessorSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockFactory
-    with Eventually
-    with IntegrationPatience
-    with should.Matchers {
+class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   import AccessTokenFinder._
 
