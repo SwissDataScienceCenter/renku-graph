@@ -112,11 +112,10 @@ class GitLabCommitStatFetcherSpec
     implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
     val projectId = projectIds.generateOne
 
-    val gitLabCommitFetcher = mock[GitLabCommitFetcher[IO]]
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabClient = mock[GitLabClient[IO]]
-    val gitLabCommitStatFetcher =
-      new GitLabCommitStatFetcherImpl[IO](gitLabCommitFetcher, gitLabClient)
+    private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    val gitLabCommitFetcher     = mock[GitLabCommitFetcher[IO]]
+    val gitLabCommitStatFetcher = new GitLabCommitStatFetcherImpl[IO](gitLabCommitFetcher)
 
     val uri = uri"projects" / projectId.show withQueryParams Map("statistics" -> true)
     val endpointName: String Refined NonEmpty = "single-project"

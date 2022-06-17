@@ -113,9 +113,9 @@ class GitLabAuthenticatorSpec
     val uri         = uri"user"
     val endpointName: NonEmptyString = "user"
 
-    private implicit val logger: TestLogger[IO] = TestLogger()
-    val gitLabClient  = mock[GitLabClient[IO]]
-    val authenticator = new GitLabAuthenticatorImpl[IO](gitLabClient)
+    private implicit val logger: TestLogger[IO]   = TestLogger()
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    val authenticator = new GitLabAuthenticatorImpl[IO]
 
     lazy val mapResponse =
       captureMapping(authenticator, gitLabClient)(

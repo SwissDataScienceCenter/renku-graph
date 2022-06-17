@@ -37,14 +37,12 @@ private[webhookservice] trait ProjectHookFetcher[F[_]] {
 }
 
 private[webhookservice] object ProjectHookFetcher {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]) = new ProjectHookFetcherImpl[F](gitLabClient).pure[F]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectHookFetcher[F]] = new ProjectHookFetcherImpl[F].pure[F].widen
 
   final case class HookIdAndUrl(id: String, url: ProjectHookUrl)
 }
 
-private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: Logger](
-    gitLabClient: GitLabClient[F]
-) extends ProjectHookFetcher[F] {
+private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: GitLabClient: Logger] extends ProjectHookFetcher[F] {
 
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
@@ -60,7 +58,7 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: Logger](
   }
 
   override def fetchProjectHooks(projectId: projects.Id, accessToken: AccessToken): F[List[HookIdAndUrl]] =
-    gitLabClient.get(uri"projects" / projectId.show / "hooks", "project-hooks")(mapResponse)(accessToken.some)
+    GitLabClient[F].get(uri"projects" / projectId.show / "hooks", "project-hooks")(mapResponse)(accessToken.some)
 
   private implicit lazy val hooksIdsAndUrlsDecoder: EntityDecoder[F, List[HookIdAndUrl]] = {
     implicit val hookIdAndUrlDecoder: Decoder[List[HookIdAndUrl]] = decodeList { cursor =>

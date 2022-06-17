@@ -47,15 +47,11 @@ private[globalcommitsync] trait GitLabCommitFetcher[F[_]] {
   ): F[PageResult]
 }
 
-private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
-    gitLabClientImpl: GitLabClient[F]
-) extends GitLabCommitFetcher[F] {
-
-  import gitLabClientImpl._
+private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async: GitLabClient] extends GitLabCommitFetcher[F] {
 
   override def fetchLatestGitLabCommit(projectId: projects.Id)(implicit
       maybeAccessToken:                           Option[AccessToken]
-  ): F[Option[CommitId]] = get(
+  ): F[Option[CommitId]] = GitLabClient[F].get(
     uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
     "latest-commit"
   )(mapLatestCommit(projectId))
@@ -64,7 +60,7 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
       projectId:               projects.Id,
       dateCondition:           DateCondition,
       pageRequest:             PagingRequest
-  )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = get(
+  )(implicit maybeAccessToken: Option[AccessToken]): F[PageResult] = GitLabClient[F].get(
     uri"projects" / projectId.show / "repository" / "commits" withQueryParams Map(
       "page"     -> pageRequest.page.show,
       "per_page" -> pageRequest.perPage.show
@@ -103,6 +99,6 @@ private[globalcommitsync] class GitLabCommitFetcherImpl[F[_]: Async](
 }
 
 private[globalcommitsync] object GitLabCommitFetcher {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[GitLabCommitFetcher[F]] =
-    new GitLabCommitFetcherImpl[F](gitLabClient).pure[F].widen
+  def apply[F[_]: Async: GitLabClient: Logger]: F[GitLabCommitFetcher[F]] =
+    new GitLabCommitFetcherImpl[F].pure[F].widen
 }

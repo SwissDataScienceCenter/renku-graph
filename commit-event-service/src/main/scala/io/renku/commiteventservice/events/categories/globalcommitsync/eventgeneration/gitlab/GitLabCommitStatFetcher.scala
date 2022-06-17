@@ -39,9 +39,8 @@ private[globalcommitsync] trait GitLabCommitStatFetcher[F[_]] {
   ): F[Option[ProjectCommitStats]]
 }
 
-private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger](
-    gitLabCommitFetcher: GitLabCommitFetcher[F],
-    gitLabClient:        GitLabClient[F]
+private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: GitLabClient: Logger](
+    gitLabCommitFetcher: GitLabCommitFetcher[F]
 ) extends GitLabCommitStatFetcher[F] {
 
   import gitLabCommitFetcher._
@@ -56,7 +55,7 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
   }.value
 
   private def fetchCommitCount(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]) =
-    gitLabClient.get(uri"projects" / projectId.show withQueryParams Map("statistics" -> "true"), "single-project")(
+    GitLabClient[F].get(uri"projects" / projectId.show withQueryParams Map("statistics" -> "true"), "single-project")(
       mapResponse
     )
 
@@ -75,7 +74,7 @@ private[globalcommitsync] class GitLabCommitStatFetcherImpl[F[_]: Async: Logger]
 }
 
 private[globalcommitsync] object GitLabCommitStatFetcher {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[GitLabCommitStatFetcher[F]] = for {
-    gitLabCommitFetcher <- GitLabCommitFetcher(gitLabClient)
-  } yield new GitLabCommitStatFetcherImpl[F](gitLabCommitFetcher, gitLabClient)
+  def apply[F[_]: Async: GitLabClient: Logger]: F[GitLabCommitStatFetcher[F]] = for {
+    gitLabCommitFetcher <- GitLabCommitFetcher[F]
+  } yield new GitLabCommitStatFetcherImpl[F](gitLabCommitFetcher)
 }

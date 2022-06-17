@@ -117,9 +117,9 @@ class LatestCommitFinderSpec
   private trait TestCase {
     val projectId  = projectIds.generateOne
     val commitInfo = commitInfos.generateOne
-    private implicit val logger: TestLogger[IO] = TestLogger()
-    val gitLabClient       = mock[GitLabClient[IO]]
-    val latestCommitFinder = new LatestCommitFinderImpl[IO](gitLabClient)
+    private implicit val logger: TestLogger[IO]   = TestLogger()
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    val latestCommitFinder = new LatestCommitFinderImpl[IO]
 
     val endpointName: String Refined NonEmpty = "commits"
 

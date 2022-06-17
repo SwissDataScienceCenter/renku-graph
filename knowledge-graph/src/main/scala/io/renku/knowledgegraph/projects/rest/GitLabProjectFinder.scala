@@ -35,9 +35,7 @@ private trait GitLabProjectFinder[F[_]] {
   def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): F[Option[GitLabProject]]
 }
 
-private class GitLabProjectFinderImpl[F[_]: Async: Logger](
-    gitLabClient: GitLabClient[F]
-) extends GitLabProjectFinder[F] {
+private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends GitLabProjectFinder[F] {
 
   import cats.syntax.all._
   import io.circe._
@@ -47,7 +45,7 @@ private class GitLabProjectFinderImpl[F[_]: Async: Logger](
   import org.http4s.dsl.io._
 
   def findProject(projectPath: projects.Path)(implicit accessToken: AccessToken): F[Option[GitLabProject]] =
-    gitLabClient.get(uri"projects" / projectPath.value withQueryParam ("statistics", "true"), "single-project")(
+    GitLabClient[F].get(uri"projects" / projectPath.value withQueryParam ("statistics", "true"), "single-project")(
       mapResponse
     )(accessToken.some)
 
@@ -143,6 +141,6 @@ private object GitLabProjectFinder {
                                  statistics:  Statistics
   )
 
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[GitLabProjectFinder[F]] =
-    new GitLabProjectFinderImpl(gitLabClient).pure[F].widen
+  def apply[F[_]: Async: GitLabClient: Logger]: F[GitLabProjectFinder[F]] =
+    new GitLabProjectFinderImpl[F].pure[F].widen
 }

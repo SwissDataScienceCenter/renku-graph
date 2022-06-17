@@ -35,9 +35,8 @@ private trait ProjectHookVerifier[F[_]] {
 
 private object ProjectHookVerifier {
 
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]) = for {
-    projectHookFetcher <- ProjectHookFetcher(gitLabClient)
-  } yield new ProjectHookVerifierImpl[F](projectHookFetcher)
+  def apply[F[_]: Async: GitLabClient: Logger] =
+    ProjectHookFetcher[F] map (new ProjectHookVerifierImpl[F](_))
 }
 
 private class ProjectHookVerifierImpl[F[_]: Async: Logger](

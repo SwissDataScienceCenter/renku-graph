@@ -229,14 +229,14 @@ class CommitsSynchronizerSpec
     val untilNow         = DateCondition.Until(now)
     val sinceNow         = DateCondition.Since(now)
 
-    implicit val logger: TestLogger[IO] = TestLogger()
+    implicit val logger:                TestLogger[IO]                = TestLogger()
+    implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
     val accessTokenFinder         = mock[AccessTokenFinder[IO]]
     val gitLabCommitStatFetcher   = mock[GitLabCommitStatFetcher[IO]]
     val gitLabCommitFetcher       = mock[GitLabCommitFetcher[IO]]
     val eventLogCommitFetcher     = mock[ELCommitFetcher[IO]]
     val commitEventDeleter        = mock[CommitEventDeleter[IO]]
     val missingCommitEventCreator = mock[MissingCommitEventCreator[IO]]
-    val executionTimeRecorder     = TestExecutionTimeRecorder[IO]()
     private val currentTime       = mockFunction[Instant]
     val commitsSynchronizer = new CommitsSynchronizerImpl[IO](accessTokenFinder,
                                                               gitLabCommitStatFetcher,
@@ -244,7 +244,6 @@ class CommitsSynchronizerSpec
                                                               eventLogCommitFetcher,
                                                               commitEventDeleter,
                                                               missingCommitEventCreator,
-                                                              executionTimeRecorder,
                                                               currentTime
     )
 

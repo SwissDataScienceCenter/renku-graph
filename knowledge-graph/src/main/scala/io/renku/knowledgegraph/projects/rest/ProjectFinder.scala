@@ -92,11 +92,9 @@ private object ProjectFinder {
 
   import io.renku.rdfstore.SparqlQueryTimeRecorder
 
-  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
-      gitLabClient: GitLabClient[F]
-  ): F[ProjectFinder[F]] = for {
+  def apply[F[_]: Async: Parallel: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[ProjectFinder[F]] = for {
     kgProjectFinder     <- KGProjectFinder[F]
-    gitLabProjectFinder <- GitLabProjectFinder[F](gitLabClient)
+    gitLabProjectFinder <- GitLabProjectFinder[F]
     accessTokenFinder   <- AccessTokenFinder[F]
   } yield new ProjectFinderImpl(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
 }

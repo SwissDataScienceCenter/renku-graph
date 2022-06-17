@@ -85,10 +85,7 @@ private[events] class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
 }
 
 private[events] object EventHandler {
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      gitLabClient:          GitLabClient[F],
-      executionTimeRecorder: ExecutionTimeRecorder[F]
-  ): F[EventHandler[F]] = for {
-    commitEventSynchronizer <- CommitsSynchronizer(gitLabClient, executionTimeRecorder)
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]: F[EventHandler[F]] = for {
+    commitEventSynchronizer <- CommitsSynchronizer[F]
   } yield new EventHandler[F](categoryName, commitEventSynchronizer)
 }

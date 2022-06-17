@@ -44,14 +44,13 @@ private[globalcommitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: GlobalCommitSyncEvent): F[Unit]
 }
 
-private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyParallel: Logger](
+private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeRecorder](
     accessTokenFinder:         AccessTokenFinder[F],
     gitLabCommitStatFetcher:   GitLabCommitStatFetcher[F],
     gitLabCommitFetcher:       GitLabCommitFetcher[F],
     elCommitFetcher:           ELCommitFetcher[F],
     commitEventDeleter:        CommitEventDeleter[F],
     missingCommitEventCreator: MissingCommitEventCreator[F],
-    executionTimeRecorder:     ExecutionTimeRecorder[F],
     now:                       () => Instant = () => Instant.now
 ) extends CommitsSynchronizer[F] {
 
@@ -60,6 +59,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
   import accessTokenFinder._
   import commitEventDeleter._
   import elCommitFetcher._
+  private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
   import gitLabCommitFetcher._
   import gitLabCommitStatFetcher._
@@ -177,22 +177,20 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
 }
 
 private[globalcommitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: NonEmptyParallel: Logger: MetricsRegistry](gitLabClient: GitLabClient[F],
-                                                                    executionTimeRecorder: ExecutionTimeRecorder[F]
-  ): F[CommitsSynchronizer[F]] = for {
+  def apply[F[_]: Async: NonEmptyParallel: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]
+      : F[CommitsSynchronizer[F]] = for {
     accessTokenFinder         <- AccessTokenFinder[F]
-    gitLabCommitStatFetcher   <- GitLabCommitStatFetcher(gitLabClient)
-    gitLabCommitFetcher       <- GitLabCommitFetcher[F](gitLabClient)
+    gitLabCommitStatFetcher   <- GitLabCommitStatFetcher[F]
+    gitLabCommitFetcher       <- GitLabCommitFetcher[F]
     elCommitFetcher           <- ELCommitFetcher[F]
     commitEventDeleter        <- CommitEventDeleter[F]
-    missingCommitEventCreator <- MissingCommitEventCreator(gitLabClient)
+    missingCommitEventCreator <- MissingCommitEventCreator[F]
   } yield new CommitsSynchronizerImpl(
     accessTokenFinder,
     gitLabCommitStatFetcher,
     gitLabCommitFetcher,
     elCommitFetcher,
     commitEventDeleter,
-    missingCommitEventCreator,
-    executionTimeRecorder
+    missingCommitEventCreator
   )
 }
