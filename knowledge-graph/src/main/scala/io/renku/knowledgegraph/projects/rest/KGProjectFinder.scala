@@ -159,7 +159,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     case Nil            => Option.empty[KGProject].pure[F]
     case project +: Nil => project.some.pure[F]
     case projects =>
-      new RuntimeException(s"More than one project with ${projects.head.path} path")
+      new RuntimeException(s"Multiple projects or values for ${projects.head.path}")
         .raiseError[F, Option[KGProject]]
   }
 }

@@ -110,7 +110,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
         finder.findParentTopmostSameAs(sameAs).unsafeRunSync()
       }
 
-      exception.getMessage should include(s"More than one topmostSameAs found for dataset ${sameAs.show}")
+      exception.getMessage should include(s"Multiple topmostSameAs found for dataset ${sameAs.show}")
     }
   }
 

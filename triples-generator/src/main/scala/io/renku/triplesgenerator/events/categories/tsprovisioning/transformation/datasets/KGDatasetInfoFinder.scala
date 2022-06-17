@@ -53,7 +53,7 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
   ): F[Option[TopmostSameAs]] = {
     implicit val decoder: Decoder[Option[TopmostSameAs]] = ResultsDecoder[Option, TopmostSameAs] { implicit cur =>
       extract[TopmostSameAs]("topmostSameAs")
-    }(toOption(onMultiple = show"More than one topmostSameAs found for dataset ${sameAs.show}"))
+    }(toOption(onMultiple = show"Multiple topmostSameAs found for dataset ${sameAs.show}"))
 
     queryExpecting[Option[TopmostSameAs]](using = queryFindingSameAs(sameAs.value))
   }

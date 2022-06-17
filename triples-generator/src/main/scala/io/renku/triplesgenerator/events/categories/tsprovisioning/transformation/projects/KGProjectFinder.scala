@@ -90,7 +90,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
                                  maybeAgent,
                                  maybeCreatorId
       )
-    }(toOption(s"More than one project found for resourceId: '$resourceId'"))
+    }(toOption(s"Multiple projects or values for '$resourceId'"))
 }
 
 private object KGProjectFinder {
