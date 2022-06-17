@@ -81,7 +81,11 @@ class ThrottlerSpec extends AnyWordSpec with IOSpec with should.Matchers {
         } yield startTime
       }.unsafeRunSync()
 
-      tasksStartDelays(startTime.toMillis) foreach { delay => delay should be < 100L }
+      val (slowEvents, fastEvents) = tasksStartDelays(startTime.toMillis).partition(_ > 100L)
+      slowEvents.size should be < 2
+      fastEvents foreach { delay => delay should be < 100L }
+      // it's actually never close to 100ms but it looks like CI is sometimes slooow
+      // and there might be events that need more, especially when the test is warming up
     }
   }
 
