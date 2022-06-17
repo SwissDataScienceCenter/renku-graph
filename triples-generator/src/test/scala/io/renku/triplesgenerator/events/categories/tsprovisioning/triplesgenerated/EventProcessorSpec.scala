@@ -440,7 +440,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       logger.logged(
         Info(
           s"${commonLogMessage(triplesGeneratedEvent)} processed in ${executionTimeRecorder.elapsedTime}ms: " +
-            s"${if (isSuccessful) "was successfully processed" else "failed to process"}"
+            s"${if (isSuccessful) "success" else "failure"}"
         )
       )
 
