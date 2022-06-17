@@ -55,6 +55,6 @@ class ProjectsFinderSpec extends AnyWordSpec with IOSpec with should.Matchers wi
     )
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val projectsFinder = new ProjectsFinderImpl[IO](query, rdfStoreConfig)
+    val projectsFinder = new ProjectsFinderImpl[IO](query, renkuStoreConfig)
   }
 }

@@ -29,7 +29,7 @@ import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, TriplesStoreConfig}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,6 +48,8 @@ class MigrationExecutionRegisterSpec extends AnyWordSpec with IOSpec with InMemo
       register.findExecution(migrationName).unsafeRunSync() shouldBe None
     }
   }
+
+  override lazy val storeConfig: TriplesStoreConfig = migrationsStoreConfig
 
   private trait TestCase {
     val migrationName  = migrationNames.generateOne

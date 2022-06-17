@@ -76,8 +76,8 @@ class MultipleProjectAgentsSpec
     implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
     val executionRegister = mock[MigrationExecutionRegister[IO]]
-    val recordsFinder     = RecordsFinder[IO](rdfStoreConfig)
-    val updateRunner      = UpdateQueryRunner[IO](rdfStoreConfig)
+    val recordsFinder     = RecordsFinder[IO](renkuStoreConfig)
+    val updateRunner      = UpdateQueryRunner[IO](renkuStoreConfig)
     val migration         = new MultipleProjectAgents[IO](executionRegister, recordsFinder, updateRunner)
 
     lazy val satisfyMocks = {

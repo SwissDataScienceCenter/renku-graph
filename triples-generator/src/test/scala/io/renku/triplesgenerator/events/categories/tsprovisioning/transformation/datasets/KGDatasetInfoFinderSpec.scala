@@ -240,7 +240,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new KGDatasetInfoFinderImpl[IO](rdfStoreConfig)
+    val finder = new KGDatasetInfoFinderImpl[IO](renkuStoreConfig)
   }
 
   private def removeTopmostSameAs(datasetId: EntityId): Unit = runUpdate {

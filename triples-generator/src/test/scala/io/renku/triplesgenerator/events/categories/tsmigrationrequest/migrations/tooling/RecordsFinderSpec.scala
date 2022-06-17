@@ -60,6 +60,6 @@ class RecordsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryRd
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val client = new RecordsFinderImpl[IO](rdfStoreConfig)
+    val client = new RecordsFinderImpl[IO](renkuStoreConfig)
   }
 }

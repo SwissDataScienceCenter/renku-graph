@@ -45,12 +45,12 @@ trait ReProvisioningStatus[F[_]] {
 
 private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
     subscriptions:         List[SubscriptionMechanism[F]],
-    rdfStoreConfig:        RdfStoreConfig,
+    storeConfig:           MigrationsStoreConfig,
     statusRefreshInterval: FiniteDuration,
     cacheRefreshInterval:  FiniteDuration,
     lastCacheCheckTimeRef: Ref[F, Long]
 )(implicit renkuUrl:       RenkuUrl)
-    extends RdfStoreClientImpl(rdfStoreConfig)
+    extends RdfStoreClientImpl(storeConfig)
     with ReProvisioningStatus[F] {
 
   import io.renku.jsonld.syntax._
@@ -170,13 +170,13 @@ object ReProvisioningStatus {
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
       subscriptionFactories: (EventHandler[F], SubscriptionMechanism[F])*
   ): F[ReProvisioningStatus[F]] = for {
-    rdfStoreConfig        <- RdfStoreConfig[F]()
+    storeConfig           <- MigrationsStoreConfig[F]()
     renkuUrl              <- RenkuUrlLoader[F]()
     lastCacheCheckTimeRef <- Ref.of[F, Long](0)
   } yield {
     implicit val baseUrl: RenkuUrl = renkuUrl
     new ReProvisioningStatusImpl(subscriptionFactories.map(_._2).toList,
-                                 rdfStoreConfig,
+                                 storeConfig,
                                  StatusRefreshInterval,
                                  CacheRefreshInterval,
                                  lastCacheCheckTimeRef

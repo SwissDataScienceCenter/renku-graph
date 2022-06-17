@@ -74,7 +74,7 @@ class KGPersonFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new KGPersonFinderImpl[IO](rdfStoreConfig)
+    val finder = new KGPersonFinderImpl[IO](renkuStoreConfig)
   }
 
   private def findNames(id: entities.Person): Set[persons.Name] =

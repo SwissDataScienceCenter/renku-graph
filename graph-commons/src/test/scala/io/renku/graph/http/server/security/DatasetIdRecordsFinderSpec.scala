@@ -85,6 +85,6 @@ class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val recordsFinder = new DatasetIdRecordsFinderImpl[IO](rdfStoreConfig)
+    val recordsFinder = new DatasetIdRecordsFinderImpl[IO](renkuStoreConfig)
   }
 }
