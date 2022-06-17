@@ -24,8 +24,6 @@ import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.persons
@@ -253,12 +251,10 @@ private object MicroserviceRoutes {
       metricsRegistry:    MetricsRegistry[IO],
       sparqlTimeRecorder: SparqlQueryTimeRecorder[IO]
   ): IO[MicroserviceRoutes[IO]] = for {
-    gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-    gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
     datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO]
     datasetEndpoint         <- DatasetEndpoint[IO]
     entitiesEndpoint        <- entities.Endpoint[IO]
-    gitLabClient            <- GitLabClient(gitLabThrottler)
+    gitLabClient            <- GitLabClient[IO]()
     queryEndpoint           <- QueryEndpoint()
     lineageEndpoint         <- lineage.Endpoint[IO]
     projectEndpoint         <- ProjectEndpoint[IO](gitLabClient)

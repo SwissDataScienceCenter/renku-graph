@@ -19,10 +19,8 @@
 package io.renku.webhookservice
 
 import cats.effect._
-import io.renku.config.GitLab
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
-import io.renku.control.{RateLimit, Throttler}
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -37,9 +35,7 @@ object Microservice extends IOMicroservice {
     for {
       certificateLoader     <- CertificateLoader[IO]
       sentryInitializer     <- SentryInitializer[IO]
-      gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-      gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-      gitLabClient          <- GitLabClient(gitLabThrottler)
+      gitLabClient          <- GitLabClient[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO]()
       microserviceRoutes    <- MicroserviceRoutes(gitLabClient, executionTimeRecorder)
       exitcode <- microserviceRoutes.routes.use { routes =>

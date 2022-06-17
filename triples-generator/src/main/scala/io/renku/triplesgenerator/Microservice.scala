@@ -24,10 +24,8 @@ import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.config.GitLab
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
-import io.renku.control.{RateLimit, Throttler}
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.http.client.GitLabClient
@@ -66,9 +64,7 @@ object Microservice extends IOMicroservice {
           gitCertificateInstaller        <- GitCertificateInstaller[IO]
           sentryInitializer              <- SentryInitializer[IO]
           cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
-          gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-          gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
-          gitLabClient                   <- GitLabClient[IO](gitLabThrottler)
+          gitLabClient                   <- GitLabClient[IO]()
           awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
           membersSyncSubscription        <- membersync.SubscriptionFactory(gitLabClient)
           triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory(gitLabClient)
