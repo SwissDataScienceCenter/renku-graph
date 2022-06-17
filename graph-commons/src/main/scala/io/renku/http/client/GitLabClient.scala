@@ -110,6 +110,9 @@ final class GitLabClientImpl[F[_]: Async: Logger](
 }
 
 object GitLabClient {
+
+  def apply[F[_]](implicit ev: GitLabClient[F]): GitLabClient[F] = ev
+
   def apply[F[_]: Async: Logger: MetricsRegistry](
       retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
       maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
