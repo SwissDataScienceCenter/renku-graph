@@ -68,10 +68,7 @@ class HookDeletionEndpointImpl[F[_]: MonadThrow: Logger](
 }
 
 object HookDeletionEndpoint {
-  def apply[F[_]: Async: Logger](
-      projectHookUrl: ProjectHookUrl,
-      gitLabClient:   GitLabClient[F]
-  ): F[HookDeletionEndpoint[F]] = for {
-    hookDeletor <- HookDeletor(gitLabClient)
+  def apply[F[_]: Async: GitLabClient: Logger](projectHookUrl: ProjectHookUrl): F[HookDeletionEndpoint[F]] = for {
+    hookDeletor <- HookDeletor[F]
   } yield new HookDeletionEndpointImpl[F](projectHookUrl, hookDeletor)
 }

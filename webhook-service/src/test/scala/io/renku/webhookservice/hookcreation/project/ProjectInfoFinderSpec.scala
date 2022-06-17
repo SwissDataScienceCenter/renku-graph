@@ -128,11 +128,11 @@ class ProjectInfoFinderSpec
     val uri:          Uri                     = uri"projects" / projectId.show
     val endpointName: String Refined NonEmpty = "single-project"
 
-    implicit val logger:           TestLogger[IO]      = TestLogger[IO]()
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
-    val gitLabClient      = mock[GitLabClient[IO]]
-    val projectInfoFinder = new ProjectInfoFinderImpl[IO](gitLabClient)
+    implicit val logger:       TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+    val projectInfoFinder = new ProjectInfoFinderImpl[IO]
 
     def projectJson(maybeAccessToken: Option[AccessToken]): String = maybeAccessToken match {
       case Some(_) =>
