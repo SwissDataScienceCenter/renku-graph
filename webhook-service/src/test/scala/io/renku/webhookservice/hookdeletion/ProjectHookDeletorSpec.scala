@@ -94,11 +94,11 @@ class ProjectHookDeletorSpec
     val hookIdAndUrl = hookIdAndUrls.generateOne
     val projectId    = projectIds.generateOne
     val uri          = uri"projects" / projectId.show / "hooks" / hookIdAndUrl.id.show
-    val endpointName:    NonEmptyString = "delete-hook"
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val endpointName: NonEmptyString = "delete-hook"
 
-    val gitLabClient = mock[GitLabClient[IO]]
-    val hookDeletor  = new ProjectHookDeletorImpl[IO](gitLabClient)
+    implicit val logger:       TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+    val hookDeletor = new ProjectHookDeletorImpl[IO]
 
     lazy val mapResponse =
       captureMapping(hookDeletor, gitLabClient)(

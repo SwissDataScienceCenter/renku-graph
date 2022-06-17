@@ -41,9 +41,7 @@ private trait ProjectHookDeletor[F[_]] {
   ): F[DeletionResult]
 }
 
-private class ProjectHookDeletorImpl[F[_]: Async: Logger](
-    gitLabClient: GitLabClient[F]
-) extends ProjectHookDeletor[F] {
+private class ProjectHookDeletorImpl[F[_]: Async: GitLabClient: Logger] extends ProjectHookDeletor[F] {
 
   import cats.effect._
   import io.renku.http.client.RestClientError.UnauthorizedException
@@ -57,7 +55,7 @@ private class ProjectHookDeletorImpl[F[_]: Async: Logger](
   }
 
   def delete(projectId: projects.Id, projectHookId: HookIdAndUrl, accessToken: AccessToken): F[DeletionResult] =
-    gitLabClient.delete(uri"projects" / projectId.show / "hooks" / projectHookId.id.show, "delete-hook")(
+    GitLabClient[F].delete(uri"projects" / projectId.show / "hooks" / projectHookId.id.show, "delete-hook")(
       mapResponse
     )(
       accessToken.some
@@ -65,9 +63,8 @@ private class ProjectHookDeletorImpl[F[_]: Async: Logger](
 }
 
 private object ProjectHookDeletor {
-  def apply[F[_]: Async: Logger](
-      gitLabClient: GitLabClient[F]
-  ): F[ProjectHookDeletor[F]] = new ProjectHookDeletorImpl(gitLabClient).pure[F].widen[ProjectHookDeletor[F]]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectHookDeletor[F]] =
+    new ProjectHookDeletorImpl[F].pure[F].widen[ProjectHookDeletor[F]]
 
   final case class ProjectHook(
       projectId:           Id,

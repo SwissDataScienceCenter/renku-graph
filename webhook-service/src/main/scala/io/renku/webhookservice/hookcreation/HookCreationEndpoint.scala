@@ -73,11 +73,9 @@ class HookCreationEndpointImpl[F[_]: MonadThrow: Logger](
 }
 
 object HookCreationEndpoint {
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      projectHookUrl:  ProjectHookUrl,
-      gitLabClient:    GitLabClient[F],
-      hookTokenCrypto: HookTokenCrypto[F]
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl: ProjectHookUrl,
+                                                                hookTokenCrypto: HookTokenCrypto[F]
   ): F[HookCreationEndpoint[F]] = for {
-    hookCreator <- hookcreation.HookCreator(projectHookUrl, gitLabClient, hookTokenCrypto)
+    hookCreator <- hookcreation.HookCreator(projectHookUrl, hookTokenCrypto)
   } yield new HookCreationEndpointImpl[F](hookCreator)
 }

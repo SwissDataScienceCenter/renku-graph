@@ -31,6 +31,7 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
 import io.renku.events.CategoryName
+import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.events.{EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects.Path
 import io.renku.metrics.LabeledHistogram
@@ -121,6 +122,20 @@ class StatsFinderImpl[F[_]: Async: SessionResource](
                 FROM subscription_category_sync_time
                 WHERE category_name = $categoryNameEncoder
               ) 
+            ) UNION ALL (
+              SELECT '#${minprojectinfo.categoryName.show}' AS category_name, COUNT(DISTINCT p.project_id) AS count
+              FROM project p
+              WHERE NOT EXISTS (
+                SELECT project_id 
+                FROM subscription_category_sync_time st 
+                WHERE st.category_name = '#${minprojectinfo.categoryName.show}' 
+                  AND st.project_id = p.project_id
+              ) AND NOT EXISTS (
+                SELECT event_id 
+                FROM event e
+                WHERE e.project_id = p.project_id
+                  AND e.status = '#${TriplesStore.value}'
+              )
             ) UNION ALL (
               SELECT event_type AS category_name, COUNT(DISTINCT id) AS count
               FROM status_change_events_queue

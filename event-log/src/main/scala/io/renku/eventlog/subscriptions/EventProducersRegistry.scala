@@ -77,9 +77,10 @@ object EventProducersRegistry {
       globalCommitSyncCategory <- globalcommitsync.SubscriptionCategory(queriesExecTimes)
       triplesGeneratedCategory <-
         triplesgenerated.SubscriptionCategory(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
-      cleanUpEventCategory <- cleanup.SubscriptionCategory(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
-      zombieEventsCategory <- zombieevents.SubscriptionCategory(queriesExecTimes)
-      tsMigrationCategory  <- tsmigrationrequest.SubscriptionCategory(queriesExecTimes)
+      cleanUpEventCategory   <- cleanup.SubscriptionCategory(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
+      zombieEventsCategory   <- zombieevents.SubscriptionCategory(queriesExecTimes)
+      tsMigrationCategory    <- tsmigrationrequest.SubscriptionCategory(queriesExecTimes)
+      minProjectInfoCategory <- minprojectinfo.SubscriptionCategory(queriesExecTimes)
     } yield new EventProducersRegistryImpl(
       Set(
         awaitingGenerationCategory,
@@ -89,7 +90,8 @@ object EventProducersRegistry {
         triplesGeneratedCategory,
         cleanUpEventCategory,
         zombieEventsCategory,
-        tsMigrationCategory
+        tsMigrationCategory,
+        minProjectInfoCategory
       )
     )
   }

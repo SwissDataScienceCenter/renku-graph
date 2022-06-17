@@ -105,23 +105,24 @@ class ProjectHookFetcherSpec
   }
 
   private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectId = projectIds.generateOne
     val uri       = uri"projects" / projectId.show / "hooks"
     val endpointName: String Refined NonEmpty = "project-hooks"
     val accessToken = accessTokens.generateOne
 
-    val gitLabClient = mock[GitLabClient[IO]]
-    val fetcher      = new ProjectHookFetcherImpl[IO](gitLabClient)
-    implicit val idsAndUrlsEncoder: Encoder[HookIdAndUrl] = Encoder.instance { idAndUrl =>
-      Json.obj(
-        "id"  -> idAndUrl.id.asJson,
-        "url" -> idAndUrl.url.value.asJson
-      )
-    }
+    implicit val logger:       TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+    val fetcher = new ProjectHookFetcherImpl[IO]
 
     val mapResponse = captureMapping(fetcher, gitLabClient)(_.fetchProjectHooks(projectId, accessToken).unsafeRunSync(),
                                                             Gen.const(List.empty[HookIdAndUrl])
+    )
+  }
+
+  private implicit val idsAndUrlsEncoder: Encoder[HookIdAndUrl] = Encoder.instance { idAndUrl =>
+    Json.obj(
+      "id"  -> idAndUrl.id.asJson,
+      "url" -> idAndUrl.url.value.asJson
     )
   }
 }

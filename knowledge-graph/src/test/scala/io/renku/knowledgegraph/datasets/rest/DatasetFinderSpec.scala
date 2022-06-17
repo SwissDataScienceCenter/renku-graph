@@ -634,10 +634,10 @@ class DatasetFinderSpec
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val datasetFinder = new DatasetFinderImpl[IO](
-      new BaseDetailsFinderImpl[IO](rdfStoreConfig),
-      new CreatorsFinderImpl[IO](rdfStoreConfig),
-      new PartsFinderImpl[IO](rdfStoreConfig),
-      new ProjectsFinderImpl[IO](rdfStoreConfig)
+      new BaseDetailsFinderImpl[IO](renkuStoreConfig),
+      new CreatorsFinderImpl[IO](renkuStoreConfig),
+      new PartsFinderImpl[IO](renkuStoreConfig),
+      new ProjectsFinderImpl[IO](renkuStoreConfig)
     )
   }
 

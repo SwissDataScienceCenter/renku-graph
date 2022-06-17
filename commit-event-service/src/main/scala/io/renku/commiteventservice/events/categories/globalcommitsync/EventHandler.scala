@@ -98,13 +98,11 @@ private[events] object EventHandler {
   import eu.timepit.refined.auto._
   val processesLimit: Int Refined Positive = 1
 
-  def apply[F[_]: Async: NonEmptyParallel: Logger: MetricsRegistry](
-      subscriptionMechanism: SubscriptionMechanism[F],
-      gitLabClient:          GitLabClient[F],
-      executionTimeRecorder: ExecutionTimeRecorder[F]
+  def apply[F[_]: Async: NonEmptyParallel: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder](
+      subscriptionMechanism: SubscriptionMechanism[F]
   ): F[EventHandler[F]] = for {
     concurrentProcessesLimiter    <- ConcurrentProcessesLimiter(processesLimit)
-    globalCommitEventSynchronizer <- CommitsSynchronizer(gitLabClient, executionTimeRecorder)
+    globalCommitEventSynchronizer <- CommitsSynchronizer[F]
   } yield new EventHandler[F](categoryName,
                               globalCommitEventSynchronizer,
                               subscriptionMechanism,

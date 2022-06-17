@@ -45,16 +45,15 @@ private[commitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: CommitSyncEvent): F[Unit]
 }
 
-private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
-    accessTokenFinder:     AccessTokenFinder[F],
-    latestCommitFinder:    LatestCommitFinder[F],
-    eventDetailsFinder:    EventDetailsFinder[F],
-    commitInfoFinder:      CommitInfoFinder[F],
-    commitToEventLog:      CommitToEventLog[F],
-    commitEventsRemover:   CommitEventsRemover[F],
-    eventSender:           EventSender[F],
-    executionTimeRecorder: ExecutionTimeRecorder[F],
-    clock:                 java.time.Clock = java.time.Clock.systemUTC()
+private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
+    accessTokenFinder:   AccessTokenFinder[F],
+    latestCommitFinder:  LatestCommitFinder[F],
+    eventDetailsFinder:  EventDetailsFinder[F],
+    commitInfoFinder:    CommitInfoFinder[F],
+    commitToEventLog:    CommitToEventLog[F],
+    commitEventsRemover: CommitEventsRemover[F],
+    eventSender:         EventSender[F],
+    clock:               java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitsSynchronizer[F] {
 
   import accessTokenFinder._
@@ -62,6 +61,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
   import commitInfoFinder._
   import commitToEventLog._
   import eventDetailsFinder._
+  private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
   import latestCommitFinder._
 
@@ -224,14 +224,11 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger](
 }
 
 private[commitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      gitLabClient:          GitLabClient[F],
-      executionTimeRecorder: ExecutionTimeRecorder[F]
-  ) = for {
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder] = for {
     accessTokenFinder   <- AccessTokenFinder[F]
-    latestCommitFinder  <- LatestCommitFinder(gitLabClient)
+    latestCommitFinder  <- LatestCommitFinder[F]
     eventDetailsFinder  <- EventDetailsFinder[F]
-    commitInfoFinder    <- CommitInfoFinder(gitLabClient)
+    commitInfoFinder    <- CommitInfoFinder[F]
     commitToEventLog    <- CommitToEventLog[F]
     commitEventsRemover <- CommitEventsRemover[F]
     eventSender         <- EventSender[F]
@@ -241,7 +238,6 @@ private[commitsync] object CommitsSynchronizer {
                                          commitInfoFinder,
                                          commitToEventLog,
                                          commitEventsRemover,
-                                         eventSender,
-                                         executionTimeRecorder
+                                         eventSender
   )
 }

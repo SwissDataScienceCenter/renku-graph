@@ -60,11 +60,9 @@ private class HookDeletorImpl[F[_]: Spawn: Logger](projectHookFetcher: ProjectHo
 
 private object HookDeletor {
 
-  def apply[F[_]: Async: Logger](
-      gitLabClient: GitLabClient[F]
-  ): F[HookDeletor[F]] = for {
-    hookDeletor        <- ProjectHookDeletor[F](gitLabClient)
-    projectHookFetcher <- ProjectHookFetcher(gitLabClient)
+  def apply[F[_]: Async: GitLabClient: Logger]: F[HookDeletor[F]] = for {
+    hookDeletor        <- ProjectHookDeletor[F]
+    projectHookFetcher <- ProjectHookFetcher[F]
   } yield new HookDeletorImpl[F](projectHookFetcher, hookDeletor)
 
   sealed trait DeletionResult extends Product with Serializable

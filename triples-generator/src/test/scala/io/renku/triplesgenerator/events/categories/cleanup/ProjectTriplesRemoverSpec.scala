@@ -461,7 +461,7 @@ class ProjectTriplesRemoverSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](rdfStoreConfig, renkuUrl)
+    val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](renkuStoreConfig, renkuUrl)
   }
 
   private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance]): EntityId =

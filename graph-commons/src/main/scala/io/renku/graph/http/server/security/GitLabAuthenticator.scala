@@ -19,7 +19,6 @@
 package io.renku.graph.http.server.security
 
 import cats.effect.Async
-import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -29,9 +28,7 @@ import io.renku.http.server.security.{Authenticator, EndpointSecurityException}
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
-class GitLabAuthenticatorImpl[F[_]: Async: Temporal: Logger](
-    gitLabClient: GitLabClient[F]
-) extends Authenticator[F] {
+class GitLabAuthenticatorImpl[F[_]: Async: GitLabClient: Logger] extends Authenticator[F] {
 
   import cats.syntax.all._
   import io.circe._
@@ -40,7 +37,7 @@ class GitLabAuthenticatorImpl[F[_]: Async: Temporal: Logger](
   import org.http4s.dsl.io._
 
   override def authenticate(accessToken: AccessToken): F[Either[EndpointSecurityException, AuthUser]] =
-    gitLabClient.get(uri"user", "user")(mapResponse(accessToken))(accessToken.some)
+    GitLabClient[F].get(uri"user", "user")(mapResponse(accessToken))(accessToken.some)
 
   private def mapResponse(
       accessToken: AccessToken
@@ -67,6 +64,6 @@ class GitLabAuthenticatorImpl[F[_]: Async: Temporal: Logger](
 
 object GitLabAuthenticator {
 
-  def apply[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F]): F[Authenticator[F]] =
-    new GitLabAuthenticatorImpl(gitLabClient).pure[F].widen[Authenticator[F]]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[Authenticator[F]] =
+    new GitLabAuthenticatorImpl[F].pure[F].widen[Authenticator[F]]
 }

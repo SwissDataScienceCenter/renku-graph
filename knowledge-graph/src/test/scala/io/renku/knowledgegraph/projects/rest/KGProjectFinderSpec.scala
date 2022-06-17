@@ -113,7 +113,7 @@ class KGProjectFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val kgProjectFinder = new KGProjectFinderImpl[IO](rdfStoreConfig)
+    val kgProjectFinder = new KGProjectFinderImpl[IO](renkuStoreConfig)
   }
 
   private def replaceMembers(members: Set[Person]): Project => Project = {

@@ -32,8 +32,7 @@ private[hookcreation] trait ProjectInfoFinder[F[_]] {
   def findProjectInfo(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo]
 }
 
-private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: Logger](gitLabClient: GitLabClient[F])
-    extends ProjectInfoFinder[F] {
+private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: GitLabClient: Logger] extends ProjectInfoFinder[F] {
 
   import io.circe._
   import io.renku.http.client.RestClientError.UnauthorizedException
@@ -44,7 +43,7 @@ private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: Logger](gitLabCli
   import org.http4s.dsl.io._
 
   def findProjectInfo(projectId: projects.Id)(implicit maybeAccessToken: Option[AccessToken]): F[ProjectInfo] =
-    gitLabClient.get(uri"projects" / projectId.show, "single-project")(mapResponse)
+    GitLabClient[F].get(uri"projects" / projectId.show, "single-project")(mapResponse)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProjectInfo]] = {
     case (Ok, _, response)    => response.as[ProjectInfo]
@@ -67,7 +66,6 @@ private[hookcreation] class ProjectInfoFinderImpl[F[_]: Async: Logger](gitLabCli
 }
 
 private[hookcreation] object ProjectInfoFinder {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[ProjectInfoFinder[F]] = new ProjectInfoFinderImpl(
-    gitLabClient
-  ).pure[F].widen[ProjectInfoFinder[F]]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectInfoFinder[F]] =
+    new ProjectInfoFinderImpl[F].pure[F].widen[ProjectInfoFinder[F]]
 }

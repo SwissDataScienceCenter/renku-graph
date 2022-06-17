@@ -101,24 +101,21 @@ private object HookCreator {
 
   case class HookAlreadyCreated(projectId: Id, projectHookUrl: ProjectHookUrl)
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      projectHookUrl:  ProjectHookUrl,
-      gitLabClient:    GitLabClient[F],
-      hookTokenCrypto: HookTokenCrypto[F]
-  ): F[HookCreator[F]] =
-    for {
-      commitSyncRequestSender <- CommitSyncRequestSender[F]
-      hookValidator           <- hookvalidation.HookValidator(projectHookUrl, gitLabClient)
-      projectInfoFinder       <- ProjectInfoFinder[F](gitLabClient)
-      hookCreator             <- ProjectHookCreator[F](gitLabClient)
-      tokenAssociator         <- AccessTokenAssociator[F]
-    } yield new HookCreatorImpl[F](
-      projectHookUrl,
-      hookValidator,
-      projectInfoFinder,
-      hookTokenCrypto,
-      hookCreator,
-      tokenAssociator,
-      commitSyncRequestSender
-    )
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry](projectHookUrl: ProjectHookUrl,
+                                                                hookTokenCrypto: HookTokenCrypto[F]
+  ): F[HookCreator[F]] = for {
+    commitSyncRequestSender <- CommitSyncRequestSender[F]
+    hookValidator           <- hookvalidation.HookValidator(projectHookUrl)
+    projectInfoFinder       <- ProjectInfoFinder[F]
+    hookCreator             <- ProjectHookCreator[F]
+    tokenAssociator         <- AccessTokenAssociator[F]
+  } yield new HookCreatorImpl[F](
+    projectHookUrl,
+    hookValidator,
+    projectInfoFinder,
+    hookTokenCrypto,
+    hookCreator,
+    tokenAssociator,
+    commitSyncRequestSender
+  )
 }

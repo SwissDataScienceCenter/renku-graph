@@ -39,7 +39,6 @@ import io.renku.tinytypes.Renderer
 import org.apache.jena.rdf.model.ModelFactory
 import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
 import org.apache.jena.riot.{Lang, RDFDataMgr}
-import org.http4s.Uri
 import org.scalatest._
 
 import java.io.ByteArrayInputStream
@@ -66,7 +65,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
       .isValid
   }
 
-  protected lazy val rdfStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
+  protected lazy val renkuStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
     fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort"),
     datasetName =
       if (givenServerRunning) DatasetName("renku") else (nonEmptyStrings() map DatasetName.apply).generateOne,
@@ -78,14 +77,12 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
     authCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
   )
 
-  protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = rdfStoreConfig.fusekiBaseUrl
+  protected lazy val storeConfig: TriplesStoreConfig = renkuStoreConfig
+
+  protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = storeConfig.fusekiBaseUrl
 
   private lazy val rdfStoreServer =
-    new RdfStoreServer(fusekiServerPort, rdfStoreConfig.datasetName, MigrationsStoreConfig.MigrationsDS)
-
-  protected lazy val sparqlEndpoint: Uri = Uri
-    .fromString(s"$fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql")
-    .fold(throw _, identity)
+    new RdfStoreServer(fusekiServerPort, renkuStoreConfig.datasetName, MigrationsStoreConfig.MigrationsDS)
 
   private def rdfConnectionResource(dsName: DatasetName): Resource[IO, RDFConnection] =
     Resource.make(openConnection(dsName))(connection => IO(connection.close()))
@@ -108,7 +105,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
     }
   }
 
-  def clearDataset(): Unit = rdfStoreServer.clearDataset().unsafeRunSync()
+  def clearDataset(): Unit = rdfStoreServer.clearDatasets().unsafeRunSync()
 
   protected override def afterAll(): Unit = {
     if (!givenServerRunning) rdfStoreServer.stop.unsafeRunSync()
@@ -116,19 +113,19 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
   }
 
   protected def loadToStore(jsonLD: JsonLD): Unit =
-    loadToStore(rdfStoreConfig.datasetName, "default", jsonLD)
+    loadToStore(storeConfig.datasetName, "default", jsonLD)
 
   protected def loadToStore(jsonLDs: JsonLD*): Unit = {
     val jsonLD = JsonLD.arr(jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD])): _*)
-    loadToStore(rdfStoreConfig.datasetName, "default", jsonLD)
+    loadToStore(storeConfig.datasetName, "default", jsonLD)
   }
 
   protected def loadToStore(graphId: EntityId, jsonLD: JsonLD): Unit =
-    loadToStore(rdfStoreConfig.datasetName, graphId.show, jsonLD)
+    loadToStore(storeConfig.datasetName, graphId.show, jsonLD)
 
   protected def loadToStore(graphId: EntityId, jsonLDs: JsonLD*): Unit = {
     val jsonLD = JsonLD.arr(jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD])): _*)
-    loadToStore(rdfStoreConfig.datasetName, graphId.show, jsonLD)
+    loadToStore(storeConfig.datasetName, graphId.show, jsonLD)
   }
 
   protected def loadToStore(dsName: DatasetName, graphId: EntityId, jsonLD: JsonLD): Unit =
@@ -183,7 +180,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
 
   private implicit lazy val logger:  TestLogger[IO]              = TestLogger[IO]()
   private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-  private lazy val queryRunner = new RdfStoreClientImpl[IO](rdfStoreConfig) {
+  private lazy val queryRunner = new RdfStoreClientImpl[IO](storeConfig) {
 
     import io.circe.Decoder._
     import io.renku.graph.model.Schemas._

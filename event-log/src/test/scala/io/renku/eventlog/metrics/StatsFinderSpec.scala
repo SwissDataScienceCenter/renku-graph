@@ -27,7 +27,7 @@ import io.renku.eventlog._
 import io.renku.eventlog.subscriptions._
 import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, positiveInts, timestamps}
+import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, positiveInts, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus._
@@ -51,7 +51,7 @@ class StatsFinderSpec
   "countEventsByCategoryName" should {
 
     "return info about number of events grouped by categoryName for the memberSync category" in {
-      // MEMBER_SYNC specific
+
       val compoundId1 = compoundEventIds.generateOne
       val eventDate1  = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
       val lastSynced1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(6)))
@@ -85,13 +85,13 @@ class StatsFinderSpec
         membersync.categoryName        -> 4L,
         commitsync.categoryName        -> 5L,
         globalcommitsync.categoryName  -> 5L,
+        minprojectinfo.categoryName    -> 5L,
         CategoryName("CLEAN_UP_EVENT") -> 0L
       )
     }
 
     "return info about number of events grouped by categoryName for the commitSync category" in {
 
-      // COMMIT_SYNC specific
       val compoundId1   = compoundEventIds.generateOne
       val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
       val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(61)))
@@ -119,13 +119,13 @@ class StatsFinderSpec
         membersync.categoryName        -> 4L,
         commitsync.categoryName        -> 3L,
         globalcommitsync.categoryName  -> 4L,
+        minprojectinfo.categoryName    -> 4L,
         CategoryName("CLEAN_UP_EVENT") -> 0L
       )
     }
 
     "return info about number of events grouped by categoryName for the globalCommitSync category" in {
 
-      // GLOBAL_COMMIT_SYNC specific
       val compoundId1   = compoundEventIds.generateOne
       val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
       val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
@@ -147,6 +147,37 @@ class StatsFinderSpec
         membersync.categoryName        -> 3L,
         commitsync.categoryName        -> 3L,
         globalcommitsync.categoryName  -> 2L,
+        minprojectinfo.categoryName    -> 3L,
+        CategoryName("CLEAN_UP_EVENT") -> 0L
+      )
+    }
+
+    "return info about number of events grouped by categoryName for the minProjectInfo category" in {
+
+      val compoundId1   = compoundEventIds.generateOne
+      val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
+      val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
+      upsertProject(compoundId1, projectPaths.generateOne, eventDate1)
+      upsertLastSynced(compoundId1.projectId, globalcommitsync.categoryName, lastSyncDate1)
+
+      val compoundId2 = compoundEventIds.generateOne
+      val eventDate2  = EventDate(generateInstant())
+      upsertProject(compoundId2, projectPaths.generateOne, eventDate2)
+
+      // ADD_MIN_PROJECT_INFO should not see this one
+      val compoundId3    = compoundEventIds.generateOne
+      val lastEventDate3 = eventDates.generateOne
+      upsertProject(compoundId3, projectPaths.generateOne, lastEventDate3)
+      upsertLastSynced(compoundId3.projectId,
+                       minprojectinfo.categoryName,
+                       timestampsNotInTheFuture(lastEventDate3.value).generateAs(LastSyncedDate)
+      )
+
+      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
+        membersync.categoryName        -> 3L,
+        commitsync.categoryName        -> 3L,
+        globalcommitsync.categoryName  -> 3L,
+        minprojectinfo.categoryName    -> 2L,
         CategoryName("CLEAN_UP_EVENT") -> 0L
       )
     }
@@ -166,6 +197,8 @@ class StatsFinderSpec
         membersync.categoryName        -> 0L,
         commitsync.categoryName        -> 0L,
         globalcommitsync.categoryName  -> 0L,
+        minprojectinfo.categoryName    -> 0L,
+        minprojectinfo.categoryName    -> 0L,
         CategoryName("CLEAN_UP_EVENT") -> 0L
       )
     }
@@ -181,7 +214,8 @@ class StatsFinderSpec
         CategoryName("CLEAN_UP_EVENT") -> eventsCount.toLong,
         membersync.categoryName        -> 0L,
         commitsync.categoryName        -> 0L,
-        globalcommitsync.categoryName  -> 0L
+        globalcommitsync.categoryName  -> 0L,
+        minprojectinfo.categoryName    -> 0L
       )
     }
   }

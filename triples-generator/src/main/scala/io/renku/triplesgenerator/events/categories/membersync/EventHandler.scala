@@ -37,9 +37,7 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
   import io.renku.graph.model.projects
   import membersSynchronizer._
 
-  override def createHandlingProcess(
-      request: EventRequestContent
-  ): F[EventHandlingProcess[F]] =
+  override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess[F](startSynchronizingMember(request))
 
   private def startSynchronizingMember(request: EventRequestContent) = for {

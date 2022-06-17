@@ -35,17 +35,15 @@ private trait LatestCommitFinder[F[_]] {
   def findLatestCommit(projectId: Id)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitInfo]]
 }
 
-private class LatestCommitFinderImpl[F[_]: Async: Logger](
-    gitLabClient: GitLabClient[F]
-) extends LatestCommitFinder[F] {
+private class LatestCommitFinderImpl[F[_]: Async: GitLabClient: Logger] extends LatestCommitFinder[F] {
 
   import CommitInfo._
   import org.http4s.Status._
   import org.http4s.{Request, Response}
 
   override def findLatestCommit(projectId: Id)(implicit maybeAccessToken: Option[AccessToken]): F[Option[CommitInfo]] =
-    gitLabClient.get(uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
-                     "commits"
+    GitLabClient[F].get(uri"projects" / projectId.show / "repository" / "commits" withQueryParam ("per_page", "1"),
+                        "commits"
     )(mapResponse(projectId))
 
   private def mapResponse(projectId: Id): PartialFunction[(Status, Request[F], Response[F]), F[Option[CommitInfo]]] = {
@@ -61,6 +59,6 @@ private class LatestCommitFinderImpl[F[_]: Async: Logger](
 }
 
 private object LatestCommitFinder {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[LatestCommitFinder[F]] =
-    new LatestCommitFinderImpl[F](gitLabClient).pure[F].widen
+  def apply[F[_]: Async: GitLabClient: Logger]: F[LatestCommitFinder[F]] =
+    new LatestCommitFinderImpl[F].pure[F].widen
 }

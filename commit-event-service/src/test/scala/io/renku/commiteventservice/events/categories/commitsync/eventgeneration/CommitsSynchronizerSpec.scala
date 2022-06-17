@@ -575,16 +575,16 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val batchDate = batchDates.generateOne
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val accessTokenFinder     = mock[AccessTokenFinder[Try]]
-    val latestCommitFinder    = mock[LatestCommitFinder[Try]]
-    val eventDetailsFinder    = mock[EventDetailsFinder[Try]]
-    val commitInfoFinder      = mock[CommitInfoFinder[Try]]
-    val commitToEventLog      = mock[CommitToEventLog[Try]]
-    val commitEventsRemover   = mock[CommitEventsRemover[Try]]
-    val executionTimeRecorder = TestExecutionTimeRecorder[Try]()
-    val eventSender           = mock[EventSender[Try]]
-    val clock                 = Clock.fixed(batchDate.value, ZoneId.of(ZoneOffset.UTC.getId))
+    implicit val logger:                TestLogger[Try]                = TestLogger[Try]()
+    implicit val executionTimeRecorder: TestExecutionTimeRecorder[Try] = TestExecutionTimeRecorder[Try]()
+    val accessTokenFinder   = mock[AccessTokenFinder[Try]]
+    val latestCommitFinder  = mock[LatestCommitFinder[Try]]
+    val eventDetailsFinder  = mock[EventDetailsFinder[Try]]
+    val commitInfoFinder    = mock[CommitInfoFinder[Try]]
+    val commitToEventLog    = mock[CommitToEventLog[Try]]
+    val commitEventsRemover = mock[CommitEventsRemover[Try]]
+    val eventSender         = mock[EventSender[Try]]
+    val clock               = Clock.fixed(batchDate.value, ZoneId.of(ZoneOffset.UTC.getId))
 
     val commitsSynchronizer = new CommitsSynchronizerImpl[Try](accessTokenFinder,
                                                                latestCommitFinder,
@@ -593,7 +593,6 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
                                                                commitToEventLog,
                                                                commitEventsRemover,
                                                                eventSender,
-                                                               executionTimeRecorder,
                                                                clock
     )
 

@@ -904,7 +904,7 @@ class DatasetsFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val datasetsFinder = new DatasetsFinderImpl[IO](rdfStoreConfig, new CreatorsFinderImpl[IO](rdfStoreConfig))
+    val datasetsFinder = new DatasetsFinderImpl[IO](renkuStoreConfig, new CreatorsFinderImpl[IO](renkuStoreConfig))
   }
 
   private lazy val publicProjectEntities: Gen[RenkuProject.WithoutParent] = renkuProjectEntities(visibilityPublic)

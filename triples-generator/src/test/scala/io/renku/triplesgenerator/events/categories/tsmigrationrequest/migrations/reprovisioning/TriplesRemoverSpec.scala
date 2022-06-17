@@ -19,7 +19,6 @@
 package io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning
 
 import cats.effect.IO
-import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.generators.Generators._
 import io.renku.graph.model.testentities._
@@ -40,25 +39,14 @@ class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       loadToStore(
         anyRenkuProjectEntities.generateOne.asJsonLD,
         anyRenkuProjectEntities.generateOne.asJsonLD,
-        renkuVersionPairs.generateOne.asJsonLD,
-        ReProvisioningInfo(ReProvisioningInfo.Status.Running, microserviceBaseUrls.generateOne).asJsonLD
+        renkuVersionPairs.generateOne.asJsonLD
       )
 
-      val graphMetadataTriples = runQuery {
-        """|SELECT DISTINCT ?s ?p ?o 
-           |WHERE {
-           |  ?s a ?type
-           |  FILTER (?type IN (renku:VersionPair, renku:ReProvisioning))
-           |  ?s ?p ?o
-           |}
-           |""".stripMargin
-      }.unsafeRunSync()
-
-      rdfStoreSize should be > graphMetadataTriples.size
+      rdfStoreSize should be > 0
 
       triplesRemover.removeAllTriples().unsafeRunSync() shouldBe ()
 
-      rdfStoreSize shouldBe graphMetadataTriples.size
+      rdfStoreSize shouldBe 0
     }
   }
 
@@ -68,6 +56,6 @@ class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
     private val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
       TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
-    val triplesRemover = new TriplesRemoverImpl[IO](removalBatchSize, rdfStoreConfig)
+    val triplesRemover = new TriplesRemoverImpl[IO](removalBatchSize, renkuStoreConfig)
   }
 }

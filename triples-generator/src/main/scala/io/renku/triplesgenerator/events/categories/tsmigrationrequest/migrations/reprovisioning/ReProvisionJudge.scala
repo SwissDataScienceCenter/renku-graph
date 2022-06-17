@@ -26,7 +26,7 @@ import cats.{MonadThrow, Show}
 import io.renku.graph.model._
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.microservices.MicroserviceUrlFinder
-import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{MigrationsStoreConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private trait ReProvisionJudge[F[_]] {
@@ -34,12 +34,12 @@ private trait ReProvisionJudge[F[_]] {
 }
 
 private object ReProvisionJudge {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig,
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: MigrationsStoreConfig,
                                                           reProvisioningStatus:      ReProvisioningStatus[F],
                                                           microserviceUrlFinder:     MicroserviceUrlFinder[F],
                                                           versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
   )(implicit renkuUrl:                                                               RenkuUrl) = for {
-    renkuVersionPairFinder <- RenkuVersionPairFinder(rdfStoreConfig)
+    renkuVersionPairFinder <- RenkuVersionPairFinder(storeConfig)
     serviceHealthChecker   <- ServiceHealthChecker[F]
   } yield new ReProvisionJudgeImpl[F](renkuVersionPairFinder,
                                       reProvisioningStatus,

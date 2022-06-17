@@ -25,7 +25,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import org.apache.jena.fuseki.FusekiException
 import org.apache.jena.fuseki.main.FusekiServer
-import org.apache.jena.query.DatasetFactory
+import org.apache.jena.query.{Dataset, DatasetFactory}
 
 import java.net.BindException
 import scala.concurrent.duration._
@@ -112,15 +112,14 @@ class RdfStoreServer(
 
   def stop: IO[Unit] = IO(rdfStoreServer.stop())
 
-  def clearDataset(): IO[Unit] = for {
-    _ <- IO(renkuDataset.asDatasetGraph().clear())
-    _ <- isDatasetEmpty flatMap {
-           case true  => IO.unit
-           case false => IO.raiseError(new Exception(s"Clearing $datasetName wasn't successful"))
-         }
+  def clearDatasets(): IO[Unit] = for {
+    _ <- IO(renkuDataset.asDatasetGraph().clear()) >> validateEmpty(renkuDataset, datasetName)
+    _ <- IO(migrationsDataset.asDatasetGraph().clear()) >> validateEmpty(migrationsDataset, migrationsDatasetName)
   } yield ()
 
-  def isDatasetEmpty: IO[Boolean] = IO {
-    renkuDataset.asDatasetGraph().isEmpty
-  }
+  private def validateEmpty(dataset: Dataset, name: DatasetName): IO[Unit] =
+    IO(dataset.asDatasetGraph().isEmpty) >>= {
+      case true  => IO.unit
+      case false => IO.raiseError(new Exception(s"Clearing $name wasn't successful"))
+    }
 }

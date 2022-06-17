@@ -78,6 +78,26 @@ Accepts an event as multipart requests.
 
 `payload` part: binary of `application/zip` content-type
 
+- **ADD_MIN_PROJECT_INFO**
+
+Upon arrival, triples-generator will
+* gather minimal project info based on data found in GitLab;
+* send the info to the TS
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "ADD_MIN_PROJECT_INFO",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  }
+}
+```
+
 - **MEMBER_SYNC**
 
 **Multipart Request**

@@ -24,8 +24,6 @@ import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.persons
@@ -252,33 +250,32 @@ private object MicroserviceRoutes {
       logger:             Logger[IO],
       metricsRegistry:    MetricsRegistry[IO],
       sparqlTimeRecorder: SparqlQueryTimeRecorder[IO]
-  ): IO[MicroserviceRoutes[IO]] = for {
-    gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-    gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
-    datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO]
-    datasetEndpoint         <- DatasetEndpoint[IO]
-    entitiesEndpoint        <- entities.Endpoint[IO]
-    gitLabClient            <- GitLabClient(gitLabThrottler)
-    queryEndpoint           <- QueryEndpoint()
-    lineageEndpoint         <- lineage.Endpoint[IO]
-    projectEndpoint         <- ProjectEndpoint[IO](gitLabClient)
-    projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
-    authenticator           <- GitLabAuthenticator(gitLabClient)
-    authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-    projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
-    datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
-    versionRoutes           <- version.Routes[IO]
-  } yield new MicroserviceRoutes(datasetsSearchEndpoint,
-                                 datasetEndpoint,
-                                 entitiesEndpoint,
-                                 queryEndpoint,
-                                 lineageEndpoint,
-                                 projectEndpoint,
-                                 projectDatasetsEndpoint,
-                                 authMiddleware,
-                                 projectPathAuthorizer,
-                                 datasetIdAuthorizer,
-                                 new RoutesMetrics[IO],
-                                 versionRoutes
-  )
+  ): IO[MicroserviceRoutes[IO]] = GitLabClient[IO]() flatMap { implicit gitLabClient =>
+    for {
+      datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO]
+      datasetEndpoint         <- DatasetEndpoint[IO]
+      entitiesEndpoint        <- entities.Endpoint[IO]
+      queryEndpoint           <- QueryEndpoint()
+      lineageEndpoint         <- lineage.Endpoint[IO]
+      projectEndpoint         <- ProjectEndpoint[IO]
+      projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
+      authenticator           <- GitLabAuthenticator[IO]
+      authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
+      projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
+      datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
+      versionRoutes           <- version.Routes[IO]
+    } yield new MicroserviceRoutes(datasetsSearchEndpoint,
+                                   datasetEndpoint,
+                                   entitiesEndpoint,
+                                   queryEndpoint,
+                                   lineageEndpoint,
+                                   projectEndpoint,
+                                   projectDatasetsEndpoint,
+                                   authMiddleware,
+                                   projectPathAuthorizer,
+                                   datasetIdAuthorizer,
+                                   new RoutesMetrics[IO],
+                                   versionRoutes
+    )
+  }
 }

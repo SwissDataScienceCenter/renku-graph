@@ -55,8 +55,7 @@ class AccessTokenAssociatorImpl[F[_]: Async: Logger](
 }
 
 object AccessTokenAssociator {
-  def apply[F[_]: Async: Logger]: F[AccessTokenAssociator[F]] =
-    for {
-      tokenRepositoryUrl <- TokenRepositoryUrl[F]()
-    } yield new AccessTokenAssociatorImpl[F](tokenRepositoryUrl)
+  def apply[F[_]: Async: Logger]: F[AccessTokenAssociator[F]] = for {
+    tokenRepositoryUrl <- TokenRepositoryUrl[F]()
+  } yield new AccessTokenAssociatorImpl[F](tokenRepositoryUrl)
 }

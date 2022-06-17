@@ -70,10 +70,7 @@ class HookValidationEndpointImpl[F[_]: MonadThrow: Logger](
 }
 
 object HookValidationEndpoint {
-  def apply[F[_]: Async: Logger](
-      projectHookUrl: ProjectHookUrl,
-      gitLabClient:   GitLabClient[F]
-  ): F[HookValidationEndpoint[F]] = for {
-    hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabClient)
+  def apply[F[_]: Async: GitLabClient: Logger](projectHookUrl: ProjectHookUrl): F[HookValidationEndpoint[F]] = for {
+    hookValidator <- hookvalidation.HookValidator(projectHookUrl)
   } yield new HookValidationEndpointImpl[F](hookValidator)
 }
