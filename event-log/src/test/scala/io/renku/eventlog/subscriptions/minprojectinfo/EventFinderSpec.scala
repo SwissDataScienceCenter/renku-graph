@@ -33,6 +33,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit.MICROS
 
 class EventFinderSpec
     extends AnyWordSpec
@@ -54,7 +55,9 @@ class EventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe Some(MinProjectInfoEvent(projectId, projectPath))
 
-        findProjectCategorySyncTimes(projectId) shouldBe List(categoryName -> LastSyncedDate(currentTime))
+        findProjectCategorySyncTimes(projectId) shouldBe List(
+          categoryName -> LastSyncedDate(currentTime.truncatedTo(MICROS))
+        )
 
         finder.popEvent().unsafeRunSync() shouldBe None
       }
@@ -72,7 +75,9 @@ class EventFinderSpec
 
         finder.popEvent().unsafeRunSync() shouldBe Some(MinProjectInfoEvent(projectId, projectPath))
 
-        findProjectCategorySyncTimes(projectId) shouldBe List(categoryName -> LastSyncedDate(currentTime))
+        findProjectCategorySyncTimes(projectId) shouldBe List(
+          categoryName -> LastSyncedDate(currentTime.truncatedTo(MICROS))
+        )
 
         finder.popEvent().unsafeRunSync() shouldBe None
       }
