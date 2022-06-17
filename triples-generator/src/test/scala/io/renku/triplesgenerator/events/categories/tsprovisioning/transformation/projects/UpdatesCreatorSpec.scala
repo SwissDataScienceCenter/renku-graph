@@ -35,6 +35,8 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.Instant
+
 class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
@@ -45,6 +47,7 @@ class UpdatesCreatorSpec
   import UpdatesCreator._
 
   "prepareUpdates" should {
+
     "generate queries which delete the project name when changed" in {
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
@@ -54,6 +57,18 @@ class UpdatesCreatorSpec
         .unsafeRunSync()
 
       findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeName = None))
+    }
+
+    "generate queries which delete the project dateCreated when changed" in {
+      val project = anyProjectEntities.generateOne.to[entities.Project]
+
+      loadToStore(project)
+
+      prepareUpdates(project,
+                     toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateOne)
+      ).runAll.unsafeRunSync()
+
+      findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeDateCreated = None))
     }
 
     val projectWithParentScenarios = Table(
@@ -190,18 +205,20 @@ class UpdatesCreatorSpec
     }
   }
 
-  private case class CurrentProjectState(maybeName:       Option[String],
-                                         maybeParentId:   Option[String],
-                                         maybeVisibility: Option[String],
-                                         maybeDesc:       Option[String],
-                                         keywords:        Set[String],
-                                         maybeAgent:      Option[String],
-                                         maybeCreatorId:  Option[String]
+  private case class CurrentProjectState(maybeName:        Option[String],
+                                         maybeDateCreated: Option[projects.DateCreated],
+                                         maybeParentId:    Option[String],
+                                         maybeVisibility:  Option[String],
+                                         maybeDesc:        Option[String],
+                                         keywords:         Set[String],
+                                         maybeAgent:       Option[String],
+                                         maybeCreatorId:   Option[String]
   )
 
   private object CurrentProjectState {
     def from(project: entities.Project): CurrentProjectState = CurrentProjectState(
       project.name.value.some,
+      project.dateCreated.some,
       findParent(project).map(_.value),
       project.visibility.value.some,
       project.maybeDescription.map(_.value),
@@ -212,11 +229,12 @@ class UpdatesCreatorSpec
   }
 
   private def findProjects: Set[CurrentProjectState] = runQuery(
-    s"""|SELECT ?name ?maybeParent ?visibility ?maybeDesc 
+    s"""|SELECT ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc 
         |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
         |WHERE {
         |  ?id a schema:Project
         |  OPTIONAL { ?id schema:name ?name } 
+        |  OPTIONAL { ?id schema:dateCreated ?dateCreated } 
         |  OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent } 
         |  OPTIONAL { ?id renku:projectVisibility ?visibility } 
         |  OPTIONAL { ?id schema:description ?maybeDesc } 
@@ -224,13 +242,14 @@ class UpdatesCreatorSpec
         |  OPTIONAL { ?id schema:agent ?maybeAgent } 
         |  OPTIONAL { ?id schema:creator ?maybeCreatorId } 
         |}
-        |GROUP BY ?name ?maybeParent ?visibility ?maybeDesc ?maybeAgent ?maybeCreatorId
+        |GROUP BY ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc ?maybeAgent ?maybeCreatorId
         |""".stripMargin
   )
     .unsafeRunSync()
     .map(row =>
       CurrentProjectState(
         maybeName = row.get("name"),
+        maybeDateCreated = row.get("dateCreated").map(d => projects.DateCreated(Instant.parse(d))),
         maybeParentId = row.get("maybeParent"),
         maybeVisibility = row.get("visibility"),
         maybeDesc = row.get("maybeDesc"),

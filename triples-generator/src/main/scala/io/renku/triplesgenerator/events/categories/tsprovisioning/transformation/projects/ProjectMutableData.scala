@@ -21,6 +21,7 @@ package io.renku.triplesgenerator.events.categories.tsprovisioning.transformatio
 import io.renku.graph.model.{CliVersion, persons, projects}
 
 private final case class ProjectMutableData(name:             projects.Name,
+                                            dateCreated:      projects.DateCreated,
                                             maybeParentId:    Option[projects.ResourceId],
                                             visibility:       projects.Visibility,
                                             maybeDescription: Option[projects.Description],

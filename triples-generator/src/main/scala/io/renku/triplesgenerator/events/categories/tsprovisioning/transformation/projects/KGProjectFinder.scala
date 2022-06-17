@@ -47,12 +47,13 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "transformation - find project",
     Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
-    s"""|SELECT DISTINCT ?name ?maybeParent ?visibility ?maybeDescription
+    s"""|SELECT DISTINCT ?name ?dateCreated ?maybeParent ?visibility ?maybeDescription
         |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
         |WHERE {
         |  BIND (${resourceId.showAs[RdfResource]} AS ?id)
         |  ?id a schema:Project;
         |      schema:name ?name;
+        |      schema:dateCreated ?dateCreated;
         |      renku:projectVisibility ?visibility.
         |  OPTIONAL { ?id schema:description ?maybeDescription }
         |  OPTIONAL { ?id schema:keywords ?keyword }
@@ -60,7 +61,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |  OPTIONAL { ?id schema:agent ?maybeAgent }
         |  OPTIONAL { ?id schema:creator ?maybeCreatorId }
         |}
-        |GROUP BY ?name ?maybeParent ?visibility ?maybeDescription ?maybeAgent ?maybeCreatorId
+        |GROUP BY ?name ?dateCreated ?maybeParent ?visibility ?maybeDescription ?maybeAgent ?maybeCreatorId
         |""".stripMargin
   )
 
@@ -73,13 +74,22 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
       for {
         name             <- extract[projects.Name]("name")
+        dateCreated      <- extract[projects.DateCreated]("dateCreated")
         maybeParent      <- extract[Option[projects.ResourceId]]("maybeParent")
         visibility       <- extract[projects.Visibility]("visibility")
         maybeDescription <- extract[Option[projects.Description]]("maybeDescription")
         keywords         <- extract[Option[String]]("keywords") >>= toSetOfKeywords
         maybeAgent       <- extract[Option[CliVersion]]("maybeAgent")
         maybeCreatorId   <- extract[Option[persons.ResourceId]]("maybeCreatorId")
-      } yield ProjectMutableData(name, maybeParent, visibility, maybeDescription, keywords, maybeAgent, maybeCreatorId)
+      } yield ProjectMutableData(name,
+                                 dateCreated,
+                                 maybeParent,
+                                 visibility,
+                                 maybeDescription,
+                                 keywords,
+                                 maybeAgent,
+                                 maybeCreatorId
+      )
     }(toOption(s"More than one project found for resourceId: '$resourceId'"))
 }
 
