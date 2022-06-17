@@ -40,28 +40,28 @@ object Microservice extends IOMicroservice {
   private implicit val logger: Logger[IO]           = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] =
-    MetricsRegistry[IO]().flatMap { implicit metricsRegistry =>
-      for {
-        certificateLoader     <- CertificateLoader[IO]
-        sentryInitializer     <- SentryInitializer[IO]
-        gitLabClient          <- GitLabClient[IO]()
-        executionTimeRecorder <- ExecutionTimeRecorder[IO]()
-        commitSyncCategory <-
-          events.categories.commitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
-        globalCommitSyncCategory <-
-          events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
-        eventConsumersRegistry  <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-        serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-        microserviceRoutes      <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
-        exitcode <- microserviceRoutes.routes.use { routes =>
-                      new MicroserviceRunner[IO](serviceReadinessChecker,
-                                                 certificateLoader,
-                                                 sentryInitializer,
-                                                 eventConsumersRegistry,
-                                                 HttpServer[IO](serverPort = ServicePort.value, routes)
-                      ).run()
-                    }
-      } yield exitcode
+    MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
+      ExecutionTimeRecorder[IO]() flatMap { implicit executionTimeRecorder =>
+        GitLabClient[IO]() flatMap { implicit gitLabClient =>
+          for {
+            certificateLoader        <- CertificateLoader[IO]
+            sentryInitializer        <- SentryInitializer[IO]
+            commitSyncCategory       <- events.categories.commitsync.SubscriptionFactory[IO]
+            globalCommitSyncCategory <- events.categories.globalcommitsync.SubscriptionFactory[IO]
+            eventConsumersRegistry   <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
+            serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
+            microserviceRoutes       <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
+            exitcode <- microserviceRoutes.routes.use { routes =>
+                          new MicroserviceRunner[IO](serviceReadinessChecker,
+                                                     certificateLoader,
+                                                     sentryInitializer,
+                                                     eventConsumersRegistry,
+                                                     HttpServer[IO](serverPort = ServicePort.value, routes)
+                          ).run()
+                        }
+          } yield exitcode
+        }
+      }
     }
 }
 

@@ -54,10 +54,8 @@ private[eventgeneration] class MissingCommitEventCreatorImpl[F[_]: MonadThrow](
 }
 
 private[eventgeneration] object MissingCommitEventCreator {
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      gitLabClient: GitLabClient[F]
-  ): F[MissingCommitEventCreator[F]] = for {
-    commitInfoFinder <- CommitInfoFinder(gitLabClient)
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry]: F[MissingCommitEventCreator[F]] = for {
+    commitInfoFinder <- CommitInfoFinder[F]
     commitToEventLog <- CommitToEventLog[F]
   } yield new MissingCommitEventCreatorImpl[F](commitInfoFinder, commitToEventLog)
 }

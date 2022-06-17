@@ -189,9 +189,9 @@ class CommitInfoFinderSpec
     val author        = authors.generateOne
     val committer     = committers.generateOne
     val parents       = parentsIdsLists().generateOne
-    private implicit val logger: TestLogger[IO] = TestLogger()
-    val gitLabClient = mock[GitLabClient[IO]]
-    val finder       = new CommitInfoFinderImpl[IO](gitLabClient)
+    private implicit val logger: TestLogger[IO]   = TestLogger()
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    val finder = new CommitInfoFinderImpl[IO]
 
     val endpointName: String Refined NonEmpty = "single-commit"
 

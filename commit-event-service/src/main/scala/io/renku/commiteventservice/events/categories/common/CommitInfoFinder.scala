@@ -18,7 +18,7 @@
 
 package io.renku.commiteventservice.events.categories.common
 
-import cats.effect.{Async, Temporal}
+import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.events._
@@ -42,8 +42,7 @@ private[categories] trait CommitInfoFinder[F[_]] {
   ): F[Option[CommitInfo]]
 }
 
-private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F])
-    extends CommitInfoFinder[F] {
+private[categories] class CommitInfoFinderImpl[F[_]: Async: GitLabClient: Logger] extends CommitInfoFinder[F] {
 
   import CommitInfo._
   import org.http4s.Status.{Ok, Unauthorized}
@@ -64,7 +63,7 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](gi
         ResultType
       ]]
   )(implicit maybeAccessToken: Option[AccessToken]) =
-    gitLabClient.get(uri"projects" / projectId.show / "repository" / "commits" / commitId.show, "single-commit")(
+    GitLabClient[F].get(uri"projects" / projectId.show / "repository" / "commits" / commitId.show, "single-commit")(
       mapResponse
     )
 
@@ -87,6 +86,5 @@ private[categories] class CommitInfoFinderImpl[F[_]: Async: Temporal: Logger](gi
 }
 
 private[categories] object CommitInfoFinder {
-  def apply[F[_]: Async: Temporal: Logger](gitLabClient: GitLabClient[F]): F[CommitInfoFinderImpl[F]] =
-    new CommitInfoFinderImpl[F](gitLabClient).pure[F]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[CommitInfoFinder[F]] = new CommitInfoFinderImpl[F].pure[F].widen
 }

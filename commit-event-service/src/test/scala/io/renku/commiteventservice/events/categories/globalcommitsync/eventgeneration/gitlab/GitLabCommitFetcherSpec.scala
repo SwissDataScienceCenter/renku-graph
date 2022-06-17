@@ -224,9 +224,9 @@ class GitLabCommitFetcherSpec extends AnyWordSpec with IOSpec with MockFactory w
     val pageRequest    = pagingRequests.generateOne
     val commitInfoList = commitInfos.generateNonEmptyList().toList
 
-    val gitLabClient = mock[GitLabClient[IO]]
-    private implicit val logger: TestLogger[IO] = TestLogger()
-    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO](gitLabClient)
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    private implicit val logger: TestLogger[IO]   = TestLogger()
+    val gitLabCommitFetcher = new GitLabCommitFetcherImpl[IO]
   }
 
   private trait AllCommitsEndpointTestCase extends TestCase {
