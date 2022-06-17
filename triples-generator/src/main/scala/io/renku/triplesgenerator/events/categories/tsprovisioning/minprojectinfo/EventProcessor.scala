@@ -116,8 +116,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](accessTokenFinder: Ac
   private def logSummary(event: MinProjectInfoEvent): ((ElapsedTime, UploadingResult)) => F[Unit] = {
     case (elapsedTime, uploadingResult) =>
       val message = uploadingResult match {
-        case Uploaded(_) => "was successfully processed"
-        case _           => "failed to process"
+        case Uploaded(_) => "success"
+        case _           => "failure"
       }
       Logger[F].info(s"${logMessageCommon(event)} processed in ${elapsedTime}ms: $message")
   }

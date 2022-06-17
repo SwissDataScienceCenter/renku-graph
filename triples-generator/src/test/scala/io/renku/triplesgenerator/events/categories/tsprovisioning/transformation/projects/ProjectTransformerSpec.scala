@@ -109,11 +109,20 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
   private lazy val projectMutableDataGen: Gen[ProjectMutableData] = for {
     name           <- projectNames
+    dateCreated    <- projectCreatedDates()
     maybeParentId  <- projectResourceIds.toGeneratorOfOptions
     visibility     <- projectVisibilities
     maybeDesc      <- projectDescriptions.toGeneratorOfOptions
     keywords       <- projectKeywords.toGeneratorOfSet(minElements = 0)
     maybeAgent     <- cliVersions.toGeneratorOfOptions
     maybeCreatorId <- personResourceIds.toGeneratorOfOptions
-  } yield ProjectMutableData(name, maybeParentId, visibility, maybeDesc, keywords, maybeAgent, maybeCreatorId)
+  } yield ProjectMutableData(name,
+                             dateCreated,
+                             maybeParentId,
+                             visibility,
+                             maybeDesc,
+                             keywords,
+                             maybeAgent,
+                             maybeCreatorId
+  )
 }
