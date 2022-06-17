@@ -26,12 +26,14 @@ import cats.effect.{IO, Resource}
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import io.renku.db.{DBConfigProvider, SessionResource}
 import io.renku.eventlog._
+import io.renku.events.CategoryName
 import io.renku.graph.model.events.{CommitId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
 import skunk._
+import skunk.codec.text.varchar
 import skunk.implicits._
 
 import scala.collection.immutable
@@ -51,13 +53,23 @@ object EventLog extends TypeSerializers {
 
   def findEvents(projectId: Id, status: EventStatus*)(implicit ioRuntime: IORuntime): List[CommitId] = execute {
     session =>
-      val query: Query[projects.Id, CommitId] =
-        sql"""SELECT event_id
+      val query: Query[projects.Id, CommitId] = sql"""
+            SELECT event_id
             FROM event
             WHERE project_id = $projectIdEncoder AND #${`status IN`(status.toList)}"""
-          .query(eventIdDecoder)
-          .map(eventId => CommitId(eventId.value))
+        .query(eventIdDecoder)
+        .map(eventId => CommitId(eventId.value))
       session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+  }
+
+  def findSyncEvents(projectId: Id)(implicit ioRuntime: IORuntime): List[CategoryName] = execute { session =>
+    val query: Query[projects.Id, CategoryName] = sql"""
+          SELECT category_name
+          FROM subscription_category_sync_time
+          WHERE project_id = $projectIdEncoder"""
+      .query(varchar)
+      .map(category => CategoryName(category))
+    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
 
   private def `status IN`(status: List[EventStatus]) =

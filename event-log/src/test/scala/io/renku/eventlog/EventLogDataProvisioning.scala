@@ -149,19 +149,17 @@ trait EventLogDataProvisioning {
   protected def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit =
     upsertProject(compoundEventId.projectId, projectPath, eventDate)
 
-  protected def upsertProject(projectId: projects.Id, projectPath: Path, eventDate: EventDate): Unit =
-    execute {
-      Kleisli { session =>
-        val query: Command[projects.Id ~ projects.Path ~ EventDate] =
-          sql"""INSERT INTO
-                project (project_id, project_path, latest_event_date)
-                VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
-                ON CONFLICT (project_id)
-                DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+  protected def upsertProject(projectId: projects.Id, projectPath: Path, eventDate: EventDate): Unit = execute {
+    Kleisli { session =>
+      val query: Command[projects.Id ~ projects.Path ~ EventDate] =
+        sql"""INSERT INTO project (project_id, project_path, latest_event_date)
+              VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
+              ON CONFLICT (project_id)
+              DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           """.command
-        session.prepare(query).use(_.execute(projectId ~ projectPath ~ eventDate)).void
-      }
+      session.prepare(query).use(_.execute(projectId ~ projectPath ~ eventDate)).void
     }
+  }
 
   protected def upsertEventPayload(compoundEventId: CompoundEventId,
                                    eventStatus:     EventStatus,

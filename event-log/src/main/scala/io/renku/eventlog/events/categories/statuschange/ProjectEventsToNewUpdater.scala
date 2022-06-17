@@ -29,6 +29,7 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.categories.statuschange.projectCleaner.ProjectCleaner
+import io.renku.eventlog.subscriptions.minprojectinfo
 import io.renku.eventlog.{EventDate, ExecutionDate}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus
@@ -65,6 +66,7 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
       _                        <- removeProjectProcessingTimes(event.project)
       _                        <- removeProjectPayloads(event.project)
       _                        <- removeProjectDeliveryInfo(event.project)
+      _                        <- removeCategorySyncTimes(event.project)
       removedAwaitingDeletions <- removeProjectEvents(event.project, AwaitingDeletion)
       removedDeletingEvents    <- removeProjectEvents(event.project, Deleting)
       maybeLatestEventDate     <- findLatestEventDate(event.project)
@@ -164,6 +166,18 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
                 )""".command
       )
       .arguments(project.id ~ project.id)
+      .build
+      .void
+  }
+
+  private def removeCategorySyncTimes(project: Project) = measureExecutionTime {
+    SqlStatement
+      .named("project_to_new - delivery removal")
+      .command[projects.Id](sql"""
+        DELETE FROM subscription_category_sync_time
+        WHERE project_id = $projectIdEncoder AND category_name = '#${minprojectinfo.categoryName.show}'
+        """.command)
+      .arguments(project.id)
       .build
       .void
   }

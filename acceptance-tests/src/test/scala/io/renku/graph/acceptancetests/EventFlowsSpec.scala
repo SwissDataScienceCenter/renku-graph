@@ -66,7 +66,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
         .POST("webhooks/events", HookToken(project.id), data.GitLab.pushEvent(project, commitId))
         .status shouldBe Accepted
 
-      And("relevant commit events are processed")
+      And("commit events are processed")
       `wait for events to be processed`(project.id)
 
       Then(s"all the events should get the $TriplesStore status in the Event Log")

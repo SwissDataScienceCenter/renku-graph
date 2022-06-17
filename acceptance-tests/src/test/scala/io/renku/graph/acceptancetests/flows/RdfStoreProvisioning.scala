@@ -37,6 +37,10 @@ import org.scalatest.matchers.should
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 import cats.data.NonEmptyList
+import io.renku.events.CategoryName
+import io.renku.graph.acceptancetests.db.EventLog
+
+import scala.annotation.tailrec
 
 trait RdfStoreProvisioning
     extends ModelImplicits
@@ -74,5 +78,22 @@ trait RdfStoreProvisioning
     val ClientResponse(status, jsonBody, _) = eventLogClient.fetchProcessingStatus(projectId)
     status                                            shouldBe Ok
     jsonBody.hcursor.downField("progress").as[Double] shouldBe Right(100d)
+  }
+
+  def `wait for the Fast Tract event`(projectId: projects.Id)(implicit ioRuntime: IORuntime): Unit = eventually {
+
+    val sleepTime = 1 second
+
+    @tailrec
+    def checkIfWasSent(categoryName: CategoryName, attempt: Int = 1): Unit = {
+      if (attempt > 20) fail(s"'$categoryName' event wasn't sent after ${(sleepTime * attempt).toSeconds}")
+
+      if (!EventLog.findSyncEvents(projectId).contains(categoryName)) {
+        sleep(sleepTime.toMillis)
+        checkIfWasSent(categoryName)
+      }
+    }
+
+    checkIfWasSent(CategoryName("ADD_MIN_PROJECT_INFO"))
   }
 }

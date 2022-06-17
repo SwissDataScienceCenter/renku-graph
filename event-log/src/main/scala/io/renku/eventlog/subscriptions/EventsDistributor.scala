@@ -67,9 +67,7 @@ private class EventsDistributorImpl[F[_]: MonadThrow: Temporal: Logger, Category
     eventsFinder.popEvent() recoverWith logError
   }.flatTapNone(Temporal[F] sleep noEventSleep)
 
-  private def dispatch(
-      subscriber: SubscriberUrl
-  )(event:        CategoryEvent): F[Unit] = {
+  private def dispatch(subscriber: SubscriberUrl)(event: CategoryEvent): F[Unit] = {
     sendEvent(subscriber, event) >>= handleResult(subscriber, event)
   } recoverWith recover(subscriber, event)
 
