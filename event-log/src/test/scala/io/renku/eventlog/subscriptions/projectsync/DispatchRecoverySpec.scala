@@ -17,7 +17,7 @@
  */
 
 package io.renku.eventlog.subscriptions
-package minprojectinfo
+package projectsync
 
 import Generators.sendingResults
 import cats.effect.IO
@@ -94,7 +94,7 @@ class DispatchRecoverySpec
   }
 
   private trait TestCase {
-    val event = MinProjectInfoEvent(projectIds.generateOne, projectPaths.generateOne)
+    val event = ProjectSyncEvent(projectIds.generateOne, projectPaths.generateOne)
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")

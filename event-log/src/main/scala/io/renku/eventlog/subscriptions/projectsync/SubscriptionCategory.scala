@@ -16,32 +16,30 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.zombieevents
+package io.renku.eventlog.subscriptions.projectsync
 
-import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.subscriptions.eventdelivery._
-import io.renku.eventlog.subscriptions.zombieevents.ZombieEventEncoder.encodeEvent
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
+import projectsync.EventEncoder.encodeEvent
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply[F[_]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
+  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
       queriesExecTimes: LabeledHistogram[F]
   ): F[subscriptions.SubscriptionCategory[F]] = for {
     subscribers      <- UrlAndIdSubscribers[F](categoryName)
-    eventsFinder     <- EventFinder(queriesExecTimes)
-    dispatchRecovery <- LoggingDispatchRecovery[F, ZombieEvent](categoryName)
-    eventDelivery    <- EventDelivery.noOp[F, ZombieEvent]
+    eventFinder      <- EventFinder(queriesExecTimes)
+    dispatchRecovery <- DispatchRecovery[F](queriesExecTimes)
+    eventDelivery    <- EventDelivery.noOp[F, ProjectSyncEvent]
     eventsDistributor <- EventsDistributor(categoryName,
                                            subscribers,
-                                           eventsFinder,
+                                           eventFinder,
                                            eventDelivery,
                                            EventEncoder(encodeEvent),
                                            dispatchRecovery
@@ -53,8 +51,3 @@ private[subscriptions] object SubscriptionCategory {
                                                                deserializer
   )
 }
-
-private case class SubscriptionPayload(subscriberUrl: SubscriberUrl,
-                                       subscriberId:  SubscriberId,
-                                       maybeCapacity: Option[Capacity]
-) extends subscriptions.UrlAndIdSubscriptionInfo

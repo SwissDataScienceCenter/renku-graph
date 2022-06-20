@@ -27,7 +27,7 @@ import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog._
 import io.renku.eventlog.events.categories.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.categories.statuschange.projectCleaner.ProjectCleaner
-import io.renku.eventlog.subscriptions.minprojectinfo
+import io.renku.eventlog.subscriptions.{SubscriptionDataProvisioning, minprojectinfo}
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
@@ -55,6 +55,7 @@ class ProjectEventsToNewUpdaterSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
+    with SubscriptionDataProvisioning
     with TypeSerializers
     with should.Matchers
     with MockFactory {

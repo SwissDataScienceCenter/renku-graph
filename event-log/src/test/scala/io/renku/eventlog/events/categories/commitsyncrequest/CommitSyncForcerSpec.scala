@@ -55,8 +55,8 @@ class CommitSyncForcerSpec
         upsertProject(projectId, projectPath, eventDates.generateOne)
 
         val otherCategoryName = categoryNames.generateOne
-        upsertLastSynced(projectId, commitsync.categoryName, lastSyncedDates.generateOne)
-        upsertLastSynced(projectId, otherCategoryName, lastSyncedDates.generateOne)
+        upsertCategorySyncTime(projectId, commitsync.categoryName, lastSyncedDates.generateOne)
+        upsertCategorySyncTime(projectId, otherCategoryName, lastSyncedDates.generateOne)
 
         findSyncTime(projectId, commitsync.categoryName) shouldBe a[Some[_]]
         findSyncTime(projectId, otherCategoryName)       shouldBe a[Some[_]]

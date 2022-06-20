@@ -44,11 +44,10 @@ private[subscriptions] object SubscriptionCategory {
                                            EventEncoder(encodeEvent),
                                            dispatchRecovery
                          )
-    deserializer <-
-      UrlAndIdSubscriptionDeserializer[F, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
-  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](categoryName,
-                                                                       subscribers,
-                                                                       eventsDistributor,
-                                                                       deserializer
+    deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](categoryName, SubscriptionPayload.apply)
+  } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](categoryName,
+                                                               subscribers,
+                                                               eventsDistributor,
+                                                               deserializer
   )
 }

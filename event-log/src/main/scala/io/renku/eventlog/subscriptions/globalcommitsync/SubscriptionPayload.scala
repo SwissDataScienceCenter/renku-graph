@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.cleanup
+package io.renku.eventlog.subscriptions.globalcommitsync
 
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.Capacity
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 
-private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
-                                               subscriberId:  SubscriberId,
-                                               maybeCapacity: Option[Capacity]
+private case class SubscriptionPayload(subscriberUrl: SubscriberUrl,
+                                       subscriberId:  SubscriberId,
+                                       maybeCapacity: Option[Capacity]
 ) extends subscriptions.UrlAndIdSubscriptionInfo

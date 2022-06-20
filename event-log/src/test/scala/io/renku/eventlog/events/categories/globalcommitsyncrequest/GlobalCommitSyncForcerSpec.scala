@@ -60,9 +60,9 @@ class GlobalCommitSyncForcerSpec
         val otherCategoryName = categoryNames.generateOne
         val globalSyncSyncDate =
           timestampsNotInTheFuture(butYoungerThan = now.minus(syncFrequency minusDays 1)).generateAs(LastSyncedDate)
-        upsertLastSynced(projectId, globalcommitsync.categoryName, globalSyncSyncDate)
+        upsertCategorySyncTime(projectId, globalcommitsync.categoryName, globalSyncSyncDate)
         val otherCategorySyncDate = lastSyncedDates.generateOne
-        upsertLastSynced(projectId, otherCategoryName, otherCategorySyncDate)
+        upsertCategorySyncTime(projectId, otherCategoryName, otherCategorySyncDate)
 
         findSyncTime(projectId, globalcommitsync.categoryName) shouldBe globalSyncSyncDate.some
         findSyncTime(projectId, otherCategoryName)             shouldBe otherCategorySyncDate.some

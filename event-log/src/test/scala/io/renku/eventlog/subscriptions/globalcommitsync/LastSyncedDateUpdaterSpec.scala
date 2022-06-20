@@ -55,7 +55,7 @@ class LastSyncedDateUpdaterSpec
 
     "delete the current last synced date if the argument is None" in new TestCase {
       val oldLastSyncedDate = lastSyncedDates.generateOne
-      upsertLastSynced(project.id, categoryName, oldLastSyncedDate)
+      upsertCategorySyncTime(project.id, categoryName, oldLastSyncedDate)
 
       getLastSyncedDate(project) shouldBe oldLastSyncedDate.some
 
@@ -66,7 +66,7 @@ class LastSyncedDateUpdaterSpec
 
     "update the previous last synced date" in new TestCase {
       val oldLastSyncedDate = lastSyncedDates.generateOne
-      upsertLastSynced(project.id, categoryName, oldLastSyncedDate)
+      upsertCategorySyncTime(project.id, categoryName, oldLastSyncedDate)
 
       getLastSyncedDate(project) shouldBe oldLastSyncedDate.some
 

@@ -39,6 +39,7 @@ class EventFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryEventLogDbSpec
+    with SubscriptionDataProvisioning
     with MockFactory
     with should.Matchers {
 
