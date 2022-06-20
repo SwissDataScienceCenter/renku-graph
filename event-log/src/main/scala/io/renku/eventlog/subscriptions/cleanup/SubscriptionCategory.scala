@@ -49,11 +49,6 @@ private[subscriptions] object SubscriptionCategory {
     eventFinder      <- EventFinder(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
     eventsDistributor <-
       EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)
-    deserializer <-
-      UrlAndIdSubscriptionDeserializer[F, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
-  } yield new SubscriptionCategoryImpl[F, SubscriptionCategoryPayload](name,
-                                                                       subscribers,
-                                                                       eventsDistributor,
-                                                                       deserializer
-  )
+    deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](name, SubscriptionPayload.apply)
+  } yield new SubscriptionCategoryImpl[F, SubscriptionPayload](name, subscribers, eventsDistributor, deserializer)
 }

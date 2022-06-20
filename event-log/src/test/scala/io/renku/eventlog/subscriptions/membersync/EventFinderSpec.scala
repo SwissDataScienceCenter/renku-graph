@@ -58,9 +58,9 @@ class EventFinderSpec
         val projectPath1 = projectPaths.generateOne
         val eventDate1   = eventDates.generateOne
         upsertProject(eventId1, projectPath1, eventDate1)
-        upsertLastSynced(eventId1.projectId,
-                         commitsync.categoryName,
-                         relativeTimestamps(moreThanAgo = Duration.ofDays(30)).generateAs(LastSyncedDate)
+        upsertCategorySyncTime(eventId1.projectId,
+                               commitsync.categoryName,
+                               relativeTimestamps(moreThanAgo = Duration.ofDays(30)).generateAs(LastSyncedDate)
         )
 
         val projectPathsByDateDecreasing = List(
@@ -82,7 +82,7 @@ class EventFinderSpec
         val lastSynced0 =
           LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofMinutes(5).plusSeconds(1)).generateOne)
         upsertProject(compoundId0, projectPath0, eventDate0)
-        upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
+        upsertCategorySyncTime(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
@@ -90,7 +90,7 @@ class EventFinderSpec
         val lastSynced1 =
           LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(5).minusSeconds(1)).generateOne)
         upsertProject(compoundId1, projectPath1, eventDate1)
-        upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
+        upsertCategorySyncTime(compoundId1.projectId, categoryName, lastSynced1)
 
         finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPath0))
         finder.popEvent().unsafeRunSync() shouldBe None
@@ -107,7 +107,7 @@ class EventFinderSpec
         )
         val lastSynced0 = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofMinutes(65)).generateOne)
         upsertProject(compoundId0, projectPath0, eventDate0)
-        upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
+        upsertCategorySyncTime(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
@@ -116,7 +116,7 @@ class EventFinderSpec
         )
         val lastSynced1 = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(55)).generateOne)
         upsertProject(compoundId1, projectPath1, eventDate1)
-        upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
+        upsertCategorySyncTime(compoundId1.projectId, categoryName, lastSynced1)
 
         finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPath0))
         finder.popEvent().unsafeRunSync() shouldBe None
@@ -131,14 +131,14 @@ class EventFinderSpec
         val eventDate0   = EventDate(relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateOne)
         val lastSynced0  = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateOne)
         upsertProject(compoundId0, projectPath0, eventDate0)
-        upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
+        upsertCategorySyncTime(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
         val eventDate1   = EventDate(relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateOne)
         val lastSynced1  = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofHours(23)).generateOne)
         upsertProject(compoundId1, projectPath1, eventDate1)
-        upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
+        upsertCategorySyncTime(compoundId1.projectId, categoryName, lastSynced1)
 
         finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPath0))
         finder.popEvent().unsafeRunSync() shouldBe None

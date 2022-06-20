@@ -125,7 +125,7 @@ class EventFinderSpec
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(projectId = project0.id)
         addEvent(project0Event0Id, project0Event0Date, project0.path)
         addEvent(project0Event1Id, project0Event1Date, project0.path)
-        upsertLastSynced(project0.id, categoryName, project0LastSynced)
+        upsertCategorySyncTime(project0.id, categoryName, project0LastSynced)
 
         currentTime.expects().returning(now)
 
@@ -146,7 +146,7 @@ class EventFinderSpec
         val (project0Event1Id, project0Event1Date) = genCommitIdAndDate(olderThanAWeek = false, projectId = project0.id)
         addEvent(project0Event0Id, project0Event0Date, project0.path)
         addEvent(project0Event1Id, project0Event1Date, project0.path)
-        upsertLastSynced(project0.id, categoryName, project0LastSynced)
+        upsertCategorySyncTime(project0.id, categoryName, project0LastSynced)
 
         val project1           = consumerProjects.generateOne
         val project1LastSynced = genLastSynced(true)
@@ -154,7 +154,7 @@ class EventFinderSpec
         val project1Event0Id   = genCompoundEventId(projectId = project1.id)
         val project1Event0Date = EventDate(project0Event0Date.value.minus(1, ChronoUnit.DAYS))
         addEvent(project1Event0Id, project1Event0Date, project1.path)
-        upsertLastSynced(project1.id, categoryName, project1LastSynced)
+        upsertCategorySyncTime(project1.id, categoryName, project1LastSynced)
 
         givenTheLastSyncedDateIsUpdated(project0)
 
@@ -184,7 +184,7 @@ class EventFinderSpec
         addEvent(project0Event0Id, project0Event0Date, project0.path)
         addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
         addEvent(project0Event2Id, project0Event2Date, project0.path, eventStatus = Deleting)
-        upsertLastSynced(project0.id, categoryName, project0LastSynced)
+        upsertCategorySyncTime(project0.id, categoryName, project0LastSynced)
 
         givenTheLastSyncedDateIsUpdated(project0)
 
@@ -211,7 +211,7 @@ class EventFinderSpec
         addEvent(project0Event0Id, project0Event0Date, project0.path, eventStatus = AwaitingDeletion)
         addEvent(project0Event1Id, project0Event1Date, project0.path, eventStatus = AwaitingDeletion)
         addEvent(project0Event2Id, project0Event2Date, project0.path, eventStatus = Deleting)
-        upsertLastSynced(project0.id, categoryName, project0LastSynced)
+        upsertCategorySyncTime(project0.id, categoryName, project0LastSynced)
 
         givenTheLastSyncedDateIsUpdated(project0)
 

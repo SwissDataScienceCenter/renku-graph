@@ -16,13 +16,28 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.minprojectinfo
+package io.renku.eventlog.subscriptions.projectsync
 
-import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.Capacity
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import io.circe.literal._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
-                                               subscriberId:  SubscriberId,
-                                               maybeCapacity: Option[Capacity]
-) extends subscriptions.UrlAndIdSubscriptionInfo
+class EventEncoderSpec extends AnyWordSpec with should.Matchers {
+
+  "encodeEvent" should {
+
+    "serialize MemberSyncEvent to Json" in {
+      val event = ProjectSyncEvent(projectIds.generateOne, projectPaths.generateOne)
+
+      EventEncoder.encodeEvent(event) shouldBe json"""{
+        "categoryName": "PROJECT_SYNC",
+        "project": {
+          "id":   ${event.projectId.value},
+          "path": ${event.projectPath.value}
+        }
+      }"""
+    }
+  }
+}

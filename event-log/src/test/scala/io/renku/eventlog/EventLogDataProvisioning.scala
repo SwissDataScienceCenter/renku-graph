@@ -22,7 +22,6 @@ import cats.data.Kleisli
 import io.circe.Json
 import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog.subscriptions.eventdelivery._
-import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
@@ -30,7 +29,7 @@ import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
-import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, LastSyncedDate, ZippedEventPayload}
+import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.microservices.MicroserviceBaseUrl
@@ -38,7 +37,7 @@ import skunk._
 import skunk.codec.all.{text, timestamptz, varchar}
 import skunk.implicits._
 
-import java.time.{Instant, OffsetDateTime, ZoneId}
+import java.time.{Instant, OffsetDateTime}
 import scala.util.Random
 
 trait EventLogDataProvisioning {
@@ -245,41 +244,6 @@ trait EventLogDataProvisioning {
               DO NOTHING
         """.command
       session.prepare(query).use(_.execute(eventId.id ~ eventId.projectId ~ deliveryId)).void
-    }
-  }
-  protected def findProjectCategorySyncTimes(projectId: projects.Id): List[(CategoryName, LastSyncedDate)] = execute {
-    val lastSyncedDateDecoder: Decoder[LastSyncedDate] =
-      timestamptz.map(timestamp => LastSyncedDate(timestamp.toInstant))
-    Kleisli { session =>
-      val query: Query[projects.Id, (CategoryName, LastSyncedDate)] =
-        sql"""SELECT category_name, last_synced
-              FROM subscription_category_sync_time
-              WHERE project_id = $projectIdEncoder"""
-          .query(varchar ~ lastSyncedDateDecoder)
-          .map { case (category: String) ~ lastSynced => (CategoryName(category), lastSynced) }
-      session.prepare(query).use(_.stream(projectId, 32).compile.toList)
-    }
-
-  }
-  protected def upsertCategorySyncTime(projectId:      projects.Id,
-                                       categoryName:   CategoryName,
-                                       lastSyncedDate: LastSyncedDate
-  ): Unit = execute[Unit] {
-    Kleisli { session =>
-      val query: Command[projects.Id ~ String ~ OffsetDateTime] =
-        sql"""INSERT INTO subscription_category_sync_time (project_id, category_name, last_synced)
-              VALUES ($projectIdEncoder, $varchar, $timestamptz)
-              ON CONFLICT (project_id, category_name)
-              DO NOTHING
-        """.command
-      session
-        .prepare(query)
-        .use(
-          _.execute(
-            projectId ~ categoryName.value ~ OffsetDateTime.ofInstant(lastSyncedDate.value, ZoneId.systemDefault())
-          )
-        )
-        .void
     }
   }
 

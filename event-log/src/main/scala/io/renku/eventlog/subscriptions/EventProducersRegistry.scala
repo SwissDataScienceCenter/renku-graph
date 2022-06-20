@@ -75,6 +75,7 @@ object EventProducersRegistry {
       memberSyncCategory       <- membersync.SubscriptionCategory(queriesExecTimes)
       commitSyncCategory       <- commitsync.SubscriptionCategory(queriesExecTimes)
       globalCommitSyncCategory <- globalcommitsync.SubscriptionCategory(queriesExecTimes)
+      projectSyncCategory      <- projectsync.SubscriptionCategory(queriesExecTimes)
       triplesGeneratedCategory <-
         triplesgenerated.SubscriptionCategory(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
       cleanUpEventCategory   <- cleanup.SubscriptionCategory(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
@@ -87,6 +88,7 @@ object EventProducersRegistry {
         memberSyncCategory,
         commitSyncCategory,
         globalCommitSyncCategory,
+        projectSyncCategory,
         triplesGeneratedCategory,
         cleanUpEventCategory,
         zombieEventsCategory,

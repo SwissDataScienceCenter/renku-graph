@@ -16,13 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.globalcommitsync
+package io.renku.eventlog.subscriptions.projectsync
 
-import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.Capacity
-import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
-                                               subscriberId:  SubscriberId,
-                                               maybeCapacity: Option[Capacity]
-) extends subscriptions.UrlAndIdSubscriptionInfo
+class ProjectSyncEventSpec extends AnyWordSpec with should.Matchers {
+
+  "show" should {
+    "return String representation of the underlying Project" in {
+      val id   = projectIds.generateOne
+      val path = projectPaths.generateOne
+
+      ProjectSyncEvent(id, path).show shouldBe show"projectId = $id, projectPath = $path"
+    }
+  }
+}
