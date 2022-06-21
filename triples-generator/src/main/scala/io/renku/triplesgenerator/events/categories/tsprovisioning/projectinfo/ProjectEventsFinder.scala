@@ -42,23 +42,21 @@ private trait ProjectEventsFinder[F[_]] {
   ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)]
 }
 
-private class ProjectEventsFinderImpl[F[_]: Async: Logger](
-    gitLabClient:     GitLabClient[F],
+private class ProjectEventsFinderImpl[F[_]: Async: GitLabClient: Logger](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ProjectEventsFinder[F] {
 
   override def find(project: Project, page: Int)(implicit
       maybeAccessToken:      Option[AccessToken]
-  ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)] =
-    EitherT {
-      gitLabClient
-        .get(
-          uri"projects" / project.id.show / "events" withQueryParams Map("action" -> "pushed", "page" -> page.toString),
-          "project-events"
-        )(mapResponse)
-        .map(_.asRight[ProcessingRecoverableError])
-        .recoverWith(recoveryStrategy.maybeRecoverableError)
-    }
+  ): EitherT[F, ProcessingRecoverableError, (List[PushEvent], PagingInfo)] = EitherT {
+    GitLabClient[F]
+      .get(
+        uri"projects" / project.id.show / "events" withQueryParams Map("action" -> "pushed", "page" -> page.toString),
+        "project-events"
+      )(mapResponse)
+      .map(_.asRight[ProcessingRecoverableError])
+      .recoverWith(recoveryStrategy.maybeRecoverableError)
+  }
 
   private lazy val mapResponse: ResponseMappingF[F, (List[PushEvent], PagingInfo)] = {
     case (Ok, _, response) =>
@@ -86,8 +84,8 @@ private class ProjectEventsFinderImpl[F[_]: Async: Logger](
 }
 
 private object ProjectEventsFinder {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[ProjectEventsFinder[F]] =
-    new ProjectEventsFinderImpl[F](gitLabClient).pure[F].widen[ProjectEventsFinder[F]]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectEventsFinder[F]] =
+    new ProjectEventsFinderImpl[F].pure[F].widen[ProjectEventsFinder[F]]
 }
 
 private case class PushEvent(projectId:  projects.Id,

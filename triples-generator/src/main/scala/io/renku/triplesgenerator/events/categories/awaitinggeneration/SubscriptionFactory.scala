@@ -21,12 +21,15 @@ package io.renku.triplesgenerator.events.categories.awaitinggeneration
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesgenerator.events.categories.awaitinggeneration.subscriptions.PayloadComposer.payloadsComposerFactory
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry]
+      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism[F](categoryName, payloadsComposerFactory)
     handler               <- EventHandler(subscriptionMechanism)
   } yield handler -> subscriptionMechanism

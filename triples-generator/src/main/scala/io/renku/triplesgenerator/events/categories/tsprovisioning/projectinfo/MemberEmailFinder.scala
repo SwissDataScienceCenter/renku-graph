@@ -37,9 +37,9 @@ private trait MemberEmailFinder[F[_]] {
 }
 
 private object MemberEmailFinder {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[MemberEmailFinder[F]] = for {
-    commitAuthorFinder  <- CommitAuthorFinder[F](gitLabClient)
-    projectEventsFinder <- ProjectEventsFinder[F](gitLabClient)
+  def apply[F[_]: Async: GitLabClient: Logger]: F[MemberEmailFinder[F]] = for {
+    commitAuthorFinder  <- CommitAuthorFinder[F]
+    projectEventsFinder <- ProjectEventsFinder[F]
   } yield new MemberEmailFinderImpl(commitAuthorFinder, projectEventsFinder)
 }
 

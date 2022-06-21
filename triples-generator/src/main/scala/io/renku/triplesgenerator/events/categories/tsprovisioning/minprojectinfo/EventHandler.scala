@@ -25,6 +25,7 @@ import cats.{NonEmptyParallel, Parallel}
 import io.renku.events.consumers.EventSchedulingResult.Accepted
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
@@ -55,10 +56,11 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 private[events] object EventHandler {
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
-      gitLabClient: GitLabClient[F]
-  ): F[EventHandler[F]] = for {
+  def apply[F[
+      _
+  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: MetricsRegistry: Logger: SparqlQueryTimeRecorder]
+      : F[EventHandler[F]] = for {
     concurrentProcessesLimiter <- ConcurrentProcessesLimiter(processesCount = 2)
-    eventProcessor             <- EventProcessor[F](gitLabClient)
+    eventProcessor             <- EventProcessor[F]
   } yield new EventHandler[F](categoryName, concurrentProcessesLimiter, eventProcessor)
 }

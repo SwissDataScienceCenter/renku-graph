@@ -35,8 +35,7 @@ private trait MembersSynchronizer[F[_]] {
   def synchronizeMembers(projectPath: projects.Path): F[Unit]
 }
 
-private class MembersSynchronizerImpl[F[_]: MonadThrow: Logger](
-    accessTokenFinder:          AccessTokenFinder[F],
+private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     gitLabProjectMembersFinder: GitLabProjectMembersFinder[F],
     kGProjectMembersFinder:     KGProjectMembersFinder[F],
     kGPersonFinder:             KGPersonFinder[F],
@@ -45,9 +44,9 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: Logger](
     executionTimeRecorder:      ExecutionTimeRecorder[F]
 ) extends MembersSynchronizer[F] {
 
+  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import accessTokenFinder._
   import executionTimeRecorder._
-  import io.renku.graph.tokenrepository.AccessTokenFinder._
 
   override def synchronizeMembers(projectPath: projects.Path): F[Unit] = measureExecutionTime {
     findAccessToken(projectPath) >>= { implicit maybeAccessToken =>
@@ -90,10 +89,9 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: Logger](
 }
 
 private object MembersSynchronizer {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](gitLabClient: GitLabClient[F]): F[MembersSynchronizer[F]] =
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]: F[MembersSynchronizer[F]] =
     for {
-      accessTokenFinder          <- AccessTokenFinder[F]
-      gitLabProjectMembersFinder <- GitLabProjectMembersFinder(gitLabClient)
+      gitLabProjectMembersFinder <- GitLabProjectMembersFinder[F]
       kGProjectMembersFinder     <- KGProjectMembersFinder[F]
       kGPersonFinder             <- KGPersonFinder[F]
       updatesCreator             <- UpdatesCreator[F]
@@ -103,8 +101,7 @@ private object MembersSynchronizer {
           override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
         })
       executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
-    } yield new MembersSynchronizerImpl[F](accessTokenFinder,
-                                           gitLabProjectMembersFinder,
+    } yield new MembersSynchronizerImpl[F](gitLabProjectMembersFinder,
                                            kGProjectMembersFinder,
                                            kGPersonFinder,
                                            updatesCreator,

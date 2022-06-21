@@ -25,6 +25,7 @@ import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult.Accepted
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
@@ -54,7 +55,7 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private[events] object EventHandler {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](gitLabClient: GitLabClient[F]): F[EventHandler[F]] = for {
-    membersSynchronizer <- MembersSynchronizer[F](gitLabClient)
+  def apply[F[_]: Async: Logger: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder]: F[EventHandler[F]] = for {
+    membersSynchronizer <- MembersSynchronizer[F]
   } yield new EventHandler[F](categoryName, membersSynchronizer)
 }

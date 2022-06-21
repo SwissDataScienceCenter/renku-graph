@@ -23,10 +23,10 @@ import io.renku.generators.CommonGraphGenerators.{accessTokens, sparqlQueries}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.graph.model.projects.Path
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.projectPathToPath
+import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectPathToPath
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
@@ -127,8 +127,8 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
     implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
     val projectPath = projectPaths.generateOne
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val accessTokenFinder          = mock[AccessTokenFinder[Try]]
+    implicit val logger:            TestLogger[Try]        = TestLogger[Try]()
+    implicit val accessTokenFinder: AccessTokenFinder[Try] = mock[AccessTokenFinder[Try]]
     val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[Try]]
     val kGProjectMembersFinder     = mock[KGProjectMembersFinder[Try]]
     val kGPersonFinder             = mock[KGPersonFinder[Try]]
@@ -137,7 +137,6 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
     val executionTimeRecorder      = TestExecutionTimeRecorder[Try](maybeHistogram = None)
 
     val synchronizer = new MembersSynchronizerImpl[Try](
-      accessTokenFinder,
       gitLabProjectMembersFinder,
       kGProjectMembersFinder,
       kGPersonFinder,

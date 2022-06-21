@@ -42,14 +42,14 @@ private trait EventProcessor[F[_]] {
   def process(event: MinProjectInfoEvent): F[Unit]
 }
 
-private class EventProcessorImpl[F[_]: MonadThrow: Logger](accessTokenFinder: AccessTokenFinder[F],
-                                                           stepsCreator:          TransformationStepsCreator[F],
-                                                           uploader:              TransformationStepsRunner[F],
-                                                           entityBuilder:         EntityBuilder[F],
-                                                           executionTimeRecorder: ExecutionTimeRecorder[F]
+private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
+    stepsCreator:          TransformationStepsCreator[F],
+    uploader:              TransformationStepsRunner[F],
+    entityBuilder:         EntityBuilder[F],
+    executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends EventProcessor[F] {
 
-  import AccessTokenFinder._
+  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import UploadingResult._
   import accessTokenFinder._
   import entityBuilder._
@@ -145,13 +145,13 @@ private object EventProcessor {
 
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      gitLabClient: GitLabClient[F]
-  ): F[EventProcessor[F]] = for {
-    uploader          <- TransformationStepsRunner[F]
-    accessTokenFinder <- AccessTokenFinder[F]
-    stepsCreator      <- TransformationStepsCreator[F]
-    entityBuilder     <- EntityBuilder(gitLabClient)
+  def apply[F[
+      _
+  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
+      : F[EventProcessor[F]] = for {
+    uploader      <- TransformationStepsRunner[F]
+    stepsCreator  <- TransformationStepsCreator[F]
+    entityBuilder <- EntityBuilder[F]
     eventsProcessingTimes <- Histogram(
                                name = "min_project_info_processing_times",
                                help = "Min project info processing times",
@@ -159,11 +159,5 @@ private object EventProcessor {
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
-  } yield new EventProcessorImpl(
-    accessTokenFinder,
-    stepsCreator,
-    uploader,
-    entityBuilder,
-    executionTimeRecorder
-  )
+  } yield new EventProcessorImpl(stepsCreator, uploader, entityBuilder, executionTimeRecorder)
 }

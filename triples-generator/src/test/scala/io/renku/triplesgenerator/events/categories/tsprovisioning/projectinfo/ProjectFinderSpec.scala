@@ -157,9 +157,9 @@ class ProjectFinderSpec
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabClient = mock[GitLabClient[IO]]
-    val finder       = new ProjectFinderImpl[IO](gitLabClient)
+    private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    val finder = new ProjectFinderImpl[IO]
 
     private type ProjectAndCreators = (GitLabProjectInfo, Option[persons.GitLabId])
 

@@ -44,15 +44,14 @@ private trait EventProcessor[F[_]] {
   def process(event: CommitEvent): F[Unit]
 }
 
-private class EventProcessorImpl[F[_]: MonadThrow: Logger](
-    accessTokenFinder:       AccessTokenFinder[F],
+private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     triplesGenerator:        TriplesGenerator[F],
     statusUpdater:           EventStatusUpdater[F],
     allEventsTimeRecorder:   ExecutionTimeRecorder[F],
     singleEventTimeRecorder: ExecutionTimeRecorder[F]
 ) extends EventProcessor[F] {
 
-  import AccessTokenFinder._
+  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import TriplesGenerationResult._
   import accessTokenFinder._
   import triplesGenerator._
@@ -186,9 +185,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
 private object EventProcessor {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[EventProcessor[F]] = for {
+  def apply[F[_]: Async: Logger: AccessTokenFinder: MetricsRegistry]: F[EventProcessor[F]] = for {
     triplesGenerator   <- TriplesGenerator()
-    accessTokenFinder  <- AccessTokenFinder[F]
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     histogram <- Histogram[F](
                    name = "triples_generation_processing_times",
@@ -199,7 +197,6 @@ private object EventProcessor {
     allEventsTimeRecorder   <- ExecutionTimeRecorder[F](maybeHistogram = Some(histogram))
     singleEventTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
   } yield new EventProcessorImpl(
-    accessTokenFinder,
     triplesGenerator,
     eventStatusUpdater,
     allEventsTimeRecorder,

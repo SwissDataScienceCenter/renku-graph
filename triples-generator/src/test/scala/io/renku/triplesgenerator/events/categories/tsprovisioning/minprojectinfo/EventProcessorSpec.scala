@@ -54,7 +54,7 @@ import scala.util.{Success, Try}
 
 class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  import AccessTokenFinder._
+  import AccessTokenFinder.Implicits._
 
   "process" should {
 
@@ -297,18 +297,14 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     implicit val maybeAccessToken: Option[AccessToken] = Gen.option(accessTokens).generateOne
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val accessTokenFinder     = mock[AccessTokenFinder[Try]]
+    implicit val logger:            TestLogger[Try]        = TestLogger[Try]()
+    implicit val accessTokenFinder: AccessTokenFinder[Try] = mock[AccessTokenFinder[Try]]
     val stepsCreator          = mock[TransformationStepsCreator[Try]]
     val triplesUploader       = mock[TransformationStepsRunner[Try]]
     val entityBuilder         = mock[EntityBuilder[Try]]
     val executionTimeRecorder = TestExecutionTimeRecorder[Try](maybeHistogram = None)
-    val eventProcessor = new EventProcessorImpl[Try](accessTokenFinder,
-                                                     stepsCreator,
-                                                     triplesUploader,
-                                                     entityBuilder,
-                                                     executionTimeRecorder
-    )
+    val eventProcessor =
+      new EventProcessorImpl[Try](stepsCreator, triplesUploader, entityBuilder, executionTimeRecorder)
 
     def givenFetchingAccessToken(forProjectPath: Path) =
       (accessTokenFinder

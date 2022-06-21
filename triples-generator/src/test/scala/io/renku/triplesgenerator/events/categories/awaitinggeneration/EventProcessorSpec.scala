@@ -58,7 +58,7 @@ class EventProcessorSpec
     with IntegrationPatience
     with should.Matchers {
 
-  import AccessTokenFinder._
+  import AccessTokenFinder.Implicits._
 
   "process" should {
 
@@ -180,14 +180,13 @@ class EventProcessorSpec
 
     val maybeAccessToken = Gen.option(accessTokens).generateOne
 
-    implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val accessTokenFinder       = mock[AccessTokenFinder[Try]]
+    implicit val logger:            TestLogger[Try]        = TestLogger[Try]()
+    implicit val accessTokenFinder: AccessTokenFinder[Try] = mock[AccessTokenFinder[Try]]
     val triplesFinder           = mock[TriplesGenerator[Try]]
     val eventStatusUpdater      = mock[EventStatusUpdater[Try]]
     val allEventsTimeRecorder   = TestExecutionTimeRecorder[Try](maybeHistogram = None)
     val singleEventTimeRecorder = TestExecutionTimeRecorder[Try](maybeHistogram = None)
     val eventProcessor = new EventProcessorImpl(
-      accessTokenFinder,
       triplesFinder,
       eventStatusUpdater,
       allEventsTimeRecorder,
