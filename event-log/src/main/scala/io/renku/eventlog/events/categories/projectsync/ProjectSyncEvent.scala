@@ -16,10 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.zombieevents
+package io.renku.eventlog.events.categories.projectsync
 
-import io.renku.graph.model.events.CompoundEventId
-import io.renku.graph.model.events.EventStatus.ProcessingStatus
+import cats.Show
+import cats.syntax.all._
 import io.renku.graph.model.projects
 
-private final case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: ProcessingStatus)
+private final case class ProjectSyncEvent(projectId: projects.Id, projectPath: projects.Path)
+
+private object ProjectSyncEvent {
+  implicit lazy val show: Show[ProjectSyncEvent] = Show.show { case ProjectSyncEvent(id, path) =>
+    show"projectId = $id, projectPath = $path"
+  }
+}

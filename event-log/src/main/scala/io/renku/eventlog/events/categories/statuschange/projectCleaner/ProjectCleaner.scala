@@ -28,6 +28,7 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers.{projectIdEncoder, projectPathEncoder}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
@@ -41,8 +42,8 @@ private[statuschange] trait ProjectCleaner[F[_]] {
 }
 
 private[statuschange] object ProjectCleaner {
-  def apply[F[_]: Async: Logger](queriesExecTimes: LabeledHistogram[F]): F[ProjectCleaner[F]] = for {
-    projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]()
+  def apply[F[_]: Async: AccessTokenFinder: Logger](queriesExecTimes: LabeledHistogram[F]): F[ProjectCleaner[F]] = for {
+    projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]
   } yield new ProjectCleanerImpl[F](projectWebhookAndTokenRemover, queriesExecTimes)
 }
 

@@ -35,6 +35,7 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, Skipped}
 import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
@@ -47,10 +48,11 @@ import scala.util.control.NonFatal
 private trait ProjectEventsToNewUpdater[F[_]] extends DBUpdater[F, ProjectEventsToNew]
 
 private object ProjectEventsToNewUpdater {
-  def apply[F[_]: Async: Logger](queriesExecTimes: LabeledHistogram[F]): F[DBUpdater[F, ProjectEventsToNew]] =
-    ProjectCleaner[F](queriesExecTimes).map(
-      new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes)
-    )
+  def apply[F[_]: Async: AccessTokenFinder: Logger](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[DBUpdater[F, ProjectEventsToNew]] = ProjectCleaner[F](queriesExecTimes).map(
+    new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes)
+  )
 }
 
 private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](

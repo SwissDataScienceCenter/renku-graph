@@ -16,10 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.zombieevents
+package io.renku.http.client
 
-import io.renku.graph.model.events.CompoundEventId
-import io.renku.graph.model.events.EventStatus.ProcessingStatus
-import io.renku.graph.model.projects
+import cats.syntax.all._
+import io.renku.http.client.RestClientError.UnauthorizedException
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private final case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: ProcessingStatus)
+class RestClientErrorSpec extends AnyWordSpec with should.Matchers {
+
+  "UnauthorizedException.show" should {
+    "return Unauthorized" in {
+      UnauthorizedException.show shouldBe "Unauthorized"
+    }
+  }
+}

@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.categories.zombieevents
+package io.renku.eventlog.events.categories
 
-import io.renku.graph.model.events.CompoundEventId
-import io.renku.graph.model.events.EventStatus.ProcessingStatus
-import io.renku.graph.model.projects
+import io.renku.events.CategoryName
 
-private final case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: ProcessingStatus)
+package object projectsync {
+  private[projectsync] val categoryName: CategoryName = CategoryName("PROJECT_SYNC")
+}

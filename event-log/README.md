@@ -402,6 +402,42 @@ Forces issuing a commit sync event for the given project
 }
 ```
 
+- **GLOBAL_COMMIT_SYNC_REQUEST**
+
+Forces issuing a GLOBAL_COMMIT_SYNC event for the given project.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST",
+  "project": {
+    "id":   12,
+    "path": "namespace/project-name"
+  }
+}
+```
+
+- **PROJECT_SYNC**
+
+Checks if the data stored for the project in EL matches the data in GitLab. If not, the process fixes the data in EL as well as sends a relevant `GLOBAL_COMMIT_SYNC` and `CLEAN_UP` events.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "PROJECT_SYNC",
+  "project": {
+    "id":   12,
+    "path": "namespace/project-name"
+  }
+}
+```
+
 **Response**
 
 | Status                     | Description                                                                          |

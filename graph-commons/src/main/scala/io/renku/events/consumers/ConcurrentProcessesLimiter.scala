@@ -42,9 +42,8 @@ object ConcurrentProcessesLimiter {
 
   def withoutLimit[F[_]: Concurrent]: ConcurrentProcessesLimiter[F] =
     new ConcurrentProcessesLimiter[F] {
-      override def tryExecuting(
-          scheduledProcess: EventHandlingProcess[F]
-      ): F[EventSchedulingResult] =
+
+      override def tryExecuting(scheduledProcess: EventHandlingProcess[F]): F[EventSchedulingResult] =
         scheduledProcess.process
           .widen[EventSchedulingResult]
           .merge
