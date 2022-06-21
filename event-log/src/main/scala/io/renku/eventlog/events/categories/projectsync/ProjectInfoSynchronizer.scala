@@ -19,18 +19,23 @@
 package io.renku.eventlog.events.categories
 package projectsync
 
+import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.events.EventRequestContent
 import io.renku.events.producers.EventSender
 import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.client.GitLabClient
+import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 private trait ProjectInfoSynchronizer[F[_]] {
   def syncProjectInfo(event: ProjectSyncEvent): F[Unit]
 }
 
-private class ProjectInfoSynchronizerImpl[F[_]: Async: Logger](
+private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
     gitLabProjectFetcher: GitLabProjectFetcher[F],
     dbUpdater:            DBUpdater[F],
     eventSender:          EventSender[F]
@@ -78,4 +83,15 @@ private class ProjectInfoSynchronizerImpl[F[_]: Async: Logger](
     val context = EventSender.EventContext(category, errorMessage = show"$categoryName: sending $category failed")
     payload -> context
   }
+}
+
+private object ProjectInfoSynchronizer {
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[ProjectInfoSynchronizer[F]] =
+    for {
+      gitLabProjectFetcher <- GitLabProjectFetcher[F]
+      dbUpdater            <- DBUpdater[F](queriesExecTimes)
+      eventSender          <- EventSender[F]
+    } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, dbUpdater, eventSender)
 }

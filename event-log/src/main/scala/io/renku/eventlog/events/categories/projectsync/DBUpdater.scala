@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.events.categories.projectsync
 
+import cats.MonadThrow
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
@@ -57,4 +58,9 @@ private class DBUpdaterImpl[F[_]: MonadCancelThrow: SessionResource](queriesExec
         case completion => new Exception(s"Failed updating project $projectId: $completion").raiseError[F, Unit]
       }
   }
+}
+
+private object DBUpdater {
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[DBUpdater[F]] =
+    MonadThrow[F].catchNonFatal(new DBUpdaterImpl[F](queriesExecTimes: LabeledHistogram[F])).widen
 }

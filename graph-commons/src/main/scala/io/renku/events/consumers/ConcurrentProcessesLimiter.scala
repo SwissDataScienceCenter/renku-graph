@@ -34,9 +34,7 @@ trait ConcurrentProcessesLimiter[F[_]] {
 
 object ConcurrentProcessesLimiter {
 
-  def apply[F[_]: Concurrent](
-      processesCount: Int Refined Positive
-  ): F[ConcurrentProcessesLimiter[F]] = for {
+  def apply[F[_]: Concurrent](processesCount: Int Refined Positive): F[ConcurrentProcessesLimiter[F]] = for {
     semaphore <- Semaphore(processesCount.value)
   } yield new ConcurrentProcessesLimiterImpl[F](processesCount, semaphore)
 

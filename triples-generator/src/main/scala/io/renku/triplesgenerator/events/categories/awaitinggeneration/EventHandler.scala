@@ -44,12 +44,11 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 
   import eventBodyDeserializer.toCommitEvent
 
-  override def createHandlingProcess(
-      requestContent: EventRequestContent
-  ): F[EventHandlingProcess[F]] = EventHandlingProcess.withWaitingForCompletion[F](
-    deferred => startProcessEvent(requestContent, deferred),
-    subscriptionMechanism.renewSubscription()
-  )
+  override def createHandlingProcess(requestContent: EventRequestContent): F[EventHandlingProcess[F]] =
+    EventHandlingProcess.withWaitingForCompletion[F](
+      deferred => startProcessEvent(requestContent, deferred),
+      subscriptionMechanism.renewSubscription()
+    )
 
   private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
     eventBody <- requestContent match {
