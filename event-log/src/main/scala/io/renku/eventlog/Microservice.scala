@@ -95,9 +95,6 @@ object Microservice extends IOMicroservice {
                                             queriesExecTimes
                                           )
               commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(queriesExecTimes)
-              globalCommitSyncRequestSubscription <-
-                events.categories.globalcommitsyncrequest.SubscriptionFactory(queriesExecTimes)
-              projectSyncSubscription <- events.categories.projectsync.SubscriptionFactory(queriesExecTimes)
               statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
                                                  eventsQueue,
                                                  awaitingGenerationGauge,
@@ -108,6 +105,9 @@ object Microservice extends IOMicroservice {
                                                  deletingGauge,
                                                  queriesExecTimes
                                                )
+              globalCommitSyncRequestSubscription <-
+                events.categories.globalcommitsyncrequest.SubscriptionFactory(queriesExecTimes)
+              projectSyncSubscription    <- events.categories.projectsync.SubscriptionFactory(queriesExecTimes)
               cleanUpRequestSubscription <- events.categories.cleanuprequest.SubscriptionFactory(queriesExecTimes)
               migrationStatusChange <- events.categories.migrationstatuschange.SubscriptionFactory[IO](queriesExecTimes)
               eventConsumersRegistry <- consumers.EventConsumersRegistry(

@@ -22,7 +22,6 @@ import cats.data.EitherT.fromEither
 import cats.effect._
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.events.categories.globalcommitsyncrequest.categoryName
 import io.renku.events.consumers.EventSchedulingResult.Accepted
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
