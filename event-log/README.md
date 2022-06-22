@@ -379,6 +379,7 @@ Kicks off clean-up of the data in the Triples Store.
 {
   "categoryName": "CLEAN_UP_REQUEST",
   "project": {
+    "id":   123,
     "path": "namespace/project-name"
   }
 }

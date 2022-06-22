@@ -50,8 +50,8 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
     case Right(Some(newPath)) =>
       dbUpdater.update(event.projectId, newPath) >>
         send(globalCommitSyncRequest(event.projectId, newPath)) >>
-        send(cleanUpRequest(event.projectPath))
-    case Right(None)     => send(cleanUpRequest(event.projectPath))
+        send(cleanUpRequest(event))
+    case Right(None)     => send(cleanUpRequest(event))
     case Left(exception) => Logger[F].info(show"$categoryName: $event failed: $exception")
   }
 
@@ -72,12 +72,13 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
     payload -> context
   }
 
-  private def cleanUpRequest(oldPath: projects.Path) = {
+  private def cleanUpRequest(event: ProjectSyncEvent) = {
     val category = cleanuprequest.categoryName
     val payload = EventRequestContent.NoPayload(json"""{
       "categoryName": ${category.show},
       "project": {
-        "path": ${oldPath.value}
+        "id":   ${event.projectId.value},
+        "path": ${event.projectPath.show}
       }
     }""")
     val context = EventSender.EventContext(category, errorMessage = show"$categoryName: sending $category failed")

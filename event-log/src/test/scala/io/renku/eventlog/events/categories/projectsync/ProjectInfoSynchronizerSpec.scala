@@ -53,7 +53,7 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
       "if GitLab returns a different path " +
       "project info in the project table is changed " +
       "and a GLOBAL_COMMIT_SYNC_REQUEST event with the updated project info " +
-      "and a CLEAN_UP event with the old project info " +
+      "and a CLEAN_UP_REQUEST event with the old project info " +
       "are sent" in new TestCase {
 
         val newPath = projectPaths.generateOne
@@ -63,18 +63,18 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
 
         givenSending(globalCommitSyncRequestEvent(event.projectId, newPath), returning = ().pure[Try])
 
-        givenSending(cleanUpRequestEvent(event.projectPath), returning = ().pure[Try])
+        givenSending(cleanUpRequestEvent(event), returning = ().pure[Try])
 
         synchronizer.syncProjectInfo(event) shouldBe ().pure[Try]
       }
 
     "fetches relevant project info from GitLab and " +
       "if GitLab returns no path " +
-      "only a CLEAN_UP event with the old project info is sent" in new TestCase {
+      "only a CLEAN_UP_REQUEST event with the old project info is sent" in new TestCase {
 
         givenGitLabProject(by = event.projectId, returning = Option.empty[projects.Path].asRight.pure[Try])
 
-        givenSending(cleanUpRequestEvent(event.projectPath), returning = ().pure[Try])
+        givenSending(cleanUpRequestEvent(event), returning = ().pure[Try])
 
         synchronizer.syncProjectInfo(event) shouldBe ().pure[Try]
       }
@@ -140,12 +140,13 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
     category -> EventRequestContent.NoPayload(payload)
   }
 
-  private def cleanUpRequestEvent(path: projects.Path): (CategoryName, EventRequestContent.NoPayload) = {
+  private def cleanUpRequestEvent(event: ProjectSyncEvent): (CategoryName, EventRequestContent.NoPayload) = {
     val category = cleanuprequest.categoryName
     val payload = json"""{
       "categoryName": ${category.show},
       "project": {
-        "path": ${path.show}
+        "id":   ${event.projectId.value},
+        "path": ${event.projectPath.show}
       }
     }"""
     category -> EventRequestContent.NoPayload(payload)
