@@ -25,20 +25,19 @@ import io.renku.events.consumers.Project
 private final case class CleanUpEvent(project: Project)
 
 private object CleanUpEvent {
-  implicit lazy val show: Show[CleanUpEvent] = Show.show(_.project.show)
+  implicit lazy val show: Show[CleanUpEvent] = Show[Project].contramap(_.project)
 }
 
 private object CleanUpEventEncoder {
 
   import io.circe.Json
-  import io.circe.literal.JsonStringContext
+  import io.circe.literal._
 
-  def encodeEvent(event: CleanUpEvent): Json =
-    json"""{
-    "categoryName": ${SubscriptionCategory.name.value},
+  def encodeEvent(event: CleanUpEvent): Json = json"""{
+    "categoryName": ${categoryName.value},
     "project": {
-      "id":         ${event.project.id.value},
-      "path":   ${event.project.path.value}
+      "id":   ${event.project.id.value},
+      "path": ${event.project.path.value}
     }
   }"""
 }

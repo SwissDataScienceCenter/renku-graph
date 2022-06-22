@@ -22,7 +22,6 @@ import cats.data.Kleisli
 import cats.data.Kleisli.liftF
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.db.implicits.PreparedQueryOps
 import io.renku.db.{DbClient, SqlStatement}
@@ -141,7 +140,8 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
   }
 
   private def removeProjectEvents(project: Project, status: EventStatus) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"project_to_new - ${status.value.toLowerCase()} removal"))
+    SqlStatement
+      .named(show"project_to_new - $status removal")
       .command[EventStatus ~ projects.Id](
         sql"""DELETE FROM event
               WHERE status = $eventStatusEncoder AND project_id = $projectIdEncoder

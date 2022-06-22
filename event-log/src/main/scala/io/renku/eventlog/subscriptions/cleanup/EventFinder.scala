@@ -60,11 +60,11 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger](
 
   private def findInCleanUpEvents = measureExecutionTime {
     SqlStatement
-      .named(s"${SubscriptionCategory.name.value.toLowerCase} - find clean-up event")
+      .named(s"${categoryName.show.toLowerCase} - find event in queue")
       .select[Void, Project](sql"""
         SELECT prj.project_id, prj.project_path
         FROM clean_up_events_queue queue
-        JOIN  project prj ON prj.project_path = queue.project_path 
+        JOIN project prj ON prj.project_path = queue.project_path 
         ORDER BY queue.date ASC
         LIMIT 1
         """.query(projectDecoder))
@@ -74,7 +74,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger](
 
   private def findInEvents = measureExecutionTime {
     SqlStatement
-      .named(s"${SubscriptionCategory.name.value.toLowerCase} - find event")
+      .named(s"${categoryName.show.toLowerCase} - find event")
       .select[ExecutionDate, Project](sql"""
         SELECT evt.project_id, prj.project_path
         FROM event evt
@@ -92,7 +92,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger](
     case Some(project @ Project(_, projectPath)) =>
       measureExecutionTime {
         SqlStatement
-          .named(s"${SubscriptionCategory.name.value.toLowerCase} - delete clean-up event")
+          .named(s"${categoryName.show.toLowerCase} - delete clean-up event")
           .command[projects.Path](sql"""
             DELETE FROM clean_up_events_queue
             WHERE project_path = $projectPathEncoder
@@ -111,7 +111,7 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger](
     case Some(project @ Project(projectId, _)) =>
       measureExecutionTime {
         SqlStatement
-          .named(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
+          .named(s"${categoryName.show.toLowerCase} - update status")
           .command[ExecutionDate ~ projects.Id](sql"""
             UPDATE event
             SET status = '#${Deleting.value}', execution_date = $executionDateEncoder
