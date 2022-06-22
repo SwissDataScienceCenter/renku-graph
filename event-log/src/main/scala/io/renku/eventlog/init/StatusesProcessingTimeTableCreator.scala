@@ -36,6 +36,7 @@ private object StatusesProcessingTimeTableCreator {
 private class StatusesProcessingTimeTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
     extends StatusesProcessingTimeTableCreator[F] {
 
+  import MigratorTools._
   import cats.syntax.all._
 
   override def run(): F[Unit] = SessionResource[F].useK {

@@ -36,9 +36,9 @@ private object TimestampZoneAdder {
   def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: TimestampZoneAdder[F] = new TimestampZoneAdderImpl[F]
 }
 
-private class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
-    extends TimestampZoneAdder[F]
-    with EventTableCheck {
+private class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource] extends TimestampZoneAdder[F] {
+
+  import MigratorTools._
 
   override def run(): F[Unit] = SessionResource[F].useK {
     columnsToMigrate.map { case (table, column) => migrateIfNeeded(table, column) }.sequence.void
@@ -66,12 +66,11 @@ private class TimestampZoneAdderImpl[F[_]: MonadCancelThrow: Logger: SessionReso
   }
 
   private def findCurrentType(table: String, column: String): Kleisli[F, Session[F], String] = {
-    val query: Query[(String, String), String] =
-      sql"""
-           SELECT data_type
-           FROM information_schema.columns
-           WHERE table_name = $varchar AND column_name = $varchar"""
-        .query(varchar)
+    val query: Query[(String, String), String] = sql"""
+       SELECT data_type
+       FROM information_schema.columns
+       WHERE table_name = $varchar AND column_name = $varchar"""
+      .query(varchar)
     Kleisli {
       _.prepare(query)
         .use(_.unique(table -> column))

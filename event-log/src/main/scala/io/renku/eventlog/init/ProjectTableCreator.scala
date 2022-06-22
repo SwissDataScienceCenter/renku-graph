@@ -23,7 +23,6 @@ import cats.effect.MonadCancelThrow
 import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.codec.all._
 import skunk.implicits._
 
 private trait ProjectTableCreator[F[_]] extends DbMigrator[F]
@@ -32,39 +31,30 @@ private object ProjectTableCreator {
   def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: ProjectTableCreator[F] = new ProjectTableCreatorImpl[F]
 }
 
-private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
-    extends ProjectTableCreator[F]
-    with EventTableCheck {
+private class ProjectTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource] extends ProjectTableCreator[F] {
 
-  import cats.syntax.all._
+  import MigratorTools._
 
   override def run(): F[Unit] = SessionResource[F].useK {
-    whenEventTableExists(
+    whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'project' table creation skipped"),
-      otherwise = checkTableExists >>= {
-        case true  => Kleisli.liftF(Logger[F] info "'project' table exists")
-        case false => createTable()
-      }
+      otherwise = whenTableExists("project")(
+        Kleisli.liftF(Logger[F] info "'project' table exists"),
+        otherwise = createTable()
+      )
     )
   }
 
-  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[Void, Boolean] =
-      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'project')".query(bool)
-    Kleisli(_.unique(query).recover { case _ => false })
-  }
-
-  private def createTable(): Kleisli[F, Session[F], Unit] =
-    for {
-      _ <- execute(createTableSql)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id        ON project(project_id)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path      ON project(project_path)".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_latest_event_date ON project(latest_event_date)".command)
-      _ <- Kleisli.liftF(Logger[F] info "'project' table created")
-      _ <- execute(fillInTableSql)
-      _ <- Kleisli.liftF(Logger[F] info "'project' table filled in")
-      _ <- execute(foreignKeySql)
-    } yield ()
+  private def createTable(): Kleisli[F, Session[F], Unit] = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id        ON project(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path      ON project(project_path)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_latest_event_date ON project(latest_event_date)".command)
+    _ <- Kleisli.liftF(Logger[F] info "'project' table created")
+    _ <- execute(fillInTableSql)
+    _ <- Kleisli.liftF(Logger[F] info "'project' table filled in")
+    _ <- execute(foreignKeySql)
+  } yield ()
 
   private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS project(

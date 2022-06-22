@@ -33,6 +33,7 @@ private object StatusChangeEventsTableCreator {
 private class StatusChangeEventsTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
     extends StatusChangeEventsTableCreator[F] {
 
+  import MigratorTools._
   import cats.syntax.all._
   import skunk._
   import skunk.codec.all._

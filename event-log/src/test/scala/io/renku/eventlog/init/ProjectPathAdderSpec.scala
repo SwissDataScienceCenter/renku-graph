@@ -20,7 +20,6 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.IO
-import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.init.Generators.events
@@ -60,42 +59,42 @@ class ProjectPathAdderSpec
 
       createEventTable()
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'project_path' column adding skipped"))
     }
 
     "do nothing if the 'project_path' column already exists" in new TestCase {
 
-      checkColumnExists shouldBe false
+      verifyColumnExists("event_log", "project_path") shouldBe false
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ()
 
-      checkColumnExists shouldBe true
+      verifyColumnExists("event_log", "project_path") shouldBe true
 
       logger.loggedOnly(Info("'project_path' column added"))
 
       logger.reset()
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'project_path' column exists"))
     }
 
     "add the 'project_path' column if does not exist and migrate the data for it" in new TestCase {
 
-      checkColumnExists shouldBe false
+      verifyColumnExists("event_log", "project_path") shouldBe false
 
       val event1 = events.generateOne
       storeEvent(event1)
       val event2 = events.generateOne
       storeEvent(event2)
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ()
 
       findProjectPaths shouldBe Set(event1.project.path, event2.project.path)
 
-      verifyTrue(sql"DROP INDEX idx_project_path;".command)
+      verifyIndexExists("event_log", "idx_project_path") shouldBe true
 
       eventually {
         logger.loggedOnly(Info("'project_path' column added"))
@@ -107,19 +106,6 @@ class ProjectPathAdderSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectPathAdder = new ProjectPathAdderImpl[IO]
   }
-
-  private def checkColumnExists: Boolean = sessionResource
-    .useK {
-      Kleisli { session =>
-        val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
-          .query(projectPathDecoder)
-        session
-          .option(query)
-          .map(_ => true)
-          .recover { case _ => false }
-      }
-    }
-    .unsafeRunSync()
 
   private def storeEvent(event: Event): Unit = execute[Unit] {
     Kleisli { session =>
@@ -149,12 +135,11 @@ class ProjectPathAdderSpec
     }
   }
 
-  private def toJson(event: Event): String =
-    json"""{
+  private def toJson(event: Event): String = json"""{
     "project": {
-      "id": ${event.project.id.value},
+      "id":   ${event.project.id.value},
       "path": ${event.project.path.value}
-     }
+    }
   }""".noSpaces
 
   private def findProjectPaths: Set[Path] = sessionResource
@@ -166,5 +151,4 @@ class ProjectPathAdderSpec
     }
     .unsafeRunSync()
     .toSet
-
 }

@@ -34,14 +34,15 @@ private object EventLogTableRenamer {
 }
 
 private class EventLogTableRenamerImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
-    extends EventLogTableRenamer[F]
-    with EventTableCheck {
+    extends EventLogTableRenamer[F] {
+
+  import MigratorTools._
 
   override def run(): F[Unit] = SessionResource[F].useK {
     checkOldTableExists >>= {
       case false => Kleisli.liftF(Logger[F] info "'event' table already exists")
       case true =>
-        whenEventTableExists(
+        whenTableExists("event")(
           dropOldTable(),
           otherwise = renameTable()
         )

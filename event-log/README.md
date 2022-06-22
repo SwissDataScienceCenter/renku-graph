@@ -910,6 +910,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 |--------------------------------------|
 | id           SERIAL      PK NOT NULL |
 | date         TIMESTAMPTZ    NOT NULL |
+| project_id   INT4           NOT NULL |
 | project_path VARCHAR        NOT NULL |
 
 | ts_migration                                |

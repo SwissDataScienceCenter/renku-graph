@@ -56,6 +56,9 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
   def execute[O](query: Kleisli[IO, Session[IO], O]): O =
     sessionResource.useK(query).unsafeRunSync()
 
+  def executeCommand(sql: Command[Void]): Unit =
+    execute[Unit](Kleisli(session => session.execute(sql).void))
+
   def verifyTrue(sql: Command[Void]): Unit = execute[Unit](Kleisli(session => session.execute(sql).void))
 
   def verify(table: String, column: String, hasType: String): Boolean = execute[Boolean] {
