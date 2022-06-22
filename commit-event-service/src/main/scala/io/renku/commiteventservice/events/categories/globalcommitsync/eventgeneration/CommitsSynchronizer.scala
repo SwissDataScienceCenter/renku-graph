@@ -28,7 +28,6 @@ import io.renku.commiteventservice.events.categories.globalcommitsync.eventgener
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
@@ -44,8 +43,9 @@ private[globalcommitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: GlobalCommitSyncEvent): F[Unit]
 }
 
-private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyParallel: Logger: ExecutionTimeRecorder](
-    accessTokenFinder:         AccessTokenFinder[F],
+private[globalcommitsync] class CommitsSynchronizerImpl[F[
+    _
+]: Async: NonEmptyParallel: Logger: AccessTokenFinder: ExecutionTimeRecorder](
     gitLabCommitStatFetcher:   GitLabCommitStatFetcher[F],
     gitLabCommitFetcher:       GitLabCommitFetcher[F],
     elCommitFetcher:           ELCommitFetcher[F],
@@ -56,6 +56,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
 
   val commitsPerPage = PerPage(50)
 
+  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import accessTokenFinder._
   import commitEventDeleter._
   import elCommitFetcher._
@@ -177,20 +178,19 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[_]: Async: NonEmptyPar
 }
 
 private[globalcommitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: NonEmptyParallel: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]
+  def apply[F[
+      _
+  ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
       : F[CommitsSynchronizer[F]] = for {
-    accessTokenFinder         <- AccessTokenFinder[F]
     gitLabCommitStatFetcher   <- GitLabCommitStatFetcher[F]
     gitLabCommitFetcher       <- GitLabCommitFetcher[F]
     elCommitFetcher           <- ELCommitFetcher[F]
     commitEventDeleter        <- CommitEventDeleter[F]
     missingCommitEventCreator <- MissingCommitEventCreator[F]
-  } yield new CommitsSynchronizerImpl(
-    accessTokenFinder,
-    gitLabCommitStatFetcher,
-    gitLabCommitFetcher,
-    elCommitFetcher,
-    commitEventDeleter,
-    missingCommitEventCreator
+  } yield new CommitsSynchronizerImpl(gitLabCommitStatFetcher,
+                                      gitLabCommitFetcher,
+                                      elCommitFetcher,
+                                      commitEventDeleter,
+                                      missingCommitEventCreator
   )
 }

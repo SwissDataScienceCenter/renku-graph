@@ -32,7 +32,6 @@ import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.{BatchDate, CommitId}
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder._
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
@@ -45,8 +44,7 @@ private[commitsync] trait CommitsSynchronizer[F[_]] {
   def synchronizeEvents(event: CommitSyncEvent): F[Unit]
 }
 
-private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
-    accessTokenFinder:   AccessTokenFinder[F],
+private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: AccessTokenFinder: ExecutionTimeRecorder](
     latestCommitFinder:  LatestCommitFinder[F],
     eventDetailsFinder:  EventDetailsFinder[F],
     commitInfoFinder:    CommitInfoFinder[F],
@@ -56,6 +54,7 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Exec
     clock:               java.time.Clock = java.time.Clock.systemUTC()
 ) extends CommitsSynchronizer[F] {
 
+  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import accessTokenFinder._
   import commitEventsRemover._
   import commitInfoFinder._
@@ -224,16 +223,14 @@ private[commitsync] class CommitsSynchronizerImpl[F[_]: MonadThrow: Logger: Exec
 }
 
 private[commitsync] object CommitsSynchronizer {
-  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder] = for {
-    accessTokenFinder   <- AccessTokenFinder[F]
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder] = for {
     latestCommitFinder  <- LatestCommitFinder[F]
     eventDetailsFinder  <- EventDetailsFinder[F]
     commitInfoFinder    <- CommitInfoFinder[F]
     commitToEventLog    <- CommitToEventLog[F]
     commitEventsRemover <- CommitEventsRemover[F]
     eventSender         <- EventSender[F]
-  } yield new CommitsSynchronizerImpl[F](accessTokenFinder,
-                                         latestCommitFinder,
+  } yield new CommitsSynchronizerImpl[F](latestCommitFinder,
                                          eventDetailsFinder,
                                          commitInfoFinder,
                                          commitToEventLog,

@@ -33,6 +33,7 @@ import io.renku.events.consumers._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.CommitId
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
@@ -98,7 +99,9 @@ private[events] object EventHandler {
   import eu.timepit.refined.auto._
   val processesLimit: Int Refined Positive = 1
 
-  def apply[F[_]: Async: NonEmptyParallel: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder](
+  def apply[F[
+      _
+  ]: Async: NonEmptyParallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F]
   ): F[EventHandler[F]] = for {
     concurrentProcessesLimiter    <- ConcurrentProcessesLimiter(processesLimit)

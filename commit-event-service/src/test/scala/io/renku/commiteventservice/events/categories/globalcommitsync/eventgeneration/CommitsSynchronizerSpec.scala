@@ -36,7 +36,7 @@ import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.projectIdToPath
+import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectIdToPath
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage}
@@ -231,15 +231,14 @@ class CommitsSynchronizerSpec
 
     implicit val logger:                TestLogger[IO]                = TestLogger()
     implicit val executionTimeRecorder: TestExecutionTimeRecorder[IO] = TestExecutionTimeRecorder[IO]()
-    val accessTokenFinder         = mock[AccessTokenFinder[IO]]
+    implicit val accessTokenFinder:     AccessTokenFinder[IO]         = mock[AccessTokenFinder[IO]]
     val gitLabCommitStatFetcher   = mock[GitLabCommitStatFetcher[IO]]
     val gitLabCommitFetcher       = mock[GitLabCommitFetcher[IO]]
     val eventLogCommitFetcher     = mock[ELCommitFetcher[IO]]
     val commitEventDeleter        = mock[CommitEventDeleter[IO]]
     val missingCommitEventCreator = mock[MissingCommitEventCreator[IO]]
     private val currentTime       = mockFunction[Instant]
-    val commitsSynchronizer = new CommitsSynchronizerImpl[IO](accessTokenFinder,
-                                                              gitLabCommitStatFetcher,
+    val commitsSynchronizer = new CommitsSynchronizerImpl[IO](gitLabCommitStatFetcher,
                                                               gitLabCommitFetcher,
                                                               eventLogCommitFetcher,
                                                               commitEventDeleter,

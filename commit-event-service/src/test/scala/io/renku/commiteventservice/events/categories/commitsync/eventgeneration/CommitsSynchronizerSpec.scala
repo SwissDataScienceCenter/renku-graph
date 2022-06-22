@@ -36,7 +36,7 @@ import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder._
+import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits._
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level._
@@ -577,7 +577,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
 
     implicit val logger:                TestLogger[Try]                = TestLogger[Try]()
     implicit val executionTimeRecorder: TestExecutionTimeRecorder[Try] = TestExecutionTimeRecorder[Try]()
-    val accessTokenFinder   = mock[AccessTokenFinder[Try]]
+    implicit val accessTokenFinder:     AccessTokenFinder[Try]         = mock[AccessTokenFinder[Try]]
     val latestCommitFinder  = mock[LatestCommitFinder[Try]]
     val eventDetailsFinder  = mock[EventDetailsFinder[Try]]
     val commitInfoFinder    = mock[CommitInfoFinder[Try]]
@@ -586,8 +586,7 @@ class CommitsSynchronizerSpec extends AnyWordSpec with should.Matchers with Mock
     val eventSender         = mock[EventSender[Try]]
     val clock               = Clock.fixed(batchDate.value, ZoneId.of(ZoneOffset.UTC.getId))
 
-    val commitsSynchronizer = new CommitsSynchronizerImpl[Try](accessTokenFinder,
-                                                               latestCommitFinder,
+    val commitsSynchronizer = new CommitsSynchronizerImpl[Try](latestCommitFinder,
                                                                eventDetailsFinder,
                                                                commitInfoFinder,
                                                                commitToEventLog,
