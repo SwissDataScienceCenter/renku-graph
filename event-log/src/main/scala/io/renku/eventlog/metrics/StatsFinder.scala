@@ -58,70 +58,90 @@ class StatsFinderImpl[F[_]: Async: SessionResource](
     with SubscriptionTypeSerializers {
 
   override def countEventsByCategoryName(): F[Map[CategoryName, Long]] = SessionResource[F].useK {
-    measureExecutionTime(countEventsPerCategoryName).map(_.toMap)
+    countEventsPerCategoryName.map(_.toMap)
   }
 
-  private def countEventsPerCategoryName = {
+  private def countEventsPerCategoryName = measureExecutionTime {
     val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply)(now())
     SqlStatement(name = "category name events count")
-      .select[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~
-                CategoryName ~ CategoryName ~ CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ CategoryName ~
-                CategoryName ~ CategoryName ~ LastSyncedDate ~ CategoryName ~ CategoryName,
+      .select[EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ // MEMBER_SYNC
+                EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ LastSyncedDate ~ // COMMIT_SYNC
+                LastSyncedDate, // PROJECT_SYNC
               (CategoryName, Long)
       ](
         sql"""
           SELECT all_counts.category_name, SUM(all_counts.count)
           FROM (
+            -- MEMBER_SYNC
             (
               SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               JOIN subscription_category_sync_time sync_time
-                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = '#${membersync.categoryName.show}'
               WHERE
                    (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '5 minutes')
                 OR (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
                 OR (($eventDateEncoder - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
               GROUP BY sync_time.category_name
             ) UNION ALL (
-              SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              SELECT '#${membersync.categoryName.show}' AS category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               WHERE proj.project_id NOT IN (
                 SELECT project_id
                 FROM subscription_category_sync_time
-                WHERE category_name = $categoryNameEncoder
+                WHERE category_name = '#${membersync.categoryName.show}'
               )
+            -- COMMIT_SYNC
             ) UNION ALL (
               SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               JOIN subscription_category_sync_time sync_time
-                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = '#${commitsync.categoryName.show}'
               WHERE
                    (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
                 OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
               GROUP BY sync_time.category_name
             ) UNION ALL (
-              SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              SELECT '#${commitsync.categoryName.show}' AS category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               WHERE proj.project_id NOT IN (
                 SELECT project_id
                 FROM subscription_category_sync_time
-                WHERE category_name = $categoryNameEncoder
+                WHERE category_name = '#${commitsync.categoryName.show}'
               ) 
+            -- GLOBAL_COMMIT_SYNC
             ) UNION ALL (
               SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               LEFT JOIN subscription_category_sync_time sync_time
-                ON proj.project_id = sync_time.project_id AND sync_time.category_name = $categoryNameEncoder
+                ON proj.project_id = sync_time.project_id AND sync_time.category_name = '#${globalcommitsync.categoryName.show}'
               WHERE ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '7 days'
               GROUP BY sync_time.category_name
             ) UNION ALL (
-              SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              SELECT '#${globalcommitsync.categoryName.show}' AS category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               WHERE proj.project_id NOT IN (
                 SELECT project_id
                 FROM subscription_category_sync_time
-                WHERE category_name = $categoryNameEncoder
+                WHERE category_name = '#${globalcommitsync.categoryName.show}'
               ) 
+            -- PROJECT_SYNC  
+            ) UNION ALL (
+              SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              LEFT JOIN subscription_category_sync_time sync_time
+                ON proj.project_id = sync_time.project_id AND sync_time.category_name = '#${projectsync.categoryName.show}'
+              WHERE ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day'
+              GROUP BY sync_time.category_name
+            ) UNION ALL (
+              SELECT '#${projectsync.categoryName.show}' AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              WHERE proj.project_id NOT IN (
+                SELECT project_id
+                FROM subscription_category_sync_time
+                WHERE category_name = '#${projectsync.categoryName.show}'
+              ) 
+            -- MIN_PROJECT_INFO
             ) UNION ALL (
               SELECT '#${minprojectinfo.categoryName.show}' AS category_name, COUNT(DISTINCT p.project_id) AS count
               FROM project p
@@ -151,10 +171,9 @@ class StatsFinderImpl[F[_]: Async: SessionResource](
         }
       )
       .arguments(
-        membersync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~
-          lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName ~ commitsync.categoryName ~ eventDate ~
-          lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName ~
-          globalcommitsync.categoryName ~ lastSyncedDate ~ globalcommitsync.categoryName ~ globalcommitsync.categoryName
+        eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ // MEMBER_SYNC
+          eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ lastSyncedDate ~ // COMMIT_SYNC
+          lastSyncedDate // PROJECT_SYNC
       )
       .build(_.toList)
   }

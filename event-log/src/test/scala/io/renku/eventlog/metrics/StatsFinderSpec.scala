@@ -85,6 +85,7 @@ class StatsFinderSpec
         membersync.categoryName        -> 4L,
         commitsync.categoryName        -> 5L,
         globalcommitsync.categoryName  -> 5L,
+        projectsync.categoryName       -> 5L,
         minprojectinfo.categoryName    -> 5L,
         CategoryName("CLEAN_UP_EVENT") -> 0L
       )
@@ -119,6 +120,7 @@ class StatsFinderSpec
         membersync.categoryName        -> 4L,
         commitsync.categoryName        -> 3L,
         globalcommitsync.categoryName  -> 4L,
+        projectsync.categoryName       -> 4L,
         minprojectinfo.categoryName    -> 4L,
         CategoryName("CLEAN_UP_EVENT") -> 0L
       )
@@ -147,6 +149,36 @@ class StatsFinderSpec
         membersync.categoryName        -> 3L,
         commitsync.categoryName        -> 3L,
         globalcommitsync.categoryName  -> 2L,
+        projectsync.categoryName       -> 3L,
+        minprojectinfo.categoryName    -> 3L,
+        CategoryName("CLEAN_UP_EVENT") -> 0L
+      )
+    }
+
+    "return info about number of events grouped by categoryName for the projectSync category" in {
+
+      val compoundId1   = compoundEventIds.generateOne
+      val eventDate1    = EventDate(generateInstant(lessThanAgo = Duration.ofDays(7)))
+      val lastSyncDate1 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
+      upsertProject(compoundId1, projectPaths.generateOne, eventDate1)
+      upsertCategorySyncTime(compoundId1.projectId, globalcommitsync.categoryName, lastSyncDate1)
+
+      val compoundId2 = compoundEventIds.generateOne
+      val eventDate2  = EventDate(generateInstant())
+      upsertProject(compoundId2, projectPaths.generateOne, eventDate2)
+
+      // PROJECT_SYNC should not see this one
+      val compoundId3   = compoundEventIds.generateOne
+      val eventDate3    = EventDate(generateInstant(moreThanAgo = Duration.ofDays(7)))
+      val lastSyncDate3 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+      upsertProject(compoundId3, projectPaths.generateOne, eventDate3)
+      upsertCategorySyncTime(compoundId3.projectId, projectsync.categoryName, lastSyncDate3)
+
+      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
+        membersync.categoryName        -> 3L,
+        commitsync.categoryName        -> 3L,
+        globalcommitsync.categoryName  -> 3L,
+        projectsync.categoryName       -> 2L,
         minprojectinfo.categoryName    -> 3L,
         CategoryName("CLEAN_UP_EVENT") -> 0L
       )
@@ -177,6 +209,7 @@ class StatsFinderSpec
         membersync.categoryName        -> 3L,
         commitsync.categoryName        -> 3L,
         globalcommitsync.categoryName  -> 3L,
+        projectsync.categoryName       -> 3L,
         minprojectinfo.categoryName    -> 2L,
         CategoryName("CLEAN_UP_EVENT") -> 0L
       )
@@ -197,7 +230,7 @@ class StatsFinderSpec
         membersync.categoryName        -> 0L,
         commitsync.categoryName        -> 0L,
         globalcommitsync.categoryName  -> 0L,
-        minprojectinfo.categoryName    -> 0L,
+        projectsync.categoryName       -> 0L,
         minprojectinfo.categoryName    -> 0L,
         CategoryName("CLEAN_UP_EVENT") -> 0L
       )
@@ -215,6 +248,7 @@ class StatsFinderSpec
         membersync.categoryName        -> 0L,
         commitsync.categoryName        -> 0L,
         globalcommitsync.categoryName  -> 0L,
+        projectsync.categoryName       -> 0L,
         minprojectinfo.categoryName    -> 0L
       )
     }
