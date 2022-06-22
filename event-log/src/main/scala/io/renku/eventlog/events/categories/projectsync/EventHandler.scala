@@ -58,13 +58,19 @@ private class EventHandler[F[_]: Concurrent: Logger](override val categoryName: 
 }
 
 private object EventHandler {
-  import eu.timepit.refined.auto._
+  import com.typesafe.config.{Config, ConfigFactory}
+  import eu.timepit.refined.api.Refined
+  import eu.timepit.refined.numeric.Positive
+  import eu.timepit.refined.pureconfig._
+  import io.renku.config.ConfigLoader.find
 
   def apply[F[_]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry](
       subscriptionMechanism: SubscriptionMechanism[F],
-      queriesExecTimes:      LabeledHistogram[F]
+      queriesExecTimes:      LabeledHistogram[F],
+      config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
     projectInfoSynchronizer    <- ProjectInfoSynchronizer[F](queriesExecTimes)
-    concurrentProcessesLimiter <- ConcurrentProcessesLimiter[F](processesCount = 2)
+    maxConcurrentProcesses     <- find[F, Int Refined Positive]("project-sync-max-concurrent-processes", config)
+    concurrentProcessesLimiter <- ConcurrentProcessesLimiter[F](processesCount = maxConcurrentProcesses)
   } yield new EventHandler[F](categoryName, projectInfoSynchronizer, subscriptionMechanism, concurrentProcessesLimiter)
 }

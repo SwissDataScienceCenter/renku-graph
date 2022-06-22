@@ -96,9 +96,9 @@ private object EventHandler {
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
-    generationProcesses        <- find[F, Int Refined Positive]("transformation-processes-number", config)
+    maxConcurrentProcesses     <- find[F, Int Refined Positive]("transformation-processes-number", config)
     eventProcessor             <- EventProcessor[F]
-    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
+    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(maxConcurrentProcesses)
   } yield new EventHandler[F](categoryName,
                               EventBodyDeserializer[F],
                               subscriptionMechanism,
