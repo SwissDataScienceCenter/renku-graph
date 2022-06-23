@@ -24,11 +24,12 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
+  def apply[F[_]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry](
       eventsQueue:                        StatusChangeEventsQueue[F],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],

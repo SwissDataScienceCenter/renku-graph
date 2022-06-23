@@ -33,6 +33,7 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger
 
@@ -110,7 +111,7 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry](
 
 private object EventHandler {
 
-  def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
+  def apply[F[_]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry](
       eventsQueue:                        StatusChangeEventsQueue[F],
       queriesExecTimes:                   LabeledHistogram[F],
       awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
@@ -134,9 +135,9 @@ private object EventHandler {
     _             <- registerHandlers(eventsQueue, statusChanger, queriesExecTimes)
   } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queriesExecTimes)
 
-  private def registerHandlers[F[_]: Async: Logger](eventsQueue: StatusChangeEventsQueue[F],
-                                                    statusChanger:    StatusChanger[F],
-                                                    queriesExecTimes: LabeledHistogram[F]
+  private def registerHandlers[F[_]: Async: AccessTokenFinder: Logger](eventsQueue: StatusChangeEventsQueue[F],
+                                                                       statusChanger:    StatusChanger[F],
+                                                                       queriesExecTimes: LabeledHistogram[F]
   ) = for {
     projectsToNewUpdater <- ProjectEventsToNewUpdater(queriesExecTimes)
     _ <- eventsQueue.register[ProjectEventsToNew](statusChanger.updateStatuses(_)(projectsToNewUpdater))

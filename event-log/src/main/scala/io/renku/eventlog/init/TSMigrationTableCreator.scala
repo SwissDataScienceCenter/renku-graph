@@ -33,6 +33,7 @@ private object TSMigrationTableCreator {
 private class TSMigrationTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
     extends TSMigrationTableCreator[F] {
 
+  import MigratorTools._
   import cats.syntax.all._
   import skunk._
   import skunk.codec.all._

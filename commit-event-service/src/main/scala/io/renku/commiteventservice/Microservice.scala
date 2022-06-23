@@ -27,6 +27,7 @@ import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -43,23 +44,25 @@ object Microservice extends IOMicroservice {
     MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
       ExecutionTimeRecorder[IO]() flatMap { implicit executionTimeRecorder =>
         GitLabClient[IO]() flatMap { implicit gitLabClient =>
-          for {
-            certificateLoader        <- CertificateLoader[IO]
-            sentryInitializer        <- SentryInitializer[IO]
-            commitSyncCategory       <- events.categories.commitsync.SubscriptionFactory[IO]
-            globalCommitSyncCategory <- events.categories.globalcommitsync.SubscriptionFactory[IO]
-            eventConsumersRegistry   <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-            serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
-            microserviceRoutes       <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
-            exitcode <- microserviceRoutes.routes.use { routes =>
-                          new MicroserviceRunner[IO](serviceReadinessChecker,
-                                                     certificateLoader,
-                                                     sentryInitializer,
-                                                     eventConsumersRegistry,
-                                                     HttpServer[IO](serverPort = ServicePort.value, routes)
-                          ).run()
-                        }
-          } yield exitcode
+          AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
+            for {
+              certificateLoader        <- CertificateLoader[IO]
+              sentryInitializer        <- SentryInitializer[IO]
+              commitSyncCategory       <- events.categories.commitsync.SubscriptionFactory[IO]
+              globalCommitSyncCategory <- events.categories.globalcommitsync.SubscriptionFactory[IO]
+              eventConsumersRegistry   <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
+              serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
+              microserviceRoutes       <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
+              exitcode <- microserviceRoutes.routes.use { routes =>
+                            new MicroserviceRunner[IO](serviceReadinessChecker,
+                                                       certificateLoader,
+                                                       sentryInitializer,
+                                                       eventConsumersRegistry,
+                                                       HttpServer[IO](serverPort = ServicePort.value, routes)
+                            ).run()
+                          }
+            } yield exitcode
+          }
         }
       }
     }

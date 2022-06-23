@@ -18,11 +18,12 @@
 
 package io.renku.db
 
-import cats.Monad
+import cats.{Monad, Show}
 import cats.data.Kleisli
 import cats.syntax.all._
 import io.renku.metrics.LabeledHistogram
 import skunk.Session
+import skunk.data.Completion
 
 abstract class DbClient[F[_]: Monad](maybeHistogram: Option[LabeledHistogram[F]]) {
 
@@ -39,4 +40,6 @@ abstract class DbClient[F[_]: Monad](maybeHistogram: Option[LabeledHistogram[F]]
         } yield result
     }
   }
+
+  protected implicit val completionShow: Show[Completion] = Show.show(c => c.toString)
 }

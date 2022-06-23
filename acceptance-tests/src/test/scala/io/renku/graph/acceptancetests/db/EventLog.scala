@@ -23,6 +23,7 @@ import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.IO._
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
+import cats.syntax.all._
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import io.renku.db.{DBConfigProvider, SessionResource}
 import io.renku.eventlog._
@@ -70,6 +71,16 @@ object EventLog extends TypeSerializers {
       .query(varchar)
       .map(category => CategoryName(category))
     session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+  }
+
+  def forceCategoryEventTriggering(categoryName: CategoryName, projectId: projects.Id)(implicit
+      ioRuntime:                                 IORuntime
+  ): Unit = execute { session =>
+    val query: Command[projects.Id ~ String] = sql"""
+      DELETE FROM subscription_category_sync_time 
+      WHERE project_id = $projectIdEncoder AND category_name = $varchar
+      """.command
+    session.prepare(query).use(_.execute(projectId, categoryName.show)).void
   }
 
   private def `status IN`(status: List[EventStatus]) =

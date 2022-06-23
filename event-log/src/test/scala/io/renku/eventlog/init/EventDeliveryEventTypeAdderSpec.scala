@@ -57,7 +57,7 @@ class EventDeliveryEventTypeAdderSpec
 
       verifyColumnExists("event_delivery", "event_type_id") shouldBe false
 
-      eventTypeAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      eventTypeAdder.run().unsafeRunSync() shouldBe ()
 
       verifyColumnExists("event_delivery", "event_type_id") shouldBe true
 
@@ -69,7 +69,6 @@ class EventDeliveryEventTypeAdderSpec
         logger.loggedOnly(Info("'event_type_id' column added"))
       }
     }
-
   }
 
   private trait TestCase {

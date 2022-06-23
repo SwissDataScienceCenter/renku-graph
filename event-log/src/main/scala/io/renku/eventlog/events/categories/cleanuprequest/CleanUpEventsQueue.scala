@@ -31,7 +31,7 @@ import skunk.data.Completion
 import java.time.OffsetDateTime
 
 private trait CleanUpEventsQueue[F[_]] {
-  def offer(projectPath: projects.Path): F[Unit]
+  def offer(projectId: projects.Id, projectPath: projects.Path): F[Unit]
 }
 
 private object CleanUpEventsQueue {
@@ -50,21 +50,20 @@ private class CleanUpEventsQueueImpl[F[_]: Async: SessionResource](queriesExecTi
   import skunk.codec.all._
   import skunk.implicits._
 
-  override def offer(projectPath: projects.Path): F[Unit] = SessionResource[F].useK {
+  override def offer(projectId: projects.Id, projectPath: projects.Path): F[Unit] = SessionResource[F].useK {
     measureExecutionTime {
       SqlStatement[F](name = "clean_up_events_queue - offer")
-        .command[OffsetDateTime ~ projects.Path](
-          sql"""INSERT INTO clean_up_events_queue (date, project_path)
-                VALUES ($timestamptz, $projectPathEncoder)
+        .command[OffsetDateTime ~ projects.Id ~ projects.Path](
+          sql"""INSERT INTO clean_up_events_queue (date, project_id, project_path)
+                VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)
                 ON CONFLICT DO NOTHING
           """.command
         )
-        .arguments(now() ~ projectPath)
+        .arguments(now() ~ projectId ~ projectPath)
         .build
     } flatMapF {
       case Completion.Insert(0 | 1) => ().pure[F]
-      case other =>
-        new Exception(s"${categoryName.show}: offering ${projectPath.show} failed with $other").raiseError[F, Unit]
+      case other => new Exception(show"$categoryName: offering $projectPath failed with $other").raiseError[F, Unit]
     }
   }
 }

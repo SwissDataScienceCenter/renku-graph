@@ -39,8 +39,7 @@ private trait GitLabProjectMembersFinder[F[_]] {
   def findProjectMembers(path: Path)(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]]
 }
 
-private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](gitLabClient: GitLabClient[F])
-    extends GitLabProjectMembersFinder[F] {
+private class GitLabProjectMembersFinderImpl[F[_]: Async: GitLabClient: Logger] extends GitLabProjectMembersFinder[F] {
 
   override def findProjectMembers(
       path:                    Path
@@ -57,7 +56,7 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](gitLabClient: 
       allUsers:                Set[GitLabProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[GitLabProjectMember]] = for {
     uri                     <- addPageToUrl(uri, maybePage).pure[F]
-    fetchedUsersAndNextPage <- gitLabClient.get(uri, endpointName)(mapResponse(uri, endpointName))
+    fetchedUsersAndNextPage <- GitLabClient[F].get(uri, endpointName)(mapResponse(uri, endpointName))
     allUsers                <- addNextPage(uri, endpointName, allUsers, fetchedUsersAndNextPage)
   } yield allUsers
 
@@ -113,8 +112,8 @@ private class GitLabProjectMembersFinderImpl[F[_]: Async: Logger](gitLabClient: 
 }
 
 private object GitLabProjectMembersFinder {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[GitLabProjectMembersFinder[F]] =
-    new GitLabProjectMembersFinderImpl[F](gitLabClient).pure[F].widen[GitLabProjectMembersFinder[F]]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[GitLabProjectMembersFinder[F]] =
+    new GitLabProjectMembersFinderImpl[F].pure[F].widen[GitLabProjectMembersFinder[F]]
 }
 
 private final case class GitLabProjectMember(gitLabId: GitLabId, name: Name)

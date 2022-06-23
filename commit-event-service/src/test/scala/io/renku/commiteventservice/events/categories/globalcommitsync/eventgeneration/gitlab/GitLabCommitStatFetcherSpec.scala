@@ -26,15 +26,18 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Encoder
 import io.circe.literal.JsonStringContext
+import io.circe.syntax._
 import io.renku.commiteventservice.events.categories.globalcommitsync.Generators.commitsCounts
 import io.renku.commiteventservice.events.categories.globalcommitsync.eventgeneration.ProjectCommitStats
 import io.renku.generators.CommonGraphGenerators.personalAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectIds
+import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
@@ -57,32 +60,26 @@ class GitLabCommitStatFetcherSpec
   "fetchCommitStats" should {
 
     "return a ProjectCommitStats with count of commits " in new TestCase {
-      forAll(commitIds.toGeneratorOfOptions, commitsCounts) { (maybeLatestCommit, commitCount) =>
-        (gitLabCommitFetcher
-          .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
-          .expects(projectId, maybeAccessToken)
-          .returning(maybeLatestCommit.pure[IO])
+      val maybeLatestCommit = commitIds.generateOption
+      givenLatestCommitFetcher(returning = maybeLatestCommit.pure[IO])
 
-        (gitLabClient
-          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
-            _: Option[AccessToken]
-          ))
-          .expects(uri, endpointName, *, maybeAccessToken)
-          .returning(commitCount.some.pure[IO])
+      val commitCount = commitsCounts.generateOne
+      (gitLabClient
+        .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
+          _: Option[AccessToken]
+        ))
+        .expects(uri, endpointName, *, maybeAccessToken)
+        .returning(commitCount.some.pure[IO])
 
-        gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe ProjectCommitStats(
-          maybeLatestCommit,
-          commitCount
-        ).some
-      }
+      gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe ProjectCommitStats(
+        maybeLatestCommit,
+        commitCount
+      ).some
     }
 
     "return None if the gitlab API returns no statistics" in new TestCase {
       val maybeLatestCommit = commitIds.generateOption
-      (gitLabCommitFetcher
-        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
-        .expects(projectId, maybeAccessToken)
-        .returning(maybeLatestCommit.pure[IO])
+      givenLatestCommitFetcher(returning = maybeLatestCommit.pure[IO])
 
       (gitLabClient
         .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[CommitsCount]])(
@@ -94,15 +91,19 @@ class GitLabCommitStatFetcherSpec
       gitLabCommitStatFetcher.fetchCommitStats(projectId).unsafeRunSync() shouldBe None
     }
 
-    Status.NotFound :: Status.InternalServerError :: Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
-      s"return None if the gitlab API returns a $status" in new TestCase {
-        val maybeLatestCommit = commitIds.generateOption
-        (gitLabCommitFetcher
-          .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
-          .expects(projectId, maybeAccessToken)
-          .returning(maybeLatestCommit.pure[IO])
+    "extract commitCount if GitLab responds with OK" in new TestCase {
+      givenLatestCommitFetcher(returning = commitIds.generateOption.pure[IO])
 
-        mapResponse(status, Request[IO](), Response[IO]()).unsafeRunSync() shouldBe None
+      val commitsCount = commitsCounts.generateOne
+      mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(commitsCount.asJson))
+        .unsafeRunSync() shouldBe commitsCount.some
+    }
+
+    Status.NotFound :: Status.InternalServerError :: Status.Unauthorized :: Status.Forbidden :: Nil foreach { status =>
+      s"return None if Gitlab responds with $status" in new TestCase {
+        givenLatestCommitFetcher(returning = commitIds.generateOption.pure[IO])
+
+        mapResponse(status, Request[IO](), Response[IO](status)).unsafeRunSync() shouldBe None
       }
     }
   }
@@ -124,6 +125,12 @@ class GitLabCommitStatFetcherSpec
       _.fetchCommitStats(projectId).unsafeRunSync(),
       commitsCounts.generateOption
     )
+
+    def givenLatestCommitFetcher(returning: IO[Option[CommitId]]) =
+      (gitLabCommitFetcher
+        .fetchLatestGitLabCommit(_: projects.Id)(_: Option[AccessToken]))
+        .expects(projectId, maybeAccessToken)
+        .returning(returning)
   }
 
   private implicit lazy val commitsCountEncoder: Encoder[CommitsCount] = Encoder.instance { count =>

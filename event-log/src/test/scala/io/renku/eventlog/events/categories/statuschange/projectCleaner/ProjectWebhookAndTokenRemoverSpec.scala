@@ -50,9 +50,9 @@ class ProjectWebhookAndTokenRemoverSpec
   "removeWebhookAndToken" should {
 
     "remove the token and the webhook of the specified project" in new TestCase {
-      (accesTokenFinder
+      (accessTokenFinder
         .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
-        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
         delete(s"/projects/${project.id}/webhooks")
@@ -69,9 +69,9 @@ class ProjectWebhookAndTokenRemoverSpec
 
     NotFound :: Unauthorized :: Forbidden :: Nil foreach { status =>
       s"remove the token even if the webhook removal returned $status" in new TestCase {
-        (accesTokenFinder
+        (accessTokenFinder
           .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
-          .expects(project.id, AccessTokenFinder.projectIdToPath)
+          .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
           .returns(accessToken.some.pure[IO])
         stubFor {
           delete(s"/projects/${project.id}/webhooks")
@@ -90,9 +90,9 @@ class ProjectWebhookAndTokenRemoverSpec
     }
 
     "do nothing when the tokenFinder returns no token for the project" in new TestCase {
-      (accesTokenFinder
+      (accessTokenFinder
         .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
-        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(None.pure[IO])
 
       webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync() shouldBe ()
@@ -100,9 +100,9 @@ class ProjectWebhookAndTokenRemoverSpec
 
     "fail when the tokenFinder fails" in new TestCase {
       val exception = exceptions.generateOne
-      (accesTokenFinder
+      (accessTokenFinder
         .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
-        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(exception.raiseError[IO, Option[AccessToken]])
       intercept[Exception] {
         webhookAndTokenRemover.removeWebhookAndToken(project).unsafeRunSync()
@@ -110,9 +110,9 @@ class ProjectWebhookAndTokenRemoverSpec
     }
 
     s"do nothing when the webhook deletion ends with $InternalServerError" in new TestCase {
-      (accesTokenFinder
+      (accessTokenFinder
         .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
-        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
         delete(s"/projects/${project.id}/webhooks")
@@ -126,9 +126,9 @@ class ProjectWebhookAndTokenRemoverSpec
     }
 
     "fail when the webhook deletion fails" in new TestCase {
-      (accesTokenFinder
+      (accessTokenFinder
         .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
-        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
         delete(s"/projects/${project.id}/webhooks")
@@ -141,9 +141,9 @@ class ProjectWebhookAndTokenRemoverSpec
     }
 
     "fail when the token deletion fails" in new TestCase {
-      (accesTokenFinder
+      (accessTokenFinder
         .findAccessToken[projects.Id](_: projects.Id)(_: projects.Id => String))
-        .expects(project.id, AccessTokenFinder.projectIdToPath)
+        .expects(project.id, AccessTokenFinder.Implicits.projectIdToPath)
         .returns(accessToken.some.pure[IO])
       stubFor {
         delete(s"/projects/${project.id}/webhooks")
@@ -164,11 +164,10 @@ class ProjectWebhookAndTokenRemoverSpec
     implicit val accessToken: AccessToken = accessTokens.generateOne
     val project = consumerProjects.generateOne
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val accesTokenFinder   = mock[AccessTokenFinder[IO]]
-    val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
-    val webhookServiceUrl  = WebhookServiceUrl(externalServiceBaseUrl)
-    val webhookAndTokenRemover =
-      new ProjectWebhookAndTokenRemoverImpl[IO](accesTokenFinder, webhookServiceUrl, tokenRepositoryUrl)
+    implicit val logger:            TestLogger[IO]        = TestLogger[IO]()
+    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
+    val tokenRepositoryUrl     = TokenRepositoryUrl(externalServiceBaseUrl)
+    val webhookServiceUrl      = WebhookServiceUrl(externalServiceBaseUrl)
+    val webhookAndTokenRemover = new ProjectWebhookAndTokenRemoverImpl[IO](webhookServiceUrl, tokenRepositoryUrl)
   }
 }

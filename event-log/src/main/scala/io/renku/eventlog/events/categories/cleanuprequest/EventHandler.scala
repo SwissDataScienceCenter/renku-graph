@@ -18,12 +18,11 @@
 
 package io.renku.eventlog.events.categories.cleanuprequest
 
-import cats.Show
 import cats.data.EitherT
 import cats.data.EitherT.fromEither
 import cats.effect.{Async, Concurrent}
 import cats.syntax.all._
-import io.circe.Decoder
+import io.circe.{Decoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
@@ -33,7 +32,7 @@ import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 private class EventHandler[F[_]: Concurrent: Logger](
-    eventsQueue:               CleanUpEventsQueue[F],
+    processor:                 EventProcessor[F],
     override val categoryName: CategoryName = categoryName
 ) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
@@ -42,22 +41,27 @@ private class EventHandler[F[_]: Concurrent: Logger](
 
   private def processEvent(request: EventRequestContent): EitherT[F, EventSchedulingResult, Accepted] = for {
     event <- fromEither[F](request.event.as(event).leftMap(_ => BadRequest).leftWiden[EventSchedulingResult])
-    result <- eventsQueue
-                .offer(event)
+    result <- processor
+                .process(event)
                 .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(event)(_)(eventShow))
-                .leftSemiflatTap(Logger[F].log(event)(_)(eventShow))
+                .semiflatTap(Logger[F].log(event)(_))
+                .leftSemiflatTap(Logger[F].log(event)(_))
   } yield result
 
-  import io.renku.tinytypes.json.TinyTypeDecoders._
-  private val event: Decoder[projects.Path] = _.downField("project").downField("path").as[projects.Path]
+  private val event: Decoder[CleanUpRequestEvent] = {
+    import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  private lazy val eventShow: Show[projects.Path] = Show.show(path => show"projectPath = $path")
+    _.downField("project").as[Json].map(_.hcursor) >>= { cursor =>
+      (cursor.downField("id").as[Option[projects.Id]], cursor.downField("path").as[projects.Path]).mapN {
+        case (Some(id), path) => CleanUpRequestEvent(id, path)
+        case (None, path)     => CleanUpRequestEvent(path)
+      }
+    }
+  }
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: Logger: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventHandler[F]] = for {
-    eventsQueue <- CleanUpEventsQueue[F](queriesExecTimes)
-  } yield new EventHandler[F](eventsQueue)
+  def apply[F[_]: Async: Logger: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventHandler[F]] =
+    EventProcessor[F](queriesExecTimes).map(new EventHandler[F](_))
 }

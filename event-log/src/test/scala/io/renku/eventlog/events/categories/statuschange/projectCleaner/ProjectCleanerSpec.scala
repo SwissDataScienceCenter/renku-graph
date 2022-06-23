@@ -31,7 +31,6 @@ import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
@@ -53,12 +52,12 @@ class ProjectCleanerSpec
 
   "cleanUp" should {
 
-    "remove related records from subscription_category_sync_time, " +
-      "related records from the clean_up_events_queue " +
+    "remove related records from the subscription_category_sync_time table, " +
+      "related records from the the clean_up_events_queue " +
       "and remove the project itself" in new TestCase {
 
-        val otherProjectPath = projectPaths.generateOne
-        insertCleanUpEvent(otherProjectPath)
+        val otherProject = consumerProjects.generateOne
+        insertCleanUpEvent(otherProject)
 
         (projectHookRemover.removeWebhookAndToken _).expects(project).returns(().pure[IO])
 
@@ -66,7 +65,7 @@ class ProjectCleanerSpec
 
         findProjects.find(_._1 == project.id)    shouldBe None
         findProjectCategorySyncTimes(project.id) shouldBe List.empty[(CategoryName, LastSyncedDate)]
-        findCleanUpEvents                        shouldBe List(otherProjectPath)
+        findCleanUpEvents                        shouldBe List(otherProject.id -> otherProject.path)
 
         logger.loggedOnly(Info(show"$categoryName: $project removed"))
       }
@@ -91,7 +90,7 @@ class ProjectCleanerSpec
     val project = consumerProjects.generateOne
 
     upsertProject(project.id, project.path, eventDates.generateOne)
-    insertCleanUpEvent(project.path)
+    insertCleanUpEvent(project)
     upsertCategorySyncTime(project.id, categoryNames.generateOne, lastSyncedDates.generateOne)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()

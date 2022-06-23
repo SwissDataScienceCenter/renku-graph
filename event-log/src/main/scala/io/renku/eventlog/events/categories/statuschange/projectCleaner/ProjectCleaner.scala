@@ -28,11 +28,12 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers.{projectIdEncoder, projectPathEncoder}
 import io.renku.events.consumers.Project
 import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
-import skunk.implicits.toStringOps
-import skunk.{Session, SqlState}
+import skunk.implicits._
+import skunk.{Session, SqlState, ~}
 
 import scala.util.control.NonFatal
 
@@ -41,8 +42,8 @@ private[statuschange] trait ProjectCleaner[F[_]] {
 }
 
 private[statuschange] object ProjectCleaner {
-  def apply[F[_]: Async: Logger](queriesExecTimes: LabeledHistogram[F]): F[ProjectCleaner[F]] = for {
-    projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]()
+  def apply[F[_]: Async: AccessTokenFinder: Logger](queriesExecTimes: LabeledHistogram[F]): F[ProjectCleaner[F]] = for {
+    projectWebhookAndTokenRemover <- ProjectWebhookAndTokenRemover[F]
   } yield new ProjectCleanerImpl[F](projectWebhookAndTokenRemover, queriesExecTimes)
 }
 
@@ -60,42 +61,47 @@ private[statuschange] class ProjectCleanerImpl[F[_]: Async: Logger](
       _       <- removeCleanUpEvents(project)
       _       <- removeProjectSubscriptionSyncTimes(project)
       removed <- removeProject(project)
-      _       <- Kleisli.liftF[F, Session[F], Unit](removeWebhookAndToken(project)) recoverWith logError(project)
+      _       <- Kleisli.liftF(whenA(removed)(removeWebhookAndToken(project) recoverWith logError(project)))
       _       <- Kleisli.liftF(whenA(removed)(Logger[F].info(show"$categoryName: $project removed")))
     } yield ()
   } recoverWith logWarnAndRetry(project)
 
-  private def logError(project: Project): PartialFunction[Throwable, Kleisli[F, Session[F], Unit]] = {
-    case NonFatal(error) =>
-      Kleisli.liftF(Logger[F].error(error)(s"Failed to remove webhook or token for project: ${project.show}"))
+  private def logError(project: Project): PartialFunction[Throwable, F[Unit]] = { case NonFatal(error) =>
+    Logger[F].error(error)(s"Failed to remove webhook or token for project: ${project.show}")
   }
 
   private def removeCleanUpEvents(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - clean_up_events_queue removal")
-      .command[projects.Path](sql"""
+      .command[projects.Id ~ projects.Path](sql"""
         DELETE FROM clean_up_events_queue 
-        WHERE project_path = $projectPathEncoder""".command)
-      .arguments(project.path)
+        WHERE project_id = $projectIdEncoder AND project_path = $projectPathEncoder""".command)
+      .arguments(project.id ~ project.path)
       .build
       .void
   }
 
   private def removeProjectSubscriptionSyncTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - subscription_time removal")
-      .command[projects.Id](sql"""
+      .command[projects.Id ~ projects.Path](sql"""
         DELETE FROM subscription_category_sync_time 
-        WHERE project_id = $projectIdEncoder""".command)
-      .arguments(project.id)
+        WHERE project_id IN (
+          SELECT st.project_id
+          FROM subscription_category_sync_time st
+          JOIN project p ON st.project_id = p.project_id 
+            AND p.project_id = $projectIdEncoder
+            AND p.project_path = $projectPathEncoder
+        )""".command)
+      .arguments(project.id ~ project.path)
       .build
       .void
   }
 
   private def removeProject(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - remove project")
-      .command[projects.Id](sql"""
+      .command[projects.Id ~ projects.Path](sql"""
         DELETE FROM project 
-        WHERE project_id = $projectIdEncoder""".command)
-      .arguments(project.id)
+        WHERE project_id = $projectIdEncoder AND project_path = $projectPathEncoder""".command)
+      .arguments(project.id ~ project.path)
       .build
       .mapResult {
         case Completion.Delete(1) => true

@@ -30,6 +30,7 @@ import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventBody
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
@@ -43,12 +44,11 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 
   import eventBodyDeserializer.toCommitEvent
 
-  override def createHandlingProcess(
-      requestContent: EventRequestContent
-  ): F[EventHandlingProcess[F]] = EventHandlingProcess.withWaitingForCompletion[F](
-    deferred => startProcessEvent(requestContent, deferred),
-    subscriptionMechanism.renewSubscription()
-  )
+  override def createHandlingProcess(requestContent: EventRequestContent): F[EventHandlingProcess[F]] =
+    EventHandlingProcess.withWaitingForCompletion[F](
+      deferred => startProcessEvent(requestContent, deferred),
+      subscriptionMechanism.renewSubscription()
+    )
 
   private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
     eventBody <- requestContent match {
@@ -71,7 +71,7 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 
 object EventHandler {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry](
+  def apply[F[_]: Async: Logger: AccessTokenFinder: MetricsRegistry](
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {

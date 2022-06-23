@@ -29,6 +29,7 @@ import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.{CommitId, LastSyncedDate}
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
@@ -85,7 +86,8 @@ private[events] class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
 }
 
 private[events] object EventHandler {
-  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]: F[EventHandler[F]] = for {
+  def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: ExecutionTimeRecorder]
+      : F[EventHandler[F]] = for {
     commitEventSynchronizer <- CommitsSynchronizer[F]
   } yield new EventHandler[F](categoryName, commitEventSynchronizer)
 }

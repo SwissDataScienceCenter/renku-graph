@@ -47,8 +47,7 @@ private trait EventProcessor[F[_]] {
   def process(event: TriplesGeneratedEvent): F[Unit]
 }
 
-private class EventProcessorImpl[F[_]: MonadThrow: Logger](
-    accessTokenFinder:     AccessTokenFinder[F],
+private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     stepsCreator:          TransformationStepsCreator[F],
     uploader:              TransformationStepsRunner[F],
     statusUpdater:         EventStatusUpdater[F],
@@ -56,7 +55,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends EventProcessor[F] {
 
-  import AccessTokenFinder._
+  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import UploadingResult._
   import accessTokenFinder._
   import entityBuilder._
@@ -201,11 +200,11 @@ private class EventProcessorImpl[F[_]: MonadThrow: Logger](
 
 private object EventProcessor {
 
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      gitLabClient: GitLabClient[F]
-  ): F[EventProcessor[F]] = for {
+  def apply[F[
+      _
+  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder]
+      : F[EventProcessor[F]] = for {
     uploader           <- TransformationStepsRunner[F]
-    accessTokenFinder  <- AccessTokenFinder[F]
     stepsCreator       <- TransformationStepsCreator[F]
     eventStatusUpdater <- EventStatusUpdater(categoryName)
     eventsProcessingTimes <- Histogram(
@@ -215,13 +214,6 @@ private object EventProcessor {
                                              1000000, 5000000, 10000000, 50000000, 100000000, 500000000)
                              )
     executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = Some(eventsProcessingTimes))
-    entityBuilder         <- EntityBuilder(gitLabClient)
-  } yield new EventProcessorImpl(
-    accessTokenFinder,
-    stepsCreator,
-    uploader,
-    eventStatusUpdater,
-    entityBuilder,
-    executionTimeRecorder
-  )
+    entityBuilder         <- EntityBuilder[F]
+  } yield new EventProcessorImpl(stepsCreator, uploader, eventStatusUpdater, entityBuilder, executionTimeRecorder)
 }

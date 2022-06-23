@@ -45,12 +45,11 @@ private trait ProjectMembersFinder[F[_]] {
 }
 
 private object ProjectMembersFinder {
-  def apply[F[_]: Async: NonEmptyParallel: Logger](gitLabClient: GitLabClient[F]): F[ProjectMembersFinder[F]] =
-    new ProjectMembersFinderImpl(gitLabClient).pure[F].widen[ProjectMembersFinder[F]]
+  def apply[F[_]: Async: NonEmptyParallel: GitLabClient: Logger]: F[ProjectMembersFinder[F]] =
+    new ProjectMembersFinderImpl[F].pure[F].widen[ProjectMembersFinder[F]]
 }
 
-private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
-    gitLabClient:     GitLabClient[F],
+private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: GitLabClient: Logger](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ProjectMembersFinder[F] {
 
@@ -84,7 +83,7 @@ private class ProjectMembersFinderImpl[F[_]: Async: NonEmptyParallel: Logger](
       allMembers:              Set[ProjectMember] = Set.empty
   )(implicit maybeAccessToken: Option[AccessToken]): F[Set[ProjectMember]] = for {
     uri                     <- uriWithPage(uri, maybePage).pure[F]
-    fetchedUsersAndNextPage <- gitLabClient.get(uri, endpointName)(mapResponse)
+    fetchedUsersAndNextPage <- GitLabClient[F].get(uri, endpointName)(mapResponse)
     allMembers              <- addNextPage(uri, endpointName, allMembers, fetchedUsersAndNextPage)
   } yield allMembers
 

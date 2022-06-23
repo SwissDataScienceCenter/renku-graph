@@ -41,7 +41,7 @@ class AccessTokenFinderSpec
     with MockFactory
     with should.Matchers {
 
-  import AccessTokenFinder._
+  import AccessTokenFinder.Implicits._
 
   "findAccessToken(ProjectId)" should {
 

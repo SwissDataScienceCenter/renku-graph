@@ -55,11 +55,11 @@ private class EventFinderSpec
       "when an event for a project having such events is returned" in new TestCase {
 
         val project1 = consumerProjects.generateOne
-        insertCleanUpEvent(project1.path, date = OffsetDateTime.now().minusSeconds(2))
+        insertCleanUpEvent(project1, date = OffsetDateTime.now().minusSeconds(2))
 
         val project2 = consumerProjects.generateOne
-        insertCleanUpEvent(project2.path, date = OffsetDateTime.now())
-        upsertProject(project2.id, project2.path, EventDate(Instant.EPOCH))
+        insertCleanUpEvent(project2, date = OffsetDateTime.now())
+        upsertProject(project2, EventDate(Instant.EPOCH))
 
         generateEvent(
           project1,
@@ -86,8 +86,8 @@ private class EventFinderSpec
       "and then events for projects having AwaitingDeletion events" in new TestCase {
 
         val project1 = consumerProjects.generateOne
-        insertCleanUpEvent(project1.path, date = OffsetDateTime.now())
-        upsertProject(project1.id, project1.path, EventDate(Instant.EPOCH))
+        insertCleanUpEvent(project1, date = OffsetDateTime.now())
+        upsertProject(project1, EventDate(Instant.EPOCH))
 
         val project2      = consumerProjects.generateOne
         val project2Event = generateEvent(project2, AwaitingDeletion, ExecutionDate(now))
@@ -160,13 +160,12 @@ private class EventFinderSpec
                             executionDate: ExecutionDate
   ): CompoundEventId = {
     val eventId = compoundEventIds.generateOne.copy(projectId = project.id)
-    storeEvent(
-      eventId,
-      eventStatus,
-      executionDate,
-      eventDates.generateOne,
-      eventBodies.generateOne,
-      projectPath = project.path
+    storeEvent(eventId,
+               eventStatus,
+               executionDate,
+               eventDates.generateOne,
+               eventBodies.generateOne,
+               projectPath = project.path
     )
     eventId
   }

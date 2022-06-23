@@ -22,4 +22,4 @@ import io.renku.graph.model.events.CompoundEventId
 import io.renku.graph.model.events.EventStatus.ProcessingStatus
 import io.renku.graph.model.projects
 
-private case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: ProcessingStatus)
+private final case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: ProcessingStatus)

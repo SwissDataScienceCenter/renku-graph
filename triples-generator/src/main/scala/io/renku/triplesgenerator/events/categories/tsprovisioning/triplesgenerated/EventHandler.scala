@@ -33,6 +33,7 @@ import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProce
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.SchemaVersion
 import io.renku.graph.model.events.{CompoundEventId, EventBody, ZippedEventPayload}
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
 import io.renku.rdfstore.SparqlQueryTimeRecorder
@@ -89,14 +90,15 @@ private object EventHandler {
   import ConfigLoader.find
   import eu.timepit.refined.pureconfig._
 
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      gitLabClient:          GitLabClient[F],
+  def apply[F[
+      _
+  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
-    generationProcesses        <- find[F, Int Refined Positive]("transformation-processes-number", config)
-    eventProcessor             <- EventProcessor(gitLabClient)
-    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(generationProcesses)
+    maxConcurrentProcesses     <- find[F, Int Refined Positive]("transformation-processes-number", config)
+    eventProcessor             <- EventProcessor[F]
+    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(maxConcurrentProcesses)
   } yield new EventHandler[F](categoryName,
                               EventBodyDeserializer[F],
                               subscriptionMechanism,

@@ -27,7 +27,7 @@ import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder.projectPathToPath
+import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectPathToPath
 import io.renku.http.client.AccessToken
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.model
@@ -209,10 +209,10 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
   }
 
   private trait TestCase {
+    implicit val accessTokenFinder: AccessTokenFinder[IO] = mock[AccessTokenFinder[IO]]
     val kgProjectFinder     = mock[KGProjectFinder[IO]]
-    val accessTokenFinder   = mock[AccessTokenFinder[IO]]
     val gitLabProjectFinder = mock[GitLabProjectFinder[IO]]
-    val projectFinder       = new ProjectFinderImpl[IO](kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
+    val projectFinder       = new ProjectFinderImpl[IO](kgProjectFinder, gitLabProjectFinder)
 
     def givenAccessToken(existsFor: Path): AccessToken = {
       val accessToken = accessTokens.generateOne

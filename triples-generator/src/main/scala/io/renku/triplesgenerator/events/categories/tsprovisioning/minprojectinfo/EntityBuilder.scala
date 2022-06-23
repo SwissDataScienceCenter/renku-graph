@@ -127,8 +127,8 @@ private class EntityBuilderImpl[F[_]: MonadThrow](projectInfoFinder: ProjectInfo
 }
 
 private object EntityBuilder {
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](gitLabClient: GitLabClient[F]): F[EntityBuilder[F]] = for {
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: GitLabClient: Logger]: F[EntityBuilder[F]] = for {
     renkuUrl          <- RenkuUrlLoader[F]()
-    projectInfoFinder <- ProjectInfoFinder(gitLabClient)
+    projectInfoFinder <- ProjectInfoFinder[F]
   } yield new EntityBuilderImpl[F](projectInfoFinder, renkuUrl)
 }

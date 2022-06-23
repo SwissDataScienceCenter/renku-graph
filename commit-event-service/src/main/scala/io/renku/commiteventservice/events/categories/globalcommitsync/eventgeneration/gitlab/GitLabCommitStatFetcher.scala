@@ -30,7 +30,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import org.http4s.Status.{Forbidden, InternalServerError, NotFound, Ok, Unauthorized}
 import org.http4s._
 import org.http4s.circe.jsonOf
-import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.implicits._
 import org.typelevel.log4cats.Logger
 
 private[globalcommitsync] trait GitLabCommitStatFetcher[F[_]] {

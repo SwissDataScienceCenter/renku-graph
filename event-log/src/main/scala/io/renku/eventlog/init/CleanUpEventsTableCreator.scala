@@ -33,22 +33,16 @@ private object CleanUpEventsTableCreator {
 private class CleanUpEventsTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
     extends CleanUpEventsTableCreator[F] {
 
+  import MigratorTools._
   import cats.syntax.all._
   import skunk._
-  import skunk.codec.all._
   import skunk.implicits._
 
   override def run(): F[Unit] = SessionResource[F].useK {
-    checkTableExists flatMap {
+    checkTableExists("clean_up_events_queue") >>= {
       case true  => Kleisli.liftF(Logger[F] info "'clean_up_events_queue' table exists")
       case false => createTable()
     }
-  }
-
-  private def checkTableExists: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[Void, Boolean] =
-      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'clean_up_events_queue')".query(bool)
-    Kleisli(_.unique(query).recover { case _ => false })
   }
 
   private def createTable(): Kleisli[F, Session[F], Unit] = for {

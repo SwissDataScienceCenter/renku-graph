@@ -37,23 +37,23 @@ private trait ProjectWebhookAndTokenRemover[F[_]] {
 }
 
 private object ProjectWebhookAndTokenRemover {
-  def apply[F[_]: Async: Logger](): F[ProjectWebhookAndTokenRemover[F]] = for {
-    accessTokenFinder  <- AccessTokenFinder[F]
+  def apply[F[_]: Async: AccessTokenFinder: Logger]: F[ProjectWebhookAndTokenRemover[F]] = for {
     webhookUrl         <- WebhookServiceUrl()
     tokenRepositoryUrl <- TokenRepositoryUrl()
-  } yield new ProjectWebhookAndTokenRemoverImpl[F](accessTokenFinder, webhookUrl, tokenRepositoryUrl)
+  } yield new ProjectWebhookAndTokenRemoverImpl[F](webhookUrl, tokenRepositoryUrl)
 }
 
-private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: Logger](accessTokenFinder: AccessTokenFinder[F],
-                                                                     webhookUrl:         WebhookServiceUrl,
-                                                                     tokenRepositoryUrl: TokenRepositoryUrl
+private class ProjectWebhookAndTokenRemoverImpl[F[_]: Async: AccessTokenFinder: Logger](
+    webhookUrl:         WebhookServiceUrl,
+    tokenRepositoryUrl: TokenRepositoryUrl
 ) extends RestClient[F, ProjectWebhookAndTokenRemover[F]](Throttler.noThrottling[F])
     with ProjectWebhookAndTokenRemover[F] {
 
-  import AccessTokenFinder.projectIdToPath
+  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
+  import accessTokenFinder._
 
   override def removeWebhookAndToken(project: Project): F[Unit] =
-    accessTokenFinder.findAccessToken(project.id) >>= {
+    findAccessToken(project.id) >>= {
       case Some(token) => removeProjectWebhook(project, token) >> removeProjectTokens(project)
       case None        => ().pure[F]
     }

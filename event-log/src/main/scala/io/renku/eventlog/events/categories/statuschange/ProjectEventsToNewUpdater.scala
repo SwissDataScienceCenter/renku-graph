@@ -22,7 +22,6 @@ import cats.data.Kleisli
 import cats.data.Kleisli.liftF
 import cats.effect.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.db.implicits.PreparedQueryOps
 import io.renku.db.{DbClient, SqlStatement}
@@ -35,6 +34,7 @@ import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, Skipped}
 import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
@@ -47,10 +47,11 @@ import scala.util.control.NonFatal
 private trait ProjectEventsToNewUpdater[F[_]] extends DBUpdater[F, ProjectEventsToNew]
 
 private object ProjectEventsToNewUpdater {
-  def apply[F[_]: Async: Logger](queriesExecTimes: LabeledHistogram[F]): F[DBUpdater[F, ProjectEventsToNew]] =
-    ProjectCleaner[F](queriesExecTimes).map(
-      new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes)
-    )
+  def apply[F[_]: Async: AccessTokenFinder: Logger](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[DBUpdater[F, ProjectEventsToNew]] = ProjectCleaner[F](queriesExecTimes).map(
+    new ProjectEventsToNewUpdaterImpl(_, queriesExecTimes)
+  )
 }
 
 private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
@@ -63,12 +64,12 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
   override def updateDB(event: ProjectEventsToNew): UpdateResult[F] = {
     for {
       statuses                 <- updateStatuses(event.project)
-      _                        <- removeProjectProcessingTimes(event.project)
-      _                        <- removeProjectPayloads(event.project)
-      _                        <- removeProjectDeliveryInfo(event.project)
+      _                        <- removeProcessingTimes(event.project)
+      _                        <- removePayloads(event.project)
+      _                        <- removeDeliveryInfo(event.project)
       _                        <- removeCategorySyncTimes(event.project)
-      removedAwaitingDeletions <- removeProjectEvents(event.project, AwaitingDeletion)
-      removedDeletingEvents    <- removeProjectEvents(event.project, Deleting)
+      removedAwaitingDeletions <- removeEvents(event.project, AwaitingDeletion)
+      removedDeletingEvents    <- removeEvents(event.project, Deleting)
       maybeLatestEventDate     <- findLatestEventDate(event.project)
       _                        <- updateLatestEventDate(event.project)(maybeLatestEventDate)
       _                        <- cleanUpProjectIfGone(event.project)(maybeLatestEventDate)
@@ -93,59 +94,76 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
 
   private def updateStatuses(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
-      .select[ExecutionDate ~ projects.Id, EventStatus](
-        sql"""UPDATE event evt
-              SET status = '#${New.value}',
-                  execution_date = $executionDateEncoder,
-                  message = NULL
-              FROM (
-                SELECT event_id, project_id, status 
-                FROM event
-                WHERE project_id = $projectIdEncoder 
-                  AND #${`status IN`(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))}
-                FOR UPDATE
-              ) old_evt
-              WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
-              RETURNING old_evt.status
-           """.query(eventStatusDecoder)
-      )
-      .arguments(ExecutionDate(now()) ~ project.id)
+      .select[ExecutionDate ~ projects.Id ~ projects.Path, EventStatus](sql"""
+        UPDATE event evt
+        SET status = '#${New.value}',
+            execution_date = $executionDateEncoder,
+            message = NULL
+        FROM (
+          SELECT event_id, e.project_id, status 
+          FROM event e
+          JOIN project p ON e.project_id = p.project_id 
+            AND p.project_id = $projectIdEncoder
+            AND p.project_path = $projectPathEncoder
+          WHERE #${`status IN`(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))}
+          FOR UPDATE
+        ) old_evt
+        WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
+        RETURNING old_evt.status
+        """.query(eventStatusDecoder))
+      .arguments(ExecutionDate(now()) ~ project.id ~ project.path)
       .build(_.toList)
   }
 
   private def `status IN`(statuses: Set[EventStatus]) =
     s"status IN (${statuses.map(s => s"'$s'").toList.mkString(",")})"
 
-  private def removeProjectProcessingTimes(project: Project) = measureExecutionTime {
+  private def removeProcessingTimes(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - processing_times removal")
-      .command[projects.Id](
-        sql"""DELETE FROM status_processing_time 
-              WHERE project_id = $projectIdEncoder""".command
-      )
-      .arguments(project.id)
+      .command[projects.Id ~ projects.Path](sql"""
+        DELETE FROM status_processing_time 
+        WHERE project_id IN (
+          SELECT t.project_id
+          FROM status_processing_time t
+          JOIN project p ON t.project_id = p.project_id 
+            AND p.project_id = $projectIdEncoder
+            AND p.project_path = $projectPathEncoder
+        )""".command)
+      .arguments(project.id ~ project.path)
       .build
       .void
   }
 
-  private def removeProjectPayloads(project: Project) = measureExecutionTime {
+  private def removePayloads(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - payloads removal")
-      .command[projects.Id](
-        sql"""DELETE FROM event_payload 
-              WHERE project_id = $projectIdEncoder""".command
-      )
-      .arguments(project.id)
+      .command[projects.Id ~ projects.Path](sql"""
+        DELETE FROM event_payload 
+        WHERE project_id IN (
+          SELECT ep.project_id
+          FROM event_payload ep
+          JOIN project p ON ep.project_id = p.project_id 
+            AND p.project_id = $projectIdEncoder
+            AND p.project_path = $projectPathEncoder
+        )""".command)
+      .arguments(project.id ~ project.path)
       .build
       .void
   }
 
-  private def removeProjectEvents(project: Project, status: EventStatus) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"project_to_new - ${status.value.toLowerCase()} removal"))
-      .command[EventStatus ~ projects.Id](
-        sql"""DELETE FROM event
-              WHERE status = $eventStatusEncoder AND project_id = $projectIdEncoder
-        """.command
-      )
-      .arguments(status ~ project.id)
+  private def removeEvents(project: Project, status: EventStatus) = measureExecutionTime {
+    SqlStatement
+      .named(show"project_to_new - $status removal")
+      .command[EventStatus ~ projects.Id ~ projects.Path](sql"""
+        DELETE FROM event
+        WHERE status = $eventStatusEncoder AND project_id IN (
+          SELECT e.project_id
+          FROM event e
+          JOIN project p ON e.project_id = p.project_id 
+            AND p.project_id = $projectIdEncoder
+            AND p.project_path = $projectPathEncoder
+        )
+        """.command)
+      .arguments(status ~ project.id ~ project.path)
       .build
       .mapResult {
         case Completion.Delete(count) => count
@@ -153,19 +171,20 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
       }
   }
 
-  private def removeProjectDeliveryInfo(project: Project) = measureExecutionTime {
+  private def removeDeliveryInfo(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - delivery removal")
-      .command[projects.Id ~ projects.Id](
-        sql"""DELETE FROM event_delivery 
-              WHERE project_id = $projectIdEncoder
-                AND event_id NOT IN (
-                  SELECT e.event_id
-                  FROM event e
-                  WHERE e.project_id = $projectIdEncoder
-                    AND e.status = '#${GeneratingTriples.value}'
-                )""".command
-      )
-      .arguments(project.id ~ project.id)
+      .command[projects.Id ~ projects.Id ~ projects.Path](sql"""
+        DELETE FROM event_delivery 
+        WHERE project_id = $projectIdEncoder
+          AND event_id NOT IN (
+            SELECT e.event_id
+            FROM event e
+            JOIN project p ON e.project_id = p.project_id 
+              AND p.project_id = $projectIdEncoder
+              AND p.project_path = $projectPathEncoder
+            WHERE e.status = '#${GeneratingTriples.value}'
+          )""".command)
+      .arguments(project.id ~ project.id ~ project.path)
       .build
       .void
   }
@@ -173,25 +192,32 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
   private def removeCategorySyncTimes(project: Project) = measureExecutionTime {
     SqlStatement
       .named("project_to_new - delivery removal")
-      .command[projects.Id](sql"""
+      .command[projects.Id ~ projects.Path](sql"""
         DELETE FROM subscription_category_sync_time
-        WHERE project_id = $projectIdEncoder AND category_name = '#${minprojectinfo.categoryName.show}'
+        WHERE category_name = '#${minprojectinfo.categoryName.show}' AND project_id IN (
+          SELECT st.project_id
+          FROM subscription_category_sync_time st
+          JOIN project p ON st.project_id = p.project_id 
+            AND p.project_id = $projectIdEncoder
+            AND p.project_path = $projectPathEncoder
+        )
         """.command)
-      .arguments(project.id)
+      .arguments(project.id ~ project.path)
       .build
       .void
   }
 
   private def findLatestEventDate(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - get latest event date")
-      .select[projects.Id, EventDate](
-        sql"""SELECT event_date
-              FROM event 
-              WHERE project_id = $projectIdEncoder 
-              ORDER BY event_date DESC
-              LIMIT 1""".query(eventDateDecoder)
-      )
-      .arguments(project.id)
+      .select[projects.Id ~ projects.Path, EventDate](sql"""
+        SELECT event_date
+        FROM event e
+        JOIN project p ON e.project_id = p.project_id 
+          AND p.project_id = $projectIdEncoder
+          AND p.project_path = $projectPathEncoder
+        ORDER BY event_date DESC
+        LIMIT 1""".query(eventDateDecoder))
+      .arguments(project.id ~ project.path)
       .build(_.option)
   }
 

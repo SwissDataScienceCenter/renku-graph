@@ -21,25 +21,36 @@ package io.renku.eventlog.init
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import skunk.codec.all._
-import skunk.implicits.toStringOps
-import skunk.{Query, Session}
+import skunk.codec.all.bool
+import skunk.implicits._
+import skunk.{Command, Query, Session, Void}
 
-private trait EventTableCheck {
+private object MigratorTools {
 
-  def whenEventTableExists[F[_]: MonadCancelThrow](
+  def whenTableExists[F[_]: MonadCancelThrow](table: String)(
       eventTableExistsMessage: => Kleisli[F, Session[F], Unit],
       otherwise:               => Kleisli[F, Session[F], Unit]
-  ): Kleisli[F, Session[F], Unit] = checkTableExists flatMap {
+  ): Kleisli[F, Session[F], Unit] = checkTableExists(table) >>= {
     case true  => eventTableExistsMessage
     case false => otherwise
   }
 
-  private def checkTableExists[F[_]: MonadCancelThrow]: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[skunk.Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event')"
+  def checkTableExists[F[_]: MonadCancelThrow](table: String): Kleisli[F, Session[F], Boolean] = {
+    val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = '#$table')"
       .query(bool)
-    Kleisli[F, Session[F], Boolean] { session =>
-      session.unique(query).recover { case _ => false }
-    }
+    Kleisli(_.unique(query).recover { case _ => false })
   }
+
+  def checkColumnExists[F[_]: MonadCancelThrow](table: String, column: String): Kleisli[F, Session[F], Boolean] = {
+    val query: Query[Void, Boolean] = sql"""
+      SELECT EXISTS (
+        SELECT *
+        FROM information_schema.columns
+        WHERE table_name = '#$table' AND column_name = '#$column'
+      )""".query(bool)
+    Kleisli(_.unique(query).recover { case _ => false })
+  }
+
+  def execute[F[_]: MonadCancelThrow](sql: Command[Void]): Kleisli[F, Session[F], Unit] =
+    Kleisli(_.execute(sql).void)
 }

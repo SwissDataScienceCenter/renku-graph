@@ -37,6 +37,8 @@ private object EventDeliveryEventTypeAdder {
 private class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
     extends EventDeliveryEventTypeAdder[F] {
 
+  import MigratorTools._
+
   override def run(): F[Unit] = SessionResource[F].useK {
     checkColumnExists() >>= {
       case true  => Kleisli.liftF(Logger[F] info "'event_type_id' column adding skipped")
@@ -55,36 +57,19 @@ private class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logger: Se
     }
   }
 
-  private def addEventTypeColumn(): Kleisli[F, Session[F], Unit] =
-    for {
-      _ <-
-        execute(
-          sql"ALTER TABLE event_delivery ADD COLUMN IF NOT EXISTS event_type_id varchar".command
-        )
-      _ <-
-        execute(
-          sql"ALTER TABLE event_delivery DROP CONSTRAINT IF EXISTS event_delivery_pkey".command
-        )
-      _ <-
-        execute(
-          sql"ALTER TABLE event_delivery ALTER COLUMN event_id DROP NOT NULL".command
-        )
-      _ <-
-        execute(
-          sql"ALTER TABLE event_delivery DROP CONSTRAINT IF EXISTS event_project_id_unique".command
-        )
-      _ <-
-        execute(
-          sql"ALTER TABLE event_delivery ADD CONSTRAINT event_project_id_unique UNIQUE (event_id, project_id)".command
-        )
-      _ <-
-        execute(
-          sql"ALTER TABLE event_delivery DROP CONSTRAINT IF EXISTS project_event_type_id_unique".command
-        )
-      _ <-
-        execute(
-          sql"ALTER TABLE event_delivery ADD CONSTRAINT project_event_type_id_unique UNIQUE (project_id, event_type_id)".command
-        )
-      _ <- Kleisli.liftF(Logger[F] info "'event_type_id' column added")
-    } yield ()
+  private def addEventTypeColumn(): Kleisli[F, Session[F], Unit] = for {
+    _ <- execute(sql"ALTER TABLE event_delivery ADD COLUMN IF NOT EXISTS event_type_id varchar".command)
+    _ <- execute(sql"ALTER TABLE event_delivery DROP CONSTRAINT IF EXISTS event_delivery_pkey".command)
+    _ <- execute(sql"ALTER TABLE event_delivery ALTER COLUMN event_id DROP NOT NULL".command)
+    _ <- execute(sql"ALTER TABLE event_delivery DROP CONSTRAINT IF EXISTS event_project_id_unique".command)
+    _ <- execute(
+           sql"ALTER TABLE event_delivery ADD CONSTRAINT event_project_id_unique UNIQUE(event_id, project_id)".command
+         )
+    _ <- execute(sql"ALTER TABLE event_delivery DROP CONSTRAINT IF EXISTS project_event_type_id_unique".command)
+    _ <-
+      execute(
+        sql"ALTER TABLE event_delivery ADD CONSTRAINT project_event_type_id_unique UNIQUE(project_id, event_type_id)".command
+      )
+    _ <- Kleisli.liftF(Logger[F] info "'event_type_id' column added")
+  } yield ()
 }

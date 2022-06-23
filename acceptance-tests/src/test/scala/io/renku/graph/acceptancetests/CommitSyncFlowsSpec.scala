@@ -18,7 +18,9 @@
 
 package io.renku.graph.acceptancetests
 
+import cats.data.NonEmptyList
 import io.renku.eventlog.TypeSerializers
+import io.renku.events.CategoryName
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
@@ -29,16 +31,12 @@ import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.events.EventStatus.TriplesStore
-import io.renku.graph.model.projects.Id
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.client.AccessToken
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import skunk.Command
-import skunk.implicits._
-import cats.data.NonEmptyList
 
 class CommitSyncFlowsSpec
     extends AnyFeatureSpec
@@ -102,14 +100,7 @@ class CommitSyncFlowsSpec
       `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, missedCommitId)
 
       When("commit synchronisation process kicks-off")
-      db.EventLog.execute { session =>
-        val query: Command[Id] =
-          sql"""
-          DELETE FROM subscription_category_sync_time 
-          WHERE project_id = $projectIdEncoder AND category_name = 'COMMIT_SYNC'
-          """.command
-        session.prepare(query).use(_.execute(project.id))
-      }
+      EventLog.forceCategoryEventTriggering(CategoryName("COMMIT_SYNC"), project.id)
 
       And("commit events for the missed event are created and processed")
       `wait for events to be processed`(project.id)

@@ -22,6 +22,7 @@ import cats.data.Kleisli
 import io.circe.Json
 import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog.subscriptions.eventdelivery._
+import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
@@ -148,6 +149,9 @@ trait EventLogDataProvisioning {
   protected def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit =
     upsertProject(compoundEventId.projectId, projectPath, eventDate)
 
+  protected def upsertProject(project: consumers.Project, eventDate: EventDate): Unit =
+    upsertProject(project.id, project.path, eventDate)
+
   protected def upsertProject(projectId: projects.Id, projectPath: Path, eventDate: EventDate): Unit = execute {
     Kleisli { session =>
       val query: Command[projects.Id ~ projects.Path ~ EventDate] =
@@ -169,12 +173,11 @@ trait EventLogDataProvisioning {
         .map { payload =>
           execute[Unit] {
             Kleisli { session =>
-              val query: Command[EventId ~ projects.Id ~ ZippedEventPayload] =
-                sql"""INSERT INTO
-                    event_payload (event_id, project_id, payload)
-                    VALUES ($eventIdEncoder, $projectIdEncoder, $zippedPayloadEncoder)
-                    ON CONFLICT (event_id, project_id)
-                    DO UPDATE SET payload = excluded.payload
+              val query: Command[EventId ~ projects.Id ~ ZippedEventPayload] = sql"""
+                INSERT INTO event_payload (event_id, project_id, payload)
+                VALUES ($eventIdEncoder, $projectIdEncoder, $zippedPayloadEncoder)
+                ON CONFLICT (event_id, project_id)
+                DO UPDATE SET payload = excluded.payload
               """.command
               session
                 .prepare(query)
@@ -265,7 +268,8 @@ trait EventLogDataProvisioning {
     Kleisli { session =>
       val query: Query[Void, (projects.Id, SubscriberId, EventTypeId)] =
         sql"""SELECT project_id, delivery_id, event_type_id
-              FROM event_delivery WHERE event_id IS NULL"""
+              FROM event_delivery
+              WHERE event_id IS NULL"""
           .query(projectIdDecoder ~ subscriberIdDecoder ~ eventTypeIdDecoder)
           .map { case projectId ~ subscriberId ~ eventTypeId =>
             (projectId, subscriberId, eventTypeId)

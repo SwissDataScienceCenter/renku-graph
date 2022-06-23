@@ -16,15 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog
+package io.renku.eventlog.events.categories.projectsync
 
-import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
 import cats.syntax.all._
-import skunk._
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-package object init {
+class ProjectSyncEventSpec extends AnyWordSpec with should.Matchers {
 
-  def execute[F[_]: MonadCancelThrow](sql: Command[Void]): Kleisli[F, Session[F], Unit] =
-    Kleisli(_.execute(sql).void)
+  "show" should {
+    "return String representation of the underlying Project" in {
+      val id   = projectIds.generateOne
+      val path = projectPaths.generateOne
+
+      ProjectSyncEvent(id, path).show shouldBe show"projectId = $id, projectPath = $path"
+    }
+  }
 }

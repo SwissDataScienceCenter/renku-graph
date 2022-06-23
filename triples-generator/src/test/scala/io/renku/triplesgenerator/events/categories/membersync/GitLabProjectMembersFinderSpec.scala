@@ -168,9 +168,9 @@ class GitLabProjectMembersFinderSpec
     val path = projectPaths.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabClient = mock[GitLabClient[IO]]
-    val finder       = new GitLabProjectMembersFinderImpl[IO](gitLabClient)
+    private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    val finder = new GitLabProjectMembersFinderImpl[IO]
 
     def setGitLabClientExpectation(projectPath:              projects.Path,
                                    path:                     String,

@@ -23,7 +23,6 @@ import cats.effect.MonadCancelThrow
 import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.codec.all._
 import skunk.implicits._
 
 private trait EventPayloadSchemaVersionAdder[F[_]] extends DbMigrator[F]
@@ -34,27 +33,18 @@ private object EventPayloadSchemaVersionAdder {
 }
 
 private class EventPayloadSchemaVersionAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
-    extends EventPayloadSchemaVersionAdder[F]
-    with EventTableCheck {
+    extends EventPayloadSchemaVersionAdder[F] {
 
+  import MigratorTools._
   import cats.syntax.all._
 
   override def run(): F[Unit] = SessionResource[F].useK {
-    checkTableExists >>= {
-      case true => alterTable()
-      case false =>
-        Kleisli.liftF(
-          new Exception("Event payload table missing; alteration is not possible").raiseError[F, Unit]
-        )
-    }
-  }
-
-  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[Void, Boolean] =
-      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
-        .query(bool)
-
-    Kleisli(_.unique(query).recover { case _ => false })
+    whenTableExists("event_payload")(
+      alterTable(),
+      otherwise = Kleisli.liftF(
+        new Exception("Event payload table missing; alteration is not possible").raiseError[F, Unit]
+      )
+    )
   }
 
   private def alterTable(): Kleisli[F, Session[F], Unit] = for {

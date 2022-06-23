@@ -40,13 +40,11 @@ private trait ProjectFinder[F[_]] {
 }
 
 private object ProjectFinder {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[ProjectFinder[F]] = new ProjectFinderImpl(
-    gitLabClient
-  ).pure[F].widen[ProjectFinder[F]]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectFinder[F]] =
+    new ProjectFinderImpl[F].pure[F].widen[ProjectFinder[F]]
 }
 
-private class ProjectFinderImpl[F[_]: Async: Logger](
-    gitLabClient:     GitLabClient[F],
+private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ProjectFinder[F] {
 
@@ -68,7 +66,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
   }
 
   private def fetchProject(path: projects.Path)(implicit maybeAccessToken: Option[AccessToken]) = OptionT {
-    gitLabClient.get(uri"projects" / path.show, "single-project")(mapTo[ProjectAndCreator])
+    GitLabClient[F].get(uri"projects" / path.show, "single-project")(mapTo[ProjectAndCreator])
   }
 
   private def mapTo[OUT](implicit
@@ -118,7 +116,7 @@ private class ProjectFinderImpl[F[_]: Async: Logger](
       case None => OptionT.some[F](Option.empty[ProjectMember])
       case Some(creatorId) =>
         OptionT.liftF {
-          gitLabClient.get(uri"users" / creatorId.show, "single-user")(mapTo[ProjectMember])
+          GitLabClient[F].get(uri"users" / creatorId.show, "single-user")(mapTo[ProjectMember])
         }
     }
 

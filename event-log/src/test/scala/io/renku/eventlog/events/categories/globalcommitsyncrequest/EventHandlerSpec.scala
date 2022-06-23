@@ -47,7 +47,7 @@ class EventHandlerSpec
 
   "handle" should {
 
-    s"decode an event from the request, " +
+    "decode an event from the request, " +
       "force global commit sync " +
       s"and return $Accepted if forcing global commit sync succeeds" in new TestCase {
 

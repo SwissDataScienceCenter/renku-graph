@@ -39,22 +39,19 @@ private trait CommitAuthorFinder[F[_]] {
 }
 
 private object CommitAuthorFinder {
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[CommitAuthorFinder[F]] = new CommitAuthorFinderImpl(
-    gitLabClient
-  ).pure[F].widen
+  def apply[F[_]: Async: GitLabClient: Logger]: F[CommitAuthorFinder[F]] = new CommitAuthorFinderImpl[F].pure[F].widen
 }
 
-private class CommitAuthorFinderImpl[F[_]: Async: Logger](
-    gitLabClient:     GitLabClient[F],
+private class CommitAuthorFinderImpl[F[_]: Async: GitLabClient: Logger](
     recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends CommitAuthorFinder[F] {
 
-  import org.http4s.dsl.io.{NotFound, Ok}
+  import org.http4s.Status.{NotFound, Ok}
 
   override def findCommitAuthor(path: projects.Path, commitId: CommitId)(implicit
       maybeAccessToken:               Option[AccessToken]
   ): EitherT[F, ProcessingRecoverableError, Option[(persons.Name, persons.Email)]] = EitherT {
-    gitLabClient
+    GitLabClient[F]
       .get(uri"projects" / path.value / "repository" / "commits" / commitId.show, "single-commit")(
         mapTo[(persons.Name, persons.Email)]
       )

@@ -22,55 +22,55 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.subscriptions
+import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.EventStatus._
+import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
-import io.renku.graph.model.events.EventStatus._
-import io.renku.metrics.MetricsRegistry
 
-private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
-    eventSender: EventSender[F]
-) extends subscriptions.DispatchRecovery[F, CleanUpEvent]
+private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](eventSender: EventSender[F])
+    extends subscriptions.DispatchRecovery[F, CleanUpEvent]
     with TinyTypeEncoders {
 
   override def returnToQueue(event: CleanUpEvent, reason: SendingResult): F[Unit] =
+    sendStatusChangeEvent(newStatus = AwaitingDeletion, event)
+
+  override def recover(url: SubscriberUrl, event: CleanUpEvent): PartialFunction[Throwable, F[Unit]] = {
+    case NonFatal(exception) =>
+      sendStatusChangeEvent(newStatus = AwaitingDeletion, event) >>
+        Logger[F].error(exception)(show"$categoryName: $event, url = $url -> $AwaitingDeletion")
+  }
+
+  private def sendStatusChangeEvent(newStatus: EventStatus, event: CleanUpEvent) =
     eventSender.sendEvent(
-      sendEventPayload(event),
+      event.toStatusChangeEvent(newStatus),
       EventSender.EventContext(
         CategoryName("EVENTS_STATUS_CHANGE"),
-        s"${SubscriptionCategory.name}: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
+        show"$categoryName: Marking events for project: ${event.project.path} as $AwaitingDeletion failed"
       )
     )
 
-  override def recover(
-      url:   SubscriberUrl,
-      event: CleanUpEvent
-  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    val errorMessage = s"${SubscriptionCategory.name}: $event, url = $url -> $AwaitingDeletion"
-    eventSender.sendEvent(sendEventPayload(event),
-                          EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"), errorMessage)
-    ) >> Logger[F].error(exception)(errorMessage)
-  }
+  private implicit class CleanUpEventOps(event: CleanUpEvent) {
 
-  private def sendEventPayload(event: CleanUpEvent) =
-    EventRequestContent.NoPayload(
+    def toStatusChangeEvent(newStatus: EventStatus) = EventRequestContent.NoPayload(
       json"""{
         "categoryName": "EVENTS_STATUS_CHANGE",
         "project": {
           "id":   ${event.project.id},
           "path": ${event.project.path}
         },
-        "newStatus": $AwaitingDeletion
+        "newStatus": $newStatus
      }"""
     )
-
+  }
 }
 
 private object DispatchRecovery {

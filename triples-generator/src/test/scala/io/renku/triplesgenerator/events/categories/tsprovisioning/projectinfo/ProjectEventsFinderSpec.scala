@@ -154,15 +154,14 @@ class ProjectEventsFinderSpec
     val member  = projectMembersNoEmail.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabClient = mock[GitLabClient[IO]]
-    val finder       = new ProjectEventsFinderImpl[IO](gitLabClient)
+    private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    val finder = new ProjectEventsFinderImpl[IO]
 
-    val mapResponse =
-      captureMapping(finder, gitLabClient)(
-        _.find(Project(projectIds.generateOne, projectPaths.generateOne), nonNegativeInts().generateOne),
-        Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
-      )
+    val mapResponse = captureMapping(finder, gitLabClient)(
+      _.find(Project(projectIds.generateOne, projectPaths.generateOne), nonNegativeInts().generateOne),
+      Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
+    )
   }
 
   private implicit lazy val pushEventEncoder: Encoder[GitLabPushEvent] = Encoder.instance { event =>

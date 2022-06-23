@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests.stubs
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -46,10 +47,9 @@ import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.server.security.model.AuthUser
+import io.renku.jsonld.JsonLD
 
 import java.time.Instant
-import io.renku.jsonld.JsonLD
-import cats.data.NonEmptyList
 
 trait GitLab {
   self: GraphServices =>
@@ -482,6 +482,8 @@ trait GitLab {
   }
 
   private def stubFor(mappingBuilder: MappingBuilder): StubMapping = instance.register(mappingBuilder)
+
+  def resetGitLab(): Unit = server.resetAll()
 }
 
 private object GitLabWiremockInstance {
@@ -491,7 +493,7 @@ private object GitLabWiremockInstance {
 
   val instance = WireMock.create().http().host("localhost").port(port.value).build()
 
-  private val server = {
+  val server = {
     val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port.value))
     newServer.start()
     WireMock.configureFor(newServer.port())

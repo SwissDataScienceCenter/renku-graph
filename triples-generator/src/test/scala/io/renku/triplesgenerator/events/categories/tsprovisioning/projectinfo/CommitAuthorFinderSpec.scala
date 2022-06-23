@@ -150,16 +150,14 @@ class CommitAuthorFinderSpec
     val projectPath = projectPaths.generateOne
     val commitId    = commitIds.generateOne
 
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabClient = mock[GitLabClient[IO]]
-    val finder       = new CommitAuthorFinderImpl[IO](gitLabClient)
+    private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    val finder = new CommitAuthorFinderImpl[IO]
 
-    val mapResponse =
-      captureMapping(finder, gitLabClient)(
-        _.findCommitAuthor(projectPaths.generateOne, commitIds.generateOne),
-        Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
-      )
-
+    val mapResponse = captureMapping(finder, gitLabClient)(
+      _.findCommitAuthor(projectPaths.generateOne, commitIds.generateOne),
+      Gen.const(EitherT(IO(Option.empty[(persons.Name, persons.Email)].asRight[ProcessingRecoverableError])))
+    )
   }
 
   private implicit lazy val authorEncoder: Encoder[(persons.Name, persons.Email)] = Encoder.instance {

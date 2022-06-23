@@ -36,12 +36,10 @@ private[tsprovisioning] trait ProjectInfoFinder[F[_]] {
 }
 
 private[tsprovisioning] object ProjectInfoFinder {
-  def apply[F[_]: Async: NonEmptyParallel: Parallel: Logger](
-      gitLabClient: GitLabClient[F]
-  ): F[ProjectInfoFinder[F]] = for {
-    projectFinder     <- ProjectFinder[F](gitLabClient)
-    membersFinder     <- ProjectMembersFinder[F](gitLabClient)
-    memberEmailFinder <- MemberEmailFinder[F](gitLabClient)
+  def apply[F[_]: Async: NonEmptyParallel: Parallel: GitLabClient: Logger]: F[ProjectInfoFinder[F]] = for {
+    projectFinder     <- ProjectFinder[F]
+    membersFinder     <- ProjectMembersFinder[F]
+    memberEmailFinder <- MemberEmailFinder[F]
   } yield new ProjectInfoFinderImpl(projectFinder, membersFinder, memberEmailFinder)
 }
 

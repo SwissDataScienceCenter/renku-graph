@@ -62,7 +62,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         logger.loggedOnly(
           Info(
-            s"${handler.categoryName}: ${commitEvent.compoundEventId}, projectPath = ${commitEvent.project.path} -> $Accepted"
+            show"$categoryName: ${commitEvent.compoundEventId}, projectPath = ${commitEvent.project.path} -> $Accepted"
           )
         )
       }
@@ -106,7 +106,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
       logger.loggedOnly(
         Info(
-          s"${handler.categoryName}: ${commitEvent.compoundEventId}, projectPath = ${commitEvent.project.path} -> $Accepted"
+          show"$categoryName: ${commitEvent.compoundEventId}, projectPath = ${commitEvent.project.path} -> $Accepted"
         )
       )
     }
