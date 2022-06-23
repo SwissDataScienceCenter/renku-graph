@@ -36,9 +36,9 @@ trait CleanUpEventsProvisioning {
   protected def insertCleanUpEvent(projectId: projects.Id, projectPath: projects.Path, date: OffsetDateTime): Unit =
     execute {
       Kleisli { session =>
-        val query: Command[OffsetDateTime ~ projects.Id ~ projects.Path] =
-          sql"""INSERT INTO clean_up_events_queue (date, project_id, project_path)
-              VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)""".command
+        val query: Command[OffsetDateTime ~ projects.Id ~ projects.Path] = sql"""
+          INSERT INTO clean_up_events_queue (date, project_id, project_path)
+          VALUES ($timestamptz, $projectIdEncoder, $projectPathEncoder)""".command
         session
           .prepare(query)
           .use(_.execute(date ~ projectId ~ projectPath))
@@ -49,9 +49,9 @@ trait CleanUpEventsProvisioning {
   protected def findCleanUpEvents: List[(projects.Id, projects.Path)] = execute {
     Kleisli { session =>
       val query: Query[Void, projects.Id ~ projects.Path] = sql"""
-            SELECT project_id, project_path
-            FROM clean_up_events_queue
-            ORDER BY date DESC"""
+        SELECT project_id, project_path
+        FROM clean_up_events_queue
+        ORDER BY date DESC"""
         .query(projectIdDecoder ~ projectPathDecoder)
       session.prepare(query).use(_.stream(Void, 32).compile.toList)
     }

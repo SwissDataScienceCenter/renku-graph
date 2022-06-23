@@ -21,7 +21,6 @@ package projectsync
 
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.eventlog.events.categories.globalcommitsyncrequest
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
@@ -52,18 +51,21 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
     "fetches relevant project info from GitLab and " +
       "if GitLab returns a different path " +
       "project info in the project table is changed " +
-      "and a GLOBAL_COMMIT_SYNC_REQUEST event with the updated project info " +
+      "and a COMMIT_SYNC_REQUEST event with the updated project info " +
       "and a CLEAN_UP_REQUEST event with the old project info " +
       "are sent" in new TestCase {
 
         val newPath = projectPaths.generateOne
-        givenGitLabProject(by = event.projectId, returning = newPath.some.asRight.pure[Try])
 
-        givenProjectChangeInDB(event.projectId, newPath, returning = ().pure[Try])
+        inSequence {
+          givenGitLabProject(by = event.projectId, returning = newPath.some.asRight.pure[Try])
 
-        givenSending(globalCommitSyncRequestEvent(event.projectId, newPath), returning = ().pure[Try])
+          givenProjectRemovedFromDB(event.projectId, returning = ().pure[Try])
 
-        givenSending(cleanUpRequestEvent(event), returning = ().pure[Try])
+          givenSending(cleanUpRequestEvent(event), returning = ().pure[Try])
+
+          givenSending(commitSyncRequestEvent(event.projectId, newPath), returning = ().pure[Try])
+        }
 
         synchronizer.syncProjectInfo(event) shouldBe ().pure[Try]
       }
@@ -102,18 +104,18 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
 
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
     val gitLabProjectFetcher = mock[GitLabProjectFetcher[Try]]
-    val dbUpdater            = mock[DBUpdater[Try]]
+    val projectRemover       = mock[ProjectRemover[Try]]
     val eventSender          = mock[EventSender[Try]]
-    val synchronizer         = new ProjectInfoSynchronizerImpl[Try](gitLabProjectFetcher, dbUpdater, eventSender)
+    val synchronizer         = new ProjectInfoSynchronizerImpl[Try](gitLabProjectFetcher, projectRemover, eventSender)
 
     def givenGitLabProject(by: projects.Id, returning: Try[Either[UnauthorizedException, Option[projects.Path]]]) =
       (gitLabProjectFetcher.fetchGitLabProject _)
         .expects(by)
         .returning(returning)
 
-    def givenProjectChangeInDB(id: projects.Id, newPath: projects.Path, returning: Try[Unit]) =
-      (dbUpdater.update _)
-        .expects(id, newPath)
+    def givenProjectRemovedFromDB(id: projects.Id, returning: Try[Unit]) =
+      (projectRemover.removeProject _)
+        .expects(id)
         .returning(returning)
 
     def givenSending(categoryAndRequest: (CategoryName, EventRequestContent.NoPayload), returning: Try[Unit]) =
@@ -126,10 +128,10 @@ class ProjectInfoSynchronizerSpec extends AnyWordSpec with MockFactory with shou
         .returning(returning)
   }
 
-  private def globalCommitSyncRequestEvent(id:   projects.Id,
-                                           path: projects.Path
+  private def commitSyncRequestEvent(id:   projects.Id,
+                                     path: projects.Path
   ): (CategoryName, EventRequestContent.NoPayload) = {
-    val category = globalcommitsyncrequest.categoryName
+    val category = commitsyncrequest.categoryName
     val payload = json"""{
       "categoryName": ${category.show},
       "project": {

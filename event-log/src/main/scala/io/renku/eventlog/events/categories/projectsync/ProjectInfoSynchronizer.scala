@@ -37,20 +37,21 @@ private trait ProjectInfoSynchronizer[F[_]] {
 
 private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
     gitLabProjectFetcher: GitLabProjectFetcher[F],
-    dbUpdater:            DBUpdater[F],
+    projectRemover:       ProjectRemover[F],
     eventSender:          EventSender[F]
 ) extends ProjectInfoSynchronizer[F] {
 
   import eventSender._
   import gitLabProjectFetcher._
   import io.circe.literal._
+  import projectRemover._
 
   override def syncProjectInfo(event: ProjectSyncEvent): F[Unit] = fetchGitLabProject(event.projectId) >>= {
     case Right(Some(event.projectPath)) => ().pure[F]
     case Right(Some(newPath)) =>
-      dbUpdater.update(event.projectId, newPath) >>
-        send(globalCommitSyncRequest(event.projectId, newPath)) >>
-        send(cleanUpRequest(event))
+      removeProject(event.projectId) >>
+        send(cleanUpRequest(event)) >>
+        send(commitSyncRequest(event.projectId, newPath))
     case Right(None)     => send(cleanUpRequest(event))
     case Left(exception) => Logger[F].info(show"$categoryName: $event failed: $exception")
   }
@@ -59,8 +60,8 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
     case (payload, eventCtx) => sendEvent(payload, eventCtx)
   }
 
-  private def globalCommitSyncRequest(projectId: projects.Id, newPath: projects.Path) = {
-    val category = globalcommitsyncrequest.categoryName
+  private def commitSyncRequest(projectId: projects.Id, newPath: projects.Path) = {
+    val category = commitsyncrequest.categoryName
     val payload = EventRequestContent.NoPayload(json"""{
       "categoryName": ${category.show},
       "project": {
@@ -89,10 +90,9 @@ private class ProjectInfoSynchronizerImpl[F[_]: MonadThrow: Logger](
 private object ProjectInfoSynchronizer {
   def apply[F[_]: Async: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry](
       queriesExecTimes: LabeledHistogram[F]
-  ): F[ProjectInfoSynchronizer[F]] =
-    for {
-      gitLabProjectFetcher <- GitLabProjectFetcher[F]
-      dbUpdater            <- DBUpdater[F](queriesExecTimes)
-      eventSender          <- EventSender[F]
-    } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, dbUpdater, eventSender)
+  ): F[ProjectInfoSynchronizer[F]] = for {
+    gitLabProjectFetcher <- GitLabProjectFetcher[F]
+    projectRemover       <- ProjectRemover[F](queriesExecTimes)
+    eventSender          <- EventSender[F]
+  } yield new ProjectInfoSynchronizerImpl(gitLabProjectFetcher, projectRemover, eventSender)
 }

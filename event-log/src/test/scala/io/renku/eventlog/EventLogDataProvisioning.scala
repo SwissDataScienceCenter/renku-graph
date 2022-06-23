@@ -173,12 +173,11 @@ trait EventLogDataProvisioning {
         .map { payload =>
           execute[Unit] {
             Kleisli { session =>
-              val query: Command[EventId ~ projects.Id ~ ZippedEventPayload] =
-                sql"""INSERT INTO
-                    event_payload (event_id, project_id, payload)
-                    VALUES ($eventIdEncoder, $projectIdEncoder, $zippedPayloadEncoder)
-                    ON CONFLICT (event_id, project_id)
-                    DO UPDATE SET payload = excluded.payload
+              val query: Command[EventId ~ projects.Id ~ ZippedEventPayload] = sql"""
+                INSERT INTO event_payload (event_id, project_id, payload)
+                VALUES ($eventIdEncoder, $projectIdEncoder, $zippedPayloadEncoder)
+                ON CONFLICT (event_id, project_id)
+                DO UPDATE SET payload = excluded.payload
               """.command
               session
                 .prepare(query)
@@ -269,7 +268,8 @@ trait EventLogDataProvisioning {
     Kleisli { session =>
       val query: Query[Void, (projects.Id, SubscriberId, EventTypeId)] =
         sql"""SELECT project_id, delivery_id, event_type_id
-              FROM event_delivery WHERE event_id IS NULL"""
+              FROM event_delivery
+              WHERE event_id IS NULL"""
           .query(projectIdDecoder ~ subscriberIdDecoder ~ eventTypeIdDecoder)
           .map { case projectId ~ subscriberId ~ eventTypeId =>
             (projectId, subscriberId, eventTypeId)
