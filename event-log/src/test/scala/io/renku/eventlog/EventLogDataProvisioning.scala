@@ -22,6 +22,7 @@ import cats.data.Kleisli
 import io.circe.Json
 import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog.subscriptions.eventdelivery._
+import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
@@ -147,6 +148,9 @@ trait EventLogDataProvisioning {
 
   protected def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit =
     upsertProject(compoundEventId.projectId, projectPath, eventDate)
+
+  protected def upsertProject(project: consumers.Project, eventDate: EventDate): Unit =
+    upsertProject(project.id, project.path, eventDate)
 
   protected def upsertProject(projectId: projects.Id, projectPath: Path, eventDate: EventDate): Unit = execute {
     Kleisli { session =>

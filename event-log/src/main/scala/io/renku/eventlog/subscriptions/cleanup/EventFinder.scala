@@ -62,9 +62,8 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger](
     SqlStatement
       .named(s"${categoryName.show.toLowerCase} - find event in queue")
       .select[Void, Project](sql"""
-        SELECT prj.project_id, prj.project_path
+        SELECT queue.project_id, queue.project_path
         FROM clean_up_events_queue queue
-        JOIN project prj ON prj.project_path = queue.project_path 
         ORDER BY queue.date ASC
         LIMIT 1
         """.query(projectDecoder))

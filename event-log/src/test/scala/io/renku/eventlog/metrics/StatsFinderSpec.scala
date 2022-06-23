@@ -29,7 +29,7 @@ import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, positiveInts, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventsGenerators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects.{Id, Path}
@@ -38,7 +38,7 @@ import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.{Duration, Instant}
+import java.time.{Duration, Instant, OffsetDateTime}
 
 class StatsFinderSpec
     extends AnyWordSpec
@@ -240,7 +240,7 @@ class StatsFinderSpec
 
       val eventsCount = positiveInts(max = 20).generateOne.value
       1 to eventsCount foreach { _ =>
-        insertCleanUpEvent(projectPaths.generateOne)
+        insertCleanUpEvent(projectIds.generateOne, projectPaths.generateOne, OffsetDateTime.now())
       }
 
       stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(
