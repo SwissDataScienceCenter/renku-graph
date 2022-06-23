@@ -25,7 +25,8 @@ import io.renku.events.EventRequestContent
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
@@ -35,15 +36,30 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  "tryHandling" should {
+  "handle" should {
 
-    "decode an event from the request, pass it to the queue and return Accepted" in new TestCase {
-      (eventsQueue.offer _).expects(projectPath).returning(().pure[IO])
+    "decode an event containing project id and path from the request, " +
+      "kick-off passing the event to the queue " +
+      "and return Accepted" in new TestCase {
+        val projectId = projectIds.generateOne
+        val event     = CleanUpRequestEvent(projectId, projectPath)
+        (processor.process _).expects(event).returning(().pure[IO])
 
-      handler.tryHandling(event).unsafeRunSync() shouldBe Accepted
+        handler.tryHandling(eventRequest(projectId, projectPath)).unsafeRunSync() shouldBe Accepted
 
-      logger.loggedOnly(Info(show"$categoryName: projectPath = $projectPath -> $Accepted"))
-    }
+        logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
+      }
+
+    "decode an event containing project path only from the request, " +
+      "kick-off passing the event to the queue " +
+      "and return Accepted" in new TestCase {
+        val event = CleanUpRequestEvent(projectPath)
+        (processor.process _).expects(event).returning(().pure[IO])
+
+        handler.tryHandling(eventRequest(projectPath)).unsafeRunSync() shouldBe Accepted
+
+        logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
+      }
 
     "fail with BadRequest for malformed event" in new TestCase {
 
@@ -54,14 +70,16 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       logger.expectNoLogs()
     }
 
-    "log an error if offering the event to the queue fails" in new TestCase {
+    "log an error if processing the event fails" in new TestCase {
+      val projectId = projectIds.generateOne
+      val event     = CleanUpRequestEvent(projectId, projectPath)
 
       val exception = exceptions.generateOne
-      (eventsQueue.offer _).expects(projectPath).returning(exception.raiseError[IO, Unit])
+      (processor.process _).expects(event).returning(exception.raiseError[IO, Unit])
 
-      handler.tryHandling(event).unsafeRunSync() shouldBe SchedulingError(exception)
+      handler.tryHandling(eventRequest(projectId, projectPath)).unsafeRunSync() shouldBe SchedulingError(exception)
 
-      logger.loggedOnly(Error(show"$categoryName: projectPath = $projectPath -> SchedulingError", exception))
+      logger.loggedOnly(Error(show"$categoryName: $event -> SchedulingError", exception))
     }
   }
 
@@ -69,13 +87,21 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     val projectPath = projectPaths.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val eventsQueue = mock[CleanUpEventsQueue[IO]]
-    val handler     = new EventHandler[IO](eventsQueue)
+    val processor = mock[EventProcessor[IO]]
+    val handler   = new EventHandler[IO](processor)
 
-    lazy val event = EventRequestContent.NoPayload(json"""{
+    def eventRequest(projectId: projects.Id, projectPath: projects.Path) = EventRequestContent.NoPayload(json"""{
       "categoryName": "CLEAN_UP_REQUEST",
       "project": {
-        "path": ${projectPath.value}
+        "id":   ${projectId.value},
+        "path": ${projectPath.show}
+      }
+    }""")
+
+    def eventRequest(projectPath: projects.Path) = EventRequestContent.NoPayload(json"""{
+      "categoryName": "CLEAN_UP_REQUEST",
+      "project": {
+        "path": ${projectPath.show}
       }
     }""")
   }

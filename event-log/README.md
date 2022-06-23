@@ -369,7 +369,9 @@ Allowed values for the `newStatus` property are: `DONE`, `NON_RECOVERABLE_FAILUR
 
 - **CLEAN_UP_REQUEST**
 
-Kicks off clean-up of the data in the Triples Store.
+Enqueues a `CLEAN_UP` event for the project with the given `id` and `path`. The `CLEAN_UP` event performs re-provisioning process for a project in the Triples Store.
+
+**NOTICE**: When a `CLEAN_UP_REQUEST` event without project `id` is sent, there's an attempt to find the `id` based on the given `path`. If there's no project with the given `path`, no `CLEAN_UP` event will be created. 
 
 **Multipart Request**
 
@@ -379,7 +381,7 @@ Kicks off clean-up of the data in the Triples Store.
 {
   "categoryName": "CLEAN_UP_REQUEST",
   "project": {
-    "id":   123,
+    "id":   123  // optional,
     "path": "namespace/project-name"
   }
 }

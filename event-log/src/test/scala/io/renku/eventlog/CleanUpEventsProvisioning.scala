@@ -43,13 +43,13 @@ trait CleanUpEventsProvisioning {
     }
   }
 
-  protected def findCleanUpEvents: List[projects.Path] = execute {
+  protected def findCleanUpEvents: List[(projects.Id, projects.Path)] = execute {
     Kleisli { session =>
-      val query: Query[Void, projects.Path] = sql"""
-            SELECT project_path
+      val query: Query[Void, projects.Id ~ projects.Path] = sql"""
+            SELECT project_id, project_path
             FROM clean_up_events_queue
             ORDER BY date DESC"""
-        .query(projectPathDecoder)
+        .query(projectIdDecoder ~ projectPathDecoder)
       session.prepare(query).use(_.stream(Void, 32).compile.toList)
     }
   }

@@ -34,6 +34,7 @@ trait InMemoryEventLogDbSpec
     with InMemoryEventLogDb
     with EventLogDataProvisioning
     with EventDataFetching {
+
   self: TestSuite with IOSpec =>
 
   protected def initDb(): Unit = allMigrations.map(_.run()).sequence.void.unsafeRunSync()
