@@ -69,14 +69,14 @@ private class CommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource](quer
   }
 
   private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
-    SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project"))
+    SqlStatement
+      .named(s"${categoryName.value.toLowerCase} - insert project")
       .command[projects.Id ~ projects.Path ~ EventDate](sql"""
-          INSERT INTO
-          project (project_id, project_path, latest_event_date)
-          VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
-          ON CONFLICT (project_id)
-          DO NOTHING
-      """.command)
+        INSERT INTO project (project_id, project_path, latest_event_date)
+        VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
+        ON CONFLICT (project_id)
+        DO NOTHING
+        """.command)
       .arguments(projectId ~ projectPath ~ EventDate(Instant.EPOCH))
       .build
   }

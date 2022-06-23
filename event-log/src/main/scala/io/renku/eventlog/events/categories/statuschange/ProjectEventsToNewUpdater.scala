@@ -94,22 +94,21 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
 
   private def updateStatuses(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - status update")
-      .select[ExecutionDate ~ projects.Id, EventStatus](
-        sql"""UPDATE event evt
-              SET status = '#${New.value}',
-                  execution_date = $executionDateEncoder,
-                  message = NULL
-              FROM (
-                SELECT event_id, project_id, status 
-                FROM event
-                WHERE project_id = $projectIdEncoder 
-                  AND #${`status IN`(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))}
-                FOR UPDATE
-              ) old_evt
-              WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
-              RETURNING old_evt.status
-           """.query(eventStatusDecoder)
-      )
+      .select[ExecutionDate ~ projects.Id, EventStatus](sql"""
+        UPDATE event evt
+        SET status = '#${New.value}',
+            execution_date = $executionDateEncoder,
+            message = NULL
+        FROM (
+          SELECT event_id, project_id, status 
+          FROM event
+          WHERE project_id = $projectIdEncoder 
+            AND #${`status IN`(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))}
+          FOR UPDATE
+        ) old_evt
+        WHERE evt.event_id = old_evt.event_id AND evt.project_id = old_evt.project_id 
+        RETURNING old_evt.status
+        """.query(eventStatusDecoder))
       .arguments(ExecutionDate(now()) ~ project.id)
       .build(_.toList)
   }
@@ -186,13 +185,12 @@ private class ProjectEventsToNewUpdaterImpl[F[_]: Async: Logger](
 
   private def findLatestEventDate(project: Project) = measureExecutionTime {
     SqlStatement(name = "project_to_new - get latest event date")
-      .select[projects.Id, EventDate](
-        sql"""SELECT event_date
-              FROM event 
-              WHERE project_id = $projectIdEncoder 
-              ORDER BY event_date DESC
-              LIMIT 1""".query(eventDateDecoder)
-      )
+      .select[projects.Id, EventDate](sql"""
+        SELECT event_date
+        FROM event 
+        WHERE project_id = $projectIdEncoder 
+        ORDER BY event_date DESC
+        LIMIT 1""".query(eventDateDecoder))
       .arguments(project.id)
       .build(_.option)
   }
