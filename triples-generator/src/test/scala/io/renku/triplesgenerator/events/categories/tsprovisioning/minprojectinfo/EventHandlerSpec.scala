@@ -28,6 +28,7 @@ import io.renku.events
 import io.renku.events.EventRequestContent
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.consumers.EventSchedulingResult._
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
@@ -78,8 +79,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
+    val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     val eventProcessor             = mock[EventProcessor[IO]]
-    val handler                    = new EventHandler[IO](categoryName, concurrentProcessesLimiter, eventProcessor)
+    val handler = new EventHandler[IO](categoryName, concurrentProcessesLimiter, subscriptionMechanism, eventProcessor)
+
+    (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
 
     def toRequestContent(event: Json): EventRequestContent = events.EventRequestContent.NoPayload(event)
   }

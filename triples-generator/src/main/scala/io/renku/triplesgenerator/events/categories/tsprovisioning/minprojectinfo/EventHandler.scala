@@ -19,10 +19,11 @@
 package io.renku.triplesgenerator.events.categories.tsprovisioning.minprojectinfo
 
 import cats.data.EitherT.fromEither
-import cats.effect.{Async, Concurrent, Spawn}
+import cats.effect.{Async, Concurrent, Deferred, Spawn}
 import cats.syntax.all._
 import cats.{NonEmptyParallel, Parallel}
 import io.renku.events.consumers.EventSchedulingResult.Accepted
+import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -34,18 +35,22 @@ import org.typelevel.log4cats.Logger
 private[events] class EventHandler[F[_]: Concurrent: Logger](
     override val categoryName:  CategoryName,
     concurrentProcessesLimiter: ConcurrentProcessesLimiter[F],
+    subscriptionMechanism:      SubscriptionMechanism[F],
     eventProcessor:             EventProcessor[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
 
   import eventProcessor._
 
   override def createHandlingProcess(request: EventRequestContent) =
-    EventHandlingProcess[F](startProcessingEvent(request))
+    EventHandlingProcess.withWaitingForCompletion[F](
+      startProcessingEvent(request, _),
+      releaseProcess = subscriptionMechanism.renewSubscription()
+    )
 
-  private def startProcessingEvent(request: EventRequestContent) = for {
+  private def startProcessingEvent(request: EventRequestContent, processing: Deferred[F, Unit]) = for {
     project <- fromEither(request.event.getProject)
     result <- Spawn[F]
-                .start(process(MinProjectInfoEvent(project)))
+                .start(process(MinProjectInfoEvent(project)) >> processing.complete(()))
                 .toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(project))
@@ -54,13 +59,20 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private[events] object EventHandler {
-  import eu.timepit.refined.auto._
+  import com.typesafe.config.{Config, ConfigFactory}
+  import eu.timepit.refined.api.Refined
+  import eu.timepit.refined.numeric.Positive
+  import eu.timepit.refined.pureconfig._
+  import io.renku.config.ConfigLoader.find
 
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: MetricsRegistry: Logger: SparqlQueryTimeRecorder]
-      : F[EventHandler[F]] = for {
-    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(processesCount = 2)
+  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: MetricsRegistry: Logger: SparqlQueryTimeRecorder](
+      subscriptionMechanism: SubscriptionMechanism[F],
+      config:                Config = ConfigFactory.load()
+  ): F[EventHandler[F]] = for {
+    maxConcurrentProcesses     <- find[F, Int Refined Positive]("add-min-project-info-max-concurrent-processes", config)
+    concurrentProcessesLimiter <- ConcurrentProcessesLimiter(maxConcurrentProcesses)
     eventProcessor             <- EventProcessor[F]
-  } yield new EventHandler[F](categoryName, concurrentProcessesLimiter, eventProcessor)
+  } yield new EventHandler[F](categoryName, concurrentProcessesLimiter, subscriptionMechanism, eventProcessor)
 }
