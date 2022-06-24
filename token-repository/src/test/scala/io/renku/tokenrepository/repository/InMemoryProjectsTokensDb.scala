@@ -37,7 +37,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
   override val container: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:11.11-alpine"),
+    dockerImageNameOverride = DockerImageName.parse("postgres:12.8-alpine"),
     databaseName = "projects_tokens",
     username = dbConfig.user.value,
     password = dbConfig.pass.value
