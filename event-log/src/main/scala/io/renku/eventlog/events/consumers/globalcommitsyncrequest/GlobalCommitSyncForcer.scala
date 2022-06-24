@@ -25,7 +25,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, globalcommitsync}
+import io.renku.eventlog.events.producers.{SubscriptionTypeSerializers, globalcommitsync}
 import io.renku.eventlog.{EventDate, TypeSerializers}
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
@@ -60,10 +60,10 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource
   private def scheduleGlobalSync(projectId: projects.Id) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - move last_synced"))
       .command[LastSyncedDate ~ projects.Id](sql"""
-            UPDATE subscription_category_sync_time
-            SET last_synced = $lastSyncedDateEncoder
-            WHERE project_id = $projectIdEncoder AND category_name = '#${globalcommitsync.categoryName.show}'
-          """.command)
+        UPDATE subscription_category_sync_time
+        SET last_synced = $lastSyncedDateEncoder
+        WHERE project_id = $projectIdEncoder AND category_name = '#${globalcommitsync.categoryName.show}'
+        """.command)
       .arguments(LastSyncedDate(now().minus(syncFrequency).plus(delayOnRequest)), projectId)
       .build
       .mapResult {
@@ -75,11 +75,11 @@ private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource
   private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
     SqlStatement(name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project"))
       .command[projects.Id ~ projects.Path ~ EventDate](sql"""
-          INSERT INTO project (project_id, project_path, latest_event_date)
-          VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
-          ON CONFLICT (project_id)
-          DO NOTHING
-      """.command)
+        INSERT INTO project (project_id, project_path, latest_event_date)
+        VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
+        ON CONFLICT (project_id)
+        DO NOTHING
+        """.command)
       .arguments(projectId ~ projectPath ~ EventDate(Instant.EPOCH))
       .build
       .void

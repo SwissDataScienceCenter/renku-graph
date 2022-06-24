@@ -25,9 +25,9 @@ import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
+import io.renku.eventlog.events.producers.SubscriptionsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
-import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
 import io.renku.generators.CommonGraphGenerators.{httpStatuses, pages, perPages, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}

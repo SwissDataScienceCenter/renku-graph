@@ -29,7 +29,7 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.events.producers._
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.events.{EventStatus, LastSyncedDate}

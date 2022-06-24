@@ -28,9 +28,9 @@ import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue
+import io.renku.eventlog.events.producers.EventProducersRegistry
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
-import io.renku.eventlog.subscriptions._
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.model.projects

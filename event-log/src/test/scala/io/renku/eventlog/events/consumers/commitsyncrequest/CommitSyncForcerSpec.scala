@@ -18,10 +18,9 @@
 
 package io.renku.eventlog.events.consumers.commitsyncrequest
 
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventDates
-import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.events.producers._
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._

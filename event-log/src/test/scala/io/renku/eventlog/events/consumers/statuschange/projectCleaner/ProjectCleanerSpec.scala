@@ -23,7 +23,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventDates
-import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
+import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
 import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames

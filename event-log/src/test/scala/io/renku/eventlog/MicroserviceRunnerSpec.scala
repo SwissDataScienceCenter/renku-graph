@@ -23,9 +23,9 @@ import cats.syntax.all._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue
+import io.renku.eventlog.events.producers.EventProducersRegistry
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.EventLogMetrics
-import io.renku.eventlog.subscriptions.EventProducersRegistry
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

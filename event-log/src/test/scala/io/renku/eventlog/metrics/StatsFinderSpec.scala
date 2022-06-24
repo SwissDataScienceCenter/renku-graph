@@ -24,7 +24,7 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.events.producers._
 import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, positiveInts, timestamps, timestampsNotInTheFuture}

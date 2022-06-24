@@ -27,7 +27,7 @@ import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.projectCleaner.ProjectCleaner
-import io.renku.eventlog.subscriptions.{SubscriptionDataProvisioning, minprojectinfo}
+import io.renku.eventlog.events.producers.{SubscriptionDataProvisioning, minprojectinfo}
 import io.renku.events.CategoryName
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects

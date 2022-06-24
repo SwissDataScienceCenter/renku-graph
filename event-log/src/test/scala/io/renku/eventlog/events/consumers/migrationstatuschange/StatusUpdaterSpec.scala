@@ -25,7 +25,7 @@ import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigrationGenerators.changeDates
 import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event.{ToDone, ToNonRecoverableFailure, ToRecoverableFailure}
-import io.renku.eventlog.subscriptions.tsmigrationrequest.TsMigrationTableProvisioning
+import io.renku.eventlog.events.producers.tsmigrationrequest.TsMigrationTableProvisioning
 import io.renku.events.consumers.subscriptions.subscriberUrls
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
