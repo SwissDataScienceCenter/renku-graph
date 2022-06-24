@@ -51,7 +51,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
               decodeList(entities.ParameterValue.decoder(activity.association.plan))
             )
 
-          parameterValues           shouldBe activity.parameters
+          parameterValues shouldBe activity.parameters
           parameterValues.foreach(_ shouldBe a[entities.ParameterValue.CommandParameterValue])
       }
     }
@@ -72,7 +72,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
             decodeList(entities.ParameterValue.decoder(activity.association.plan))
           )
 
-        parameterValues           shouldBe activity.parameters
+        parameterValues shouldBe activity.parameters
         parameterValues.foreach(_ shouldBe a[entities.ParameterValue.CommandInputValue])
       }
     }
@@ -92,7 +92,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
             decodeList(entities.ParameterValue.decoder(activity.association.plan))
           )
 
-        parameterValues           shouldBe activity.parameters
+        parameterValues shouldBe activity.parameters
         parameterValues.foreach(_ shouldBe a[entities.ParameterValue.CommandOutputValue])
       }
     }

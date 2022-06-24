@@ -32,6 +32,7 @@ import io.renku.json.JsonOps.JsonExt
 import org.http4s._
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.headers.`Content-Type`
+import org.http4s.multipart.{Multipart, Multiparts, Part}
 import org.http4s.server.AuthMiddleware
 
 object EndpointTester {
@@ -105,5 +106,16 @@ object EndpointTester {
 
   def givenAuthFailing(): AuthMiddleware[IO, Option[AuthUser]] = AuthMiddleware {
     Kleisli(_ => OptionT.none)
+  }
+
+  implicit class RequestOps(request: Request[IO]) {
+
+    def addParts(parts: Part[IO]*): IO[Request[IO]] =
+      createMultiparts(parts: _*)
+        .map(mltParts => request.withEntity(mltParts).withHeaders(mltParts.headers))
+
+    private def createMultiparts(parts: Part[IO]*): IO[Multipart[IO]] = Multiparts
+      .forSync[IO]
+      .flatMap(_.multipart(Vector(parts: _*)))
   }
 }

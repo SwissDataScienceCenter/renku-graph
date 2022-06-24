@@ -19,7 +19,7 @@
 organization := "io.renku"
 name := "tiny-types"
 
-libraryDependencies += "eu.timepit" %% "refined" % "0.9.27"
+libraryDependencies += "eu.timepit" %% "refined" % "0.9.29"
 
 val circeVersion = "0.14.1"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
@@ -30,10 +30,10 @@ libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
 libraryDependencies += "io.renku" %% "jsonld4s" % "0.1.34"
 
-val catsVersion = "2.6.1"
+val catsVersion = "2.8.0"
 libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free" % catsVersion
 
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.10"  % Test
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.12"  % Test
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test

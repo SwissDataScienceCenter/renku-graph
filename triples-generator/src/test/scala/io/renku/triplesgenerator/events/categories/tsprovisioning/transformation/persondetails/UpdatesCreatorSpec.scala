@@ -121,11 +121,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
       findPersons.toIdAndPropertyPairs shouldBe Set(
         (person.resourceId.value -> person.name.value).some,
-        person.maybeEmail.map(person.resourceId.value       -> _.value),
+        person.maybeEmail.map(person.resourceId.value -> _.value),
         person.maybeAffiliation.map(person.resourceId.value -> _.value),
         (person.resourceId.value          -> person.gitLabId.value.toString).some,
         (duplicatePerson.resourceId.value -> duplicatePerson.name.value).some,
-        duplicatePerson.maybeEmail.map(duplicatePerson.resourceId.value       -> _.value),
+        duplicatePerson.maybeEmail.map(duplicatePerson.resourceId.value -> _.value),
         duplicatePerson.maybeAffiliation.map(duplicatePerson.resourceId.value -> _.value),
         (duplicatePerson.resourceId.value -> duplicatePerson.gitLabId.value.toString).some
       ).flatten

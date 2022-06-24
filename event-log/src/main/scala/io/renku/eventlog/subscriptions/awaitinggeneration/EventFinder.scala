@@ -70,17 +70,17 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
   }
 
   private def findEventAndUpdateForProcessing = for {
-    maybeProject <- selectCandidateProject()
+    maybeProject <- selectCandidateProject
     maybeIdAndProjectAndBody <- maybeProject
                                   .map(findLatestEvent)
                                   .getOrElse(Kleisli.pure(Option.empty[AwaitingGenerationEvent]))
     maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
 
-  private def selectCandidateProject() =
-    (findProjectsWithEventsInQueue, findTotalOccupancy) parMapN { case (potentialProjects, totalOccupancy) =>
-      ((prioritise _).tupled >>> selectProject)(potentialProjects, totalOccupancy)
-    }
+  private def selectCandidateProject = for {
+    projects       <- findProjectsWithEventsInQueue
+    totalOccupancy <- findTotalOccupancy
+  } yield ((prioritise _).tupled >>> selectProject)(projects, totalOccupancy)
 
   private def findProjectsWithEventsInQueue = measureExecutionTime {
     SqlStatement
@@ -129,10 +129,10 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
   private def findTotalOccupancy = measureExecutionTime {
     SqlStatement
       .named(s"${SubscriptionCategory.categoryName.value.toLowerCase} - find total occupancy")
-      .select[EventStatus, Long](
-        sql"""SELECT count(event_id) FROM event WHERE status = $eventStatusEncoder""".query(int8)
+      .select[Void, Long](
+        sql"""SELECT COUNT(event_id) FROM event WHERE status = '#${GeneratingTriples.value}'""".query(int8)
       )
-      .arguments(GeneratingTriples)
+      .arguments(Void)
       .build[Id](_.unique)
   }
 

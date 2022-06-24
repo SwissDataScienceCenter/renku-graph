@@ -168,7 +168,7 @@ class MemberEmailFinderSpec
         }
 
         def setExpectationForMiddlePages =
-          step to (totalPages - 1, step) foreach { page => //gets every every value from 100, 200, 300 up to 2990
+          step to (totalPages - 1, step) foreach { page => // gets every every value from 100, 200, 300 up to 2990
             val nextPageEvents  = pushEvents.generateNonEmptyList(minElements = 20, maxElements = 20).toList
             val nextPageResults = wrapResult(nextPageEvents, PagingInfo((page + 1).some, maybeTotalPages))
             (projectEventsFinder

@@ -34,8 +34,8 @@ class MicroserviceIdentifierSpec extends AnyWordSpec with should.Matchers {
 
       id     shouldBe a[MicroserviceIdentifier]
       id.value should fullyMatch regex s"${now.getYear}${addPadding(now.getMonthValue)}${addPadding(
-        now.getDayOfMonth
-      )}${addPadding(now.getHour)}${addPadding(now.getMinute)}${addPadding(now.getSecond)}\\-\\d{4}"
+          now.getDayOfMonth
+        )}${addPadding(now.getHour)}${addPadding(now.getMinute)}${addPadding(now.getSecond)}\\-\\d{4}"
     }
   }
 

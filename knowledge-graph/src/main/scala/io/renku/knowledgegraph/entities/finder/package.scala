@@ -78,8 +78,8 @@ package object finder {
         case creators if creators.isEmpty => ""
         case creators =>
           s"""FILTER (IF (BOUND($variableName), ${creators
-            .map(c => s"CONTAINS(LCASE($variableName), ${c.toLowerCase.asSparqlEncodedLiteral})")
-            .mkString(" || ")} , false))"""
+              .map(c => s"CONTAINS(LCASE($variableName), ${c.toLowerCase.asSparqlEncodedLiteral})")
+              .mkString(" || ")} , false))"""
       }
 
     def maybeOnVisibility(variableName: String): String =

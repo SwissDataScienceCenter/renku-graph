@@ -147,18 +147,18 @@ class EventHandlerSpec
       val request = requestContent {
         event.asJson deepMerge json"""{
           "status": ${Gen
-          .oneOf(
-            New,
-            TriplesGenerated,
-            TriplesStore,
-            Skipped,
-            GenerationRecoverableFailure,
-            GenerationNonRecoverableFailure,
-            TransformationRecoverableFailure,
-            TransformationNonRecoverableFailure
-          )
-          .generateOne
-          .value}}"""
+            .oneOf(
+              New,
+              TriplesGenerated,
+              TriplesStore,
+              Skipped,
+              GenerationRecoverableFailure,
+              GenerationNonRecoverableFailure,
+              TransformationRecoverableFailure,
+              TransformationNonRecoverableFailure
+            )
+            .generateOne
+            .value}}"""
       }
 
       handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(BadRequest)

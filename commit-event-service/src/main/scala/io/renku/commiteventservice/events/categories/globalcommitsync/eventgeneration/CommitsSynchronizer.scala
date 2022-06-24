@@ -84,7 +84,7 @@ private[globalcommitsync] class CommitsSynchronizerImpl[F[
   private def outOfSync(event: GlobalCommitSyncEvent): Option[ProjectCommitStats] => Boolean = {
     case Some(commitStats) =>
       event.commits.count != commitStats.commitsCount ||
-        !(commitStats.maybeLatestCommit contains event.commits.latest)
+      !(commitStats.maybeLatestCommit contains event.commits.latest)
     case _ => true
   }
 
