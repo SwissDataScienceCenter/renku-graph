@@ -36,9 +36,9 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
-import io.renku.triplesgenerator.events.categories._
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
-import io.renku.triplesgenerator.events.categories.tsprovisioning.{minprojectinfo, triplesgenerated}
+import io.renku.triplesgenerator.events.consumers._
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import org.typelevel.log4cats.Logger
 
