@@ -51,6 +51,7 @@ private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
   private val applicative = Applicative[F]
   import SendingResult._
   import applicative.whenA
+  import categoryEventEncoder._
   import cats.syntax.all._
   import org.http4s.Method.POST
   import org.http4s.Status._
@@ -58,9 +59,10 @@ private class EventsSenderImpl[F[_]: Async: Logger, CategoryEvent](
 
   override def sendEvent(subscriberUrl: SubscriberUrl, event: CategoryEvent): F[SendingResult] = {
     for {
-      uri    <- validateUri(subscriberUrl.value)
-      result <- send(request(POST, uri).withParts(categoryEventEncoder.encodeParts(event)))(mapResponse)
-      _      <- whenA(result == Delivered)(sentEventsGauge increment categoryName)
+      uri     <- validateUri(subscriberUrl.value)
+      request <- request(POST, uri).withParts(encodeParts(event))
+      result  <- send(request)(mapResponse)
+      _       <- whenA(result == Delivered)(sentEventsGauge increment categoryName)
     } yield result
   } recoverWith exceptionToSendingResult(subscriberUrl, event)
 

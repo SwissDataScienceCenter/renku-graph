@@ -426,14 +426,12 @@ class RestClientSpec
                               zippedPart: (String, ByteArrayTinyType with ZippedContent)
     ): IO[Int] = for {
       uri <- validateUri(s"$hostUrl/resource")
-      response <-
-        send(
-          request(POST, uri).withMultipartBuilder
-            .addPart(jsonPart._1, jsonPart._2)
-            .addPart(textPart._1, textPart._2)
-            .addPart(zippedPart._1, zippedPart._2)
-            .build()
-        )(mapResponseToInt)
+      request <- request(POST, uri).withMultipartBuilder
+                   .addPart(jsonPart._1, jsonPart._2)
+                   .addPart(textPart._1, textPart._2)
+                   .addPart(zippedPart._1, zippedPart._2)
+                   .build()
+      response <- send(request)(mapResponseToInt)
     } yield response
   }
 }

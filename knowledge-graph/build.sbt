@@ -18,7 +18,7 @@
 
 name := "knowledge-graph"
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.6"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.11"
 
-libraryDependencies += "org.sangria-graphql" %% "sangria"       % "2.1.3"
+libraryDependencies += "org.sangria-graphql" %% "sangria"       % "3.0.0"
 libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2"

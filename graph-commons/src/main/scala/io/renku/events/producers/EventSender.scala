@@ -66,8 +66,8 @@ class EventSenderImpl[F[_]: Async: Logger](
   import applicative.whenA
 
   override def sendEvent(eventContent: EventRequestContent.NoPayload, context: EventContext): F[Unit] = for {
-    uri <- validateUri(s"$eventLogUrl/events")
-    request = createRequest(uri, eventContent)
+    uri            <- validateUri(s"$eventLogUrl/events")
+    request        <- createRequest(uri, eventContent)
     responseStatus <- sendWithRetry(request, context)
     _              <- whenA(responseStatus == Accepted)(sentEventsGauge.increment(context.categoryName))
   } yield ()
@@ -75,8 +75,8 @@ class EventSenderImpl[F[_]: Async: Logger](
   override def sendEvent[PayloadType](eventContent: EventRequestContent.WithPayload[PayloadType],
                                       context:      EventContext
   )(implicit partEncoder:                           RestClient.PartEncoder[PayloadType]): F[Unit] = for {
-    uri <- validateUri(s"$eventLogUrl/events")
-    request = createRequest(uri, eventContent)
+    uri            <- validateUri(s"$eventLogUrl/events")
+    request        <- createRequest(uri, eventContent)
     responseStatus <- sendWithRetry(request, context)
     _              <- whenA(responseStatus == Accepted)(sentEventsGauge.increment(context.categoryName))
   } yield ()
