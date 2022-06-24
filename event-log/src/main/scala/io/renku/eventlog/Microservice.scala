@@ -27,7 +27,7 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
-import io.renku.eventlog.events.categories.statuschange.StatusChangeEventsQueue
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.subscriptions._
@@ -84,8 +84,8 @@ object Microservice extends IOMicroservice {
                                          MetricsConfigProvider()
                                        )
               creationSubscription <-
-                events.categories.creation.SubscriptionFactory(awaitingGenerationGauge, queriesExecTimes)
-              zombieEventsSubscription <- events.categories.zombieevents.SubscriptionFactory(
+                events.consumers.creation.SubscriptionFactory(awaitingGenerationGauge, queriesExecTimes)
+              zombieEventsSubscription <- events.consumers.zombieevents.SubscriptionFactory(
                                             awaitingGenerationGauge,
                                             underTriplesGenerationGauge,
                                             awaitingTransformationGauge,
@@ -94,8 +94,8 @@ object Microservice extends IOMicroservice {
                                             deletingGauge,
                                             queriesExecTimes
                                           )
-              commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(queriesExecTimes)
-              statusChangeEventSubscription <- events.categories.statuschange.SubscriptionFactory(
+              commitSyncRequestSubscription <- events.consumers.commitsyncrequest.SubscriptionFactory(queriesExecTimes)
+              statusChangeEventSubscription <- events.consumers.statuschange.SubscriptionFactory(
                                                  eventsQueue,
                                                  awaitingGenerationGauge,
                                                  underTriplesGenerationGauge,
@@ -106,10 +106,10 @@ object Microservice extends IOMicroservice {
                                                  queriesExecTimes
                                                )
               globalCommitSyncRequestSubscription <-
-                events.categories.globalcommitsyncrequest.SubscriptionFactory(queriesExecTimes)
-              projectSyncSubscription    <- events.categories.projectsync.SubscriptionFactory(queriesExecTimes)
-              cleanUpRequestSubscription <- events.categories.cleanuprequest.SubscriptionFactory(queriesExecTimes)
-              migrationStatusChange <- events.categories.migrationstatuschange.SubscriptionFactory[IO](queriesExecTimes)
+                events.consumers.globalcommitsyncrequest.SubscriptionFactory(queriesExecTimes)
+              projectSyncSubscription    <- events.consumers.projectsync.SubscriptionFactory(queriesExecTimes)
+              cleanUpRequestSubscription <- events.consumers.cleanuprequest.SubscriptionFactory(queriesExecTimes)
+              migrationStatusChange <- events.consumers.migrationstatuschange.SubscriptionFactory[IO](queriesExecTimes)
               eventConsumersRegistry <- consumers.EventConsumersRegistry(
                                           creationSubscription,
                                           zombieEventsSubscription,
