@@ -24,7 +24,6 @@ import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.codec.all._
 import skunk.implicits._
 
 private trait EventDeliveryEventTypeAdder[F[_]] extends DbMigrator[F]
@@ -40,20 +39,9 @@ private class EventDeliveryEventTypeAdderImpl[F[_]: MonadCancelThrow: Logger: Se
   import MigratorTools._
 
   override def run(): F[Unit] = SessionResource[F].useK {
-    checkColumnExists() >>= {
+    checkColumnExists("event_delivery", "event_type_id") >>= {
       case true  => Kleisli.liftF(Logger[F] info "'event_type_id' column adding skipped")
       case false => addEventTypeColumn()
-    }
-  }
-
-  private def checkColumnExists(): Kleisli[F, Session[F], Boolean] = {
-    val query: Query[Void, String] =
-      sql"""SELECT column_name FROM information_schema.columns WHERE table_name = 'event_delivery'""".query(varchar)
-
-    Kleisli {
-      _.execute(query)
-        .map(_.exists(_ == "event_type_id"))
-        .recover(_ => false)
     }
   }
 
