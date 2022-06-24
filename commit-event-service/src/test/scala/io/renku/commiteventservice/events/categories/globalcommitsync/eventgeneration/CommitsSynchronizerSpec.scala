@@ -270,10 +270,11 @@ class CommitsSynchronizerSpec
         if (pageResults.isEmpty) Page.first
         else pageResults.reverse.tail.headOption.flatMap(_.maybeNextPage).getOrElse(Page(pageResults.size))
 
-      if (pageResults.isEmpty)(gitLabCommitFetcher
-        .fetchGitLabCommits(_: projects.Id, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
-        .expects(projectId, condition, pageRequest(Page.first), maybeAccessToken)
-        .returning(PageResult.empty.pure[IO])
+      if (pageResults.isEmpty)
+        (gitLabCommitFetcher
+          .fetchGitLabCommits(_: projects.Id, _: DateCondition, _: PagingRequest)(_: Option[AccessToken]))
+          .expects(projectId, condition, pageRequest(Page.first), maybeAccessToken)
+          .returning(PageResult.empty.pure[IO])
       else
         pageResults foreach { pageResult =>
           val previousPage = pageResult.maybeNextPage.map(p => Page(p.value - 1)).getOrElse(lastPage)
@@ -326,8 +327,8 @@ class CommitsSynchronizerSpec
                          maybeElapsedTime: Option[ElapsedTime] = None
   ) = Info(
     s"$categoryName: projectId = ${project.id}, projectPath = ${project.path} -> events generation result: ${summary.show}${maybeElapsedTime
-      .map(t => s" in ${t}ms")
-      .getOrElse("")}"
+        .map(t => s" in ${t}ms")
+        .getOrElse("")}"
   )
 
   private implicit class PageOps(commits: List[CommitId]) {

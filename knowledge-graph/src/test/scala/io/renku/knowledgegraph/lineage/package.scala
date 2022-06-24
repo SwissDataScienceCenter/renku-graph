@@ -32,11 +32,11 @@ package object lineage {
     lazy val toEdgesMap =
       processRunNodes.foldLeft(Map.empty[ExecutionInfo, (Set[Node.Location], Set[Node.Location])]) {
         case (planWithLocation, node) =>
-          planWithLocation + (
-            ExecutionInfo(EntityId.of(node.location.toString), Instant.now()) -> (
+          planWithLocation + {
+            ExecutionInfo(EntityId.of(node.location.toString), Instant.now()) -> {
               lineage.collectSources(of = node) -> lineage.collectTargets(of = node)
-            )
-          )
+            }
+          }
       }
 
     def collectSources(of: Node): Set[Node.Location] =

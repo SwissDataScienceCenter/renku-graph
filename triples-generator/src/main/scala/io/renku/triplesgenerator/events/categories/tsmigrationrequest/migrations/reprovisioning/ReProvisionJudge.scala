@@ -65,7 +65,7 @@ private class ReProvisionJudgeImpl[F[_]: MonadThrow: Logger](renkuVersionPairFin
     case None => true
     case Some(tsVersionPair) =>
       `is TS schema version different from latest`(tsVersionPair.schemaVersion) ||
-        `are latest schema versions same but CLI versions different`(tsVersionPair.cliVersion)
+      `are latest schema versions same but CLI versions different`(tsVersionPair.cliVersion)
   }
 
   private lazy val `is TS schema version different from latest`: SchemaVersion => Boolean =

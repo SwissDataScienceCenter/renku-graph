@@ -111,8 +111,8 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
       intercept[Exception] {
         elCommitFetcher.fetchELCommits(projectPath, dateCondition, pageRequest).unsafeRunSync()
       }.getMessage shouldBe s"GET $eventLogUrl/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(
-        dateCondition.date.toString
-      )} returned ${Status.BadRequest}; body: some error"
+          dateCondition.date.toString
+        )} returned ${Status.BadRequest}; body: some error"
     }
 
     "return an Exception if remote client responds with unexpected body" in new TestCase {
@@ -129,8 +129,8 @@ class ELCommitFetcherSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
         elCommitFetcher.fetchELCommits(projectPath, dateCondition, pageRequest).unsafeRunSync()
       }.getMessage should startWith(
         s"GET $eventLogUrl/events?project-path=$projectPath&page=${pageRequest.page}&per_page=${pageRequest.perPage}&until=${urlEncode(
-          dateCondition.date.toString
-        )} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+            dateCondition.date.toString
+          )} returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
       )
     }
   }

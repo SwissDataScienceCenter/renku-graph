@@ -102,7 +102,9 @@ private class EventFinderImpl[F[_]: Async: SessionResource](
               (SELECT COUNT(event_id) FROM event 
                 WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)}) AS count,
               (SELECT event_id FROM event 
-                WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(deletionStatus)} ORDER BY event_date DESC LIMIT 1) AS latest
+                WHERE project_id = $projectIdEncoder AND #${`status NOT IN`(
+              deletionStatus
+            )} ORDER BY event_date DESC LIMIT 1) AS latest
             """.query(int8 ~ commitIdDecoder.opt))
           .arguments(project.id ~ project.id)
           .build[Id](_.unique)

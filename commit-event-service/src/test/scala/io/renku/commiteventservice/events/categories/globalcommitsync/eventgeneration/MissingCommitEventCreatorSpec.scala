@@ -67,7 +67,7 @@ class MissingCommitEventCreatorSpec extends AnyWordSpec with should.Matchers wit
 
       givenStoringCommitSucceedsWithCreated(event.project, commitInfos.tail)
 
-      (commitToEventLog.storeCommitInEventLog _) //skip head
+      (commitToEventLog.storeCommitInEventLog _) // skip head
         .expects(event.project, commitInfos.head, batchDate)
         .returning(Success(Skipped))
 
