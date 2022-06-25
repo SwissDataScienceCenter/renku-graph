@@ -35,7 +35,7 @@ import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._

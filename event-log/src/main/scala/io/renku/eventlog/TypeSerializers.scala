@@ -19,7 +19,7 @@
 package io.renku.eventlog
 
 import cats.syntax.all._
-import io.renku.eventlog.subscriptions.eventdelivery._
+import io.renku.eventlog.events.producers.eventdelivery._
 import io.renku.events.consumers.Project
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import io.renku.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}

@@ -48,8 +48,8 @@ object Microservice extends IOMicroservice {
             for {
               certificateLoader        <- CertificateLoader[IO]
               sentryInitializer        <- SentryInitializer[IO]
-              commitSyncCategory       <- events.categories.commitsync.SubscriptionFactory[IO]
-              globalCommitSyncCategory <- events.categories.globalcommitsync.SubscriptionFactory[IO]
+              commitSyncCategory       <- events.consumers.commitsync.SubscriptionFactory[IO]
+              globalCommitSyncCategory <- events.consumers.globalcommitsync.SubscriptionFactory[IO]
               eventConsumersRegistry   <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
               serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
               microserviceRoutes       <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
