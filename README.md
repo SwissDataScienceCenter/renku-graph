@@ -4,14 +4,17 @@
 
 #### Repository structure
 
-- `helm-chart` helm chart, published using chartpress
+- `helm-chart` helm charts for publishing with chartpress
+- `generators` a set of common use scalacheck generators
+- `tiny-types` a module containing tooling for Tiny Types
 - `graph-commons` common classes for all the services
+- `renku-model` defines both production and testing Renku metadata model
+- `webhook-service` a microservice managing GitLab hooks and incoming external events
+- `event-log` a microservice responsible for events management
+- `commit-event-service` a microservice synchronizing commit events between KG and GitLab
+- `triples-generator` a microservice generating, transforming and taking care of data in the Triples Store
+- `token-repository` a microservice managing projects' Access Tokens
 - `acceptance-tests` acceptance tests for the services
-- `webhook-service` a microservice managing Graph Services hooks and external events
-- `commit-event-service` a microservice synchronizing commit events
-- `event-log` a microservice providing CRUD operations on the Event Log
-- `triples-generator` a microservice translating Event Log events to RDF triples in an RDF store
-- `token-repository` a microservice managing Access Tokens for projects
 
 #### Running the tests
 
@@ -25,6 +28,36 @@ If such error is raised, try setting the variable with the following:
 ```bash
 export SBT_OPTS="-Xmx2G -Xss5M"
 ```
+
+#### Development
+
+###### Coding molds
+
+Renk Graph was built with code readability and maintainability as a value. We believe that high coding standards can:
+* reduce time needed for adding new features;
+* reduce number of bugs;
+* lower cognitive load for developers;
+* make the work with the code more fun ;)
+
+Hence, we are trying to find and then follow good patterns in naming, code organization on a method, class, package and module level. The following list has a work-in-progress style is it supposed to be in constant improvement.
+* `camelCase` notation is used everywhere in Scala code;
+* the lower scope of a variable, method, class, package, the shorter, less descriptive name can be;
+* readability has always a higher value than succinctness;
+* `class`es should rather have noun names;
+* `class`es names should rather not be comprised of more than three words;
+* `def`s should be verbs;
+* `def`s should rather be very short (let's keep it an exception for a `def` having more than 10 lines);
+* `class`es should rather be short;
+* `class`es and `def`s should be having single purpose;
+* nesting `if`s or any other structures should not exceed three levels; preferable one level of nesting should be used;
+* great attention should be paid to the scopes on all levels and as a rule it's preferable that the visibility is kept as low as possible;
+* variables should rather be defined the closest possible the usage; we don't follow the old way of top-variables-definition-block as it's hard to see the aim of a variable;
+* ADTs (Abstract Data Types) are used everywhere to make compiler preventing accidental mixing up different domain values; only in very exceptional cases that can be lifted;
+* `implicit`s and Context Bound should/may be used extensively but wisely;
+* `show` String Interpolator should be the first choice over the `s` and `toString`; 
+* obviously the rules above can be always lifted if favour of readability;
+* code should be formatted with the rules defined in the `.scalafmt.conf` file;
+* once code readability issue is found, it should be either fix straight away or an issue should be created.
 
 #### Releasing
 
