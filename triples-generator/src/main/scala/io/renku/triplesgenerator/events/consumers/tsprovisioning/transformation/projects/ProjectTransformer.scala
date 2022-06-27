@@ -24,8 +24,10 @@ import cats.data.EitherT
 import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.graph.model.entities.Project
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries.preDataQueriesOnly
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{Queries, Transformation}
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{RecoverableErrorsRecovery, TransformationStep}
 import org.typelevel.log4cats.Logger
@@ -37,8 +39,10 @@ private[transformation] trait ProjectTransformer[F[_]] {
 private class ProjectTransformerImpl[F[_]: MonadThrow](
     kgProjectFinder:           KGProjectFinder[F],
     updatesCreator:            UpdatesCreator,
+    dateCreatedUpdater:        DateCreatedUpdater,
     recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
 ) extends ProjectTransformer[F] {
+  import dateCreatedUpdater._
   import recoverableErrorsRecovery._
   import updatesCreator._
 
@@ -50,17 +54,24 @@ private class ProjectTransformerImpl[F[_]: MonadThrow](
       kgProjectFinder
         .find(project.resourceId)
         .map {
-          case None => (project, Queries.empty).asRight[ProcessingRecoverableError]
-          case Some(kgData) =>
-            (project, Queries.preDataQueriesOnly(prepareUpdates(project, kgData)))
-              .asRight[ProcessingRecoverableError]
+          case None         => (project, Queries.empty).asRight[ProcessingRecoverableError]
+          case Some(kgData) => transform(project, kgData).asRight[ProcessingRecoverableError]
         }
         .recoverWith(maybeRecoverableError("Problem finding project details in KG"))
     }
+
+  private def transform(project: Project, kgData: ProjectMutableData): (Project, Queries) = (
+    updateDateCreated(kgData) >>> addOtherUpdates(kgData)
+  )(project, Queries.empty)
+
+  private def addOtherUpdates(kgData: ProjectMutableData): ((Project, Queries)) => (Project, Queries) = {
+    case (project, queries) =>
+      (project, queries |+| preDataQueriesOnly(prepareUpdates(project, kgData)))
+  }
 }
 
 private[transformation] object ProjectTransformer {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectTransformer[F]] = for {
     kgProjectFinder <- KGProjectFinder[F]
-  } yield new ProjectTransformerImpl[F](kgProjectFinder, UpdatesCreator)
+  } yield new ProjectTransformerImpl[F](kgProjectFinder, UpdatesCreator, DateCreatedUpdater())
 }

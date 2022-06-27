@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.projects
+package io.renku.triplesgenerator.events.consumers.tsprovisioning
+package transformation.projects
 
+import TransformationStep.Queries
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
@@ -27,12 +29,12 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.Generators.recoverableClientErrors
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries.preDataQueriesOnly
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import transformation.Generators.{queriesGen, recoverableClientErrors}
 
 import scala.util.{Success, Try}
 
@@ -41,23 +43,28 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
   "createTransformationStep" should {
 
     "create preDataUploadQueries when project is in KG" in new TestCase {
-      val kgProjectInfo = projectMutableDataGen.generateOne
 
+      val kgProjectData = projectMutableDataGen.generateOne
       (kgProjectFinder.find _)
         .expects(project.resourceId)
-        .returning(kgProjectInfo.some.pure[Try])
+        .returning(kgProjectData.some.pure[Try])
 
-      val queries = sparqlQueries.generateList()
+      val step1Result @ (step1UpdatedProject, step1Queries) = generateProjAndQueries
+      (dateCreatedUpdater
+        .updateDateCreated(_: ProjectMutableData))
+        .expects(kgProjectData)
+        .returning(transformation(in = project -> Queries.empty, out = step1Result))
 
+      val otherQueries = sparqlQueries.generateList()
       (updatesCreator.prepareUpdates _)
-        .expects(project, kgProjectInfo)
-        .returning(queries)
+        .expects(step1UpdatedProject, kgProjectData)
+        .returning(otherQueries)
 
       val step = transformer.createTransformationStep
 
       step.name.value shouldBe "Project Details Updates"
       val Success(Right(updateResult)) = (step run project).value
-      updateResult shouldBe (project, Queries(queries, Nil))
+      updateResult shouldBe (step1UpdatedProject, step1Queries |+| preDataQueriesOnly(otherQueries))
     }
 
     "do nothing if no project found in KG" in new TestCase {
@@ -100,9 +107,17 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
   private trait TestCase {
 
-    val kgProjectFinder = mock[KGProjectFinder[Try]]
-    val updatesCreator  = mock[UpdatesCreator]
-    val transformer     = new ProjectTransformerImpl[Try](kgProjectFinder, updatesCreator)
+    def transformation(in:  (entities.Project, Queries),
+                       out: (entities.Project, Queries)
+    ): ((entities.Project, Queries)) => (entities.Project, Queries) = {
+      case `in` => out
+      case _    => fail("Project or Queries different than expected")
+    }
+
+    val kgProjectFinder    = mock[KGProjectFinder[Try]]
+    val updatesCreator     = mock[UpdatesCreator]
+    val dateCreatedUpdater = mock[DateCreatedUpdater]
+    val transformer        = new ProjectTransformerImpl[Try](kgProjectFinder, updatesCreator, dateCreatedUpdater)
 
     val project = renkuProjectEntitiesWithDatasetsAndActivities.generateOne.to[entities.Project]
   }
@@ -125,4 +140,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
                              maybeAgent,
                              maybeCreatorId
   )
+
+  private def generateProjAndQueries =
+    projectEntities(anyVisibility).generateOne.to[entities.Project] -> queriesGen.generateOne
 }
