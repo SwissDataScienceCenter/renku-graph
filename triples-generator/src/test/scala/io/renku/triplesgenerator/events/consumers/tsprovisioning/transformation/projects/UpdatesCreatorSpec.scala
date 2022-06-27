@@ -59,18 +59,6 @@ class UpdatesCreatorSpec
       findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeName = None))
     }
 
-    "generate queries which delete the project dateCreated when changed" in {
-      val project = anyProjectEntities.generateOne.to[entities.Project]
-
-      loadToStore(project)
-
-      prepareUpdates(project,
-                     toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateOne)
-      ).runAll.unsafeRunSync()
-
-      findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeDateCreated = None))
-    }
-
     val projectWithParentScenarios = Table(
       "project" -> "type",
       renkuProjectWithParentEntities(anyVisibility).generateOne.to[entities.RenkuProject.WithParent] ->
@@ -202,6 +190,21 @@ class UpdatesCreatorSpec
       prepareUpdates(project, toProjectMutableData(project)).runAll.unsafeRunSync()
 
       findProjects shouldBe Set(CurrentProjectState.from(project))
+    }
+  }
+
+  "dateCreatedDeletion" should {
+
+    "generate queries which delete the project dateCreated when changed" in {
+      val project = anyProjectEntities.generateOne.to[entities.Project]
+
+      loadToStore(project)
+
+      dateCreatedDeletion(project,
+                          toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateOne)
+      ).runAll.unsafeRunSync()
+
+      findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeDateCreated = None))
     }
   }
 

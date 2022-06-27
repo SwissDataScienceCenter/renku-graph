@@ -27,14 +27,14 @@ import io.renku.rdfstore.SparqlQuery
 import io.renku.rdfstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
-  def prepareUpdates(project: Project, kgData: ProjectMutableData): List[SparqlQuery]
+  def prepareUpdates(project:      Project, kgData: ProjectMutableData): List[SparqlQuery]
+  def dateCreatedDeletion(project: Project, kgData: ProjectMutableData): List[SparqlQuery]
 }
 
 private object UpdatesCreator extends UpdatesCreator {
 
   override def prepareUpdates(project: Project, kgData: ProjectMutableData): List[SparqlQuery] = List(
     nameDeletion(project, kgData),
-    dateCreatedDeletion(project, kgData),
     maybeParentDeletion(project, kgData),
     visibilityDeletion(project, kgData),
     descriptionDeletion(project, kgData),
@@ -51,18 +51,6 @@ private object UpdatesCreator extends UpdatesCreator {
         Prefixes.of(schema -> "schema"),
         s"""|DELETE { $resource schema:name ?name }
             |WHERE  { $resource schema:name ?name }
-            |""".stripMargin
-      )
-    }
-
-  private def dateCreatedDeletion(project: Project, kgData: ProjectMutableData) =
-    Option.when(project.dateCreated != kgData.dateCreated) {
-      val resource = project.resourceId.showAs[RdfResource]
-      SparqlQuery.of(
-        name = "transformation - project dateCreated delete",
-        Prefixes.of(schema -> "schema"),
-        s"""|DELETE { $resource schema:dateCreated ?date }
-            |WHERE  { $resource schema:dateCreated ?date }
             |""".stripMargin
       )
     }
@@ -168,4 +156,18 @@ private object UpdatesCreator extends UpdatesCreator {
             |""".stripMargin
       )
     }
+
+  override def dateCreatedDeletion(project: Project, kgData: ProjectMutableData) =
+    Option
+      .when(project.dateCreated != kgData.dateCreated) {
+        val resource = project.resourceId.showAs[RdfResource]
+        SparqlQuery.of(
+          name = "transformation - project dateCreated delete",
+          Prefixes.of(schema -> "schema"),
+          s"""|DELETE { $resource schema:dateCreated ?date }
+              |WHERE  { $resource schema:dateCreated ?date }
+              |""".stripMargin
+        )
+      }
+      .toList
 }
