@@ -18,6 +18,7 @@
 
 package io.renku.http.client
 
+import cats.Show
 import org.http4s.Status
 
 sealed trait RestClientError extends Exception
@@ -42,6 +43,8 @@ object RestClientError {
       extends Exception(message, cause)
       with RestClientError
 
-  final case object UnauthorizedException extends RuntimeException("Unauthorized") with RestClientError
+  final case object UnauthorizedException extends RuntimeException("Unauthorized") with RestClientError {
+    implicit val exceptionShow: Show[UnauthorizedException] = Show.show(_.getMessage)
+  }
   type UnauthorizedException = UnauthorizedException.type
 }

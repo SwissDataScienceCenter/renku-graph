@@ -47,17 +47,18 @@ class EventDeliveryEventTypeAdderSpec
 
       verifyColumnExists("event_delivery", "event_type_id") shouldBe true
 
+      logger.reset()
+
       eventTypeAdder.run().unsafeRunSync() shouldBe ()
 
-      logger.loggedOnly(Info("'event_type_id' column added"), Info("'event_type_id' column adding skipped"))
-
+      logger.loggedOnly(Info("'event_type_id' column adding skipped"))
     }
 
     "add the 'event_type_id' column if does not exist and create the indices and unique keys" in new TestCase {
 
       verifyColumnExists("event_delivery", "event_type_id") shouldBe false
 
-      eventTypeAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      eventTypeAdder.run().unsafeRunSync() shouldBe ()
 
       verifyColumnExists("event_delivery", "event_type_id") shouldBe true
 
@@ -69,7 +70,6 @@ class EventDeliveryEventTypeAdderSpec
         logger.loggedOnly(Info("'event_type_id' column added"))
       }
     }
-
   }
 
   private trait TestCase {

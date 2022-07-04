@@ -34,14 +34,14 @@ private object EventPayloadTableCreator {
 }
 
 private class EventPayloadTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
-    extends EventPayloadTableCreator[F]
-    with EventTableCheck {
+    extends EventPayloadTableCreator[F] {
 
+  import MigratorTools._
   import cats.syntax.all._
 
   override def run(): F[Unit] = SessionResource[F].useK {
-    whenEventTableExists(
-      checkTableExists flatMap {
+    whenTableExists("event")(
+      checkTableExists >>= {
         case true  => Kleisli.liftF(Logger[F] info "'event_payload' table exists")
         case false => createTable()
       },

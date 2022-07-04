@@ -46,7 +46,6 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
 
   private val applicative = Applicative[F]
 
-  import AccessTokenFinder._
   import HookValidator.HookValidationResult._
   import HookValidator._
   import Token._

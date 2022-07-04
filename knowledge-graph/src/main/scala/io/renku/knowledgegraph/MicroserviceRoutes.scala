@@ -27,6 +27,7 @@ import cats.syntax.all._
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.persons
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
@@ -250,32 +251,34 @@ private object MicroserviceRoutes {
       logger:             Logger[IO],
       metricsRegistry:    MetricsRegistry[IO],
       sparqlTimeRecorder: SparqlQueryTimeRecorder[IO]
-  ): IO[MicroserviceRoutes[IO]] = GitLabClient[IO]() flatMap { implicit gitLabClient =>
-    for {
-      datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO]
-      datasetEndpoint         <- DatasetEndpoint[IO]
-      entitiesEndpoint        <- entities.Endpoint[IO]
-      queryEndpoint           <- QueryEndpoint()
-      lineageEndpoint         <- lineage.Endpoint[IO]
-      projectEndpoint         <- ProjectEndpoint[IO]
-      projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
-      authenticator           <- GitLabAuthenticator[IO]
-      authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-      projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
-      datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
-      versionRoutes           <- version.Routes[IO]
-    } yield new MicroserviceRoutes(datasetsSearchEndpoint,
-                                   datasetEndpoint,
-                                   entitiesEndpoint,
-                                   queryEndpoint,
-                                   lineageEndpoint,
-                                   projectEndpoint,
-                                   projectDatasetsEndpoint,
-                                   authMiddleware,
-                                   projectPathAuthorizer,
-                                   datasetIdAuthorizer,
-                                   new RoutesMetrics[IO],
-                                   versionRoutes
-    )
+  ): IO[MicroserviceRoutes[IO]] = GitLabClient[IO]() >>= { implicit gitLabClient =>
+    AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
+      for {
+        datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO]
+        datasetEndpoint         <- DatasetEndpoint[IO]
+        entitiesEndpoint        <- entities.Endpoint[IO]
+        queryEndpoint           <- QueryEndpoint()
+        lineageEndpoint         <- lineage.Endpoint[IO]
+        projectEndpoint         <- ProjectEndpoint[IO]
+        projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
+        authenticator           <- GitLabAuthenticator[IO]
+        authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
+        projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
+        datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
+        versionRoutes           <- version.Routes[IO]
+      } yield new MicroserviceRoutes(datasetsSearchEndpoint,
+                                     datasetEndpoint,
+                                     entitiesEndpoint,
+                                     queryEndpoint,
+                                     lineageEndpoint,
+                                     projectEndpoint,
+                                     projectDatasetsEndpoint,
+                                     authMiddleware,
+                                     projectPathAuthorizer,
+                                     datasetIdAuthorizer,
+                                     new RoutesMetrics[IO],
+                                     versionRoutes
+      )
+    }
   }
 }

@@ -23,6 +23,7 @@ import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.config.renku
 import io.renku.graph.model.projects
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
@@ -172,7 +173,8 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
 
 object ProjectEndpoint {
 
-  def apply[F[_]: Parallel: Async: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[ProjectEndpoint[F]] = for {
+  def apply[F[_]: Parallel: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]
+      : F[ProjectEndpoint[F]] = for {
     projectFinder         <- ProjectFinder[F]
     renkuResourceUrl      <- renku.ApiUrl[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()

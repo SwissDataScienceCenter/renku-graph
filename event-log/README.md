@@ -369,7 +369,9 @@ Allowed values for the `newStatus` property are: `DONE`, `NON_RECOVERABLE_FAILUR
 
 - **CLEAN_UP_REQUEST**
 
-Kicks off clean-up of the data in the Triples Store.
+Enqueues a `CLEAN_UP` event for the project with the given `id` and `path`. The `CLEAN_UP` event performs re-provisioning process for a project in the Triples Store.
+
+**NOTICE**: When a `CLEAN_UP_REQUEST` event without project `id` is sent, there's an attempt to find the `id` based on the given `path`. If there's no project with the given `path`, no `CLEAN_UP` event will be created. 
 
 **Multipart Request**
 
@@ -379,6 +381,7 @@ Kicks off clean-up of the data in the Triples Store.
 {
   "categoryName": "CLEAN_UP_REQUEST",
   "project": {
+    "id":   123  // optional,
     "path": "namespace/project-name"
   }
 }
@@ -395,6 +398,42 @@ Forces issuing a commit sync event for the given project
 ```json
 {
   "categoryName": "COMMIT_SYNC_REQUEST",
+  "project": {
+    "id":   12,
+    "path": "namespace/project-name"
+  }
+}
+```
+
+- **GLOBAL_COMMIT_SYNC_REQUEST**
+
+Forces issuing a GLOBAL_COMMIT_SYNC event for the given project.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "GLOBAL_COMMIT_SYNC_REQUEST",
+  "project": {
+    "id":   12,
+    "path": "namespace/project-name"
+  }
+}
+```
+
+- **PROJECT_SYNC**
+
+Checks if the data stored for the project in EL matches the data in GitLab. If not, the process fixes the data in EL as well as sends a relevant `GLOBAL_COMMIT_SYNC` and `CLEAN_UP` events.
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "PROJECT_SYNC",
   "project": {
     "id":   12,
     "path": "namespace/project-name"
@@ -660,6 +699,36 @@ or
 }
 ```
 
+- **PROJECT_SYNC**
+
+Events of the type are issued for all the projects with the frequency of 1 per 24H.
+
+**Request**
+
+```json
+{
+  "categoryName": "PROJECT_SYNC",
+  "subscriber": {
+    "url": "http://host/path",
+    "id":  "20210302140653-8641"
+  }
+}
+```
+
+**Event example**
+
+`event` part:
+
+```json
+{
+  "categoryName": "PROJECT_SYNC",
+  "project": {
+    "id":   12,
+    "path": "project/path"
+  }
+}
+```
+
 - **ADD_MIN_PROJECT_INFO**
 
 Events of the type are issued for all the projects that have no events in the `TRIPLES_STORE` status and for which `ADD_MIN_PROJECT_INFO` has not been sent, yet.
@@ -844,6 +913,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 |--------------------------------------|
 | id           SERIAL      PK NOT NULL |
 | date         TIMESTAMPTZ    NOT NULL |
+| project_id   INT4           NOT NULL |
 | project_path VARCHAR        NOT NULL |
 
 | ts_migration                                |

@@ -40,7 +40,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.util.{Failure, Try}
 
 class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
-  import AccessTokenFinder._
+  import AccessTokenFinder.Implicits._
 
   s"validateHook - finding access token" should {
 

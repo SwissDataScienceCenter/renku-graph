@@ -41,7 +41,7 @@ import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.blaze.pipeline.Command
 import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.headers.{Authorization, `Content-Disposition`, `Content-Type`}
-import org.http4s.multipart.{Multipart, Part}
+import org.http4s.multipart.{Multiparts, Part}
 import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
@@ -231,7 +231,7 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
   implicit class RequestOps(request: Request[F]) {
     lazy val withMultipartBuilder: MultipartBuilder = new MultipartBuilder(request)
 
-    def withParts(parts: Vector[Part[F]]): Request[F] =
+    def withParts(parts: Vector[Part[F]]): F[Request[F]] =
       new MultipartBuilder(request, parts).build()
 
     class MultipartBuilder private[RequestOps] (request: Request[F], parts: Vector[Part[F]] = Vector.empty[Part[F]]) {
@@ -246,12 +246,15 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
         .map(addPart(name, _))
         .getOrElse(this)
 
-      def build(): Request[F] = {
-        val multipart = Multipart[F](parts)
-        request
-          .withEntity(multipart)
-          .withHeaders(multipart.headers.headers.filterNot(_.name == ci"transfer-encoding"))
-      }
+      def build(): F[Request[F]] =
+        Multiparts
+          .forSync[F]
+          .flatMap(_.multipart(parts))
+          .map(multipart =>
+            request
+              .withEntity(multipart)
+              .withHeaders(multipart.headers.headers.filterNot(_.name == ci"transfer-encoding"))
+          )
     }
   }
 }

@@ -132,7 +132,8 @@ object EventLogClient {
     def sendEvent(event: Json)(implicit ioRuntime: IORuntime): Unit = {
       for {
         uri <- validateUri(s"$baseUrl/events")
-        _   <- send(createRequest(uri, event)) { case (Accepted, _, _) => ().pure[IO] }
+        req <- createRequest(uri, event)
+        _   <- send(req) { case (Accepted, _, _) => ().pure[IO] }
       } yield ()
     }.unsafeRunSync()
 

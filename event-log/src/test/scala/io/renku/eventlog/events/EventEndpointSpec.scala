@@ -41,7 +41,7 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
-import org.http4s.multipart.{Multipart, Part}
+import org.http4s.multipart.Part
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -67,12 +67,10 @@ class EventEndpointSpec
 
     s"$BadRequest if there is no event part in the request" in new TestCase {
 
-      val multipart = Multipart[IO](
-        Vector(Part.formData[IO](nonEmptyStrings().generateOne, nonEmptyStrings().generateOne))
-      )
+      override lazy val request =
+        Request[IO]().addParts(Part.formData[IO](nonEmptyStrings().generateOne, nonEmptyStrings().generateOne))
 
-      val response =
-        endpoint.processEvent(Request().withEntity(multipart).withHeaders(multipart.headers)).unsafeRunSync()
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
@@ -81,10 +79,9 @@ class EventEndpointSpec
 
     s"$BadRequest if there the event part in the request is malformed" in new TestCase {
 
-      val multipart = Multipart[IO](Vector(Part.formData[IO]("event", "")))
+      override lazy val request = Request[IO]().addParts(Part.formData[IO]("event", ""))
 
-      val response =
-        endpoint.processEvent(Request().withEntity(multipart).withHeaders(multipart.headers)).unsafeRunSync()
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
@@ -109,7 +106,7 @@ class EventEndpointSpec
           .expects(where(eventRequestEquals(requestContent)))
           .returning(EventSchedulingResult.Accepted.pure[IO])
 
-        val response = endpoint.processEvent(request).unsafeRunSync()
+        val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
         response.status                          shouldBe Accepted
         response.contentType                     shouldBe Some(`Content-Type`(application.json))
@@ -123,7 +120,7 @@ class EventEndpointSpec
         .expects(*)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
-      val response = endpoint.processEvent(request).unsafeRunSync()
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
       response.status                           shouldBe BadRequest
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
@@ -136,7 +133,7 @@ class EventEndpointSpec
         .expects(*)
         .returning(EventSchedulingResult.BadRequest.pure[IO])
 
-      val response = endpoint.processEvent(request).unsafeRunSync()
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
       response.status                           shouldBe BadRequest
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
@@ -149,7 +146,7 @@ class EventEndpointSpec
         .expects(*)
         .returning(EventSchedulingResult.Busy.pure[IO])
 
-      val response = endpoint.processEvent(request).unsafeRunSync()
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
       response.status                          shouldBe TooManyRequests
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
@@ -162,7 +159,7 @@ class EventEndpointSpec
         .expects(*)
         .returning(SchedulingError(exceptions.generateOne).pure[IO])
 
-      val response = endpoint.processEvent(request).unsafeRunSync()
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
@@ -175,7 +172,7 @@ class EventEndpointSpec
         .expects(*)
         .returning(exceptions.generateOne.raiseError[IO, EventSchedulingResult])
 
-      val response = endpoint.processEvent(request).unsafeRunSync()
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
@@ -186,33 +183,25 @@ class EventEndpointSpec
   private trait TestCase {
     val requestContent = eventRequestContents.generateOne
 
-    private lazy val multipartContent: Multipart[IO] = requestContent match {
+    private lazy val multipartParts: Vector[Part[IO]] = requestContent match {
       case EventRequestContent.NoPayload(event) =>
-        Multipart[IO](
-          Vector(
-            implicitly[PartEncoder[Json]].encode("event", event)
-          )
+        Vector(
+          implicitly[PartEncoder[Json]].encode("event", event)
         )
       case EventRequestContent.WithPayload(event, payload: String) =>
-        Multipart[IO](
-          Vector(
-            implicitly[PartEncoder[Json]].encode("event", event),
-            implicitly[PartEncoder[String]].encode("payload", payload)
-          )
+        Vector(
+          implicitly[PartEncoder[Json]].encode("event", event),
+          implicitly[PartEncoder[String]].encode("payload", payload)
         )
       case EventRequestContent.WithPayload(event, payload: ByteArrayTinyType with ZippedContent) =>
-        Multipart[IO](
-          Vector(
-            implicitly[PartEncoder[Json]].encode("event", event),
-            implicitly[PartEncoder[ByteArrayTinyType with ZippedContent]].encode("payload", payload)
-          )
+        Vector(
+          implicitly[PartEncoder[Json]].encode("event", event),
+          implicitly[PartEncoder[ByteArrayTinyType with ZippedContent]].encode("payload", payload)
         )
       case event: EventRequestContent.WithPayload[_] => fail(s"Unsupported EventRequestContent payload type $event")
     }
 
-    lazy val request = Request(Method.POST, uri"events")
-      .withEntity(multipartContent)
-      .withHeaders(multipartContent.headers)
+    lazy val request = Request[IO](Method.POST, uri"events").addParts(multipartParts: _*)
 
     val eventConsumersRegistry = mock[EventConsumersRegistry[IO]]
     val endpoint               = new EventEndpointImpl[IO](eventConsumersRegistry)

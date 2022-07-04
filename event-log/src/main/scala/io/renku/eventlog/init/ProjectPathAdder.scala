@@ -43,25 +43,17 @@ private object ProjectPathAdder {
 
 private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
     extends ProjectPathAdder[F]
-    with EventTableCheck
     with TypeSerializers {
 
+  import MigratorTools._
+
   override def run(): F[Unit] = SessionResource[F].useK {
-    whenEventTableExists(
+    whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'project_path' column adding skipped"),
-      otherwise = checkColumnExists >>= {
+      otherwise = checkColumnExists("event_log", "project_path") >>= {
         case true  => Kleisli.liftF(Logger[F] info "'project_path' column exists")
         case false => addColumn()
       }
-    )
-  }
-
-  private lazy val checkColumnExists: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[Void, String] = sql"select project_path from event_log limit 1".query(varchar)
-    Kleisli(
-      _.option(query)
-        .map(_ => true)
-        .recover { case _ => false }
     )
   }
 
@@ -77,7 +69,6 @@ private class ProjectPathAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResour
   } recoverWith logging
 
   private lazy val findDistinctProjects: Kleisli[F, Session[F], List[(Id, Path)]] = {
-
     val query: Query[Void, String] = sql"select min(event_body) from event_log group by project_id;".query(text)
     Kleisli(_.execute(query).flatMap(toListOfProjectIdAndPath))
   }

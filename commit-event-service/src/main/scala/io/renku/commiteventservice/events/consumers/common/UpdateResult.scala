@@ -1,0 +1,32 @@
+/*
+ * Copyright 2022 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.renku.commiteventservice.events.consumers.common
+
+sealed trait UpdateResult extends Product with Serializable {
+  val name: String
+}
+
+object UpdateResult {
+  final case object Skipped                                      extends UpdateResult { val name: String = "Skipped" }
+  final case object Created                                      extends UpdateResult { val name: String = "Created" }
+  final case object Existed                                      extends UpdateResult { val name: String = "Existed" }
+  final case object Deleted                                      extends UpdateResult { val name: String = "Deleted" }
+  final case class Failed(message: String, exception: Throwable) extends UpdateResult { val name: String = Failed.name }
+  final object Failed { val name: String = "Failed" }
+}

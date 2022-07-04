@@ -26,7 +26,7 @@ import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.http.server.version
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesgenerator.events.EventEndpoint
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.http4s.dsl.Http4sDsl
 
 import scala.jdk.CollectionConverters._
