@@ -1,15 +1,11 @@
 ---
 apiVersion: v1
-kind: Secret
+kind: ConfigMap
 metadata:
-  name: jena-shiro-ini
+  name: shiro-ini
   labels:
-    app: {{ template "jena.name" . }}
-    chart: {{ template "jena.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
-type: Opaque
-stringData:
+    {{- include "renku-jena.labels" . | nindent 4 }}
+data:
   shiro.ini: |-
     [main]
     # Development
@@ -19,8 +15,8 @@ stringData:
     iniRealm.credentialsMatcher = $plainMatcher
 
     [users]
-    admin={{ .Values.users.admin.password }}
-    renku={{ .Values.users.renku.password }}
+    admin={{ .Values.renkuJena.users.admin.password }}
+    renku={{ .Values.renkuJena.users.renku.password }}
 
     [roles]
 
@@ -31,5 +27,5 @@ stringData:
 
     ## and the rest are restricted
     /$/** = authcBasic,user[admin]
-    /{{ .Values.global.graph.jena.dataset }}/** = authcBasic,user[renku]
+    /renku/** = authcBasic,user[renku]
     /migrations/** = authcBasic,user[admin]

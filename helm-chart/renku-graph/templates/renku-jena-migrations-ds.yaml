@@ -4,13 +4,9 @@ kind: ConfigMap
 metadata:
   name: migrations-ds-ttl
   labels:
-    app: {{ template "jena.name" . }}
-    chart: {{ template "jena.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "renku-jena.labels" . | nindent 4 }}
 data:
-  migrations.ttl: |-
-    
+  migrations.ttl: |-    
     @prefix :      <http://base/#> .
     @prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix tdb2:  <http://jena.apache.org/2016/tdb#> .

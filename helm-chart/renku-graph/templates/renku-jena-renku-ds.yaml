@@ -4,13 +4,9 @@ kind: ConfigMap
 metadata:
   name: renku-ds-ttl
   labels:
-    app: {{ template "jena.name" . }}
-    chart: {{ template "jena.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "renku-jena.labels" . | nindent 4 }}
 data:
-  {{ .Values.global.graph.jena.dataset }}.ttl: |-
-
+  renku.ttl: |-
     @prefix:        <#> .
     @prefix fuseki:  <http://jena.apache.org/fuseki#> .
     @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -21,7 +17,7 @@ data:
 
     :renku_tdb_all rdf:type fuseki:Service ;
       rdfs:label                        "TDB renku" ;
-      fuseki:name                       "{{ .Values.global.graph.jena.dataset }}" ;
+      fuseki:name                       "renku" ;
       fuseki:dataset                    :text_dataset ;
       fuseki:serviceQuery               "query" , "sparql" ;
       fuseki:serviceReadGraphStore      "get" ;
@@ -31,16 +27,16 @@ data:
     .
 
     :text_dataset rdf:type text:TextDataset ;
-      text:dataset   :{{ .Values.global.graph.jena.dataset }} ;
+      text:dataset   :renku ;
       text:index     <#indexLucene> ;
     .
 
-    :{{ .Values.global.graph.jena.dataset }} rdf:type tdb:DatasetTDB ;
-      tdb:location "/fuseki/databases/{{ .Values.global.graph.jena.dataset }}" ;
+    :renku rdf:type tdb:DatasetTDB ;
+      tdb:location "/fuseki/databases/renku" ;
     .
 
     <#indexLucene> a text:TextIndexLucene ;
-      text:directory <file:/fuseki/databases/{{ .Values.global.graph.jena.dataset }}/lucene_index> ;
+      text:directory <file:/fuseki/databases/renku/lucene_index> ;
       text:entityMap <#entMap> ;
     .
 

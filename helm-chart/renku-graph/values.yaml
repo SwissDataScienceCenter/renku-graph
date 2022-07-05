@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 global:
-  ## Specify a secret that containes the certificate
+  ## Specify a secret that contains the certificate
   ## if you would like to use a custom CA. The key for the secret
   ## should have the .crt extension otherwise it is ignored. The
   ## keys across all secrets are mounted as files in one location so
@@ -14,6 +14,50 @@ global:
       tag: '0.0.1'
     customCAs: []
       # - secret:
+
+renku-jena:
+  image:
+    repository: renku/renku-jena
+    pullPolicy: IfNotPresent
+    tag: '0.0.6'
+  users:
+    admin:
+      ## Admin user password
+      ## Generate one using: `openssl rand -hex 16`
+      password:
+    renku:
+      ## Dataset user password
+      ## Generate one using: `openssl rand -hex 16`
+      password:
+  persistence:
+    size: 10Gi
+  additionalEnvironmentVariables:
+    - name: JVM_ARGS
+      value: -Xmx2G -Xms2G
+  additionalVolumeMounts:
+    - name: shiro
+      mountPath: /fuseki/shiro.ini
+      subPath: shiro.ini
+      readOnly: true
+    - name: renku-ds
+      mountPath: /fuseki/configuration/renku.ttl
+      subPath: renku.ttl
+      readOnly: true
+    - name: migrations-ds
+      mountPath: /fuseki/configuration/migrations.ttl
+      subPath: migrations.ttl
+      readOnly: true
+  additionalVolumes:
+    - name: shiro
+      configMap:
+        name: shiro-ini
+        defaultMode: 0555
+    - name: renku-ds
+      configMap:
+        name: renku-ds-ttl
+    - name: migrations-ds
+      configMap:
+        name: migrations-ds-ttl
 
 webhookService:
   image:
