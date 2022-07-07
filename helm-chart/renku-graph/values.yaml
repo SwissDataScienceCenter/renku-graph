@@ -14,6 +14,13 @@ global:
       tag: '0.0.1'
     customCAs: []
       # - secret:
+  graph:
+    dbEventLog:
+      postgresPassword:
+        value:
+  tokenRepository:
+    postgresPassword:
+      value:
 
 renku-jena:
   image:
