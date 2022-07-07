@@ -89,17 +89,15 @@ object CommonGraphGenerators {
     password <- basicAuthPasswords
   } yield BasicAuthCredentials(username, password)
 
-  def rateLimits[Target]: Gen[RateLimit[Target]] =
-    for {
-      items <- positiveLongs()
-      unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
-    } yield RateLimit[Target](items, per = unit)
+  def rateLimits[Target]: Gen[RateLimit[Target]] = for {
+    items <- positiveLongs()
+    unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
+  } yield RateLimit[Target](items, per = unit)
 
   implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
     fusekiUrl       <- httpUrls() map FusekiBaseUrl.apply
-    datasetName     <- nonEmptyStrings() map DatasetName.apply
     authCredentials <- basicAuthCredentials
-  } yield RdfStoreConfig(fusekiUrl, datasetName, authCredentials)
+  } yield RdfStoreConfig(fusekiUrl, authCredentials)
 
   implicit val microserviceBaseUrls: Gen[MicroserviceBaseUrl] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {

@@ -27,7 +27,6 @@ import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.views.RdfResource
 import io.renku.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import io.renku.interpreters.TestLogger
@@ -36,14 +35,9 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.Renderer
-import org.apache.jena.rdf.model.ModelFactory
-import org.apache.jena.rdfconnection.{RDFConnection, RDFConnectionFuseki}
-import org.apache.jena.riot.{Lang, RDFDataMgr}
 import org.scalatest._
 
-import java.io.ByteArrayInputStream
 import java.net.{ServerSocket, SocketException}
-import java.nio.charset.StandardCharsets.UTF_8
 import scala.language.reflectiveCalls
 import scala.util.Random.nextInt
 
@@ -67,8 +61,6 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
 
   protected lazy val renkuStoreConfig: RdfStoreConfig = rdfStoreConfigs.generateOne.copy(
     fusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort"),
-    datasetName =
-      if (givenServerRunning) DatasetName("renku") else (nonEmptyStrings() map DatasetName.apply).generateOne,
     authCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
   )
 
@@ -81,18 +73,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
 
   protected implicit lazy val fusekiBaseUrl: FusekiBaseUrl = storeConfig.fusekiBaseUrl
 
-  private lazy val rdfStoreServer =
+  private lazy val rdfStoreServer: RdfStoreServer =
     new RdfStoreServer(fusekiServerPort, renkuStoreConfig.datasetName, MigrationsStoreConfig.MigrationsDS)
-
-  private def rdfConnectionResource(dsName: DatasetName): Resource[IO, RDFConnection] =
-    Resource.make(openConnection(dsName))(connection => IO(connection.close()))
-
-  private def openConnection(dsName: DatasetName): IO[RDFConnection] = IO {
-    RDFConnectionFuseki
-      .create()
-      .destination((fusekiBaseUrl / dsName).toString)
-      .build()
-  }
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -131,24 +113,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter with Result
   protected def loadToStore(dsName: DatasetName, graphId: EntityId, jsonLD: JsonLD): Unit =
     loadToStore(dsName, graphId.show, jsonLD)
 
-  private def loadToStore(dsName: DatasetName, graphId: String, jsonLD: JsonLD): Unit = rdfConnectionResource(dsName)
-    .use { connection =>
-      IO {
-        val model = {
-          val mod = ModelFactory.createDefaultModel()
-          RDFDataMgr.read(
-            mod,
-            new ByteArrayInputStream(jsonLD.toJson.noSpaces.getBytes(UTF_8)),
-            null,
-            Lang.JSONLD
-          )
-          mod
-        }
-
-        connection.load(graphId.show, model)
-      }
-    }
-    .unsafeRunSync()
+  private def loadToStore(dsName: DatasetName, graphId: String, jsonLD: JsonLD): Unit =
+    println(s"$dsName $graphId $jsonLD")
 
   protected def loadToStore[T](objects: T*)(implicit encoder: JsonLDEncoder[T]): Unit =
     loadToStore(objects.map(encoder.apply): _*)

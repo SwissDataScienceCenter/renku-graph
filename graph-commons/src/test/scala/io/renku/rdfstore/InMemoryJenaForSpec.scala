@@ -16,22 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.rdfstore
 
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import io.renku.db.DBConfigProvider.DBConfig
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
+import com.dimafeng.testcontainers.ForAllTestContainer
+import io.renku.testtools.IOSpec
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
-object TestDbConfig {
+trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfterAll {
+  self: Suite with IOSpec =>
 
-  def newDbConfig[TargetDb]: DBConfig[TargetDb] = DBConfig[TargetDb](
-    name = Refined.unsafeApply(nonEmptyStrings().map(suffix => s"db_$suffix").generateOne),
-    host = "localhost",
-    port = 5432,
-    user = "user",
-    pass = "test",
-    connectionPool = 20
-  )
+  override def afterStart(): Unit = {
+    super.afterStart()
+    createDatasets()
+  }
 }

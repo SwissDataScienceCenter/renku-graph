@@ -25,12 +25,17 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class DatasetIdRecordsFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with should.Matchers {
 
   "apply" should {
 
@@ -38,7 +43,7 @@ class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
       val (dataset, project) =
         renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       recordsFinder(dataset.identification.identifier).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
@@ -52,7 +57,7 @@ class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
           .addDataset(datasetEntities(provenanceNonModified))
           .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       recordsFinder(dataset.identification.identifier).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, Set.empty)
@@ -67,7 +72,7 @@ class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
           .forkOnce()
           .generateOne
 
-      loadToStore(parentProject, project)
+      upload(to = renkuDataset, parentProject, project)
 
       recordsFinder(dataset.identification.identifier).unsafeRunSync() should contain theSameElementsAs List(
         (parentProject.visibility, parentProject.path, parentProject.members.flatMap(_.maybeGitLabId)),
@@ -85,6 +90,6 @@ class DatasetIdRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val recordsFinder = new DatasetIdRecordsFinderImpl[IO](renkuStoreConfig)
+    val recordsFinder = new DatasetIdRecordsFinderImpl[IO](renkuDSConnectionInfo)
   }
 }

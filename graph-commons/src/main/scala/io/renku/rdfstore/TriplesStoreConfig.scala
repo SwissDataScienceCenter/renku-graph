@@ -21,10 +21,10 @@ package io.renku.rdfstore
 import cats.MonadThrow
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
-import io.renku.config.ConfigLoader.{stringTinyTypeReader, urlTinyTypeReader}
+import io.renku.config.ConfigLoader.urlTinyTypeReader
 import io.renku.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
-import io.renku.tinytypes.constraints.{NonBlank, Url, UrlOps}
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory, UrlTinyType}
+import io.renku.tinytypes.constraints.{Url, UrlOps}
+import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
 import pureconfig.ConfigReader
 
 trait TriplesStoreConfig {
@@ -35,21 +35,23 @@ trait TriplesStoreConfig {
 
 final case class RdfStoreConfig(
     fusekiBaseUrl:   FusekiBaseUrl,
-    datasetName:     DatasetName,
     authCredentials: BasicAuthCredentials
-) extends TriplesStoreConfig
+) extends TriplesStoreConfig {
+  val datasetName: DatasetName = RdfStoreConfig.RenkuDS
+}
 
 object RdfStoreConfig {
+
+  val RenkuDS: DatasetName = DatasetName("renku")
 
   import io.renku.config.ConfigLoader._
   import io.renku.http.client.BasicAuthConfigReaders._
 
   def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[RdfStoreConfig] = for {
-    url         <- find[F, FusekiBaseUrl]("services.fuseki.url", config)
-    datasetName <- find[F, DatasetName]("services.fuseki.dataset-name", config)
-    username    <- find[F, BasicAuthUsername]("services.fuseki.renku.username", config)
-    password    <- find[F, BasicAuthPassword]("services.fuseki.renku.password", config)
-  } yield RdfStoreConfig(url, datasetName, BasicAuthCredentials(username, password))
+    url      <- find[F, FusekiBaseUrl]("services.fuseki.url", config)
+    username <- find[F, BasicAuthUsername]("services.fuseki.renku.username", config)
+    password <- find[F, BasicAuthPassword]("services.fuseki.renku.password", config)
+  } yield RdfStoreConfig(url, BasicAuthCredentials(username, password))
 }
 
 final case class MigrationsStoreConfig(
@@ -74,16 +76,9 @@ object MigrationsStoreConfig {
 }
 
 class FusekiBaseUrl private (val value: String) extends AnyVal with UrlTinyType
-
 object FusekiBaseUrl
     extends TinyTypeFactory[FusekiBaseUrl](new FusekiBaseUrl(_))
     with Url[FusekiBaseUrl]
     with UrlOps[FusekiBaseUrl] {
   implicit val fusekiBaseUrlReader: ConfigReader[FusekiBaseUrl] = urlTinyTypeReader(FusekiBaseUrl)
-}
-
-class DatasetName private (val value: String) extends AnyVal with StringTinyType
-
-object DatasetName extends TinyTypeFactory[DatasetName](new DatasetName(_)) with NonBlank[DatasetName] {
-  implicit val datasetNameReader: ConfigReader[DatasetName] = stringTinyTypeReader(DatasetName)
 }

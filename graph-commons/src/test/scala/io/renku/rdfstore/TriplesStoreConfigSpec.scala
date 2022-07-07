@@ -39,8 +39,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
           Map(
             "services" -> Map(
               "fuseki" -> Map(
-                "url"          -> storeConfig.fusekiBaseUrl.toString,
-                "dataset-name" -> storeConfig.datasetName.value,
+                "url" -> storeConfig.fusekiBaseUrl.toString,
                 "renku" -> Map(
                   "username" -> storeConfig.authCredentials.username.value,
                   "password" -> storeConfig.authCredentials.password.value
@@ -53,7 +52,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         val Success(actual) = RdfStoreConfig[Try](config)
 
         actual.fusekiBaseUrl            shouldBe storeConfig.fusekiBaseUrl
-        actual.datasetName              shouldBe storeConfig.datasetName
+        actual.datasetName              shouldBe DatasetName("renku")
         actual.authCredentials.username shouldBe storeConfig.authCredentials.username
         actual.authCredentials.password shouldBe storeConfig.authCredentials.password
       }
@@ -64,29 +63,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url"          -> "invalid-url",
-              "dataset-name" -> rdfStoreConfigs.generateOne.datasetName.value,
-              "renku" -> Map(
-                "username" -> rdfStoreConfigs.generateOne.authCredentials.username.value,
-                "password" -> rdfStoreConfigs.generateOne.authCredentials.password.value
-              ).asJava
-            ).asJava
-          ).asJava
-        ).asJava
-      )
-
-      val Failure(exception) = RdfStoreConfig[Try](config)
-
-      exception shouldBe an[ConfigLoadingException]
-    }
-
-    "fail if dataset-name is blank" in {
-      val config = ConfigFactory.parseMap(
-        Map(
-          "services" -> Map(
-            "fuseki" -> Map(
-              "url"          -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
-              "dataset-name" -> "  ",
+              "url" -> "invalid-url",
               "renku" -> Map(
                 "username" -> rdfStoreConfigs.generateOne.authCredentials.username.value,
                 "password" -> rdfStoreConfigs.generateOne.authCredentials.password.value
@@ -106,8 +83,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url"          -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
-              "dataset-name" -> rdfStoreConfigs.generateOne.datasetName.value,
+              "url" -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
               "renku" -> Map(
                 "username" -> "  ",
                 "password" -> rdfStoreConfigs.generateOne.authCredentials.password.value
@@ -127,8 +103,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url"          -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
-              "dataset-name" -> rdfStoreConfigs.generateOne.datasetName.value,
+              "url" -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
               "renku" -> Map(
                 "username" -> rdfStoreConfigs.generateOne.authCredentials.username.value,
                 "password" -> ""
