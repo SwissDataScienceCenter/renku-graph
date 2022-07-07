@@ -3,5 +3,5 @@ dependencies:
   version: "0.0.2"
   repository: "https://swissdatasciencecenter.github.io/helm-charts/"
 - name: renku-jena
-  version: "0.0.6"
+  version: "0.0.7"
   repository: "https://swissdatasciencecenter.github.io/helm-charts/"
