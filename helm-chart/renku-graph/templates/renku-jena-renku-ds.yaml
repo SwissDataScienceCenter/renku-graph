@@ -36,7 +36,7 @@ data:
     .
 
     <#indexLucene> a text:TextIndexLucene ;
-      text:directory <file:/fuseki/databases/renku/lucene_index> ;
+      text:directory <file:///fuseki/databases/renku/lucene_index> ;
       text:entityMap <#entMap> ;
     .
 
