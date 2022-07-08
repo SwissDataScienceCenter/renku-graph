@@ -46,7 +46,7 @@ trait InMemoryJena {
   private val adminCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
 
   val container: GenericContainer = GenericContainer(
-    dockerImage = "renku/renku-jena:0.0.7",
+    dockerImage = "renku/renku-jena:0.0.8",
     exposedPorts = Seq(3030),
     waitStrategy = Wait forHttp "/$/ping"
   )
@@ -84,7 +84,6 @@ trait InMemoryJena {
   def clear(dataset: DatasetName)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(dataset)
       .runUpdate("CLEAR ALL")
-      .map(_ => println(s"$dataset cleared"))
       .unsafeRunSync()
 
   def upload(to: DatasetName, jsonLDs: JsonLD*)(implicit ioRuntime: IORuntime): Unit = {
