@@ -26,7 +26,7 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.Property
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -34,7 +34,8 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class StatsFinderSpec
     extends AnyWordSpec
-    with InMemoryRdfStore
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with ScalaCheckPropertyChecks
     with should.Matchers
     with IOSpec {
@@ -71,7 +72,7 @@ class StatsFinderSpec
         .update(schema / "Person", persons.size)
         .update(schema / "Person with GitLabId", persons.count(_.maybeGitLabId.isDefined))
 
-      loadToStore(projectsWithDatasets.map(_._2) ::: projectsWithActivities: _*)
+      upload(to = renkuDataset, projectsWithDatasets.map(_._2) ::: projectsWithActivities: _*)
 
       stats.entitiesCount().unsafeRunSync() shouldBe entitiesWithActivities
     }
@@ -80,7 +81,7 @@ class StatsFinderSpec
   private trait TestCase {
     implicit val logger:               TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val stats = new StatsFinderImpl[IO](renkuStoreConfig)
+    val stats = new StatsFinderImpl[IO](renkuDSConnectionInfo)
   }
 
   private implicit class MapOps(entitiesByType: Map[EntityLabel, Count]) {

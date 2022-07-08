@@ -76,9 +76,16 @@ trait InMemoryJena {
       .void
       .unsafeRunSync()
 
-  def clear(dataset: DatasetName)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(dataset)
-    .runUpdate("DROP GRAPH ALL")
-    .unsafeRunSync()
+  def clearAllDatasets()(implicit ioRuntime: IORuntime): Unit =
+    datasets
+      .map { case (connectionInfoFactory, _) => connectionInfoFactory(fusekiUrl).datasetName }
+      .foreach(clear)
+
+  def clear(dataset: DatasetName)(implicit ioRuntime: IORuntime): Unit =
+    queryRunnerFor(dataset)
+      .runUpdate("CLEAR ALL")
+      .map(_ => println(s"$dataset cleared"))
+      .unsafeRunSync()
 
   def upload(to: DatasetName, jsonLDs: JsonLD*)(implicit ioRuntime: IORuntime): Unit = {
     val jsonLD = JsonLD.arr(jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD])): _*)

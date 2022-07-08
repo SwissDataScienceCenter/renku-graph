@@ -20,13 +20,17 @@ package io.renku.rdfstore
 
 import com.dimafeng.testcontainers.ForAllTestContainer
 import io.renku.testtools.IOSpec
-import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.scalatest.{BeforeAndAfter, Suite}
 
-trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfterAll {
+trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter {
   self: Suite with IOSpec =>
 
   override def afterStart(): Unit = {
     super.afterStart()
     createDatasets()
+  }
+
+  before {
+    clearAllDatasets()
   }
 }

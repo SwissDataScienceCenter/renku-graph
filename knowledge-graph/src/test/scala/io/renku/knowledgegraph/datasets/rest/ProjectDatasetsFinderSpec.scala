@@ -26,7 +26,7 @@ import io.renku.graph.model.datasets.{OriginalIdentifier, SameAs}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
@@ -35,10 +35,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class ProjectDatasetsFinderSpec
     extends AnyWordSpec
-    with InMemoryRdfStore
+    with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with ExternalServiceStubbing
     with ScalaCheckPropertyChecks
-    with should.Matchers
     with IOSpec {
 
   "findProjectDatasets" should {
@@ -48,9 +49,9 @@ class ProjectDatasetsFinderSpec
         renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
       val (modification2, projectComplete) = project.addDataset(modification1.createModification())
 
-      loadToStore(
-        renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne._2,
-        projectComplete
+      upload(to = renkuDataset,
+             renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne._2,
+             projectComplete
       )
 
       datasetsFinder
@@ -72,7 +73,7 @@ class ProjectDatasetsFinderSpec
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
         (dataset1.identification.identifier,
@@ -101,7 +102,7 @@ class ProjectDatasetsFinderSpec
       assume(dataset1.provenance.topmostSameAs == dataset2.provenance.topmostSameAs)
       assume(dataset1.provenance.topmostSameAs == original.provenance.topmostSameAs)
 
-      loadToStore(originalProject, project)
+      upload(to = renkuDataset, originalProject, project)
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
         (dataset1.identification.identifier,
@@ -131,7 +132,7 @@ class ProjectDatasetsFinderSpec
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
         (dataset2.identification.identifier,
@@ -148,7 +149,7 @@ class ProjectDatasetsFinderSpec
       val (_ ::~ modification, project) =
         renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(project.addDatasets(modification.invalidateNow))
+      upload(to = renkuDataset, project.addDatasets(modification.invalidateNow))
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe Nil
     }
@@ -157,6 +158,6 @@ class ProjectDatasetsFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val datasetsFinder = new ProjectDatasetsFinderImpl[IO](renkuStoreConfig)
+    val datasetsFinder = new ProjectDatasetsFinderImpl[IO](renkuDSConnectionInfo)
   }
 }

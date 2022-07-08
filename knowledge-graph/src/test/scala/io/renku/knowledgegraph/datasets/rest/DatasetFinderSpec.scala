@@ -30,7 +30,7 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.model._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -40,9 +40,10 @@ import scala.util.Random
 
 class DatasetFinderSpec
     extends AnyWordSpec
-    with InMemoryRdfStore
-    with ScalaCheckPropertyChecks
     with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with ScalaCheckPropertyChecks
     with IOSpec {
 
   "findDataset" should {
@@ -54,7 +55,7 @@ class DatasetFinderSpec
           anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal),
           anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceNonModified)
         ) { case ((dataset, project), (_, otherProject)) =>
-          loadToStore(project, otherProject)
+          upload(to = renkuDataset, project, otherProject)
 
           datasetFinder
             .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
@@ -72,7 +73,8 @@ class DatasetFinderSpec
           .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
           .generateOne
 
-        loadToStore(
+        upload(
+          to = renkuDataset,
           project1,
           project2,
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceNonModified)).generateOne._2
@@ -103,7 +105,7 @@ class DatasetFinderSpec
           .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
           .generateOne
 
-        loadToStore(project1, project2)
+        upload(to = renkuDataset, project1, project2)
 
         datasetFinder
           .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
@@ -121,7 +123,7 @@ class DatasetFinderSpec
             val (_, project1)        = (renkuProjectEntities(visibilityPublic) importDataset sourceDataset).generateOne
             val (dataset2, project2) = (renkuProjectEntities(visibilityPublic) importDataset sourceDataset).generateOne
 
-            loadToStore(sourceProject, project1, project2)
+            upload(to = renkuDataset, sourceProject, project1, project2)
 
             datasetFinder
               .findDataset(sourceDataset.identifier,
@@ -163,7 +165,7 @@ class DatasetFinderSpec
           provenanceInternal
         )).generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       datasetFinder
         .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -186,7 +188,7 @@ class DatasetFinderSpec
       val datasetWithInvalidatedPart = dataset.invalidatePartNow(partToInvalidate)
       val projectBothDatasets        = project.addDatasets(datasetWithInvalidatedPart)
 
-      loadToStore(projectBothDatasets)
+      upload(to = renkuDataset, projectBothDatasets)
 
       datasetFinder
         .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
@@ -205,7 +207,7 @@ class DatasetFinderSpec
       val (dataset, project) =
         (anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       datasetFinder
         .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(projectPaths.generateOne)))
@@ -222,7 +224,7 @@ class DatasetFinderSpec
         .importDataset(dataset)
         .generateOne
 
-      loadToStore(project, otherProject)
+      upload(to = renkuDataset, project, otherProject)
 
       datasetFinder
         .findDataset(dataset.identifier, AuthContext(authUser.some, dataset.identifier, Set(project.path)))
@@ -239,7 +241,7 @@ class DatasetFinderSpec
         .importDataset(dataset)
         .generateOne
 
-      loadToStore(project, otherProject)
+      upload(to = renkuDataset, project, otherProject)
 
       datasetFinder
         .findDataset(dataset.identifier,
@@ -260,7 +262,7 @@ class DatasetFinderSpec
           .forkOnce()
           .generateOne
 
-        loadToStore(originalProject, fork)
+        upload(to = renkuDataset, originalProject, fork)
 
         assume(originalProject.datasets === fork.datasets,
                "Datasets on original project and its fork should be the same"
@@ -287,7 +289,7 @@ class DatasetFinderSpec
           .forkOnce()
           .generateOne
 
-        loadToStore(project1, project2, project2Fork)
+        upload(to = renkuDataset, project1, project2, project2Fork)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -317,7 +319,7 @@ class DatasetFinderSpec
             val grandparentForked ::~ parent = grandparent.forkOnce()
             val parentForked ::~ child       = parent.forkOnce()
 
-            loadToStore(grandparentForked, parentForked, child)
+            upload(to = renkuDataset, grandparentForked, parentForked, child)
 
             assume(
               (grandparentForked.datasets === parentForked.datasets) && (parentForked.datasets === child.datasets),
@@ -345,7 +347,7 @@ class DatasetFinderSpec
             .addDatasetAndModification(datasetEntities(provenanceInternal))
             .forkOnce()
         ) { case (original ::~ modified, project ::~ fork) =>
-          loadToStore(project, fork)
+          upload(to = renkuDataset, project, fork)
 
           datasetFinder
             .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -369,7 +371,7 @@ class DatasetFinderSpec
           .generateOne
         val (modifiedAgain, projectUpdated) = project.addDataset(modified.createModification())
 
-        loadToStore(projectUpdated, fork)
+        upload(to = renkuDataset, projectUpdated, fork)
 
         datasetFinder
           .findDataset(original.identifier, AuthContext(None, original.identifier, Set(projectUpdated.path)))
@@ -393,7 +395,7 @@ class DatasetFinderSpec
           case (original, project ::~ fork) =>
             val (modifiedOnFork, forkUpdated) = fork.addDataset(original.createModification())
 
-            loadToStore(project, forkUpdated)
+            upload(to = renkuDataset, project, forkUpdated)
 
             datasetFinder
               .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -416,7 +418,7 @@ class DatasetFinderSpec
             val invalidation         = original.invalidateNow
             val forkWithInvalidation = fork.addDatasets(invalidation)
 
-            loadToStore(project, forkWithInvalidation)
+            upload(to = renkuDataset, project, forkWithInvalidation)
 
             datasetFinder
               .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -439,7 +441,7 @@ class DatasetFinderSpec
         val invalidation            = original.invalidateNow
         val projectWithInvalidation = project.addDatasets(invalidation)
 
-        loadToStore(projectWithInvalidation, fork)
+        upload(to = renkuDataset, projectWithInvalidation, fork)
 
         datasetFinder
           .findDataset(original.identifier, AuthContext(None, original.identifier, Set(fork.path)))
@@ -458,7 +460,7 @@ class DatasetFinderSpec
           .forkOnce()
           .generateOne
 
-        loadToStore(originalProject, fork)
+        upload(to = renkuDataset, originalProject, fork)
 
         assume(originalProject.datasets === fork.datasets,
                "Datasets on original project and its fork should be the same"
@@ -486,7 +488,7 @@ class DatasetFinderSpec
           .generateOne
         val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
 
-        loadToStore(project1, project2, project3)
+        upload(to = renkuDataset, project1, project2, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -513,7 +515,7 @@ class DatasetFinderSpec
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
         val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
 
-        loadToStore(project1, project2, project3)
+        upload(to = renkuDataset, project1, project2, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -541,7 +543,7 @@ class DatasetFinderSpec
         val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
         val (_, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2Modified).generateOne
 
-        loadToStore(project1, project2Updated, project3)
+        upload(to = renkuDataset, project1, project2Updated, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -565,7 +567,7 @@ class DatasetFinderSpec
         val dataset2Invalidation = dataset2.invalidateNow
         val project2Updated      = project2.addDatasets(dataset2Invalidation)
 
-        loadToStore(project1, project2Updated)
+        upload(to = renkuDataset, project1, project2Updated)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -590,7 +592,7 @@ class DatasetFinderSpec
         val dataset1Invalidation = dataset1.invalidateNow
         val project1Updated      = project1.addDatasets(dataset1Invalidation)
 
-        loadToStore(project1Updated, project2)
+        upload(to = renkuDataset, project1Updated, project2)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -613,7 +615,7 @@ class DatasetFinderSpec
         val datasetInvalidation = datasetModified.invalidateNow
         val projectUpdated      = project.addDatasets(datasetInvalidation)
 
-        loadToStore(projectUpdated)
+        upload(to = renkuDataset, projectUpdated)
 
         datasetFinder
           .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
@@ -634,10 +636,10 @@ class DatasetFinderSpec
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val datasetFinder = new DatasetFinderImpl[IO](
-      new BaseDetailsFinderImpl[IO](renkuStoreConfig),
-      new CreatorsFinderImpl[IO](renkuStoreConfig),
-      new PartsFinderImpl[IO](renkuStoreConfig),
-      new ProjectsFinderImpl[IO](renkuStoreConfig)
+      new BaseDetailsFinderImpl[IO](renkuDSConnectionInfo),
+      new CreatorsFinderImpl[IO](renkuDSConnectionInfo),
+      new PartsFinderImpl[IO](renkuDSConnectionInfo),
+      new ProjectsFinderImpl[IO](renkuDSConnectionInfo)
     )
   }
 

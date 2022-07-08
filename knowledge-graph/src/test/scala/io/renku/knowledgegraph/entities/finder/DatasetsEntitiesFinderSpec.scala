@@ -28,16 +28,17 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.SortBy
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class DatasetsEntitiesFinderSpec
     extends AnyWordSpec
-    with FinderSpecOps
     with should.Matchers
-    with InMemoryRdfStore
+    with FinderSpecOps
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with IOSpec {
 
   "findEntities - in case of a shared datasets" should {
@@ -51,7 +52,7 @@ class DatasetsEntitiesFinderSpec
         .importDataset(originalDS)
         .generateOne
 
-      loadToStore(originalDSProject, importedDSProject)
+      upload(to = renkuDataset, originalDSProject, importedDSProject)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
@@ -74,7 +75,7 @@ class DatasetsEntitiesFinderSpec
         .importDataset(importedDS1)
         .generateOne
 
-      loadToStore(project1WithImportedDS, project2WithImportedDS, projectWithDSImportedFromProject)
+      upload(to = renkuDataset, project1WithImportedDS, project2WithImportedDS, projectWithDSImportedFromProject)
 
       val results = finder
         .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
@@ -100,7 +101,7 @@ class DatasetsEntitiesFinderSpec
         .importDataset(originalDS)
         .generateOne
 
-      loadToStore(originalDSProject, importedDSProject)
+      upload(to = renkuDataset, originalDSProject, importedDSProject)
 
       finder
         .findEntities(
@@ -127,7 +128,7 @@ class DatasetsEntitiesFinderSpec
         .importDataset(originalDS)
         .generateOne
 
-      loadToStore(originalDSProject, importedDSProject)
+      upload(to = renkuDataset, originalDSProject, importedDSProject)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
@@ -145,7 +146,7 @@ class DatasetsEntitiesFinderSpec
 
       val original ::~ fork = originalDSProject.forkOnce()
 
-      loadToStore(original, fork)
+      upload(to = renkuDataset, original, fork)
 
       val results = finder
         .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Dataset))))
@@ -174,7 +175,7 @@ class DatasetsEntitiesFinderSpec
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
       }
 
-      loadToStore(original, fork)
+      upload(to = renkuDataset, original, fork)
 
       finder
         .findEntities(
@@ -198,7 +199,7 @@ class DatasetsEntitiesFinderSpec
         original -> fork.copy(visibility = projects.Visibility.Private, members = Set(member))
       }
 
-      loadToStore(original, fork)
+      upload(to = renkuDataset, original, fork)
 
       finder
         .findEntities(
@@ -217,7 +218,7 @@ class DatasetsEntitiesFinderSpec
         .importDataset(externalDS)
         .generateOne
 
-      loadToStore(privateProject)
+      upload(to = renkuDataset, privateProject)
 
       finder
         .findEntities(
