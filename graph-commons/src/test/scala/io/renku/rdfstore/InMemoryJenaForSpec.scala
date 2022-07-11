@@ -22,7 +22,7 @@ import com.dimafeng.testcontainers.ForAllTestContainer
 import io.renku.testtools.IOSpec
 import org.scalatest.{BeforeAndAfter, Suite}
 
-trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter {
+trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
   self: Suite with IOSpec =>
 
   override def afterStart(): Unit = {

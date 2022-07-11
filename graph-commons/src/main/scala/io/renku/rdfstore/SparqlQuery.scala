@@ -53,6 +53,11 @@ object SparqlQuery {
   import io.renku.tinytypes.constraints.NonBlank
 
   def of(
+      name: String Refined NonEmpty,
+      body: String
+  ): SparqlQuery = SparqlQuery(name, Prefixes.empty, body, maybePagingRequest = None)
+
+  def of(
       name:     String Refined NonEmpty,
       prefixes: Set[Prefix],
       body:     String

@@ -26,14 +26,11 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
-import io.renku.graph.model.views.RdfResource
 import io.renku.graph.rdfstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.{EntityId, JsonLD, JsonLDEncoder}
+import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.tinytypes.Renderer
 import org.testcontainers.containers.wait.strategy.Wait
 
 import scala.collection.mutable
@@ -83,7 +80,9 @@ trait InMemoryJena {
 
   def clear(dataset: DatasetName)(implicit ioRuntime: IORuntime): Unit =
     queryRunnerFor(dataset)
-      .runUpdate("CLEAR ALL")
+      .runUpdate(
+        SparqlQuery.of("delete all data", "CLEAR ALL")
+      )
       .unsafeRunSync()
 
   def upload(to: DatasetName, jsonLDs: JsonLD*)(implicit ioRuntime: IORuntime): Unit = {
@@ -99,30 +98,38 @@ trait InMemoryJena {
   def upload[T](to: DatasetName, objects: T*)(implicit encoder: JsonLDEncoder[T], ioRuntime: IORuntime): Unit =
     upload(to, objects.map(encoder.apply): _*)
 
-  def insertTriple(to: DatasetName, entityId: EntityId, p: String, o: String)(implicit
-      ioRuntime:       IORuntime
-  ): Unit = queryRunnerFor(to)
+  def insertTriple(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
     .runUpdate {
-      show"INSERT DATA { <$entityId> $p $o }"
+      SparqlQuery.of("insert triple", show"INSERT DATA { $triple }")
     }
     .unsafeRunSync()
 
-  def insertTriple[R](to: DatasetName, entityId: R, p: String, o: String)(implicit
-      entityIdRenderer:   Renderer[RdfResource, R],
-      ioRuntime:          IORuntime
-  ): Unit = queryRunnerFor(to)
+  def deleteTriple(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
     .runUpdate {
-      show"INSERT DATA { ${entityIdRenderer.render(entityId)} $p $o }"
+      SparqlQuery.of("delete triple", show"DELETE DATA { $triple }")
     }
     .unsafeRunSync()
 
-  def deleteTriple(from: DatasetName, entityId: EntityId, p: String, o: String)(implicit
-      ioRuntime:         IORuntime
-  ): Unit = queryRunnerFor(from)
-    .runUpdate {
-      show"DELETE DATA { <$entityId> $p $o }"
+  def runSelect(on: DatasetName, query: SparqlQuery): IO[List[Map[String, String]]] =
+    queryRunnerFor(on).runQuery(query)
+
+  def runUpdate(on: DatasetName, query: SparqlQuery): IO[Unit] =
+    queryRunnerFor(on).runUpdate(query)
+
+  def triplesCount(on: DatasetName)(implicit ioRuntime: IORuntime): Long =
+    queryRunnerFor(on)
+      .runQuery(
+        SparqlQuery.of("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { ?s ?p ?o }")
+      )
+      .map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
+      .unsafeRunSync()
+
+  implicit class QueriesOps(queries: List[SparqlQuery]) {
+    def runAll(on: DatasetName): IO[Unit] = {
+      val runner = queryRunnerFor(on)
+      queries.map(runner.runUpdate).sequence.void
     }
-    .unsafeRunSync()
+  }
 
   private def findConnectionInfo(datasetName: DatasetName): TriplesStoreConfig = datasets
     .map { case (connectionInfoFactory, _) => connectionInfoFactory(fusekiUrl) }
@@ -137,7 +144,6 @@ trait InMemoryJena {
   private def queryRunner(connectionInfo: TriplesStoreConfig) = new RdfStoreClientImpl[IO](connectionInfo) {
 
     import io.circe.Decoder._
-    import io.renku.graph.model.Schemas._
     import org.http4s.Method.POST
     import org.http4s.Status.{Conflict, Ok}
     import org.http4s.Uri
@@ -162,38 +168,7 @@ trait InMemoryJena {
     def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] =
       queryExpecting[List[Map[String, String]]](query)
 
-    def runQuery(query: String): IO[List[Map[String, String]]] =
-      queryExpecting[List[Map[String, String]]] {
-        SparqlQuery.of(
-          name = "test query",
-          Prefixes.of(
-            prov   -> "prov",
-            rdf    -> "rdf",
-            rdfs   -> "rdfs",
-            renku  -> "renku",
-            schema -> "schema",
-            xsd    -> "xsd"
-          ),
-          query
-        )
-      }
-
     def runUpdate(query: SparqlQuery): IO[Unit] = updateWithNoResult(using = query)
-
-    def runUpdate(query: String): IO[Unit] = runUpdate(
-      SparqlQuery.of(
-        name = "test query",
-        Prefixes.of(
-          prov   -> "prov",
-          rdf    -> "rdf",
-          rdfs   -> "rdfs",
-          renku  -> "renku",
-          schema -> "schema",
-          xsd    -> "xsd"
-        ),
-        query
-      )
-    )
 
     private implicit lazy val valuesDecoder: Decoder[List[Map[String, String]]] = { cursor =>
       for {
@@ -242,8 +217,8 @@ trait RenkuDataset extends JenaDataset[RdfStoreConfig] {
     _,
     BasicAuthCredentials(BasicAuthUsername("renku"), BasicAuthPassword("renku"))
   )
-  def renkuDataset: DatasetName = renkuDSConnectionInfo.datasetName
 
+  def renkuDataset:          DatasetName    = renkuDSConnectionInfo.datasetName
   def renkuDSConnectionInfo: RdfStoreConfig = connectionInfoFactory(fusekiUrl)
 }
 
@@ -256,5 +231,6 @@ trait MigrationsDataset extends JenaDataset[MigrationsStoreConfig] {
     BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
   )
 
+  def migrationsDataset:          DatasetName           = migrationsDSConnectionInfo.datasetName
   def migrationsDSConnectionInfo: MigrationsStoreConfig = connectionInfoFactory(fusekiUrl)
 }
