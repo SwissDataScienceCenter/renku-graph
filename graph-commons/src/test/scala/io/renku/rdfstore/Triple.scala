@@ -20,9 +20,9 @@ package io.renku.rdfstore
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.graph.model.views.RdfResource
-import io.renku.jsonld.{EntityId, Property}
-import io.renku.tinytypes.Renderer
+import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import io.renku.jsonld.{EntityId, EntityIdEncoder, Property}
+import io.renku.tinytypes.{StringTinyType, TinyType}
 
 sealed trait Triple {
   val subject:   EntityId
@@ -38,26 +38,42 @@ object Triple {
   final case class Value(subject: EntityId, predicate: Property, `object`: String) extends Triple {
     override type O = String
 
-    override lazy val asSparql: String = show"""<$subject> $predicate ${`object`}"""
+    override lazy val asSparql: String = show"""<$subject> <$predicate> ${`object`}"""
   }
 
   final case class Edge(subject: EntityId, predicate: Property, `object`: EntityId) extends Triple {
     override type O = EntityId
 
-    override lazy val asSparql: String = show"""<$subject> $predicate <${`object`}>"""
+    override lazy val asSparql: String = show"""<$subject> <$predicate> <${`object`}>"""
   }
 
   def apply(subject: EntityId, predicate: Property, `object`: String): Triple =
-    Value(subject, predicate, s"${`object`}")
+    Value(subject, predicate, s"'${sparqlEncode(`object`)}'")
+
+  def apply[O <: StringTinyType](subject: EntityId, predicate: Property, `object`: O)(implicit oShow: Show[O]): Triple =
+    apply(subject, predicate, `object`.show)
+
+  def apply[S, O <: TinyType](subject: S, predicate: Property, `object`: O)(implicit
+      sEncoder:                        EntityIdEncoder[S],
+      oShow:                           Show[O]
+  ): Triple = apply(subject, predicate, `object`.show)
 
   def apply[S](subject: S, predicate: Property, `object`: String)(implicit
-      sRenderer:        Renderer[RdfResource, S]
-  ): Triple = Value(EntityId.of(sRenderer render subject), predicate, s"${`object`}")
+      sEncoder:         EntityIdEncoder[S]
+  ): Triple = Value(sEncoder(subject), predicate, s"'${sparqlEncode(`object`)}'")
 
   def edge[S, O](subject: S, predicate: Property, `object`: O)(implicit
-      sRenderer:          Renderer[RdfResource, S],
-      oRenderer:          Renderer[RdfResource, O]
-  ): Triple = Edge(EntityId.of(sRenderer render subject), predicate, EntityId.of(oRenderer render `object`))
+      sEncoder:           EntityIdEncoder[S],
+      oEncoder:           EntityIdEncoder[O]
+  ): Triple = Edge(sEncoder(subject), predicate, oEncoder(`object`))
+
+  def edge[O](subject: EntityId, predicate: Property, `object`: O)(implicit
+      oEncoder:        EntityIdEncoder[O]
+  ): Triple = Edge(subject, predicate, oEncoder(`object`))
+
+  def edge[S](subject: S, predicate: Property, `object`: EntityId)(implicit
+      sEncoder:        EntityIdEncoder[S]
+  ): Triple = Edge(sEncoder(subject), predicate, `object`)
 
   def edge(subject: EntityId, predicate: Property, `object`: EntityId): Triple =
     Edge(subject, predicate, `object`)

@@ -19,16 +19,23 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persondetails
 
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class UpdatesCreatorSpec
+    extends AnyWordSpec
+    with IOSpec
+    with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   import UpdatesCreator._
 
@@ -46,7 +53,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
                                          maybeAffiliation = personAffiliations.generateSome
         )
 
-        loadToStore(kgPerson)
+        upload(to = renkuDataset, kgPerson)
 
         findPersons shouldBe Set(
           (kgPerson.resourceId.value,
@@ -59,7 +66,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
         val queries = preparePreDataUpdates(kgPerson, mergedPerson)
 
-        queries.runAll.unsafeRunSync()
+        queries.runAll(on = renkuDataset).unsafeRunSync()
 
         findPersons shouldBe Set((kgPerson.resourceId.value, None, None, None, kgPerson.gitLabId.value.some))
       }
@@ -73,7 +80,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
           .toMaybe[entities.Person.WithGitLabId]
         val mergedPerson = kgPerson.copy(maybeEmail = None, maybeAffiliation = None)
 
-        loadToStore(kgPerson)
+        upload(to = renkuDataset, kgPerson)
 
         findPersons shouldBe Set(
           (kgPerson.resourceId.value,
@@ -86,7 +93,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
         val queries = preparePreDataUpdates(kgPerson, mergedPerson)
 
-        queries.runAll.unsafeRunSync()
+        queries.runAll(on = renkuDataset).unsafeRunSync()
 
         findPersons shouldBe Set(
           (kgPerson.resourceId.value, Some(kgPerson.name.value), None, None, kgPerson.gitLabId.value.some)
@@ -117,7 +124,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
                                         maybeAffiliation = personAffiliations.generateSome
       )
 
-      loadToStore(person, duplicatePerson)
+      upload(to = renkuDataset, person, duplicatePerson)
 
       findPersons.toIdAndPropertyPairs shouldBe Set(
         (person.resourceId.value -> person.name.value).some,
@@ -132,7 +139,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
       val queries = preparePostDataUpdates(person)
 
-      queries.runAll.unsafeRunSync()
+      queries.runAll(on = renkuDataset).unsafeRunSync()
 
       findPersons shouldBe Set(
         (person.resourceId.value,
@@ -151,7 +158,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         .generateOne
         .toMaybe[entities.Person.WithGitLabId]
 
-      loadToStore(person)
+      upload(to = renkuDataset, person)
 
       findPersons shouldBe Set(
         (person.resourceId.value,
@@ -164,7 +171,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
       val queries = preparePostDataUpdates(person)
 
-      queries.runAll.unsafeRunSync()
+      queries.runAll(on = renkuDataset).unsafeRunSync()
 
       findPersons shouldBe Set(
         (person.resourceId.value,
@@ -178,20 +185,26 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
   }
 
   private def findPersons: Set[(String, Option[String], Option[String], Option[String], Option[Int])] =
-    runQuery(s"""|SELECT ?id ?name ?email ?affiliation ?sameAsId ?gitlabId
-                 |WHERE {
-                 |  ?id a schema:Person .
-                 |  OPTIONAL { ?id schema:name ?name } .
-                 |  OPTIONAL { ?id schema:email ?email } .
-                 |  OPTIONAL { ?id schema:affiliation ?affiliation } .
-                 |  OPTIONAL { ?id schema:sameAs ?sameAsId.
-                 |             ?sameAsId a schema:URL;
-                 |                       schema:additionalType 'GitLab';
-                 |                       schema:identifier ?gitlabId.
-                 |  }
-                 |}
-                 |""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch person data",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?id ?name ?email ?affiliation ?sameAsId ?gitlabId
+            |WHERE {
+            |  ?id a schema:Person .
+            |  OPTIONAL { ?id schema:name ?name } .
+            |  OPTIONAL { ?id schema:email ?email } .
+            |  OPTIONAL { ?id schema:affiliation ?affiliation } .
+            |  OPTIONAL { ?id schema:sameAs ?sameAsId.
+            |             ?sameAsId a schema:URL;
+            |                       schema:additionalType 'GitLab';
+            |                       schema:identifier ?gitlabId.
+            |  }
+            |}
+            |""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row =>
         (row("id"), row.get("name"), row.get("email"), row.get("affiliation"), row.get("gitlabId").map(_.toInt))
       )

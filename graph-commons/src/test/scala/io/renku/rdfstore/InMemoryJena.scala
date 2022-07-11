@@ -98,13 +98,13 @@ trait InMemoryJena {
   def upload[T](to: DatasetName, objects: T*)(implicit encoder: JsonLDEncoder[T], ioRuntime: IORuntime): Unit =
     upload(to, objects.map(encoder.apply): _*)
 
-  def insertTriple(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
+  def insert(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
     .runUpdate {
       SparqlQuery.of("insert triple", show"INSERT DATA { $triple }")
     }
     .unsafeRunSync()
 
-  def deleteTriple(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
+  def delete(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
     .runUpdate {
       SparqlQuery.of("delete triple", show"DELETE DATA { $triple }")
     }

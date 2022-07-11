@@ -19,10 +19,10 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
-import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.datasetSameAs
+import eu.timepit.refined.auto._
 import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
@@ -30,14 +30,21 @@ import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import tooling._
 
-class MultipleDSSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore with MockFactory {
+class MultipleDSSameAsSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with MockFactory {
 
   "query" should {
 
@@ -51,17 +58,17 @@ class MultipleDSSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec 
         .importDataset(ds)
         .generateOne
 
-      loadToStore(dsProject, importedDSProject)
+      upload(to = renkuDataset, dsProject, importedDSProject)
 
       val additionalSameAsId = datasetSameAs.generateOne.entityId
-      insertTriple(importedDS.entityId, "schema:sameAs", show"<$additionalSameAsId>")
+      insert(to = renkuDataset, Triple.edge(importedDS.entityId, schema / "sameAs", additionalSameAsId))
 
       findSameAsIds(importedDS.identification.identifier) shouldBe Set(importedDS.provenance.sameAs.entityId,
                                                                        additionalSameAsId
       )
       findSameAsIds(ds.identification.identifier) shouldBe Set.empty
 
-      runUpdate(MultipleDSSameAs.query).unsafeRunSync() shouldBe ()
+      runUpdate(on = renkuDataset, MultipleDSSameAs.query).unsafeRunSync() shouldBe ()
 
       findSameAsIds(importedDS.identification.identifier) shouldBe Set(importedDS.provenance.sameAs.entityId)
       findSameAsIds(ds.identification.identifier)         shouldBe Set.empty
@@ -73,18 +80,24 @@ class MultipleDSSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec 
       implicit val logger:          TestLogger[IO]              = TestLogger[IO]()
       implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
       implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
-      MultipleModifiedDSData[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
+      MultipleDSSameAs[IO].unsafeRunSync().getClass shouldBe classOf[UpdateQueryMigration[IO]]
     }
   }
 
   private def findSameAsIds(id: datasets.Identifier): Set[EntityId] =
-    runQuery(s"""|SELECT ?sameAs
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      schema:sameAs ?sameAs
-                 |}""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch ds sameAs",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?sameAs
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      schema:sameAs ?sameAs
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => EntityId.of(row("sameAs")))
       .toSet
 

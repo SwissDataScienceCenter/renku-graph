@@ -20,14 +20,19 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.graph.model.testentities._
 import io.renku.graph.model._
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.graph.model.testentities._
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class MalformedActivityIdsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MalformedActivityIdsSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "query" should {
 
@@ -49,7 +54,8 @@ class MalformedActivityIdsSpec extends AnyWordSpec with should.Matchers with IOS
         p.copy(activities = p.activities.map(makeResourceIdBroken))
       }
 
-      loadToStore(
+      upload(
+        to = renkuDataset,
         project1,
         project2,
         anyRenkuProjectEntities
@@ -59,7 +65,7 @@ class MalformedActivityIdsSpec extends AnyWordSpec with should.Matchers with IOS
         anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
       )
 
-      runQuery(MalformedActivityIds.query)
+      runSelect(on = renkuDataset, MalformedActivityIds.query)
         .unsafeRunSync()
         .map(row => projects.Path(row("path")))
         .toSet shouldBe Set(project1.path, project2.path)

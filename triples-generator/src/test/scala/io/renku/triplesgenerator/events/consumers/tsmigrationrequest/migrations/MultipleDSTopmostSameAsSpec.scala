@@ -19,22 +19,28 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.datasetResourceIds
 import io.renku.graph.model.datasets
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.views.RdfResource
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import tooling.UpdateQueryMigration
 
-class MultipleDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MultipleDSTopmostSameAsSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "query" should {
 
@@ -51,15 +57,17 @@ class MultipleDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with 
         val (importedDS2, importedDS2Project) =
           renkuProjectEntities(anyVisibility).importDataset(originalDS).generateOne
 
-        loadToStore(originalDSProject, importedDS1Project, importedDS2Project)
+        upload(to = renkuDataset, originalDSProject, importedDS1Project, importedDS2Project)
 
-        insertTriple(importedDS1.entityId, "renku:topmostSameAs", datasetResourceIds.generateOne.showAs[RdfResource])
+        insert(to = renkuDataset,
+               Triple.edge(importedDS1.entityId, renku / "topmostSameAs", datasetResourceIds.generateOne)
+        )
 
         findTopmostSameAs(originalDS.identification.identifier)       shouldBe Set(TopmostSameAs(originalDS.entityId))
         findTopmostSameAs(importedDS1.identification.identifier).size shouldBe 2
         findTopmostSameAs(importedDS2.identification.identifier)      shouldBe Set(TopmostSameAs(originalDS.entityId))
 
-        runUpdate(MultipleDSTopmostSameAs.query).unsafeRunSync() shouldBe ()
+        runUpdate(on = renkuDataset, MultipleDSTopmostSameAs.query).unsafeRunSync() shouldBe ()
 
         findTopmostSameAs(originalDS.identification.identifier)  shouldBe Set(TopmostSameAs(originalDS.entityId))
         findTopmostSameAs(importedDS1.identification.identifier) shouldBe Set(TopmostSameAs(originalDS.entityId))
@@ -77,13 +85,19 @@ class MultipleDSTopmostSameAsSpec extends AnyWordSpec with should.Matchers with 
   }
 
   private def findTopmostSameAs(id: datasets.Identifier): Set[datasets.TopmostSameAs] =
-    runQuery(s"""|SELECT ?sameAs 
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |  schema:identifier '$id';
-                 |  renku:topmostSameAs ?sameAs
-                 |}""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch ds sameAs",
+        Prefixes.of(renku -> "renku", schema -> "schema"),
+        s"""|SELECT ?sameAs 
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |  schema:identifier '$id';
+            |  renku:topmostSameAs ?sameAs
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => datasets.TopmostSameAs(row("sameAs")))
       .toSet
 }

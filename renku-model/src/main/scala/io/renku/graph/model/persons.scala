@@ -19,18 +19,17 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
+import io.circe.DecodingFailure
 import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.graph.model.views.{EntityIdJsonLdOps, RdfResource, TinyTypeJsonLDOps}
+import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt}
 
 object persons {
 
   sealed trait ResourceId extends Any with StringTinyType
-  implicit object ResourceId
-      extends TinyTypeFactory[ResourceId](ResourceIdFactory)
-      with Constraints[ResourceId]
-      with EntityIdJsonLdOps[ResourceId] {
+  implicit object ResourceId extends TinyTypeFactory[ResourceId](ResourceIdFactory) with Constraints[ResourceId] {
 
     addConstraint(
       check = value =>
@@ -44,7 +43,6 @@ object persons {
     final class GitLabIdBased private[persons] (val value: String) extends AnyVal with ResourceId
     object GitLabIdBased
         extends TinyTypeFactory[GitLabIdBased](new GitLabIdBased(_))
-        with EntityIdJsonLdOps[GitLabIdBased]
         with Constraints[GitLabIdBased]
         with NonBlank[GitLabIdBased] {
       private[persons] val validator = "^http(s)?://.*/persons/\\d+$"
@@ -52,12 +50,13 @@ object persons {
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
       )
+
+      lazy val rdfRenderer: Renderer[RdfResource, GitLabIdBased] = { id => s"<${sparqlEncode(id.value)}>" }
     }
 
     final class OrcidIdBased private[persons] (val value: String) extends AnyVal with ResourceId
     object OrcidIdBased
         extends TinyTypeFactory[OrcidIdBased](new OrcidIdBased(_))
-        with EntityIdJsonLdOps[OrcidIdBased]
         with Constraints[OrcidIdBased]
         with NonBlank[OrcidIdBased] {
       private[persons] val validator = "^http(s)?://.*/persons\\/orcid\\/\\d{4}-\\d{4}-\\d{4}-\\d{4}$"
@@ -65,25 +64,31 @@ object persons {
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
       )
+
+      lazy val rdfRenderer: Renderer[RdfResource, OrcidIdBased] = { id => s"<${sparqlEncode(id.value)}>" }
     }
 
     final class EmailBased private[persons] (val value: String) extends AnyVal with ResourceId
     object EmailBased
         extends TinyTypeFactory[EmailBased](new EmailBased(_))
-        with EntityIdJsonLdOps[EmailBased]
         with Constraints[EmailBased]
         with NonBlank[EmailBased] {
       private[persons] val validator = "^mailto:(.*)@.*$"
+      private val validatorRegex     = validator.r
       addConstraint(
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
       )
+
+      lazy val rdfRenderer: Renderer[RdfResource, EmailBased] = _.value match {
+        case id @ validatorRegex(localPart) => s"<${id.replace(localPart, sparqlEncode(localPart))}>"
+        case id => throw new IllegalStateException(s"EmailBased Person Id without 'mailto:' scheme: $id")
+      }
     }
 
     final class NameBased private[persons] (val value: String) extends AnyVal with ResourceId
     object NameBased
         extends TinyTypeFactory[NameBased](new NameBased(_))
-        with EntityIdJsonLdOps[NameBased]
         with Constraints[NameBased]
         with NonBlank[NameBased] {
       private[persons] val validator = "^http(s)?://.*/persons/.+$"
@@ -91,6 +96,8 @@ object persons {
         check = _.trim.matches(validator),
         message = (v: String) => s"$v is not valid $typeName"
       )
+
+      lazy val rdfRenderer: Renderer[RdfResource, NameBased] = { id => s"<${sparqlEncode(id.value)}>" }
     }
 
     def apply(gitLabId: GitLabId)(implicit renkuUrl: RenkuUrl): GitLabIdBased =
@@ -104,12 +111,27 @@ object persons {
     def apply(name: Name)(implicit renkuUrl: RenkuUrl): NameBased =
       new NameBased((renkuUrl / "persons" / name).show)
 
-    implicit object UsersResourceIdRdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
-      private val localPartExtractor = "^mailto:(.*)@.*$".r
+    implicit lazy val rdfRenderer: Renderer[RdfResource, ResourceId] = {
+      case id: GitLabIdBased => GitLabIdBased.rdfRenderer.render(id)
+      case id: OrcidIdBased  => OrcidIdBased.rdfRenderer.render(id)
+      case id: EmailBased    => EmailBased.rdfRenderer.render(id)
+      case id: NameBased     => NameBased.rdfRenderer.render(id)
+    }
 
-      override def render(id: ResourceId): String = id.value match {
-        case localPartExtractor(localPart) => s"<${id.value.replace(localPart, sparqlEncode(localPart))}>"
-        case otherId                       => s"<${sparqlEncode(otherId)}>"
+    implicit def entityIdEncoder[ID <: ResourceId]: EntityIdEncoder[ID] = EntityIdEncoder.instance[ID] {
+      case id: GitLabIdBased => EntityId.of(id.value)
+      case id: OrcidIdBased  => EntityId.of(id.value)
+      case id: EmailBased    => EntityId.of(id.value)
+      case id: NameBased     => EntityId.of(id.value)
+    }
+
+    implicit lazy val entityIdDecoder: JsonLDDecoder[ResourceId] = JsonLDDecoder.instance {
+      JsonLDDecoder.decodeEntityId >>> {
+        _.flatMap(entityId =>
+          ResourceId
+            .from(entityId.toString)
+            .leftMap(e => DecodingFailure(s"Cannot decode $entityId entityId: ${e.getMessage}", Nil))
+        )
       }
     }
   }

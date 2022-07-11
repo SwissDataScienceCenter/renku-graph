@@ -19,22 +19,29 @@
 package io.renku.triplesgenerator.events.consumers.membersync
 
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.testentities._
 import io.renku.graph.model.persons.{Email, GitLabId}
+import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{persons, projects}
 import io.renku.jsonld.syntax._
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.membersync.Generators._
 import io.renku.triplesgenerator.events.consumers.membersync.PersonOps._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class UpdatesCreatorSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "removal" should {
 
@@ -45,7 +52,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       val allMembers      = Set(memberToRemove0, memberToRemove1, memberToStay)
       val project         = anyRenkuProjectEntities.modify(membersLens.modify(_ => allMembers)).generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       findMembers(project.path) shouldBe allMembers.flatMap(_.maybeGitLabId)
 
@@ -54,7 +61,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         Set(memberToRemove0, memberToRemove1).flatMap(_.toMaybe[KGProjectMember]) + kgProjectMembers.generateOne
       )
 
-      queries.map(runUpdate).sequence.unsafeRunSync()
+      queries.runAll(on = renkuDataset).unsafeRunSync()
 
       findMembers(project.path) shouldBe Set(memberToStay.maybeGitLabId).flatten
     }
@@ -67,7 +74,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
       val project    = anyRenkuProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
 
-      loadToStore(project.asJsonLD, personInKG.asJsonLD)
+      upload(to = renkuDataset, project.asJsonLD, personInKG.asJsonLD)
 
       findMembers(project.path) shouldBe Set.empty
 
@@ -76,7 +83,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         Set(member -> personInKG.resourceId.some)
       )
 
-      queries.map(runUpdate).sequence.unsafeRunSync()
+      queries.runAll(on = renkuDataset).unsafeRunSync()
 
       findMembersEmails(project.path) shouldBe Set(member.gitLabId -> personInKG.maybeEmail)
     }
@@ -85,7 +92,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
       val project = anyRenkuProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       findMembers(project.path) shouldBe Set.empty
 
@@ -95,7 +102,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         Set(member -> Option.empty[persons.ResourceId])
       )
 
-      queries.map(runUpdate).sequence.unsafeRunSync()
+      queries.runAll(on = renkuDataset).unsafeRunSync()
 
       findMembersEmails(project.path) shouldBe Set(member.gitLabId -> Option.empty[persons.Email])
     }
@@ -112,7 +119,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         Set(member -> Option.empty[persons.ResourceId])
       )
 
-      queries.map(runUpdate).sequence.unsafeRunSync()
+      queries.runAll(on = renkuDataset).unsafeRunSync()
 
       findMembersEmails(projectPath) shouldBe Set(
         member.gitLabId -> Option.empty[persons.Email]
@@ -124,7 +131,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
       val member     = gitLabProjectMembers.generateOne
       val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
 
-      loadToStore(personInKG)
+      upload(to = renkuDataset, personInKG)
 
       val projectPath = projectPaths.generateOne
 
@@ -135,7 +142,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
         Set(member -> personInKG.resourceId.some)
       )
 
-      queries.map(runUpdate).sequence.unsafeRunSync()
+      queries.runAll(on = renkuDataset).unsafeRunSync()
 
       findMembersEmails(projectPath) shouldBe Set(
         member.gitLabId -> personInKG.maybeEmail
@@ -144,7 +151,6 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
   }
 
   /*
-
   Difficult situation would be if the person doesn't exist in KG yet but we need to create the link to the project
   We can fetch this information when we're fetching project members
 
@@ -158,27 +164,18 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
 
   for all existing members in KG who have been removed in gitlab,
     remove link in KG
-
-
-    - new project created and initial push to gitlab
-    - Gitlab sends commit event to EL
-    - EL puts a new event to the event table and new project to the project table
-    - EL will trigger two events
-      - commit event
-      - members sync
-    - both events reach TG at the same time
-    - member sync event is first
-      - links are created regardless of the project exists in KG
    */
-
   private lazy val updatesCreator = new UpdatesCreator(renkuUrl, gitLabApiUrl)
 
-  private def findMembers(path: projects.Path): Set[GitLabId] =
-    runQuery(
+  private def findMembers(path: projects.Path): Set[GitLabId] = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "find gitLabId",
+      Prefixes of schema -> "schema",
       s"""|SELECT DISTINCT ?gitLabId
           |WHERE {
           |  ${projects.ResourceId(path).showAs[RdfResource]} schema:member ?memberId.
-          |  ?memberId  rdf:type      schema:Person;
+          |  ?memberId  a             schema:Person;
           |             schema:sameAs ?sameAsId. 
           |             
           |  ?sameAsId  schema:additionalType  'GitLab';
@@ -186,16 +183,19 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
           |}
           |""".stripMargin
     )
-      .unsafeRunSync()
-      .flatMap(row => row.get("gitLabId").map(_.toInt).map(GitLabId.apply))
-      .toSet
+  ).unsafeRunSync()
+    .flatMap(row => row.get("gitLabId").map(_.toInt).map(GitLabId.apply))
+    .toSet
 
-  private def findMembersEmails(path: projects.Path): Set[(GitLabId, Option[Email])] =
-    runQuery(
+  private def findMembersEmails(path: projects.Path): Set[(GitLabId, Option[Email])] = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "find gitLabId and email",
+      Prefixes of schema -> "schema",
       s"""|SELECT DISTINCT ?gitLabId ?email
           |WHERE {
           |  ${projects.ResourceId(path).showAs[RdfResource]} schema:member ?memberId.
-          |  ?memberId  rdf:type     schema:Person;
+          |  ?memberId  a             schema:Person;
           |             schema:sameAs ?sameAsId. 
           |             
           |  ?sameAsId  schema:additionalType  'GitLab';
@@ -207,7 +207,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
           |}
           |""".stripMargin
     )
-      .unsafeRunSync()
-      .map(row => GitLabId(row("gitLabId").toInt) -> row.get("email").map(Email.apply))
-      .toSet
+  ).unsafeRunSync()
+    .map(row => GitLabId(row("gitLabId").toInt) -> row.get("email").map(Email.apply))
+    .toSet
 }

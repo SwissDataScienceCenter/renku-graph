@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.consumers.cleanup
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.testentities._
@@ -29,7 +30,8 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax.JsonEncoderOps
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -39,7 +41,8 @@ class ProjectTriplesRemoverSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
-    with InMemoryRdfStore
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with ScalaCheckPropertyChecks
     with EntitiesGenerators {
 
@@ -47,7 +50,7 @@ class ProjectTriplesRemoverSpec
 
     "remove all activities, datasets and their dependant entities of a project and the project itself" in new TestCase {
       forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
-        loadToStore(project.asJsonLD)
+        upload(to = renkuDataset, project.asJsonLD)
 
         projectTriplesRemover.removeTriples(project.path).unsafeRunSync()
 
@@ -60,7 +63,7 @@ class ProjectTriplesRemoverSpec
         forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
           val (projectData, child) = project.forkOnce()
 
-          loadToStore(projectData.asJsonLD, child.asJsonLD)
+          upload(to = renkuDataset, projectData.asJsonLD, child.asJsonLD)
 
           projectTriplesRemover.removeTriples(projectData.path).unsafeRunSync()
 
@@ -83,7 +86,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        loadToStore(middleProject, bottomProject, topProject)
+        upload(to = renkuDataset, middleProject, bottomProject, topProject)
 
         projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
 
@@ -112,7 +115,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        loadToStore(middleProject, bottomProject, topProject)
+        upload(to = renkuDataset, middleProject, bottomProject, topProject)
 
         projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
 
@@ -141,7 +144,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        loadToStore(middleProject, bottomProject, topProject)
+        upload(to = renkuDataset, middleProject, bottomProject, topProject)
 
         projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
 
@@ -171,7 +174,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        loadToStore(middleProject, bottomProject, topProject)
+        upload(to = renkuDataset, middleProject, bottomProject, topProject)
 
         projectTriplesRemover.removeTriples(bottomProject.path).unsafeRunSync()
 
@@ -204,7 +207,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProject1DS).generateOne
 
-        loadToStore(middleProject1, middleProject2, bottomProject, topProject)
+        upload(to = renkuDataset, middleProject1, middleProject2, bottomProject, topProject)
 
         projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
 
@@ -261,7 +264,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProject1DS).generateOne
 
-        loadToStore(topProject, middleProject1, middleProject2, bottomProject)
+        upload(to = renkuDataset, topProject, middleProject1, middleProject2, bottomProject)
 
         projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
 
@@ -301,7 +304,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        loadToStore(bottomProject.asJsonLD, topProject.asJsonLD, topProjectFork.asJsonLD)
+        upload(to = renkuDataset, bottomProject.asJsonLD, topProject.asJsonLD, topProjectFork.asJsonLD)
 
         projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
 
@@ -332,7 +335,12 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        loadToStore(topProject.asJsonLD, middleProject.asJsonLD, middleProjectFork.asJsonLD, bottomProject.asJsonLD)
+        upload(to = renkuDataset,
+               topProject.asJsonLD,
+               middleProject.asJsonLD,
+               middleProjectFork.asJsonLD,
+               bottomProject.asJsonLD
+        )
 
         projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
 
@@ -367,7 +375,12 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        loadToStore(topProject.asJsonLD, middleProject.asJsonLD, middleProjectFork.asJsonLD, bottomProject.asJsonLD)
+        upload(to = renkuDataset,
+               topProject.asJsonLD,
+               middleProject.asJsonLD,
+               middleProjectFork.asJsonLD,
+               bottomProject.asJsonLD
+        )
 
         projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
         projectTriplesRemover.removeTriples(middleProjectFork.path).unsafeRunSync()
@@ -403,7 +416,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProject2DS, bottomProject2) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        loadToStore(topProject, middleProject, middleProjectFork, bottomProject1, bottomProject2)
+        upload(to = renkuDataset, topProject, middleProject, middleProjectFork, bottomProject1, bottomProject2)
 
         projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
 
@@ -428,29 +441,43 @@ class ProjectTriplesRemoverSpec
       }
   }
 
-  private def findAllData = runQuery(s"""SELECT ?s ?p ?o WHERE { ?s ?p ?o }""").map(_.map(_.values.toList))
-
-  private def findProject(projectPath: projects.Path) = runQuery(
-    s"""SELECT ?p ?o 
-        WHERE { 
-          <$renkuUrl/projects/$projectPath> ?p ?o .
-        } """
+  private def findAllData = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "find all data",
+      s"""SELECT ?s ?p ?o WHERE { ?s ?p ?o }"""
+    )
   ).map(_.map(_.values.toList))
 
-  private def findDataset(datasetId: EntityId) = runQuery(
-    s"""SELECT ?p ?o 
-        WHERE { 
-          <$datasetId> ?p ?o .
-        } """
+  private def findProject(projectPath: projects.Path) = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "find project triples",
+      s"""SELECT ?p ?o 
+          WHERE { <$renkuUrl/projects/$projectPath> ?p ?o . }"""
+    )
   ).map(_.map(_.values.toList))
 
-  private def findSameAs(datasetId: EntityId): IO[Option[(Option[datasets.SameAs], TopmostSameAs)]] = runQuery(
-    s"""SELECT ?sameAs ?topmostSameAs 
-        WHERE {
-          <$datasetId> renku:topmostSameAs ?topmostSameAs . 
-          OPTIONAL {<$datasetId> schema:sameAs/schema:url ?sameAs .}                                  
-        }
-       """
+  private def findDataset(datasetId: EntityId) = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "find DS triples",
+      s"""SELECT ?p ?o 
+          WHERE { <$datasetId> ?p ?o . }"""
+    )
+  ).map(_.map(_.values.toList))
+
+  private def findSameAs(datasetId: EntityId): IO[Option[(Option[datasets.SameAs], TopmostSameAs)]] = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "find DS sameAs",
+      Prefixes.of(renku -> "renku", schema -> "schema"),
+      s"""SELECT ?sameAs ?topmostSameAs 
+          WHERE {
+            <$datasetId> renku:topmostSameAs ?topmostSameAs . 
+            OPTIONAL {<$datasetId> schema:sameAs/schema:url ?sameAs .}                                  
+          }"""
+    )
   ) map {
     case Nil => None
     case props :: Nil =>
@@ -461,7 +488,7 @@ class ProjectTriplesRemoverSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](renkuStoreConfig, renkuUrl)
+    val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](renkuDSConnectionInfo, renkuUrl)
   }
 
   private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance]): EntityId =

@@ -21,6 +21,7 @@ package migrations
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.config.ServiceVersion
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
@@ -29,7 +30,8 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -40,7 +42,8 @@ class MultipleOriginalIdentifiersSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
-    with InMemoryRdfStore
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with MockFactory {
 
   "run" should {
@@ -56,9 +59,11 @@ class MultipleOriginalIdentifiersSpec
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .generateOne
 
-      loadToStore(correctProject, brokenProject)
+      upload(to = renkuDataset, correctProject, brokenProject)
 
-      insertTriple(brokenDS.entityId, "renku:originalIdentifier", show"'${brokenDS.identification.identifier}'")
+      insert(to = renkuDataset,
+             Triple(brokenDS.entityId, renku / "originalIdentifier", brokenDS.identification.identifier)
+      )
 
       findOriginalIdentifiers(brokenDS.identification.identifier) shouldBe Set(
         brokenDS.provenance.originalIdentifier,
@@ -84,8 +89,8 @@ class MultipleOriginalIdentifiersSpec
     implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
     val executionRegister = mock[MigrationExecutionRegister[IO]]
-    val recordsFinder     = RecordsFinder[IO](renkuStoreConfig)
-    val updateRunner      = UpdateQueryRunner[IO](renkuStoreConfig)
+    val recordsFinder     = RecordsFinder[IO](renkuDSConnectionInfo)
+    val updateRunner      = UpdateQueryRunner[IO](renkuDSConnectionInfo)
     val migration         = new MultipleOriginalIdentifiers[IO](executionRegister, recordsFinder, updateRunner)
 
     lazy val satisfyMocks = {
@@ -95,13 +100,19 @@ class MultipleOriginalIdentifiersSpec
   }
 
   private def findOriginalIdentifiers(id: datasets.Identifier): Set[datasets.OriginalIdentifier] =
-    runQuery(s"""|SELECT ?version 
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      renku:originalIdentifier ?version
-                 |}""".stripMargin)
-      .unsafeRunSync()
-      .map(row => datasets.OriginalIdentifier(row("version")))
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch ds originalIdentifier",
+        Prefixes.of(renku -> "renku", schema -> "schema"),
+        s"""|SELECT ?originalId
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      renku:originalIdentifier ?originalId
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
+      .map(row => datasets.OriginalIdentifier(row("originalId")))
       .toSet
 }

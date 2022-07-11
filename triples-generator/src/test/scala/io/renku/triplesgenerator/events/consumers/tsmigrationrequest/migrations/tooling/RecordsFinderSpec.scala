@@ -28,12 +28,17 @@ import io.renku.graph.model.Schemas.schema
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class RecordsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryRdfStore with IOSpec {
+class RecordsFinderSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with IOSpec {
 
   "findRecords" should {
 
@@ -41,7 +46,7 @@ class RecordsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryRd
 
       val entityId = entityIds.generateOne
       val name     = nonEmptyStrings().generateOne
-      insertTriple(entityId, "schema:name", s"'$name'")
+      insert(to = renkuDataset, Triple(entityId, schema / "name", name))
 
       implicit val decoder: Decoder[List[String]] =
         ResultsDecoder[List, String](implicit cur => extract[String]("name"))
@@ -60,6 +65,6 @@ class RecordsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryRd
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val client = new RecordsFinderImpl[IO](renkuStoreConfig)
+    val client = new RecordsFinderImpl[IO](renkuDSConnectionInfo)
   }
 }

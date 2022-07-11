@@ -27,7 +27,6 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.views.RdfResource
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
@@ -38,7 +37,12 @@ import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class KGDatasetInfoFinderSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "findTopmostSameAs" should {
 
@@ -46,7 +50,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
       val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       finder
         .findTopmostSameAs(dataset.resourceId)
@@ -58,9 +62,9 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
       val otherTopmostSameAs = datasetTopmostSameAs.generateOne
-      insertTriple(dataset.resourceId, "renku:topmostSameAs", otherTopmostSameAs.showAs[RdfResource])
+      insert(to = renkuDataset, Triple.edge(dataset.resourceId, renku / "topmostSameAs", otherTopmostSameAs))
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       finder
         .findTopmostSameAs(dataset.resourceId)
@@ -77,7 +81,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
     "return the dataset's topmostSameAs if this dataset has one" in new TestCase {
       val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       finder.findParentTopmostSameAs(SameAs(dataset.entityId)).unsafeRunSync() shouldBe
         Some(dataset.provenance.topmostSameAs)
@@ -90,7 +94,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
     "return None if there's a dataset with the given id but it has no topmostSameAs" in new TestCase {
       val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       removeTopmostSameAs(dataset.entityId)
 
@@ -100,9 +104,11 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
     "fail if the dataset has multiple topmostSameAs" in new TestCase {
       val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
-      insertTriple(dataset.entityId, "renku:topmostSameAs", datasetTopmostSameAs.generateOne.showAs[RdfResource])
+      insert(to = renkuDataset,
+             Triple.edge(dataset.entityId, renku / "topmostSameAs", datasetTopmostSameAs.generateOne.asEntityId)
+      )
 
       val sameAs = SameAs(dataset.entityId)
 
@@ -123,7 +129,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       finder.findDatasetCreators(dataset.resourceId).unsafeRunSync() shouldBe
         dataset.provenance.creators.map(_.resourceId).toList.toSet
@@ -140,10 +146,10 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
       val dataset = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       val otherOriginalId = datasetOriginalIdentifiers.generateOne
-      insertTriple(dataset.resourceId, "renku:originalIdentifier", show"'$otherOriginalId'")
+      insert(to = renkuDataset, Triple(dataset.resourceId, renku / "originalIdentifier", otherOriginalId))
 
       finder.findDatasetOriginalIdentifiers(dataset.resourceId).unsafeRunSync() shouldBe
         Set(dataset.provenance.originalIdentifier, otherOriginalId)
@@ -162,10 +168,10 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
       val dataset = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       val otherDateCreated = datasetCreatedDates(min = dataset.provenance.date.instant).generateOne
-      insertTriple(dataset.resourceId, "schema:dateCreated", show"'$otherDateCreated'")
+      insert(to = renkuDataset, Triple(dataset.resourceId, schema / "dateCreated", otherDateCreated))
 
       finder.findDatasetDateCreated(dataset.resourceId).unsafeRunSync() shouldBe
         Set(dataset.provenance.date, otherDateCreated)
@@ -186,10 +192,10 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       val description2 = datasetDescriptions.generateOne
-      insertTriple(dataset.resourceId, "schema:description", show"'$description2'")
+      insert(to = renkuDataset, Triple(dataset.resourceId, schema / "description", description2))
 
       finder.findDatasetDescriptions(dataset.resourceId).unsafeRunSync() shouldBe
         Set(description1, description2)
@@ -202,7 +208,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       finder.findDatasetDescriptions(dataset.resourceId).unsafeRunSync() shouldBe Set.empty
     }
@@ -223,10 +229,10 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
       ).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
 
-      loadToStore(originalDS.asJsonLD, importedDS.asJsonLD)
+      upload(to = renkuDataset, originalDS.asJsonLD, importedDS.asJsonLD)
 
       val otherSameAs = datasetSameAs.generateOne.entityId
-      insertTriple(importedDS.resourceId, "schema:sameAs", show"<$otherSameAs>")
+      insert(to = renkuDataset, Triple.edge(importedDS.resourceId, schema / "sameAs", otherSameAs))
 
       finder.findDatasetSameAs(importedDS.resourceId).unsafeRunSync().map(_.show) shouldBe
         Set(importedDS.provenance.sameAs.entityId, otherSameAs).map(_.show)
@@ -240,10 +246,11 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new KGDatasetInfoFinderImpl[IO](renkuStoreConfig)
+    val finder = new KGDatasetInfoFinderImpl[IO](renkuDSConnectionInfo)
   }
 
-  private def removeTopmostSameAs(datasetId: EntityId): Unit = runUpdate {
+  private def removeTopmostSameAs(datasetId: EntityId): Unit = runUpdate(
+    on = renkuDataset,
     SparqlQuery.of(
       name = "topmostSameAs removal",
       Prefixes.of(renku -> "renku", schema -> "schema"),
@@ -254,7 +261,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfSt
                  |}
                  |""".stripMargin
     )
-  }.unsafeRunSync()
+  ).unsafeRunSync()
 
   private implicit class SameAsOps(sameAs: SameAs) {
     lazy val entityId: EntityId = sameAs.asJsonLD.entityId.getOrElse(fail("Cannot obtain sameAs @id"))

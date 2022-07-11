@@ -25,28 +25,33 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class TriplesRemoverSpec
+    extends AnyWordSpec
+    with IOSpec
+    with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "removeAllTriples" should {
 
     "remove all the triples from the storage except for CLI version" in new TestCase {
-      loadToStore(
-        anyRenkuProjectEntities.generateOne.asJsonLD,
-        anyRenkuProjectEntities.generateOne.asJsonLD,
-        renkuVersionPairs.generateOne.asJsonLD
+      upload(to = renkuDataset,
+             anyRenkuProjectEntities.generateOne.asJsonLD,
+             anyRenkuProjectEntities.generateOne.asJsonLD,
+             renkuVersionPairs.generateOne.asJsonLD
       )
 
-      rdfStoreSize should be > 0
+      triplesCount(on = renkuDataset) should be > 0L
 
       triplesRemover.removeAllTriples().unsafeRunSync() shouldBe ()
 
-      rdfStoreSize shouldBe 0
+      triplesCount(on = renkuDataset) shouldBe 0L
     }
   }
 
@@ -56,6 +61,6 @@ class TriplesRemoverSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
     private val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
       TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
-    val triplesRemover = new TriplesRemoverImpl[IO](removalBatchSize, renkuStoreConfig)
+    val triplesRemover = new TriplesRemoverImpl[IO](removalBatchSize, renkuDSConnectionInfo)
   }
 }

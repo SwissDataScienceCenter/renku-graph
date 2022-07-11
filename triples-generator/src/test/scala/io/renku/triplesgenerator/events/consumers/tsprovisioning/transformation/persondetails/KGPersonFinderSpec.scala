@@ -19,28 +19,34 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persondetails
 
 import cats.effect.IO
-import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.personNames
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import io.renku.jsonld.syntax._
 import io.renku.graph.model.{entities, persons}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class KGPersonFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class KGPersonFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "find" should {
 
     "find a Person by its resourceId" in new TestCase {
       val person = personEntities().generateOne.to[entities.Person]
 
-      loadToStore(person)
+      upload(to = renkuDataset, person)
 
       finder.find(person).unsafeRunSync() shouldBe Some(person)
     }
@@ -48,11 +54,11 @@ class KGPersonFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
     "pick-up one of the Person names if there multiple" in new TestCase {
       val person = personEntities().generateOne.to[entities.Person]
 
-      loadToStore(person)
+      upload(to = renkuDataset, person)
 
       val duplicateNames = personNames.generateNonEmptyList().toList.toSet
       duplicateNames foreach { name =>
-        insertTriple(person.resourceId, "schema:name", show"'${sparqlEncode(name.show)}'")
+        insert(to = renkuDataset, Triple(person.resourceId.asEntityId, schema / "name", name))
       }
       findNames(person) shouldBe duplicateNames + person.name
 
@@ -74,15 +80,21 @@ class KGPersonFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore w
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new KGPersonFinderImpl[IO](renkuStoreConfig)
+    val finder = new KGPersonFinderImpl[IO](renkuDSConnectionInfo)
   }
 
   private def findNames(id: entities.Person): Set[persons.Name] =
-    runQuery(s"""|SELECT ?name 
-                 |WHERE { 
-                 |  ${id.resourceId.showAs[RdfResource]} schema:name ?name
-                 |}""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch person name",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?name 
+            |WHERE { 
+            |  ${id.resourceId.showAs[RdfResource]} schema:name ?name
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => persons.Name(row("name")))
       .toSet
 }

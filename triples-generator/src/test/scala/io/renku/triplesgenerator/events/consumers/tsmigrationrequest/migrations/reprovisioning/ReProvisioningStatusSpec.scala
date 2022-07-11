@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning
 
+import ReProvisioningInfo.Status.Running
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.syntax.all._
@@ -33,7 +34,6 @@ import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningInfo.Status.Running
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -46,7 +46,8 @@ class ReProvisioningStatusSpec
     with IOSpec
     with should.Matchers
     with MockFactory
-    with InMemoryRdfStore {
+    with InMemoryJenaForSpec
+    with MigrationsDataset {
 
   "underReProvisioning" should {
 
@@ -146,8 +147,6 @@ class ReProvisioningStatusSpec
     }
   }
 
-  override lazy val storeConfig: TriplesStoreConfig = migrationsStoreConfig
-
   private trait TestCase {
     val cacheRefreshInterval  = 1 second
     val statusRefreshInterval = 1 second
@@ -157,7 +156,7 @@ class ReProvisioningStatusSpec
     private val statusCacheCheckTimeRef = Ref.unsafe[IO, Long](0L)
     private val subscriptions           = List(mock[SubscriptionMechanism[IO]], mock[SubscriptionMechanism[IO]])
     val reProvisioningStatus = new ReProvisioningStatusImpl[IO](subscriptions,
-                                                                migrationsStoreConfig,
+                                                                migrationsDSConnectionInfo,
                                                                 statusRefreshInterval,
                                                                 cacheRefreshInterval,
                                                                 statusCacheCheckTimeRef
@@ -170,19 +169,25 @@ class ReProvisioningStatusSpec
     }
   }
 
-  private def findInfo: Option[(String, String)] = runQuery {
-    s"""|SELECT DISTINCT ?status ?controllerUrl
-        |WHERE {
-        |  ?id a renku:ReProvisioning;
-        |      renku:status ?status;
-        |      renku:controllerUrl ?controllerUrl
-        |}
-        |""".stripMargin
-  }.unsafeRunSync()
+  private def findInfo: Option[(String, String)] = runSelect(
+    on = migrationsDataset,
+    SparqlQuery.of(
+      "fetch re-provisioning info",
+      Prefixes of renku -> "renku",
+      s"""|SELECT DISTINCT ?status ?controllerUrl
+          |WHERE {
+          |  ?id a renku:ReProvisioning;
+          |        renku:status ?status;
+          |        renku:controllerUrl ?controllerUrl
+          |}
+          |""".stripMargin
+    )
+  ).unsafeRunSync()
     .map(row => row("status") -> row("controllerUrl"))
     .headOption
 
-  private def clearStatus(): Unit = runUpdate {
+  private def clearStatus(): Unit = runUpdate(
+    on = migrationsDataset,
     SparqlQuery.of(
       name = "re-provisioning - status remove",
       Prefixes of renku -> "renku",
@@ -193,5 +198,5 @@ class ReProvisioningStatusSpec
           |}
           |""".stripMargin
     )
-  }.unsafeRunSync()
+  ).unsafeRunSync()
 }

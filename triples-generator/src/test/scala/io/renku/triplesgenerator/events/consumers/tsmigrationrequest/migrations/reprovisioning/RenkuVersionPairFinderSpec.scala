@@ -26,14 +26,19 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, TriplesStoreConfig}
+import io.renku.rdfstore.{InMemoryJenaForSpec, MigrationsDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import org.scalatest._
 import matchers._
 import org.scalatest.wordspec.AnyWordSpec
 
-class RenkuVersionPairFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class RenkuVersionPairFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with should.Matchers
+    with InMemoryJenaForSpec
+    with MigrationsDataset {
 
   private implicit lazy val renkuUrl: RenkuUrl = renkuUrls.generateOne
 
@@ -41,7 +46,7 @@ class RenkuVersionPairFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
 
     "return the Version pair in the triples store" in new TestCase {
 
-      loadToStore(currentVersionPair)
+      upload(to = migrationsDataset, currentVersionPair)
 
       versionPairFinder.find().unsafeRunSync() shouldBe currentVersionPair.some
 
@@ -56,15 +61,14 @@ class RenkuVersionPairFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
     }
 
     "return an IllegalStateException if there are multiple Version Pairs" in new TestCase {
-      loadToStore(currentVersionPair, renkuVersionPairs.generateOne)
+
+      upload(to = migrationsDataset, currentVersionPair, renkuVersionPairs.generateOne)
 
       intercept[IllegalStateException] {
         versionPairFinder.find().unsafeRunSync()
       }.getMessage should startWith("Too many Version pairs found:")
     }
   }
-
-  override lazy val storeConfig: TriplesStoreConfig = migrationsStoreConfig
 
   private trait TestCase {
     val currentVersionPair = renkuVersionPairs.generateOne
@@ -73,6 +77,6 @@ class RenkuVersionPairFinderSpec extends AnyWordSpec with IOSpec with InMemoryRd
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
       TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
-    val versionPairFinder = new RenkuVersionPairFinderImpl[IO](migrationsStoreConfig)
+    val versionPairFinder = new RenkuVersionPairFinderImpl[IO](migrationsDSConnectionInfo)
   }
 }

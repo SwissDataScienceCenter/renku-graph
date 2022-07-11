@@ -19,13 +19,15 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -36,7 +38,8 @@ class RemoveNotLinkedPersonsSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
-    with InMemoryRdfStore
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with MockFactory {
 
   "run" should {
@@ -50,16 +53,16 @@ class RemoveNotLinkedPersonsSpec
 
       assume(project.maybeCreator.isDefined)
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val person = personEntities.generateOne.to[entities.Person]
-      loadToStore(person)
+      upload(to = renkuDataset, person)
 
       assume((project.maybeCreator.map(_.resourceId).toSet + person.resourceId).size > 1)
 
       findAllPersons() shouldBe project.maybeCreator.map(_.resourceId).toSet + person.resourceId
 
-      runUpdate(RemoveNotLinkedPersons.query).unsafeRunSync() shouldBe ()
+      runUpdate(on = renkuDataset, RemoveNotLinkedPersons.query).unsafeRunSync() shouldBe ()
 
       findAllPersons() shouldBe project.maybeCreator.map(_.resourceId).toSet
     }
@@ -75,10 +78,16 @@ class RemoveNotLinkedPersonsSpec
   }
 
   private def findAllPersons(): Set[persons.ResourceId] =
-    runQuery(s"""|SELECT ?personId
-                 |WHERE { ?personId a schema:Person }
-                 |""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch personId",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?personId
+            |WHERE { ?personId a schema:Person }
+            |""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => persons.ResourceId(row("personId")))
       .toSet
 }

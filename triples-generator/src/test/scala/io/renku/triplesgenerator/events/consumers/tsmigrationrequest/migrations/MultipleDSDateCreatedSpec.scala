@@ -21,6 +21,7 @@ package migrations
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.datasetCreatedDates
 import io.renku.graph.model._
@@ -28,7 +29,8 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -41,7 +43,8 @@ class MultipleDSDateCreatedSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
-    with InMemoryRdfStore
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with MockFactory {
 
   "query" should {
@@ -58,15 +61,15 @@ class MultipleDSDateCreatedSpec
         .generateOne
         .bimap(_.to[entities.Dataset[entities.Dataset.Provenance.Internal]], _.to[entities.Project])
 
-      loadToStore(validDSProject, brokenDSProject)
+      upload(to = renkuDataset, validDSProject, brokenDSProject)
 
       val anotherDateCreated = datasetCreatedDates(min = brokenDS.provenance.date.instant).generateOne
-      insertTriple(brokenDS.resourceId, "schema:dateCreated", show"'$anotherDateCreated'")
+      insert(to = renkuDataset, Triple(brokenDS.resourceId, schema / "dateCreated", anotherDateCreated))
 
       findDateCreated(validDS.identification.identifier)  shouldBe Set(validDS.provenance.date)
       findDateCreated(brokenDS.identification.identifier) shouldBe Set(brokenDS.provenance.date, anotherDateCreated)
 
-      runUpdate(MultipleDSDateCreated.query).unsafeRunSync() shouldBe ()
+      runUpdate(on = renkuDataset, MultipleDSDateCreated.query).unsafeRunSync() shouldBe ()
 
       findDateCreated(validDS.identification.identifier)  shouldBe Set(validDS.provenance.date)
       findDateCreated(brokenDS.identification.identifier) shouldBe Set(brokenDS.provenance.date)
@@ -82,14 +85,19 @@ class MultipleDSDateCreatedSpec
     }
   }
 
-  private def findDateCreated(id: datasets.Identifier): Set[datasets.DateCreated] =
-    runQuery(s"""|SELECT ?date 
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      schema:dateCreated ?date
-                 |}""".stripMargin)
-      .unsafeRunSync()
-      .map(row => datasets.DateCreated(Instant.parse(row("date"))))
-      .toSet
+  private def findDateCreated(id: datasets.Identifier): Set[datasets.DateCreated] = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "find DS date created",
+      Prefixes of schema -> "schema",
+      s"""|SELECT ?date 
+          |WHERE { 
+          |  ?id a schema:Dataset;
+          |      schema:identifier '$id';
+          |      schema:dateCreated ?date
+          |}""".stripMargin
+    )
+  ).unsafeRunSync()
+    .map(row => datasets.DateCreated(Instant.parse(row("date"))))
+    .toSet
 }

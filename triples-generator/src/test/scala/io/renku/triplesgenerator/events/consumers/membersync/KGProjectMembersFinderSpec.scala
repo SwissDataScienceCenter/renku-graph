@@ -24,7 +24,7 @@ import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.membersync.PersonOps._
 import org.scalatest.matchers.should
@@ -33,10 +33,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class KGProjectMembersFinderSpec
     extends AnyWordSpec
+    with should.Matchers
     with IOSpec
-    with InMemoryRdfStore
-    with ScalaCheckPropertyChecks
-    with should.Matchers {
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with ScalaCheckPropertyChecks {
 
   "findProjectMembers" should {
 
@@ -44,7 +45,7 @@ class KGProjectMembersFinderSpec
       val members = personEntities(withGitLabId).generateFixedSizeSet()
       val project = anyRenkuProjectEntities.modify(membersLens.modify(_ => members)).generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val expectedMembers = members.flatMap(_.toMaybe[KGProjectMember])
 
@@ -59,6 +60,6 @@ class KGProjectMembersFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new KGProjectMembersFinderImpl[IO](renkuStoreConfig, renkuUrl)
+    val finder = new KGProjectMembersFinderImpl[IO](renkuDSConnectionInfo, renkuUrl)
   }
 }

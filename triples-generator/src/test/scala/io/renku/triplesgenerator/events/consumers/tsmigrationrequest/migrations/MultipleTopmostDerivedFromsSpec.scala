@@ -21,16 +21,17 @@ package migrations
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.config.ServiceVersion
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.datasets
 import io.renku.graph.model.datasets.TopmostDerivedFrom
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.views.RdfResource
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling._
 import org.scalamock.scalatest.MockFactory
@@ -41,7 +42,8 @@ class MultipleTopmostDerivedFromsSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
-    with InMemoryRdfStore
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with MockFactory {
 
   "run" should {
@@ -60,10 +62,10 @@ class MultipleTopmostDerivedFromsSpec
         brokenProject.addDataset(okDS.createModification())
       }
 
-      loadToStore(correctProject, brokenProject)
+      upload(to = renkuDataset, correctProject, brokenProject)
 
       val illegalTopmost = TopmostDerivedFrom(brokenDS.provenance.derivedFrom)
-      insertTriple(brokenDS.entityId, "renku:topmostDerivedFrom", illegalTopmost.showAs[RdfResource])
+      insert(to = renkuDataset, Triple.edge(brokenDS.entityId, renku / "topmostDerivedFrom", illegalTopmost))
 
       findTopmostDerivedFroms(correctDS.identification.identifier) shouldBe Set(correctDS.provenance.topmostDerivedFrom)
       findTopmostDerivedFroms(brokenDS.identification.identifier) shouldBe Set(
@@ -89,8 +91,8 @@ class MultipleTopmostDerivedFromsSpec
     implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
     val executionRegister = mock[MigrationExecutionRegister[IO]]
-    val recordsFinder     = RecordsFinder[IO](renkuStoreConfig)
-    val updateRunner      = UpdateQueryRunner[IO](renkuStoreConfig)
+    val recordsFinder     = RecordsFinder[IO](renkuDSConnectionInfo)
+    val updateRunner      = UpdateQueryRunner[IO](renkuDSConnectionInfo)
     val migration         = new MultipleTopmostDerivedFroms[IO](executionRegister, recordsFinder, updateRunner)
 
     lazy val satisfyMocks = {
@@ -100,12 +102,19 @@ class MultipleTopmostDerivedFromsSpec
   }
 
   private def findTopmostDerivedFroms(id: datasets.Identifier): Set[datasets.TopmostDerivedFrom] =
-    runQuery(s"""|SELECT ?top 
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      renku:topmostDerivedFrom ?top
-                 |}""".stripMargin)
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch ds topmostDerivedFrom",
+        Prefixes.of(renku -> "renku", schema -> "schema"),
+        s"""|SELECT ?top
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      renku:topmostDerivedFrom ?top
+            |}""".stripMargin
+      )
+    )
       .unsafeRunSync()
       .map(row => datasets.TopmostDerivedFrom(row("top")))
       .toSet

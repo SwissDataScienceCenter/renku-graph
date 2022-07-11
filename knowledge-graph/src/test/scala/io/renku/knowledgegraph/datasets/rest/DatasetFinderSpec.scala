@@ -60,6 +60,8 @@ class DatasetFinderSpec
           datasetFinder
             .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
             .unsafeRunSync() shouldBe internalToNonModified(dataset, project).some
+
+          clear(renkuDataset)
         }
       }
 
@@ -150,6 +152,8 @@ class DatasetFinderSpec
                   ).sorted
                 )
                 .some
+
+            clear(renkuDataset)
         }
       }
 
@@ -338,6 +342,8 @@ class DatasetFinderSpec
                 )
                 .some
         }
+
+        clear(renkuDataset)
       }
 
     "return details of the modified dataset with the given id " +
@@ -360,6 +366,8 @@ class DatasetFinderSpec
             modifiedToModified(modified, project)
               .copy(usedIn = List(project.to[DatasetProject], fork.to[DatasetProject]).sorted)
               .some
+
+          clear(renkuDataset)
         }
       }
 
@@ -408,6 +416,8 @@ class DatasetFinderSpec
               )
               .unsafeRunSync() shouldBe
               modifiedToModified(modifiedOnFork, forkUpdated).some
+
+            clear(renkuDataset)
         }
       }
 
@@ -428,6 +438,8 @@ class DatasetFinderSpec
             datasetFinder
               .findDataset(invalidation.identifier, AuthContext(None, invalidation.identifier, Set(project.path)))
               .unsafeRunSync() shouldBe None
+
+            clear(renkuDataset)
         }
       }
 

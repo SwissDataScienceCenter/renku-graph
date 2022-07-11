@@ -169,7 +169,8 @@ object datasets {
   implicit object TopmostDerivedFrom
       extends TinyTypeFactory[TopmostDerivedFrom](new TopmostDerivedFrom(_))
       with constraints.Url[TopmostDerivedFrom]
-      with UrlResourceRenderer[TopmostDerivedFrom] {
+      with UrlResourceRenderer[TopmostDerivedFrom]
+      with EntityIdJsonLdOps[TopmostDerivedFrom] {
 
     final def apply(derivedFrom: DerivedFrom): TopmostDerivedFrom = apply(derivedFrom.value)
 
@@ -260,14 +261,14 @@ object datasets {
   implicit object TopmostSameAs
       extends TinyTypeFactory[TopmostSameAs](new TopmostSameAs(_))
       with constraints.Url[TopmostSameAs]
-      with UrlResourceRenderer[TopmostSameAs] {
+      with UrlResourceRenderer[TopmostSameAs]
+      with EntityIdJsonLdOps[TopmostSameAs] {
 
     final def apply(sameAs: SameAs): TopmostSameAs = apply(sameAs.value)
 
     final def apply(entityId: EntityId): TopmostSameAs = apply(entityId.toString)
 
-    implicit lazy val topmostSameAsJsonLdEncoder: JsonLDEncoder[TopmostSameAs] =
-      sameAs => EntityId.of(sameAs.value).asJsonLD
+    implicit lazy val topmostSameAsJsonLdEncoder: JsonLDEncoder[TopmostSameAs] = _.asEntityId.asJsonLD
   }
 
   class PartResourceId private (val value: String) extends AnyVal with StringTinyType

@@ -37,7 +37,6 @@ private[tsmigrationrequest] object Migrations {
     reProvisioning                    <- ReProvisioning[F](reProvisioningStatus, config)
     malformedActivityIds              <- MalformedActivityIds[F]
     multiplePersonNames               <- MultiplePersonNames[F]
-    multipleModifiedDSData            <- MultipleModifiedDSData[F]
     malformedDSImageIds               <- MalformedDSImageIds[F]
     multipleDSTopmostSameAs           <- MultipleDSTopmostSameAs[F]
     multipleAllWrongTopmostSameAs     <- MultipleAllWrongTopmostSameAs[F]
@@ -53,7 +52,6 @@ private[tsmigrationrequest] object Migrations {
                     reProvisioning,
                     malformedActivityIds,
                     multiplePersonNames,
-                    multipleModifiedDSData,
                     malformedDSImageIds,
                     multipleDSTopmostSameAs,
                     multipleAllWrongTopmostSameAs,

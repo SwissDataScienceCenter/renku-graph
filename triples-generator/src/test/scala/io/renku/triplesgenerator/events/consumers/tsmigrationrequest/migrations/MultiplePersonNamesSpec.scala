@@ -19,21 +19,26 @@
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
-import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.personNames
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import tooling.UpdateQueryMigration
 
-class MultiplePersonNamesSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MultiplePersonNamesSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "query" should {
 
@@ -41,16 +46,16 @@ class MultiplePersonNamesSpec extends AnyWordSpec with should.Matchers with IOSp
       val person      = personEntities(withGitLabId).generateOne.to[entities.Person]
       val otherPerson = personEntities(withGitLabId).generateOne.to[entities.Person]
 
-      loadToStore(person, otherPerson)
+      upload(to = renkuDataset, person, otherPerson)
 
       val duplicateNames = personNames.generateNonEmptyList().toList.toSet
       duplicateNames foreach { name =>
-        insertTriple(person.resourceId, "schema:name", show"'${sparqlEncode(name.show)}'")
+        insert(to = renkuDataset, Triple(person.resourceId, schema / "name", name))
       }
 
       findNames(person.resourceId) shouldBe duplicateNames + person.name
 
-      runUpdate(MultiplePersonNames.query).unsafeRunSync() shouldBe ()
+      runUpdate(on = renkuDataset, MultiplePersonNames.query).unsafeRunSync() shouldBe ()
 
       findNames(person.resourceId)        should contain oneElementOf (duplicateNames + person.name)
       findNames(otherPerson.resourceId) shouldBe Set(otherPerson.name)
@@ -66,8 +71,12 @@ class MultiplePersonNamesSpec extends AnyWordSpec with should.Matchers with IOSp
   }
 
   private def findNames(id: persons.ResourceId): Set[persons.Name] =
-    runQuery(s"""SELECT ?name WHERE { <$id> a schema:Person; schema:name ?name }""")
-      .unsafeRunSync()
+    runSelect(on = renkuDataset,
+              SparqlQuery.of("fetch person name",
+                             Prefixes of schema -> "schema",
+                             s"""SELECT ?name WHERE { <$id> a schema:Person; schema:name ?name }"""
+              )
+    ).unsafeRunSync()
       .map(row => persons.Name(row("name")))
       .toSet
 }

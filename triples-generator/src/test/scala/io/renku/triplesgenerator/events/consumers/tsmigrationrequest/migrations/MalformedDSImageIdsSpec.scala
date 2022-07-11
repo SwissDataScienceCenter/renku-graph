@@ -24,13 +24,18 @@ import io.renku.graph.model._
 import GraphModelGenerators.datasetImageUris
 import io.renku.graph.model.datasets.{ImagePosition, ImageResourceId}
 import io.renku.graph.model.testentities._
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class MalformedDSImageIdsSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MalformedDSImageIdsSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "query" should {
 
@@ -60,14 +65,14 @@ class MalformedDSImageIdsSpec extends AnyWordSpec with should.Matchers with IOSp
         .generateOne
         .to[entities.RenkuProject.WithoutParent]
 
-      loadToStore(
-        project1,
-        project2,
-        project3,
-        anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
+      upload(to = renkuDataset,
+             project1,
+             project2,
+             project3,
+             anyRenkuProjectEntities.generateOne.to[entities.RenkuProject]
       )
 
-      runQuery(MalformedDSImageIds.query)
+      runSelect(on = renkuDataset, MalformedDSImageIds.query)
         .unsafeRunSync()
         .map(row => projects.Path(row("path")))
         .toSet shouldBe Set(project1.path, project2.path)
