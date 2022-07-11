@@ -95,7 +95,7 @@ object CommonGraphGenerators {
   } yield RateLimit[Target](items, per = unit)
 
   implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
-    fusekiUrl       <- httpUrls() map FusekiBaseUrl.apply
+    fusekiUrl       <- httpUrls() map FusekiUrl.apply
     authCredentials <- basicAuthCredentials
   } yield RdfStoreConfig(fusekiUrl, authCredentials)
 
@@ -191,7 +191,7 @@ object CommonGraphGenerators {
     .from[Try, Result](results, PagingRequest(page, perPage), total)
     .fold(throw _, identity)
 
-  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls() map FusekiBaseUrl.apply
+  implicit val fusekiUrls: Gen[FusekiUrl] = httpUrls() map FusekiUrl.apply
 
   implicit lazy val certificates: Gen[Certificate] =
     nonBlankStrings()

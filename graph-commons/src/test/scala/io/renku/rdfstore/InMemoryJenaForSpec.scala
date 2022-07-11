@@ -27,7 +27,7 @@ trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with Bef
 
   override def afterStart(): Unit = {
     super.afterStart()
-    createDatasets()
+    createDatasets().unsafeRunSync()
   }
 
   before {

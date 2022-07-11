@@ -84,7 +84,7 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   protected def uploadAndMap[ResultType](jsonLD: JsonLD)(mapResponse: ResponseMapping[ResultType]): F[ResultType] =
     for {
-      uri          <- validateUri((fusekiBaseUrl / datasetName / "data").toString)
+      uri          <- validateUri((fusekiUrl / datasetName / "data").toString)
       uploadResult <- send(uploadRequest(uri, jsonLD))(mapResponse)
     } yield uploadResult
 
@@ -104,7 +104,7 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ResultType]],
       queryType:   RdfQueryType
   ): F[ResultType] = for {
-    uri    <- validateUri((fusekiBaseUrl / datasetName / path(queryType)).toString)
+    uri    <- validateUri((fusekiUrl / datasetName / path(queryType)).toString)
     result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)
   } yield result
 

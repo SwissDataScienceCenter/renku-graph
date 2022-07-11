@@ -30,7 +30,7 @@ import io.renku.generators.Generators._
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{FusekiBaseUrl, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{FusekiUrl, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
@@ -102,7 +102,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    lazy val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
+    lazy val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
     lazy val updater        = new UpdatesUploaderImpl[IO](rdfStoreConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) = stubFor {

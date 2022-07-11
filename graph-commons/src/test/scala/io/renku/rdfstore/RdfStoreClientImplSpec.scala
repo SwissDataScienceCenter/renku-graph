@@ -91,7 +91,7 @@ class RdfStoreClientImplSpec
 
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/sparql returned $BadRequest; body: some message"
     }
 
     "fail if remote responds with OK status but non-expected body" in new QueryClientTestCase {
@@ -104,7 +104,7 @@ class RdfStoreClientImplSpec
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
       }.getMessage should startWith(
-        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql returned ${Status.Ok}; error: "
+        s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/sparql returned ${Status.Ok}; error: "
       )
     }
   }
@@ -286,7 +286,7 @@ class RdfStoreClientImplSpec
 
       intercept[Exception] {
         client.callWith(pagingRequests.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/sparql returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/sparql returned $BadRequest; body: some message"
     }
   }
 
@@ -318,7 +318,7 @@ class RdfStoreClientImplSpec
 
       intercept[Exception] {
         client.sendUpdate.unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/update returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/update returned $BadRequest; body: some message"
     }
 
     "use the given response mapping for calculating the result" in new UpdateClientTestCase {
@@ -377,13 +377,13 @@ class RdfStoreClientImplSpec
 
       intercept[Exception] {
         client.uploadJson(jsonLDEntities.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/data returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/data returned $BadRequest; body: some message"
     }
   }
 
   private trait TestCase {
-    val fusekiBaseUrl  = FusekiBaseUrl(externalServiceBaseUrl)
-    val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
+    val fusekiUrl      = FusekiUrl(externalServiceBaseUrl)
+    val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
     implicit val logger:       Logger[IO]                  = TestLogger[IO]()
     implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
   }

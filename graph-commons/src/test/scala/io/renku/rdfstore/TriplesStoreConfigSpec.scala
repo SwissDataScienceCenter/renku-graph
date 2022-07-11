@@ -39,7 +39,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
           Map(
             "services" -> Map(
               "fuseki" -> Map(
-                "url" -> storeConfig.fusekiBaseUrl.toString,
+                "url" -> storeConfig.fusekiUrl.toString,
                 "renku" -> Map(
                   "username" -> storeConfig.authCredentials.username.value,
                   "password" -> storeConfig.authCredentials.password.value
@@ -51,7 +51,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
 
         val Success(actual) = RdfStoreConfig[Try](config)
 
-        actual.fusekiBaseUrl            shouldBe storeConfig.fusekiBaseUrl
+        actual.fusekiUrl                shouldBe storeConfig.fusekiUrl
         actual.datasetName              shouldBe DatasetName("renku")
         actual.authCredentials.username shouldBe storeConfig.authCredentials.username
         actual.authCredentials.password shouldBe storeConfig.authCredentials.password
@@ -83,7 +83,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url" -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
+              "url" -> rdfStoreConfigs.generateOne.fusekiUrl.toString,
               "renku" -> Map(
                 "username" -> "  ",
                 "password" -> rdfStoreConfigs.generateOne.authCredentials.password.value
@@ -103,7 +103,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url" -> rdfStoreConfigs.generateOne.fusekiBaseUrl.toString,
+              "url" -> rdfStoreConfigs.generateOne.fusekiUrl.toString,
               "renku" -> Map(
                 "username" -> rdfStoreConfigs.generateOne.authCredentials.username.value,
                 "password" -> ""
@@ -127,7 +127,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
           Map(
             "services" -> Map(
               "fuseki" -> Map(
-                "url" -> storeConfig.fusekiBaseUrl.toString,
+                "url" -> storeConfig.fusekiUrl.toString,
                 "admin" -> Map(
                   "username" -> storeConfig.authCredentials.username.value,
                   "password" -> storeConfig.authCredentials.password.value
@@ -139,7 +139,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
 
         val Success(actual) = MigrationsStoreConfig[Try](config)
 
-        actual.fusekiBaseUrl            shouldBe storeConfig.fusekiBaseUrl
+        actual.fusekiUrl                shouldBe storeConfig.fusekiUrl
         actual.datasetName              shouldBe DatasetName("migrations")
         actual.authCredentials.username shouldBe storeConfig.authCredentials.username
         actual.authCredentials.password shouldBe storeConfig.authCredentials.password

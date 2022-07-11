@@ -21,7 +21,7 @@ package io.renku.rdfstore
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import cats.syntax.all._
-import com.dimafeng.testcontainers.GenericContainer
+import com.dimafeng.testcontainers.{FixedHostPortGenericContainer, GenericContainer, SingleContainer}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -38,32 +38,43 @@ import scala.language.reflectiveCalls
 
 trait InMemoryJena {
 
-  protected val givenServerRunning: Boolean = false
+  protected val maybeJenaFixedPort: Option[Int Refined Positive] = None
 
   private val adminCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
 
-  val container: GenericContainer = GenericContainer(
-    dockerImage = "renku/renku-jena:0.0.8",
-    exposedPorts = Seq(3030),
-    waitStrategy = Wait forHttp "/$/ping"
-  )
-
-  private lazy val fusekiServerPort: Int Refined Positive = Refined.unsafeApply {
-    if (givenServerRunning) 3030
-    else container.container.getMappedPort(container.exposedPorts.head)
+  lazy val container: SingleContainer[_] = maybeJenaFixedPort match {
+    case None =>
+      GenericContainer(
+        dockerImage = "renku/renku-jena:0.0.8",
+        exposedPorts = Seq(3030),
+        waitStrategy = Wait forHttp "/$/ping"
+      )
+    case Some(fixedPort) =>
+      FixedHostPortGenericContainer(
+        imageName = "renku/renku-jena:0.0.8",
+        exposedPorts = Seq(3030),
+        exposedHostPort = fixedPort.value,
+        exposedContainerPort = fixedPort.value,
+        waitStrategy = Wait forHttp "/$/ping"
+      )
   }
 
-  protected lazy val fusekiUrl: FusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$fusekiServerPort")
+  private lazy val fusekiServerPort: Int Refined Positive = maybeJenaFixedPort match {
+    case None       => Refined.unsafeApply(container.mappedPort(container.exposedPorts.head))
+    case Some(port) => port
+  }
 
-  private val datasets: mutable.Map[FusekiBaseUrl => TriplesStoreConfig, DatasetConfigFile] = mutable.Map.empty
+  lazy val fusekiUrl: FusekiUrl = FusekiUrl(s"http://localhost:$fusekiServerPort")
 
-  protected def registerDataset(connectionInfoFactory: FusekiBaseUrl => TriplesStoreConfig,
+  private val datasets: mutable.Map[FusekiUrl => TriplesStoreConfig, DatasetConfigFile] = mutable.Map.empty
+
+  protected def registerDataset(connectionInfoFactory: FusekiUrl => TriplesStoreConfig,
                                 maybeConfigFile:       Either[Exception, DatasetConfigFile]
   ): Unit = maybeConfigFile
     .map(configFile => datasets.addOne(connectionInfoFactory -> configFile))
     .fold(throw _, _ => ())
 
-  protected def createDatasets()(implicit ioRuntime: IORuntime): Unit =
+  protected def createDatasets(): IO[Unit] =
     datasets
       .map { case (connectionInfoFactory, configFile) =>
         queryRunner(connectionInfoFactory(fusekiUrl)).createDataset(configFile, adminCredentials)
@@ -71,7 +82,6 @@ trait InMemoryJena {
       .toList
       .sequence
       .void
-      .unsafeRunSync()
 
   def clearAllDatasets()(implicit ioRuntime: IORuntime): Unit =
     datasets
@@ -200,37 +210,36 @@ trait InMemoryJena {
   }
 }
 
-trait JenaDataset[C <: TriplesStoreConfig] {
+trait JenaDataset {
   self: InMemoryJena =>
-
-  protected def configFile:            Either[Exception, DatasetConfigFile]
-  protected def connectionInfoFactory: FusekiBaseUrl => C
-
-  registerDataset(connectionInfoFactory, configFile)
 }
 
-trait RenkuDataset extends JenaDataset[RdfStoreConfig] {
+trait RenkuDataset extends JenaDataset {
   self: InMemoryJena =>
 
-  protected lazy val configFile: Either[Exception, DatasetConfigFile] = RenkuTTL.fromConfigMap()
-  protected lazy val connectionInfoFactory: FusekiBaseUrl => RdfStoreConfig = RdfStoreConfig(
+  private lazy val configFile: Either[Exception, DatasetConfigFile] = RenkuTTL.fromConfigMap()
+  private lazy val connectionInfoFactory: FusekiUrl => RdfStoreConfig = RdfStoreConfig(
     _,
     BasicAuthCredentials(BasicAuthUsername("renku"), BasicAuthPassword("renku"))
   )
 
   def renkuDataset:          DatasetName    = renkuDSConnectionInfo.datasetName
   def renkuDSConnectionInfo: RdfStoreConfig = connectionInfoFactory(fusekiUrl)
+
+  registerDataset(connectionInfoFactory, configFile)
 }
 
-trait MigrationsDataset extends JenaDataset[MigrationsStoreConfig] {
+trait MigrationsDataset extends JenaDataset {
   self: InMemoryJena =>
 
-  protected lazy val configFile: Either[Exception, MigrationsTTL] = MigrationsTTL.fromConfigMap()
-  protected lazy val connectionInfoFactory: FusekiBaseUrl => MigrationsStoreConfig = MigrationsStoreConfig(
+  private lazy val configFile: Either[Exception, MigrationsTTL] = MigrationsTTL.fromConfigMap()
+  private lazy val connectionInfoFactory: FusekiUrl => MigrationsStoreConfig = MigrationsStoreConfig(
     _,
     BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
   )
 
   def migrationsDataset:          DatasetName           = migrationsDSConnectionInfo.datasetName
   def migrationsDSConnectionInfo: MigrationsStoreConfig = connectionInfoFactory(fusekiUrl)
+
+  registerDataset(connectionInfoFactory, configFile)
 }

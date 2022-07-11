@@ -31,7 +31,7 @@ import io.renku.generators.jsonld.JsonLDGenerators._
 import io.renku.http.client.RestClientError.BadRequestException
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{FusekiUrl, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
@@ -107,7 +107,7 @@ class TriplesUploaderSpec
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    lazy val rdfStoreConfig  = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
+    lazy val rdfStoreConfig  = rdfStoreConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
     lazy val triplesUploader = new TriplesUploaderImpl[IO](rdfStoreConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenUploader(returning: ResponseDefinitionBuilder) = stubFor {

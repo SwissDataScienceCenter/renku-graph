@@ -18,6 +18,8 @@
 
 package io.renku.graph.model
 
+import cats.Show
+import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import io.renku.graph.model.views.{TinyTypeJsonLDOps, UrlResourceRenderer}
@@ -82,6 +84,10 @@ object RenkuVersionPair {
       } yield RenkuVersionPair(cliVersion, schemaVersion)
     }
     topCursor.downField("results").downField("bindings").as(decodeList(renkuVersionPairs))
+  }
+
+  implicit lazy val show: Show[RenkuVersionPair] = Show.show { case RenkuVersionPair(cliVersion, schemaVersion) =>
+    show"cliVersion: $cliVersion, schemaVersion: $schemaVersion"
   }
 }
 
