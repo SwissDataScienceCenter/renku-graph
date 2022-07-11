@@ -25,7 +25,7 @@ import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Json
 import io.renku.config.GitLab
-import io.renku.control.Throttler
+import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.GitLabApiUrl
 import io.renku.http.client.HttpRequest.NamedRequest
@@ -69,21 +69,17 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     )
     with GitLabClient[F] {
 
-  def get[ResultType](path: Uri, endpointName: String Refined NonEmpty)(
-      mapResponse:          ResponseMapping[ResultType]
-  )(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): F[ResultType] = for {
+  def get[ResultType](path:    Uri, endpointName: String Refined NonEmpty)(
+      mapResponse:             ResponseMapping[ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
     uri     <- validateUri(show"$gitLabApiUrl/$path")
     request <- secureNamedRequest(GET, uri, endpointName)
     result  <- super.send(request)(mapResponse)
   } yield result
 
-  def post[ResultType](path: Uri, endpointName: String Refined NonEmpty, payload: Json)(
-      mapResponse:           ResponseMappingF[F, ResultType]
-  )(implicit
-      maybeAccessToken: Option[AccessToken]
-  ): F[ResultType] = for {
+  def post[ResultType](path:   Uri, endpointName: String Refined NonEmpty, payload: Json)(
+      mapResponse:             ResponseMappingF[F, ResultType]
+  )(implicit maybeAccessToken: Option[AccessToken]): F[ResultType] = for {
     uri     <- validateUri(show"$gitLabApiUrl/$path")
     request <- secureNamedRequest(uri, endpointName, payload)
     result  <- super.send(request)(mapResponse)
@@ -109,19 +105,21 @@ final class GitLabClientImpl[F[_]: Async: Logger](
   private def secureNamedRequest(uri: Uri, endpointName: String Refined NonEmpty, payload: Json)(implicit
       maybeAccessToken:               Option[AccessToken]
   ): F[NamedRequest[F]] =
-    secureNamedRequest(POST, uri, endpointName).map(originalRequest =>
-      originalRequest.copy(request = originalRequest.request.withEntity(payload))
-    )
-
+    secureNamedRequest(POST, uri, endpointName)
+      .map(originalRequest => originalRequest.copy(request = originalRequest.request.withEntity(payload)))
 }
 
 object GitLabClient {
+
+  def apply[F[_]](implicit ev: GitLabClient[F]): GitLabClient[F] = ev
+
   def apply[F[_]: Async: Logger: MetricsRegistry](
-      gitLabThrottler:        Throttler[F, GitLab],
       retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
       maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
       requestTimeoutOverride: Option[Duration] = None
   ): F[GitLabClientImpl[F]] = for {
+    gitLabRateLimit <- RateLimit.fromConfig[F, GitLab]("services.gitlab.rate-limit")
+    gitLabThrottler <- Throttler[F, GitLab](gitLabRateLimit)
     gitLabUrl       <- GitLabUrlLoader[F]()
     apiCallRecorder <- GitLabApiCallRecorder[F]
   } yield new GitLabClientImpl[F](gitLabUrl.apiV4,

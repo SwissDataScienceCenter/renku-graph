@@ -145,11 +145,12 @@ Response body example:
 Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 
 Filtering:
-* `query` - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
-* `type` - to filter by entity type(s); allowed values: `project`, `dataset`, `workflow`, and `person`; multiple `type` parameters allowed
-* `creator` - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
+* `query`      - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
+* `type`       - to filter by entity type(s); allowed values: `project`, `dataset`, `workflow`, and `person`; multiple `type` parameters allowed
+* `creator`    - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
 * `visibility` - to filter by visibility(ies) (restricted vs. public); allowed values: `public`, `internal`, `private`; multiple `visibility` parameters allowed
-* `date` - to filter by entity's creation date
+* `since`      - to filter by entity's creation date to >= the given date
+* `until`      - to filter by entity's creation date to <= the given date
 
 **NOTE:** all query parameters have to be url-encoded.
 
@@ -309,7 +310,7 @@ Response body example:
   ],
   "identifier" : "22222222-2222-2222-2222-222222222222",
   "versions" : {
-    "initial: "11111111-1111-1111-1111-111111111111"
+    "initial": "11111111-1111-1111-1111-111111111111"
   },
   "title" : "dataset title",
   "name" : "dataset alternate name",
@@ -651,7 +652,7 @@ Response body example:
 
 #### GET /knowledge-graph/projects/:namespace/:name/files/:location/lineage
 
-Fetches lineage for a given project `namespace`/`name` and file `location` (relative path). This endpoint is intended to replace the graphql endpoint.
+Fetches lineage for a given project `namespace`/`name` and file `location` (URL-encoded relative path to the file). This endpoint is intended to replace the graphql endpoint.
 
 | Status                     | Description                                                       |
 |----------------------------|-------------------------------------------------------------------|

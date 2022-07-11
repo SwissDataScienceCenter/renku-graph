@@ -23,7 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.config.renku
-import io.renku.graph.config.{GitLabUrlLoader, RenkuBaseUrlLoader}
+import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.datasets.ImageUri
 import io.renku.graph.model._
 import io.renku.http.rest.Links.Href
@@ -63,7 +63,8 @@ object Endpoint {
                              entityTypes:  Set[Filters.EntityType] = Set.empty,
                              creators:     Set[persons.Name] = Set.empty,
                              visibilities: Set[projects.Visibility] = Set.empty,
-                             maybeDate:    Option[Filters.Date] = None
+                             maybeSince:   Option[Filters.Since] = None,
+                             maybeUntil:   Option[Filters.Until] = None
     )
 
     object Filters {
@@ -131,18 +132,33 @@ object Endpoint {
         }
       }
 
-      final class Date private (val value: LocalDate) extends AnyVal with LocalDateTinyType
-      object Date extends TinyTypeFactory[Date](new Date(_)) with LocalDateNotInTheFuture[Date] {
-        private implicit val dateParameterDecoder: QueryParamDecoder[Date] =
+      final class Since private (val value: LocalDate) extends AnyVal with LocalDateTinyType
+      object Since extends TinyTypeFactory[Since](new Since(_)) with LocalDateNotInTheFuture[Since] {
+        private implicit val dateParameterDecoder: QueryParamDecoder[Since] =
           (value: QueryParameterValue) =>
             Either
               .catchNonFatal(LocalDate.parse(value.value))
-              .flatMap(Date.from)
-              .leftMap(_ => parsingFailure(date.parameterName))
+              .flatMap(Since.from)
+              .leftMap(_ => parsingFailure(since.parameterName))
               .toValidatedNel
 
-        object date extends OptionalValidatingQueryParamDecoderMatcher[Date]("date") {
-          val parameterName: String = "date"
+        object since extends OptionalValidatingQueryParamDecoderMatcher[Since]("since") {
+          val parameterName: String = "since"
+        }
+      }
+
+      final class Until private (val value: LocalDate) extends AnyVal with LocalDateTinyType
+      object Until extends TinyTypeFactory[Until](new Until(_)) with LocalDateNotInTheFuture[Until] {
+        private implicit val dateParameterDecoder: QueryParamDecoder[Until] =
+          (value: QueryParameterValue) =>
+            Either
+              .catchNonFatal(LocalDate.parse(value.value))
+              .flatMap(Until.from)
+              .leftMap(_ => parsingFailure(until.parameterName))
+              .toValidatedNel
+
+        object until extends OptionalValidatingQueryParamDecoderMatcher[Until]("until") {
+          val parameterName: String = "until"
         }
       }
     }
@@ -166,17 +182,17 @@ object Endpoint {
   private def parsingFailure(paramName: String) = ParseFailure(s"'$paramName' parameter with invalid value", "")
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    entitiesFinder    <- EntitiesFinder[F]
-    renkuBaseUrl      <- RenkuBaseUrlLoader()
-    renkuResourcesUrl <- renku.ResourcesUrl()
-    gitLabUrl         <- GitLabUrlLoader[F]()
-  } yield new EndpointImpl(entitiesFinder, renkuBaseUrl, renkuResourcesUrl, gitLabUrl)
+    entitiesFinder <- EntitiesFinder[F]
+    renkuUrl       <- RenkuUrlLoader()
+    renkuApiUrl    <- renku.ApiUrl()
+    gitLabUrl      <- GitLabUrlLoader[F]()
+  } yield new EndpointImpl(entitiesFinder, renkuUrl, renkuApiUrl, gitLabUrl)
 }
 
 private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
-                                                renkuBaseUrl:      RenkuBaseUrl,
-                                                renkuResourcesUrl: renku.ResourcesUrl,
-                                                gitLabUrl:         GitLabUrl
+                                                renkuUrl:    RenkuUrl,
+                                                renkuApiUrl: renku.ApiUrl,
+                                                gitLabUrl:   GitLabUrl
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
@@ -196,7 +212,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
     finder.findEntities(criteria) map toHttpResponse(request) recoverWith httpResult
 
   private def toHttpResponse(request: Request[F])(response: PagingResponse[model.Entity]): Response[F] = {
-    implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuBaseUrl${request.uri}")
+    implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
     Response[F](Status.Ok)
       .withEntity(response.results.asJson)
       .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
@@ -219,7 +235,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
           .addIfDefined("description" -> project.maybeDescription)
           .deepMerge(
             _links(
-              Link(Rel("details") -> ProjectEndpoint.href(renkuResourcesUrl, project.path))
+              Link(Rel("details") -> ProjectEndpoint.href(renkuApiUrl, project.path))
             )
           )
       case ds: model.Entity.Dataset =>
@@ -236,7 +252,7 @@ private class EndpointImpl[F[_]: Async: Logger](finder: EntitiesFinder[F],
           .addIfDefined("description" -> ds.maybeDescription)
           .deepMerge(
             _links(
-              Link(Rel("details") -> DatasetEndpoint.href(renkuResourcesUrl, ds.identifier))
+              Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, ds.identifier))
             )
           )
       case workflow: model.Entity.Workflow =>

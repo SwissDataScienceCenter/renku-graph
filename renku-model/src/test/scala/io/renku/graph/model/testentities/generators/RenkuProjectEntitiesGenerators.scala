@@ -30,7 +30,7 @@ import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.projects.{ForksCount, Visibility}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{ActivityGenFactory, DatasetGenFactory}
-import io.renku.graph.model.{RenkuBaseUrl, projects}
+import io.renku.graph.model.{RenkuUrl, projects}
 import org.scalacheck.Gen
 
 import java.time.Instant
@@ -62,11 +62,11 @@ trait RenkuProjectEntitiesGenerators {
       )
 
   def renkuProjectEntities(
-      visibilityGen:       Gen[Visibility],
-      minDateCreated:      projects.DateCreated = projects.DateCreated(Instant.EPOCH),
-      activitiesFactories: List[ActivityGenFactory] = Nil,
-      datasetsFactories:   List[DatasetGenFactory[Dataset.Provenance]] = Nil,
-      forksCountGen:       Gen[ForksCount] = anyForksCount
+      visibilityGen:     Gen[Visibility],
+      minDateCreated:    projects.DateCreated = projects.DateCreated(Instant.EPOCH),
+      activityFactories: List[ActivityGenFactory] = Nil,
+      datasetFactories:  List[DatasetGenFactory[Dataset.Provenance]] = Nil,
+      forksCountGen:     Gen[ForksCount] = anyForksCount
   ): Gen[RenkuProject.WithoutParent] = for {
     path             <- projectPaths
     name             <- Gen.const(path.toName)
@@ -79,8 +79,8 @@ trait RenkuProjectEntitiesGenerators {
     keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
     members          <- personEntities(withGitLabId).toGeneratorOfSet(minElements = 0)
     version          <- projectSchemaVersions
-    activities       <- activitiesFactories.map(_.apply(dateCreated)).sequence
-    datasets         <- datasetsFactories.map(_.apply(dateCreated)).sequence
+    activities       <- activityFactories.map(_.apply(dateCreated)).sequence
+    datasets         <- datasetFactories.map(_.apply(dateCreated)).sequence
   } yield RenkuProject.WithoutParent(path,
                                      name,
                                      maybeDescription,
@@ -147,7 +147,7 @@ trait RenkuProjectEntitiesGenerators {
   }
 
   implicit class RenkuProjectGenFactoryOps[FC <: ForksCount](projectGen: Gen[RenkuProject])(implicit
-      renkuBaseUrl:                                                      RenkuBaseUrl
+      renkuUrl:                                                          RenkuUrl
   ) {
 
     def withDatasets[P <: Dataset.Provenance](factories: DatasetGenFactory[P]*): Gen[RenkuProject] = for {
@@ -212,7 +212,7 @@ trait RenkuProjectEntitiesGenerators {
     def forkOnce(): Gen[(RenkuProject, RenkuProject.WithParent)] = projectGen.map(_.forkOnce())
   }
 
-  implicit class DatasetAndProjectOps[T](tupleGen: Gen[(T, RenkuProject)])(implicit renkuBaseUrl: RenkuBaseUrl) {
+  implicit class DatasetAndProjectOps[T](tupleGen: Gen[(T, RenkuProject)])(implicit renkuUrl: RenkuUrl) {
 
     def addDataset[P <: Dataset.Provenance](
         factory: DatasetGenFactory[P]

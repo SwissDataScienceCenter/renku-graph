@@ -23,6 +23,7 @@ import cats.data.{Kleisli, OptionT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.http.client.UrlEncoder.urlEncode
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -244,9 +245,10 @@ class MicroserviceRoutesSpec
       response.body[ErrorMessage] shouldBe InfoMessage(AuthorizationFailure.getMessage)
     }
   }
+
   "GET /knowledge-graph/projects/:projectId/files/:location/lineage" should {
     def lineageUri(projectPath: ProjectPath, location: Location) =
-      Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.value}/files/${location.value}/lineage")
+      Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.show}/files/${urlEncode(location.show)}/lineage")
 
     s"return $Ok when the lineage is found" in new TestCase {
       val projectPath   = projectPaths.generateOne
@@ -316,7 +318,6 @@ class MicroserviceRoutesSpec
         .call(Request[IO](Method.GET, lineageUri(projectPaths.generateOne, nodeLocations.generateOne)))
         .status shouldBe Unauthorized
     }
-
   }
 
   "GET /knowledge-graph/entities" should {
@@ -368,9 +369,14 @@ class MicroserviceRoutesSpec
             uri -> Criteria(Filters(visibilities = list.toSet))
           }
           .generateOne,
-        dateParams
+        sinceParams
           .map(d =>
-            uri"/knowledge-graph/entities" +? ("date" -> d.value.toString) -> Criteria(Filters(maybeDate = d.some))
+            uri"/knowledge-graph/entities" +? ("since" -> d.value.toString) -> Criteria(Filters(maybeSince = d.some))
+          )
+          .generateOne,
+        untilParams
+          .map(d =>
+            uri"/knowledge-graph/entities" +? ("until" -> d.value.toString) -> Criteria(Filters(maybeUntil = d.some))
           )
           .generateOne,
         sortingDirections
@@ -431,6 +437,18 @@ class MicroserviceRoutesSpec
       response.status             shouldBe BadRequest
       response.contentType        shouldBe Some(`Content-Type`(application.json))
       response.body[ErrorMessage] shouldBe ErrorMessage("'visibility' parameter with invalid value")
+    }
+
+    s"return $BadRequest for if since > until" in new TestCase {
+      val since = sinceParams.generateOne
+      val until = localDates(max = since.value.minusDays(1)).generateAs(Filters.Until)
+      val response = routes().call {
+        Request[IO](Method.GET, uri"/knowledge-graph/entities" +? ("since" -> since.show) +? ("until" -> until.show))
+      }
+
+      response.status             shouldBe BadRequest
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe ErrorMessage("'since' parameter > 'until'")
     }
 
     "authenticate user from the request if given" in new TestCase {

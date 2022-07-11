@@ -63,10 +63,7 @@ final case class Activity(id:                  Id,
 object Activity {
 
   final class Id private (val value: String) extends AnyVal with StringTinyType
-  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID[Id] {
-    def generate: Id = Id(java.util.UUID.randomUUID.toString)
-
-  }
+  implicit object Id                         extends TinyTypeFactory[Id](new Id(_)) with UUID[Id]
 
   def apply(id:                  Id,
             startTime:           StartTime,
@@ -89,7 +86,7 @@ object Activity {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def toEntitiesActivity(implicit renkuBaseUrl: RenkuBaseUrl): Activity => entities.Activity = activity =>
+  implicit def toEntitiesActivity(implicit renkuUrl: RenkuUrl): Activity => entities.Activity = activity =>
     entities.Activity(
       activities.ResourceId(activity.asEntityId.show),
       activity.startTime,
@@ -102,9 +99,9 @@ object Activity {
       activity.parameters.map(_.to[entities.ParameterValue])
     )
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
     JsonLDEncoder.instance(activity => activity.to[entities.Activity].asJsonLD)
 
-  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Activity] =
-    EntityIdEncoder.instance(entity => EntityId of renkuBaseUrl / "activities" / entity.id)
+  implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Activity] =
+    EntityIdEncoder.instance(entity => EntityId of renkuUrl / "activities" / entity.id)
 }

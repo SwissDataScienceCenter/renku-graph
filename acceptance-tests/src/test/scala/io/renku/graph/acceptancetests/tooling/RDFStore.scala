@@ -26,7 +26,7 @@ import io.renku.graph.acceptancetests.data.RdfStoreData
 import RdfStoreData.currentVersionPair
 import io.renku.graph.model.RenkuVersionPair
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.testentities.renkuBaseUrl
+import io.renku.graph.model.testentities.renkuUrl
 import io.renku.jsonld.EntityId
 import io.renku.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
@@ -107,7 +107,7 @@ object RDFStore {
     _ = maybeVersionPair.map { currentVersionPair =>
           newJena.connection.update(s"""
           INSERT DATA{
-            <${EntityId.of((renkuBaseUrl / "version-pair").toString)}> a <${renku / "VersionPair"}> ;
+            <${EntityId.of((renkuUrl / "version-pair").toString)}> a <${renku / "VersionPair"}> ;
                             <${renku / "cliVersion"}> '${currentVersionPair.cliVersion}' ;
                             <${renku / "schemaVersion"}> '${currentVersionPair.schemaVersion}'}""")
         }

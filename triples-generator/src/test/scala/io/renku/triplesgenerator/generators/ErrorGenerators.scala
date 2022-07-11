@@ -20,8 +20,8 @@ package io.renku.triplesgenerator.generators
 
 import io.renku.generators.Generators._
 import Implicits._
-import io.renku.triplesgenerator.events.categories.{ProcessingNonRecoverableError, ProcessingRecoverableError}
-import io.renku.triplesgenerator.events.categories.ProcessingRecoverableError._
+import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
+import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import org.scalacheck.Gen
 
 object ErrorGenerators {

@@ -33,8 +33,8 @@ import java.time.Instant.now
 
 package object data extends RdfStoreData {
 
-  implicit val cliVersion: CliVersion         = currentVersionPair.cliVersion
-  val renkuResourcesUrl:   renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
+  implicit val cliVersion: CliVersion   = currentVersionPair.cliVersion
+  val renkuApiUrl:         renku.ApiUrl = renku.ApiUrl("http://localhost:9004/knowledge-graph")
 
   def dataProjects(
       projectGen:   Gen[testentities.RenkuProject],

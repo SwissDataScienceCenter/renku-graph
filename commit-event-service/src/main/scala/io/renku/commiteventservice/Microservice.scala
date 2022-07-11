@@ -23,12 +23,11 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.config.GitLab
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
-import io.renku.control.{RateLimit, Throttler}
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -42,30 +41,30 @@ object Microservice extends IOMicroservice {
   private implicit val logger: Logger[IO]           = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] =
-    MetricsRegistry[IO]().flatMap { implicit metricsRegistry =>
-      for {
-        certificateLoader     <- CertificateLoader[IO]
-        sentryInitializer     <- SentryInitializer[IO]
-        gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-        gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-        gitLabClient          <- GitLabClient[IO](gitLabThrottler)
-        executionTimeRecorder <- ExecutionTimeRecorder[IO]()
-        commitSyncCategory <-
-          events.categories.commitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
-        globalCommitSyncCategory <-
-          events.categories.globalcommitsync.SubscriptionFactory(gitLabClient, executionTimeRecorder)
-        eventConsumersRegistry  <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-        serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-        microserviceRoutes      <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
-        exitcode <- microserviceRoutes.routes.use { routes =>
-                      new MicroserviceRunner[IO](serviceReadinessChecker,
-                                                 certificateLoader,
-                                                 sentryInitializer,
-                                                 eventConsumersRegistry,
-                                                 HttpServer[IO](serverPort = ServicePort.value, routes)
-                      ).run()
-                    }
-      } yield exitcode
+    MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
+      ExecutionTimeRecorder[IO]() flatMap { implicit executionTimeRecorder =>
+        GitLabClient[IO]() flatMap { implicit gitLabClient =>
+          AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
+            for {
+              certificateLoader        <- CertificateLoader[IO]
+              sentryInitializer        <- SentryInitializer[IO]
+              commitSyncCategory       <- events.consumers.commitsync.SubscriptionFactory[IO]
+              globalCommitSyncCategory <- events.consumers.globalcommitsync.SubscriptionFactory[IO]
+              eventConsumersRegistry   <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
+              serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
+              microserviceRoutes       <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
+              exitcode <- microserviceRoutes.routes.use { routes =>
+                            new MicroserviceRunner[IO](serviceReadinessChecker,
+                                                       certificateLoader,
+                                                       sentryInitializer,
+                                                       eventConsumersRegistry,
+                                                       HttpServer[IO](serverPort = ServicePort.value, routes)
+                            ).run()
+                          }
+            } yield exitcode
+          }
+        }
+      }
     }
 }
 

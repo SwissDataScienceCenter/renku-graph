@@ -334,7 +334,7 @@ object Project {
   val entityTypes: EntityTypes = EntityTypes.of(prov / "Location", schema / "Project")
 
   implicit def encoder[P <: Project](implicit
-      renkuBaseUrl: RenkuBaseUrl,
+      renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
     case project: RenkuProject =>
@@ -387,7 +387,7 @@ object Project {
       }
   }
 
-  def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDDecoder[Project] =
+  def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
     ProjectJsonLDDecoder(gitLabInfo)
 
   final case class GitLabProjectInfo(id:               Id,

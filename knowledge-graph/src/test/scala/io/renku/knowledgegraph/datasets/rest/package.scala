@@ -24,7 +24,7 @@ import io.renku.generators.CommonGraphGenerators.sortBys
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.testentities.{Dataset, HavingInvalidationTime, Person, RenkuProject}
-import io.renku.graph.model.{RenkuBaseUrl, testentities}
+import io.renku.graph.model.{RenkuUrl, testentities}
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.datasets.model._
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
@@ -41,7 +41,7 @@ package object rest {
     project => DatasetProject(project.path, project.name)
 
   def internalToNonModified(dataset: Dataset[Dataset.Provenance.Internal], project: RenkuProject)(implicit
-      renkuBaseUrl:                  RenkuBaseUrl
+      renkuUrl:                      RenkuUrl
   ): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
@@ -60,7 +60,7 @@ package object rest {
   )
 
   def importedExternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedExternal], project: RenkuProject)(
-      implicit renkuBaseUrl:                 RenkuBaseUrl
+      implicit renkuUrl:                     RenkuUrl
   ): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
@@ -79,7 +79,7 @@ package object rest {
   )
 
   def importedInternalToNonModified(dataset: Dataset[Dataset.Provenance.ImportedInternal], project: RenkuProject)(
-      implicit renkuBaseUrl:                 RenkuBaseUrl
+      implicit renkuUrl:                     RenkuUrl
   ): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
@@ -98,7 +98,7 @@ package object rest {
   )
 
   def modifiedToModified(dataset: Dataset[Dataset.Provenance.Modified], project: RenkuProject)(implicit
-      renkuBaseUrl:               RenkuBaseUrl
+      renkuUrl:                   RenkuUrl
   ): ModifiedDataset = ModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identifier,

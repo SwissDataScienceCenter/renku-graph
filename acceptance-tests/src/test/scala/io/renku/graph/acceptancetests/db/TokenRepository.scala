@@ -34,7 +34,7 @@ object TokenRepository {
     new ProjectsTokensDbConfigProvider[Try].get().fold(throw _, identity)
 
   private lazy val postgresContainer = FixedHostPortGenericContainer(
-    imageName = "postgres:11.11-alpine",
+    imageName = "postgres:12.8-alpine",
     env = Map("POSTGRES_USER"     -> dbConfig.user.value,
               "POSTGRES_PASSWORD" -> dbConfig.pass.value,
               "POSTGRES_DB"       -> dbConfig.name.value

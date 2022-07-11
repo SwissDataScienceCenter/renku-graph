@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.syntax._
 import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.generators.CommonGraphGenerators.{authUsers, renkuResourcesUrls}
+import io.renku.generators.CommonGraphGenerators.{authUsers, renkuApiUrls}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -80,8 +80,8 @@ class ProjectEndpointSpec
         response.as[Project].unsafeRunSync() shouldBe project
         response.as[Json].unsafeRunSync()._links shouldBe Right(
           Links.of(
-            Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path),
-            Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets")
+            Rel.Self        -> Href(renkuApiUrl / "projects" / project.path),
+            Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets")
           )
         )
 
@@ -136,9 +136,9 @@ class ProjectEndpointSpec
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectFinder         = mock[ProjectFinder[IO]]
-    val renkuResourcesUrl     = renkuResourcesUrls.generateOne
+    val renkuApiUrl           = renkuApiUrls.generateOne
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint              = new ProjectEndpointImpl[IO](projectFinder, renkuResourcesUrl, executionTimeRecorder)
+    val endpoint              = new ProjectEndpointImpl[IO](projectFinder, renkuApiUrl, executionTimeRecorder)
   }
 
   private implicit val projectEntityDecoder: EntityDecoder[IO, Project] = jsonOf[IO, Project]

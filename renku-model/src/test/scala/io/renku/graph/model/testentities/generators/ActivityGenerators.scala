@@ -21,7 +21,7 @@ package generators
 
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestamps, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates}
 import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
@@ -37,10 +37,11 @@ import org.scalacheck.Gen
 
 import java.nio.charset.StandardCharsets._
 
-trait ActivityGenerators {
-  self: EntitiesGenerators =>
+object ActivityGenerators extends ActivityGenerators
 
-  val activityIds:        Gen[Activity.Id]          = Gen.uuid.map(uuid => Activity.Id(uuid.toString))
+trait ActivityGenerators {
+
+  val activityIds:        Gen[Activity.Id]          = noDashUuid.toGeneratorOf(Activity.Id)
   val activityStartTimes: Gen[activities.StartTime] = timestampsNotInTheFuture.map(activities.StartTime.apply)
   def activityStartTimes(after: InstantTinyType): Gen[activities.StartTime] =
     timestampsNotInTheFuture(after.value).toGeneratorOf(activities.StartTime)
@@ -50,7 +51,7 @@ trait ActivityGenerators {
   val entityLocations:       Gen[Location]        = Gen.oneOf(entityFileLocations, entityFolderLocations)
   val entityChecksums:       Gen[Checksum]        = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)
 
-  implicit val planIdentifiers: Gen[plans.Identifier] = Gen.uuid.map(uuid => plans.Identifier(uuid.toString))
+  implicit val planIdentifiers: Gen[plans.Identifier] = noDashUuid.toGeneratorOf(plans.Identifier)
   implicit val planNames:    Gen[plans.Name]    = nonBlankStrings(minLength = 5).map(_.value).toGeneratorOf[plans.Name]
   implicit val planKeywords: Gen[plans.Keyword] = nonBlankStrings(minLength = 5) map (_.value) map plans.Keyword.apply
   implicit val planDescriptions: Gen[plans.Description] = sentences().map(_.value).toGeneratorOf[plans.Description]
@@ -72,6 +73,8 @@ trait ActivityGenerators {
       .map(commandParameters.EncodingFormat(_))
   implicit val commandParameterFolderCreation: Gen[commandParameters.FolderCreation] =
     Gen.oneOf(commandParameters.FolderCreation.yes, commandParameters.FolderCreation.no)
+
+  lazy val generationIds: Gen[Generation.Id] = noDashUuid.toGeneratorOf(Generation.Id)
 
   lazy val inputEntities: Gen[InputEntity] = for {
     location <- entityLocations
@@ -127,7 +130,7 @@ trait ActivityGenerators {
     def generateList(projectDateCreated: projects.DateCreated): List[Activity] =
       factory(projectDateCreated).generateList()
 
-    def many: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne)(factory)
+    def multiple: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne)(factory)
 
     def withDateBefore(max: InstantTinyType): Gen[Activity] =
       factory(projects.DateCreated(max.value))

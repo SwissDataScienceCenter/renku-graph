@@ -109,6 +109,8 @@ eventLog:
     requests:
       memory: 512Mi
   jvmXmx: 256M
+  gitlab:
+    rateLimit: 10/sec
   connectionPool: 10
 
 commitEventService:

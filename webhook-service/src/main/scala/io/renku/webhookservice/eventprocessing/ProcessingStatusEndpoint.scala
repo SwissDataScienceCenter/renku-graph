@@ -47,15 +47,15 @@ trait ProcessingStatusEndpoint[F[_]] {
   def fetchProcessingStatus(projectId: Id): F[Response[F]]
 }
 
-class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger](
+class ProcessingStatusEndpointImpl[F[_]: MonadThrow: Logger: ExecutionTimeRecorder](
     hookValidator:           HookValidator[F],
-    processingStatusFetcher: ProcessingStatusFetcher[F],
-    executionTimeRecorder:   ExecutionTimeRecorder[F]
+    processingStatusFetcher: ProcessingStatusFetcher[F]
 ) extends Http4sDsl[F]
     with ProcessingStatusEndpoint[F] {
 
   import HookValidationResult._
   import ProcessingStatusEndpointImpl._
+  private val executionTimeRecorder = ExecutionTimeRecorder[F]
   import executionTimeRecorder._
 
   def fetchProcessingStatus(projectId: Id): F[Response[F]] = measureExecutionTime {
@@ -116,12 +116,10 @@ private object ProcessingStatusEndpointImpl {
 }
 
 object ProcessingStatusEndpoint {
-  def apply[F[_]: Async: Logger](
-      projectHookUrl:        ProjectHookUrl,
-      gitLabClient:          GitLabClient[F],
-      executionTimeRecorder: ExecutionTimeRecorder[F]
+  def apply[F[_]: Async: GitLabClient: ExecutionTimeRecorder: Logger](
+      projectHookUrl: ProjectHookUrl
   ): F[ProcessingStatusEndpoint[F]] = for {
     fetcher       <- ProcessingStatusFetcher[F]
-    hookValidator <- hookvalidation.HookValidator(projectHookUrl, gitLabClient)
-  } yield new ProcessingStatusEndpointImpl[F](hookValidator, fetcher, executionTimeRecorder)
+    hookValidator <- hookvalidation.HookValidator(projectHookUrl)
+  } yield new ProcessingStatusEndpointImpl[F](hookValidator, fetcher)
 }

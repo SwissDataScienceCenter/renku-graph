@@ -23,7 +23,6 @@ import cats.effect.MonadCancelThrow
 import io.renku.eventlog.EventLogDB.SessionResource
 import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.codec.all._
 import skunk.implicits._
 
 private trait SubscriberTableCreator[F[_]] extends DbMigrator[F]
@@ -31,20 +30,13 @@ private trait SubscriberTableCreator[F[_]] extends DbMigrator[F]
 private class SubscriberTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
     extends SubscriberTableCreator[F] {
 
-  import cats.syntax.all._
+  import MigratorTools._
 
   override def run(): F[Unit] = SessionResource[F].useK {
-    checkTableExists >>= {
-      case true  => Kleisli.liftF(Logger[F] info "'subscriber' table exists")
-      case false => createTable()
-
-    }
-  }
-
-  private lazy val checkTableExists: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'subscriber')"
-      .query(bool)
-    Kleisli(_.unique(query).recover { case _ => false })
+    whenTableExists("subscriber")(
+      Kleisli.liftF(Logger[F] info "'subscriber' table exists"),
+      otherwise = createTable()
+    )
   }
 
   private def createTable(): Kleisli[F, Session[F], Unit] = for {
@@ -55,8 +47,7 @@ private class SubscriberTableCreatorImpl[F[_]: MonadCancelThrow: Logger: Session
     _ <- Kleisli.liftF(Logger[F] info "'subscriber' table created")
   } yield ()
 
-  private lazy val createTableSql: Command[Void] =
-    sql"""
+  private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS subscriber(
       delivery_id  VARCHAR(19) NOT NULL,
       delivery_url VARCHAR     NOT NULL,

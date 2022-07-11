@@ -101,9 +101,9 @@ class GitLabProjectFinderSpec
   }
 
   private trait TestCase {
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabClient  = mock[GitLabClient[IO]]
-    val projectFinder = new GitLabProjectFinderImpl[IO](gitLabClient)
+    implicit val logger:       TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+    val projectFinder = new GitLabProjectFinderImpl[IO]
 
     def uri(path: model.projects.Path) = uri"projects" / path.show withQueryParam ("statistics", "true")
 

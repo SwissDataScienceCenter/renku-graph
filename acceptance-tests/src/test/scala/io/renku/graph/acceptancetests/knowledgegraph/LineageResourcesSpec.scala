@@ -36,6 +36,7 @@ import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{personEntities, renkuProjectEntities, visibilityPublic}
 import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef}
 import io.renku.http.client.AccessToken
+import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.jsonld.syntax._
 import org.http4s.Status.{NotFound, Ok}
 import org.scalatest.GivenWhenThen
@@ -85,7 +86,7 @@ class LineageResourcesSpec
 
       When("user calls the lineage endpoint")
       val response =
-        knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/files/${exemplarData.`grid_plot entity`.location}/lineage"
+        knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/files/${urlEncode(exemplarData.`grid_plot entity`.location)}/lineage"
 
       Then("they should get Ok response with project lineage in Json")
       response.status shouldBe Ok
@@ -121,7 +122,7 @@ class LineageResourcesSpec
       When("user fetches the lineage of the project he is a member of")
 
       val response =
-        knowledgeGraphClient GET (s"knowledge-graph/projects/${project.path}/files/${accessibleExemplarData.`grid_plot entity`.location}/lineage", user.accessToken)
+        knowledgeGraphClient GET (s"knowledge-graph/projects/${project.path}/files/${urlEncode(accessibleExemplarData.`grid_plot entity`.location)}/lineage", user.accessToken)
 
       Then("he should get OK response with project lineage in Json")
       response.status shouldBe Ok
@@ -150,7 +151,7 @@ class LineageResourcesSpec
       When("user posts a graphql query to fetch lineage of the project he is not a member of")
       val response =
         knowledgeGraphClient.GET(
-          s"knowledge-graph/projects/${project.path}/files/${privateExemplarData.`grid_plot entity`.location}/lineage"
+          s"knowledge-graph/projects/${project.path}/files/${urlEncode(privateExemplarData.`grid_plot entity`.location)}/lineage"
         )
 
       Then("he should get a NotFound response without lineage")

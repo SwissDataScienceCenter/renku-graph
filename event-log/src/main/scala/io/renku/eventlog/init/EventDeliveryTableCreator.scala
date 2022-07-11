@@ -31,6 +31,7 @@ private trait EventDeliveryTableCreator[F[_]] extends DbMigrator[F]
 private class EventDeliveryTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
     extends EventDeliveryTableCreator[F] {
 
+  import MigratorTools._
   import cats.syntax.all._
 
   override def run(): F[Unit] = SessionResource[F].useK {

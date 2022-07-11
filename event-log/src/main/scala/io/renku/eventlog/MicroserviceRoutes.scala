@@ -26,9 +26,9 @@ import cats.syntax.all._
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
+import io.renku.eventlog.events.producers.{EventProducersRegistry, SubscriptionsEndpoint}
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
-import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders._
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}

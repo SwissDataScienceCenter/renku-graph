@@ -41,9 +41,8 @@ trait EventEndpoint[F[_]] {
   def processEvent(request: Request[F]): F[Response[F]]
 }
 
-class EventEndpointImpl[F[_]: Concurrent](
-    eventConsumersRegistry: EventConsumersRegistry[F]
-) extends Http4sDsl[F]
+class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumersRegistry[F])
+    extends Http4sDsl[F]
     with EventEndpoint[F] {
 
   import org.http4s.circe._

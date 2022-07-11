@@ -45,7 +45,7 @@ private class EdgesTrimmerImpl[F[_]: MonadThrow]() extends EdgesTrimmer[F] {
 
     List(
       findEdgesConnected[From](to = Set(location), _: EdgeMap),
-      findEdgesConnected[To](to = Set(location), _:   EdgeMap)
+      findEdgesConnected[To](to = Set(location), _: EdgeMap)
     ).flatMap(_.apply(latestEdges)).toMap.pure[F]
   }
 

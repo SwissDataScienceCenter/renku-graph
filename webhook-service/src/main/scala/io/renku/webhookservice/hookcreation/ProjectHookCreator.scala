@@ -32,15 +32,10 @@ import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
 private trait ProjectHookCreator[F[_]] {
-  def create(
-      projectHook: ProjectHook,
-      accessToken: AccessToken
-  ): F[Unit]
+  def create(projectHook: ProjectHook, accessToken: AccessToken): F[Unit]
 }
 
-private class ProjectHookCreatorImpl[F[_]: Async: Logger](
-    gitLabClient: GitLabClient[F]
-) extends ProjectHookCreator[F] {
+private class ProjectHookCreatorImpl[F[_]: Async: GitLabClient: Logger] extends ProjectHookCreator[F] {
 
   import cats.effect._
   import io.circe.Json
@@ -50,18 +45,15 @@ private class ProjectHookCreatorImpl[F[_]: Async: Logger](
 
   def create(projectHook: ProjectHook, accessToken: AccessToken): F[Unit] = {
     val uri = uri"projects" / projectHook.projectId.show / "hooks"
-    gitLabClient.post(uri, "create-hook", payload(projectHook))(mapResponse)(
-      Some(accessToken)
-    )
+    GitLabClient[F].post(uri, "create-hook", payload(projectHook))(mapResponse)(Some(accessToken))
   }
 
-  private def payload(projectHook: ProjectHook) =
-    Json.obj(
-      "id"          -> Json.fromInt(projectHook.projectId.value),
-      "url"         -> Json.fromString(projectHook.projectHookUrl.value),
-      "push_events" -> Json.fromBoolean(true),
-      "token"       -> Json.fromString(projectHook.serializedHookToken.value)
-    )
+  private def payload(projectHook: ProjectHook) = Json.obj(
+    "id"          -> Json.fromInt(projectHook.projectId.value),
+    "url"         -> Json.fromString(projectHook.projectHookUrl.value),
+    "push_events" -> Json.fromBoolean(true),
+    "token"       -> Json.fromString(projectHook.serializedHookToken.value)
+  )
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
     case (Created, _, _)      => Applicative[F].unit
@@ -76,6 +68,6 @@ private object ProjectHookCreator {
       serializedHookToken: SerializedHookToken
   )
 
-  def apply[F[_]: Async: Logger](gitLabClient: GitLabClient[F]): F[ProjectHookCreator[F]] =
-    new ProjectHookCreatorImpl(gitLabClient).pure[F].widen[ProjectHookCreator[F]]
+  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectHookCreator[F]] =
+    new ProjectHookCreatorImpl[F].pure[F].widen[ProjectHookCreator[F]]
 }

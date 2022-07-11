@@ -19,10 +19,8 @@
 package io.renku.webhookservice
 
 import cats.effect._
-import io.renku.config.GitLab
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
-import io.renku.control.{RateLimit, Throttler}
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -34,23 +32,23 @@ object Microservice extends IOMicroservice {
   private implicit val logger: ApplicationLogger.type = ApplicationLogger
 
   override def run(args: List[String]): IO[ExitCode] = MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
-    for {
-      certificateLoader     <- CertificateLoader[IO]
-      sentryInitializer     <- SentryInitializer[IO]
-      gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-      gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-      gitLabClient          <- GitLabClient(gitLabThrottler)
-      executionTimeRecorder <- ExecutionTimeRecorder[IO]()
-      microserviceRoutes    <- MicroserviceRoutes(gitLabClient, executionTimeRecorder)
-      exitcode <- microserviceRoutes.routes.use { routes =>
-                    val httpServer = HttpServer[IO](serverPort = 9001, routes)
-                    new MicroserviceRunner(
-                      certificateLoader,
-                      sentryInitializer,
-                      httpServer
-                    ).run()
-                  }
-    } yield exitcode
+    GitLabClient[IO]() flatMap { implicit gitLabClient =>
+      ExecutionTimeRecorder[IO]() flatMap { implicit executionTimeRecorder =>
+        for {
+          certificateLoader  <- CertificateLoader[IO]
+          sentryInitializer  <- SentryInitializer[IO]
+          microserviceRoutes <- MicroserviceRoutes[IO]
+          exitcode <- microserviceRoutes.routes.use { routes =>
+                        val httpServer = HttpServer[IO](serverPort = 9001, routes)
+                        new MicroserviceRunner(
+                          certificateLoader,
+                          sentryInitializer,
+                          httpServer
+                        ).run()
+                      }
+        } yield exitcode
+      }
+    }
   }
 }
 

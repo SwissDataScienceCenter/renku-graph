@@ -24,7 +24,6 @@ import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.graph.tokenrepository.AccessTokenFinder._
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.model._
@@ -38,12 +37,12 @@ private trait ProjectFinder[F[_]] {
   def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[Project]]
 }
 
-private class ProjectFinderImpl[F[_]: MonadThrow: Parallel](
+private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
     kgProjectFinder:     KGProjectFinder[F],
-    gitLabProjectFinder: GitLabProjectFinder[F],
-    accessTokenFinder:   AccessTokenFinder[F]
+    gitLabProjectFinder: GitLabProjectFinder[F]
 ) extends ProjectFinder[F] {
 
+  private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import accessTokenFinder._
   import gitLabProjectFinder.{findProject => findProjectInGitLab}
   import kgProjectFinder.{findProject => findInKG}
@@ -92,11 +91,9 @@ private object ProjectFinder {
 
   import io.renku.rdfstore.SparqlQueryTimeRecorder
 
-  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
-      gitLabClient: GitLabClient[F]
-  ): F[ProjectFinder[F]] = for {
+  def apply[F[_]: Async: Parallel: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]
+      : F[ProjectFinder[F]] = for {
     kgProjectFinder     <- KGProjectFinder[F]
-    gitLabProjectFinder <- GitLabProjectFinder[F](gitLabClient)
-    accessTokenFinder   <- AccessTokenFinder[F]
-  } yield new ProjectFinderImpl(kgProjectFinder, gitLabProjectFinder, accessTokenFinder)
+    gitLabProjectFinder <- GitLabProjectFinder[F]
+  } yield new ProjectFinderImpl(kgProjectFinder, gitLabProjectFinder)
 }

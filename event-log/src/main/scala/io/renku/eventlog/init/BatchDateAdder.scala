@@ -22,13 +22,10 @@ import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.graph.model.events.BatchDate
 import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.codec.all.timestamp
 import skunk.implicits._
 
-import java.time.{LocalDateTime, ZoneOffset}
 import scala.util.control.NonFatal
 
 private trait BatchDateAdder[F[_]] extends DbMigrator[F]
@@ -37,28 +34,17 @@ private object BatchDateAdder {
   def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: BatchDateAdder[F] = new BatchDateAdderImpl[F]
 }
 
-private class BatchDateAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
-    extends BatchDateAdder[F]
-    with EventTableCheck {
+private class BatchDateAdderImpl[F[_]: MonadCancelThrow: Logger: SessionResource] extends BatchDateAdder[F] {
+
+  import MigratorTools._
 
   override def run(): F[Unit] = SessionResource[F].useK {
-    whenEventTableExists(
+    whenTableExists("event")(
       Kleisli.liftF(Logger[F] info "'batch_date' column adding skipped"),
-      otherwise = checkColumnExists >>= {
+      otherwise = checkColumnExists("event_log", "batch_date") >>= {
         case true  => Kleisli.liftF(Logger[F] info "'batch_date' column exists")
         case false => addColumn()
       }
-    )
-  }
-
-  private lazy val checkColumnExists: Kleisli[F, Session[F], Boolean] = {
-    val query: Query[skunk.Void, BatchDate] = sql"SELECT batch_date FROM event_log limit 1"
-      .query(timestamp)
-      .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
-    Kleisli(
-      _.option(query)
-        .map(_ => true)
-        .recover { case _ => false }
     )
   }
 

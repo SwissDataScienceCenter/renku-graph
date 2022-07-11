@@ -24,12 +24,11 @@ import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.config.GitLab
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
-import io.renku.control.{RateLimit, Throttler}
 import io.renku.events.consumers
 import io.renku.events.consumers.EventConsumersRegistry
+import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
@@ -37,8 +36,9 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
-import io.renku.triplesgenerator.events.categories._
-import io.renku.triplesgenerator.events.categories.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesgenerator.events.consumers._
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
 import org.typelevel.log4cats.Logger
 
@@ -59,47 +59,52 @@ object Microservice extends IOMicroservice {
   override def run(args: List[String]): IO[ExitCode] =
     MetricsRegistry[IO]() >>= { implicit metricsRegistry =>
       SparqlQueryTimeRecorder[IO](metricsRegistry) >>= { implicit sparqlTimeRecorder =>
-        for {
-          config                         <- parseConfigArgs(args)
-          certificateLoader              <- CertificateLoader[IO]
-          gitCertificateInstaller        <- GitCertificateInstaller[IO]
-          sentryInitializer              <- SentryInitializer[IO]
-          cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
-          gitLabRateLimit                <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-          gitLabThrottler                <- Throttler[IO, GitLab](gitLabRateLimit)
-          gitLabClient                   <- GitLabClient[IO](gitLabThrottler)
-          awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
-          membersSyncSubscription        <- membersync.SubscriptionFactory(gitLabClient)
-          triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory(gitLabClient)
-          cleanUpSubscription            <- cleanup.SubscriptionFactory[IO]
-          reProvisioningStatus <- ReProvisioningStatus(awaitingGenerationSubscription,
-                                                       membersSyncSubscription,
-                                                       triplesGeneratedSubscription,
-                                                       cleanUpSubscription
-                                  )
-          migrationRequestSubscription <- tsmigrationrequest.SubscriptionFactory[IO](reProvisioningStatus, config)
-          eventConsumersRegistry <- consumers.EventConsumersRegistry(
-                                      awaitingGenerationSubscription,
-                                      membersSyncSubscription,
-                                      triplesGeneratedSubscription,
-                                      cleanUpSubscription,
-                                      migrationRequestSubscription
-                                    )
-          serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-          microserviceRoutes <-
-            MicroserviceRoutes[IO](eventConsumersRegistry, reProvisioningStatus, config.some).map(_.routes)
-          exitCode <- microserviceRoutes.use { routes =>
-                        new MicroserviceRunner[IO](
-                          serviceReadinessChecker,
-                          certificateLoader,
-                          gitCertificateInstaller,
-                          sentryInitializer,
-                          cliVersionCompatChecker,
-                          eventConsumersRegistry,
-                          HttpServer[IO](serverPort = ServicePort.value, routes)
-                        ).run()
-                      }
-        } yield exitCode
+        GitLabClient[IO]() >>= { implicit gitLabClient =>
+          AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
+            for {
+              config                         <- parseConfigArgs(args)
+              certificateLoader              <- CertificateLoader[IO]
+              gitCertificateInstaller        <- GitCertificateInstaller[IO]
+              sentryInitializer              <- SentryInitializer[IO]
+              cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
+              awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
+              membersSyncSubscription        <- membersync.SubscriptionFactory[IO]
+              triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO]
+              minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO]
+              cleanUpSubscription            <- cleanup.SubscriptionFactory[IO]
+              reProvisioningStatus <- ReProvisioningStatus(
+                                        awaitingGenerationSubscription,
+                                        membersSyncSubscription,
+                                        triplesGeneratedSubscription,
+                                        minProjectInfoSubscription,
+                                        cleanUpSubscription
+                                      )
+              migrationRequestSubscription <- tsmigrationrequest.SubscriptionFactory[IO](reProvisioningStatus, config)
+              eventConsumersRegistry <- consumers.EventConsumersRegistry(
+                                          awaitingGenerationSubscription,
+                                          membersSyncSubscription,
+                                          triplesGeneratedSubscription,
+                                          minProjectInfoSubscription,
+                                          cleanUpSubscription,
+                                          migrationRequestSubscription
+                                        )
+              serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
+              microserviceRoutes <-
+                MicroserviceRoutes[IO](eventConsumersRegistry, reProvisioningStatus, config.some).map(_.routes)
+              exitCode <- microserviceRoutes.use { routes =>
+                            new MicroserviceRunner[IO](
+                              serviceReadinessChecker,
+                              certificateLoader,
+                              gitCertificateInstaller,
+                              sentryInitializer,
+                              cliVersionCompatChecker,
+                              eventConsumersRegistry,
+                              HttpServer[IO](serverPort = ServicePort.value, routes)
+                            ).run()
+                          }
+            } yield exitCode
+          }
+        }
       }
     }
 }

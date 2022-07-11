@@ -25,7 +25,7 @@ import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.{AccessToken, RestClient}
 import org.typelevel.log4cats.Logger
 
-trait AccessTokenFinder[F[_]] {
+trait AccessTokenFinder[F[_]] extends AccessTokenFinder.Implicits {
   def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): F[Option[AccessToken]]
 }
 
@@ -56,12 +56,16 @@ class AccessTokenFinderImpl[F[_]: Async: Logger](
 
 object AccessTokenFinder {
 
-  import io.renku.http.client.UrlEncoder.urlEncode
+  trait Implicits {
+    import io.renku.http.client.UrlEncoder.urlEncode
+    implicit val projectPathToPath: Path => String = path => urlEncode(path.value)
+    implicit val projectIdToPath:   Id => String   = _.toString
+  }
+  object Implicits extends Implicits
 
-  implicit val projectPathToPath: Path => String = path => urlEncode(path.value)
-  implicit val projectIdToPath:   Id => String   = _.toString
+  def apply[F[_]](implicit ev: AccessTokenFinder[F]): AccessTokenFinder[F] = ev
 
-  def apply[F[_]: Async: Logger]: F[AccessTokenFinder[F]] = for {
+  def apply[F[_]: Async: Logger](): F[AccessTokenFinder[F]] = for {
     tokenRepositoryUrl <- TokenRepositoryUrl[F]()
   } yield new AccessTokenFinderImpl[F](tokenRepositoryUrl)
 }

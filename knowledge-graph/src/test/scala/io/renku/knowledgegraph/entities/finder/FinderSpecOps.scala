@@ -39,7 +39,7 @@ trait FinderSpecOps {
   protected[finder] trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new EntitiesFinderImpl[IO](rdfStoreConfig)
+    val finder = new EntitiesFinderImpl[IO](renkuStoreConfig)
   }
 
   protected implicit class PagingResponseOps(response: PagingResponse[model.Entity]) {

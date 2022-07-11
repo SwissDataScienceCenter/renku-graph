@@ -19,15 +19,17 @@
 package io.renku.knowledgegraph
 
 import cats.MonadThrow
+import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
 import io.renku.graph.model.persons
+import io.renku.graph.tokenrepository.AccessTokenFinder
+import io.renku.http.InfoMessage
+import io.renku.http.InfoMessage._
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
@@ -40,13 +42,12 @@ import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
-import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
-import org.http4s.{AuthedRoutes, ParseFailure, Request, Response}
+import org.http4s.{AuthedRoutes, ParseFailure, Request, Response, Status, Uri}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -101,19 +102,20 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   private lazy val `GET /entities routes`: AuthedRoutes[Option[AuthUser], F] = {
     import io.renku.knowledgegraph.entities.Endpoint.Criteria._
     import Filters.CreatorName.creatorNames
-    import Filters.Date.date
     import Filters.EntityType.entityTypes
     import Filters.Query.query
+    import Filters.Since.since
+    import Filters.Until.until
     import Filters.Visibility.visibilities
     import Sorting.sort
 
     AuthedRoutes.of {
       case req@GET -> Root / "knowledge-graph" / "entities"
         :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators)
-        +& visibilities(maybeVisibilities) +& date(maybeDate) +& sort(maybeSort)
-        +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
+        +& visibilities(maybeVisibilities) +& since(maybeSince) +& until(maybeUntil) 
+        +& sort(maybeSort) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
         searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeVisibilities,
-          maybeDate, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
+          maybeSince, maybeUntil, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
     }
   }
   // format: on
@@ -153,7 +155,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
       types:        ValidatedNel[ParseFailure, List[entities.Endpoint.Criteria.Filters.EntityType]],
       creators:     ValidatedNel[ParseFailure, List[persons.Name]],
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
-      maybeDate:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Date]],
+      maybeSince:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Since]],
+      maybeUntil:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Until]],
       maybeSort:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Sorting.By]],
       maybePage:    Option[ValidatedNel[ParseFailure, Page]],
       maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]],
@@ -169,12 +172,25 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
       types.map(_.toSet),
       creators.map(_.toSet),
       visibilities.map(_.toSet),
-      maybeDate.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Date])),
+      maybeSince.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Since])),
+      maybeUntil.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Until])),
       maybeSort getOrElse Validated.validNel(Sorting.By(ByName, Direction.Asc)),
-      PagingRequest(maybePage, maybePerPage)
-    ).mapN { case (maybeQuery, types, creators, visibilities, maybeDate, sorting, paging) =>
+      PagingRequest(maybePage, maybePerPage),
+      (maybeSince -> maybeUntil)
+        .mapN(_ -> _)
+        .map {
+          case (Valid(since), Valid(until)) if (since.value compareTo until.value) > 0 =>
+            ParseFailure("'since' parameter > 'until'", "").invalidNel[Unit]
+          case _ => ().validNel[ParseFailure]
+        }
+        .getOrElse(().validNel[ParseFailure])
+    ).mapN { case (maybeQuery, types, creators, visibilities, maybeSince, maybeUntil, sorting, paging, _) =>
       `GET /entities`(
-        Criteria(Filters(maybeQuery, types, creators, visibilities, maybeDate), sorting, paging, maybeUser),
+        Criteria(Filters(maybeQuery, types, creators, visibilities, maybeSince, maybeUntil),
+                 sorting,
+                 paging,
+                 maybeUser
+        ),
         request
       )
     }.fold(toBadRequest, identity)
@@ -195,12 +211,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
         .semiflatMap(getProjectDatasets)
         .merge
-    case LineageEndpoint(projectPathParts, locationParts) =>
-      (projectPathParts.toProjectPath -> locationParts.toLocation)
-        .mapN(_ -> _)
-        .flatTap { case (projectPath, _) => authorizePath(projectPath, maybeAuthUser).leftMap(_.toHttpResponse) }
-        .semiflatMap { case (projectPath, location) => `GET /lineage`(projectPath, location, maybeAuthUser) }
-        .merge
+    case projectPathParts :+ "files" :+ location :+ "lineage" =>
+      getLineage(projectPathParts, location, maybeAuthUser)
     case projectPathParts =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
@@ -208,33 +220,25 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
         .merge
   }
 
-  object LineageEndpoint {
-    def unapply(segments: List[String]): Option[(List[String], List[String])] =
-      if (segments.contains("lineage") && segments.contains("files")) {
+  private def getLineage(projectPathParts: List[String], location: String, maybeAuthUser: Option[AuthUser]) = {
+    import io.renku.knowledgegraph.lineage.model.Node.Location
 
-        val indexOfFiles = segments.indexOf("files")
-        val projectPath  = segments.take(indexOfFiles)
-        val location     = segments.drop(indexOfFiles + 1).takeWhile(!_.contains("lineage"))
-        if (projectPath.nonEmpty && location.nonEmpty)
-          Some((projectPath, location))
-        else None
-      } else None
-  }
-
-  private implicit class PathPartsOps(parts: List[String]) {
-
-    import io.renku.http.InfoMessage
-    import io.renku.http.InfoMessage._
-    import org.http4s.{Response, Status}
-
-    lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
-      model.projects.Path
-        .from(parts mkString "/")
+    def toLocation(location: String): EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
+      Location
+        .from(Uri.decode(location))
         .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
     }
 
-    lazy val toLocation: EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
-      Location
+    (projectPathParts.toProjectPath -> toLocation(location))
+      .mapN(_ -> _)
+      .flatTap { case (projectPath, _) => authorizePath(projectPath, maybeAuthUser).leftMap(_.toHttpResponse) }
+      .semiflatMap { case (projectPath, location) => `GET /lineage`(projectPath, location, maybeAuthUser) }
+      .merge
+  }
+
+  private implicit class PathPartsOps(parts: List[String]) {
+    lazy val toProjectPath: EitherT[F, Response[F], model.projects.Path] = EitherT.fromEither[F] {
+      model.projects.Path
         .from(parts mkString "/")
         .leftMap(_ => Response[F](Status.NotFound).withEntity(InfoMessage("Resource not found")))
     }
@@ -249,35 +253,36 @@ private object MicroserviceRoutes {
       logger:             Logger[IO],
       metricsRegistry:    MetricsRegistry[IO],
       sparqlTimeRecorder: SparqlQueryTimeRecorder[IO]
-  ): IO[MicroserviceRoutes[IO]] = for {
-    gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-    gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
-    datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO]
-    datasetEndpoint         <- DatasetEndpoint[IO]
-    entitiesEndpoint        <- entities.Endpoint[IO]
-    gitLabClient            <- GitLabClient(gitLabThrottler)
-    queryEndpoint           <- QueryEndpoint()
-    lineageEndpoint         <- lineage.Endpoint[IO]
-    projectEndpoint         <- ProjectEndpoint[IO](gitLabClient)
-    docsEndpoint            <- docs.Endpoint[IO]
-    projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
-    authenticator           <- GitLabAuthenticator(gitLabClient)
-    authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-    projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
-    datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
-    versionRoutes           <- version.Routes[IO]
-  } yield new MicroserviceRoutes(datasetsSearchEndpoint,
-                                 datasetEndpoint,
-                                 entitiesEndpoint,
-                                 queryEndpoint,
-                                 lineageEndpoint,
-                                 projectEndpoint,
-                                 projectDatasetsEndpoint,
-                                 docsEndpoint,
-                                 authMiddleware,
-                                 projectPathAuthorizer,
-                                 datasetIdAuthorizer,
-                                 new RoutesMetrics[IO],
-                                 versionRoutes
-  )
+  ): IO[MicroserviceRoutes[IO]] = GitLabClient[IO]() >>= { implicit gitLabClient =>
+    AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
+      for {
+        datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO]
+        datasetEndpoint         <- DatasetEndpoint[IO]
+        entitiesEndpoint        <- entities.Endpoint[IO]
+        queryEndpoint           <- QueryEndpoint()
+        lineageEndpoint         <- lineage.Endpoint[IO]
+        projectEndpoint         <- ProjectEndpoint[IO]
+        projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
+        docsEndpoint            <- docs.Endpoint[IO]
+        authenticator           <- GitLabAuthenticator[IO]
+        authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
+        projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
+        datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
+        versionRoutes           <- version.Routes[IO]
+      } yield new MicroserviceRoutes(datasetsSearchEndpoint,
+                                     datasetEndpoint,
+                                     entitiesEndpoint,
+                                     queryEndpoint,
+                                     lineageEndpoint,
+                                     projectEndpoint,
+                                     projectDatasetsEndpoint,
+                                     docsEndpoint,
+                                     authMiddleware,
+                                     projectPathAuthorizer,
+                                     datasetIdAuthorizer,
+                                     new RoutesMetrics[IO],
+                                     versionRoutes
+      )
+    }
+  }
 }

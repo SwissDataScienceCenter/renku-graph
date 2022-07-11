@@ -46,7 +46,6 @@ class HookValidatorImpl[F[_]: MonadThrow: Logger](
 
   private val applicative = Applicative[F]
 
-  import AccessTokenFinder._
   import HookValidator.HookValidationResult._
   import HookValidator._
   import Token._
@@ -126,12 +125,9 @@ object HookValidator {
 
   final case class NoAccessTokenException(message: String) extends RuntimeException(message)
 
-  def apply[F[_]: Async: Logger](
-      projectHookUrl: ProjectHookUrl,
-      gitLabClient:   GitLabClient[F]
-  ): F[HookValidator[F]] = for {
+  def apply[F[_]: Async: GitLabClient: Logger](projectHookUrl: ProjectHookUrl): F[HookValidator[F]] = for {
     tokenRepositoryUrl    <- TokenRepositoryUrl[F]()
-    projectHookVerifier   <- ProjectHookVerifier[F](gitLabClient)
+    projectHookVerifier   <- ProjectHookVerifier[F]
     accessTokenAssociator <- AccessTokenAssociator[F]
     accessTokenRemover    <- AccessTokenRemover[F]
   } yield new HookValidatorImpl[F](

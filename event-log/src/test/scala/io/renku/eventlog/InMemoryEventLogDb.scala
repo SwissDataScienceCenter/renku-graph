@@ -37,7 +37,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
   private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
   override val container: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:11.11-alpine"),
+    dockerImageNameOverride = DockerImageName.parse("postgres:12.8-alpine"),
     databaseName = dbConfig.name.value,
     username = dbConfig.user.value,
     password = dbConfig.pass.value
@@ -55,6 +55,9 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   def execute[O](query: Kleisli[IO, Session[IO], O]): O =
     sessionResource.useK(query).unsafeRunSync()
+
+  def executeCommand(sql: Command[Void]): Unit =
+    execute[Unit](Kleisli(session => session.execute(sql).void))
 
   def verifyTrue(sql: Command[Void]): Unit = execute[Unit](Kleisli(session => session.execute(sql).void))
 

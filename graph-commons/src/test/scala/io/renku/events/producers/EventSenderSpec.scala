@@ -154,7 +154,7 @@ class EventSenderSpec
     }
   }
 
-  private lazy val requestTimeout: FiniteDuration = 1 second
+  private lazy val requestTimeout: FiniteDuration = 500 millis
 
   private trait TestCase {
     val categoryName = categoryNames.generateOne
@@ -162,7 +162,7 @@ class EventSenderSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val sentEventsGauge = mock[LabeledGauge[IO, CategoryName]]
     val eventLogUrl:  EventLogUrl    = EventLogUrl(externalServiceBaseUrl)
-    val onErrorSleep: FiniteDuration = 1 second
+    val onErrorSleep: FiniteDuration = 500 millis
     val eventSender = new EventSenderImpl[IO](eventLogUrl,
                                               sentEventsGauge,
                                               onErrorSleep,

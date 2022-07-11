@@ -86,7 +86,7 @@ trait ContainerTestDb extends ForAllTestContainer {
   private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
 
   override val container: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:11.11-alpine"),
+    dockerImageNameOverride = DockerImageName.parse("postgres:12.8-alpine"),
     databaseName = dbConfig.name.value,
     username = dbConfig.user.value,
     password = dbConfig.pass

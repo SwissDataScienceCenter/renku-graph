@@ -81,25 +81,17 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      gitLabClient:          GitLabClient[F],
-      executionTimeRecorder: ExecutionTimeRecorder[F]
-  ): F[MicroserviceRoutes[F]] = for {
-    projectHookUrl      <- ProjectHookUrl.fromConfig[F]()
-    hookTokenCrypto     <- HookTokenCrypto[F]()
-    hookEventEndpoint   <- HookEventEndpoint(hookTokenCrypto)
-    hookCreatorEndpoint <- HookCreationEndpoint(projectHookUrl, gitLabClient, hookTokenCrypto)
-    processingStatusEndpoint <-
-      eventprocessing.ProcessingStatusEndpoint(
-        projectHookUrl,
-        gitLabClient,
-        executionTimeRecorder
-      )
-    hookValidationEndpoint <- HookValidationEndpoint(projectHookUrl, gitLabClient)
-    hookDeletionEndpoint   <- HookDeletionEndpoint(projectHookUrl, gitLabClient)
-    authenticator          <- GitLabAuthenticator(gitLabClient)
-    authMiddleware         <- Authentication.middleware(authenticator)
-    versionRoutes          <- version.Routes[F]
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: ExecutionTimeRecorder]: F[MicroserviceRoutes[F]] = for {
+    projectHookUrl           <- ProjectHookUrl.fromConfig[F]()
+    hookTokenCrypto          <- HookTokenCrypto[F]()
+    hookEventEndpoint        <- HookEventEndpoint(hookTokenCrypto)
+    hookCreatorEndpoint      <- HookCreationEndpoint(projectHookUrl, hookTokenCrypto)
+    processingStatusEndpoint <- eventprocessing.ProcessingStatusEndpoint(projectHookUrl)
+    hookValidationEndpoint   <- HookValidationEndpoint(projectHookUrl)
+    hookDeletionEndpoint     <- HookDeletionEndpoint(projectHookUrl)
+    authenticator            <- GitLabAuthenticator[F]
+    authMiddleware           <- Authentication.middleware(authenticator)
+    versionRoutes            <- version.Routes[F]
   } yield new MicroserviceRoutes[F](
     hookEventEndpoint,
     hookCreatorEndpoint,

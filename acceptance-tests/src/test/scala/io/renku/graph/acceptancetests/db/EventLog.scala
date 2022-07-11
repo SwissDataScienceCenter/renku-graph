@@ -23,15 +23,18 @@ import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.IO._
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
+import cats.syntax.all._
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import io.renku.db.{DBConfigProvider, SessionResource}
 import io.renku.eventlog._
+import io.renku.events.CategoryName
 import io.renku.graph.model.events.{CommitId, EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
 import skunk._
+import skunk.codec.text.varchar
 import skunk.implicits._
 
 import scala.collection.immutable
@@ -51,13 +54,33 @@ object EventLog extends TypeSerializers {
 
   def findEvents(projectId: Id, status: EventStatus*)(implicit ioRuntime: IORuntime): List[CommitId] = execute {
     session =>
-      val query: Query[projects.Id, CommitId] =
-        sql"""SELECT event_id
+      val query: Query[projects.Id, CommitId] = sql"""
+            SELECT event_id
             FROM event
             WHERE project_id = $projectIdEncoder AND #${`status IN`(status.toList)}"""
-          .query(eventIdDecoder)
-          .map(eventId => CommitId(eventId.value))
+        .query(eventIdDecoder)
+        .map(eventId => CommitId(eventId.value))
       session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+  }
+
+  def findSyncEvents(projectId: Id)(implicit ioRuntime: IORuntime): List[CategoryName] = execute { session =>
+    val query: Query[projects.Id, CategoryName] = sql"""
+          SELECT category_name
+          FROM subscription_category_sync_time
+          WHERE project_id = $projectIdEncoder"""
+      .query(varchar)
+      .map(category => CategoryName(category))
+    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
+  }
+
+  def forceCategoryEventTriggering(categoryName: CategoryName, projectId: projects.Id)(implicit
+      ioRuntime:                                 IORuntime
+  ): Unit = execute { session =>
+    val query: Command[projects.Id ~ String] = sql"""
+      DELETE FROM subscription_category_sync_time 
+      WHERE project_id = $projectIdEncoder AND category_name = $varchar
+      """.command
+    session.prepare(query).use(_.execute(projectId, categoryName.show)).void
   }
 
   private def `status IN`(status: List[EventStatus]) =
@@ -72,7 +95,7 @@ object EventLog extends TypeSerializers {
     new EventLogDbConfigProvider[Try].get().fold(throw _, identity)
 
   private lazy val postgresContainer = FixedHostPortGenericContainer(
-    imageName = "postgres:11.11-alpine",
+    imageName = "postgres:12.8-alpine",
     env = immutable.Map("POSTGRES_USER"     -> dbConfig.user.value,
                         "POSTGRES_PASSWORD" -> dbConfig.pass.value,
                         "POSTGRES_DB"       -> dbConfig.name.value
@@ -84,10 +107,10 @@ object EventLog extends TypeSerializers {
   )
 
   def removeGlobalCommitSyncRow(projectId: Id)(implicit ioRuntime: IORuntime): Unit = execute { session =>
-    val command: Command[projects.Id] =
-      sql"""DELETE FROM subscription_category_sync_time
-            WHERE project_id = $projectIdEncoder 
-            AND category_name = 'GLOBAL_COMMIT_SYNC' """.command
+    val command: Command[projects.Id] = sql"""
+      DELETE FROM subscription_category_sync_time
+      WHERE project_id = $projectIdEncoder 
+        AND category_name = 'GLOBAL_COMMIT_SYNC' """.command
     session.prepare(command).use(_.execute(projectId)).void
   }
 

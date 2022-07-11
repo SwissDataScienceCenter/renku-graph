@@ -35,6 +35,8 @@ private object PayloadTypeChanger {
 
 private class PayloadTypeChangerImpl[F[_]: MonadCancelThrow: Logger: SessionResource] extends PayloadTypeChanger[F] {
 
+  import MigratorTools._
+
   override def run(): F[Unit] = SessionResource[F].useK {
     checkIfAlreadyMigrated >>= {
       case true =>

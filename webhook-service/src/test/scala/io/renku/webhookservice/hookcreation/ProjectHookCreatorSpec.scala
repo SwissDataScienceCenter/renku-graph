@@ -118,9 +118,9 @@ class ProjectHookCreatorSpec
           "token"       -> Json.fromString(projectHook.serializedHookToken.value)
         )
 
-    implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val gitLabClient = mock[GitLabClient[IO]]
-    val hookCreator  = new ProjectHookCreatorImpl[IO](gitLabClient)
+    implicit val logger:       TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
+    val hookCreator = new ProjectHookCreatorImpl[IO]
 
     lazy val mapResponse = captureMapping(hookCreator, gitLabClient)(
       _.create(projectHook, accessToken).unsafeRunSync(),

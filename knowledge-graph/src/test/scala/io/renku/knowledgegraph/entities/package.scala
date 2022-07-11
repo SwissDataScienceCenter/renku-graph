@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{localDatesNotInTheFuture, nonBlankStrings}
 import io.renku.graph.model.testentities.{Entity => _, _}
-import io.renku.graph.model.{RenkuBaseUrl, testentities}
+import io.renku.graph.model.{RenkuUrl, testentities}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
 
@@ -32,7 +32,8 @@ package object entities {
 
   val queryParams: Gen[Filters.Query]      = nonBlankStrings(minLength = 5).map(v => Filters.Query(v.value))
   val typeParams:  Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
-  val dateParams:  Gen[Filters.Date]       = localDatesNotInTheFuture.toGeneratorOf(Filters.Date)
+  val sinceParams: Gen[Filters.Since]      = localDatesNotInTheFuture.toGeneratorOf(Filters.Since)
+  val untilParams: Gen[Filters.Until]      = localDatesNotInTheFuture.toGeneratorOf(Filters.Until)
 
   val matchingScores: Gen[MatchingScore] = choose(MatchingScore.min.value, 10f).toGeneratorOf(MatchingScore)
 
@@ -77,7 +78,7 @@ package object entities {
 
   private[entities] implicit class ProjectDatasetOps[PROV <: testentities.Dataset.Provenance,
                                                      +P <: testentities.Project
-  ](datasetAndProject: (testentities.Dataset[PROV], P))(implicit renkuBaseUrl: RenkuBaseUrl) {
+  ](datasetAndProject: (testentities.Dataset[PROV], P))(implicit renkuUrl: RenkuUrl) {
     def to[T](implicit convert: ((testentities.Dataset[PROV], P)) => T): T = convert(datasetAndProject)
   }
 

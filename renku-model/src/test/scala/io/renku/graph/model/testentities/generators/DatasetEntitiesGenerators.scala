@@ -23,10 +23,10 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{fixed, nonBlankStrings, sentences, timestamps}
-import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetOriginalIdentifiers, datasetPartExternals, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
+import io.renku.generators.Generators.{fixed, nonBlankStrings, positiveInts, sentences, timestamps}
+import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetOriginalIdentifiers, datasetPartExternals, datasetPartIds, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
 import io.renku.graph.model._
-import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InternalSameAs, OriginalIdentifier, PartId, TopmostSameAs}
+import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InternalSameAs, OriginalIdentifier, TopmostSameAs}
 import io.renku.graph.model.testentities.Dataset.{AdditionalInfo, Identification, Provenance}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 import io.renku.tinytypes.InstantTinyType
@@ -40,16 +40,16 @@ import scala.util.Random
 trait DatasetEntitiesGenerators {
   self: EntitiesGenerators =>
 
-  type ProvenanceGen[+P <: Provenance] = (Identifier, InstantTinyType) => RenkuBaseUrl => Gen[P]
+  type ProvenanceGen[+P <: Provenance] = (Identifier, InstantTinyType) => RenkuUrl => Gen[P]
 
   def datasetEntities[P <: Dataset.Provenance](
-      provenanceGen:       ProvenanceGen[P],
-      identificationGen:   Gen[Identification] = datasetIdentifications,
-      additionalInfoGen:   Gen[AdditionalInfo] = datasetAdditionalInfos
-  )(implicit renkuBaseUrl: RenkuBaseUrl): DatasetGenFactory[P] = projectDateCreated =>
+      provenanceGen:     ProvenanceGen[P],
+      identificationGen: Gen[Identification] = datasetIdentifications,
+      additionalInfoGen: Gen[AdditionalInfo] = datasetAdditionalInfos
+  )(implicit renkuUrl:   RenkuUrl): DatasetGenFactory[P] = projectDateCreated =>
     for {
       identification <- identificationGen
-      provenance     <- provenanceGen(identification.identifier, projectDateCreated)(renkuBaseUrl)
+      provenance     <- provenanceGen(identification.identifier, projectDateCreated)(renkuUrl)
       additionalInfo <- additionalInfoGen
       parts          <- datasetPartEntities(provenance.date.instant).toGeneratorOfList()
       publicationEventFactories <- publicationEventFactories {
@@ -70,17 +70,17 @@ trait DatasetEntitiesGenerators {
       .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
   def datasetAndModificationEntities[P <: Dataset.Provenance](
-      provenance:          ProvenanceGen[P],
-      projectDateCreated:  projects.DateCreated = projects.DateCreated(Instant.EPOCH)
-  )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[(Dataset[P], Dataset[Dataset.Provenance.Modified])] = for {
-    original <- datasetEntities(provenance)(renkuBaseUrl)(projectDateCreated)
+      provenance:         ProvenanceGen[P],
+      projectDateCreated: projects.DateCreated = projects.DateCreated(Instant.EPOCH)
+  )(implicit renkuUrl:    RenkuUrl): Gen[(Dataset[P], Dataset[Dataset.Provenance.Modified])] = for {
+    original <- datasetEntities(provenance)(renkuUrl)(projectDateCreated)
     modified <- modifiedDatasetEntities(original, projectDateCreated)
   } yield original -> modified
 
   def modifiedDatasetEntities(
-      original:            Dataset[Provenance],
-      projectDateCreated:  projects.DateCreated
-  )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[Dataset[Dataset.Provenance.Modified]] = for {
+      original:           Dataset[Provenance],
+      projectDateCreated: projects.DateCreated
+  )(implicit renkuUrl:    RenkuUrl): Gen[Dataset[Dataset.Provenance.Modified]] = for {
     identifier <- datasetIdentifiers
     title      <- datasetTitles
     date <- datasetCreatedDates(
@@ -121,7 +121,7 @@ trait DatasetEntitiesGenerators {
   } yield Dataset.Identification(identifier, title, name)
 
   val provenanceInternal: ProvenanceGen[Dataset.Provenance.Internal] = (identifier, projectDateCreated) =>
-    implicit renkuBaseUrl =>
+    implicit renkuUrl =>
       for {
         date     <- datasetCreatedDates(projectDateCreated.value)
         creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
@@ -137,7 +137,7 @@ trait DatasetEntitiesGenerators {
   def provenanceImportedExternal(
       sameAsGen: Gen[ExternalSameAs]
   ): ProvenanceGen[Dataset.Provenance.ImportedExternal] = (identifier, _) =>
-    implicit renkuBaseUrl =>
+    implicit renkuUrl =>
       for {
         date     <- datasetPublishedDates()
         sameAs   <- sameAsGen
@@ -151,7 +151,7 @@ trait DatasetEntitiesGenerators {
 
   val provenanceImportedInternalAncestorExternal: ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorExternal] =
     (identifier, _) =>
-      implicit renkuBaseUrl =>
+      implicit renkuUrl =>
         for {
           date       <- datasetPublishedDates()
           sameAs     <- datasetInternalSameAs
@@ -169,7 +169,7 @@ trait DatasetEntitiesGenerators {
       sameAsGen: Gen[InternalSameAs] = datasetInternalSameAs
   ): ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] =
     (identifier, projectDateCreated) =>
-      implicit renkuBaseUrl =>
+      implicit renkuUrl =>
         for {
           date       <- datasetCreatedDates(projectDateCreated.value)
           sameAs     <- sameAsGen
@@ -188,7 +188,7 @@ trait DatasetEntitiesGenerators {
       topmostSameAs: TopmostSameAs
   ): ProvenanceGen[Dataset.Provenance.ImportedInternalAncestorInternal] =
     (identifier, projectDateCreated) =>
-      implicit renkuBaseUrl =>
+      implicit renkuUrl =>
         for {
           date     <- datasetCreatedDates(projectDateCreated.value)
           creators <- personEntities.toGeneratorOfNonEmptyList(maxElements = 1)
@@ -227,7 +227,7 @@ trait DatasetEntitiesGenerators {
     entity      <- inputEntities
     dateCreated <- datasetCreatedDates(minDateCreated)
     maybeSource <- datasetPartSources.toGeneratorOfOptions
-  } yield DatasetPart(PartId.generate, external, entity, dateCreated, maybeSource)
+  } yield DatasetPart(datasetPartIds.generateOne, external, entity, dateCreated, maybeSource)
 
   def publicationEventFactories(minDateCreated: Instant): Gen[Dataset[Provenance] => PublicationEvent] = for {
     maybeDescription <- sentences().map(_.value).map(publicationEvents.Description.apply).toGeneratorOfOptions
@@ -236,13 +236,15 @@ trait DatasetEntitiesGenerators {
   } yield PublicationEvent(_, maybeDescription, name, startDate)
 
   implicit class DatasetGenFactoryOps[P <: Dataset.Provenance](factory: DatasetGenFactory[P])(implicit
-      renkuBaseUrl:                                                     RenkuBaseUrl
+      renkuUrl:                                                         RenkuUrl
   ) {
 
     lazy val decoupledFromProject: Gen[Dataset[P]] = factory(projectCreatedDates().generateOne)
 
     def generateList(projectDateCreated: projects.DateCreated): List[Dataset[P]] =
       factory(projectDateCreated).generateList()
+
+    def multiple: List[DatasetGenFactory[P]] = List.fill(positiveInts(5).generateOne)(factory)
 
     def createMultiple(max: Int): List[DatasetGenFactory[P]] = List.fill(Random.nextInt(max - 1) + 1)(factory)
 

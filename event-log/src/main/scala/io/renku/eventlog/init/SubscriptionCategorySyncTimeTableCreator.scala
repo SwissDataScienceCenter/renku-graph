@@ -36,6 +36,7 @@ private object SubscriptionCategorySyncTimeTableCreator {
 private class SubscriptionCategorySyncTimeTableCreatorImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
     extends SubscriptionCategorySyncTimeTableCreator[F] {
 
+  import MigratorTools._
   import cats.syntax.all._
 
   override def run(): F[Unit] = SessionResource[F].useK {
@@ -56,9 +57,7 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[F[_]: MonadCancelThro
 
   private def createTable(): Kleisli[F, Session[F], Unit] = for {
     _ <- execute(createTableSql)
-    _ <- execute(
-           sql"CREATE INDEX IF NOT EXISTS idx_project_id ON subscription_category_sync_time(project_id)".command
-         )
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON subscription_category_sync_time(project_id)".command)
     _ <-
       execute(
         sql"CREATE INDEX IF NOT EXISTS idx_category_name ON subscription_category_sync_time(category_name)".command
@@ -71,8 +70,7 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[F[_]: MonadCancelThro
     _ <- execute(foreignKeySql)
   } yield ()
 
-  private lazy val createTableSql: Command[Void] =
-    sql"""
+  private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS subscription_category_sync_time(
       project_id        int4      NOT NULL,
       category_name     VARCHAR   NOT NULL,
@@ -81,8 +79,7 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[F[_]: MonadCancelThro
     );
     """.command
 
-  private lazy val foreignKeySql: Command[Void] =
-    sql"""
+  private lazy val foreignKeySql: Command[Void] = sql"""
     ALTER TABLE subscription_category_sync_time
     ADD CONSTRAINT fk_project
     FOREIGN KEY (project_id) 

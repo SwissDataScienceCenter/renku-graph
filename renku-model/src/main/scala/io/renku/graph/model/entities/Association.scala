@@ -20,7 +20,7 @@ package io.renku.graph.model.entities
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.GitLabApiUrl
+import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.associations.ResourceId
 import io.renku.jsonld._
@@ -61,21 +61,21 @@ object Association {
       )
   }
 
-  implicit lazy val decoder: JsonLDDecoder[Association] = JsonLDDecoder.entity(entityTypes) { implicit cursor =>
-    for {
-      resourceId <- cursor.downEntityId.as[ResourceId]
-      plan       <- cursor.downField(prov / "hadPlan").as[Plan]
-      association <- cursor.downField(prov / "agent").as[Option[Agent]] match {
-                       case Right(Some(agent)) => Association.WithRenkuAgent(resourceId, agent, plan).asRight
-                       case _                  => tryAsPersonAgent(resourceId, plan)
-                     }
-    } yield association
-  }
+  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Association] =
+    JsonLDDecoder.entity(entityTypes) { implicit cursor =>
+      for {
+        resourceId <- cursor.downEntityId.as[ResourceId]
+        plan       <- cursor.downField(prov / "hadPlan").as[Plan]
+        association <- cursor.downField(prov / "agent").as[Option[Agent]] match {
+                         case Right(Some(agent)) => Association.WithRenkuAgent(resourceId, agent, plan).asRight
+                         case _                  => tryAsPersonAgent(resourceId, plan)
+                       }
+      } yield association
+    }
 
-  private def tryAsPersonAgent(resourceId: ResourceId, plan: Plan)(implicit cursor: Cursor) =
+  private def tryAsPersonAgent(resourceId: ResourceId, plan: Plan)(implicit cursor: Cursor, renkuUrl: RenkuUrl) =
     cursor.downField(prov / "agent").as[Option[Person]] >>= {
       case Some(agent) => Association.WithPersonAgent(resourceId, agent, plan).asRight
-      case None =>
-        DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
+      case None        => DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
     }
 }

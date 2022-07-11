@@ -20,7 +20,9 @@ package io.renku.graph.model.testentities
 
 import Usage.Id
 import cats.syntax.all._
-import io.renku.graph.model.{RenkuBaseUrl, entities, usages}
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.noDashUuid
+import io.renku.graph.model.{RenkuUrl, entities, usages}
 import io.renku.tinytypes.constraints.UUID
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -33,21 +35,19 @@ object Usage {
 
   final class Id private (val value: String) extends AnyVal with StringTinyType
   implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID[Id] {
-    def generate: Id = Id {
-      java.util.UUID.randomUUID.toString
-    }
+    def generate: Id = noDashUuid.generateAs(Id)
   }
 
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def toEntitiesUsage(implicit renkuBaseUrl: RenkuBaseUrl): Usage => entities.Usage = usage =>
+  implicit def toEntitiesUsage(implicit renkuUrl: RenkuUrl): Usage => entities.Usage = usage =>
     entities.Usage(usages.ResourceId(usage.asEntityId.show), usage.entity.to[entities.Entity])
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Usage] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[Usage] =
     JsonLDEncoder.instance(_.to[entities.Usage].asJsonLD)
 
-  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Usage] =
+  implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Usage] =
     EntityIdEncoder.instance { case Usage(id, activity, entity) =>
       activity.asEntityId.asUrlEntityId / "usage" / id / entity.checksum / entity.location
     }

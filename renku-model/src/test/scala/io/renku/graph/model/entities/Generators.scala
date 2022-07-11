@@ -116,8 +116,8 @@ private object Generators {
     (plan: Plan) => ImplicitCommandOutput(name, maybePrefix, defaultValue, folderCreation, maybeEncodingFormat, plan)
 
   implicit val ioStreamOuts: Gen[IOStream.Out] = Gen.oneOf(
-    IOStream.StdOut(IOStream.ResourceId((renkuBaseUrl / nonEmptyStrings().generateOne).show)),
-    IOStream.StdErr(IOStream.ResourceId((renkuBaseUrl / nonEmptyStrings().generateOne).show))
+    IOStream.StdOut(IOStream.ResourceId((renkuUrl / nonEmptyStrings().generateOne).show)),
+    IOStream.StdErr(IOStream.ResourceId((renkuUrl / nonEmptyStrings().generateOne).show))
   )
 
 }

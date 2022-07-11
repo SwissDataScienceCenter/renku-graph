@@ -124,16 +124,13 @@ object CommonGraphGenerators {
     commitPart    <- shas.toGeneratorOfOptions.map(_.map(_.take(8)).map(sha => s"-$commitsNumber-g$sha").getOrElse(""))
   } yield ServiceVersion(s"$version$commitPart")
 
-  implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
+  implicit val renkuApiUrls: Gen[renku.ApiUrl] = for {
     url  <- httpUrls()
     path <- relativePaths(maxSegments = 1)
-  } yield renku.ResourcesUrl(s"$url/$path")
+  } yield renku.ApiUrl(s"$url/$path")
 
-  def renkuResourceUrls(
-      renkuResourcesUrl: renku.ResourcesUrl = renkuResourcesUrls.generateOne
-  ): Gen[renku.ResourceUrl] = for {
-    path <- relativePaths(maxSegments = 1)
-  } yield renkuResourcesUrl / path
+  def renkuResourceUrls(renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne): Gen[renku.ResourceUrl] =
+    relativePaths(maxSegments = 1) map (path => renkuApiUrl / path)
 
   private implicit val sentryDsns: Gen[Dsn] = for {
     url         <- httpUrls()
