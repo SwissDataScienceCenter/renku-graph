@@ -35,9 +35,9 @@ private trait KGProjectMembersFinder[F[_]] {
 }
 
 private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig,
-    renkuUrl:       RenkuUrl
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig,
+    renkuUrl:              RenkuUrl
+) extends RdfStoreClientImpl(renkuConnectionConfig)
     with KGProjectMembersFinder[F] {
 
   import eu.timepit.refined.auto._
@@ -70,9 +70,9 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 
 private object KGProjectMembersFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectMembersFinder[F]] = for {
-    rdfStoreConfig <- RdfStoreConfig[F]()
-    renkuUrl       <- RenkuUrlLoader[F]()
-  } yield new KGProjectMembersFinderImpl(rdfStoreConfig, renkuUrl)
+    renkuConnectionConfig <- RenkuConnectionConfig[F]()
+    renkuUrl              <- RenkuUrlLoader[F]()
+  } yield new KGProjectMembersFinderImpl(renkuConnectionConfig, renkuUrl)
 }
 
 private final case class KGProjectMember(resourceId: persons.ResourceId, gitLabId: persons.GitLabId)

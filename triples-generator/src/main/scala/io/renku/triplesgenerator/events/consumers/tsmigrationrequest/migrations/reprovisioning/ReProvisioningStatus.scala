@@ -45,7 +45,7 @@ trait ReProvisioningStatus[F[_]] {
 
 private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
     subscriptions:         List[SubscriptionMechanism[F]],
-    storeConfig:           MigrationsStoreConfig,
+    storeConfig:           MigrationsConnectionConfig,
     statusRefreshInterval: FiniteDuration,
     cacheRefreshInterval:  FiniteDuration,
     lastCacheCheckTimeRef: Ref[F, Long]
@@ -170,7 +170,7 @@ object ReProvisioningStatus {
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
       subscriptionFactories: (EventHandler[F], SubscriptionMechanism[F])*
   ): F[ReProvisioningStatus[F]] = for {
-    storeConfig           <- MigrationsStoreConfig[F]()
+    storeConfig           <- MigrationsConnectionConfig[F]()
     renkuUrl              <- RenkuUrlLoader[F]()
     lastCacheCheckTimeRef <- Ref.of[F, Long](0)
   } yield {

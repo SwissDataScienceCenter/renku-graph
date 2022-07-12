@@ -66,9 +66,9 @@ trait InMemoryJena {
 
   lazy val fusekiUrl: FusekiUrl = FusekiUrl(s"http://localhost:$fusekiServerPort")
 
-  private val datasets: mutable.Map[FusekiUrl => TriplesStoreConfig, DatasetConfigFile] = mutable.Map.empty
+  private val datasets: mutable.Map[FusekiUrl => DatasetConnectionConfig, DatasetConfigFile] = mutable.Map.empty
 
-  protected def registerDataset(connectionInfoFactory: FusekiUrl => TriplesStoreConfig,
+  protected def registerDataset(connectionInfoFactory: FusekiUrl => DatasetConnectionConfig,
                                 maybeConfigFile:       Either[Exception, DatasetConfigFile]
   ): Unit = maybeConfigFile
     .map(configFile => datasets.addOne(connectionInfoFactory -> configFile))
@@ -141,7 +141,7 @@ trait InMemoryJena {
     }
   }
 
-  private def findConnectionInfo(datasetName: DatasetName): TriplesStoreConfig = datasets
+  private def findConnectionInfo(datasetName: DatasetName): DatasetConnectionConfig = datasets
     .map { case (connectionInfoFactory, _) => connectionInfoFactory(fusekiUrl) }
     .find(_.datasetName == datasetName)
     .getOrElse(throw new Exception(s"Dataset '$datasetName' not registered in Test Jena instance"))
@@ -151,7 +151,7 @@ trait InMemoryJena {
 
   private def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
 
-  private def queryRunner(connectionInfo: TriplesStoreConfig) = new RdfStoreClientImpl[IO](connectionInfo) {
+  private def queryRunner(connectionInfo: DatasetConnectionConfig) = new RdfStoreClientImpl[IO](connectionInfo) {
 
     import io.circe.Decoder._
     import org.http4s.Method.POST
@@ -218,13 +218,13 @@ trait RenkuDataset extends JenaDataset {
   self: InMemoryJena =>
 
   private lazy val configFile: Either[Exception, DatasetConfigFile] = RenkuTTL.fromConfigMap()
-  private lazy val connectionInfoFactory: FusekiUrl => RdfStoreConfig = RdfStoreConfig(
+  private lazy val connectionInfoFactory: FusekiUrl => RenkuConnectionConfig = RenkuConnectionConfig(
     _,
     BasicAuthCredentials(BasicAuthUsername("renku"), BasicAuthPassword("renku"))
   )
 
-  def renkuDataset:          DatasetName    = renkuDSConnectionInfo.datasetName
-  def renkuDSConnectionInfo: RdfStoreConfig = connectionInfoFactory(fusekiUrl)
+  def renkuDataset:          DatasetName           = renkuDSConnectionInfo.datasetName
+  def renkuDSConnectionInfo: RenkuConnectionConfig = connectionInfoFactory(fusekiUrl)
 
   registerDataset(connectionInfoFactory, configFile)
 }
@@ -233,13 +233,13 @@ trait MigrationsDataset extends JenaDataset {
   self: InMemoryJena =>
 
   private lazy val configFile: Either[Exception, MigrationsTTL] = MigrationsTTL.fromConfigMap()
-  private lazy val connectionInfoFactory: FusekiUrl => MigrationsStoreConfig = MigrationsStoreConfig(
+  private lazy val connectionInfoFactory: FusekiUrl => MigrationsConnectionConfig = MigrationsConnectionConfig(
     _,
     BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
   )
 
-  def migrationsDataset:          DatasetName           = migrationsDSConnectionInfo.datasetName
-  def migrationsDSConnectionInfo: MigrationsStoreConfig = connectionInfoFactory(fusekiUrl)
+  def migrationsDataset:          DatasetName                = migrationsDSConnectionInfo.datasetName
+  def migrationsDSConnectionInfo: MigrationsConnectionConfig = connectionInfoFactory(fusekiUrl)
 
   registerDataset(connectionInfoFactory, configFile)
 }

@@ -36,8 +36,8 @@ private trait CreatorsFinder[F[_]] {
 }
 
 private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl(renkuConnectionConfig)
     with CreatorsFinder[F] {
 
   import CreatorsFinder._
@@ -68,8 +68,10 @@ private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
 private object CreatorsFinder {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): F[CreatorsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new CreatorsFinderImpl(rdfStoreConfig))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      renkuConnectionConfig: RenkuConnectionConfig
+  ): F[CreatorsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new CreatorsFinderImpl(renkuConnectionConfig))
 
   import ResultsDecoder._
   import io.circe.Decoder

@@ -94,10 +94,10 @@ object CommonGraphGenerators {
     unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
   } yield RateLimit[Target](items, per = unit)
 
-  implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
+  implicit val renkuConnectionConfigs: Gen[RenkuConnectionConfig] = for {
     fusekiUrl       <- httpUrls() map FusekiUrl.apply
     authCredentials <- basicAuthCredentials
-  } yield RdfStoreConfig(fusekiUrl, authCredentials)
+  } yield RenkuConnectionConfig(fusekiUrl, authCredentials)
 
   implicit val microserviceBaseUrls: Gen[MicroserviceBaseUrl] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {

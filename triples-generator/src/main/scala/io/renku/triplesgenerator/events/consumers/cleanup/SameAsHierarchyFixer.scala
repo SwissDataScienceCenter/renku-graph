@@ -36,15 +36,15 @@ import scala.concurrent.duration._
 
 private object SameAsHierarchyFixer {
   def relinkSameAsHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(implicit
-      rdfStoreConfig: RdfStoreConfig
+      renkuConnectionConfig: RenkuConnectionConfig
   ): F[Unit] = MonadThrow[F].catchNonFatal {
-    new SameAsHierarchyFixer[F](path)(rdfStoreConfig)
+    new SameAsHierarchyFixer[F](path)(renkuConnectionConfig)
   } >>= (_.run())
 }
 
 private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig,
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl(renkuConnectionConfig,
                              idleTimeoutOverride = (11 minutes).some,
                              requestTimeoutOverride = (10 minutes).some
     ) {

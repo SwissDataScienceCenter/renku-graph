@@ -39,8 +39,8 @@ private trait KGDatasetInfoFinder[F[_]] {
 }
 
 private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl(renkuConnectionConfig)
     with KGDatasetInfoFinder[F] {
 
   import cats.syntax.all._
@@ -173,6 +173,6 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
 
 private object KGDatasetInfoFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGDatasetInfoFinder[F]] = for {
-    config <- RdfStoreConfig[F]()
+    config <- RenkuConnectionConfig[F]()
   } yield new KGDatasetInfoFinderImpl(config)
 }

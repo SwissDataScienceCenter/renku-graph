@@ -36,12 +36,13 @@ private trait KGPersonFinder[F[_]] {
 
 private object KGPersonFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGPersonFinder[F]] = for {
-    rdfStoreConfig <- RdfStoreConfig[F]()
-  } yield new KGPersonFinderImpl(rdfStoreConfig)
+    renkuConnectionConfig <- RenkuConnectionConfig[F]()
+  } yield new KGPersonFinderImpl(renkuConnectionConfig)
 }
 
-private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig)
-    extends RdfStoreClientImpl(rdfStoreConfig)
+private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl(renkuConnectionConfig)
     with KGPersonFinder[F] {
 
   import eu.timepit.refined.auto._

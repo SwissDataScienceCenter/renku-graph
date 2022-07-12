@@ -43,9 +43,9 @@ private trait NodeDetailsFinder[F[_]] {
 }
 
 private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig,
-    renkuUrl:       RenkuUrl
-) extends RdfStoreClientImpl[F](rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig,
+    renkuUrl:              RenkuUrl
+) extends RdfStoreClientImpl[F](renkuConnectionConfig)
     with NodeDetailsFinder[F] {
 
   override def findDetails[T](
@@ -110,7 +110,7 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTi
 private object NodeDetailsFinder {
 
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder]: F[NodeDetailsFinder[F]] = for {
-    config   <- RdfStoreConfig[F]()
+    config   <- RenkuConnectionConfig[F]()
     renkuUrl <- RenkuUrlLoader[F]()
   } yield new NodeDetailsFinderImpl[F](config, renkuUrl)
 

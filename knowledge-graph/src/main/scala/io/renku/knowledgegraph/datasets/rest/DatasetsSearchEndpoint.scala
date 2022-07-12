@@ -35,7 +35,7 @@ import io.renku.knowledgegraph.datasets.model.DatasetCreator
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query._
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.http4s._
@@ -167,12 +167,12 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
 object DatasetsSearchEndpoint {
 
   def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetsSearchEndpoint[F]] = for {
-    rdfStoreConfig        <- RdfStoreConfig[F]()
+    renkuConnectionConfig <- RenkuConnectionConfig[F]()
     renkuResourceUrl      <- renku.ApiUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
-    creatorsFinder        <- CreatorsFinder(rdfStoreConfig)
-    datasetsFinder        <- DatasetsFinder(rdfStoreConfig, creatorsFinder)
+    creatorsFinder        <- CreatorsFinder(renkuConnectionConfig)
+    datasetsFinder        <- DatasetsFinder(renkuConnectionConfig, creatorsFinder)
   } yield new DatasetsSearchEndpointImpl[F](datasetsFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder)
 
   object Query {

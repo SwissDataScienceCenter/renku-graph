@@ -29,12 +29,12 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  "RdfStoreConfig.apply" should {
+  "RenkuConnectionConfig.apply" should {
 
-    "read 'services.fuseki.url', 'services.fuseki.dataset-name', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the RdfStoreConfig" in {
-      forAll(rdfStoreConfigs) { storeConfig =>
+    "read 'services.fuseki.url', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the RenkuConnectionConfig" in {
+      forAll(renkuConnectionConfigs) { storeConfig =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
@@ -49,7 +49,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
           ).asJava
         )
 
-        val Success(actual) = RdfStoreConfig[Try](config)
+        val Success(actual) = RenkuConnectionConfig[Try](config)
 
         actual.fusekiUrl                shouldBe storeConfig.fusekiUrl
         actual.datasetName              shouldBe DatasetName("renku")
@@ -65,15 +65,15 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
             "fuseki" -> Map(
               "url" -> "invalid-url",
               "renku" -> Map(
-                "username" -> rdfStoreConfigs.generateOne.authCredentials.username.value,
-                "password" -> rdfStoreConfigs.generateOne.authCredentials.password.value
+                "username" -> renkuConnectionConfigs.generateOne.authCredentials.username.value,
+                "password" -> renkuConnectionConfigs.generateOne.authCredentials.password.value
               ).asJava
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = RdfStoreConfig[Try](config)
+      val Failure(exception) = RenkuConnectionConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -83,17 +83,17 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url" -> rdfStoreConfigs.generateOne.fusekiUrl.toString,
+              "url" -> renkuConnectionConfigs.generateOne.fusekiUrl.toString,
               "renku" -> Map(
                 "username" -> "  ",
-                "password" -> rdfStoreConfigs.generateOne.authCredentials.password.value
+                "password" -> renkuConnectionConfigs.generateOne.authCredentials.password.value
               ).asJava
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = RdfStoreConfig[Try](config)
+      val Failure(exception) = RenkuConnectionConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -103,9 +103,9 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         Map(
           "services" -> Map(
             "fuseki" -> Map(
-              "url" -> rdfStoreConfigs.generateOne.fusekiUrl.toString,
+              "url" -> renkuConnectionConfigs.generateOne.fusekiUrl.toString,
               "renku" -> Map(
-                "username" -> rdfStoreConfigs.generateOne.authCredentials.username.value,
+                "username" -> renkuConnectionConfigs.generateOne.authCredentials.username.value,
                 "password" -> ""
               ).asJava
             ).asJava
@@ -113,16 +113,16 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         ).asJava
       )
 
-      val Failure(exception) = RdfStoreConfig[Try](config)
+      val Failure(exception) = RenkuConnectionConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
   }
 
-  "MigrationsStoreConfig.apply" should {
+  "MigrationsConnectionConfig.apply" should {
 
-    "read 'services.fuseki.url', 'services.fuseki.admin.username' and 'services.fuseki.admin.password' to instantiate the RdfStoreConfig" in {
-      forAll(rdfStoreConfigs) { storeConfig =>
+    "read 'services.fuseki.url', 'services.fuseki.admin.username' and 'services.fuseki.admin.password' to instantiate the RenkuConnectionConfig" in {
+      forAll(renkuConnectionConfigs) { storeConfig =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
@@ -137,7 +137,7 @@ class TriplesStoreConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
           ).asJava
         )
 
-        val Success(actual) = MigrationsStoreConfig[Try](config)
+        val Success(actual) = MigrationsConnectionConfig[Try](config)
 
         actual.fusekiUrl                shouldBe storeConfig.fusekiUrl
         actual.datasetName              shouldBe DatasetName("migrations")

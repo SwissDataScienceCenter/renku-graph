@@ -35,15 +35,15 @@ private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
   type ProjectDataset  = (Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig) =
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](renkuConnectionConfig: RenkuConnectionConfig) =
     MonadThrow[F].catchNonFatal(
-      new ProjectDatasetsFinderImpl[F](rdfStoreConfig)
+      new ProjectDatasetsFinderImpl[F](renkuConnectionConfig)
     )
 }
 
 private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl(renkuConnectionConfig)
     with ProjectDatasetsFinder[F] {
 
   import ProjectDatasetsFinderImpl._

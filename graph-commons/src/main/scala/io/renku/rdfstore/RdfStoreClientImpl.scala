@@ -38,7 +38,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    triplesStoreConfig:     TriplesStoreConfig,
+    triplesStoreConfig:     DatasetConnectionConfig,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeoutOverride:    Option[Duration] = None,

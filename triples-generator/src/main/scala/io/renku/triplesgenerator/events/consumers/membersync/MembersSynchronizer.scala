@@ -95,9 +95,9 @@ private object MembersSynchronizer {
       kGProjectMembersFinder     <- KGProjectMembersFinder[F]
       kGPersonFinder             <- KGPersonFinder[F]
       updatesCreator             <- UpdatesCreator[F]
-      rdfStoreConfig             <- RdfStoreConfig[F]()
+      renkuConnectionConfig      <- RenkuConnectionConfig[F]()
       querySender <-
-        MonadThrow[F].catchNonFatal(new RdfStoreClientImpl(rdfStoreConfig) with QuerySender[F] {
+        MonadThrow[F].catchNonFatal(new RdfStoreClientImpl(renkuConnectionConfig) with QuerySender[F] {
           override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
         })
       executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)

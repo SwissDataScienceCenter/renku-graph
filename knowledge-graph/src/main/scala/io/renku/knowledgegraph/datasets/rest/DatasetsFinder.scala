@@ -50,10 +50,10 @@ private trait DatasetsFinder[F[_]] {
 
 private object DatasetsFinder {
 
-  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig,
+  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](renkuConnectionConfig: RenkuConnectionConfig,
                                                                     creatorsFinder: CreatorsFinder[F]
   ): F[DatasetsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new DatasetsFinderImpl[F](rdfStoreConfig, creatorsFinder))
+    MonadThrow[F].catchNonFatal(new DatasetsFinderImpl[F](renkuConnectionConfig, creatorsFinder))
 
   final case class DatasetSearchResult(
       id:                  Identifier,
@@ -76,9 +76,9 @@ private object DatasetsFinder {
 }
 
 private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig,
-    creatorsFinder: CreatorsFinder[F]
-) extends RdfStoreClientImpl[F](rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig,
+    creatorsFinder:        CreatorsFinder[F]
+) extends RdfStoreClientImpl[F](renkuConnectionConfig)
     with DatasetsFinder[F]
     with Paging[DatasetSearchResult] {
 

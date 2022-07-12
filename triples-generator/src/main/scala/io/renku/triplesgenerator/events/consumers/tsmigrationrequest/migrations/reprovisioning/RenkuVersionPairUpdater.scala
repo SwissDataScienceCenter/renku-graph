@@ -33,7 +33,7 @@ trait RenkuVersionPairUpdater[F[_]] {
 }
 
 private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    storeConfig:     MigrationsStoreConfig
+    storeConfig:     MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
     extends RdfStoreClientImpl(storeConfig)
     with RenkuVersionPairUpdater[F] {

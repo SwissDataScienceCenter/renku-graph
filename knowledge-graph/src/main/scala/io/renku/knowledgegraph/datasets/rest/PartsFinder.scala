@@ -34,8 +34,8 @@ private trait PartsFinder[F[_]] {
 }
 
 private class PartsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl(renkuConnectionConfig)
     with PartsFinder[F] {
 
   import PartsFinderImpl._
@@ -83,6 +83,7 @@ private object PartsFinderImpl {
 
 private object PartsFinder {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): F[PartsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new PartsFinderImpl[F](rdfStoreConfig))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      renkuConnectionConfig: RenkuConnectionConfig
+  ): F[PartsFinder[F]] = MonadThrow[F].catchNonFatal(new PartsFinderImpl[F](renkuConnectionConfig))
 }

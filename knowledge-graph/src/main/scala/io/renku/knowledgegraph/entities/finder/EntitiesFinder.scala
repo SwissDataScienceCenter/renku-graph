@@ -26,7 +26,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingResponse}
-import io.renku.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{RdfStoreClientImpl, RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import model._
 import org.typelevel.log4cats.Logger
 
@@ -36,13 +36,13 @@ private[entities] trait EntitiesFinder[F[_]] {
 
 private[entities] object EntitiesFinder {
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
-    RdfStoreConfig[F]().map(new EntitiesFinderImpl(_))
+    RenkuConnectionConfig[F]().map(new EntitiesFinderImpl(_))
 }
 
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig,
-    entityQueries:  List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
-) extends RdfStoreClientImpl[F](rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig,
+    entityQueries:         List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
+) extends RdfStoreClientImpl[F](renkuConnectionConfig)
     with EntitiesFinder[F]
     with Paging[Entity] {
 

@@ -40,7 +40,7 @@ private[migrations] trait MigrationExecutionRegister[F[_]] {
 
 private class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     serviceVersion:  ServiceVersion,
-    storeConfig:     MigrationsStoreConfig
+    storeConfig:     MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
     extends RdfStoreClientImpl(storeConfig)
     with MigrationExecutionRegister[F] {
@@ -77,7 +77,7 @@ private[migrations] object MigrationExecutionRegister {
     RenkuUrlLoader[F]() flatMap { implicit renkuUrl =>
       for {
         serviceVersion <- ServiceVersion.readFromConfig[F]()
-        storeConfig    <- MigrationsStoreConfig[F]()
+        storeConfig    <- MigrationsConnectionConfig[F]()
       } yield new MigrationExecutionRegisterImpl[F](serviceVersion, storeConfig)
     }
 

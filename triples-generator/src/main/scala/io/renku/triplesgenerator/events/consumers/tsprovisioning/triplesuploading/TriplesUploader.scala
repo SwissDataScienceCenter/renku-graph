@@ -26,7 +26,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.jsonld.JsonLD
-import io.renku.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{RdfStoreClientImpl, RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
 import org.typelevel.log4cats.Logger
@@ -38,13 +38,13 @@ private trait TriplesUploader[F[_]] {
 }
 
 private class TriplesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig:   RdfStoreConfig,
-    recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery,
-    retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:      Duration = 11 minutes,
-    requestTimeout:   Duration = 10 minutes
-) extends RdfStoreClientImpl(rdfStoreConfig,
+    renkuConnectionConfig: RenkuConnectionConfig,
+    recoveryStrategy:      RecoverableErrorsRecovery = RecoverableErrorsRecovery,
+    retryInterval:         FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:            Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:           Duration = 11 minutes,
+    requestTimeout:        Duration = 10 minutes
+) extends RdfStoreClientImpl(renkuConnectionConfig,
                              retryInterval = retryInterval,
                              maxRetries = maxRetries,
                              idleTimeoutOverride = idleTimeout.some,
@@ -68,14 +68,14 @@ private class TriplesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 }
 
 private object TriplesUploader {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig,
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](renkuConnectionConfig: RenkuConnectionConfig,
                                                           retryInterval: FiniteDuration = SleepAfterConnectionIssue,
                                                           maxRetries: Int Refined NonNegative =
                                                             MaxRetriesAfterConnectionTimeout,
                                                           idleTimeout:    Duration = 6 minutes,
                                                           requestTimeout: Duration = 5 minutes
   ): F[TriplesUploaderImpl[F]] = MonadThrow[F].catchNonFatal(
-    new TriplesUploaderImpl[F](rdfStoreConfig,
+    new TriplesUploaderImpl[F](renkuConnectionConfig,
                                RecoverableErrorsRecovery,
                                retryInterval,
                                maxRetries,

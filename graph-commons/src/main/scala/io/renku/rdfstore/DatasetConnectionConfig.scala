@@ -27,50 +27,50 @@ import io.renku.tinytypes.constraints.{Url, UrlOps}
 import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
 import pureconfig.ConfigReader
 
-trait TriplesStoreConfig {
+trait DatasetConnectionConfig {
   val fusekiUrl:       FusekiUrl
   val datasetName:     DatasetName
   val authCredentials: BasicAuthCredentials
 }
 
-final case class RdfStoreConfig(fusekiUrl: FusekiUrl, authCredentials: BasicAuthCredentials)
-    extends TriplesStoreConfig {
-  val datasetName: DatasetName = RdfStoreConfig.RenkuDS
+final case class RenkuConnectionConfig(fusekiUrl: FusekiUrl, authCredentials: BasicAuthCredentials)
+    extends DatasetConnectionConfig {
+  val datasetName: DatasetName = RenkuConnectionConfig.RenkuDS
 }
 
-object RdfStoreConfig {
+object RenkuConnectionConfig {
 
   val RenkuDS: DatasetName = DatasetName("renku")
 
   import io.renku.config.ConfigLoader._
   import io.renku.http.client.BasicAuthConfigReaders._
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[RdfStoreConfig] = for {
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[RenkuConnectionConfig] = for {
     url      <- find[F, FusekiUrl]("services.fuseki.url", config)
     username <- find[F, BasicAuthUsername]("services.fuseki.renku.username", config)
     password <- find[F, BasicAuthPassword]("services.fuseki.renku.password", config)
-  } yield RdfStoreConfig(url, BasicAuthCredentials(username, password))
+  } yield RenkuConnectionConfig(url, BasicAuthCredentials(username, password))
 }
 
-final case class MigrationsStoreConfig(
+final case class MigrationsConnectionConfig(
     fusekiUrl:       FusekiUrl,
     authCredentials: BasicAuthCredentials
-) extends TriplesStoreConfig {
-  val datasetName: DatasetName = MigrationsStoreConfig.MigrationsDS
+) extends DatasetConnectionConfig {
+  val datasetName: DatasetName = MigrationsConnectionConfig.MigrationsDS
 }
 
-object MigrationsStoreConfig {
+object MigrationsConnectionConfig {
 
   val MigrationsDS: DatasetName = DatasetName("migrations")
 
   import io.renku.config.ConfigLoader._
   import io.renku.http.client.BasicAuthConfigReaders._
 
-  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[MigrationsStoreConfig] = for {
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[MigrationsConnectionConfig] = for {
     url      <- find[F, FusekiUrl]("services.fuseki.url", config)
     username <- find[F, BasicAuthUsername]("services.fuseki.admin.username", config)
     password <- find[F, BasicAuthPassword]("services.fuseki.admin.password", config)
-  } yield MigrationsStoreConfig(url, BasicAuthCredentials(username, password))
+  } yield MigrationsConnectionConfig(url, BasicAuthCredentials(username, password))
 }
 
 class FusekiUrl private (val value: String) extends AnyVal with UrlTinyType

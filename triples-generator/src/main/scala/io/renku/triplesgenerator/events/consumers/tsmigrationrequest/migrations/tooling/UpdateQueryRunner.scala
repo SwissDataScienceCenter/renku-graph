@@ -30,8 +30,8 @@ private[migrations] trait UpdateQueryRunner[F[_]] {
 }
 
 private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl[F](rdfStoreConfig,
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl[F](renkuConnectionConfig,
                                 idleTimeoutOverride = (16 minutes).some,
                                 requestTimeoutOverride = (15 minutes).some
     )
@@ -42,7 +42,8 @@ private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
 private[migrations] object UpdateQueryRunner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateQueryRunner[F]] =
-    RdfStoreConfig[F]().map(new UpdateQueryRunnerImpl(_))
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): UpdateQueryRunner[F] =
-    new UpdateQueryRunnerImpl(rdfStoreConfig)
+    RenkuConnectionConfig[F]().map(new UpdateQueryRunnerImpl(_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      renkuConnectionConfig: RenkuConnectionConfig
+  ): UpdateQueryRunner[F] = new UpdateQueryRunnerImpl(renkuConnectionConfig)
 }

@@ -33,12 +33,13 @@ private trait ProjectsFinder[F[_]] {
 
 private object ProjectsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](query: SparqlQuery): F[ProjectsFinder[F]] =
-    RdfStoreConfig[F]().map(new ProjectsFinderImpl(query, _))
+    RenkuConnectionConfig[F]().map(new ProjectsFinderImpl(query, _))
 }
 
-private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](query: SparqlQuery,
-                                                                               rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl[F](rdfStoreConfig,
+private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    query:                 SparqlQuery,
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl[F](renkuConnectionConfig,
                                 idleTimeoutOverride = (16 minutes).some,
                                 requestTimeoutOverride = (15 minutes).some
     )

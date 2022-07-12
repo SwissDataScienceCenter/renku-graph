@@ -67,8 +67,10 @@ class RdfStoreClientImplSpec
       val responseBody = jsons.generateOne
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                         renkuConnectionConfig.authCredentials.password.value
+          )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
           .withRequestBody(equalTo(s"query=${urlEncode(client.query.toString)}"))
@@ -81,7 +83,7 @@ class RdfStoreClientImplSpec
     "fail if remote responds with non-OK status" in new QueryClientTestCase {
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
           .willReturn(
             aResponse
               .withStatus(BadRequest.code)
@@ -91,20 +93,20 @@ class RdfStoreClientImplSpec
 
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/sparql returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/sparql returned $BadRequest; body: some message"
     }
 
     "fail if remote responds with OK status but non-expected body" in new QueryClientTestCase {
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
           .willReturn(okJson("abc"))
       }
 
       intercept[Exception] {
         client.callRemote.unsafeRunSync()
       }.getMessage should startWith(
-        s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/sparql returned ${Status.Ok}; error: "
+        s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/sparql returned ${Status.Ok}; error: "
       )
     }
   }
@@ -126,8 +128,10 @@ class RdfStoreClientImplSpec
       val pagingRequest = PagingRequest(Page.first, PerPage(2))
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                         renkuConnectionConfig.authCredentials.password.value
+          )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
           .withRequestBody(equalTo(s"query=${urlEncode(client.query.include[Try](pagingRequest).get.toString)}"))
@@ -146,8 +150,10 @@ class RdfStoreClientImplSpec
         }
       }"""
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                         renkuConnectionConfig.authCredentials.password.value
+          )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
           .withRequestBody(equalTo(s"query=${urlEncode(client.query.toCountQuery.toString)}"))
@@ -173,8 +179,10 @@ class RdfStoreClientImplSpec
       }"""
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                         renkuConnectionConfig.authCredentials.password.value
+          )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
           .withRequestBody(equalTo(s"query=${urlEncode(client.query.include[Try](pagingRequest).get.toString)}"))
@@ -193,8 +201,10 @@ class RdfStoreClientImplSpec
         }
       }"""
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                         renkuConnectionConfig.authCredentials.password.value
+          )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
           .withRequestBody(equalTo(s"query=${urlEncode(client.query.toCountQuery.toString)}"))
@@ -220,8 +230,10 @@ class RdfStoreClientImplSpec
       }"""
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                         renkuConnectionConfig.authCredentials.password.value
+          )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
           .withRequestBody(equalTo(s"query=${urlEncode(client.query.include[Try](pagingRequest).get.toString)}"))
@@ -244,8 +256,10 @@ class RdfStoreClientImplSpec
         }
       }"""
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
+          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                         renkuConnectionConfig.authCredentials.password.value
+          )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withHeader("accept", equalTo("application/sparql-results+json"))
           .withRequestBody(equalTo(s"query=${urlEncode(countQuery.toCountQuery.toString)}"))
@@ -263,7 +277,7 @@ class RdfStoreClientImplSpec
 
       val client = new TestRdfQueryClientImpl(
         query = SparqlQuery(name = "test query", Set.empty, "SELECT ?s ?p ?o WHERE { ?s ?p ?o}"),
-        rdfStoreConfig
+        renkuConnectionConfig
       )
 
       val exception = intercept[Exception] {
@@ -276,7 +290,7 @@ class RdfStoreClientImplSpec
     "fail for problems with calling the storage" in new QueryClientTestCase {
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/sparql")
+        post(s"/${renkuConnectionConfig.datasetName}/sparql")
           .willReturn(
             aResponse
               .withStatus(BadRequest.code)
@@ -286,7 +300,7 @@ class RdfStoreClientImplSpec
 
       intercept[Exception] {
         client.callWith(pagingRequests.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/sparql returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/sparql returned $BadRequest; body: some message"
     }
   }
 
@@ -295,8 +309,10 @@ class RdfStoreClientImplSpec
     "succeed returning unit if the update query succeeds" in new UpdateClientTestCase {
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/update")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        post(s"/${renkuConnectionConfig.datasetName}/update")
+          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                         renkuConnectionConfig.authCredentials.password.value
+          )
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
           .withRequestBody(equalTo(s"update=${urlEncode(client.query.toString)}"))
           .willReturn(ok())
@@ -308,7 +324,7 @@ class RdfStoreClientImplSpec
     "fail if remote responds with non-OK status" in new UpdateClientTestCase {
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/update")
+        post(s"/${renkuConnectionConfig.datasetName}/update")
           .willReturn(
             aResponse
               .withStatus(BadRequest.code)
@@ -318,7 +334,7 @@ class RdfStoreClientImplSpec
 
       intercept[Exception] {
         client.sendUpdate.unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/update returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/update returned $BadRequest; body: some message"
     }
 
     "use the given response mapping for calculating the result" in new UpdateClientTestCase {
@@ -329,7 +345,7 @@ class RdfStoreClientImplSpec
       }
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/update")
+        post(s"/${renkuConnectionConfig.datasetName}/update")
           .willReturn(
             aResponse.withStatus(Ok.code)
           )
@@ -338,7 +354,7 @@ class RdfStoreClientImplSpec
       client.sendUpdate(responseMapper).unsafeRunSync() shouldBe ((): Unit)
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/update")
+        post(s"/${renkuConnectionConfig.datasetName}/update")
           .willReturn(
             aResponse.withStatus(BadRequest.code)
           )
@@ -354,8 +370,10 @@ class RdfStoreClientImplSpec
       val entity = jsonLDEntities.generateOne
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/data")
-          .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+        post(s"/${renkuConnectionConfig.datasetName}/data")
+          .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                         renkuConnectionConfig.authCredentials.password.value
+          )
           .withHeader("content-type", equalTo("application/ld+json"))
           .withRequestBody(equalToJson(entity.toJson.toString()))
           .willReturn(ok())
@@ -367,7 +385,7 @@ class RdfStoreClientImplSpec
     "fail if remote responds with non-OK status" in new UpdateClientTestCase {
 
       stubFor {
-        post(s"/${rdfStoreConfig.datasetName}/data")
+        post(s"/${renkuConnectionConfig.datasetName}/data")
           .willReturn(
             aResponse
               .withStatus(BadRequest.code)
@@ -377,13 +395,13 @@ class RdfStoreClientImplSpec
 
       intercept[Exception] {
         client.uploadJson(jsonLDEntities.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"POST $fusekiUrl/${rdfStoreConfig.datasetName}/data returned $BadRequest; body: some message"
+      }.getMessage shouldBe s"POST $fusekiUrl/${renkuConnectionConfig.datasetName}/data returned $BadRequest; body: some message"
     }
   }
 
   private trait TestCase {
-    val fusekiUrl      = FusekiUrl(externalServiceBaseUrl)
-    val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
+    val fusekiUrl             = FusekiUrl(externalServiceBaseUrl)
+    val renkuConnectionConfig = renkuConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
     implicit val logger:       Logger[IO]                  = TestLogger[IO]()
     implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
   }
@@ -394,22 +412,22 @@ class RdfStoreClientImplSpec
                           prefixes = Set.empty,
                           body = """SELECT ?s ?p ?o WHERE { ?s ?p ?o } ORDER BY ASC(?s)"""
       ),
-      rdfStoreConfig
+      renkuConnectionConfig
     )
   }
 
   private trait UpdateClientTestCase extends TestCase {
     val client = new TestRdfClientImpl(
       query = SparqlQuery(name = "insert", Set.empty, """INSERT { 'o' 'p' 's' } {}"""),
-      rdfStoreConfig
+      renkuConnectionConfig
     )
   }
 
   private class TestRdfClientImpl(
-      val query:      SparqlQuery,
-      rdfStoreConfig: RdfStoreConfig
-  )(implicit logger:  Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
-      extends RdfStoreClientImpl[IO](rdfStoreConfig) {
+      val query:             SparqlQuery,
+      renkuConnectionConfig: RenkuConnectionConfig
+  )(implicit logger:         Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
+      extends RdfStoreClientImpl[IO](renkuConnectionConfig) {
 
     def sendUpdate: IO[Unit] = updateWithNoResult(query)
 
@@ -420,10 +438,10 @@ class RdfStoreClientImplSpec
     def uploadJson(json: JsonLD): IO[Unit] = upload(json)
   }
 
-  private class TestRdfQueryClientImpl(val query: SparqlQuery, rdfStoreConfig: RdfStoreConfig)(implicit
+  private class TestRdfQueryClientImpl(val query: SparqlQuery, renkuConnectionConfig: RenkuConnectionConfig)(implicit
       logger:                                     Logger[IO],
       timeRecorder:                               SparqlQueryTimeRecorder[IO]
-  ) extends RdfStoreClientImpl[IO](rdfStoreConfig)
+  ) extends RdfStoreClientImpl[IO](renkuConnectionConfig)
       with Paging[String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)

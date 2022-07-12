@@ -33,14 +33,15 @@ private[migrations] trait RecordsFinder[F[_]] {
 
 private[migrations] object RecordsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[RecordsFinder[F]] =
-    RdfStoreConfig[F]().map(new RecordsFinderImpl(_))
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): RecordsFinder[F] =
-    new RecordsFinderImpl(rdfStoreConfig)
+    RenkuConnectionConfig[F]().map(new RecordsFinderImpl(_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      renkuConnectionConfig: RenkuConnectionConfig
+  ): RecordsFinder[F] = new RecordsFinderImpl(renkuConnectionConfig)
 }
 
 private class RecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl[F](rdfStoreConfig,
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl[F](renkuConnectionConfig,
                                 idleTimeoutOverride = (16 minutes).some,
                                 requestTimeoutOverride = (15 minutes).some
     )

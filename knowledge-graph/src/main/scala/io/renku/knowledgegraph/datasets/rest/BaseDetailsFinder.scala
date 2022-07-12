@@ -39,8 +39,8 @@ private trait BaseDetailsFinder[F[_]] {
 }
 
 private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl(renkuConnectionConfig)
     with BaseDetailsFinder[F] {
 
   import BaseDetailsFinderImpl._
@@ -132,8 +132,10 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
 private object BaseDetailsFinder {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): F[BaseDetailsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new BaseDetailsFinderImpl[F](rdfStoreConfig))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      renkuConnectionConfig: RenkuConnectionConfig
+  ): F[BaseDetailsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new BaseDetailsFinderImpl[F](renkuConnectionConfig))
 }
 
 private object BaseDetailsFinderImpl {

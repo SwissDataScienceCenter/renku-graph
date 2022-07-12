@@ -42,8 +42,8 @@ private trait ProjectsFinder[F[_]] {
 }
 
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends RdfStoreClientImpl(renkuConnectionConfig)
     with ProjectsFinder[F] {
 
   import ProjectsFinderImpl._
@@ -121,6 +121,6 @@ private object ProjectsFinderImpl {
 private object ProjectsFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      rdfStoreConfig: RdfStoreConfig
-  ): F[ProjectsFinder[F]] = MonadThrow[F].catchNonFatal(new ProjectsFinderImpl[F](rdfStoreConfig))
+      renkuConnectionConfig: RenkuConnectionConfig
+  ): F[ProjectsFinder[F]] = MonadThrow[F].catchNonFatal(new ProjectsFinderImpl[F](renkuConnectionConfig))
 }

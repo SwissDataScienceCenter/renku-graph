@@ -44,9 +44,9 @@ private object ProjectTriplesRemover {
       idleTimeout:    Duration = 16 minutes,
       requestTimeout: Duration = 15 minutes
   ): F[ProjectTriplesRemover[F]] = for {
-    rdfStoreConfig <- RdfStoreConfig[F]()
-    renkuUrl       <- RenkuUrlLoader[F]()
-  } yield new ProjectTriplesRemoverImpl[F](rdfStoreConfig,
+    renkuConnectionConfig <- RenkuConnectionConfig[F]()
+    renkuUrl              <- RenkuUrlLoader[F]()
+  } yield new ProjectTriplesRemoverImpl[F](renkuConnectionConfig,
                                            renkuUrl,
                                            retryInterval,
                                            maxRetries,
@@ -56,13 +56,13 @@ private object ProjectTriplesRemover {
 }
 
 private class ProjectTriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig,
-    renkuUrl:       RenkuUrl,
-    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:    Duration = 16 minutes,
-    requestTimeout: Duration = 15 minutes
-) extends RdfStoreClientImpl(rdfStoreConfig,
+    renkuConnectionConfig: RenkuConnectionConfig,
+    renkuUrl:              RenkuUrl,
+    retryInterval:         FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:            Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:           Duration = 16 minutes,
+    requestTimeout:        Duration = 15 minutes
+) extends RdfStoreClientImpl(renkuConnectionConfig,
                              retryInterval = retryInterval,
                              maxRetries = maxRetries,
                              idleTimeoutOverride = idleTimeout.some,
@@ -72,8 +72,8 @@ private class ProjectTriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeReco
   import SameAsHierarchyFixer._
   import io.renku.graph.model.Schemas._
 
-  private implicit val baseUrl:     RenkuUrl       = renkuUrl
-  private implicit val storeConfig: RdfStoreConfig = rdfStoreConfig
+  private implicit val baseUrl:     RenkuUrl              = renkuUrl
+  private implicit val storeConfig: RenkuConnectionConfig = renkuConnectionConfig
 
   override def removeTriples(projectPath: projects.Path): F[Unit] = for {
     _ <- relinkSameAsHierarchy(projectPath)

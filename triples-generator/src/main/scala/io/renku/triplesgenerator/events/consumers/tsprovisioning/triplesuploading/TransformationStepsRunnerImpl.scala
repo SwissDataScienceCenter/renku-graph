@@ -25,7 +25,7 @@ import cats.syntax.all._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.entities.Project
 import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuUrl}
-import io.renku.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.rdfstore.{RenkuConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{ProjectWithQueries, Queries}
@@ -109,11 +109,11 @@ private[tsprovisioning] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
 private[consumers] object TransformationStepsRunner {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsRunnerImpl[F]] = for {
-    rdfStoreConfig <- RdfStoreConfig[F]()
-    renkuUrl       <- RenkuUrlLoader[F]()
-    gitlabUrl      <- GitLabUrlLoader[F]()
-  } yield new TransformationStepsRunnerImpl[F](new TriplesUploaderImpl[F](rdfStoreConfig),
-                                               new UpdatesUploaderImpl(rdfStoreConfig),
+    renkuConnectionConfig <- RenkuConnectionConfig[F]()
+    renkuUrl              <- RenkuUrlLoader[F]()
+    gitlabUrl             <- GitLabUrlLoader[F]()
+  } yield new TransformationStepsRunnerImpl[F](new TriplesUploaderImpl[F](renkuConnectionConfig),
+                                               new UpdatesUploaderImpl(renkuConnectionConfig),
                                                renkuUrl,
                                                gitlabUrl
   )

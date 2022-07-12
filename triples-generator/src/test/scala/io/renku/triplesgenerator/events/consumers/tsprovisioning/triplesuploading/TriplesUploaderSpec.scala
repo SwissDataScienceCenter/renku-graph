@@ -96,8 +96,10 @@ class TriplesUploaderSpec
 
       val Left(failure) = triplesUploader.uploadTriples(triples).value.unsafeRunSync()
 
-      failure          shouldBe a[LogWorthyRecoverableError]
-      failure.getMessage should startWith(s"POST $externalServiceBaseUrl/${rdfStoreConfig.datasetName}/data error")
+      failure shouldBe a[LogWorthyRecoverableError]
+      failure.getMessage should startWith(
+        s"POST $externalServiceBaseUrl/${renkuConnectionConfig.datasetName}/data error"
+      )
     }
   }
 
@@ -107,12 +109,16 @@ class TriplesUploaderSpec
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    lazy val rdfStoreConfig  = rdfStoreConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
-    lazy val triplesUploader = new TriplesUploaderImpl[IO](rdfStoreConfig, retryInterval = 100 millis, maxRetries = 1)
+    lazy val renkuConnectionConfig =
+      renkuConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
+    lazy val triplesUploader =
+      new TriplesUploaderImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenUploader(returning: ResponseDefinitionBuilder) = stubFor {
-      post(s"/${rdfStoreConfig.datasetName}/data")
-        .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+      post(s"/${renkuConnectionConfig.datasetName}/data")
+        .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                       renkuConnectionConfig.authCredentials.password.value
+        )
         .withHeader("content-type", equalTo("application/ld+json"))
         .withRequestBody(equalToJson(triples.toJson.toString()))
         .willReturn(returning)

@@ -38,13 +38,13 @@ private trait UpdatesUploader[F[_]] {
 }
 
 private class UpdatesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig:   RdfStoreConfig,
-    recoveryStrategy: RecoverableErrorsRecovery = RecoverableErrorsRecovery,
-    retryInterval:    FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:      Duration = 11 minutes,
-    requestTimeout:   Duration = 10 minutes
-) extends RdfStoreClientImpl[F](rdfStoreConfig,
+    renkuConnectionConfig: RenkuConnectionConfig,
+    recoveryStrategy:      RecoverableErrorsRecovery = RecoverableErrorsRecovery,
+    retryInterval:         FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:            Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:           Duration = 11 minutes,
+    requestTimeout:        Duration = 10 minutes
+) extends RdfStoreClientImpl[F](renkuConnectionConfig,
                                 retryInterval,
                                 maxRetries,
                                 idleTimeoutOverride = idleTimeout.some,
