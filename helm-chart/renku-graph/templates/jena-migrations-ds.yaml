@@ -4,7 +4,10 @@ kind: ConfigMap
 metadata:
   name: migrations-ds-ttl
   labels:
-    {{- include "jena.labels" . | nindent 4 }}
+    app: {{ template "jena.name" . }}
+    chart: {{ template "graph.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
 data:
   migrations.ttl: |-    
     @prefix :      <http://base/#> .

@@ -17,16 +17,20 @@ global:
   graph:
     dbEventLog:
       postgresPassword:
+        # Password for the `eventlog` user
+        # Generate one using: `openssl rand -hex 16`
         value:
   tokenRepository:
     postgresPassword:
+      # Password for the `tokenstorage` user
+      # Generate one using: `openssl rand -hex 16`
       value:
 
 jena:
   image:
     repository: renku/renku-jena
     pullPolicy: IfNotPresent
-    tag: '0.0.8'
+    tag: '0.0.9'
   users:
     admin:
       ## Admin user password
