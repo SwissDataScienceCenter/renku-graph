@@ -701,6 +701,15 @@ Response body example:
 }
 ```
 
+#### GET /knowledge-graph/spec.json
+
+Returns OpenApi json spec 
+
+| Status                     | Description          |
+|----------------------------|----------------------|
+| OK (200)                   | If spec is found     |
+| INTERNAL SERVER ERROR (500)| Otherwise            |
+
 #### GET /metrics
 
 Serves Prometheus metrics.
