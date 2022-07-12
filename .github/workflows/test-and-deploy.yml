@@ -39,7 +39,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '18'
+          java-version: '17'
       - name: Setup cache
         uses: actions/cache@v2
         with:
@@ -59,7 +59,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '18'
+          java-version: '17'
       - name: Setup cache
         uses: actions/cache@v2
         with:
@@ -79,7 +79,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
-          java-version: '18'
+          java-version: '17'
       - name: Setup cache
         uses: actions/cache@v2
         with:
