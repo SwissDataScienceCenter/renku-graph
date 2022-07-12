@@ -40,7 +40,7 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends 
 
   lazy val doc: OpenApiDocument =
     OpenApiDocument(
-      "3.0.3",
+      openApiVersion = "3.0.3",
       Info("Knowledge Graph API",
            "Get info about datasets, users, activities, and other entities".some,
            serviceVersion.value
