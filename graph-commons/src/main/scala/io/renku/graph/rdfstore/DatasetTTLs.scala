@@ -30,9 +30,9 @@ object DatasetTTLs {
         new RenkuTTL(_),
         ttlName = "renku.ttl",
         yamlFile = {
-          val pathFromProjRoot = Paths.get("helm-chart/renku-graph/templates/renku-jena-renku-ds.yaml")
+          val pathFromProjRoot = Paths.get("helm-chart/renku-graph/templates/jena-renku-ds.yaml")
           if (Files exists pathFromProjRoot) pathFromProjRoot
-          else Paths.get("../helm-chart/renku-graph/templates/renku-jena-renku-ds.yaml")
+          else Paths.get("../helm-chart/renku-graph/templates/jena-renku-ds.yaml")
         }
       )
 
@@ -42,9 +42,9 @@ object DatasetTTLs {
         new MigrationsTTL(_),
         ttlName = "migrations.ttl",
         yamlFile = {
-          val pathFromProjRoot = Paths.get("helm-chart/renku-graph/templates/renku-jena-migrations-ds.yaml")
+          val pathFromProjRoot = Paths.get("helm-chart/renku-graph/templates/jena-migrations-ds.yaml")
           if (Files exists pathFromProjRoot) pathFromProjRoot
-          else Paths.get("../helm-chart/renku-graph/templates/renku-jena-migrations-ds.yaml")
+          else Paths.get("../helm-chart/renku-graph/templates/jena-migrations-ds.yaml")
         }
       )
 }

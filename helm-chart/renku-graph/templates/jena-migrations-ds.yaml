@@ -4,7 +4,7 @@ kind: ConfigMap
 metadata:
   name: migrations-ds-ttl
   labels:
-    {{- include "renku-jena.labels" . | nindent 4 }}
+    {{- include "jena.labels" . | nindent 4 }}
 data:
   migrations.ttl: |-    
     @prefix :      <http://base/#> .

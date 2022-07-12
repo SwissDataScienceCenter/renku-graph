@@ -5,3 +5,4 @@ dependencies:
 - name: renku-jena
   version: "0.0.8"
   repository: "https://swissdatasciencecenter.github.io/helm-charts/"
+  alias: jena

@@ -22,7 +22,7 @@ global:
     postgresPassword:
       value:
 
-renku-jena:
+jena:
   image:
     repository: renku/renku-jena
     pullPolicy: IfNotPresent

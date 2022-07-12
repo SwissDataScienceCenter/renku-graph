@@ -89,7 +89,7 @@ class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
         |metadata:
         |  name: renku-ds-ttl
         |  labels:
-        |    {{- include "renku-jena.labels" . | nindent 4 }}
+        |    {{- include "jena.labels" . | nindent 4 }}
         |data:
         |  $ttlName: |-
         |    $configFileContent

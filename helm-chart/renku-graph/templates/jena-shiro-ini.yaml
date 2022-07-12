@@ -4,7 +4,7 @@ kind: ConfigMap
 metadata:
   name: shiro-ini
   labels:
-    {{- include "renku-jena.labels" . | nindent 4 }}
+    {{- include "jena.labels" . | nindent 4 }}
 data:
   shiro.ini: |-
     [main]
@@ -15,8 +15,8 @@ data:
     iniRealm.credentialsMatcher = $plainMatcher
 
     [users]
-    admin={{ .Values.renkuJena.users.admin.password }}
-    renku={{ .Values.renkuJena.users.renku.password }}
+    admin={{ .Values.jena.users.admin.password }}
+    renku={{ .Values.jena.users.renku.password }}
 
     [roles]
 

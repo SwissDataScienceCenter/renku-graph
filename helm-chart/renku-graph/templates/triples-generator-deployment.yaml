@@ -55,12 +55,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ template "jena.fullname" . }}
-                  key: jena-admin-password
+                  key: jena-users-admin-password
             - name: JENA_RENKU_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ template "jena.fullname" . }}
-                  key: jena-renku-password
+                  key: jena-users-renku-password
             - name: RENKU_DISABLE_VERSION_CHECK
               value: "true"
             - name: RE_PROVISIONING_REMOVAL_BATCH_SIZE
