@@ -42,6 +42,8 @@ jena:
       password:
   persistence:
     size: 10Gi
+  podSecurityContext:
+    fsGroupChangePolicy: "OnRootMismatch"
   additionalEnvironmentVariables:
     - name: JVM_ARGS
       value: -Xmx2G -Xms2G

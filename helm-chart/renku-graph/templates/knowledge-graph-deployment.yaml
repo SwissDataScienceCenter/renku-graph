@@ -46,7 +46,7 @@ spec:
             - name: JENA_RENKU_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jena.fullname" . }}
+                  name: {{ include "jena.fullname" . }}-jena
                   key: jena-users-renku-password
             - name: TOKEN_REPOSITORY_BASE_URL
               value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
