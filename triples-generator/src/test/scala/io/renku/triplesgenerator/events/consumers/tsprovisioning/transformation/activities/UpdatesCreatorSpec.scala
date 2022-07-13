@@ -28,6 +28,7 @@ import io.renku.graph.model.views.RdfResource
 import io.renku.rdfstore.SparqlQuery.Prefixes
 import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
+import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -51,7 +52,8 @@ class UpdatesCreatorSpec
       upload(to = renkuDataset, kgProject)
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
-      findAuthors(activity.resourceId) shouldBe Set(activity.author.resourceId)
+      findAuthors(activity.resourceId).map(_.value) shouldBe Set(activity.author.resourceId)
+        .map(id => URIref.encode(id.value))
 
       val newAuthor     = personEntities.generateOne.to[entities.Person]
       val modelActivity = activity.copy(author = newAuthor)
@@ -78,7 +80,8 @@ class UpdatesCreatorSpec
       upload(to = renkuDataset, person)
       insert(to = renkuDataset, Triple.edge(activity.resourceId, prov / "wasAssociatedWith", person.resourceId))
 
-      findAuthors(activity.resourceId) shouldBe Set(activity.author.resourceId, person.resourceId)
+      findAuthors(activity.resourceId).map(_.value) shouldBe Set(activity.author.resourceId, person.resourceId)
+        .map(id => URIref.encode(id.value))
 
       UpdatesCreator
         .queriesUnlinkingAuthors(activity, Set(activity.author.resourceId, personResourceIds.generateOne))
@@ -203,7 +206,7 @@ class UpdatesCreatorSpec
     on = renkuDataset,
     SparqlQuery.of(
       "fetch activity creator",
-      Prefixes.of(prov -> "prov", schema -> "schema"),
+      Prefixes of (prov -> "prov", schema -> "schema"),
       s"""|SELECT ?personId
           |WHERE {
           |  ${resourceId.showAs[RdfResource]} a prov:Activity;
