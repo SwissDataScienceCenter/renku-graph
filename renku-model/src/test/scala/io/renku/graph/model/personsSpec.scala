@@ -25,8 +25,8 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.persons.{Email, ResourceId}
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.tinytypes.constraints.NonBlank
+import org.apache.jena.util.URIref
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalatest.matchers.should
@@ -154,19 +154,19 @@ class PersonResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
 
   "showAs[RdfResource]" should {
 
-    "wrap the ResourceId in <> if the id doesn't contain email" in {
+    "URI encode and wrap the ResourceId in <> if the id doesn't contain email" in {
       forAll(Gen.oneOf(personGitLabResourceId, personOrcidResourceId, personNameResourceId).widen[persons.ResourceId]) {
         resourceId =>
-          resourceId.showAs[RdfResource] shouldBe s"<${sparqlEncode(resourceId.show)}>"
+          resourceId.showAs[RdfResource] shouldBe s"<${URIref.encode(resourceId.show)}>"
       }
     }
 
-    "encrypt the local part of the email ResourceId and wrap it in <>" in {
+    "encrypt the local part of the email ResourceId, URI encode it and wrap in <>" in {
       forAll { email: Email =>
         val username   = email.extractName.value
         val resourceId = ResourceId(email)
 
-        resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value.replace(username, sparqlEncode(username))}>"
+        resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value.replace(username, URIref.encode(username))}>"
       }
     }
   }
