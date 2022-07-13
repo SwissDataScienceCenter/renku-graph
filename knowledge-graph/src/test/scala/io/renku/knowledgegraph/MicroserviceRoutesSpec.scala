@@ -625,7 +625,7 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "GET /spec.json" should {
+  "GET /knowledge-graph/spec.json" should {
 
     s"return $Ok with OpenAPI json body" in new TestCase {
       val openApiJson = jsons.generateOne
@@ -633,7 +633,7 @@ class MicroserviceRoutesSpec
         .expects()
         .returning(IO.pure(Response[IO](Ok).withEntity(openApiJson)))
 
-      val response = routes().call(Request(Method.GET, uri"/spec.json"))
+      val response = routes().call(Request(Method.GET, uri"/knowledge-graph/spec.json"))
 
       response.status     shouldBe Ok
       response.body[Json] shouldBe openApiJson
