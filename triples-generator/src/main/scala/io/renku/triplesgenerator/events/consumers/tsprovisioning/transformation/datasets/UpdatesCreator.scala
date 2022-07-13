@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.{prov, renku, schema}
+import io.renku.graph.model.Schemas.{prov, renku, schema, xsd}
 import io.renku.graph.model.datasets.{DateCreated, Description, OriginalIdentifier, ResourceId, SameAs, TopmostSameAs}
 import io.renku.graph.model.entities.Dataset
 import io.renku.graph.model.entities.Dataset.Provenance
@@ -278,12 +278,13 @@ private object UpdatesCreator extends UpdatesCreator {
     ) {
       SparqlQuery.of(
         name = "transformation - dateCreated clean-up",
-        Prefixes of schema -> "schema",
+        Prefixes.of(schema -> "schema", xsd -> "xsd"),
         s"""|DELETE { ?dsId schema:dateCreated ?date }
             |WHERE {
             |  BIND (${ds.resourceId.showAs[RdfResource]} AS ?dsId)
             |  ?dsId schema:dateCreated ?date.
-            |  FILTER ( STR(?date) != '${ds.provenance.date}' )
+            |  BIND (xsd:dateTime('${ds.provenance.date.instant}') AS ?xsdDate)
+            |  FILTER ( ?date != ?xsdDate )
             |}""".stripMargin
       )
     }
