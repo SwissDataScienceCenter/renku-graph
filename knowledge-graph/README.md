@@ -3,22 +3,23 @@
 This is a microservice which provides API for the Graph DB.
 
 ## API
+The following routes may be slightly different when accessed via the main renku api, which uses the gateway service (e.g. /api/kg/datasets)
 
 | Method | Path                                                                     | Description                                                          |
 |--------|--------------------------------------------------------------------------|----------------------------------------------------------------------|
-| GET    | ```/api/kg/datasets```                                          | Returns datasets filtered by the given predicates.                   |
-| GET    | ```/api/kg/datasets/:id```                                      | Returns details of the dataset with the given `id`                   |
-| GET    | ```/api/kg/entities```                                          | Returns entities filtered by the given predicates`                   |
-| GET    | ```/api/kg/graphql```                                           | Returns GraphQL endpoint schema                                      |
-| POST   | ```/api/kg/graphql```                                           | GraphQL query endpoint                                               |
-| GET    | ```/api/kg/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`       |
-| GET    | ```/api/kg/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                |
-| GET    | ```/api/kg/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project |
+| GET    | ```/api/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                   |
+| GET    | ```/api/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                   |
+| GET    | ```/api/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                   |
+| GET    | ```/api/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                      |
+| POST   | ```/api/knowledge-graph/graphql```                                           | GraphQL query endpoint                                               |
+| GET    | ```/api/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`       |
+| GET    | ```/api/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                |
+| GET    | ```/api/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project |
 | GET    | ```/metrics```                                                           | Serves Prometheus metrics                                            |
 | GET    | ```/ping```                                                              | To check if service is healthy                                       |
 | GET    | ```/version```                                                           | Returns info about service version                                   |
 
-#### GET /api/kg/datasets
+#### GET /api/knowledge-graph/datasets
 
 Finds datasets which `title`, `description`, `keywords`, or creator `name` matches the given `phrase` or returns all the
 datasets if no `query` parameter is given.
@@ -55,13 +56,13 @@ Response headers:
 Link response header example:
 
 Assuming the total is `30` and the
-URL `https://renku/api/kg/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
+URL `https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
 
 ```
-Link: <https://renku/api/kg/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
-Link: <https://renku/api/kg/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
-Link: <https://renku/api/kg/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
-Link: <https://renku/api/kg/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
+Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
+Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
+Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
+Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
 ```
 
 Response body example:
@@ -140,7 +141,7 @@ Response body example:
 ]
 ```
 
-#### GET /api/kg/entities
+#### GET /api/knowledge-graph/entities
 
 Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 
@@ -192,13 +193,13 @@ Response headers:
 | `Prev-Page`   | The index of the previous page (optional)                                             |
 | `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
-Assuming the total is `30` and the URL is `https://renku/api/kg/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links are added to the response:
+Assuming the total is `30` and the URL is `https://renku/api/knowledge-graph/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links are added to the response:
 
 ```
-Link: <https://renku/api/kg/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
-Link: <https://renku/api/kg/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
-Link: <https://renku/api/kg/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
-Link: <https://renku/api/kg/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
+Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
+Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
+Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
+Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
 ```
 
 Response body example:
@@ -281,7 +282,7 @@ Response body example:
 ]
 ```
 
-#### GET /api/kg/datasets/:id
+#### GET /api/knowledge-graph/datasets/:id
 
 Finds details of the dataset with the given `id`.
 
@@ -396,7 +397,7 @@ Response body example:
 }
 ```
 
-#### GET /api/kg/graphql
+#### GET /api/knowledge-graph/graphql
 
 Returns Knowledge Graph GraphQL endpoint schema.
 
@@ -410,10 +411,10 @@ Returns Knowledge Graph GraphQL endpoint schema.
 **A curl command example**
 
 ```
-curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/api/kg/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
+curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/api/knowledge-graph/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
 ```
 
-#### POST /api/kg/graphql
+#### POST /api/knowledge-graph/graphql
 
 Endpoint to perform GraphQL queries on the Knowledge Graph data.
 
@@ -484,7 +485,7 @@ Response body example:
 }
 ```
 
-#### GET /api/kg/projects/:namespace/:name
+#### GET /api/knowledge-graph/projects/:namespace/:name
 
 Finds details of the project with the given `namespace/name`. The endpoint requires an authorization token to be passed
 in the request for non-public projects. Supported headers are:
@@ -570,7 +571,7 @@ Response body example:
 }
 ```
 
-#### GET /api/kg/projects/:namespace/:name/datasets
+#### GET /api/knowledge-graph/projects/:namespace/:name/datasets
 
 Finds list of datasets of the project with the given `namespace/name`.
 
@@ -650,7 +651,7 @@ Response body example:
 ]
 ```
 
-#### GET /api/kg/projects/:namespace/:name/files/:location/lineage
+#### GET /api/knowledge-graph/projects/:namespace/:name/files/:location/lineage
 
 Fetches lineage for a given project `namespace`/`name` and file `location` (URL-encoded relative path to the file). This endpoint is intended to replace the graphql endpoint.
 
@@ -701,7 +702,7 @@ Response body example:
 }
 ```
 
-#### GET /api/kg/spec.json
+#### GET /api/knowledge-graph/spec.json
 
 Returns OpenApi json spec 
 
