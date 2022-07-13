@@ -39,7 +39,7 @@ import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.rdfstore._
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should

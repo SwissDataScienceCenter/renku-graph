@@ -20,11 +20,11 @@ package io.renku.graph.model
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.graph.model.views.{EntityIdJsonLdOps, RdfResource, TinyTypeJsonLDOps}
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt}
+import org.apache.jena.util.URIref
 
 object persons {
 
@@ -51,7 +51,7 @@ object persons {
         message = (v: String) => s"$v is not valid $typeName"
       )
 
-      lazy val rdfRenderer: Renderer[RdfResource, GitLabIdBased] = { id => s"<${sparqlEncode(id.value)}>" }
+      lazy val rdfRenderer: Renderer[RdfResource, GitLabIdBased] = { id => s"<${URIref.encode(id.value)}>" }
     }
 
     final class OrcidIdBased private[persons] (val value: String) extends AnyVal with ResourceId
@@ -65,7 +65,7 @@ object persons {
         message = (v: String) => s"$v is not valid $typeName"
       )
 
-      lazy val rdfRenderer: Renderer[RdfResource, OrcidIdBased] = { id => s"<${sparqlEncode(id.value)}>" }
+      lazy val rdfRenderer: Renderer[RdfResource, OrcidIdBased] = { id => s"<${URIref.encode(id.value)}>" }
     }
 
     final class EmailBased private[persons] (val value: String) extends AnyVal with ResourceId
@@ -81,7 +81,7 @@ object persons {
       )
 
       lazy val rdfRenderer: Renderer[RdfResource, EmailBased] = _.value match {
-        case id @ validatorRegex(localPart) => s"<${id.replace(localPart, sparqlEncode(localPart))}>"
+        case id @ validatorRegex(localPart) => s"<${id.replace(localPart, URIref.encode(localPart))}>"
         case id => throw new IllegalStateException(s"EmailBased Person Id without 'mailto:' scheme: $id")
       }
     }
@@ -97,7 +97,7 @@ object persons {
         message = (v: String) => s"$v is not valid $typeName"
       )
 
-      lazy val rdfRenderer: Renderer[RdfResource, NameBased] = { id => s"<${sparqlEncode(id.value)}>" }
+      lazy val rdfRenderer: Renderer[RdfResource, NameBased] = { id => s"<${URIref.encode(id.value)}>" }
     }
 
     def apply(gitLabId: GitLabId)(implicit renkuUrl: RenkuUrl): GitLabIdBased =
