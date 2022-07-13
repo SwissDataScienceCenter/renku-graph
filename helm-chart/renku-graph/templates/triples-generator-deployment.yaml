@@ -54,7 +54,7 @@ spec:
             - name: JENA_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "jena.fullname" . }}-jena
+                  name: {{ include "jena.fullname" . }}
                   key: jena-users-admin-password
             - name: JENA_RENKU_PASSWORD
               valueFrom:

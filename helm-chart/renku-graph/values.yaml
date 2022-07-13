@@ -30,7 +30,7 @@ jena:
   image:
     repository: renku/renku-jena
     pullPolicy: IfNotPresent
-    tag: '0.0.9'
+    tag: '0.0.10'
   users:
     admin:
       ## Admin user password
@@ -41,9 +41,9 @@ jena:
       ## Generate one using: `openssl rand -hex 16`
       password:
   persistence:
+    accessModes:
+      - ReadWriteOnce
     size: 10Gi
-  podSecurityContext:
-    fsGroupChangePolicy: "OnRootMismatch"
   additionalEnvironmentVariables:
     - name: JVM_ARGS
       value: -Xmx2G -Xms2G
