@@ -217,7 +217,7 @@ trait JenaDataset {
 trait RenkuDataset extends JenaDataset {
   self: InMemoryJena =>
 
-  private lazy val configFile: Either[Exception, DatasetConfigFile] = RenkuTTL.fromConfigMap()
+  private lazy val configFile: Either[Exception, DatasetConfigFile] = RenkuTTL.fromTtlFile()
   private lazy val connectionInfoFactory: FusekiUrl => RenkuConnectionConfig = RenkuConnectionConfig(
     _,
     BasicAuthCredentials(BasicAuthUsername("renku"), BasicAuthPassword("renku"))
@@ -232,7 +232,7 @@ trait RenkuDataset extends JenaDataset {
 trait MigrationsDataset extends JenaDataset {
   self: InMemoryJena =>
 
-  private lazy val configFile: Either[Exception, MigrationsTTL] = MigrationsTTL.fromConfigMap()
+  private lazy val configFile: Either[Exception, MigrationsTTL] = MigrationsTTL.fromTtlFile()
   private lazy val connectionInfoFactory: FusekiUrl => MigrationsConnectionConfig = MigrationsConnectionConfig(
     _,
     BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))

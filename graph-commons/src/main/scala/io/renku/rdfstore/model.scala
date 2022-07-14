@@ -24,7 +24,8 @@ import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import pureconfig.ConfigReader
 
-import java.nio.file.{Files, Path}
+import java.io.FileNotFoundException
+import scala.io.{BufferedSource, Source}
 
 class DatasetName private (val value: String) extends AnyVal with StringTinyType
 object DatasetName extends TinyTypeFactory[DatasetName](new DatasetName(_)) with NonBlank[DatasetName] {
@@ -35,36 +36,45 @@ trait DatasetConfigFile extends StringTinyType
 object DatasetConfigFile {
   implicit lazy val show: Show[DatasetConfigFile] = Show.show(_.toString)
 }
-abstract class DatasetConfigFileFactory[TT <: DatasetConfigFile](instantiate: String => TT,
-                                                                 ttlName:     String,
-                                                                 yamlFile:    Path
-) extends TinyTypeFactory[TT](instantiate) {
+abstract class DatasetConfigFileFactory[TT <: DatasetConfigFile](instantiate: String => TT, ttlFileName: String)
+    extends TinyTypeFactory[TT](instantiate) {
   import cats.syntax.all._
 
-  import scala.jdk.CollectionConverters._
+  def fromTtlFile(): Either[Exception, TT] = instance
 
-  def fromConfigMap(): Either[Exception, TT] = instance
+  private lazy val instance: Either[Exception, TT] = readFromFile() >>= from
 
-  private lazy val instance: Either[Exception, TT] = readFromConfigMap() >>= from
-
-  private def readFromConfigMap(): Either[Exception, String] =
-    Either
-      .catchNonFatal(readTTLLines)
-      .leftMap(new Exception(s"Problems while reading $yamlFile", _))
+  private def readFromFile(): Either[Exception, String] =
+    readTtlLines
+      .leftMap(new Exception(s"Problems while reading $ttlFileName", _))
       .flatMap(validateLines)
-      .map(_.mkString("\n").stripIndent())
+      .map(_.mkString("\n"))
 
-  private def readTTLLines = Files
-    .readAllLines(yamlFile)
-    .asScala
-    .dropWhile(line => !(line contains ttlName))
-    .toList match {
-    case Nil   => Nil
-    case lines => lines.tail
+  private def readTtlLines =
+    findFile.map {
+      _.getLines().toList
+    }
+
+  private def findFile = {
+    val locationsAndReaders: Seq[(String, String => BufferedSource)] = List(
+      ttlFileName                                         -> ((f: String) => Source.fromResource(f)),
+      ttlFileName                                         -> ((f: String) => Source.fromFile(f)),
+      s"graph-commons/src/main/resources/$ttlFileName"    -> ((f: String) => Source.fromFile(f)),
+      s"../graph-commons/src/main/resources/$ttlFileName" -> ((f: String) => Source.fromFile(f))
+    )
+
+    locationsAndReaders.foldLeft[Either[Throwable, BufferedSource]](
+      new FileNotFoundException(
+        s"$ttlFileName cannot be found in the locations: ${locationsAndReaders.map(_._1).toSet.mkString(", ")}"
+      ).asLeft
+    ) {
+      case (source @ Right(_), _) => source
+      case (_, (file, reader))    => Either.catchNonFatal(reader(file))
+    }
   }
 
   private def validateLines: List[String] => Either[Exception, List[String]] = {
-    case Nil   => new Exception(s"No $ttlName found in $yamlFile or empty body").asLeft
+    case Nil   => new Exception(s"$ttlFileName is empty").asLeft
     case lines => lines.asRight
   }
 }

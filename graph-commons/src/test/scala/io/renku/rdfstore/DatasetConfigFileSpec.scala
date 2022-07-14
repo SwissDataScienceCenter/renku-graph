@@ -19,8 +19,6 @@
 package io.renku.rdfstore
 
 import cats.syntax.all._
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.nonEmptyStrings
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -30,70 +28,53 @@ class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
 
   "fromConfigMap" should {
 
-    "extract content of the config file defined in the given ConfigMap yaml" in {
-      val yamlFile = Files.createTempFile("ds", "yaml")
-      Files.writeString(yamlFile, configMap)
+    "read content of the TTL file" in {
+      val ttlFile = Files.createTempFile("ds", "ttl")
+      Files.writeString(ttlFile, ttlFileContent)
 
-      object TestConfigFile extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_), ttlName, yamlFile)
+      object TestConfigFile extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_), ttlFile.toString)
 
-      TestConfigFile.fromConfigMap() shouldBe TestConfigFile(configFileContent).asRight
+      TestConfigFile.fromTtlFile() shouldBe TestConfigFile(ttlFileContent).asRight
     }
 
-    "return a Left if cannot find the ds ttl body" in {
-      val yamlFile = Files.createTempFile("ds", "yaml")
-      Files.writeString(yamlFile, configMap)
+    "return a Left for an empty file" in {
+      val ttlFile = Files.createTempFile("ds", "ttl")
+      Files.writeString(ttlFile, "")
 
-      val otherTtlName = nonEmptyStrings().generateOne
-      object TestConfigFile
-          extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_), otherTtlName, yamlFile)
+      object TestConfigFile extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_), ttlFile.toString)
 
-      val Left(failure) = TestConfigFile.fromConfigMap()
+      val Left(failure) = TestConfigFile.fromTtlFile()
 
-      failure.getMessage shouldBe s"No $otherTtlName found in $yamlFile or empty body"
+      failure.getMessage shouldBe s"$ttlFile is empty"
     }
 
-    "return a Left if yaml file cannot be found" in {
-      val nonExistingYaml = Paths.get("non-existing.yaml")
+    "return a Left if TTL file cannot be found" in {
+      val nonExistingTtl = Paths.get("non-existing.yaml")
       object TestConfigFile
-          extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_), ttlName, nonExistingYaml)
+          extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_), nonExistingTtl.toString)
 
-      val Left(failure) = TestConfigFile.fromConfigMap()
+      val Left(failure) = TestConfigFile.fromTtlFile()
 
-      failure.printStackTrace()
-      failure.getMessage shouldBe s"Problems while reading $nonExistingYaml"
+      failure.getMessage shouldBe s"Problems while reading $nonExistingTtl"
     }
   }
 
-  private lazy val ttlName = "ds.ttl"
-  private lazy val configFileContent =
-    """|
-       |    @prefix:        <#> .
-       |    @prefix fuseki: <http://jena.apache.org/fuseki#> .
-       |    @prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-       |    @prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
-       |    @prefix tdb:    <http://jena.hpl.hp.com/2008/tdb#> .
+  private lazy val ttlFileContent =
+    """|@prefix:        <#> .
+       |@prefix fuseki: <http://jena.apache.org/fuseki#> .
+       |@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+       |@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+       |@prefix tdb:    <http://jena.hpl.hp.com/2008/tdb#> .
        |
-       |    :dsService rdf:type fuseki:Service ;
-       |      rdfs:label                        "label" ;
-       |      fuseki:name                       "name" ;
-       |      fuseki:dataset                    :ds ;
-       |    .
+       |:dsService rdf:type fuseki:Service ;
+       |  rdfs:label                        "label" ;
+       |  fuseki:name                       "name" ;
+       |  fuseki:dataset                    :ds ;
+       |.
        |
-       |    :ds rdf:type tdb:DatasetTDB ;
-       |      tdb:location "/fuseki/databases/ds" ;
-       |    .
-       |""".stripMargin
-  private lazy val configMap =
-    s"""|apiVersion: v1
-        |kind: ConfigMap
-        |metadata:
-        |  name: renku-ds-ttl
-        |  labels:
-        |    {{- include "jena.labels" . | nindent 4 }}
-        |data:
-        |  $ttlName: |-
-        |    $configFileContent
-        |""".stripMargin
+       |:ds rdf:type tdb:DatasetTDB ;
+       |  tdb:location "/fuseki/databases/ds" ;
+       |.""".stripMargin
 }
 
 private case class TestConfigFile private[rdfstore] (value: String) extends DatasetConfigFile

@@ -20,31 +20,12 @@ package io.renku.graph.rdfstore
 
 import io.renku.rdfstore.{DatasetConfigFile, DatasetConfigFileFactory}
 
-import java.nio.file.{Files, Paths}
-
 object DatasetTTLs {
 
   case class RenkuTTL private (value: String) extends DatasetConfigFile
-  object RenkuTTL
-      extends DatasetConfigFileFactory[RenkuTTL](
-        new RenkuTTL(_),
-        ttlName = "renku.ttl",
-        yamlFile = {
-          val pathFromProjRoot = Paths.get("helm-chart/renku-graph/templates/jena-renku-ds.yaml")
-          if (Files exists pathFromProjRoot) pathFromProjRoot
-          else Paths.get("../helm-chart/renku-graph/templates/jena-renku-ds.yaml")
-        }
-      )
+  object RenkuTTL extends DatasetConfigFileFactory[RenkuTTL](new RenkuTTL(_), ttlFileName = "renku-ds.ttl")
 
   case class MigrationsTTL private (value: String) extends DatasetConfigFile
   object MigrationsTTL
-      extends DatasetConfigFileFactory[MigrationsTTL](
-        new MigrationsTTL(_),
-        ttlName = "migrations.ttl",
-        yamlFile = {
-          val pathFromProjRoot = Paths.get("helm-chart/renku-graph/templates/jena-migrations-ds.yaml")
-          if (Files exists pathFromProjRoot) pathFromProjRoot
-          else Paths.get("../helm-chart/renku-graph/templates/jena-migrations-ds.yaml")
-        }
-      )
+      extends DatasetConfigFileFactory[MigrationsTTL](new MigrationsTTL(_), ttlFileName = "migrations-ds.ttl")
 }

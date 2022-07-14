@@ -52,25 +52,11 @@ jena:
       mountPath: /fuseki/shiro.ini
       subPath: shiro.ini
       readOnly: true
-    - name: renku-ds
-      mountPath: /fuseki/configuration/renku.ttl
-      subPath: renku.ttl
-      readOnly: true
-    - name: migrations-ds
-      mountPath: /fuseki/configuration/migrations.ttl
-      subPath: migrations.ttl
-      readOnly: true
   additionalVolumes:
     - name: shiro
       configMap:
         name: shiro-ini
         defaultMode: 0555
-    - name: renku-ds
-      configMap:
-        name: renku-ds-ttl
-    - name: migrations-ds
-      configMap:
-        name: migrations-ds-ttl
 
 webhookService:
   image:
