@@ -76,9 +76,7 @@ trait InMemoryJena {
 
   protected def createDatasets(): IO[Unit] =
     datasets
-      .map { case (connectionInfoFactory, configFile) =>
-        queryRunner(connectionInfoFactory(fusekiUrl)).createDataset(configFile, adminCredentials)
-      }
+      .map { case (_, configFile) => datasetsCreator.createDataset(configFile) }
       .toList
       .sequence
       .void
@@ -149,29 +147,13 @@ trait InMemoryJena {
   private implicit lazy val logger:  TestLogger[IO]              = TestLogger[IO]()
   private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
 
+  private lazy val datasetsCreator = RdfStoreAdminClient[IO](AdminConnectionConfig(fusekiUrl, adminCredentials))
+
   private def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
 
   private def queryRunner(connectionInfo: DatasetConnectionConfig) = new RdfStoreClientImpl[IO](connectionInfo) {
 
     import io.circe.Decoder._
-    import org.http4s.Method.POST
-    import org.http4s.Status.{Conflict, Ok}
-    import org.http4s.Uri
-    import org.http4s.headers.`Content-Type`
-
-    def createDataset(configFile: DatasetConfigFile, adminCredentials: BasicAuthCredentials) = for {
-      uri <- validateUri(s"$fusekiUrl/$$/datasets")
-      request = createDatasetRequest(uri, configFile, adminCredentials)
-      uploadResult <- send(request) { case (Ok | Conflict, _, _) => ().pure[IO] }
-    } yield uploadResult
-
-    private def createDatasetRequest(uri: Uri, configFile: DatasetConfigFile, credentials: BasicAuthCredentials) =
-      HttpRequest(
-        request(POST, uri, credentials)
-          .withEntity(configFile.show)
-          .putHeaders(`Content-Type`(`text/turtle`)),
-        name = "dataset creation"
-      )
 
     def uploadPayload(jsonLD: JsonLD) = upload(jsonLD)
 

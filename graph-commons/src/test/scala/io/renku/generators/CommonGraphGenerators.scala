@@ -94,6 +94,27 @@ object CommonGraphGenerators {
     unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
   } yield RateLimit[Target](items, per = unit)
 
+  val datasetConfigFiles: Gen[DatasetConfigFile] = nonEmptyStrings().map { v =>
+    new DatasetConfigFile {
+      override lazy val value: String = v
+    }
+  }
+
+  implicit val adminConnectionConfigs: Gen[AdminConnectionConfig] = for {
+    url         <- httpUrls() map FusekiUrl.apply
+    credentials <- basicAuthCredentials
+  } yield AdminConnectionConfig(url, credentials)
+
+  implicit val datasetConnectionConfigs: Gen[DatasetConnectionConfig] = for {
+    url         <- httpUrls() map FusekiUrl.apply
+    dataset     <- nonEmptyStrings().toGeneratorOf(DatasetName)
+    credentials <- basicAuthCredentials
+  } yield new DatasetConnectionConfig {
+    override val fusekiUrl       = url
+    override val datasetName     = dataset
+    override val authCredentials = credentials
+  }
+
   implicit val renkuConnectionConfigs: Gen[RenkuConnectionConfig] = for {
     fusekiUrl       <- httpUrls() map FusekiUrl.apply
     authCredentials <- basicAuthCredentials

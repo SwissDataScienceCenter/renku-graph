@@ -31,6 +31,93 @@ import scala.util.{Failure, Success, Try}
 
 class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
+  "AdminConnectionConfig.apply" should {
+
+    "read 'services.fuseki.url', 'services.fuseki.admin.username' and 'services.fuseki.admin.password' to instantiate the AdminConnectionConfig" in {
+      forAll(adminConnectionConfigs) { storeConfig =>
+        val config = ConfigFactory.parseMap(
+          Map(
+            "services" -> Map(
+              "fuseki" -> Map(
+                "url" -> storeConfig.fusekiUrl.toString,
+                "admin" -> Map(
+                  "username" -> storeConfig.authCredentials.username.value,
+                  "password" -> storeConfig.authCredentials.password.value
+                ).asJava
+              ).asJava
+            ).asJava
+          ).asJava
+        )
+
+        val Success(actual) = AdminConnectionConfig[Try](config)
+
+        actual.fusekiUrl                shouldBe storeConfig.fusekiUrl
+        actual.authCredentials.username shouldBe storeConfig.authCredentials.username
+        actual.authCredentials.password shouldBe storeConfig.authCredentials.password
+      }
+    }
+
+    "fail if url invalid" in {
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "fuseki" -> Map(
+              "url" -> "invalid-url",
+              "admin" -> Map(
+                "username" -> adminConnectionConfigs.generateOne.authCredentials.username.value,
+                "password" -> adminConnectionConfigs.generateOne.authCredentials.password.value
+              ).asJava
+            ).asJava
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = AdminConnectionConfig[Try](config)
+
+      exception shouldBe an[ConfigLoadingException]
+    }
+
+    "fail if username is blank" in {
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "fuseki" -> Map(
+              "url" -> adminConnectionConfigs.generateOne.fusekiUrl.toString,
+              "admin" -> Map(
+                "username" -> "  ",
+                "password" -> adminConnectionConfigs.generateOne.authCredentials.password.value
+              ).asJava
+            ).asJava
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = AdminConnectionConfig[Try](config)
+
+      exception shouldBe an[ConfigLoadingException]
+    }
+
+    "fail if password is blank" in {
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "fuseki" -> Map(
+              "url" -> adminConnectionConfigs.generateOne.fusekiUrl.toString,
+              "admin" -> Map(
+                "username" -> adminConnectionConfigs.generateOne.authCredentials.username.value,
+                "password" -> ""
+              ).asJava
+            ).asJava
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = AdminConnectionConfig[Try](config)
+
+      exception shouldBe an[ConfigLoadingException]
+    }
+  }
+
   "RenkuConnectionConfig.apply" should {
 
     "read 'services.fuseki.url', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the RenkuConnectionConfig" in {

@@ -53,7 +53,7 @@ class RdfStoreClientImplSpec
     with should.Matchers {
 
   "RdfStoreClientImpl" should {
-    "be a IORestClient" in new QueryClientTestCase {
+    "be a RestClient" in new QueryClientTestCase {
       type IORdfStoreClientImpl = RdfStoreClientImpl[IO]
       client shouldBe a[IORdfStoreClientImpl]
       client shouldBe a[RestClient[IO, _]]

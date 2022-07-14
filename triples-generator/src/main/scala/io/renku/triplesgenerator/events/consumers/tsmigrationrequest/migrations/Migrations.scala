@@ -34,6 +34,7 @@ private[tsmigrationrequest] object Migrations {
       reProvisioningStatus: ReProvisioningStatus[F],
       config:               Config
   ): F[List[Migration[F]]] = for {
+    datasetsCreator                   <- DatasetsCreator[F]
     reProvisioning                    <- ReProvisioning[F](reProvisioningStatus, config)
     malformedActivityIds              <- MalformedActivityIds[F]
     multiplePersonNames               <- MultiplePersonNames[F]
@@ -49,6 +50,7 @@ private[tsmigrationrequest] object Migrations {
     multipleTopmostDerivedFroms       <- MultipleTopmostDerivedFroms[F]
     multipleProjectAgents             <- MultipleProjectAgents[F]
     migrations <- validateNames(
+                    datasetsCreator,
                     reProvisioning,
                     malformedActivityIds,
                     multiplePersonNames,

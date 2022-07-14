@@ -18,14 +18,18 @@
 
 package io.renku.graph.rdfstore
 
-import io.renku.rdfstore.{DatasetConfigFile, DatasetConfigFileFactory}
+import io.renku.rdfstore.{DatasetConfigFile, DatasetConfigFileFactory, DatasetName}
 
 object DatasetTTLs {
 
   case class RenkuTTL private (value: String) extends DatasetConfigFile
-  object RenkuTTL extends DatasetConfigFileFactory[RenkuTTL](new RenkuTTL(_), ttlFileName = "renku-ds.ttl")
+  object RenkuTTL extends DatasetConfigFileFactory[RenkuTTL](new RenkuTTL(_), ttlFileName = "renku-ds.ttl") {
+    val dsName: DatasetName = DatasetName("renku")
+  }
 
   case class MigrationsTTL private (value: String) extends DatasetConfigFile
   object MigrationsTTL
-      extends DatasetConfigFileFactory[MigrationsTTL](new MigrationsTTL(_), ttlFileName = "migrations-ds.ttl")
+      extends DatasetConfigFileFactory[MigrationsTTL](new MigrationsTTL(_), ttlFileName = "migrations-ds.ttl") {
+    val dsName: DatasetName = DatasetName("migrations")
+  }
 }

@@ -27,7 +27,26 @@ import io.renku.tinytypes.constraints.{Url, UrlOps}
 import io.renku.tinytypes.{TinyTypeFactory, UrlTinyType}
 import pureconfig.ConfigReader
 
-trait DatasetConnectionConfig {
+trait FusekiConnectionConfig {
+  val fusekiUrl:       FusekiUrl
+  val authCredentials: BasicAuthCredentials
+}
+
+final case class AdminConnectionConfig(fusekiUrl: FusekiUrl, authCredentials: BasicAuthCredentials)
+    extends FusekiConnectionConfig
+
+object AdminConnectionConfig {
+  import io.renku.config.ConfigLoader._
+  import io.renku.http.client.BasicAuthConfigReaders._
+
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[AdminConnectionConfig] = for {
+    url      <- find[F, FusekiUrl]("services.fuseki.url", config)
+    username <- find[F, BasicAuthUsername]("services.fuseki.admin.username", config)
+    password <- find[F, BasicAuthPassword]("services.fuseki.admin.password", config)
+  } yield AdminConnectionConfig(url, BasicAuthCredentials(username, password))
+}
+
+trait DatasetConnectionConfig extends FusekiConnectionConfig {
   val fusekiUrl:       FusekiUrl
   val datasetName:     DatasetName
   val authCredentials: BasicAuthCredentials
