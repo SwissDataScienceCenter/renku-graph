@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,13 +16,18 @@
  * limitations under the License.
  */
 
-name := "knowledge-graph"
+package io.renku.knowledgegraph.docs
 
-Test / fork := true
+import io.renku.knowledgegraph.docs.model.Status
+import org.http4s
+import cats.syntax.all._
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.11"
+object Implicits {
+  implicit class StatusOps(status: http4s.Status) {
+    lazy val asDocStatus: Status = Status(status.code, status.reason)
+  }
 
-libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.0.33"
-
-libraryDependencies += "org.sangria-graphql" %% "sangria"       % "3.0.1"
-libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2"
+  implicit class MediaTypeOps(mediaType: http4s.MediaType) {
+    lazy val asDocMediaType: String = mediaType.show
+  }
+}

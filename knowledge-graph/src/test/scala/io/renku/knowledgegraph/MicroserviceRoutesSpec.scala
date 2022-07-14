@@ -32,6 +32,7 @@ import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.SortBy
@@ -66,7 +67,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import model.projects.{Path => ProjectPath}
 
 import scala.language.reflectiveCalls
 
@@ -625,6 +625,21 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "GET /knowledge-graph/spec.json" should {
+
+    s"return $Ok with OpenAPI json body" in new TestCase {
+      val openApiJson = jsons.generateOne
+      (() => docsEndpoint.`get /docs`)
+        .expects()
+        .returning(IO.pure(Response[IO](Ok).withEntity(openApiJson)))
+
+      val response = routes().call(Request(Method.GET, uri"/knowledge-graph/spec.json"))
+
+      response.status     shouldBe Ok
+      response.body[Json] shouldBe openApiJson
+    }
+  }
+
   "GET /version" should {
     "return response from the version endpoint" in new TestCase {
       routes().call(Request(GET, uri"/version")).status shouldBe versionEndpointResponse.status
@@ -640,6 +655,7 @@ class MicroserviceRoutesSpec
     val lineageEndpoint         = mock[lineage.Endpoint[IO]]
     val projectEndpoint         = mock[ProjectEndpoint[IO]]
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
+    val docsEndpoint            = mock[docs.Endpoint[IO]]
     val projectPathAuthorizer   = mock[Authorizer[IO, model.projects.Path]]
     val datasetIdAuthorizer     = mock[Authorizer[IO, model.datasets.Identifier]]
     val routesMetrics           = TestRoutesMetrics()
@@ -658,6 +674,7 @@ class MicroserviceRoutesSpec
         lineageEndpoint,
         projectEndpoint,
         projectDatasetsEndpoint,
+        docsEndpoint,
         middleware,
         projectPathAuthorizer,
         datasetIdAuthorizer,
