@@ -66,9 +66,7 @@ class EventEndpointImpl[F[_]: Async](
       }.merge recoverWith { case NonFatal(error) => toHttpResult(SchedulingError(error)) }
   }
 
-  private def toMultipart(
-      request: Request[F]
-  ): EitherT[F, Response[F], Multipart[F]] = EitherT {
+  private def toMultipart(request: Request[F]): EitherT[F, Response[F], Multipart[F]] = EitherT {
     request
       .as[Multipart[F]]
       .map(_.asRight[Response[F]])
@@ -126,11 +124,12 @@ class EventEndpointImpl[F[_]: Async](
   }
 
   private lazy val toHttpResult: EventSchedulingResult => F[Response[F]] = {
-    case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
-    case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
-    case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
-    case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
-    case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
+    case EventSchedulingResult.Accepted                   => Accepted(InfoMessage("Event accepted"))
+    case EventSchedulingResult.Busy                       => TooManyRequests(InfoMessage("Too many events to handle"))
+    case EventSchedulingResult.UnsupportedEventType       => BadRequest(ErrorMessage("Unsupported Event Type"))
+    case EventSchedulingResult.BadRequest                 => BadRequest(ErrorMessage("Malformed event"))
+    case EventSchedulingResult.ServiceUnavailable(reason) => ServiceUnavailable(InfoMessage(reason))
+    case EventSchedulingResult.SchedulingError(_) => InternalServerError(ErrorMessage("Failed to schedule event"))
   }
 }
 

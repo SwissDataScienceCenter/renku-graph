@@ -28,8 +28,8 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.control.Throttler
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.client.{HttpRequest, RestClient}
-import org.http4s.Method.POST
-import org.http4s.Status.{Conflict, Ok}
+import org.http4s.Method.{GET, POST}
+import org.http4s.Status.{Conflict, NotFound, Ok}
 import org.http4s.Uri
 import org.http4s.headers.`Content-Type`
 import org.typelevel.log4cats.Logger
@@ -38,6 +38,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait RdfStoreAdminClient[F[_]] {
   def createDataset(datasetConfigFile: DatasetConfigFile): F[CreationResult]
+  def checkDatasetExists(datasetName:  DatasetName):       F[Boolean]
 }
 
 object RdfStoreAdminClient {
@@ -96,5 +97,15 @@ private class RdfStoreAdminClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
   private lazy val mapCreationResponse: ResponseMapping[CreationResult] = {
     case (Ok, _, _)       => CreationResult.Created.pure[F].widen
     case (Conflict, _, _) => CreationResult.Existed.pure[F].widen
+  }
+
+  override def checkDatasetExists(datasetName: DatasetName): F[Boolean] = for {
+    uri          <- validateUri(show"$fusekiUrl/$$/datasets/$datasetName")
+    uploadResult <- send(request(GET, uri, authCredentials))(mapDatasetExistenceCheckResponse)
+  } yield uploadResult
+
+  private lazy val mapDatasetExistenceCheckResponse: ResponseMapping[Boolean] = {
+    case (Ok, _, _)       => true.pure[F]
+    case (NotFound, _, _) => false.pure[F]
   }
 }

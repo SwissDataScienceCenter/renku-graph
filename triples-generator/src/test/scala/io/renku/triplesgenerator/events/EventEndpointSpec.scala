@@ -56,7 +56,7 @@ class EventEndpointSpec
 
   "processEvent" should {
 
-    s"$BadRequest if the request is not a multipart request" in new TestCase {
+    s"return $BadRequest if the request is not a multipart request" in new TestCase {
 
       givenReProvisioningStatusSet(false)
 
@@ -67,7 +67,7 @@ class EventEndpointSpec
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
     }
 
-    s"$BadRequest if there is no event part in the request" in new TestCase {
+    s"return $BadRequest if there is no event part in the request" in new TestCase {
 
       givenReProvisioningStatusSet(false)
 
@@ -81,7 +81,7 @@ class EventEndpointSpec
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
     }
 
-    s"$BadRequest if the event part in the request is malformed" in new TestCase {
+    s"return $BadRequest if the event part in the request is malformed" in new TestCase {
 
       givenReProvisioningStatusSet(false)
 
@@ -105,7 +105,7 @@ class EventEndpointSpec
       }
     )
     forAll(scenarios) { (scenarioName, requestContents) =>
-      s"$Accepted if one of the handlers accepts the given $scenarioName request" in new TestCase {
+      s"return $Accepted if one of handlers accepts the given $scenarioName request" in new TestCase {
         override val requestContent: EventRequestContent = requestContents.generateOne
 
         givenReProvisioningStatusSet(false)
@@ -122,7 +122,7 @@ class EventEndpointSpec
       }
     }
 
-    s"$BadRequest if none of the handlers supports the given payload" in new TestCase {
+    s"return $BadRequest if none of handlers supports the given payload" in new TestCase {
       givenReProvisioningStatusSet(false)
 
       (subscriptionsRegistry.handle _)
@@ -136,7 +136,7 @@ class EventEndpointSpec
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Unsupported Event Type")
     }
 
-    s"$BadRequest if one of the handlers supports the given payload but it's malformed" in new TestCase {
+    s"return $BadRequest if one of handlers supports the given payload but it's malformed" in new TestCase {
       givenReProvisioningStatusSet(false)
 
       (subscriptionsRegistry.handle _)
@@ -150,7 +150,7 @@ class EventEndpointSpec
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event")
     }
 
-    s"$TooManyRequests if the handler returns ${EventSchedulingResult.Busy}" in new TestCase {
+    s"return $TooManyRequests if handler returns ${EventSchedulingResult.Busy}" in new TestCase {
       givenReProvisioningStatusSet(false)
 
       (subscriptionsRegistry.handle _)
@@ -164,7 +164,7 @@ class EventEndpointSpec
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
     }
 
-    s"$InternalServerError if the handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
+    s"return $InternalServerError if handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
       givenReProvisioningStatusSet(false)
 
       (subscriptionsRegistry.handle _)
@@ -178,7 +178,23 @@ class EventEndpointSpec
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
     }
 
-    s"$InternalServerError if the handler fails" in new TestCase {
+    s"return $ServiceUnavailable if handler returns EventSchedulingResult.ServiceUnavailable" in new TestCase {
+
+      givenReProvisioningStatusSet(false)
+
+      val handlingResult = EventSchedulingResult.ServiceUnavailable(nonEmptyStrings().generateOne)
+      (subscriptionsRegistry.handle _)
+        .expects(*)
+        .returning(handlingResult.pure[IO])
+
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
+
+      response.status                          shouldBe ServiceUnavailable
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage(handlingResult.reason)
+    }
+
+    s"return $InternalServerError if handler fails" in new TestCase {
 
       givenReProvisioningStatusSet(false)
 
@@ -191,19 +207,6 @@ class EventEndpointSpec
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
-    }
-
-    s"return $ServiceUnavailable if re-provisioning flag set to true" in new TestCase {
-
-      givenReProvisioningStatusSet(true)
-
-      val response = (request >>= endpoint.processEvent).unsafeRunSync()
-
-      response.status      shouldBe ServiceUnavailable
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage(
-        "Temporarily unavailable: currently re-provisioning"
-      )
     }
   }
 
