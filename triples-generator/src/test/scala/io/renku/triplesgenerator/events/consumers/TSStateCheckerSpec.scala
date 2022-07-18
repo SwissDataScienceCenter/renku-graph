@@ -22,7 +22,7 @@ import TSStateChecker.TSState
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
-import io.renku.rdfstore.{DatasetName, RdfStoreAdminClient}
+import io.renku.triplesstore.{DatasetName, RdfStoreAdminClient}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

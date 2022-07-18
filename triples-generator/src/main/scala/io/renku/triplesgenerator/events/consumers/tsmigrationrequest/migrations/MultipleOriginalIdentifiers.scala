@@ -29,9 +29,9 @@ import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.{OriginalIdentifier, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.ResultsDecoder._
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.ResultsDecoder._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 import tooling._

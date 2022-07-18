@@ -24,8 +24,8 @@ import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

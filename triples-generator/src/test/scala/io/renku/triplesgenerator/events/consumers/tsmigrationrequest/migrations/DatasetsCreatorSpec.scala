@@ -26,8 +26,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.rdfstore.RdfStoreAdminClient.CreationResult
-import io.renku.rdfstore.{DatasetConfigFile, DatasetName, RdfStoreAdminClient}
+import io.renku.triplesstore.RdfStoreAdminClient.CreationResult
+import io.renku.triplesstore.{DatasetConfigFile, DatasetName, RdfStoreAdminClient}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecoverableErrorsRecovery
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import org.scalacheck.Gen

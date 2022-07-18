@@ -22,7 +22,7 @@ package tooling
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

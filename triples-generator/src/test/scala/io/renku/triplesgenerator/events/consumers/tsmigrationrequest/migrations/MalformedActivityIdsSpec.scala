@@ -22,7 +22,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

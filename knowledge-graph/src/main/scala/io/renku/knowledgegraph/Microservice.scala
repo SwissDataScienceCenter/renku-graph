@@ -27,7 +27,7 @@ import io.renku.knowledgegraph.metrics.KGMetrics
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.IOMicroservice
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

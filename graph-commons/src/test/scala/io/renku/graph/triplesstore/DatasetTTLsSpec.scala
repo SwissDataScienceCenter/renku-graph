@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.graph.rdfstore
+package io.renku.graph.triplesstore
 
 import cats.syntax.all._
-import io.renku.graph.rdfstore.DatasetTTLs._
+import io.renku.graph.triplesstore.DatasetTTLs._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

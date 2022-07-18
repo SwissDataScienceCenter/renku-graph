@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.rdfstore
+package io.renku.triplesstore
 
 import cats.effect.Sync
 import cats.syntax.all._

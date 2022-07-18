@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.rdfstore
+package io.renku.triplesstore
 
 import cats.MonadThrow
 import cats.syntax.all._
@@ -24,7 +24,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.jsonld.Schema
-import io.renku.rdfstore.SparqlQuery.Prefix
+import io.renku.triplesstore.SparqlQuery.Prefix
 import io.renku.tinytypes.StringTinyType
 
 final case class SparqlQuery(name:               String Refined NonEmpty,

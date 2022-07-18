@@ -34,8 +34,8 @@ import io.renku.knowledgegraph.datasets.model.DatasetCreator
 import io.renku.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.tinytypes.constraints.NonNegativeInt
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger

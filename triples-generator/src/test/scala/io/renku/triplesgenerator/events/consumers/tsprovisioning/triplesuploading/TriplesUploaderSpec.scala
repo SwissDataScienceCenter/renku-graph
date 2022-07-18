@@ -31,7 +31,7 @@ import io.renku.generators.jsonld.JsonLDGenerators._
 import io.renku.http.client.RestClientError.BadRequestException
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{FusekiUrl, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{FusekiUrl, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._

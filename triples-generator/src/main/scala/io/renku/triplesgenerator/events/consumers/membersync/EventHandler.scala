@@ -27,7 +27,7 @@ import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProce
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger

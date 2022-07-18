@@ -22,8 +22,8 @@ import TSStateChecker.TSState
 import cats.{MonadThrow, Show}
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.rdfstore.DatasetTTLs
-import io.renku.rdfstore.{DatasetName, RdfStoreAdminClient, SparqlQueryTimeRecorder}
+import io.renku.graph.triplesstore.DatasetTTLs
+import io.renku.triplesstore.{DatasetName, RdfStoreAdminClient, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 

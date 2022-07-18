@@ -28,8 +28,8 @@ import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.knowledgegraph.datasets.model.Dataset
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait BaseDetailsFinder[F[_]] {
@@ -144,7 +144,7 @@ private object BaseDetailsFinderImpl {
   import Decoder._
   import io.renku.graph.model.datasets._
   import io.renku.knowledgegraph.datasets.model._
-  import io.renku.rdfstore.ResultsDecoder._
+  import io.renku.triplesstore.ResultsDecoder._
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
   private lazy val createDataset: (ResourceId,

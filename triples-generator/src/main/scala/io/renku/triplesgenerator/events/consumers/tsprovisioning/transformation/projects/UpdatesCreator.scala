@@ -23,8 +23,8 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities._
 import io.renku.graph.model.views.RdfResource
-import io.renku.rdfstore.SparqlQuery
-import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.SparqlQuery
+import io.renku.triplesstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
   def prepareUpdates(project:      Project, kgData: ProjectMutableData): List[SparqlQuery]

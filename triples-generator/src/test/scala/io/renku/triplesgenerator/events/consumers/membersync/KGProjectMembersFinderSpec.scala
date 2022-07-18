@@ -24,7 +24,7 @@ import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.membersync.PersonOps._
 import org.scalatest.matchers.should

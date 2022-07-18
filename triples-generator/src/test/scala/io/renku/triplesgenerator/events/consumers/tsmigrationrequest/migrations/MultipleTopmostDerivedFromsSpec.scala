@@ -30,8 +30,8 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling._
 import org.scalamock.scalatest.MockFactory

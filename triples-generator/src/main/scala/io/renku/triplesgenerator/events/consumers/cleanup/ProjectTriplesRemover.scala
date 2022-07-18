@@ -27,8 +27,8 @@ import io.renku.graph.config._
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

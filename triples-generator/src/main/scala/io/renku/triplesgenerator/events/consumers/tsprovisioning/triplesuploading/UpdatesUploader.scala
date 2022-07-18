@@ -25,7 +25,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.client.RestClientError.BadRequestException
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult.NonRecoverableFailure

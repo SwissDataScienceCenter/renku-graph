@@ -25,7 +25,7 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
 import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import org.scalatest.matchers.should

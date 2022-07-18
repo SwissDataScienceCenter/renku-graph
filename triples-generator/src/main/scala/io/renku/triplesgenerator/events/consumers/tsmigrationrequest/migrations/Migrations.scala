@@ -24,7 +24,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import reprovisioning.{ReProvisioning, ReProvisioningStatus}
 

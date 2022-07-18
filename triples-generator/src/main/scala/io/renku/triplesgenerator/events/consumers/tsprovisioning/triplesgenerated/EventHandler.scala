@@ -37,7 +37,7 @@ import io.renku.graph.model.events.{CompoundEventId, EventBody, ZippedEventPaylo
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 

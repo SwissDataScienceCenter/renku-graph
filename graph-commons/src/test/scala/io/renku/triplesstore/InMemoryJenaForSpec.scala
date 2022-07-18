@@ -16,13 +16,21 @@
  * limitations under the License.
  */
 
-package io.renku.logging
+package io.renku.triplesstore
 
-import cats.MonadThrow
-import io.renku.triplesstore.SparqlQueryTimeRecorder
-import org.typelevel.log4cats.Logger
+import com.dimafeng.testcontainers.ForAllTestContainer
+import io.renku.testtools.IOSpec
+import org.scalatest.{BeforeAndAfter, Suite}
 
-object TestSparqlQueryTimeRecorder {
-  def apply[F[_]: MonadThrow: Logger] = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[F]())
-  def apply[F[_]: MonadThrow: Logger](instance: ExecutionTimeRecorder[F]) = new SparqlQueryTimeRecorder(instance)
+trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
+  self: Suite with IOSpec =>
+
+  override def afterStart(): Unit = {
+    super.afterStart()
+    createDatasets().unsafeRunSync()
+  }
+
+  before {
+    clearAllDatasets()
+  }
 }

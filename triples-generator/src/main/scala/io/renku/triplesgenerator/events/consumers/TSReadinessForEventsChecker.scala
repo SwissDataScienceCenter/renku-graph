@@ -24,7 +24,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.EventSchedulingResult
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, SchedulingError, ServiceUnavailable}
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger

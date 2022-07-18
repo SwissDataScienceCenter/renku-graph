@@ -33,7 +33,7 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
-import io.renku.rdfstore.{MigrationsConnectionConfig, RenkuConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{MigrationsConnectionConfig, RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError

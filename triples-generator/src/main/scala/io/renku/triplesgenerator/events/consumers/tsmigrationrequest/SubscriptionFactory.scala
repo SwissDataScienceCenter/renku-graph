@@ -26,7 +26,7 @@ import io.renku.config.ServiceVersion
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionMechanism}
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger

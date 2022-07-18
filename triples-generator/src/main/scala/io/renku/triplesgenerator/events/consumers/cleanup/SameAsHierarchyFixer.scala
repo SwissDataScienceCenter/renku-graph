@@ -28,8 +28,8 @@ import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.projects
 import io.renku.jsonld.EntityId
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

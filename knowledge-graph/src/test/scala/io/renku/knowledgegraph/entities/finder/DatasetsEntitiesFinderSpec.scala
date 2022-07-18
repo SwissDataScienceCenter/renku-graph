@@ -28,7 +28,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.SortBy
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

@@ -27,8 +27,8 @@ import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait CreatorsFinder[F[_]] {

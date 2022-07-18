@@ -26,8 +26,8 @@ import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuUrl, persons, projects}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGProjectMembersFinder[F[_]] {

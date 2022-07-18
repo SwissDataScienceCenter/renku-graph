@@ -25,7 +25,7 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{activities, entities}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

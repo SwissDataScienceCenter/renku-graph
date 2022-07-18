@@ -25,8 +25,8 @@ import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityR
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{datasets, projects}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 object DatasetIdRecordsFinder {

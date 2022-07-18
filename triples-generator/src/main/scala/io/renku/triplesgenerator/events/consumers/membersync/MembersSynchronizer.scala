@@ -26,7 +26,7 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal

@@ -28,8 +28,8 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{persons, projects}
 import io.renku.jsonld.syntax._
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.membersync.Generators._
 import io.renku.triplesgenerator.events.consumers.membersync.PersonOps._

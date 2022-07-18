@@ -27,8 +27,8 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should

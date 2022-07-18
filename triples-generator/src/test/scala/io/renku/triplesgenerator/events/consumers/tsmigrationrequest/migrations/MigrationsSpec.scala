@@ -24,7 +24,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.metrics.MetricsRegistry.DisabledMetricsRegistry
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.scalamock.scalatest.MockFactory

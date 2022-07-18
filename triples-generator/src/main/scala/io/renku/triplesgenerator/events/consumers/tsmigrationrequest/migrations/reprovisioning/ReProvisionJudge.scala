@@ -26,7 +26,7 @@ import cats.{MonadThrow, Show}
 import io.renku.graph.model._
 import io.renku.http.client.ServiceHealthChecker
 import io.renku.microservices.MicroserviceUrlFinder
-import io.renku.rdfstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private trait ReProvisionJudge[F[_]] {

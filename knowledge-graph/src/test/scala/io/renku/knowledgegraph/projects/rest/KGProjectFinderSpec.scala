@@ -28,7 +28,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.projects.rest.Converters._
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should

@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.rdfstore
+package io.renku.triplesstore
 
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.rdfstore.SparqlQuery.{Prefix, Prefixes}
+import io.renku.triplesstore.SparqlQuery.{Prefix, Prefixes}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

@@ -29,8 +29,8 @@ import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.knowledgegraph.lineage.model.{ExecutionInfo, Node}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.tinytypes.json.TinyTypeDecoders
 import org.typelevel.log4cats.Logger
 

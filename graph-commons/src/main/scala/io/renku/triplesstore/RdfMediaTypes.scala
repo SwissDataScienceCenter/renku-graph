@@ -16,21 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.rdfstore
+package io.renku.triplesstore
 
-import com.dimafeng.testcontainers.ForAllTestContainer
-import io.renku.testtools.IOSpec
-import org.scalatest.{BeforeAndAfter, Suite}
+import org.http4s.MediaType
 
-trait InMemoryJenaForSpec extends ForAllTestContainer with InMemoryJena with BeforeAndAfter with ResultsDecoder {
-  self: Suite with IOSpec =>
+object RdfMediaTypes extends RdfMediaTypes
+trait RdfMediaTypes {
+  import org.http4s.MediaType._
 
-  override def afterStart(): Unit = {
-    super.afterStart()
-    createDatasets().unsafeRunSync()
-  }
-
-  before {
-    clearAllDatasets()
-  }
+  val `text/turtle` = new MediaType("text", "turtle", Compressible, NotBinary, List("ttl"))
 }

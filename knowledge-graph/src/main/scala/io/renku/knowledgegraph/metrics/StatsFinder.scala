@@ -23,8 +23,8 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 

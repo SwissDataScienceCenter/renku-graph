@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

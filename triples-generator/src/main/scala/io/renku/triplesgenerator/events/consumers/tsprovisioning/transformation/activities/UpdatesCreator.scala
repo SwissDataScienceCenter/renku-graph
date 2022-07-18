@@ -23,8 +23,8 @@ import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.entities.{Activity, Association}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{entities, persons}
-import io.renku.rdfstore.SparqlQuery
-import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.SparqlQuery
+import io.renku.triplesstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
   def queriesUnlinkingAuthors(activity: entities.Activity, kgAuthors: Set[persons.ResourceId]): List[SparqlQuery]

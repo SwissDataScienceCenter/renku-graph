@@ -35,7 +35,7 @@ import io.renku.knowledgegraph.datasets.model.DatasetCreator
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query._
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.rdfstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.http4s._

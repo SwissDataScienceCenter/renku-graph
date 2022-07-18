@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.graph.rdfstore
+package io.renku.graph.triplesstore
 
 import cats.syntax.all._
-import io.renku.rdfstore.{DatasetConfigFile, DatasetConfigFileFactory, DatasetName}
+import io.renku.triplesstore.{DatasetConfigFile, DatasetConfigFileFactory, DatasetName}
 
 object DatasetTTLs {
 

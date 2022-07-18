@@ -24,8 +24,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

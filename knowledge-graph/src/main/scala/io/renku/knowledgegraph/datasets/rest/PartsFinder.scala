@@ -25,8 +25,8 @@ import io.circe.Decoder.decodeList
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets._
 import io.renku.knowledgegraph.datasets.model.DatasetPart
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait PartsFinder[F[_]] {

@@ -28,7 +28,7 @@ import io.renku.http.rest.paging.PagingResponse
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import org.scalatest.TestSuite
 
 import java.time.Instant

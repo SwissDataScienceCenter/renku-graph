@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.rdfstore
+package io.renku.triplesstore
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
@@ -26,7 +26,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
-import io.renku.graph.rdfstore.DatasetTTLs._
+import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.{JsonLD, JsonLDEncoder}

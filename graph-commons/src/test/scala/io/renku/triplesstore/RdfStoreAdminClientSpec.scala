@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.rdfstore
+package io.renku.triplesstore
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -27,7 +27,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
-import io.renku.rdfstore.RdfStoreAdminClient.CreationResult
+import io.renku.triplesstore.RdfStoreAdminClient.CreationResult
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status._

@@ -27,7 +27,7 @@ import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGrap
 import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
-import io.renku.rdfstore.FusekiUrl
+import io.renku.triplesstore.FusekiUrl
 import io.renku.testtools.IOSpec
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.typelevel.log4cats.Logger

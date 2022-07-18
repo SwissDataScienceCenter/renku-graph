@@ -32,7 +32,7 @@ import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.lineage.model._
 import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
-import io.renku.rdfstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should

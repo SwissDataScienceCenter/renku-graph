@@ -45,7 +45,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import org.http4s.Status
 import org.http4s.Status._
 import org.scalacheck.{Arbitrary, Gen}

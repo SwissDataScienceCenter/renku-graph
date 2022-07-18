@@ -26,8 +26,8 @@ import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons
 import io.renku.graph.model.persons.{Email, GitLabId, ResourceId}
 import io.renku.graph.model.views.RdfResource
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGPersonFinder[F[_]] {

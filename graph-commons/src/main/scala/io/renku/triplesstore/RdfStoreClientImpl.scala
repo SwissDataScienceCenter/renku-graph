@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.rdfstore
+package io.renku.triplesstore
 
 import cats.MonadThrow
 import cats.effect._
@@ -177,11 +177,4 @@ object RdfStoreClientImpl {
   private final implicit case object RdfQuery extends RdfQueryType
   private type RdfQuery = RdfQuery.type
   private final implicit case object RdfUpdate extends RdfQueryType
-}
-
-object RdfMediaTypes extends RdfMediaTypes
-trait RdfMediaTypes {
-  import org.http4s.MediaType._
-
-  val `text/turtle` = new MediaType("text", "turtle", Compressible, NotBinary, List("ttl"))
 }

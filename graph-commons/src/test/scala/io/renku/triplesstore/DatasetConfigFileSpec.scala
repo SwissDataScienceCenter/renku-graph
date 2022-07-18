@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.rdfstore
+package io.renku.triplesstore
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
@@ -90,4 +90,4 @@ class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
        |.""".stripMargin
 }
 
-private case class TestConfigFile private[rdfstore] (value: String) extends DatasetConfigFile
+private case class TestConfigFile private[triplesstore] (value: String) extends DatasetConfigFile

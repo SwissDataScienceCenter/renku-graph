@@ -23,8 +23,8 @@ import cats.effect.kernel.Async
 import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, Name, OriginalIdentifier, SameAs, Title}
 import io.renku.graph.model.projects.Path
 import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectDatasetsFinder[F[_]] {

@@ -35,7 +35,7 @@ import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus

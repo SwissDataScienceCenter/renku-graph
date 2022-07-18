@@ -24,8 +24,8 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.{RenkuUrl, RenkuVersionPair}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 trait RenkuVersionPairFinder[F[_]] {

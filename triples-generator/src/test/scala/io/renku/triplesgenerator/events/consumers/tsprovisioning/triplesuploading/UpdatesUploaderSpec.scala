@@ -30,7 +30,7 @@ import io.renku.generators.Generators._
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{FusekiUrl, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{FusekiUrl, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
