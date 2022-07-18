@@ -23,7 +23,7 @@ import cats.{MonadThrow, Show}
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.triplesstore.DatasetTTLs
-import io.renku.triplesstore.{DatasetName, RdfStoreAdminClient, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{DatasetName, SparqlQueryTimeRecorder, TSAdminClient}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
@@ -40,7 +40,7 @@ private object TSStateChecker {
   }
 
   def apply[F[_]: Async: ReProvisioningStatus: Logger: SparqlQueryTimeRecorder]: F[TSStateChecker[F]] =
-    RdfStoreAdminClient[F].map(
+    TSAdminClient[F].map(
       new TSStateCheckerImpl(DatasetTTLs.allFactories.map(_.datasetName), _, ReProvisioningStatus[F])
     )
 
@@ -53,7 +53,7 @@ private object TSStateChecker {
 
 private class TSStateCheckerImpl[F[_]: MonadThrow](
     datasets:             List[DatasetName],
-    rdfStoreAdmin:        RdfStoreAdminClient[F],
+    rdfStoreAdmin:        TSAdminClient[F],
     reProvisioningStatus: ReProvisioningStatus[F]
 ) extends TSStateChecker[F] {
 

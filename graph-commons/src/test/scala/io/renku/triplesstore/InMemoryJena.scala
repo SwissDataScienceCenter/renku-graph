@@ -147,7 +147,7 @@ trait InMemoryJena {
   private implicit lazy val logger:  TestLogger[IO]              = TestLogger[IO]()
   private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
 
-  private lazy val datasetsCreator = RdfStoreAdminClient[IO](AdminConnectionConfig(fusekiUrl, adminCredentials))
+  private lazy val datasetsCreator = TSAdminClient[IO](AdminConnectionConfig(fusekiUrl, adminCredentials))
 
   private def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
 

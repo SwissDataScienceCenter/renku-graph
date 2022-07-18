@@ -18,7 +18,7 @@
 
 package io.renku.triplesstore
 
-import RdfStoreAdminClient._
+import TSAdminClient._
 import cats.Show
 import cats.effect.Async
 import cats.syntax.all._
@@ -36,12 +36,12 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-trait RdfStoreAdminClient[F[_]] {
+trait TSAdminClient[F[_]] {
   def createDataset(datasetConfigFile: DatasetConfigFile): F[CreationResult]
   def checkDatasetExists(datasetName:  DatasetName):       F[Boolean]
 }
 
-object RdfStoreAdminClient {
+object TSAdminClient {
 
   sealed trait CreationResult extends Product with Serializable
   object CreationResult {
@@ -56,15 +56,14 @@ object RdfStoreAdminClient {
     }
   }
 
-  def apply[F[_]: Async: Logger]: F[RdfStoreAdminClient[F]] =
-    AdminConnectionConfig[F]().map(new RdfStoreAdminClientImpl(_))
+  def apply[F[_]: Async: Logger]: F[TSAdminClient[F]] =
+    AdminConnectionConfig[F]().map(new TSAdminClientImpl(_))
 
-  def apply[F[_]: Async: Logger](
-      adminConfig: AdminConnectionConfig
-  ): RdfStoreAdminClient[F] = new RdfStoreAdminClientImpl(adminConfig)
+  def apply[F[_]: Async: Logger](adminConfig: AdminConnectionConfig): TSAdminClient[F] =
+    new TSAdminClientImpl(adminConfig)
 }
 
-private class RdfStoreAdminClientImpl[F[_]: Async: Logger](
+private class TSAdminClientImpl[F[_]: Async: Logger](
     adminConnectionConfig:  AdminConnectionConfig,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
@@ -77,7 +76,7 @@ private class RdfStoreAdminClientImpl[F[_]: Async: Logger](
                      idleTimeoutOverride,
                      requestTimeoutOverride
     )
-    with RdfStoreAdminClient[F]
+    with TSAdminClient[F]
     with RdfMediaTypes {
 
   import adminConnectionConfig._

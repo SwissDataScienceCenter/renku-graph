@@ -22,7 +22,7 @@ import TSStateChecker.TSState
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
-import io.renku.triplesstore.{DatasetName, RdfStoreAdminClient}
+import io.renku.triplesstore.{DatasetName, TSAdminClient}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -91,7 +91,7 @@ class TSStateCheckerSpec extends AnyWordSpec with should.Matchers with MockFacto
 
   private trait TestCase {
     val datasets             = nonEmptyStrings().toGeneratorOf(DatasetName).generateNonEmptyList().toList
-    val rdfStoreAdmin        = mock[RdfStoreAdminClient[Try]]
+    val rdfStoreAdmin        = mock[TSAdminClient[Try]]
     val reProvisioningStatus = mock[ReProvisioningStatus[Try]]
     val stateChecker         = new TSStateCheckerImpl[Try](datasets, rdfStoreAdmin, reProvisioningStatus)
   }

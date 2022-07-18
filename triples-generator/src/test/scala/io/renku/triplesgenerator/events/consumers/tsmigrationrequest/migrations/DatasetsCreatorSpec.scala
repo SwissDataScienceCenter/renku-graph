@@ -26,8 +26,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.triplesstore.RdfStoreAdminClient.CreationResult
-import io.renku.triplesstore.{DatasetConfigFile, DatasetName, RdfStoreAdminClient}
+import io.renku.triplesstore.TSAdminClient.CreationResult
+import io.renku.triplesstore.{DatasetConfigFile, DatasetName, TSAdminClient}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecoverableErrorsRecovery
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import org.scalacheck.Gen
@@ -84,7 +84,7 @@ class DatasetsCreatorSpec extends AnyWordSpec with should.Matchers with MockFact
     }
 
     implicit val logger: TestLogger[Try] = TestLogger[Try]()
-    val tsAdminClient  = mock[RdfStoreAdminClient[Try]]
+    val tsAdminClient  = mock[TSAdminClient[Try]]
     lazy val dsCreator = new DatasetsCreatorImpl[Try](datasets, tsAdminClient, recoveryStrategy)
 
     def givenDSCreation(of: DatasetConfigFile, returning: Try[CreationResult]) =

@@ -27,7 +27,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
-import io.renku.triplesstore.RdfStoreAdminClient.CreationResult
+import io.renku.triplesstore.TSAdminClient.CreationResult
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import org.http4s.Status._
@@ -36,7 +36,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
 
-class RdfStoreAdminClientSpec
+class TSAdminClientSpec
     extends AnyWordSpec
     with should.Matchers
     with ExternalServiceStubbing
@@ -155,7 +155,7 @@ class RdfStoreAdminClientSpec
     val fusekiUrl             = FusekiUrl(externalServiceBaseUrl)
     val adminConnectionConfig = adminConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
     implicit val logger: Logger[IO] = TestLogger[IO]()
-    val client = new RdfStoreAdminClientImpl[IO](adminConnectionConfig)
+    val client = new TSAdminClientImpl[IO](adminConnectionConfig)
 
     implicit class MappingBuilderOps(builder: MappingBuilder) {
 
