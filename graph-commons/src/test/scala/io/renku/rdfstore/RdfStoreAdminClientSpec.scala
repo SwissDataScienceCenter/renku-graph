@@ -27,7 +27,6 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
-import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.rdfstore.RdfStoreAdminClient.CreationResult
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
@@ -155,8 +154,7 @@ class RdfStoreAdminClientSpec
   private trait TestCase {
     val fusekiUrl             = FusekiUrl(externalServiceBaseUrl)
     val adminConnectionConfig = adminConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
-    implicit val logger:       Logger[IO]                  = TestLogger[IO]()
-    implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+    implicit val logger: Logger[IO] = TestLogger[IO]()
     val client = new RdfStoreAdminClientImpl[IO](adminConnectionConfig)
 
     implicit class MappingBuilderOps(builder: MappingBuilder) {

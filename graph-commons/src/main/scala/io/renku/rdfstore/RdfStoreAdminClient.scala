@@ -56,22 +56,22 @@ object RdfStoreAdminClient {
     }
   }
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[RdfStoreAdminClient[F]] =
+  def apply[F[_]: Async: Logger]: F[RdfStoreAdminClient[F]] =
     AdminConnectionConfig[F]().map(new RdfStoreAdminClientImpl(_))
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+  def apply[F[_]: Async: Logger](
       adminConfig: AdminConnectionConfig
   ): RdfStoreAdminClient[F] = new RdfStoreAdminClientImpl(adminConfig)
 }
 
-private class RdfStoreAdminClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+private class RdfStoreAdminClientImpl[F[_]: Async: Logger](
     adminConnectionConfig:  AdminConnectionConfig,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeoutOverride:    Option[Duration] = None,
     requestTimeoutOverride: Option[Duration] = None
 ) extends RestClient(Throttler.noThrottling,
-                     Some(implicitly[SparqlQueryTimeRecorder[F]].instance),
+                     maybeTimeRecorder = None,
                      retryInterval,
                      maxRetries,
                      idleTimeoutOverride,
