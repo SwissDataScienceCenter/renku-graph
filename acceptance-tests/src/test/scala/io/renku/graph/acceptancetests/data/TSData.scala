@@ -20,8 +20,8 @@ package io.renku.graph.acceptancetests.data
 
 import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}
 
-object RdfStoreData extends RdfStoreData
+object TSData extends TSData
 
-trait RdfStoreData {
+trait TSData {
   val currentVersionPair: RenkuVersionPair = RenkuVersionPair(CliVersion("0.15.0"), SchemaVersion("8"))
 }

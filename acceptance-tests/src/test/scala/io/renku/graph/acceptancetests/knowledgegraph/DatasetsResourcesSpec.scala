@@ -27,7 +27,7 @@ import io.renku.generators.CommonGraphGenerators.{accessTokens, authUsers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -53,8 +53,8 @@ class DatasetsResourcesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with RdfStoreProvisioning
-    with RdfStoreData
+    with TSProvisioning
+    with TSData
     with DatasetsResources {
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
@@ -70,10 +70,10 @@ class DatasetsResourcesSpec
 
     Scenario("As a user I would like to find project's datasets by calling a REST endpoint") {
 
-      Given("some data in the RDF Store")
+      Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
       mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
@@ -100,7 +100,7 @@ class DatasetsResourcesSpec
       val foundDatasetDetails = datasetDetailsResponse._2
       val expectedDataset = List(dataset1, dataset2Modified)
         .find(dataset => someDatasetDetailsLink.value contains urlEncode(dataset.identifier.value))
-        .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
+        .getOrFail(message = "Returned 'details' link does not point to any dataset in the Triples store")
       findIdentifier(foundDatasetDetails) shouldBe expectedDataset.identifier
 
       When("user is authenticated")
@@ -155,7 +155,7 @@ class DatasetsResourcesSpec
       Given("there's a non-public project in KG")
       val commitId = commitIds.generateOne
       mockDataOnGitLabAPIs(privateProject, testEntitiesProject.asJsonLD, commitId)
-      `data in the RDF store`(privateProject, commitId)
+      `data in the Triples Store`(privateProject, commitId)
 
       When("there's an authenticated user who is not a member of the project")
       val nonMemberAccessToken = accessTokens.generateOne
@@ -366,7 +366,7 @@ class DatasetsResourcesSpec
       val dataProject = dataProjects(project).generateOne
       val commitId    = commitIds.generateOne
       mockDataOnGitLabAPIs(dataProject, project.asJsonLD, commitId)
-      `data in the RDF store`(dataProject, commitId)
+      `data in the Triples Store`(dataProject, commitId)
       dataProject
     }
   }
@@ -384,10 +384,10 @@ class DatasetsResourcesSpec
 
       val project = dataProjects(testEntitiesProject).generateOne
 
-      Given("some data in the RDF Store")
+      Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
       mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       When("user fetches dataset details with GET knowledge-graph/datasets/:id")
       val detailsResponse = knowledgeGraphClient GET s"knowledge-graph/datasets/${dataset.identifier}"
@@ -414,10 +414,10 @@ class DatasetsResourcesSpec
       Given("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
 
-      Given("some data in the RDF Store")
+      Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
       mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
       `wait for events to be processed`(project.id)
 
       When("an authenticated and authorised user fetches dataset details through GET knowledge-graph/datasets/:id")

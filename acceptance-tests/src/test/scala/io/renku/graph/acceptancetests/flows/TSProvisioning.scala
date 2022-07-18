@@ -42,7 +42,7 @@ import io.renku.graph.acceptancetests.db.EventLog
 
 import scala.annotation.tailrec
 
-trait RdfStoreProvisioning
+trait TSProvisioning
     extends ModelImplicits
     with AccessTokenPresence
     with Eventually
@@ -50,13 +50,13 @@ trait RdfStoreProvisioning
     with should.Matchers {
   self: GraphServices =>
 
-  def `data in the RDF store`(
+  def `data in the Triples Store`(
       project:            data.Project,
       commitId:           CommitId = commitIds.generateOne
   )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion =
-    `data in the RDF store`(project, NonEmptyList(commitId, Nil))
+    `data in the Triples Store`(project, NonEmptyList(commitId, Nil))
 
-  def `data in the RDF store`(
+  def `data in the Triples Store`(
       project:            data.Project,
       commitIds:          NonEmptyList[CommitId]
   )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion = {

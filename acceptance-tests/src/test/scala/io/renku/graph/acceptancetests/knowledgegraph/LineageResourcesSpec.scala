@@ -24,8 +24,8 @@ import io.circe.{ACursor, Json}
 import io.renku.generators.CommonGraphGenerators.{accessTokens, authUsers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
-import io.renku.graph.acceptancetests.data.{RdfStoreData, cliVersion, dataProjects}
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.data.{TSData, cliVersion, dataProjects}
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -46,8 +46,8 @@ class LineageResourcesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with RdfStoreProvisioning
-    with RdfStoreData {
+    with TSProvisioning
+    with TSData {
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/files/<location>/lineage to find a file's lineage") {
     implicit val accessToken: AccessToken = accessTokens.generateOne
@@ -79,10 +79,10 @@ class LineageResourcesSpec
      *                grid_plot
      */
     Scenario("As a user I would like to find a public project's lineage") {
-      Given("some data in the RDF Store")
+      Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
       mockDataOnGitLabAPIs(project, exemplarData.project.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       When("user calls the lineage endpoint")
       val response =
@@ -110,11 +110,11 @@ class LineageResourcesSpec
         )
       )
 
-      Given("some data in the RDF Store with a project I am a member of")
+      Given("some data in the Triples Store with a project I am a member of")
       val commitId = commitIds.generateOne
       val project  = dataProjects(accessibleExemplarData.project).generateOne
       mockDataOnGitLabAPIs(project, accessibleExemplarData.project.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       And("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
@@ -143,7 +143,7 @@ class LineageResourcesSpec
       val commitId = commitIds.generateOne
       val project  = dataProjects(privateExemplarData.project).generateOne
       mockDataOnGitLabAPIs(project, privateExemplarData.project.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       Given("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)

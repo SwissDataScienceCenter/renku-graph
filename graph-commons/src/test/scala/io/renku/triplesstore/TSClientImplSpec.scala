@@ -52,10 +52,10 @@ class TSClientImplSpec
     with MockFactory
     with should.Matchers {
 
-  "RdfStoreClientImpl" should {
+  "TSClientImpl" should {
     "be a RestClient" in new QueryClientTestCase {
-      type IORdfStoreClientImpl = TSClientImpl[IO]
-      client shouldBe a[IORdfStoreClientImpl]
+      type IOTSClientImpl = TSClientImpl[IO]
+      client shouldBe a[IOTSClientImpl]
       client shouldBe a[RestClient[IO, _]]
     }
   }
@@ -275,7 +275,7 @@ class TSClientImplSpec
 
     "fail if sparql body does not end with the ORDER BY clause" in new TestCase {
 
-      val client = new TestRdfQueryClientImpl(
+      val client = new TestTSQueryClientImpl(
         query = SparqlQuery(name = "test query", Set.empty, "SELECT ?s ?p ?o WHERE { ?s ?p ?o}"),
         renkuConnectionConfig
       )
@@ -407,7 +407,7 @@ class TSClientImplSpec
   }
 
   private trait QueryClientTestCase extends TestCase {
-    val client = new TestRdfQueryClientImpl(
+    val client = new TestTSQueryClientImpl(
       query = SparqlQuery(name = "find all triples",
                           prefixes = Set.empty,
                           body = """SELECT ?s ?p ?o WHERE { ?s ?p ?o } ORDER BY ASC(?s)"""
@@ -417,13 +417,13 @@ class TSClientImplSpec
   }
 
   private trait UpdateClientTestCase extends TestCase {
-    val client = new TestRdfClientImpl(
+    val client = new TestTSClientImpl(
       query = SparqlQuery(name = "insert", Set.empty, """INSERT { 'o' 'p' 's' } {}"""),
       renkuConnectionConfig
     )
   }
 
-  private class TestRdfClientImpl(
+  private class TestTSClientImpl(
       val query:             SparqlQuery,
       renkuConnectionConfig: RenkuConnectionConfig
   )(implicit logger:         Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
@@ -438,9 +438,9 @@ class TSClientImplSpec
     def uploadJson(json: JsonLD): IO[Unit] = upload(json)
   }
 
-  private class TestRdfQueryClientImpl(val query: SparqlQuery, renkuConnectionConfig: RenkuConnectionConfig)(implicit
-      logger:                                     Logger[IO],
-      timeRecorder:                               SparqlQueryTimeRecorder[IO]
+  private class TestTSQueryClientImpl(val query: SparqlQuery, renkuConnectionConfig: RenkuConnectionConfig)(implicit
+      logger:                                    Logger[IO],
+      timeRecorder:                              SparqlQueryTimeRecorder[IO]
   ) extends TSClientImpl[IO](renkuConnectionConfig)
       with Paging[String] {
 

@@ -25,7 +25,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.{Project, _}
 import io.renku.graph.acceptancetests.db.EventLog
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsResources, fullJson}
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -48,7 +48,7 @@ class CommitHistoryChangesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with RdfStoreProvisioning
+    with TSProvisioning
     with DatasetsResources {
 
   private val user = authUsers.generateOne
@@ -68,7 +68,7 @@ class CommitHistoryChangesSpec
       `GET <gitlabApi>/user returning OK`(user)
 
       mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commits)
-      `data in the RDF store`(project, commits.last)
+      `data in the Triples Store`(project, commits.last)
 
       eventually {
         EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
@@ -113,7 +113,7 @@ class CommitHistoryChangesSpec
       `GET <gitlabApi>/user returning OK`(user)
 
       mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commits)
-      `data in the RDF store`(project, commits)
+      `data in the Triples Store`(project, commits)
 
       assertProjectDataIsCorrect(project, project.entitiesProject)
 

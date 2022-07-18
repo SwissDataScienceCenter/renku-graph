@@ -37,7 +37,7 @@ class TSStateCheckerSpec extends AnyWordSpec with should.Matchers with MockFacto
     "return Ready when all datasets are created and no re-provisioning is running" in new TestCase {
 
       datasets foreach {
-        (rdfStoreAdmin.checkDatasetExists _).expects(_).returning(true.pure[Try])
+        (tsAdminClient.checkDatasetExists _).expects(_).returning(true.pure[Try])
       }
 
       (reProvisioningStatus.underReProvisioning _).expects().returning(false.pure[Try])
@@ -48,7 +48,7 @@ class TSStateCheckerSpec extends AnyWordSpec with should.Matchers with MockFacto
     "return ReProvisioning when all datasets are created but re-provisioning is running" in new TestCase {
 
       datasets foreach {
-        (rdfStoreAdmin.checkDatasetExists _).expects(_).returning(true.pure[Try])
+        (tsAdminClient.checkDatasetExists _).expects(_).returning(true.pure[Try])
       }
 
       (reProvisioningStatus.underReProvisioning _).expects().returning(true.pure[Try])
@@ -58,9 +58,9 @@ class TSStateCheckerSpec extends AnyWordSpec with should.Matchers with MockFacto
 
     "return MissingDatasets when one or more datasets are not created" in new TestCase {
 
-      (rdfStoreAdmin.checkDatasetExists _).expects(datasets.head).returning(false.pure[Try])
+      (tsAdminClient.checkDatasetExists _).expects(datasets.head).returning(false.pure[Try])
       datasets.tail foreach {
-        (rdfStoreAdmin.checkDatasetExists _).expects(_).returning(true.pure[Try])
+        (tsAdminClient.checkDatasetExists _).expects(_).returning(true.pure[Try])
       }
 
       stateChecker.checkTSState shouldBe TSState.MissingDatasets.pure[Try]
@@ -68,9 +68,9 @@ class TSStateCheckerSpec extends AnyWordSpec with should.Matchers with MockFacto
 
     "fail if at least one datasets existence check fails" in new TestCase {
       val exception = exceptions.generateOne
-      (rdfStoreAdmin.checkDatasetExists _).expects(datasets.head).returning(exception.raiseError[Try, Boolean])
+      (tsAdminClient.checkDatasetExists _).expects(datasets.head).returning(exception.raiseError[Try, Boolean])
       datasets.tail foreach {
-        (rdfStoreAdmin.checkDatasetExists _).expects(_).returning(true.pure[Try])
+        (tsAdminClient.checkDatasetExists _).expects(_).returning(true.pure[Try])
       }
 
       stateChecker.checkTSState shouldBe exception.raiseError[Try, Boolean]
@@ -79,7 +79,7 @@ class TSStateCheckerSpec extends AnyWordSpec with should.Matchers with MockFacto
     "fail if re-provisioning check fails" in new TestCase {
 
       datasets foreach {
-        (rdfStoreAdmin.checkDatasetExists _).expects(_).returning(true.pure[Try])
+        (tsAdminClient.checkDatasetExists _).expects(_).returning(true.pure[Try])
       }
 
       val exception = exceptions.generateOne
@@ -91,8 +91,8 @@ class TSStateCheckerSpec extends AnyWordSpec with should.Matchers with MockFacto
 
   private trait TestCase {
     val datasets             = nonEmptyStrings().toGeneratorOf(DatasetName).generateNonEmptyList().toList
-    val rdfStoreAdmin        = mock[TSAdminClient[Try]]
+    val tsAdminClient        = mock[TSAdminClient[Try]]
     val reProvisioningStatus = mock[ReProvisioningStatus[Try]]
-    val stateChecker         = new TSStateCheckerImpl[Try](datasets, rdfStoreAdmin, reProvisioningStatus)
+    val stateChecker         = new TSStateCheckerImpl[Try](datasets, tsAdminClient, reProvisioningStatus)
   }
 }

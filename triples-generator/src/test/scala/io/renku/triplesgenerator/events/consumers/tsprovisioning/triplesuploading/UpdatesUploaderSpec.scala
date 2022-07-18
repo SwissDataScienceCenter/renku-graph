@@ -51,7 +51,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
       updater.send(query).value.unsafeRunSync() shouldBe ().asRight
     }
 
-    s"return $NonRecoverableFailure if the given updates is invalid (RDF store responds with BAD_REQUEST 400)" in new TestCase {
+    s"return $NonRecoverableFailure if the given updates is invalid (TS responds with a BAD_REQUEST 400)" in new TestCase {
 
       givenStore(forUpdate = query, returning = badRequest())
 

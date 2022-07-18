@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -43,7 +43,7 @@ class ProjectsResourcesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with RdfStoreProvisioning
+    with TSProvisioning
     with DatasetsResources {
 
   private val user = authUsers.generateOne
@@ -73,14 +73,14 @@ class ProjectsResourcesSpec
       Given("the user is authenticated")
       `GET <gitlabApi>/user returning OK`(user)
 
-      And("there are some data in the RDF Store")
+      And("there are some data in the Triples Store")
       val parentCommitId = commitIds.generateOne
       mockDataOnGitLabAPIs(parentProject, parentProject.entitiesProject.asJsonLD, parentCommitId)
-      `data in the RDF store`(parentProject, parentCommitId)
+      `data in the Triples Store`(parentProject, parentCommitId)
 
       val commitId = commitIds.generateOne
       mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       When("the user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)

@@ -60,7 +60,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       "do not clean the repo if .gitattributes files is committed" +
       "call 'renku migrate', " +
       "call 'renku graph export', " +
-      "convert the stream to RDF model and " +
+      "convert the stream to the metadata model and " +
       "removes the temp directory" in new TestCase {
 
         (file
@@ -118,7 +118,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       "clean the repo if it's not clean " +
       "call 'renku migrate', " +
       "call 'renku graph export', " +
-      "convert the stream to RDF model and " +
+      "convert the stream to the metadata model and " +
       "removes the temp directory" in new TestCase {
 
         (file
@@ -197,7 +197,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with IOSpec with MockFact
       "check if it's a renku repo" +
       "call 'renku migrate', " +
       "call 'renku graph export', " +
-      "convert the stream to RDF model and " +
+      "convert the stream to the metadata model and " +
       "removes the temp directory" in new TestCase {
 
         (file

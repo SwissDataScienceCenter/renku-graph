@@ -71,13 +71,13 @@ abstract class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   protected def updateWitMapping[ResultType](
       using:       SparqlQuery,
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
-  ): F[ResultType] = runQuery(using, mapResponse, RdfUpdate)
+  ): F[ResultType] = runQuery(using, mapResponse, SparqlUpdate)
 
   protected def queryExpecting[ResultType](using: SparqlQuery)(implicit decoder: Decoder[ResultType]): F[ResultType] =
     runQuery(
       using,
       toFullResponseMapper(responseMapperFor[ResultType]),
-      RdfQuery
+      SparqlSelect
     )
 
   protected def upload(jsonLD: JsonLD): F[Unit] = uploadAndMap[Unit](jsonLD)(jsonUploadMapResponse)
@@ -102,13 +102,13 @@ abstract class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def runQuery[ResultType](
       query:       SparqlQuery,
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ResultType]],
-      queryType:   RdfQueryType
+      queryType:   SparqlQueryType
   ): F[ResultType] = for {
     uri    <- validateUri((fusekiUrl / datasetName / path(queryType)).toString)
     result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)
   } yield result
 
-  private def sparqlQueryRequest(uri: Uri, queryType: RdfQueryType, query: SparqlQuery) = HttpRequest(
+  private def sparqlQueryRequest(uri: Uri, queryType: SparqlQueryType, query: SparqlQuery) = HttpRequest(
     request(POST, uri, triplesStoreConfig.authCredentials)
       .withEntity(toEntity(queryType, query))
       .putHeaders(`Content-Type`(`x-www-form-urlencoded`),
@@ -127,16 +127,16 @@ abstract class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       decoder: Decoder[ResultType]
   ): Response[F] => F[ResultType] = _.as[ResultType](MonadThrow[F], jsonOf[F, ResultType])
 
-  private def toEntity(queryType: RdfQueryType, query: SparqlQuery): String = {
+  private def toEntity(queryType: SparqlQueryType, query: SparqlQuery): String = {
     if (printQueries) println(query)
     queryType match {
-      case _: RdfQuery => s"query=${urlEncode(query.toString)}"
+      case _: SparqlSelect => s"query=${urlEncode(query.toString)}"
       case _ => s"update=${urlEncode(query.toString)}"
     }
   }
 
-  private def path(queryType: RdfQueryType): String = queryType match {
-    case _: RdfQuery => "sparql"
+  private def path(queryType: SparqlQueryType): String = queryType match {
+    case _: SparqlSelect => "sparql"
     case _ => "update"
   }
 
@@ -173,8 +173,8 @@ abstract class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
 object TSClientImpl {
 
-  private trait RdfQueryType
-  private final implicit case object RdfQuery extends RdfQueryType
-  private type RdfQuery = RdfQuery.type
-  private final implicit case object RdfUpdate extends RdfQueryType
+  private trait SparqlQueryType
+  private final implicit case object SparqlSelect extends SparqlQueryType
+  private type SparqlSelect = SparqlSelect.type
+  private final implicit case object SparqlUpdate extends SparqlQueryType
 }

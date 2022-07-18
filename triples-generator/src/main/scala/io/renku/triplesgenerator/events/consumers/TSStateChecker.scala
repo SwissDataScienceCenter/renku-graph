@@ -53,7 +53,7 @@ private object TSStateChecker {
 
 private class TSStateCheckerImpl[F[_]: MonadThrow](
     datasets:             List[DatasetName],
-    rdfStoreAdmin:        TSAdminClient[F],
+    tsAdminClient:        TSAdminClient[F],
     reProvisioningStatus: ReProvisioningStatus[F]
 ) extends TSStateChecker[F] {
 
@@ -71,7 +71,7 @@ private class TSStateCheckerImpl[F[_]: MonadThrow](
 
   private def checkDatasetsExist =
     datasets
-      .map(rdfStoreAdmin.checkDatasetExists)
+      .map(tsAdminClient.checkDatasetExists)
       .sequence
       .map(_.reduce(_ && _))
 }
