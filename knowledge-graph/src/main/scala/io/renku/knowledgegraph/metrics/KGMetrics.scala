@@ -65,7 +65,7 @@ object KGMetrics {
 
   import scala.concurrent.duration._
 
-  private[metrics] val initialDelay:   FiniteDuration = 10 seconds
+  private[metrics] val initialDelay:   FiniteDuration = 1 minute
   private[metrics] val countsInterval: FiniteDuration = 1 minute
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[KGMetrics[F]] = for {
