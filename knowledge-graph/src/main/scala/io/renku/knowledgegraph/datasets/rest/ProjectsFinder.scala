@@ -43,7 +43,7 @@ private trait ProjectsFinder[F[_]] {
 
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl(renkuConnectionConfig)
+) extends TSClientImpl(renkuConnectionConfig)
     with ProjectsFinder[F] {
 
   import ProjectsFinderImpl._

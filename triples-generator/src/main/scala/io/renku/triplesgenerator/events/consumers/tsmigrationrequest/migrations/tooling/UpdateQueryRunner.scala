@@ -31,9 +31,9 @@ private[migrations] trait UpdateQueryRunner[F[_]] {
 
 private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl[F](renkuConnectionConfig,
-                                idleTimeoutOverride = (16 minutes).some,
-                                requestTimeoutOverride = (15 minutes).some
+) extends TSClientImpl[F](renkuConnectionConfig,
+                          idleTimeoutOverride = (16 minutes).some,
+                          requestTimeoutOverride = (15 minutes).some
     )
     with UpdateQueryRunner[F] {
 

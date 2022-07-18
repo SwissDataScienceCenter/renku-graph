@@ -26,7 +26,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.jsonld.JsonLD
-import io.renku.triplesstore.{RdfStoreClientImpl, RenkuConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
 import org.typelevel.log4cats.Logger
@@ -44,11 +44,11 @@ private class TriplesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     maxRetries:            Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:           Duration = 11 minutes,
     requestTimeout:        Duration = 10 minutes
-) extends RdfStoreClientImpl(renkuConnectionConfig,
-                             retryInterval = retryInterval,
-                             maxRetries = maxRetries,
-                             idleTimeoutOverride = idleTimeout.some,
-                             requestTimeoutOverride = requestTimeout.some
+) extends TSClientImpl(renkuConnectionConfig,
+                       retryInterval = retryInterval,
+                       maxRetries = maxRetries,
+                       idleTimeoutOverride = idleTimeout.some,
+                       requestTimeoutOverride = requestTimeout.some
     )
     with TriplesUploader[F] {
 

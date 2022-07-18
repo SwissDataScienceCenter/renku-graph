@@ -97,7 +97,7 @@ private object MembersSynchronizer {
       updatesCreator             <- UpdatesCreator[F]
       renkuConnectionConfig      <- RenkuConnectionConfig[F]()
       querySender <-
-        MonadThrow[F].catchNonFatal(new RdfStoreClientImpl(renkuConnectionConfig) with QuerySender[F] {
+        MonadThrow[F].catchNonFatal(new TSClientImpl(renkuConnectionConfig) with QuerySender[F] {
           override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
         })
       executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)

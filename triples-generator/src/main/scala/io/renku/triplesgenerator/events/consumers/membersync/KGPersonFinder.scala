@@ -35,7 +35,7 @@ private trait KGPersonFinder[F[_]] {
 
 private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl(renkuConnectionConfig)
+) extends TSClientImpl(renkuConnectionConfig)
     with KGPersonFinder[F] {
 
   import eu.timepit.refined.auto._

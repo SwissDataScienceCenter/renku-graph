@@ -44,9 +44,9 @@ private object SameAsHierarchyFixer {
 
 private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl(renkuConnectionConfig,
-                             idleTimeoutOverride = (11 minutes).some,
-                             requestTimeoutOverride = (10 minutes).some
+) extends TSClientImpl(renkuConnectionConfig,
+                       idleTimeoutOverride = (11 minutes).some,
+                       requestTimeoutOverride = (10 minutes).some
     ) {
 
   import io.renku.jsonld.syntax._

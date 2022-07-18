@@ -39,9 +39,9 @@ private object ProjectsFinder {
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     query:                 SparqlQuery,
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl[F](renkuConnectionConfig,
-                                idleTimeoutOverride = (16 minutes).some,
-                                requestTimeoutOverride = (15 minutes).some
+) extends TSClientImpl[F](renkuConnectionConfig,
+                          idleTimeoutOverride = (16 minutes).some,
+                          requestTimeoutOverride = (15 minutes).some
     )
     with ProjectsFinder[F] {
 

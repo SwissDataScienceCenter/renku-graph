@@ -35,7 +35,7 @@ trait RenkuVersionPairUpdater[F[_]] {
 private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     storeConfig:     MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
-    extends RdfStoreClientImpl(storeConfig)
+    extends TSClientImpl(storeConfig)
     with RenkuVersionPairUpdater[F] {
 
   override def update(versionPair: RenkuVersionPair): F[Unit] =

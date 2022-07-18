@@ -37,7 +37,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+abstract class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     triplesStoreConfig:     DatasetConnectionConfig,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
@@ -54,7 +54,7 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     with ResultsDecoder
     with RdfMediaTypes {
 
-  import RdfStoreClientImpl._
+  import TSClientImpl._
   import eu.timepit.refined.auto._
   import io.renku.http.client.UrlEncoder.urlEncode
   import org.http4s.MediaType.application._
@@ -171,7 +171,7 @@ abstract class RdfStoreClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     }
 }
 
-object RdfStoreClientImpl {
+object TSClientImpl {
 
   private trait RdfQueryType
   private final implicit case object RdfQuery extends RdfQueryType

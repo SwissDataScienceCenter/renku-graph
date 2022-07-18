@@ -50,7 +50,7 @@ private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQuer
     subscriptionsRegistry: Ref[F, List[SubscriptionMechanism[F]]],
     lastCacheCheckTimeRef: Ref[F, Long]
 )(implicit renkuUrl:       RenkuUrl)
-    extends RdfStoreClientImpl(storeConfig)
+    extends TSClientImpl(storeConfig)
     with ReProvisioningStatus[F] {
 
   import io.renku.jsonld.syntax._

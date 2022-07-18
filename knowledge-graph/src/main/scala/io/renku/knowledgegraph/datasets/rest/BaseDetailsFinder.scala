@@ -40,7 +40,7 @@ private trait BaseDetailsFinder[F[_]] {
 
 private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl(renkuConnectionConfig)
+) extends TSClientImpl(renkuConnectionConfig)
     with BaseDetailsFinder[F] {
 
   import BaseDetailsFinderImpl._

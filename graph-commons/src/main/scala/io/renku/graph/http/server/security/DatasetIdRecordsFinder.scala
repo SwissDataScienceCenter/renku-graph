@@ -36,7 +36,7 @@ object DatasetIdRecordsFinder {
 
 private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl(renkuConnectionConfig)
+) extends TSClientImpl(renkuConnectionConfig)
     with SecurityRecordFinder[F, datasets.Identifier] {
 
   override def apply(id: datasets.Identifier): F[List[SecurityRecord]] =

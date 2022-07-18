@@ -37,7 +37,7 @@ private trait CreatorsFinder[F[_]] {
 
 private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl(renkuConnectionConfig)
+) extends TSClientImpl(renkuConnectionConfig)
     with CreatorsFinder[F] {
 
   import CreatorsFinder._

@@ -78,7 +78,7 @@ private object DatasetsFinder {
 private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig,
     creatorsFinder:        CreatorsFinder[F]
-) extends RdfStoreClientImpl[F](renkuConnectionConfig)
+) extends TSClientImpl[F](renkuConnectionConfig)
     with DatasetsFinder[F]
     with Paging[DatasetSearchResult] {
 

@@ -62,11 +62,11 @@ private class ProjectTriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeReco
     maxRetries:            Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:           Duration = 16 minutes,
     requestTimeout:        Duration = 15 minutes
-) extends RdfStoreClientImpl(renkuConnectionConfig,
-                             retryInterval = retryInterval,
-                             maxRetries = maxRetries,
-                             idleTimeoutOverride = idleTimeout.some,
-                             requestTimeoutOverride = requestTimeout.some
+) extends TSClientImpl(renkuConnectionConfig,
+                       retryInterval = retryInterval,
+                       maxRetries = maxRetries,
+                       idleTimeoutOverride = idleTimeout.some,
+                       requestTimeoutOverride = requestTimeout.some
     )
     with ProjectTriplesRemover[F] {
   import SameAsHierarchyFixer._

@@ -45,7 +45,7 @@ private trait NodeDetailsFinder[F[_]] {
 private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig,
     renkuUrl:              RenkuUrl
-) extends RdfStoreClientImpl[F](renkuConnectionConfig)
+) extends TSClientImpl[F](renkuConnectionConfig)
     with NodeDetailsFinder[F] {
 
   override def findDetails[T](

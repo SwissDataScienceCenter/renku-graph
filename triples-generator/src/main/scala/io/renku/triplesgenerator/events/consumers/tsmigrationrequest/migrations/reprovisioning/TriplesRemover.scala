@@ -39,9 +39,9 @@ private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig,
     idleTimeout:           Duration = 11 minutes,
     requestTimeout:        Duration = 10 minutes
-) extends RdfStoreClientImpl(renkuConnectionConfig,
-                             idleTimeoutOverride = idleTimeout.some,
-                             requestTimeoutOverride = requestTimeout.some
+) extends TSClientImpl(renkuConnectionConfig,
+                       idleTimeoutOverride = idleTimeout.some,
+                       requestTimeoutOverride = requestTimeout.some
     )
     with TriplesRemover[F] {
 

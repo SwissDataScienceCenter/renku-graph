@@ -42,7 +42,7 @@ private class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTim
     serviceVersion:  ServiceVersion,
     storeConfig:     MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
-    extends RdfStoreClientImpl(storeConfig)
+    extends TSClientImpl(storeConfig)
     with MigrationExecutionRegister[F] {
 
   import MigrationExecutionRegister._

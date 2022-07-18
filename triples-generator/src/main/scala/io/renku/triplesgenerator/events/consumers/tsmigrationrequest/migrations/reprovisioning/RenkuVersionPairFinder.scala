@@ -35,7 +35,7 @@ trait RenkuVersionPairFinder[F[_]] {
 private class RenkuVersionPairFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     storeConfig:     MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
-    extends RdfStoreClientImpl[F](storeConfig)
+    extends TSClientImpl[F](storeConfig)
     with RenkuVersionPairFinder[F] {
 
   override def find(): F[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {

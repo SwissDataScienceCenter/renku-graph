@@ -45,7 +45,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.Try
 
-class RdfStoreClientImplSpec
+class TSClientImplSpec
     extends AnyWordSpec
     with IOSpec
     with ExternalServiceStubbing
@@ -54,7 +54,7 @@ class RdfStoreClientImplSpec
 
   "RdfStoreClientImpl" should {
     "be a RestClient" in new QueryClientTestCase {
-      type IORdfStoreClientImpl = RdfStoreClientImpl[IO]
+      type IORdfStoreClientImpl = TSClientImpl[IO]
       client shouldBe a[IORdfStoreClientImpl]
       client shouldBe a[RestClient[IO, _]]
     }
@@ -427,7 +427,7 @@ class RdfStoreClientImplSpec
       val query:             SparqlQuery,
       renkuConnectionConfig: RenkuConnectionConfig
   )(implicit logger:         Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
-      extends RdfStoreClientImpl[IO](renkuConnectionConfig) {
+      extends TSClientImpl[IO](renkuConnectionConfig) {
 
     def sendUpdate: IO[Unit] = updateWithNoResult(query)
 
@@ -441,7 +441,7 @@ class RdfStoreClientImplSpec
   private class TestRdfQueryClientImpl(val query: SparqlQuery, renkuConnectionConfig: RenkuConnectionConfig)(implicit
       logger:                                     Logger[IO],
       timeRecorder:                               SparqlQueryTimeRecorder[IO]
-  ) extends RdfStoreClientImpl[IO](renkuConnectionConfig)
+  ) extends TSClientImpl[IO](renkuConnectionConfig)
       with Paging[String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)

@@ -42,7 +42,7 @@ private object KGInfoFinder {
 
 private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl(renkuConnectionConfig)
+) extends TSClientImpl(renkuConnectionConfig)
     with KGInfoFinder[F] {
 
   override def findActivityAuthors(resourceId: activities.ResourceId): F[Set[persons.ResourceId]] =

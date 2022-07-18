@@ -44,11 +44,11 @@ private class UpdatesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     maxRetries:            Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:           Duration = 11 minutes,
     requestTimeout:        Duration = 10 minutes
-) extends RdfStoreClientImpl[F](renkuConnectionConfig,
-                                retryInterval,
-                                maxRetries,
-                                idleTimeoutOverride = idleTimeout.some,
-                                requestTimeoutOverride = requestTimeout.some
+) extends TSClientImpl[F](renkuConnectionConfig,
+                          retryInterval,
+                          maxRetries,
+                          idleTimeoutOverride = idleTimeout.some,
+                          requestTimeoutOverride = requestTimeout.some
     )
     with UpdatesUploader[F] {
 

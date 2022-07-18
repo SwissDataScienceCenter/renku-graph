@@ -34,7 +34,7 @@ private trait StatsFinder[F[_]] {
 
 private class StatsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl[F](renkuConnectionConfig)
+) extends TSClientImpl[F](renkuConnectionConfig)
     with StatsFinder[F] {
 
   import EntityCount._

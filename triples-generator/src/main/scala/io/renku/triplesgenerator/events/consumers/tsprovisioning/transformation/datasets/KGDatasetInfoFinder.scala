@@ -40,7 +40,7 @@ private trait KGDatasetInfoFinder[F[_]] {
 
 private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends RdfStoreClientImpl(renkuConnectionConfig)
+) extends TSClientImpl(renkuConnectionConfig)
     with KGDatasetInfoFinder[F] {
 
   import cats.syntax.all._

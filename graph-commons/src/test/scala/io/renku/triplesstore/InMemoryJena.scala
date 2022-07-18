@@ -151,7 +151,7 @@ trait InMemoryJena {
 
   private def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
 
-  private def queryRunner(connectionInfo: DatasetConnectionConfig) = new RdfStoreClientImpl[IO](connectionInfo) {
+  private def queryRunner(connectionInfo: DatasetConnectionConfig) = new TSClientImpl[IO](connectionInfo) {
 
     import io.circe.Decoder._
 
