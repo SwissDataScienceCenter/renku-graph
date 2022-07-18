@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
+package migrations
 
 import cats.MonadThrow
 import cats.data.EitherT
@@ -62,5 +63,5 @@ private class DatasetsCreatorImpl[F[_]: MonadThrow: Logger](
   }
 
   private lazy val logSuccess: DatasetName => CreationResult => F[Unit] =
-    datasetName => result => Logger[F].info(show"$name: $datasetName $result")
+    datasetName => result => Logger[F].info(show"$categoryName: $name -> '$datasetName' $result")
 }

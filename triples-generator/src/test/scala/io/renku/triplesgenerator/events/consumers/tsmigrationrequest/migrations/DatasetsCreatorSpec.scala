@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
+package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
+package migrations
 
 import cats.MonadThrow
 import cats.syntax.all._
@@ -50,7 +51,7 @@ class DatasetsCreatorSpec extends AnyWordSpec with should.Matchers with MockFact
       dsCreator.run().value shouldBe ().asRight.pure[Try]
 
       val logEntries = results map { case (datasetName, result) =>
-        Info(show"${dsCreator.name}: $datasetName $result")
+        Info(show"$categoryName: ${dsCreator.name} -> '$datasetName' $result")
       }
       logger.loggedOnly(logEntries)
     }
