@@ -19,6 +19,8 @@
 package io.renku.rdfstore
 
 import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.nonEmptyStrings
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -32,7 +34,11 @@ class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
       val ttlFile = Files.createTempFile("ds", "ttl")
       Files.writeString(ttlFile, ttlFileContent)
 
-      object TestConfigFile extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_), ttlFile.toString)
+      object TestConfigFile
+          extends DatasetConfigFileFactory[TestConfigFile](nonEmptyStrings().generateAs(DatasetName),
+                                                           new TestConfigFile(_),
+                                                           ttlFile.toString
+          )
 
       TestConfigFile.fromTtlFile() shouldBe TestConfigFile(ttlFileContent).asRight
     }
@@ -41,7 +47,11 @@ class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
       val ttlFile = Files.createTempFile("ds", "ttl")
       Files.writeString(ttlFile, "")
 
-      object TestConfigFile extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_), ttlFile.toString)
+      object TestConfigFile
+          extends DatasetConfigFileFactory[TestConfigFile](nonEmptyStrings().generateAs(DatasetName),
+                                                           new TestConfigFile(_),
+                                                           ttlFile.toString
+          )
 
       val Left(failure) = TestConfigFile.fromTtlFile()
 
@@ -51,7 +61,10 @@ class DatasetConfigFileSpec extends AnyWordSpec with should.Matchers {
     "return a Left if TTL file cannot be found" in {
       val nonExistingTtl = Paths.get("non-existing.yaml")
       object TestConfigFile
-          extends DatasetConfigFileFactory[TestConfigFile](new TestConfigFile(_), nonExistingTtl.toString)
+          extends DatasetConfigFileFactory[TestConfigFile](nonEmptyStrings().generateAs(DatasetName),
+                                                           new TestConfigFile(_),
+                                                           nonExistingTtl.toString
+          )
 
       val Left(failure) = TestConfigFile.fromTtlFile()
 

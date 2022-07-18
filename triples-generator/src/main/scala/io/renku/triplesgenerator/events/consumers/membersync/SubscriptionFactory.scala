@@ -26,16 +26,18 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.Microservice
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: Logger: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder]
+  def apply[F[_]: Async: Logger: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder]
       : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
                                categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier)
                              )
+    _       <- ReProvisioningStatus[F].registerForNotification(subscriptionMechanism)
     handler <- EventHandler[F]
   } yield handler -> subscriptionMechanism
 }

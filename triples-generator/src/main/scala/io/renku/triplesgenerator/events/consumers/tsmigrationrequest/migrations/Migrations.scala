@@ -30,12 +30,11 @@ import reprovisioning.{ReProvisioning, ReProvisioningStatus}
 
 private[tsmigrationrequest] object Migrations {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      reProvisioningStatus: ReProvisioningStatus[F],
-      config:               Config
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      config: Config
   ): F[List[Migration[F]]] = for {
     datasetsCreator                   <- DatasetsCreator[F]
-    reProvisioning                    <- ReProvisioning[F](reProvisioningStatus, config)
+    reProvisioning                    <- ReProvisioning[F](config)
     malformedActivityIds              <- MalformedActivityIds[F]
     multiplePersonNames               <- MultiplePersonNames[F]
     malformedDSImageIds               <- MalformedDSImageIds[F]

@@ -36,8 +36,10 @@ trait DatasetConfigFile extends StringTinyType
 object DatasetConfigFile {
   implicit lazy val show: Show[DatasetConfigFile] = Show.show(_.toString)
 }
-abstract class DatasetConfigFileFactory[TT <: DatasetConfigFile](instantiate: String => TT, ttlFileName: String)
-    extends TinyTypeFactory[TT](instantiate) {
+abstract class DatasetConfigFileFactory[TT <: DatasetConfigFile](val datasetName: DatasetName,
+                                                                 instantiate:     String => TT,
+                                                                 ttlFileName:     String
+) extends TinyTypeFactory[TT](instantiate) {
   import cats.syntax.all._
 
   def fromTtlFile(): Either[Exception, TT] = instance

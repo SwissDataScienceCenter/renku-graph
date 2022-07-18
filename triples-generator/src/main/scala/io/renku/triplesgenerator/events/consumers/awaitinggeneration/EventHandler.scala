@@ -32,10 +32,14 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventBody
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
+import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName:  CategoryName,
+    tsReadinessChecker:         TSReadinessForEventsChecker[F],
     eventProcessor:             EventProcessor[F],
     eventBodyDeserializer:      EventBodyDeserializer[F],
     subscriptionMechanism:      SubscriptionMechanism[F],
@@ -43,10 +47,11 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 ) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
 
   import eventBodyDeserializer.toCommitEvent
+  import tsReadinessChecker.verifyTSReady
 
   override def createHandlingProcess(requestContent: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess.withWaitingForCompletion[F](
-      deferred => startProcessEvent(requestContent, deferred),
+      verifyTSReady >> startProcessEvent(requestContent, _),
       subscriptionMechanism.renewSubscription()
     )
 
@@ -71,14 +76,16 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 
 object EventHandler {
 
-  def apply[F[_]: Async: Logger: AccessTokenFinder: MetricsRegistry](
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: AccessTokenFinder: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
+    tsReadinessChecker       <- TSReadinessForEventsChecker[F]
     eventProcessor           <- EventProcessor[F]
     generationProcesses      <- GenerationProcessesNumber[F](config)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
   } yield new EventHandler[F](categoryName,
+                              tsReadinessChecker,
                               eventProcessor,
                               EventBodyDeserializer[F],
                               subscriptionMechanism,

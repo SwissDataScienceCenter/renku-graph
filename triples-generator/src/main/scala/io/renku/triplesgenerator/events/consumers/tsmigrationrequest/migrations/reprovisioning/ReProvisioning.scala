@@ -121,10 +121,9 @@ private[migrations] object ReProvisioning {
 
   import scala.concurrent.duration._
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      reProvisioningStatus: ReProvisioningStatus[F],
-      config:               Config = ConfigFactory.load()
-  ): F[Migration[F]] = RenkuUrlLoader[F]() flatMap { implicit renkuUrl =>
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      config: Config = ConfigFactory.load()
+  ): F[Migration[F]] = RenkuUrlLoader[F]().flatMap { implicit renkuUrl =>
     for {
       retryDelay                 <- find[F, FiniteDuration]("re-provisioning-retry-delay", config)
       migrationsConnectionConfig <- MigrationsConnectionConfig[F](config)
@@ -135,7 +134,7 @@ private[migrations] object ReProvisioning {
       executionTimeRecorder      <- ExecutionTimeRecorder[F]()
       triplesRemover             <- TriplesRemoverImpl(renkuStoreConfig)
       judge <- ReProvisionJudge[F](migrationsConnectionConfig,
-                                   reProvisioningStatus,
+                                   ReProvisioningStatus[F],
                                    microserviceUrlFinder,
                                    compatibilityMatrix
                )
@@ -146,7 +145,7 @@ private[migrations] object ReProvisioning {
       eventSender,
       new RenkuVersionPairUpdaterImpl(migrationsConnectionConfig),
       microserviceUrlFinder,
-      reProvisioningStatus,
+      ReProvisioningStatus[F],
       executionTimeRecorder,
       retryDelay
     )

@@ -18,18 +18,24 @@
 
 package io.renku.graph.rdfstore
 
+import cats.syntax.all._
 import io.renku.rdfstore.{DatasetConfigFile, DatasetConfigFileFactory, DatasetName}
 
 object DatasetTTLs {
 
   case class RenkuTTL private (value: String) extends DatasetConfigFile
-  object RenkuTTL extends DatasetConfigFileFactory[RenkuTTL](new RenkuTTL(_), ttlFileName = "renku-ds.ttl") {
-    val dsName: DatasetName = DatasetName("renku")
-  }
+  object RenkuTTL
+      extends DatasetConfigFileFactory[RenkuTTL](DatasetName("renku"), new RenkuTTL(_), ttlFileName = "renku-ds.ttl")
 
   case class MigrationsTTL private (value: String) extends DatasetConfigFile
   object MigrationsTTL
-      extends DatasetConfigFileFactory[MigrationsTTL](new MigrationsTTL(_), ttlFileName = "migrations-ds.ttl") {
-    val dsName: DatasetName = DatasetName("migrations")
-  }
+      extends DatasetConfigFileFactory[MigrationsTTL](DatasetName("migrations"),
+                                                      new MigrationsTTL(_),
+                                                      ttlFileName = "migrations-ds.ttl"
+      )
+
+  val allFactories: List[DatasetConfigFileFactory[_ <: DatasetConfigFile]] = List(RenkuTTL, MigrationsTTL)
+
+  val allNamesAndConfigs: Either[Exception, List[(DatasetName, DatasetConfigFile)]] =
+    allFactories.map(factory => factory.fromTtlFile().map(factory.datasetName -> _)).sequence
 }

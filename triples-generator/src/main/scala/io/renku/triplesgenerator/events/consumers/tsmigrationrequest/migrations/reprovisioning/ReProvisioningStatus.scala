@@ -24,7 +24,6 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
-import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
@@ -41,13 +40,14 @@ trait ReProvisioningStatus[F[_]] {
   def setRunning(on: MicroserviceBaseUrl): F[Unit]
   def clear():                     F[Unit]
   def findReProvisioningService(): F[Option[MicroserviceBaseUrl]]
+  def registerForNotification(subscription: SubscriptionMechanism[F]): F[Unit]
 }
 
 private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
-    subscriptions:         List[SubscriptionMechanism[F]],
     storeConfig:           MigrationsConnectionConfig,
     statusRefreshInterval: FiniteDuration,
     cacheRefreshInterval:  FiniteDuration,
+    subscriptionsRegistry: Ref[F, List[SubscriptionMechanism[F]]],
     lastCacheCheckTimeRef: Ref[F, Long]
 )(implicit renkuUrl:       RenkuUrl)
     extends RdfStoreClientImpl(storeConfig)
@@ -87,6 +87,9 @@ private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQuer
       )
     }(controllerUrlDecoder)
 
+  override def registerForNotification(subscription: SubscriptionMechanism[F]): F[Unit] =
+    subscriptionsRegistry.update(subscription :: _)
+
   private def deleteFromDb() = updateWithNoResult {
     SparqlQuery.of(
       name = "re-provisioning - status remove",
@@ -124,7 +127,7 @@ private class ReProvisioningStatusImpl[F[_]: Async: Parallel: Logger: SparqlQuer
     time = statusRefreshInterval
   )
 
-  private def renewSubscriptions() = subscriptions.map(_.renewSubscription()).parSequence.void
+  private def renewSubscriptions() = (subscriptionsRegistry.get >>= (_.parTraverse(_.renewSubscription()))).void
 
   private def fetchStatus: F[Option[ReProvisioningInfo.Status]] = queryExpecting[Option[ReProvisioningInfo.Status]] {
     SparqlQuery.of(
@@ -167,18 +170,19 @@ object ReProvisioningStatus {
   private val CacheRefreshInterval:  FiniteDuration = 2 minutes
   private val StatusRefreshInterval: FiniteDuration = 15 seconds
 
-  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
-      subscriptionFactories: (EventHandler[F], SubscriptionMechanism[F])*
-  ): F[ReProvisioningStatus[F]] = for {
+  def apply[F[_]](implicit ev: ReProvisioningStatus[F]): ReProvisioningStatus[F] = ev
+
+  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](): F[ReProvisioningStatus[F]] = for {
     storeConfig           <- MigrationsConnectionConfig[F]()
     renkuUrl              <- RenkuUrlLoader[F]()
+    subscriptionsRegistry <- Ref.of(List.empty[SubscriptionMechanism[F]])
     lastCacheCheckTimeRef <- Ref.of[F, Long](0)
   } yield {
     implicit val baseUrl: RenkuUrl = renkuUrl
-    new ReProvisioningStatusImpl(subscriptionFactories.map(_._2).toList,
-                                 storeConfig,
+    new ReProvisioningStatusImpl(storeConfig,
                                  StatusRefreshInterval,
                                  CacheRefreshInterval,
+                                 subscriptionsRegistry,
                                  lastCacheCheckTimeRef
     )
   }

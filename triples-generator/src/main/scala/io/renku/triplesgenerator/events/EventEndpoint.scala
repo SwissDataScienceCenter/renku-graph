@@ -29,7 +29,6 @@ import io.renku.events.consumers.EventSchedulingResult.SchedulingError
 import io.renku.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import io.renku.graph.model.events.ZippedEventPayload
 import io.renku.http.ErrorMessage
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
@@ -42,10 +41,8 @@ trait EventEndpoint[F[_]] {
   def processEvent(request: Request[F]): F[Response[F]]
 }
 
-class EventEndpointImpl[F[_]: Async](
-    eventConsumersRegistry: EventConsumersRegistry[F],
-    reProvisioningStatus:   ReProvisioningStatus[F]
-) extends Http4sDsl[F]
+class EventEndpointImpl[F[_]: Async](eventConsumersRegistry: EventConsumersRegistry[F])
+    extends Http4sDsl[F]
     with EventEndpoint[F] {
 
   import cats.syntax.all._
@@ -53,18 +50,14 @@ class EventEndpointImpl[F[_]: Async](
   import io.renku.http.InfoMessage._
   import org.http4s._
 
-  override def processEvent(request: Request[F]): F[Response[F]] = reProvisioningStatus.underReProvisioning() >>= {
-    case true => ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
-    case false =>
-      {
-        for {
-          multipart      <- toMultipart(request)
-          eventJson      <- toEvent(multipart)
-          requestContent <- getRequestContent(multipart, eventJson)
-          result         <- right[Response[F]](eventConsumersRegistry.handle(requestContent) >>= toHttpResult)
-        } yield result
-      }.merge recoverWith { case NonFatal(error) => toHttpResult(SchedulingError(error)) }
-  }
+  override def processEvent(request: Request[F]): F[Response[F]] = {
+    for {
+      multipart      <- toMultipart(request)
+      eventJson      <- toEvent(multipart)
+      requestContent <- getRequestContent(multipart, eventJson)
+      result         <- right[Response[F]](eventConsumersRegistry.handle(requestContent) >>= toHttpResult)
+    } yield result
+  }.merge recoverWith { case NonFatal(error) => toHttpResult(SchedulingError(error)) }
 
   private def toMultipart(request: Request[F]): EitherT[F, Response[F], Multipart[F]] = EitherT {
     request
@@ -135,9 +128,6 @@ class EventEndpointImpl[F[_]: Async](
 
 object EventEndpoint {
 
-  def apply[F[_]: Async](
-      eventConsumersRegistry: EventConsumersRegistry[F],
-      reProvisioningStatus:   ReProvisioningStatus[F]
-  ): F[EventEndpoint[F]] =
-    MonadThrow[F].catchNonFatal(new EventEndpointImpl[F](eventConsumersRegistry, reProvisioningStatus))
+  def apply[F[_]: Async](consumersRegistry: EventConsumersRegistry[F]): F[EventEndpoint[F]] =
+    MonadThrow[F].catchNonFatal(new EventEndpointImpl[F](consumersRegistry))
 }

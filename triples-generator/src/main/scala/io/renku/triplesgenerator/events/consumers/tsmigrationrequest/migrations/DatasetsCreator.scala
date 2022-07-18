@@ -22,7 +22,7 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.rdfstore.DatasetTTLs.{MigrationsTTL, RenkuTTL}
+import io.renku.graph.rdfstore.DatasetTTLs
 import io.renku.rdfstore.RdfStoreAdminClient.CreationResult
 import io.renku.rdfstore._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
@@ -34,10 +34,9 @@ private trait DatasetsCreator[F[_]] extends Migration[F]
 
 private object DatasetsCreator {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Migration[F]] = for {
-    tsAdminClient <- RdfStoreAdminClient[F]
-    renkuDS       <- MonadThrow[F].fromEither(RenkuTTL.fromTtlFile()).map(RenkuTTL.dsName -> _)
-    migrationsDS  <- MonadThrow[F].fromEither(MigrationsTTL.fromTtlFile()).map(MigrationsTTL.dsName -> _)
-  } yield new DatasetsCreatorImpl[F](List(renkuDS, migrationsDS), tsAdminClient)
+    tsAdminClient  <- RdfStoreAdminClient[F]
+    datasetConfigs <- MonadThrow[F].fromEither(DatasetTTLs.allNamesAndConfigs)
+  } yield new DatasetsCreatorImpl[F](datasetConfigs, tsAdminClient)
 }
 
 private class DatasetsCreatorImpl[F[_]: MonadThrow: Logger](

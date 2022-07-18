@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
+package io.renku.triplesgenerator.events.consumers
+package tsmigrationrequest
 
 import cats.data.EitherT
 import cats.data.EitherT.{left, leftT, rightT}
@@ -27,7 +28,7 @@ import com.typesafe.config.Config
 import io.circe.Json
 import io.renku.config.ServiceVersion
 import io.renku.data.ErrorMessage
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, ServiceUnavailable}
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, SubscriptionMechanism}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.producers.EventSender
@@ -36,6 +37,7 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceIdentifier
 import io.renku.rdfstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesgenerator.events.consumers.TSStateChecker.TSState
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
@@ -45,6 +47,7 @@ private[events] class EventHandler[F[_]: Async: Logger](
     subscriberUrl:              SubscriberUrl,
     serviceId:                  MicroserviceIdentifier,
     serviceVersion:             ServiceVersion,
+    tsStateChecker:             TSStateChecker[F],
     migrationsRunner:           MigrationsRunner[F],
     eventSender:                EventSender[F],
     subscriptionMechanism:      SubscriptionMechanism[F],
@@ -54,13 +57,26 @@ private[events] class EventHandler[F[_]: Async: Logger](
 
   import eventSender._
   import io.circe.literal._
+  import tsStateChecker._
 
   protected[tsmigrationrequest] override def createHandlingProcess(
       request: EventRequestContent
   ): F[EventHandlingProcess[F]] = EventHandlingProcess.withWaitingForCompletion[F](
-    deferred => startEventProcessing(request, deferred),
+    verifyTSState >> startEventProcessing(request, _),
     subscriptionMechanism.renewSubscription()
   )
+
+  private def verifyTSState: EitherT[F, EventSchedulingResult, Accepted] = EitherT {
+    checkTSState
+      .map {
+        case TSState.Ready | TSState.MissingDatasets => Accepted.asRight
+        case TSState.ReProvisioning =>
+          ServiceUnavailable("Re-provisioning running").asLeft.leftWiden[EventSchedulingResult]
+      }
+      .recover { case NonFatal(exception) =>
+        SchedulingError(exception).asLeft[Accepted].leftWiden[EventSchedulingResult]
+      }
+  }
 
   private def startEventProcessing(request: EventRequestContent, deferred: Deferred[F, Unit]) = for {
     event            <- toJson(request)
@@ -134,24 +150,24 @@ private[events] class EventHandler[F[_]: Async: Logger](
 private[events] object EventHandler {
   import eu.timepit.refined.auto._
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriberUrl:         SubscriberUrl,
       serviceId:             MicroserviceIdentifier,
       serviceVersion:        ServiceVersion,
       subscriptionMechanism: SubscriptionMechanism[F],
-      reProvisioningStatus:  ReProvisioningStatus[F],
       config:                Config
   ): F[EventHandler[F]] = for {
-    migrationsRunner         <- MigrationsRunner[F](reProvisioningStatus, config)
+    tsStateChecker           <- TSStateChecker[F]
+    migrationsRunner         <- MigrationsRunner[F](config)
     eventSender              <- EventSender[F]
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(1)
-  } yield new EventHandler[F](
-    subscriberUrl,
-    serviceId,
-    serviceVersion,
-    migrationsRunner,
-    eventSender,
-    subscriptionMechanism,
-    concurrentProcessLimiter
+  } yield new EventHandler[F](subscriberUrl,
+                              serviceId,
+                              serviceVersion,
+                              tsStateChecker,
+                              migrationsRunner,
+                              eventSender,
+                              subscriptionMechanism,
+                              concurrentProcessLimiter
   )
 }

@@ -82,7 +82,7 @@ class ReProvisioningStatusSpec
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
       reProvisioningStatus.underReProvisioning().unsafeRunSync()       shouldBe true
 
-      expectNotificationSent()
+      expectNotificationSent(subscriptions: _*)
 
       clearStatus()
 
@@ -114,7 +114,7 @@ class ReProvisioningStatusSpec
 
       findInfo shouldBe (Running.value, controller.value).some
 
-      expectNotificationSent()
+      expectNotificationSent(subscriptions: _*)
 
       reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
@@ -125,7 +125,7 @@ class ReProvisioningStatusSpec
 
       findInfo shouldBe None
 
-      expectNotificationSent()
+      expectNotificationSent(subscriptions: _*)
 
       reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
@@ -147,25 +147,51 @@ class ReProvisioningStatusSpec
     }
   }
 
+  "registerForNotification" should {
+
+    "register the given Subscription Mechanism for the notification about done re-provisioning" in new TestCase {
+
+      val controller = microserviceBaseUrls.generateOne
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
+
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe true
+
+      val subscription = mock[SubscriptionMechanism[IO]]
+      reProvisioningStatus.registerForNotification(subscription).unsafeRunSync() shouldBe ()
+      expectNotificationSent(subscription :: subscriptions: _*)
+
+      clearStatus()
+
+      sleep((statusRefreshInterval + (500 millis)).toMillis)
+
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe false
+    }
+  }
+
   private trait TestCase {
+    val subscriptions = List(mock[SubscriptionMechanism[IO]], mock[SubscriptionMechanism[IO]])
+
     val cacheRefreshInterval  = 1 second
     val statusRefreshInterval = 1 second
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
     private val statusCacheCheckTimeRef = Ref.unsafe[IO, Long](0L)
-    private val subscriptions           = List(mock[SubscriptionMechanism[IO]], mock[SubscriptionMechanism[IO]])
-    val reProvisioningStatus = new ReProvisioningStatusImpl[IO](subscriptions,
-                                                                migrationsDSConnectionInfo,
+    private val subscriptionsRegistry   = Ref.unsafe[IO, List[SubscriptionMechanism[IO]]](Nil)
+    val reProvisioningStatus = new ReProvisioningStatusImpl[IO](migrationsDSConnectionInfo,
                                                                 statusRefreshInterval,
                                                                 cacheRefreshInterval,
+                                                                subscriptionsRegistry,
                                                                 statusCacheCheckTimeRef
     )
 
-    def expectNotificationSent(): Unit = subscriptions foreach { subscription =>
-      (subscription.renewSubscription _)
-        .expects()
-        .returning(IO.unit)
+    subscriptions.traverse(reProvisioningStatus.registerForNotification).unsafeRunSync()
+
+    def expectNotificationSent(subscriptions: SubscriptionMechanism[IO]*): Unit = subscriptions foreach {
+      subscription =>
+        (subscription.renewSubscription _)
+          .expects()
+          .returning(IO.unit)
     }
   }
 

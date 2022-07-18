@@ -16,26 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.events.consumers
+package io.renku.graph.rdfstore
 
-import EventSchedulingResult._
-import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{exceptions, fixed, nonEmptyStrings}
-import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import org.scalacheck.Gen
+import cats.syntax.all._
+import io.renku.graph.rdfstore.DatasetTTLs._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-object ConsumersModelGenerators {
+class DatasetTTLsSpec extends AnyWordSpec with should.Matchers {
 
-  implicit lazy val consumerProjects: Gen[Project] = for {
-    projectId <- projectIds
-    path      <- projectPaths
-  } yield Project(projectId, path)
+  "allNamesAndConfigs" should {
 
-  lazy val notHappySchedulingResults: Gen[EventSchedulingResult] = Gen.oneOf(
-    fixed(Busy),
-    fixed(UnsupportedEventType),
-    fixed(BadRequest),
-    nonEmptyStrings().toGeneratorOf(ServiceUnavailable),
-    exceptions.toGeneratorOf(SchedulingError)
-  )
+    "return a List comprised of Renku and Migrations datasets" in {
+      DatasetTTLs.allNamesAndConfigs shouldBe List(
+        RenkuTTL.fromTtlFile().map(RenkuTTL.datasetName -> _),
+        MigrationsTTL.fromTtlFile().map(MigrationsTTL.datasetName -> _)
+      ).sequence
+    }
+  }
 }

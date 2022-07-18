@@ -19,6 +19,7 @@
 package io.renku.generators
 
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import cats.{Applicative, Functor, Semigroupal}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -361,6 +362,10 @@ object Generators {
       def generateSome: Option[T] = Option(generator.generateOne)
 
       def generateNone: Option[T] = Option.empty
+
+      def generateRight[A]: Either[A, T] = generateExample(generator).asRight[A]
+
+      def generateLeft[B]: Either[T, B] = generateExample(generator).asLeft[B]
 
       def generateDifferentThan(value: T): T = {
         val generated = generator.sample.getOrElse(generateDifferentThan(value))

@@ -35,7 +35,6 @@ import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -58,8 +57,6 @@ class EventEndpointSpec
 
     s"return $BadRequest if the request is not a multipart request" in new TestCase {
 
-      givenReProvisioningStatusSet(false)
-
       val response = endpoint.processEvent(Request()).unsafeRunSync()
 
       response.status                          shouldBe BadRequest
@@ -68,8 +65,6 @@ class EventEndpointSpec
     }
 
     s"return $BadRequest if there is no event part in the request" in new TestCase {
-
-      givenReProvisioningStatusSet(false)
 
       override lazy val request =
         Request[IO]().addParts(Part.formData[IO](nonEmptyStrings().generateOne, nonEmptyStrings().generateOne))
@@ -82,8 +77,6 @@ class EventEndpointSpec
     }
 
     s"return $BadRequest if the event part in the request is malformed" in new TestCase {
-
-      givenReProvisioningStatusSet(false)
 
       override lazy val request = Request[IO]().addParts(Part.formData[IO]("event", ""))
 
@@ -108,8 +101,6 @@ class EventEndpointSpec
       s"return $Accepted if one of handlers accepts the given $scenarioName request" in new TestCase {
         override val requestContent: EventRequestContent = requestContents.generateOne
 
-        givenReProvisioningStatusSet(false)
-
         (subscriptionsRegistry.handle _)
           .expects(where(eventRequestEquals(requestContent)))
           .returning(EventSchedulingResult.Accepted.pure[IO])
@@ -123,7 +114,6 @@ class EventEndpointSpec
     }
 
     s"return $BadRequest if none of handlers supports the given payload" in new TestCase {
-      givenReProvisioningStatusSet(false)
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -137,7 +127,6 @@ class EventEndpointSpec
     }
 
     s"return $BadRequest if one of handlers supports the given payload but it's malformed" in new TestCase {
-      givenReProvisioningStatusSet(false)
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -151,7 +140,6 @@ class EventEndpointSpec
     }
 
     s"return $TooManyRequests if handler returns ${EventSchedulingResult.Busy}" in new TestCase {
-      givenReProvisioningStatusSet(false)
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -165,7 +153,6 @@ class EventEndpointSpec
     }
 
     s"return $InternalServerError if handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
-      givenReProvisioningStatusSet(false)
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -180,8 +167,6 @@ class EventEndpointSpec
 
     s"return $ServiceUnavailable if handler returns EventSchedulingResult.ServiceUnavailable" in new TestCase {
 
-      givenReProvisioningStatusSet(false)
-
       val handlingResult = EventSchedulingResult.ServiceUnavailable(nonEmptyStrings().generateOne)
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -195,8 +180,6 @@ class EventEndpointSpec
     }
 
     s"return $InternalServerError if handler fails" in new TestCase {
-
-      givenReProvisioningStatusSet(false)
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -232,14 +215,7 @@ class EventEndpointSpec
     lazy val request: IO[Request[IO]] = Request[IO](Method.POST, uri"events").addParts(multipartParts: _*)
 
     val subscriptionsRegistry = mock[EventConsumersRegistry[IO]]
-
-    val reProvisioningStatus = mock[ReProvisioningStatus[IO]]
-    val endpoint             = new EventEndpointImpl[IO](subscriptionsRegistry, reProvisioningStatus)
-
-    def givenReProvisioningStatusSet(flag: Boolean) =
-      (reProvisioningStatus.underReProvisioning _)
-        .expects()
-        .returning(flag.pure[IO])
+    val endpoint              = new EventEndpointImpl[IO](subscriptionsRegistry)
   }
 
   private def eventRequestEquals(eventRequestContent: EventRequestContent): EventRequestContent => Boolean = {

@@ -33,9 +33,8 @@ import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      reProvisioningStatus: ReProvisioningStatus[F],
-      config:               Config
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      config: Config
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     urlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
     subscriberUrl  <- urlFinder.findBaseUrl().map(SubscriberUrl(_, "events"))
@@ -45,12 +44,6 @@ object SubscriptionFactory {
         categoryName,
         PayloadComposer.payloadsComposerFactory[F](subscriberUrl, Microservice.Identifier, serviceVersion)
       )
-    handler <- EventHandler(subscriberUrl,
-                            Microservice.Identifier,
-                            serviceVersion,
-                            subscriptionMechanism,
-                            reProvisioningStatus,
-                            config
-               )
+    handler <- EventHandler(subscriberUrl, Microservice.Identifier, serviceVersion, subscriptionMechanism, config)
   } yield handler -> subscriptionMechanism
 }
