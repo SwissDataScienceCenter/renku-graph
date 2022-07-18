@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,10 +16,6 @@
  * limitations under the License.
  */
 
-name := "knowledge-graph"
+package io.renku.knowledgegraph.entities
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.11"
-
-libraryDependencies += "org.sangria-graphql" %% "sangria"        % "3.0.0"
-libraryDependencies += "org.sangria-graphql" %% "sangria-circe"  % "1.3.2"
-libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.0.33"
+object EndpointDoc {}

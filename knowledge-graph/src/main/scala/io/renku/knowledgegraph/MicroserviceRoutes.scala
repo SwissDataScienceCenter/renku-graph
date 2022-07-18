@@ -60,6 +60,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     lineageEndpoint:         lineage.Endpoint[F],
     projectEndpoint:         ProjectEndpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
+    docsEndpoint:            docs.Endpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
     projectPathAuthorizer:   Authorizer[F, model.projects.Path],
     datasetIdAuthorizer:     Authorizer[F, model.datasets.Identifier],
@@ -126,8 +127,9 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "knowledge-graph" / "graphql" => schema()
-    case GET -> Root / "ping"                        => Ok("pong")
+    case GET -> Root / "knowledge-graph" / "graphql"   => schema()
+    case GET -> Root / "knowledge-graph" / "spec.json" => docsEndpoint.`get /docs`
+    case GET -> Root / "ping"                          => Ok("pong")
   }
 
   private def searchForDatasets(
@@ -261,6 +263,7 @@ private object MicroserviceRoutes {
         lineageEndpoint         <- lineage.Endpoint[IO]
         projectEndpoint         <- ProjectEndpoint[IO]
         projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
+        docsEndpoint            <- docs.Endpoint[IO]
         authenticator           <- GitLabAuthenticator[IO]
         authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
         projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
@@ -273,6 +276,7 @@ private object MicroserviceRoutes {
                                      lineageEndpoint,
                                      projectEndpoint,
                                      projectDatasetsEndpoint,
+                                     docsEndpoint,
                                      authMiddleware,
                                      projectPathAuthorizer,
                                      datasetIdAuthorizer,
