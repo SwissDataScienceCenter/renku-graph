@@ -34,7 +34,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import org.scalamock.scalatest.MockFactory
@@ -57,14 +57,14 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
         val eventJson = project.asJson(eventEncoder)
         (eventBodyDeserializer.toCleanUpEvent _).expects(eventJson).returns(CleanUpEvent(project).pure[IO])
 
-        val request = requestContent(eventJson)
+        val handlingProcess = handler.createHandlingProcess(requestContent(eventJson)).unsafeRunSync()
 
-        handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
+        handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
+
+        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(
-          Info(
-            show"CLEAN_UP: projectId = ${project.id}, projectPath = ${project.path} -> Accepted"
-          )
+          Info(show"CLEAN_UP: projectId = ${project.id}, projectPath = ${project.path} -> Accepted")
         )
       }
 
@@ -85,6 +85,30 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with IOSpec with sho
       handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
+    }
+
+    s"return $Accepted and release the processing flag when event processor fails while processing the event" in new TestCase {
+
+      givenTsReady
+
+      val exception = exceptions.generateOne
+      (eventProcessor.process _)
+        .expects(project)
+        .returning(exception.raiseError[IO, Unit])
+
+      val eventJson = project.asJson(eventEncoder)
+      (eventBodyDeserializer.toCleanUpEvent _).expects(eventJson).returns(CleanUpEvent(project).pure[IO])
+
+      val handlingProcess = handler.createHandlingProcess(requestContent(eventJson)).unsafeRunSync()
+
+      handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
+
+      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(
+        Info(show"CLEAN_UP: projectId = ${project.id}, projectPath = ${project.path} -> Accepted"),
+        Error(show"$categoryName: $project failed", exception)
+      )
     }
 
     "return failure if returned from the TS readiness check" in new TestCase {

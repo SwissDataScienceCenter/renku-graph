@@ -35,7 +35,7 @@ import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProce
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -59,26 +59,37 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         val request = requestContent(event.asJson)
 
-        handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
+        val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+
+        handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
+
+        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
       }
 
-    s"return $Accepted when event processor fails processing the event" in new TestCase {
+    s"return $Accepted and release the processing flag when event processor fails processing the event" in new TestCase {
 
       givenTsReady
 
       val event = minProjectInfoEvents.generateOne
 
+      val exception = exceptions.generateOne
       (eventProcessor.process _)
         .expects(event)
-        .returning(exceptions.generateOne.raiseError[IO, Unit])
+        .returning(exception.raiseError[IO, Unit])
 
       val request = requestContent(event.asJson)
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
+      val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
 
-      logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
+      handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
+
+      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"),
+                        Error(show"$categoryName: $event failed", exception)
+      )
     }
 
     "return failure if returned from the TS readiness check" in new TestCase {

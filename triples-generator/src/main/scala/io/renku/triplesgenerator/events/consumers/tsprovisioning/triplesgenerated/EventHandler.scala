@@ -71,7 +71,7 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
                }
     event <- toEvent(eventId, project, payload).toRightT(recoverTo = BadRequest)
     result <- Spawn[F]
-                .start(process(event) >> processing.complete(()))
+                .start(process(event).recoverWith(errorLogging(event)) >> processing.complete(()))
                 .toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(eventId -> event.project))

@@ -68,26 +68,27 @@ class EventHandlerSpec
         logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
 
-    s"return $Accepted and log an error if scheduling event synchronization fails" in new TestCase {
+    s"return $Accepted and release the processing flag when scheduling event synchronization fails" in new TestCase {
 
       val event = globalCommitSyncEvents().generateOne
 
+      val exception = exceptions.generateOne
       (commitEventSynchronizer.synchronizeEvents _)
         .expects(event)
-        .returning(exceptions.generateOne.raiseError[IO, Unit])
+        .returning(exception.raiseError[IO, Unit])
 
-      handler
+      val handlingProcess = handler
         .createHandlingProcess(requestContent(event.asJson))
         .unsafeRunSync()
-        .process
-        .value
-        .unsafeRunSync() shouldBe Accepted.asRight
 
-      logger.getMessages(Info).map(_.message) should contain only s"${logMessageCommon(event)} -> $Accepted"
+      handlingProcess.process.value.unsafeRunSync() shouldBe Accepted.asRight
 
-      eventually {
-        logger.getMessages(Error).map(_.message) should contain only s"${logMessageCommon(event)} -> Failure"
-      }
+      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(
+        Info(s"${logMessageCommon(event)} -> $Accepted"),
+        Error(show"$categoryName: $event failed", exception)
+      )
     }
 
     s"return $BadRequest if event is malformed" in new TestCase {

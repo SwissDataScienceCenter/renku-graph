@@ -114,11 +114,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
           )
           .returning(().pure[IO])
 
-        val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+        val handlingProcess = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
 
-        process.process.merge.unsafeRunSync() shouldBe Accepted
+        handlingProcess.process.merge.unsafeRunSync() shouldBe Accepted
 
-        process.waitToFinish().unsafeRunSync()
+        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(Info(show"$categoryName: $serviceVersion -> $Accepted"))
       }
@@ -138,11 +138,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
           .expects(capture(payloadCaptor), expectedEventContext)
           .returning(().pure[IO])
 
-        val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+        val handlingProcess = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
 
-        process.process.merge.unsafeRunSync() shouldBe Accepted
+        handlingProcess.process.merge.unsafeRunSync() shouldBe Accepted
 
-        process.waitToFinish().unsafeRunSync()
+        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
         val actualEvent = payloadCaptor.value.event
         actualEvent.hcursor.downField("newStatus").as[String] shouldBe "NON_RECOVERABLE_FAILURE".asRight

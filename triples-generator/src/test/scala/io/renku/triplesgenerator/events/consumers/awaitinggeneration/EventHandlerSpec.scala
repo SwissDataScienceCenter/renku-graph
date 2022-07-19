@@ -34,7 +34,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import io.renku.graph.model.events.CompoundEventId
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.awaitinggeneration.EventProcessingGenerators._
@@ -63,7 +63,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
 
-        handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
+        val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+
+        handlingProcess.process.value.unsafeRunSync() shouldBe Right(Accepted)
+
+        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(
           Info(
@@ -98,7 +102,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       logger.expectNoLogs()
     }
 
-    s"return $Accepted when event processor fails while processing the event" in new TestCase {
+    s"return $Accepted and release the processing flag when event processor fails while processing the event" in new TestCase {
 
       givenTsReady
 
@@ -107,18 +111,24 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         .expects(eventBody)
         .returning(commitEvent.pure[IO])
 
+      val exception = exceptions.generateOne
       (eventProcessor.process _)
         .expects(commitEvent)
-        .returning(exceptions.generateOne.raiseError[IO, Unit])
+        .returning(exception.raiseError[IO, Unit])
 
       val request = requestContent(commitEvent.compoundEventId.asJson(eventEncoder), eventBody.value)
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
+      val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+
+      handlingProcess.process.value.unsafeRunSync() shouldBe Accepted.asRight
+
+      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Info(
           show"$categoryName: ${commitEvent.compoundEventId}, projectPath = ${commitEvent.project.path} -> $Accepted"
-        )
+        ),
+        Error(show"$categoryName: $commitEvent failed", exception)
       )
     }
 
@@ -177,8 +187,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       }"""
     }
 
-  private implicit class EventHandlingProcessOps(handlingProcess: IO[EventHandlingProcess[IO]]) {
+  private implicit class EventHandlingProcessOps(handlingProcessIO: IO[EventHandlingProcess[IO]]) {
     def unsafeRunSyncProcess() =
-      handlingProcess.unsafeRunSync().process.value.unsafeRunSync()
+      handlingProcessIO.unsafeRunSync().process.value.unsafeRunSync()
   }
 }

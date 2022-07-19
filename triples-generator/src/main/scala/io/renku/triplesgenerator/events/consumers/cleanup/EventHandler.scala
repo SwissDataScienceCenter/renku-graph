@@ -44,21 +44,21 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
   import eventBodyDeserializer.toCleanUpEvent
   import tsReadinessChecker._
 
-  override def createHandlingProcess(
-      requestContent: EventRequestContent
-  ): F[EventHandlingProcess[F]] = EventHandlingProcess.withWaitingForCompletion[F](
-    verifyTSReady >> startCleanUp(requestContent, _),
-    subscriptionMechanism.renewSubscription()
-  )
+  override def createHandlingProcess(requestContent: EventRequestContent): F[EventHandlingProcess[F]] =
+    EventHandlingProcess.withWaitingForCompletion[F](
+      verifyTSReady >> startCleanUp(requestContent, _),
+      subscriptionMechanism.renewSubscription()
+    )
 
   private def startCleanUp(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
-    cleanupEvent <- toCleanUpEvent(requestContent.event).toRightT(recoverTo = BadRequest)
-    result <- Spawn[F]
-                .start(eventProcessor.process(cleanupEvent.project) >> deferred.complete(()))
-                .toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(cleanupEvent))
-                .leftSemiflatTap(Logger[F].log(cleanupEvent))
+    event <- toCleanUpEvent(requestContent.event).toRightT(recoverTo = BadRequest)
+    result <-
+      Spawn[F]
+        .start(eventProcessor.process(event.project).recoverWith(errorLogging(event.project)) >> deferred.complete(()))
+        .toRightT
+        .map(_ => Accepted)
+        .semiflatTap(Logger[F].log(event))
+        .leftSemiflatTap(Logger[F].log(event))
   } yield result
 
   private implicit lazy val eventInfoToString: Show[CleanUpEvent] = Show.show { event =>

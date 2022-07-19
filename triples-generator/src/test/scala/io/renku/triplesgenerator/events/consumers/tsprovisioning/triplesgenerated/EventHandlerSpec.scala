@@ -36,7 +36,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.zippedEventPayloads
 import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import org.scalamock.scalatest.MockFactory
@@ -63,7 +63,10 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
         val request = requestContent((event.compoundEventId, event.project).asJson, zippedPayload)
 
-        handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
+        val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+
+        handlingProcess.process.value.unsafeRunSync()  shouldBe Right(Accepted)
+        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
       }
@@ -93,7 +96,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       logger.expectNoLogs()
     }
 
-    s"return $Accepted when event processor fails processing the event" in new TestCase {
+    s"return $Accepted and release the processing flag when event processor fails processing the event" in new TestCase {
 
       givenTsReady
 
@@ -101,15 +104,22 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
         .expects(event.compoundEventId, event.project, zippedPayload)
         .returning(event.pure[IO])
 
+      val exception = exceptions.generateOne
       (eventProcessor.process _)
         .expects(event)
-        .returning(exceptions.generateOne.raiseError[IO, Unit])
+        .returning(exception.raiseError[IO, Unit])
 
       val request = requestContent((event.compoundEventId, event.project).asJson, zippedPayload)
 
-      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Right(Accepted)
+      val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
 
-      logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
+      handlingProcess.process.value.unsafeRunSync()  shouldBe Right(Accepted)
+      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(
+        Info(show"$categoryName: $event -> $Accepted"),
+        Error(show"$categoryName: $event failed", exception)
+      )
     }
 
     "return failure if returned from the TS readiness check" in new TestCase {

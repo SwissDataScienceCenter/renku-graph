@@ -53,12 +53,13 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 
   private def startProcessingEvent(request: EventRequestContent, processing: Deferred[F, Unit]) = for {
     project <- fromEither(request.event.getProject)
-    result <- Spawn[F]
-                .start(process(MinProjectInfoEvent(project)) >> processing.complete(()))
-                .toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(project))
-                .leftSemiflatTap(Logger[F].log(project))
+    result <-
+      Spawn[F]
+        .start(process(MinProjectInfoEvent(project)).recoverWith(errorLogging(project)) >> processing.complete(()))
+        .toRightT
+        .map(_ => Accepted)
+        .semiflatTap(Logger[F].log(project))
+        .leftSemiflatTap(Logger[F].log(project))
   } yield result
 }
 
