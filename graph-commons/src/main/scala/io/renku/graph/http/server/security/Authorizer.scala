@@ -44,6 +44,11 @@ object Authorizer {
     def addAllowedProject(path: projects.Path): AuthContext[Key] = copy(allowedProjects = allowedProjects + path)
   }
 
+  object AuthContext {
+    def forUnknownUser[Key](key: Key, allowedProjects: Set[projects.Path]): AuthContext[Key] =
+      AuthContext(None, key, allowedProjects)
+  }
+
   def using[F[_]: Async: Logger, Key](
       securityRecordsFinderFactory: F[SecurityRecordFinder[F, Key]]
   ): F[Authorizer[F, Key]] = securityRecordsFinderFactory.map(new AuthorizerImpl[F, Key](_))

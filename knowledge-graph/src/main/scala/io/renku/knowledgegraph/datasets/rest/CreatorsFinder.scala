@@ -70,8 +70,7 @@ private object CreatorsFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       renkuConnectionConfig: RenkuConnectionConfig
-  ): F[CreatorsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new CreatorsFinderImpl(renkuConnectionConfig))
+  ): F[CreatorsFinder[F]] = MonadThrow[F].catchNonFatal(new CreatorsFinderImpl(renkuConnectionConfig))
 
   import ResultsDecoder._
   import io.circe.Decoder
