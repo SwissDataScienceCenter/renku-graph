@@ -54,8 +54,8 @@ object GraphModelGenerators {
     nonBlankStrings(minLength = 4).map(v => Affiliation(v.value))
 
   implicit val personEmails: Gen[persons.Email] = {
-    val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!$%&*+-/=?_~".toList))
-    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~.".toList))
+    val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!$&*+-/=?_~".toList))
+    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$&*+-/=?_~.".toList))
     val beforeAts = for {
       firstChar  <- firstCharGen
       otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
