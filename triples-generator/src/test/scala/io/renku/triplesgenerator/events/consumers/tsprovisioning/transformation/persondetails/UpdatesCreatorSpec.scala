@@ -21,14 +21,12 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.{entities, persons}
+import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
+import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
-import io.renku.testtools.IOSpec
-import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
