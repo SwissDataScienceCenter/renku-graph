@@ -23,8 +23,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json, JsonObject}
 import io.renku.knowledgegraph.docs.model.Example.{JsonExample, StringExample}
-import io.renku.knowledgegraph.docs.model.SecurityScheme.{SecuritySchemeAuth, SecuritySchemeNoAuth}
-import io.renku.knowledgegraph.docs.model.{Info, OpenApiDocument, Operation, Server}
+import io.renku.knowledgegraph.docs.model.{Info, OpenApiDocument, Operation, SecurityRequirementAuth, SecurityRequirementNoAuth, Server}
 
 object Encoders {
 
@@ -116,7 +115,12 @@ object Encoders {
   implicit val headerEncoder: Encoder[model.Header] = deriveEncoder
   implicit val linkEncoder:   Encoder[model.Link]   = deriveEncoder
   implicit lazy val securityRequirementEncoder: Encoder[model.SecurityRequirement] = Encoder.instance { sR =>
-    json"""{${sR.schemeName}: ${sR.scopeNames}}"""
+    sR match {
+      case SecurityRequirementAuth(name, scopes) =>
+        json"""{$name: $scopes}"""
+      case SecurityRequirementNoAuth =>
+        json"""{}"""
+    }
   }
   implicit val inEncoder: Encoder[model.In] = Encoder.instance { inType =>
     Json.fromString(inType.value)
@@ -145,11 +149,9 @@ object Encoders {
              "securitySchemes": ${components.securitySchemes}
            }"""
   }
-  implicit val securitySchemeEncoder: Encoder[model.SecurityScheme] = Encoder.instance {
-    case SecuritySchemeNoAuth => Json.obj()
-    case scheme: SecuritySchemeAuth =>
-      val description = scheme.description.map(s => json"""{"description": $s }""").getOrElse(empty)
-      json"""{
+  implicit val securitySchemeEncoder: Encoder[model.SecurityScheme] = Encoder.instance { scheme =>
+    val description = scheme.description.map(s => json"""{"description": $s }""").getOrElse(empty)
+    json"""{
                  "name": ${scheme.name},
                  "type": ${scheme.`type`.value},
                  "in": ${scheme.in}

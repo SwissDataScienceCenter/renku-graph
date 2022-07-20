@@ -23,7 +23,6 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
-import io.renku.knowledgegraph.docs.model.SecurityScheme.{SecuritySchemeAuth, SecuritySchemeNoAuth}
 
 object model {
   trait OpenApiDocument {
@@ -61,20 +60,15 @@ object model {
 
     def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
 
-    def addNoAuthSecurity: CompleteDoc = {
-      val newComponents = {
-        val c = this.components.getOrElse(Components.empty)
-        c.copy(securitySchemes = c.securitySchemes + (SecuritySchemeNoAuth.name -> SecuritySchemeNoAuth))
-      }
-      copy(security = security :+ SecurityRequirement(SecuritySchemeNoAuth.name, Nil), components = newComponents.some)
-    }
+    def addNoAuthSecurity: CompleteDoc =
+      copy(security = security :+ SecurityRequirementNoAuth)
 
-    def addSecurity(securityScheme: SecuritySchemeAuth) = {
+    def addSecurity(securityScheme: SecurityScheme) = {
       val newComponents = {
         val c = this.components.getOrElse(Components.empty)
         c.copy(securitySchemes = c.securitySchemes + (securityScheme.name -> securityScheme))
       }
-      copy(security = security :+ SecurityRequirement(securityScheme.name, Nil), components = newComponents.some)
+      copy(security = security :+ SecurityRequirementAuth(securityScheme.name, Nil), components = newComponents.some)
     }
 
     def addResponsesToAll(responses: Map[Status, Response]): CompleteDoc =
@@ -271,19 +265,13 @@ object model {
 
   case class Status(code: Int, name: String)
 
-  final case class SecurityRequirement(schemeName: String, scopeNames: List[String])
-  trait SecurityScheme {
-    def name: String
-  }
+  trait SecurityRequirement
+  final case class SecurityRequirementAuth(schemeName: String, scopeNames: List[String]) extends SecurityRequirement
+  final object SecurityRequirementNoAuth                                                 extends SecurityRequirement
+
+  final case class SecurityScheme(name: String, `type`: TokenType, description: Option[String], in: In)
 
   object SecurityScheme {
-
-    final case class SecuritySchemeAuth(name: String, `type`: TokenType, description: Option[String], in: In)
-        extends SecurityScheme
-
-    final object SecuritySchemeNoAuth extends SecurityScheme {
-      def name: String = "noAuth"
-    }
 
     sealed trait SchemeType {
       def value: String

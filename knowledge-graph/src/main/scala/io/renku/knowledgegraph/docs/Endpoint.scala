@@ -23,7 +23,6 @@ import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.ServiceVersion
 import io.renku.knowledgegraph.docs.Implicits.StatusOps
-import io.renku.knowledgegraph.docs.model.SecurityScheme.SecuritySchemeAuth
 import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph.lineage
 import org.http4s
@@ -60,14 +59,14 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends 
       variables = Map.empty
     )
 
-  private lazy val privateToken = SecuritySchemeAuth(
+  private lazy val privateToken = SecurityScheme(
     "PRIVATE-TOKEN",
     TokenType.ApiKey,
     "User's Personal Access Token in GitLab".some,
     In.Header
   )
 
-  private lazy val oAuth = SecuritySchemeAuth(
+  private lazy val oAuth = SecurityScheme(
     "oauth_auth",
     TokenType.ApiKey,
     "User's Personal Access Token in GitLab".some,
