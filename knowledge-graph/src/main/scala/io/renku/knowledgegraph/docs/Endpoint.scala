@@ -55,7 +55,7 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends 
 
   private lazy val server: Server =
     Server(
-      url = "knowledge-graph",
+      url = "/knowledge-graph",
       description = "Renku Knowledge Graph API",
       variables = Map.empty
     )
