@@ -56,10 +56,11 @@ object Generators {
     }
   }.map(_.reverse.mkString)
 
-  def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
-    require(maxLength > 0)
-    nonBlankStrings(maxLength = Refined.unsafeApply(maxLength), charsGenerator = charsGenerator) map (_.value)
-  }
+  def nonEmptyStrings(minLength: Int = 1, maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] =
+    nonBlankStrings(minLength = Refined.unsafeApply(minLength),
+                    maxLength = Refined.unsafeApply(maxLength),
+                    charsGenerator = charsGenerator
+    ) map (_.value)
 
   def nonBlankStrings(minLength:      Int Refined Positive = 1,
                       maxLength:      Int Refined Positive = 10,
@@ -285,7 +286,7 @@ object Generators {
       .choose(min, max)
       .map(JavaDuration.ofMillis)
 
-  implicit val exceptions: Gen[Exception] = nonEmptyStrings(20) map (new Exception(_))
+  implicit val exceptions: Gen[Exception] = nonEmptyStrings(maxLength = 20) map (new Exception(_))
   implicit val nestedExceptions: Gen[Exception] = for {
     nestLevels <- positiveInts(5)
     rootCause  <- exceptions
