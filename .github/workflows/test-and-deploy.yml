@@ -11,7 +11,7 @@ on:
       - synchronize
       - reopened
 env:
-  SBT_OPTS: "-Xmx2G"
+  SBT_OPTS: "-Xmx2G -XX:+UseG1GC"
 jobs:
   cleanup-previous-runs:
     name: Cleanup previous runs

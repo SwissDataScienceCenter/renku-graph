@@ -9,7 +9,7 @@ on:
       - reopened
       - closed
 env:
-  SBT_OPTS: "-Xmx2G"
+  SBT_OPTS: "-Xmx2G -XX:+UseG1GC"
 jobs:
   cleanup-previous-runs:
     runs-on: ubuntu-20.04
