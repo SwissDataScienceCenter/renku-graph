@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
+import io.renku.knowledgegraph.docs.model.SecurityScheme.{SecuritySchemeAuth, SecuritySchemeNoAuth}
 
 object model {
   trait OpenApiDocument {
@@ -60,7 +61,15 @@ object model {
 
     def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
 
-    def addSecurity(securityScheme: SecurityScheme) = {
+    def addNoAuthSecurity: CompleteDoc = {
+      val newComponents = {
+        val c = this.components.getOrElse(Components.empty)
+        c.copy(securitySchemes = c.securitySchemes + (SecuritySchemeNoAuth.name -> SecuritySchemeNoAuth))
+      }
+      copy(security = security :+ SecurityRequirement(SecuritySchemeNoAuth.name, Nil), components = newComponents.some)
+    }
+
+    def addSecurity(securityScheme: SecuritySchemeAuth) = {
       val newComponents = {
         val c = this.components.getOrElse(Components.empty)
         c.copy(securitySchemes = c.securitySchemes + (securityScheme.name -> securityScheme))
@@ -263,8 +272,19 @@ object model {
   case class Status(code: Int, name: String)
 
   final case class SecurityRequirement(schemeName: String, scopeNames: List[String])
-  final case class SecurityScheme(name: String, `type`: TokenType, description: Option[String], in: In)
+  trait SecurityScheme {
+    def name: String
+  }
+
   object SecurityScheme {
+
+    final case class SecuritySchemeAuth(name: String, `type`: TokenType, description: Option[String], in: In)
+        extends SecurityScheme
+
+    final object SecuritySchemeNoAuth extends SecurityScheme {
+      def name: String = "noAuth"
+    }
+
     sealed trait SchemeType {
       def value: String
     }
@@ -280,9 +300,8 @@ object model {
         def value: String = "OAuth"
       }
     }
-
   }
-  final case class Header()
+  final case class Header(description: Option[String], schema: Schema)
   final case class Link()
 
   sealed trait TokenType extends Product with Serializable {
@@ -362,6 +381,9 @@ object model {
   object Schema {
     final case object String extends Schema {
       val `type`: String = "string"
+    }
+    final case object Integer extends Schema {
+      val `type`: String = "integer"
     }
   }
 

@@ -23,6 +23,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json, JsonObject}
 import io.renku.knowledgegraph.docs.model.Example.{JsonExample, StringExample}
+import io.renku.knowledgegraph.docs.model.SecurityScheme.{SecuritySchemeAuth, SecuritySchemeNoAuth}
 import io.renku.knowledgegraph.docs.model.{Info, OpenApiDocument, Operation, Server}
 
 object Encoders {
@@ -89,7 +90,7 @@ object Encoders {
   }
   implicit val requestBodyEncoder: Encoder[model.RequestBody] = Encoder.instance { requestBody =>
     val content = requestBody.content.foldLeft(empty) { case (acc, (key, mediaType)) =>
-      json"""{$key: $mediaType}""" deepMerge acc // TODO: see why this isn't getting encoded
+      json"""{$key: $mediaType}""" deepMerge acc
     }
     json"""
            {
@@ -115,7 +116,7 @@ object Encoders {
   implicit val headerEncoder: Encoder[model.Header] = deriveEncoder
   implicit val linkEncoder:   Encoder[model.Link]   = deriveEncoder
   implicit lazy val securityRequirementEncoder: Encoder[model.SecurityRequirement] = Encoder.instance { sR =>
-    json"""{${sR.schemeName}: ${sR.scopeNames}}""" // TODO: add empty object for no auth
+    json"""{${sR.schemeName}: ${sR.scopeNames}}"""
   }
   implicit val inEncoder: Encoder[model.In] = Encoder.instance { inType =>
     Json.fromString(inType.value)
@@ -144,13 +145,15 @@ object Encoders {
              "securitySchemes": ${components.securitySchemes}
            }"""
   }
-  implicit val securitySchemeEncoder: Encoder[model.SecurityScheme] = Encoder.instance { scheme =>
-    val description = scheme.description.map(s => json"""{"description": $s }""").getOrElse(empty)
-    json"""{
-      "name": ${scheme.name},
-      "type": ${scheme.`type`.value},
-      "in": ${scheme.in}
-    }""" deepMerge description
+  implicit val securitySchemeEncoder: Encoder[model.SecurityScheme] = Encoder.instance {
+    case SecuritySchemeNoAuth => Json.obj()
+    case scheme: SecuritySchemeAuth =>
+      val description = scheme.description.map(s => json"""{"description": $s }""").getOrElse(empty)
+      json"""{
+                 "name": ${scheme.name},
+                 "type": ${scheme.`type`.value},
+                 "in": ${scheme.in}
+               }""" deepMerge description
   }
   implicit def exampleEncoder: Encoder[model.Example] = Encoder.instance { example =>
     val value = example match {
