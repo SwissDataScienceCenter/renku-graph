@@ -85,8 +85,11 @@ object Generators {
   def paragraphs(minElements: Int Refined Positive = 5, maxElements: Int Refined Positive = 10): Gen[NonBlank] =
     nonEmptyStringsList(minElements, maxElements) map (_.mkString(" ")) map Refined.unsafeApply
 
-  def sentences(minWords: Int Refined Positive = 1, maxWords: Int Refined Positive = 10): Gen[NonBlank] =
-    nonEmptyStringsList(minWords, maxWords) map (_.mkString(" ")) map Refined.unsafeApply
+  def sentences(minWords:       Int Refined Positive = 1,
+                maxWords:       Int Refined Positive = 10,
+                charsGenerator: Gen[Char] = alphaChar
+  ): Gen[NonBlank] =
+    nonEmptyStringsList(minWords, maxWords, charsGenerator) map (_.mkString(" ")) map Refined.unsafeApply
 
   def sentenceContaining(phrase: NonBlank): Gen[String] = for {
     prefix <- nonEmptyStrings()
@@ -99,13 +102,13 @@ object Generators {
       chars  <- listOfN(length, const(" "))
     } yield chars.mkString("")
 
-  def nonEmptyStringsList(minElements: Int Refined Positive = 1,
-                          maxElements: Int Refined Positive = 5
-  ): Gen[List[String]] =
-    for {
-      size  <- choose(minElements.value, maxElements.value)
-      lines <- Gen.listOfN(size, nonEmptyStrings())
-    } yield lines
+  def nonEmptyStringsList(minElements:    Int Refined Positive = 1,
+                          maxElements:    Int Refined Positive = 5,
+                          charsGenerator: Gen[Char] = alphaChar
+  ): Gen[List[String]] = for {
+    size  <- choose(minElements.value, maxElements.value)
+    lines <- Gen.listOfN(size, nonEmptyStrings(charsGenerator = charsGenerator))
+  } yield lines
 
   def nonEmptyList[T](generator:   Gen[T],
                       minElements: Int Refined Positive = 1,
