@@ -23,7 +23,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json, JsonObject}
 import io.renku.knowledgegraph.docs.model.Example.{JsonExample, StringExample}
-import io.renku.knowledgegraph.docs.model.{Info, OpenApiDocument, Operation, SecurityRequirementAuth, SecurityRequirementNoAuth, Server}
+import io.renku.knowledgegraph.docs.model._
 
 object Encoders {
 
