@@ -38,9 +38,8 @@ trait EventEndpoint[F[_]] {
   def processEvent(request: Request[F]): F[Response[F]]
 }
 
-class EventEndpointImpl[F[_]: Concurrent](
-    eventConsumersRegistry: EventConsumersRegistry[F]
-) extends Http4sDsl[F]
+class EventEndpointImpl[F[_]: Concurrent](eventConsumersRegistry: EventConsumersRegistry[F])
+    extends Http4sDsl[F]
     with EventEndpoint[F] {
 
   import org.http4s.circe._
@@ -71,9 +70,7 @@ class EventEndpointImpl[F[_]: Concurrent](
     case EventSchedulingResult.SchedulingError(_) => InternalServerError(ErrorMessage("Failed to schedule event"))
   }
 
-  private def toMultipart(
-      request: Request[F]
-  ): EitherT[F, Response[F], Multipart[F]] = EitherT {
+  private def toMultipart(request: Request[F]): EitherT[F, Response[F], Multipart[F]] = EitherT {
     request
       .as[Multipart[F]]
       .map(_.asRight[Response[F]])
@@ -82,19 +79,16 @@ class EventEndpointImpl[F[_]: Concurrent](
       }
   }
 
-  private def toEvent(multipart: Multipart[F]): EitherT[F, Response[F], Json] =
-    EitherT {
-      multipart.parts
-        .find(_.name.contains("event"))
-        .map(_.as[Json].map(_.asRight[Response[F]]).recoverWith { case NonFatal(_) =>
-          BadRequest(ErrorMessage("Malformed event body")).map(_.asLeft[Json])
-        })
-        .getOrElse(BadRequest(ErrorMessage("Missing event part")).map(_.asLeft[Json]))
-    }
+  private def toEvent(multipart: Multipart[F]): EitherT[F, Response[F], Json] = EitherT {
+    multipart.parts
+      .find(_.name.contains("event"))
+      .map(_.as[Json].map(_.asRight[Response[F]]).recoverWith { case NonFatal(_) =>
+        BadRequest(ErrorMessage("Malformed event body")).map(_.asLeft[Json])
+      })
+      .getOrElse(BadRequest(ErrorMessage("Missing event part")).map(_.asLeft[Json]))
+  }
 
-  private def getPayload(
-      multipart: Multipart[F]
-  ): EitherT[F, Response[F], Option[String]] = EitherT {
+  private def getPayload(multipart: Multipart[F]): EitherT[F, Response[F], Option[String]] = EitherT {
     multipart.parts
       .find(_.name.contains("payload"))
       .map {
