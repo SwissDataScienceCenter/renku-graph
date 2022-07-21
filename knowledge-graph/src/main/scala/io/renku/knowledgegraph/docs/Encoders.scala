@@ -71,7 +71,7 @@ object Encoders {
                     "content": ${response.content},
                     "links": ${response.links},
                     "headers": ${response.headers}
-               } 
+               }
              }"""
       }
       .foldLeft(empty)((acc, opJson) => acc deepMerge opJson)
@@ -107,7 +107,7 @@ object Encoders {
   }
   implicit val responseEncoder: Encoder[model.Response] = Encoder.instance { response =>
     json"""{
-             "description": ${response.description}, 
+             "description": ${response.description},
              "content": ${response.content}
            }"""
   }
