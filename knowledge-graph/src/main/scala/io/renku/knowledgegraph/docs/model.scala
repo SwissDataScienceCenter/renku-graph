@@ -60,12 +60,15 @@ object model {
 
     def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
 
+    def addNoAuthSecurity: CompleteDoc =
+      copy(security = security :+ SecurityRequirementNoAuth)
+
     def addSecurity(securityScheme: SecurityScheme) = {
       val newComponents = {
         val c = this.components.getOrElse(Components.empty)
         c.copy(securitySchemes = c.securitySchemes + (securityScheme.name -> securityScheme))
       }
-      copy(security = security :+ SecurityRequirement(securityScheme.name, Nil), components = newComponents.some)
+      copy(security = security :+ SecurityRequirementAuth(securityScheme.name, Nil), components = newComponents.some)
     }
 
     def addResponsesToAll(responses: Map[Status, Response]): CompleteDoc =
@@ -262,9 +265,14 @@ object model {
 
   case class Status(code: Int, name: String)
 
-  final case class SecurityRequirement(schemeName: String, scopeNames: List[String])
+  trait SecurityRequirement
+  final case class SecurityRequirementAuth(schemeName: String, scopeNames: List[String]) extends SecurityRequirement
+  final object SecurityRequirementNoAuth                                                 extends SecurityRequirement
+
   final case class SecurityScheme(name: String, `type`: TokenType, description: Option[String], in: In)
+
   object SecurityScheme {
+
     sealed trait SchemeType {
       def value: String
     }
@@ -280,9 +288,8 @@ object model {
         def value: String = "OAuth"
       }
     }
-
   }
-  final case class Header()
+  final case class Header(description: Option[String], schema: Schema)
   final case class Link()
 
   sealed trait TokenType extends Product with Serializable {
@@ -362,6 +369,9 @@ object model {
   object Schema {
     final case object String extends Schema {
       val `type`: String = "string"
+    }
+    final case object Integer extends Schema {
+      val `type`: String = "integer"
     }
   }
 
