@@ -23,11 +23,13 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.datasetDescriptions
+import eu.timepit.refined.auto._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -38,7 +40,8 @@ class MultipleDSDescriptionsSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
-    with InMemoryRdfStore
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with MockFactory {
 
   "run" should {
@@ -53,14 +56,14 @@ class MultipleDSDescriptionsSpec
         .addDataset(datasetEntities(provenanceInternal).modify(replaceDSDesc(brokenDSDesc1.some)))
         .generateOne
 
-      loadToStore(correctProject, brokenProject)
+      upload(to = renkuDataset, correctProject, brokenProject)
 
       val brokenDSDesc2 = datasetDescriptions.generateOne
-      insertTriple(brokenDS.entityId, "schema:description", show"'$brokenDSDesc2'")
+      insert(to = renkuDataset, Triple(brokenDS.entityId, schema / "description", brokenDSDesc2))
 
       findDescriptions(brokenDS.identification.identifier) shouldBe Set(brokenDSDesc1, brokenDSDesc2)
 
-      runUpdate(MultipleDSDescriptions.query).unsafeRunSync() shouldBe ()
+      runUpdate(on = renkuDataset, MultipleDSDescriptions.query).unsafeRunSync() shouldBe ()
 
       findDescriptions(brokenDS.identification.identifier)    should (be(Set(brokenDSDesc1)) or be(Set(brokenDSDesc2)))
       findDescriptions(correctDS.identification.identifier) shouldBe correctDS.additionalInfo.maybeDescription.toSet
@@ -76,14 +79,19 @@ class MultipleDSDescriptionsSpec
     }
   }
 
-  private def findDescriptions(id: datasets.Identifier): Set[datasets.Description] =
-    runQuery(s"""|SELECT ?desc 
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      schema:description ?desc
-                 |}""".stripMargin)
-      .unsafeRunSync()
-      .map(row => datasets.Description(row("desc")))
-      .toSet
+  private def findDescriptions(id: datasets.Identifier): Set[datasets.Description] = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "find DS description",
+      Prefixes of schema -> "schema",
+      s"""|SELECT ?desc 
+          |WHERE { 
+          |  ?id a schema:Dataset;
+          |      schema:identifier '$id';
+          |      schema:description ?desc
+          |}""".stripMargin
+    )
+  ).unsafeRunSync()
+    .map(row => datasets.Description(row("desc")))
+    .toSet
 }

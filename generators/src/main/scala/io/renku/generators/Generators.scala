@@ -19,6 +19,7 @@
 package io.renku.generators
 
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import cats.{Applicative, Functor, Semigroupal}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -55,10 +56,11 @@ object Generators {
     }
   }.map(_.reverse.mkString)
 
-  def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
-    require(maxLength > 0)
-    nonBlankStrings(maxLength = Refined.unsafeApply(maxLength), charsGenerator = charsGenerator) map (_.value)
-  }
+  def nonEmptyStrings(minLength: Int = 1, maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] =
+    nonBlankStrings(minLength = Refined.unsafeApply(minLength),
+                    maxLength = Refined.unsafeApply(maxLength),
+                    charsGenerator = charsGenerator
+    ) map (_.value)
 
   def nonBlankStrings(minLength:      Int Refined Positive = 1,
                       maxLength:      Int Refined Positive = 10,
@@ -284,7 +286,7 @@ object Generators {
       .choose(min, max)
       .map(JavaDuration.ofMillis)
 
-  implicit val exceptions: Gen[Exception] = nonEmptyStrings(20) map (new Exception(_))
+  implicit val exceptions: Gen[Exception] = nonEmptyStrings(maxLength = 20) map (new Exception(_))
   implicit val nestedExceptions: Gen[Exception] = for {
     nestLevels <- positiveInts(5)
     rootCause  <- exceptions
@@ -361,6 +363,10 @@ object Generators {
       def generateSome: Option[T] = Option(generator.generateOne)
 
       def generateNone: Option[T] = Option.empty
+
+      def generateRight[A]: Either[A, T] = generateExample(generator).asRight[A]
+
+      def generateLeft[B]: Either[T, B] = generateExample(generator).asLeft[B]
 
       def generateDifferentThan(value: T): T = {
         val generated = generator.sample.getOrElse(generateDifferentThan(value))

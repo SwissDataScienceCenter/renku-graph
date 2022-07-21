@@ -31,7 +31,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, jsons}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -64,18 +64,23 @@ class EventHandlerSpec
         logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
       }
 
-    s"return $Accepted when synchronization process fails" in new TestCase {
+    s"return $Accepted and release the processing flag when synchronization process fails" in new TestCase {
 
-      (synchronizer.syncProjectInfo _).expects(event).returning(exceptions.generateOne.raiseError[IO, Unit])
+      val exception = exceptions.generateOne
+      (synchronizer.syncProjectInfo _).expects(event).returning(exception.raiseError[IO, Unit])
 
-      handler
+      val handlingProcess = handler
         .createHandlingProcess(requestContent(event.asJson))
         .unsafeRunSync()
-        .process
-        .value
-        .unsafeRunSync() shouldBe Accepted.asRight
 
-      logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
+      handlingProcess.process.value.unsafeRunSync() shouldBe Accepted.asRight
+
+      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(
+        Info(show"$categoryName: $event -> $Accepted"),
+        Error(show"$categoryName: $event failed", exception)
+      )
     }
 
     s"return $BadRequest if event is malformed" in new TestCase {

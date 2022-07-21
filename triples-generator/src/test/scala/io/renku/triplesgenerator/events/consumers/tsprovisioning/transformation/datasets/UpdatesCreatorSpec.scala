@@ -20,6 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators._
@@ -29,7 +30,8 @@ import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{datasets, entities, persons}
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -41,8 +43,9 @@ import scala.util.Random
 class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
-    with InMemoryRdfStore
     with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with ScalaCheckPropertyChecks {
 
   "prepareUpdatesWhenInvalidated" should {
@@ -69,7 +72,7 @@ class UpdatesCreatorSpec
         val entitiesParent2 = parent2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
         val entitiesChild2  = child2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
 
-        loadToStore(entitiesGrandparent, entitiesParent1, entitiesChild1, entitiesParent2, entitiesChild2)
+        upload(to = renkuDataset, entitiesGrandparent, entitiesParent1, entitiesChild1, entitiesParent2, entitiesChild2)
 
         findDatasets.map(onlySameAsAndTop) shouldBe Set(
           (entitiesGrandparent.resourceId.value, None, entitiesGrandparent.provenance.topmostSameAs.value.some),
@@ -91,7 +94,7 @@ class UpdatesCreatorSpec
           )
         )
 
-        UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesGrandparent).runAll.unsafeRunSync()
+        UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesGrandparent).runAll(on = renkuDataset).unsafeRunSync()
 
         findDatasets.map(onlySameAsAndTop) shouldBe Set(
           (entitiesGrandparent.resourceId.value, None, entitiesGrandparent.provenance.topmostSameAs.value.some),
@@ -128,7 +131,7 @@ class UpdatesCreatorSpec
         val entitiesParent2 = parent2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
         val entitiesChild2  = child2.to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorExternal]]
 
-        loadToStore(entitiesGrandparent, entitiesParent1, entitiesChild1, entitiesParent2, entitiesChild2)
+        upload(to = renkuDataset, entitiesGrandparent, entitiesParent1, entitiesChild1, entitiesParent2, entitiesChild2)
 
         findDatasets.map(onlySameAsAndTop) shouldBe Set(
           (entitiesGrandparent.resourceId.value,
@@ -153,7 +156,7 @@ class UpdatesCreatorSpec
           )
         )
 
-        UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesGrandparent).runAll.unsafeRunSync()
+        UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesGrandparent).runAll(on = renkuDataset).unsafeRunSync()
 
         findDatasets.map(onlySameAsAndTop) shouldBe Set(
           (entitiesGrandparent.resourceId.value,
@@ -216,7 +219,7 @@ class UpdatesCreatorSpec
 
           val grandparentTopmostSameAs = entitiesGrandparent.provenance.topmostSameAs.value.some
 
-          loadToStore(entitiesGrandparent, entitiesParent, entitiesChild1, entitiesChild2)
+          upload(to = renkuDataset, entitiesGrandparent, entitiesParent, entitiesChild1, entitiesChild2)
 
           findDatasets.map(onlySameAsAndTop) shouldBe Set(
             (entitiesGrandparent.resourceId.value, maybeGrandparentSameAs.map(_.value), grandparentTopmostSameAs),
@@ -225,7 +228,7 @@ class UpdatesCreatorSpec
             (entitiesChild2.resourceId.value, entitiesParent.resourceId.value.some, grandparentTopmostSameAs)
           )
 
-          UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesParent).runAll.unsafeRunSync()
+          UpdatesCreator.prepareUpdatesWhenInvalidated(entitiesParent).runAll(on = renkuDataset).unsafeRunSync()
 
           findDatasets.map(onlySameAsAndTop) shouldBe Set(
             (entitiesGrandparent.resourceId.value, maybeGrandparentSameAs.map(_.value), grandparentTopmostSameAs),
@@ -255,13 +258,13 @@ class UpdatesCreatorSpec
           setTopmostSameAs(ds, TopmostSameAs(dataset1.resourceId.value))
         }
 
-        loadToStore(dataset2)
+        upload(to = renkuDataset, dataset2)
 
         findDatasets.map(onlyTopmostSameAs) shouldBe Set(
           (dataset2.resourceId.value, TopmostSameAs(dataset1.resourceId.value).value.some)
         )
 
-        UpdatesCreator.prepareUpdates(dataset1, Set.empty).runAll.unsafeRunSync()
+        UpdatesCreator.prepareUpdates(dataset1, Set.empty).runAll(on = renkuDataset).unsafeRunSync()
 
         findDatasets.map(onlyTopmostSameAs) shouldBe Set(
           (dataset2.resourceId.value, dataset0AsTopmostSameAs.value.some)
@@ -285,17 +288,17 @@ class UpdatesCreatorSpec
           setTopmostSameAs(ds, TopmostSameAs(dataset1.resourceId.value))
         }
 
-        loadToStore(dataset2)
+        upload(to = renkuDataset, dataset2)
 
         val otherTopmostSameAs = datasetTopmostSameAs.generateOne
-        insertTriple(dataset2.resourceId, "renku:topmostSameAs", otherTopmostSameAs.showAs[RdfResource])
+        insert(to = renkuDataset, Triple.edge(dataset2.resourceId, renku / "topmostSameAs", otherTopmostSameAs))
 
         findDatasets.map(onlyTopmostSameAs) shouldBe Set(
           (dataset2.resourceId.value, TopmostSameAs(dataset1.resourceId.value).value.some),
           (dataset2.resourceId.value, otherTopmostSameAs.value.some)
         )
 
-        UpdatesCreator.prepareUpdates(dataset1, Set.empty).runAll.unsafeRunSync()
+        UpdatesCreator.prepareUpdates(dataset1, Set.empty).runAll(on = renkuDataset).unsafeRunSync()
 
         findDatasets.map(onlyTopmostSameAs) shouldBe Set(
           (dataset2.resourceId.value, dataset0AsTopmostSameAs.value.some)
@@ -327,11 +330,11 @@ class UpdatesCreatorSpec
       val dataset = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       // simulate DS having two topmostSameAs
       val parentTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value)
-      loadToStore(setTopmostSameAs(dataset, parentTopmostSameAs))
+      upload(to = renkuDataset, setTopmostSameAs(dataset, parentTopmostSameAs))
 
       findDatasets.map(onlyTopmostSameAs) shouldBe Set(
         (dataset.resourceId.value, dataset.provenance.topmostSameAs.value.some),
@@ -340,7 +343,7 @@ class UpdatesCreatorSpec
 
       UpdatesCreator
         .prepareTopmostSameAsCleanup(dataset, maybeParentTopmostSameAs = parentTopmostSameAs.some)
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findDatasets.map(onlyTopmostSameAs) shouldBe Set(
@@ -352,7 +355,7 @@ class UpdatesCreatorSpec
       val dataset = datasetEntities(provenanceImportedInternal).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternal]]
 
-      loadToStore(dataset)
+      upload(to = renkuDataset, dataset)
 
       findDatasets.map(onlyTopmostSameAs) shouldBe Set(
         (dataset.resourceId.value, dataset.provenance.topmostSameAs.value.some)
@@ -362,7 +365,7 @@ class UpdatesCreatorSpec
         .prepareTopmostSameAsCleanup(dataset,
                                      maybeParentTopmostSameAs = TopmostSameAs(datasetResourceIds.generateOne.value).some
         )
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findDatasets.map(onlyTopmostSameAs) shouldBe Set(
@@ -381,7 +384,7 @@ class UpdatesCreatorSpec
       ) { kgDataset =>
         val kgDatasetEntities = kgDataset.to[entities.Dataset[entities.Dataset.Provenance]]
 
-        loadToStore(kgDatasetEntities)
+        upload(to = renkuDataset, kgDatasetEntities)
 
         val creators = kgDataset.provenance.creators
         findCreators(kgDatasetEntities.resourceId) shouldBe creators.map(_.resourceId).toList.toSet
@@ -396,7 +399,7 @@ class UpdatesCreatorSpec
 
         UpdatesCreator
           .queriesUnlinkingCreators(model, creators.map(_.resourceId).toList.toSet)
-          .runAll
+          .runAll(on = renkuDataset)
           .unsafeRunSync()
 
         findCreators(kgDatasetEntities.resourceId) shouldBe creatorsNotChanged.map(_.resourceId).toSet
@@ -420,12 +423,12 @@ class UpdatesCreatorSpec
       val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      loadToStore(ds)
+      upload(to = renkuDataset, ds)
 
       val existingOriginalId1 = datasetOriginalIdentifiers.generateOne
-      insertTriple(ds.resourceId, "renku:originalIdentifier", s"'$existingOriginalId1'")
+      insert(to = renkuDataset, Triple(ds.resourceId, renku / "originalIdentifier", existingOriginalId1))
       val existingOriginalId2 = datasetOriginalIdentifiers.generateOne
-      insertTriple(ds.resourceId, "renku:originalIdentifier", s"'$existingOriginalId2'")
+      insert(to = renkuDataset, Triple(ds.resourceId, renku / "originalIdentifier", existingOriginalId2))
 
       findOriginalIdentifiers(ds.identification.identifier) shouldBe Set(ds.provenance.originalIdentifier,
                                                                          existingOriginalId1,
@@ -434,7 +437,7 @@ class UpdatesCreatorSpec
 
       UpdatesCreator
         .removeOtherOriginalIdentifiers(ds, Set(existingOriginalId1, existingOriginalId2))
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findOriginalIdentifiers(ds.identification.identifier) shouldBe Set(ds.provenance.originalIdentifier)
@@ -461,12 +464,12 @@ class UpdatesCreatorSpec
       val ds = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
 
-      loadToStore(ds)
+      upload(to = renkuDataset, ds)
 
       val existingDateCreated1 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
-      insertTriple(ds.resourceId, "schema:dateCreated", show"'$existingDateCreated1'")
+      insert(to = renkuDataset, Triple(ds.resourceId, schema / "dateCreated", existingDateCreated1))
       val existingDateCreated2 = datasetCreatedDates(min = ds.provenance.date.instant).generateOne
-      insertTriple(ds.resourceId, "schema:dateCreated", show"'$existingDateCreated2'")
+      insert(to = renkuDataset, Triple(ds.resourceId, schema / "dateCreated", existingDateCreated2))
 
       findDateCreated(ds.identification.identifier) shouldBe Set(ds.provenance.date,
                                                                  existingDateCreated1,
@@ -475,7 +478,7 @@ class UpdatesCreatorSpec
 
       UpdatesCreator
         .removeOtherDateCreated(ds, Set(existingDateCreated1, existingDateCreated2))
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findDateCreated(ds.identification.identifier) shouldBe Set(ds.provenance.date)
@@ -513,18 +516,18 @@ class UpdatesCreatorSpec
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      loadToStore(ds)
+      upload(to = renkuDataset, ds)
 
       val description2 = datasetDescriptions.generateOne
-      insertTriple(ds.resourceId, "schema:description", s"'$description2'")
+      insert(to = renkuDataset, Triple(ds.resourceId, schema / "description", description2))
       val description3 = datasetDescriptions.generateOne
-      insertTriple(ds.resourceId, "schema:description", s"'$description3'")
+      insert(to = renkuDataset, Triple(ds.resourceId, schema / "description", description3))
 
       findDescriptions(ds.identification.identifier) shouldBe Set(description1, description3, description2)
 
       UpdatesCreator
         .removeOtherDescriptions(ds, Set(description2, description3))
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findDescriptions(ds.identification.identifier) shouldBe Set(description1)
@@ -537,14 +540,14 @@ class UpdatesCreatorSpec
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance]]
 
-      loadToStore(ds)
+      upload(to = renkuDataset, ds)
 
       val description = datasetDescriptions.generateOne
-      insertTriple(ds.resourceId, "schema:description", s"'$description'")
+      insert(to = renkuDataset, Triple(ds.resourceId, schema / "description", description))
 
       findDescriptions(ds.identification.identifier) shouldBe Set(description)
 
-      UpdatesCreator.removeOtherDescriptions(ds, Set(description)).runAll.unsafeRunSync()
+      UpdatesCreator.removeOtherDescriptions(ds, Set(description)).runAll(on = renkuDataset).unsafeRunSync()
 
       findDescriptions(ds.identification.identifier) shouldBe Set.empty
     }
@@ -591,10 +594,10 @@ class UpdatesCreatorSpec
       ).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
 
-      loadToStore(originalDS.asJsonLD, importedDS.asJsonLD)
+      upload(to = renkuDataset, originalDS.asJsonLD, importedDS.asJsonLD)
 
       val otherSameAs = datasetSameAs.generateOne.entityId
-      insertTriple(importedDS.resourceId, "schema:sameAs", show"<$otherSameAs>")
+      insert(to = renkuDataset, Triple.edge(importedDS.resourceId, schema / "sameAs", otherSameAs))
 
       findSameAs(importedDS.identification.identifier).map(_.show) shouldBe Set(importedDS.provenance.sameAs.entityId,
                                                                                 otherSameAs
@@ -602,7 +605,7 @@ class UpdatesCreatorSpec
 
       UpdatesCreator
         .removeOtherSameAs(importedDS, Set(SameAs(otherSameAs)))
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findSameAs(importedDS.identification.identifier).map(_.show) shouldBe Set(
@@ -615,17 +618,17 @@ class UpdatesCreatorSpec
       val importedExternalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
 
-      loadToStore(importedExternalDS.asJsonLD)
+      upload(to = renkuDataset, importedExternalDS.asJsonLD)
 
       val otherSameAs = datasetSameAs.generateOne.entityId
-      insertTriple(importedExternalDS.resourceId, "schema:sameAs", show"<$otherSameAs>")
+      insert(to = renkuDataset, Triple.edge(importedExternalDS.resourceId, schema / "sameAs", otherSameAs))
 
       findSameAs(importedExternalDS.identification.identifier)
         .map(_.show) shouldBe Set(importedExternalDS.provenance.sameAs.entityId, otherSameAs).map(_.show)
 
       UpdatesCreator
         .removeOtherSameAs(importedExternalDS, Set(SameAs(otherSameAs)))
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findSameAs(importedExternalDS.identification.identifier).map(_.show) shouldBe Set(
@@ -661,17 +664,17 @@ class UpdatesCreatorSpec
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
 
-      loadToStore(ds)
+      upload(to = renkuDataset, ds)
 
       val otherDerivedFrom       = datasetDerivedFroms.generateOne
       val otherDerivedFromJsonLD = otherDerivedFrom.asJsonLD
-      loadToStore(otherDerivedFromJsonLD)
+      upload(to = renkuDataset, otherDerivedFromJsonLD)
       val derivedFromId = otherDerivedFromJsonLD.entityId.getOrElse(fail(" Cannot obtain EntityId for DerivedFrom"))
-      insertTriple(ds.resourceId, "prov:wasDerivedFrom", s"<$derivedFromId>")
+      insert(to = renkuDataset, Triple.edge(ds.resourceId, prov / "wasDerivedFrom", derivedFromId))
 
       findDerivedFrom(ds.identification.identifier) shouldBe Set(ds.provenance.derivedFrom, otherDerivedFrom)
 
-      UpdatesCreator.deleteOtherDerivedFrom(ds).runAll.unsafeRunSync()
+      UpdatesCreator.deleteOtherDerivedFrom(ds).runAll(on = renkuDataset).unsafeRunSync()
 
       findDerivedFrom(ds.identification.identifier) shouldBe Set(ds.provenance.derivedFrom)
     }
@@ -686,16 +689,16 @@ class UpdatesCreatorSpec
         .generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.Modified]]
 
-      loadToStore(ds)
+      upload(to = renkuDataset, ds)
 
       val otherTopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
-      insertTriple(ds.resourceId, "renku:topmostDerivedFrom", otherTopmostDerivedFrom.showAs[RdfResource])
+      insert(to = renkuDataset, Triple.edge(ds.resourceId, renku / "topmostDerivedFrom", otherTopmostDerivedFrom))
 
       findTopmostDerivedFrom(ds.identification.identifier) shouldBe Set(ds.provenance.topmostDerivedFrom,
                                                                         otherTopmostDerivedFrom
       )
 
-      UpdatesCreator.deleteOtherTopmostDerivedFrom(ds).runAll.unsafeRunSync()
+      UpdatesCreator.deleteOtherTopmostDerivedFrom(ds).runAll(on = renkuDataset).unsafeRunSync()
 
       findTopmostDerivedFrom(ds.identification.identifier) shouldBe Set(ds.provenance.topmostDerivedFrom)
     }
@@ -712,16 +715,22 @@ class UpdatesCreatorSpec
   }
 
   private def findDatasets: Set[(String, Option[String], Option[String], Option[String], Option[String])] =
-    runQuery(s"""|SELECT ?id ?maybeSameAs ?maybeTopmostSameAs ?maybeDerivedFrom ?maybeTopmostDerivedFrom
-                 |WHERE {
-                 |  ?id a schema:Dataset .
-                 |  OPTIONAL { ?id schema:sameAs/schema:url ?maybeSameAs } .
-                 |  OPTIONAL { ?id renku:topmostSameAs ?maybeTopmostSameAs } .
-                 |  OPTIONAL { ?id prov:wasDerivedFrom/schema:url ?maybeDerivedFrom } .
-                 |  OPTIONAL { ?id renku:topmostDerivedFrom ?maybeTopmostDerivedFrom } .
-                 |}
-                 |""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch ds data",
+        Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
+        s"""|SELECT ?id ?maybeSameAs ?maybeTopmostSameAs ?maybeDerivedFrom ?maybeTopmostDerivedFrom
+            |WHERE {
+            |  ?id a schema:Dataset .
+            |  OPTIONAL { ?id schema:sameAs/schema:url ?maybeSameAs } .
+            |  OPTIONAL { ?id renku:topmostSameAs ?maybeTopmostSameAs } .
+            |  OPTIONAL { ?id prov:wasDerivedFrom/schema:url ?maybeDerivedFrom } .
+            |  OPTIONAL { ?id renku:topmostDerivedFrom ?maybeTopmostDerivedFrom } .
+            |}
+            |""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row =>
         (row("id"),
          row.get("maybeSameAs"),
@@ -744,81 +753,123 @@ class UpdatesCreatorSpec
   }
 
   private def findCreators(resourceId: datasets.ResourceId): Set[persons.ResourceId] =
-    runQuery(s"""|SELECT ?personId
-                 |WHERE {
-                 |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
-                 |                                    schema:creator ?personId
-                 |}
-                 |""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch ds creator",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?personId
+            |WHERE {
+            |  ${resourceId.showAs[RdfResource]} a schema:Dataset;
+            |                                    schema:creator ?personId
+            |}
+            |""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => persons.ResourceId.from(row("personId")))
       .sequence
       .fold(throw _, identity)
       .toSet
 
   private def findOriginalIdentifiers(id: datasets.Identifier): Set[datasets.OriginalIdentifier] =
-    runQuery(s"""|SELECT ?initial
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      renku:originalIdentifier ?initial.
-                 |}""".stripMargin)
-      .unsafeRunSync()
-      .map(row => datasets.OriginalIdentifier(row("initial")))
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch ds originalIdentifier",
+        Prefixes.of(renku -> "renku", schema -> "schema"),
+        s"""|SELECT ?originalId
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      renku:originalIdentifier ?originalId.
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
+      .map(row => datasets.OriginalIdentifier(row("originalId")))
       .toSet
 
   private def findDateCreated(id: datasets.Identifier): Set[datasets.DateCreated] =
-    runQuery(s"""|SELECT ?date
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      schema:dateCreated ?date.
-                 |}""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch ds date",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?date
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      schema:dateCreated ?date.
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => datasets.DateCreated(Instant.parse(row("date"))))
       .toSet
 
   private def findDescriptions(id: datasets.Identifier): Set[datasets.Description] =
-    runQuery(s"""|SELECT ?desc
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      schema:description ?desc.
-                 |}""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch ds description",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?desc
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      schema:description ?desc.
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => datasets.Description(row("desc")))
       .toSet
 
   private def findSameAs(id: datasets.Identifier): Set[datasets.SameAs] =
-    runQuery(s"""|SELECT ?sameAs
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      schema:sameAs ?sameAs.
-                 |}""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch sameAs",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?sameAs
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      schema:sameAs ?sameAs.
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => datasets.SameAs(row("sameAs")))
       .toSet
 
   private def findTopmostDerivedFrom(id: datasets.Identifier): Set[datasets.TopmostDerivedFrom] =
-    runQuery(s"""|SELECT ?topmostDerivedFrom 
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      renku:topmostDerivedFrom ?topmostDerivedFrom
-                 |}""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch topmostDerivedFrom",
+        Prefixes.of(renku -> "renku", schema -> "schema"),
+        s"""|SELECT ?topmostDerivedFrom
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      renku:topmostDerivedFrom ?topmostDerivedFrom
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => datasets.TopmostDerivedFrom(row("topmostDerivedFrom")))
       .toSet
 
   private def findDerivedFrom(id: datasets.Identifier): Set[datasets.DerivedFrom] =
-    runQuery(s"""|SELECT ?derivedFrom 
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      prov:wasDerivedFrom/schema:url ?derivedFrom
-                 |}""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch derivedFrom",
+        Prefixes.of(prov -> "prov", schema -> "schema"),
+        s"""|SELECT ?derivedFrom
+            |WHERE {
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      prov:wasDerivedFrom/schema:url ?derivedFrom
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => datasets.DerivedFrom(row("derivedFrom")))
       .toSet
 

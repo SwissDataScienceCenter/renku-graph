@@ -32,7 +32,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.knowledgegraph.lineage.model.Node.{Location, Type}
 import io.renku.knowledgegraph.lineage.model.{Edge, Lineage, Node}
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.Response
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl

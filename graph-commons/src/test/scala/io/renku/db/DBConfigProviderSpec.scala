@@ -29,7 +29,6 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
@@ -43,7 +42,6 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val port           = ports.generateOne
       val password       = nonEmptyStrings().generateOne
       val connectionPool = positiveInts().generateOne
-      val maxLifetime    = durations(max = 30 minutes).generateOne
 
       val config = ConfigFactory.parseMap(
         Map(

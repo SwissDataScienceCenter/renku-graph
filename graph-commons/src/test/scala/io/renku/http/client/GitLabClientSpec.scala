@@ -78,7 +78,7 @@ class GitLabClientSpec
         )
         .generateOne
 
-      implicit val accessToken = accessTokens.generateOne.some
+      implicit val accessToken: Option[AccessToken] = accessTokens.generateOne.some
       stubFor {
         callMethod(GET, s"/api/v4/$path")
           .withAccessToken(accessToken)

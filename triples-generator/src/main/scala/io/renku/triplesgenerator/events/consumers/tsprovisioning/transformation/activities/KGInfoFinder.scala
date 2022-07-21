@@ -25,8 +25,8 @@ import io.circe.Decoder
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{activities, persons}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGInfoFinder[F[_]] {
@@ -36,12 +36,13 @@ private trait KGInfoFinder[F[_]] {
 
 private object KGInfoFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGInfoFinder[F]] = for {
-    config <- RdfStoreConfig[F]()
+    config <- RenkuConnectionConfig[F]()
   } yield new KGInfoFinderImpl(config)
 }
 
-private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig)
-    extends RdfStoreClientImpl(rdfStoreConfig)
+private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl(renkuConnectionConfig)
     with KGInfoFinder[F] {
 
   override def findActivityAuthors(resourceId: activities.ResourceId): F[Set[persons.ResourceId]] =

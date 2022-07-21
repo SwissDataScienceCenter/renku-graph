@@ -28,7 +28,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.projects.rest.Converters._
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -37,16 +37,17 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class KGProjectFinderSpec
     extends AnyWordSpec
-    with InMemoryRdfStore
-    with ScalaCheckPropertyChecks
     with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with ScalaCheckPropertyChecks
     with IOSpec {
 
   "findProject" should {
 
     "return details of the project with the given path when there's no parent" in new TestCase {
       forAll(Gen.oneOf(renkuProjectEntities(anyVisibility), nonRenkuProjectEntities(anyVisibility))) { project =>
-        loadToStore(anyProjectEntities.generateOne, project)
+        upload(to = renkuDataset, anyProjectEntities.generateOne, project)
 
         kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to[KGProject].some
@@ -57,7 +58,7 @@ class KGProjectFinderSpec
       forAll(
         Gen.oneOf(renkuProjectWithParentEntities(visibilityPublic), nonRenkuProjectWithParentEntities(visibilityPublic))
       ) { project =>
-        loadToStore(project, project.parent)
+        upload(to = renkuDataset, project, project.parent)
 
         kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to[KGProject].some
@@ -76,7 +77,7 @@ class KGProjectFinderSpec
 
       val parent = replaceMembers(Set(userAsMember))(project.parent)
 
-      loadToStore(project, parent)
+      upload(to = renkuDataset, project, parent)
 
       kgProjectFinder.findProject(project.path, user.some).unsafeRunSync() shouldBe
         project.to[KGProject].some
@@ -98,7 +99,7 @@ class KGProjectFinderSpec
 
         val parent = replaceMembers(Set.empty)(project.parent)
 
-        loadToStore(project, parent)
+        upload(to = renkuDataset, project, parent)
 
         kgProjectFinder.findProject(project.path, Some(user)).unsafeRunSync() shouldBe Some {
           project.to[KGProject].copy(maybeParent = None)
@@ -113,7 +114,7 @@ class KGProjectFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val kgProjectFinder = new KGProjectFinderImpl[IO](renkuStoreConfig)
+    val kgProjectFinder = new KGProjectFinderImpl[IO](renkuDSConnectionInfo)
   }
 
   private def replaceMembers(members: Set[Person]): Project => Project = {

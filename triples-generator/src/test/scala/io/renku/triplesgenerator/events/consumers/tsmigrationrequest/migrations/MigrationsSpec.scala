@@ -24,7 +24,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import io.renku.metrics.MetricsRegistry.DisabledMetricsRegistry
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.scalamock.scalatest.MockFactory
@@ -36,13 +36,13 @@ class MigrationsSpec extends AnyWordSpec with should.Matchers with IOSpec with M
   "apply" should {
 
     "not raise an error if there are migrations with unique names" in {
-      val migrations = Migrations[IO](reProvisioningStatus, ConfigFactory.load()).unsafeRunSync()
+      val migrations = Migrations[IO](ConfigFactory.load()).unsafeRunSync()
       migrations.isEmpty shouldBe false
     }
   }
 
-  private implicit lazy val logger:          TestLogger[IO]              = TestLogger[IO]()
-  private implicit lazy val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-  private implicit lazy val metricsRegistry: MetricsRegistry[IO]         = new DisabledMetricsRegistry[IO]
-  private lazy val reProvisioningStatus = mock[ReProvisioningStatus[IO]]
+  private implicit lazy val reProvisioningStatus: ReProvisioningStatus[IO]    = mock[ReProvisioningStatus[IO]]
+  private implicit lazy val logger:               TestLogger[IO]              = TestLogger[IO]()
+  private implicit lazy val timeRecorder:         SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
+  private implicit lazy val metricsRegistry:      MetricsRegistry[IO]         = new DisabledMetricsRegistry[IO]
 }

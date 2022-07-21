@@ -24,20 +24,19 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import reprovisioning.{ReProvisioning, ReProvisioningStatus}
 
 private[tsmigrationrequest] object Migrations {
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      reProvisioningStatus: ReProvisioningStatus[F],
-      config:               Config
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      config: Config
   ): F[List[Migration[F]]] = for {
-    reProvisioning                    <- ReProvisioning[F](reProvisioningStatus, config)
+    datasetsCreator                   <- DatasetsCreator[F]
+    reProvisioning                    <- ReProvisioning[F](config)
     malformedActivityIds              <- MalformedActivityIds[F]
     multiplePersonNames               <- MultiplePersonNames[F]
-    multipleModifiedDSData            <- MultipleModifiedDSData[F]
     malformedDSImageIds               <- MalformedDSImageIds[F]
     multipleDSTopmostSameAs           <- MultipleDSTopmostSameAs[F]
     multipleAllWrongTopmostSameAs     <- MultipleAllWrongTopmostSameAs[F]
@@ -50,10 +49,10 @@ private[tsmigrationrequest] object Migrations {
     multipleTopmostDerivedFroms       <- MultipleTopmostDerivedFroms[F]
     multipleProjectAgents             <- MultipleProjectAgents[F]
     migrations <- validateNames(
+                    datasetsCreator,
                     reProvisioning,
                     malformedActivityIds,
                     multiplePersonNames,
-                    multipleModifiedDSData,
                     malformedDSImageIds,
                     multipleDSTopmostSameAs,
                     multipleAllWrongTopmostSameAs,

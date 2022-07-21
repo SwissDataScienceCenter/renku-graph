@@ -4,7 +4,7 @@ on:
     tags:
       - '*.*.*'
 env:
-  SBT_OPTS: "-Xmx2G"
+  SBT_OPTS: "-Xmx2G -XX:+UseG1GC"
 jobs:
   cleanup-previous-runs:
     name: Cleanup previous runs
@@ -23,8 +23,8 @@ jobs:
       - name: JDK set-up
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
-          java-version: '18'
+          distribution: "temurin"
+          java-version: "17"
       - name: Setup cache
         uses: actions/cache@v2
         with:
@@ -43,8 +43,8 @@ jobs:
       - name: JDK set-up
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
-          java-version: '18'
+          distribution: "temurin"
+          java-version: "17"
       - name: Setup cache
         uses: actions/cache@v2
         with:
@@ -63,8 +63,8 @@ jobs:
       - name: JDK set-up
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
-          java-version: '18'
+          distribution: "temurin"
+          java-version: "17"
       - name: Setup cache
         uses: actions/cache@v2
         with:
@@ -89,8 +89,8 @@ jobs:
       - name: JDK set-up
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
-          java-version: '18'
+          distribution: "temurin"
+          java-version: "17"
       - name: Setup cache
         uses: actions/cache@v2
         with:

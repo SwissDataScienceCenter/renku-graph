@@ -37,8 +37,8 @@ class ArgumentsSpec extends AnyWordSpec with should.Matchers {
   "TinyTypeOps" should {
 
     "provide an extension method toScalarType which converts a String TinyType to ScalarType" in {
-      val name:        NonBlank = Refined.unsafeApply(nonEmptyStrings().generateOne)
-      val description: NonBlank = Refined.unsafeApply(nonEmptyStrings().generateOne)
+      val name        = nonBlankStrings().generateOne
+      val description = nonBlankStrings().generateOne
 
       val scalarType = TestTinyType.toScalarType(name, description)
 
@@ -68,7 +68,7 @@ class ArgumentsSpec extends AnyWordSpec with should.Matchers {
     }
 
     "provide an extension method toScalarType which returns a ScalarType which uses the given exception message on value conversion failures" in {
-      val customConversionMessage: NonBlank = Refined.unsafeApply(nonEmptyStrings().generateOne)
+      val customConversionMessage = nonBlankStrings().generateOne
 
       val scalarType = TestTinyType.toScalarType("name", "description", customConversionMessage)
 

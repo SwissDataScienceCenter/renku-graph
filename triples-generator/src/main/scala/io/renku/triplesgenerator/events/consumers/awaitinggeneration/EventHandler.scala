@@ -18,11 +18,11 @@
 
 package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
+import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.kernel.Deferred
 import cats.effect.{Async, Concurrent}
 import cats.syntax.all._
-import cats.{MonadThrow, Show}
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import io.renku.events.consumers.EventSchedulingResult._
@@ -32,10 +32,14 @@ import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventBody
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.MetricsRegistry
+import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName:  CategoryName,
+    tsReadinessChecker:         TSReadinessForEventsChecker[F],
     eventProcessor:             EventProcessor[F],
     eventBodyDeserializer:      EventBodyDeserializer[F],
     subscriptionMechanism:      SubscriptionMechanism[F],
@@ -43,42 +47,41 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
 ) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
 
   import eventBodyDeserializer.toCommitEvent
+  import tsReadinessChecker.verifyTSReady
 
   override def createHandlingProcess(requestContent: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess.withWaitingForCompletion[F](
-      deferred => startProcessEvent(requestContent, deferred),
+      verifyTSReady >> startProcessingEvent(requestContent, _),
       subscriptionMechanism.renewSubscription()
     )
 
-  private def startProcessEvent(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
+  private def startProcessingEvent(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
     eventBody <- requestContent match {
                    case EventRequestContent.WithPayload(_, payload: String) => EitherT.rightT(EventBody(payload))
                    case _                                                   => EitherT.leftT(BadRequest)
                  }
-    commitEvent <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
+    event <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
     result <- Concurrent[F]
-                .start(eventProcessor.process(commitEvent) >> deferred.complete(()))
+                .start(eventProcessor.process(event).recoverWith(errorLogging(event)) >> deferred.complete(()))
                 .toRightT
                 .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(commitEvent))
-                .leftSemiflatTap(Logger[F].log(commitEvent))
+                .semiflatTap(Logger[F].log(event))
+                .leftSemiflatTap(Logger[F].log(event))
   } yield result
-
-  private implicit lazy val eventInfoToString: Show[CommitEvent] = Show.show { event =>
-    show"${event.compoundEventId}, projectPath = ${event.project.path}"
-  }
 }
 
 object EventHandler {
 
-  def apply[F[_]: Async: Logger: AccessTokenFinder: MetricsRegistry](
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: AccessTokenFinder: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F],
       config:                Config = ConfigFactory.load()
   ): F[EventHandler[F]] = for {
+    tsReadinessChecker       <- TSReadinessForEventsChecker[F]
     eventProcessor           <- EventProcessor[F]
     generationProcesses      <- GenerationProcessesNumber[F](config)
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(generationProcesses.value))
   } yield new EventHandler[F](categoryName,
+                              tsReadinessChecker,
                               eventProcessor,
                               EventBodyDeserializer[F],
                               subscriptionMechanism,

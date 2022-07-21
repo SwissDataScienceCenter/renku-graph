@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
+package io.renku.triplesgenerator.events.consumers
+package tsmigrationrequest
 
+import TSStateChecker.TSState
 import cats.data.EitherT.{leftT, liftF, rightT}
 import cats.effect.IO
 import cats.syntax.all._
@@ -25,7 +27,7 @@ import io.circe.literal._
 import io.renku.config.ServiceVersion
 import io.renku.data.ErrorMessage
 import io.renku.events.consumers.ConcurrentProcessesLimiter
-import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
+import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.{SubscriptionMechanism, subscriberUrls}
 import io.renku.events.producers.EventSender
 import io.renku.events.producers.EventSender.EventContext
@@ -38,6 +40,7 @@ import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.json.JsonOps._
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import org.scalacheck.Gen
 import org.scalamock.matchers.ArgCapture.CaptureOne
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -47,31 +50,55 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
   "tryHandling" should {
 
-    "decode an event from the request, " +
-      "check if the requested version matches this TG version " +
-      "kick off the Migrations Runner, " +
-      "send MIGRATION_STATUS_CHANGE event with status DONE " +
-      s"and return $Accepted" in new TestCase {
+    "return ServiceUnavailable if TSState is ReProvisioning" in new TestCase {
+      (() => tsStateChecker.checkTSState).expects().returning(TSState.ReProvisioning.pure[IO])
 
-        (migrationsRunner.run _).expects().returning(rightT(()))
+      val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
 
-        (eventSender
-          .sendEvent(_: EventRequestContent.NoPayload, _: EventContext))
-          .expects(statusChangePayload(status = "DONE"), expectedEventContext)
-          .returning(().pure[IO])
+      process.process.merge.unsafeRunSync() shouldBe ServiceUnavailable("Re-provisioning running")
+    }
 
-        val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+    "return SchedulingError if TSState check fails" in new TestCase {
+      val exception = exceptions.generateOne
+      (() => tsStateChecker.checkTSState).expects().returning(exception.raiseError[IO, TSState])
 
-        process.process.merge.unsafeRunSync() shouldBe Accepted
+      val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
 
-        process.waitToFinish().unsafeRunSync()
+      process.process.merge.unsafeRunSync() shouldBe SchedulingError(exception)
+    }
 
-        logger.loggedOnly(Info(show"$categoryName: $serviceVersion -> $Accepted"))
-      }
+    TSState.Ready :: TSState.MissingDatasets :: Nil foreach { tsState =>
+      "decode an event from the request, " +
+        "check if the requested version matches this TG version " +
+        "kick off the Migrations Runner, " +
+        "send MIGRATION_STATUS_CHANGE event with status DONE " +
+        show"and return $Accepted " +
+        show"if TSState is $tsState" in new TestCase {
+
+          (() => tsStateChecker.checkTSState).expects().returning(tsState.pure[IO])
+
+          (migrationsRunner.run _).expects().returning(rightT(()))
+
+          (eventSender
+            .sendEvent(_: EventRequestContent.NoPayload, _: EventContext))
+            .expects(statusChangePayload(status = "DONE"), expectedEventContext)
+            .returning(().pure[IO])
+
+          val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+
+          process.process.merge.unsafeRunSync() shouldBe Accepted
+
+          process.waitToFinish().unsafeRunSync()
+
+          logger.loggedOnly(Info(show"$categoryName: $serviceVersion -> $Accepted"))
+        }
+    }
 
     "send MIGRATION_STATUS_CHANGE event with status RECOVERABLE_FAILURE " +
       "when migration returns ProcessingRecoverableError " +
       s"and return $Accepted" in new TestCase {
+
+        givenTsStateGreen
 
         val recoverableFailure = processingRecoverableErrors.generateOne
         (migrationsRunner.run _).expects().returning(leftT(recoverableFailure))
@@ -87,11 +114,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
           )
           .returning(().pure[IO])
 
-        val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+        val handlingProcess = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
 
-        process.process.merge.unsafeRunSync() shouldBe Accepted
+        handlingProcess.process.merge.unsafeRunSync() shouldBe Accepted
 
-        process.waitToFinish().unsafeRunSync()
+        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(Info(show"$categoryName: $serviceVersion -> $Accepted"))
       }
@@ -99,6 +126,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     "send MIGRATION_STATUS_CHANGE event with status NON_RECOVERABLE_FAILURE " +
       "when migration fails " +
       s"and return $Accepted" in new TestCase {
+
+        givenTsStateGreen
 
         val exception = exceptions.generateOne
         (migrationsRunner.run _).expects().returning(liftF(exception.raiseError[IO, Unit]))
@@ -109,11 +138,11 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
           .expects(capture(payloadCaptor), expectedEventContext)
           .returning(().pure[IO])
 
-        val process = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
+        val handlingProcess = handler.createHandlingProcess(requestPayload(serviceVersion)).unsafeRunSync()
 
-        process.process.merge.unsafeRunSync() shouldBe Accepted
+        handlingProcess.process.merge.unsafeRunSync() shouldBe Accepted
 
-        process.waitToFinish().unsafeRunSync()
+        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
         val actualEvent = payloadCaptor.value.event
         actualEvent.hcursor.downField("newStatus").as[String] shouldBe "NON_RECOVERABLE_FAILURE".asRight
@@ -125,6 +154,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     s"fail with $BadRequest for malformed event" in new TestCase {
 
+      givenTsStateGreen
+
       handler
         .createHandlingProcess(EventRequestContent.NoPayload(json"""{"categoryName": ${categoryName.value}}"""))
         .flatMap(_.process.merge)
@@ -135,6 +166,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     "decode an event from the request, " +
       s"and return $BadRequest check if the requested version is different than this TG version" in new TestCase {
+
+        givenTsStateGreen
 
         val requestedVersion = serviceVersions.generateOne
         handler
@@ -153,6 +186,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     val subscriberUrl              = subscriberUrls.generateOne
     val serviceId                  = microserviceIdentifiers.generateOne
     val serviceVersion             = serviceVersions.generateOne
+    val tsStateChecker             = mock[TSStateChecker[IO]]
     val migrationsRunner           = mock[MigrationsRunner[IO]]
     val eventSender                = mock[EventSender[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
@@ -161,6 +195,7 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     val handler = new EventHandler[IO](subscriberUrl,
                                        serviceId,
                                        serviceVersion,
+                                       tsStateChecker,
                                        migrationsRunner,
                                        eventSender,
                                        subscriptionMechanism,
@@ -188,9 +223,13 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       }
     }
     """)
+
+    def givenTsStateGreen =
+      (() => tsStateChecker.checkTSState)
+        .expects()
+        .returning(Gen.oneOf(TSState.Ready, TSState.MissingDatasets).generateOne.pure[IO])
   }
 
   private lazy val expectedEventContext =
     EventContext(CategoryName("MIGRATION_STATUS_CHANGE"), show"$categoryName: sending status change event failed")
-
 }

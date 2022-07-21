@@ -22,16 +22,15 @@ import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpUrls
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{activities, entities}
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class KGInfoFinderSpec extends AnyWordSpec with IOSpec with should.Matchers with InMemoryJenaForSpec with RenkuDataset {
 
   "findActivityAuthors" should {
 
@@ -43,11 +42,11 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
 
       val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val person = personEntities.generateOne.to[entities.Person]
-      loadToStore(person)
-      insertTriple(activity.resourceId, "prov:wasAssociatedWith", person.resourceId.showAs[RdfResource])
+      upload(to = renkuDataset, person)
+      insert(to = renkuDataset, Triple.edge(activity.resourceId, prov / "wasAssociatedWith", person.resourceId))
 
       kgInfoFinder.findActivityAuthors(activity.resourceId).unsafeRunSync() shouldBe
         Set(activity.author.resourceId, person.resourceId)
@@ -70,14 +69,14 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
 
       val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val person = personEntities.generateOne.to[entities.Person]
       val updatedAgentActivity = activity.copy(association = activity.association match {
         case assoc: entities.Association.WithPersonAgent => assoc.copy(agent = person)
         case _ => fail("Association.WithPersonAgent expected")
       })
-      loadToStore(updatedAgentActivity)
+      upload(to = renkuDataset, updatedAgentActivity)
 
       val originalAgent = activity.association match {
         case assoc: entities.Association.WithPersonAgent => assoc.agent
@@ -102,7 +101,7 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
 
       val activity = project.activities.headOption.getOrElse(fail("Activity expected"))
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       kgInfoFinder
         .findAssociationPersonAgents(activity.resourceId)
@@ -113,6 +112,6 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore wit
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val kgInfoFinder = new KGInfoFinderImpl[IO](renkuStoreConfig)
+    val kgInfoFinder = new KGInfoFinderImpl[IO](renkuDSConnectionInfo)
   }
 }

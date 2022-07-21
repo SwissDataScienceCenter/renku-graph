@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.effect.kernel.Temporal
 import cats.syntax.all._
 import io.renku.metrics._
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
@@ -65,7 +65,7 @@ object KGMetrics {
 
   import scala.concurrent.duration._
 
-  private[metrics] val initialDelay:   FiniteDuration = 10 seconds
+  private[metrics] val initialDelay:   FiniteDuration = 1 minute
   private[metrics] val countsInterval: FiniteDuration = 1 minute
 
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[KGMetrics[F]] = for {

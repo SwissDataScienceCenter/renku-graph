@@ -25,7 +25,7 @@ import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators.personResourceIds
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{activities, entities, persons}
-import io.renku.rdfstore.SparqlQuery
+import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.Generators.recoverableClientErrors

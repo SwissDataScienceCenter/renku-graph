@@ -23,8 +23,8 @@ import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.acceptancetests.data.{RdfStoreData, dataProjects}
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
@@ -45,8 +45,8 @@ class ProjectReProvisioningSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with RdfStoreProvisioning
-    with RdfStoreData {
+    with TSProvisioning
+    with TSData {
 
   Feature("Project re-provisioning") {
 
@@ -62,7 +62,7 @@ class ProjectReProvisioningSpec
       `GET <gitlabApi>/user returning OK`(user)
       mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
 
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       eventually {
         knowledgeGraphClient

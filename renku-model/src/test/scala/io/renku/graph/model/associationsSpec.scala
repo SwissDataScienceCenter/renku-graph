@@ -21,7 +21,7 @@ package io.renku.graph.model
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpUrls
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
+import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -29,9 +29,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class associationsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers with Schemas {
 
   "ResourceId" should {
-    "be renderable as RDF resource" in {
+    "be renderable as a URI encoded RDF resource" in {
       val id = httpUrls().generateAs[associations.ResourceId]
-      id.showAs[RdfResource] shouldBe s"<${sparqlEncode(id.value)}>"
+      id.showAs[RdfResource] shouldBe s"<${URIref.encode(id.value)}>"
     }
   }
 }

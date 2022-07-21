@@ -89,7 +89,7 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
 
 private object ProjectFinder {
 
-  import io.renku.rdfstore.SparqlQueryTimeRecorder
+  import io.renku.triplesstore.SparqlQueryTimeRecorder
 
   def apply[F[_]: Async: Parallel: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]
       : F[ProjectFinder[F]] = for {

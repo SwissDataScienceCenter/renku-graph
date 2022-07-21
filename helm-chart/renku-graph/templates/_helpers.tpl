@@ -26,6 +26,10 @@ Expand the name of the chart.
 {{- "commit-event-service" -}}
 {{- end -}}
 
+{{- define "jena.name" -}}
+{{- "jena" -}}
+{{- end -}}
+
 {{/*
 Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
@@ -71,6 +75,14 @@ If release name contains chart name it will be used as a full name.
 {{- end -}}
 {{- end -}}
 
+{{- define "jena.fullname" -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-jena" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "commitEventService.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
@@ -94,11 +106,4 @@ https
 {{- else -}}
 http
 {{- end -}}
-{{- end -}}
-
-{{/*
-Define subcharts full names
-*/}}
-{{- define "jena.fullname" -}}
-{{- printf "%s-%s" .Release.Name "jena" | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}

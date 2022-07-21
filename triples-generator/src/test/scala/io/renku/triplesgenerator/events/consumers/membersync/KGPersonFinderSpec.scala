@@ -26,7 +26,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -34,10 +34,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class KGPersonFinderSpec
     extends AnyWordSpec
+    with should.Matchers
     with IOSpec
-    with InMemoryRdfStore
     with ScalaCheckPropertyChecks
-    with should.Matchers {
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "findPersonIds" should {
 
@@ -47,7 +48,7 @@ class KGPersonFinderSpec
       val memberExistingInKG    = gitLabProjectMembers.generateOne
       val person                = personEntities(fixed(memberExistingInKG.gitLabId.some)).generateOne
 
-      loadToStore(person)
+      upload(to = renkuDataset, person)
 
       finder.findPersonIds(Set(memberNonExistingInKG, memberExistingInKG)).unsafeRunSync() shouldBe Set(
         memberNonExistingInKG -> None,
@@ -59,6 +60,6 @@ class KGPersonFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new KGPersonFinderImpl[IO](renkuStoreConfig)
+    val finder = new KGPersonFinderImpl[IO](renkuDSConnectionInfo)
   }
 }

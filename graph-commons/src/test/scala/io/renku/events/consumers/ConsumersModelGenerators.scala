@@ -18,6 +18,9 @@
 
 package io.renku.events.consumers
 
+import EventSchedulingResult._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{exceptions, fixed, nonEmptyStrings}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import org.scalacheck.Gen
 
@@ -27,4 +30,12 @@ object ConsumersModelGenerators {
     projectId <- projectIds
     path      <- projectPaths
   } yield Project(projectId, path)
+
+  lazy val notHappySchedulingResults: Gen[EventSchedulingResult] = Gen.oneOf(
+    fixed(Busy),
+    fixed(UnsupportedEventType),
+    fixed(BadRequest),
+    nonEmptyStrings().toGeneratorOf(ServiceUnavailable),
+    exceptions.toGeneratorOf(SchedulingError)
+  )
 }

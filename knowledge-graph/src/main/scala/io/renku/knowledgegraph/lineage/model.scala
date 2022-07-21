@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.jsonld.{EntityId, EntityType}
 import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
+import org.apache.jena.util.URIref
 
 import java.time.Instant
 
@@ -80,9 +81,7 @@ object model {
       import io.renku.graph.model.views.RdfResource
       import io.renku.tinytypes.Renderer
 
-      implicit object RdfResourceRenderer extends Renderer[RdfResource, Id] {
-        override def render(value: Id): String = s"<$value>"
-      }
+      implicit val rdfResourceRenderer: Renderer[RdfResource, Id] = value => s"<${URIref.encode(value.show)}>"
     }
 
     sealed trait Label extends Any with StringTinyType

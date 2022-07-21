@@ -1,0 +1,43 @@
+@prefix:        <#> .
+@prefix fuseki: <http://jena.apache.org/fuseki#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix tdb:    <http://jena.hpl.hp.com/2008/tdb#> .
+@prefix ja:     <http://jena.hpl.hp.com/2005/11/Assembler#> .
+@prefix text:   <http://jena.apache.org/text#> .
+
+:renku_tdb_all rdf:type fuseki:Service ;
+  rdfs:label                        "TDB renku" ;
+  fuseki:name                       "renku" ;
+  fuseki:dataset                    :text_dataset ;
+  fuseki:serviceQuery               "query" , "sparql" ;
+  fuseki:serviceReadGraphStore      "get" ;
+  fuseki:serviceReadWriteGraphStore "data" ;
+  fuseki:serviceUpdate              "update" ;
+  fuseki:serviceUpload              "upload" ;
+.
+
+:text_dataset rdf:type text:TextDataset ;
+  text:dataset   :renku ;
+  text:index     <#indexLucene> ;
+.
+
+:renku rdf:type tdb:DatasetTDB ;
+  tdb:location "/fuseki/databases/renku" ;
+.
+
+<#indexLucene> a text:TextIndexLucene ;
+  text:directory <file:///fuseki/databases/renku/lucene_index> ;
+  text:entityMap <#entMap> ;
+.
+
+<#entMap> a text:EntityMap ;
+  text:defaultField     "name" ;
+  text:entityField      "uri" ;
+  text:map (
+    [ text:field "name" ; text:predicate <http://schema.org/name> ]
+    [ text:field "description" ; text:predicate <http://schema.org/description> ]
+    [ text:field "slug" ; text:predicate <https://swissdatasciencecenter.github.io/renku-ontology#slug> ]
+    [ text:field "projectNamespaces" ; text:predicate <https://swissdatasciencecenter.github.io/renku-ontology#projectNamespaces> ]
+    [ text:field "keywords" ; text:predicate <http://schema.org/keywords> ]
+  ) .

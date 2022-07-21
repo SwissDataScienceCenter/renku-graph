@@ -18,8 +18,11 @@
 
 name := "knowledge-graph"
 
+Test / fork := true
+
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.11"
 
-libraryDependencies += "org.sangria-graphql" %% "sangria"        % "3.0.0"
-libraryDependencies += "org.sangria-graphql" %% "sangria-circe"  % "1.3.2"
 libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.0.33"
+
+libraryDependencies += "org.sangria-graphql" %% "sangria"       % "3.0.1"
+libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2"

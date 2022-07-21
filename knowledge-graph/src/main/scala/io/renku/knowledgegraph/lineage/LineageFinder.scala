@@ -25,7 +25,7 @@ import io.renku.graph.model.projects.Path
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.knowledgegraph.lineage.model._
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 trait LineageFinder[F[_]] {

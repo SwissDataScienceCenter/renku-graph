@@ -33,7 +33,7 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
-import io.renku.rdfstore.{MigrationsStoreConfig, RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{MigrationsConnectionConfig, RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
@@ -121,29 +121,31 @@ private[migrations] object ReProvisioning {
 
   import scala.concurrent.duration._
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      reProvisioningStatus: ReProvisioningStatus[F],
-      config:               Config = ConfigFactory.load()
-  ): F[Migration[F]] = RenkuUrlLoader[F]() flatMap { implicit renkuUrl =>
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      config: Config = ConfigFactory.load()
+  ): F[Migration[F]] = RenkuUrlLoader[F]().flatMap { implicit renkuUrl =>
     for {
-      retryDelay            <- find[F, FiniteDuration]("re-provisioning-retry-delay", config)
-      migrationsStoreConfig <- MigrationsStoreConfig[F](config)
-      renkuStoreConfig      <- RdfStoreConfig[F](config)
-      eventSender           <- EventSender[F]
-      microserviceUrlFinder <- MicroserviceUrlFinder[F](Microservice.ServicePort)
-      compatibilityMatrix   <- VersionCompatibilityConfig[F](config)
-      executionTimeRecorder <- ExecutionTimeRecorder[F]()
-      triplesRemover        <- TriplesRemoverImpl(renkuStoreConfig)
-      judge <-
-        ReProvisionJudge[F](migrationsStoreConfig, reProvisioningStatus, microserviceUrlFinder, compatibilityMatrix)
+      retryDelay                 <- find[F, FiniteDuration]("re-provisioning-retry-delay", config)
+      migrationsConnectionConfig <- MigrationsConnectionConfig[F](config)
+      renkuStoreConfig           <- RenkuConnectionConfig[F](config)
+      eventSender                <- EventSender[F]
+      microserviceUrlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
+      compatibilityMatrix        <- VersionCompatibilityConfig[F](config)
+      executionTimeRecorder      <- ExecutionTimeRecorder[F]()
+      triplesRemover             <- TriplesRemoverImpl(renkuStoreConfig)
+      judge <- ReProvisionJudge[F](migrationsConnectionConfig,
+                                   ReProvisioningStatus[F],
+                                   microserviceUrlFinder,
+                                   compatibilityMatrix
+               )
     } yield new ReProvisioningImpl[F](
       compatibilityMatrix,
       judge,
       triplesRemover,
       eventSender,
-      new RenkuVersionPairUpdaterImpl(migrationsStoreConfig),
+      new RenkuVersionPairUpdaterImpl(migrationsConnectionConfig),
       microserviceUrlFinder,
-      reProvisioningStatus,
+      ReProvisioningStatus[F],
       executionTimeRecorder,
       retryDelay
     )

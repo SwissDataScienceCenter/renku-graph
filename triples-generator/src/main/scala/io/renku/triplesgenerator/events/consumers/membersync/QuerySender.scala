@@ -18,7 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.membersync
 
-import io.renku.rdfstore.SparqlQuery
+import io.renku.triplesstore.SparqlQuery
 
 private trait QuerySender[F[_]] {
 

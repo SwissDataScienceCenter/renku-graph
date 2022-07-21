@@ -23,7 +23,7 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 

@@ -24,8 +24,8 @@ import io.circe.{Decoder, Json}
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
-import io.renku.graph.acceptancetests.data.{RdfStoreData, dataProjects}
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
@@ -39,12 +39,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import cats.data.NonEmptyList
 
-class EventsResourceSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with RdfStoreData
-    with RdfStoreProvisioning {
+class EventsResourceSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSData with TSProvisioning {
 
   Feature("GET /events?project-path=<path> to return info about all the project events") {
 
@@ -60,7 +55,7 @@ class EventsResourceSpec
       noEventsResponse.status                  shouldBe Ok
       noEventsResponse.jsonBody.as[List[Json]] shouldBe Nil.asRight
       When("new events are added to the store")
-      `data in the RDF store`(project, commits)
+      `data in the Triples Store`(project, commits)
 
       eventually {
         Then("the user can see the events on the endpoint")

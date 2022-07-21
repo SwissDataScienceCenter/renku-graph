@@ -197,11 +197,10 @@ class ConcurrentProcessesLimiterSpec
 
     def tryExecuting(process:        Deferred[IO, Unit] => EitherT[IO, EventSchedulingResult, Accepted],
                      releaseProcess: IO[Unit]
-    ): IO[EventSchedulingResult] =
-      for {
-        handlerProcess <- EventHandlingProcess.withWaitingForCompletion[IO](process, releaseProcess)
-        result         <- limiter.tryExecuting(handlerProcess)
-      } yield result
+    ): IO[EventSchedulingResult] = for {
+      handlerProcess <- EventHandlingProcess.withWaitingForCompletion[IO](process, releaseProcess)
+      result         <- limiter.tryExecuting(handlerProcess)
+    } yield result
 
   }
 

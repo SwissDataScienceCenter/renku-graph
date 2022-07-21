@@ -48,7 +48,7 @@ class MicroserviceRunnerSpec
   "run" should {
 
     "return Success ExitCode if " +
-      "Sentry and RDF dataset initialisation are fine " +
+      "Sentry and TS datasets initialisations are fine " +
       "and subscription, re-provisioning and the http server start up" in new TestCase {
 
         (() => serviceReadinessChecker.waitIfNotUp).expects().returning(().pure[IO])

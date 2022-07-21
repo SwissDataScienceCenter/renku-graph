@@ -21,12 +21,10 @@ package io.renku.db
 import cats.MonadThrow
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.pureconfig._
-import eu.timepit.refined.string.MatchesRegex
 import io.renku.config.ConfigLoader
 import io.renku.db.DBConfigProvider.DBConfig
 
@@ -63,10 +61,10 @@ object DBConfigProvider {
   )
 
   object DBConfig {
-    type Host           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type Host           = String Refined NonEmpty
     type Port           = Int Refined Positive
-    type DbName         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type User           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type DbName         = String Refined NonEmpty
+    type User           = String Refined NonEmpty
     type Pass           = String Refined NonEmpty
     type ConnectionPool = Int Refined Positive
   }

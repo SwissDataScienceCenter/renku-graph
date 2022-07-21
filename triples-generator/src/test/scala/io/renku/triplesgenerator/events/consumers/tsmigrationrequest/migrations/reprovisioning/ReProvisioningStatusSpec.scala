@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning
 
+import ReProvisioningInfo.Status.Running
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.syntax.all._
@@ -30,10 +31,9 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningInfo.Status.Running
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -46,7 +46,8 @@ class ReProvisioningStatusSpec
     with IOSpec
     with should.Matchers
     with MockFactory
-    with InMemoryRdfStore {
+    with InMemoryJenaForSpec
+    with MigrationsDataset {
 
   "underReProvisioning" should {
 
@@ -81,7 +82,7 @@ class ReProvisioningStatusSpec
       reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
       reProvisioningStatus.underReProvisioning().unsafeRunSync()       shouldBe true
 
-      expectNotificationSent()
+      expectNotificationSent(subscriptions: _*)
 
       clearStatus()
 
@@ -113,7 +114,7 @@ class ReProvisioningStatusSpec
 
       findInfo shouldBe (Running.value, controller.value).some
 
-      expectNotificationSent()
+      expectNotificationSent(subscriptions: _*)
 
       reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
@@ -124,7 +125,7 @@ class ReProvisioningStatusSpec
 
       findInfo shouldBe None
 
-      expectNotificationSent()
+      expectNotificationSent(subscriptions: _*)
 
       reProvisioningStatus.clear().unsafeRunSync() shouldBe ()
 
@@ -146,43 +147,73 @@ class ReProvisioningStatusSpec
     }
   }
 
-  override lazy val storeConfig: TriplesStoreConfig = migrationsStoreConfig
+  "registerForNotification" should {
+
+    "register the given Subscription Mechanism for the notification about done re-provisioning" in new TestCase {
+
+      val controller = microserviceBaseUrls.generateOne
+      reProvisioningStatus.setRunning(on = controller).unsafeRunSync() shouldBe ()
+
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe true
+
+      val subscription = mock[SubscriptionMechanism[IO]]
+      reProvisioningStatus.registerForNotification(subscription).unsafeRunSync() shouldBe ()
+      expectNotificationSent(subscription :: subscriptions: _*)
+
+      clearStatus()
+
+      sleep((statusRefreshInterval + (500 millis)).toMillis)
+
+      reProvisioningStatus.underReProvisioning().unsafeRunSync() shouldBe false
+    }
+  }
 
   private trait TestCase {
+    val subscriptions = List(mock[SubscriptionMechanism[IO]], mock[SubscriptionMechanism[IO]])
+
     val cacheRefreshInterval  = 1 second
     val statusRefreshInterval = 1 second
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
     private val statusCacheCheckTimeRef = Ref.unsafe[IO, Long](0L)
-    private val subscriptions           = List(mock[SubscriptionMechanism[IO]], mock[SubscriptionMechanism[IO]])
-    val reProvisioningStatus = new ReProvisioningStatusImpl[IO](subscriptions,
-                                                                migrationsStoreConfig,
+    private val subscriptionsRegistry   = Ref.unsafe[IO, List[SubscriptionMechanism[IO]]](Nil)
+    val reProvisioningStatus = new ReProvisioningStatusImpl[IO](migrationsDSConnectionInfo,
                                                                 statusRefreshInterval,
                                                                 cacheRefreshInterval,
+                                                                subscriptionsRegistry,
                                                                 statusCacheCheckTimeRef
     )
 
-    def expectNotificationSent(): Unit = subscriptions foreach { subscription =>
-      (subscription.renewSubscription _)
-        .expects()
-        .returning(IO.unit)
+    subscriptions.traverse(reProvisioningStatus.registerForNotification).unsafeRunSync()
+
+    def expectNotificationSent(subscriptions: SubscriptionMechanism[IO]*): Unit = subscriptions foreach {
+      subscription =>
+        (subscription.renewSubscription _)
+          .expects()
+          .returning(IO.unit)
     }
   }
 
-  private def findInfo: Option[(String, String)] = runQuery {
-    s"""|SELECT DISTINCT ?status ?controllerUrl
-        |WHERE {
-        |  ?id a renku:ReProvisioning;
-        |      renku:status ?status;
-        |      renku:controllerUrl ?controllerUrl
-        |}
-        |""".stripMargin
-  }.unsafeRunSync()
+  private def findInfo: Option[(String, String)] = runSelect(
+    on = migrationsDataset,
+    SparqlQuery.of(
+      "fetch re-provisioning info",
+      Prefixes of renku -> "renku",
+      s"""|SELECT DISTINCT ?status ?controllerUrl
+          |WHERE {
+          |  ?id a renku:ReProvisioning;
+          |        renku:status ?status;
+          |        renku:controllerUrl ?controllerUrl
+          |}
+          |""".stripMargin
+    )
+  ).unsafeRunSync()
     .map(row => row("status") -> row("controllerUrl"))
     .headOption
 
-  private def clearStatus(): Unit = runUpdate {
+  private def clearStatus(): Unit = runUpdate(
+    on = migrationsDataset,
     SparqlQuery.of(
       name = "re-provisioning - status remove",
       Prefixes of renku -> "renku",
@@ -193,5 +224,5 @@ class ReProvisioningStatusSpec
           |}
           |""".stripMargin
     )
-  }.unsafeRunSync()
+  ).unsafeRunSync()
 }

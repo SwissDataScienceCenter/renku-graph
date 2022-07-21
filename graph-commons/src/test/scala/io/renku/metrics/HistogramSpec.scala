@@ -105,8 +105,6 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       val Success(histogram) = Histogram[Try](name, help, Seq(.1, .5, 1))
 
-      val labelValue = nonEmptyStrings().generateOne
-
       val Success(timer) = histogram.startTimer()
 
       sleep(600)

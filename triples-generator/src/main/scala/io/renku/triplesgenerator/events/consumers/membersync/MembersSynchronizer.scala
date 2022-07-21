@@ -26,7 +26,7 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -95,9 +95,9 @@ private object MembersSynchronizer {
       kGProjectMembersFinder     <- KGProjectMembersFinder[F]
       kGPersonFinder             <- KGPersonFinder[F]
       updatesCreator             <- UpdatesCreator[F]
-      rdfStoreConfig             <- RdfStoreConfig[F]()
+      renkuConnectionConfig      <- RenkuConnectionConfig[F]()
       querySender <-
-        MonadThrow[F].catchNonFatal(new RdfStoreClientImpl(rdfStoreConfig) with QuerySender[F] {
+        MonadThrow[F].catchNonFatal(new TSClientImpl(renkuConnectionConfig) with QuerySender[F] {
           override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
         })
       executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)

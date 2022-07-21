@@ -28,25 +28,25 @@ import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.projects
 import io.renku.jsonld.EntityId
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
 private object SameAsHierarchyFixer {
   def relinkSameAsHierarchy[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(implicit
-      rdfStoreConfig: RdfStoreConfig
+      renkuConnectionConfig: RenkuConnectionConfig
   ): F[Unit] = MonadThrow[F].catchNonFatal {
-    new SameAsHierarchyFixer[F](path)(rdfStoreConfig)
+    new SameAsHierarchyFixer[F](path)(renkuConnectionConfig)
   } >>= (_.run())
 }
 
 private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder](path: projects.Path)(
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig,
-                             idleTimeoutOverride = (11 minutes).some,
-                             requestTimeoutOverride = (10 minutes).some
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl(renkuConnectionConfig,
+                       idleTimeoutOverride = (11 minutes).some,
+                       requestTimeoutOverride = (10 minutes).some
     ) {
 
   import io.renku.jsonld.syntax._

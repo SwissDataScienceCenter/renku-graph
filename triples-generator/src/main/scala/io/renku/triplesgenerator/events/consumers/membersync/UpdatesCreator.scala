@@ -28,8 +28,8 @@ import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
-import io.renku.rdfstore.SparqlQuery
-import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.SparqlQuery
+import io.renku.triplesstore.SparqlQuery.Prefixes
 
 private class UpdatesCreator(renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl) {
 

@@ -29,8 +29,8 @@ import io.renku.graph.model.views.RdfResource
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.EntityId
 import io.renku.knowledgegraph.lineage.model._
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait EdgesFinder[F[_]] {
@@ -38,9 +38,9 @@ private trait EdgesFinder[F[_]] {
 }
 
 private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig,
-    renkuUrl:       RenkuUrl
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig,
+    renkuUrl:              RenkuUrl
+) extends TSClientImpl(renkuConnectionConfig)
     with EdgesFinder[F] {
 
   private type EdgeData = (ExecutionInfo, Option[Node.Location], Option[Node.Location])
@@ -158,7 +158,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 private object EdgesFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EdgesFinder[F]] = for {
-    config   <- RdfStoreConfig[F]()
+    config   <- RenkuConnectionConfig[F]()
     renkuUrl <- RenkuUrlLoader[F]()
   } yield new EdgesFinderImpl[F](config, renkuUrl)
 }

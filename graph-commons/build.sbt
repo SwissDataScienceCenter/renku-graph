@@ -18,6 +18,8 @@
 
 name := "graph-commons"
 
+Test / fork := true
+
 val pureConfigVersion = "0.17.1"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
@@ -41,11 +43,6 @@ libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.3.2"
 val testContainersScalaVersion = "0.40.8"
 libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
-libraryDependencies += "com.github.tomakehurst" % "wiremock"                        % "2.27.2"                   % Test
-
-val jenaVersion = "3.14.0" // 4.0.0 requires IRI encoding
-libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % Test
-libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
-libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
+libraryDependencies += "com.github.tomakehurst" % "wiremock-jre8"                   % "2.33.2"                   % Test
 
 libraryDependencies += "org.scalamock" %% "scalamock" % "5.2.0" % Test

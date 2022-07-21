@@ -25,7 +25,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.db.EventLog
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectPaths
@@ -43,7 +43,7 @@ class ProjectSyncFlowSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with RdfStoreProvisioning
+    with TSProvisioning
     with TypeSerializers {
 
   Feature("Project info should be kept in sync with GitLab") {
@@ -54,10 +54,10 @@ class ProjectSyncFlowSpec
       val testEntitiesProject = renkuProjectEntities(visibilityPublic).generateOne
       val project             = dataProjects(testEntitiesProject).generateOne
 
-      Given("repository data in the RDF Store")
+      Given("repository data in the Triples Store")
       val commitId = commitIds.generateOne
       mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       Then("the project data should exist in the KG")
       eventually {

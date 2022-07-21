@@ -24,13 +24,13 @@ import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import eu.timepit.refined.auto._
-import io.renku.generators.CommonGraphGenerators.{rdfStoreConfigs, sparqlQueries}
+import io.renku.generators.CommonGraphGenerators.{renkuConnectionConfigs, sparqlQueries}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{FusekiBaseUrl, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{FusekiUrl, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
@@ -51,7 +51,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
       updater.send(query).value.unsafeRunSync() shouldBe ().asRight
     }
 
-    s"return $NonRecoverableFailure if the given updates is invalid (RDF store responds with BAD_REQUEST 400)" in new TestCase {
+    s"return $NonRecoverableFailure if the given updates is invalid (TS responds with a BAD_REQUEST 400)" in new TestCase {
 
       givenStore(forUpdate = query, returning = badRequest())
 
@@ -92,7 +92,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
 
       failure shouldBe a[LogWorthyRecoverableError]
       failure.getMessage should startWith(
-        s"Triples transformation update 'curation update' failed: POST $externalServiceBaseUrl/${rdfStoreConfig.datasetName}/update error"
+        s"Triples transformation update 'curation update' failed: POST $externalServiceBaseUrl/${renkuConnectionConfig.datasetName}/update error"
       )
     }
   }
@@ -102,12 +102,15 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    lazy val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl))
-    lazy val updater        = new UpdatesUploaderImpl[IO](rdfStoreConfig, retryInterval = 100 millis, maxRetries = 1)
+    lazy val renkuConnectionConfig =
+      renkuConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
+    lazy val updater = new UpdatesUploaderImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) = stubFor {
-      post(s"/${rdfStoreConfig.datasetName}/update")
-        .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
+      post(s"/${renkuConnectionConfig.datasetName}/update")
+        .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
+                       renkuConnectionConfig.authCredentials.password.value
+        )
         .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
         .withRequestBody(equalTo(s"update=${urlEncode(forUpdate.toString)}"))
         .willReturn(returning)

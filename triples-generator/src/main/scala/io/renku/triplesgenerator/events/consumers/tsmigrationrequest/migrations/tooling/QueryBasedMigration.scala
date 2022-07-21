@@ -28,7 +28,7 @@ import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import org.typelevel.log4cats.Logger
 
