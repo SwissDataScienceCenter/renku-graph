@@ -207,11 +207,11 @@ object NodeDef {
     }
     activity.parameters
       .collect {
-        case parameter @ CommandInputValue(_, _, valueReference: ExplicitCommandParameter, _) =>
+        case parameter @ CommandInputValue(_, _, valueReference: ExplicitParameter, _) =>
           parameter -> valueReference.position
-        case parameter @ CommandOutputValue(_, _, valueReference: ExplicitCommandParameter, _) =>
+        case parameter @ CommandOutputValue(_, _, valueReference: ExplicitParameter, _) =>
           parameter -> valueReference.position
-        case parameter @ CommandParameterValue(_, _, valueReference: ExplicitCommandParameter, _) =>
+        case parameter @ CommandParameterValue(_, _, valueReference: ExplicitParameter, _) =>
           parameter -> valueReference.position
       }
       .sortBy(_._2)

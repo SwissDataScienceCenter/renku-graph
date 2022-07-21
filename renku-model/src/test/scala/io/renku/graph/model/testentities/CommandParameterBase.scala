@@ -36,7 +36,7 @@ sealed trait CommandParameterBase {
   val plan:         Plan
 }
 
-sealed trait ExplicitCommandParameter {
+sealed trait ExplicitParameter {
   self: CommandParameterBase =>
   val position:         Position
   val maybeDescription: Option[Description]
@@ -44,48 +44,70 @@ sealed trait ExplicitCommandParameter {
 
 object CommandParameterBase {
 
-  final case class CommandParameter(position:         Position,
-                                    name:             Name,
-                                    maybeDescription: Option[Description],
-                                    maybePrefix:      Option[Prefix],
-                                    defaultValue:     ParameterDefaultValue,
-                                    plan:             Plan
-  ) extends CommandParameterBase
-      with ExplicitCommandParameter {
+  sealed trait CommandParameter extends CommandParameterBase {
     override type DefaultValue = ParameterDefaultValue
+    val maybeDescription: Option[Description]
   }
+
+  final case class ExplicitCommandParameter(position:         Position,
+                                            name:             Name,
+                                            maybeDescription: Option[Description],
+                                            maybePrefix:      Option[Prefix],
+                                            defaultValue:     ParameterDefaultValue,
+                                            plan:             Plan
+  ) extends CommandParameter
+      with ExplicitParameter
+
+  final case class ImplicitCommandParameter(name:             Name,
+                                            maybeDescription: Option[Description],
+                                            maybePrefix:      Option[Prefix],
+                                            defaultValue:     ParameterDefaultValue,
+                                            plan:             Plan
+  ) extends CommandParameter
 
   object CommandParameter {
 
     def from(value: ParameterDefaultValue): Position => Plan => CommandParameter =
       position =>
         plan =>
-          CommandParameter(position,
-                           Name(s"parameter_$position"),
-                           maybeDescription = None,
-                           maybePrefix = None,
-                           defaultValue = value,
-                           plan
+          ExplicitCommandParameter(position,
+                                   Name(s"parameter_$position"),
+                                   maybeDescription = None,
+                                   maybePrefix = None,
+                                   defaultValue = value,
+                                   plan
           )
 
     implicit def toEntitiesCommandParameter(implicit
         renkuUrl: RenkuUrl
-    ): CommandParameter => entities.CommandParameterBase.CommandParameter =
-      parameter =>
-        entities.CommandParameterBase.CommandParameter(
-          commandParameters.ResourceId(parameter.asEntityId.show),
-          parameter.position,
-          parameter.name,
-          parameter.maybeDescription,
-          parameter.maybePrefix,
-          parameter.defaultValue
+    ): CommandParameter => entities.CommandParameterBase.CommandParameter = {
+      case p @ ExplicitCommandParameter(position, name, maybeDesc, maybePrefix, defaultValue, _) =>
+        entities.CommandParameterBase.ExplicitCommandParameter(
+          commandParameters.ResourceId(p.asEntityId.show),
+          position,
+          name,
+          maybeDesc,
+          maybePrefix,
+          defaultValue
         )
+      case p @ ImplicitCommandParameter(name, maybeDesc, maybePrefix, defaultValue, _) =>
+        entities.CommandParameterBase.ImplicitCommandParameter(
+          commandParameters.ResourceId(p.asEntityId.show),
+          name,
+          maybeDesc,
+          maybePrefix,
+          defaultValue
+        )
+    }
 
     implicit def commandParameterEncoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[CommandParameter] =
       JsonLDEncoder.instance(_.to[entities.CommandParameterBase.CommandParameter].asJsonLD)
 
-    implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[CommandParameter] =
-      EntityIdEncoder.instance(parameter => parameter.plan.asEntityId.asUrlEntityId / "parameters" / parameter.position)
+    implicit def entityIdEncoder[P <: CommandParameter](implicit renkuUrl: RenkuUrl): EntityIdEncoder[P] =
+      EntityIdEncoder.instance {
+        case p: ExplicitCommandParameter => p.plan.asEntityId.asUrlEntityId / "parameters" / p.position
+        case p: ImplicitCommandParameter => p.plan.asEntityId.asUrlEntityId / "parameters" / p.name
+      }
   }
 
   sealed trait CommandInputOrOutput extends CommandParameterBase
@@ -137,7 +159,7 @@ object CommandParameterBase {
                                           maybeEncodingFormat: Option[EncodingFormat],
                                           plan:                Plan
     ) extends CommandInput
-        with ExplicitCommandParameter
+        with ExplicitParameter
 
     final case class MappedCommandInput(position:            Position,
                                         name:                Name,
@@ -148,7 +170,7 @@ object CommandParameterBase {
                                         plan:                Plan
     )(implicit renkuUrl:                                     RenkuUrl)
         extends CommandInput
-        with ExplicitCommandParameter {
+        with ExplicitParameter {
       val mappedTo: IOStream.In = IOStream.StdIn(IOStream.ResourceId((renkuUrl / "iostreams" / StdIn.name).value))
     }
 
@@ -259,7 +281,7 @@ object CommandParameterBase {
                                            maybeEncodingFormat: Option[EncodingFormat],
                                            plan:                Plan
     ) extends CommandOutput
-        with ExplicitCommandParameter
+        with ExplicitParameter
 
     final case class MappedCommandOutput(position:            Position,
                                          name:                Name,
@@ -271,7 +293,7 @@ object CommandParameterBase {
                                          mappedTo:            IOStream.Out,
                                          plan:                Plan
     ) extends CommandOutput
-        with ExplicitCommandParameter
+        with ExplicitParameter
 
     final case class ImplicitCommandOutput(
         name:                Name,

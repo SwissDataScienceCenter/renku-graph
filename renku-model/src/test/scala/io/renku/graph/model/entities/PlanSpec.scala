@@ -46,12 +46,12 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
   }
 
   private implicit lazy val parameterFactoryLists: Gen[List[Position => Plan => CommandParameterBase]] = for {
-    parameters      <- commandParameterObjects.toGeneratorOfList()
-    locationInputs  <- locationCommandInputObjects.toGeneratorOfList()
-    mappedInputs    <- mappedCommandInputObjects.toGeneratorOfList()
-    locationOutputs <- locationCommandOutputObjects.toGeneratorOfList()
-    mappedOutputs   <- mappedCommandOutputObjects.toGeneratorOfList()
-  } yield parameters ::: locationInputs ::: mappedInputs ::: locationOutputs ::: mappedOutputs
+    explicitParameters <- explicitCommandParameterObjects.toGeneratorOfList()
+    locationInputs     <- locationCommandInputObjects.toGeneratorOfList()
+    mappedInputs       <- mappedCommandInputObjects.toGeneratorOfList()
+    locationOutputs    <- locationCommandOutputObjects.toGeneratorOfList()
+    mappedOutputs      <- mappedCommandOutputObjects.toGeneratorOfList()
+  } yield explicitParameters ::: locationInputs ::: mappedInputs ::: locationOutputs ::: mappedOutputs
 
   private lazy val planObjects: Gen[Plan] = for {
     name                     <- planNames
