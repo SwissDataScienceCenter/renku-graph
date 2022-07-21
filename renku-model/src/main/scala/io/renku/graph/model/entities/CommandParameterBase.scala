@@ -31,7 +31,7 @@ sealed trait CommandParameterBase {
   val defaultValue: DefaultValue
 }
 
-sealed trait ExplicitCommandParameter {
+sealed trait ExplicitParameter {
   self: CommandParameterBase =>
   val position:         Position
   val maybeDescription: Option[Description]
@@ -42,27 +42,46 @@ object CommandParameterBase {
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
-  final case class CommandParameter(resourceId:       ResourceId,
-                                    position:         Position,
-                                    name:             Name,
-                                    maybeDescription: Option[Description],
-                                    maybePrefix:      Option[Prefix],
-                                    defaultValue:     ParameterDefaultValue
-  ) extends CommandParameterBase
-      with ExplicitCommandParameter {
+  sealed trait CommandParameter extends CommandParameterBase {
     override type DefaultValue = ParameterDefaultValue
+    val maybeDescription: Option[Description]
   }
+
+  final case class ExplicitCommandParameter(resourceId:       ResourceId,
+                                            position:         Position,
+                                            name:             Name,
+                                            maybeDescription: Option[Description],
+                                            maybePrefix:      Option[Prefix],
+                                            defaultValue:     ParameterDefaultValue
+  ) extends CommandParameter
+      with ExplicitParameter
+
+  final case class ImplicitCommandParameter(resourceId:       ResourceId,
+                                            name:             Name,
+                                            maybeDescription: Option[Description],
+                                            maybePrefix:      Option[Prefix],
+                                            defaultValue:     ParameterDefaultValue
+  ) extends CommandParameter
 
   object CommandParameter {
 
     private val entityTypes: EntityTypes = EntityTypes of (renku / "CommandParameter", renku / "CommandParameterBase")
 
-    implicit lazy val commandParameterEncoder: JsonLDEncoder[CommandParameter] = JsonLDEncoder.instance {
-      case CommandParameter(resourceId, position, name, maybeDescription, maybePrefix, defaultValue) =>
+    implicit def encoder[P <: CommandParameter]: JsonLDEncoder[P] = JsonLDEncoder.instance {
+      case ExplicitCommandParameter(resourceId, position, name, maybeDescription, maybePrefix, defaultValue) =>
         JsonLD.entity(
           resourceId.asEntityId,
           entityTypes,
           renku / "position"      -> position.asJsonLD,
+          schema / "name"         -> name.asJsonLD,
+          schema / "description"  -> maybeDescription.asJsonLD,
+          renku / "prefix"        -> maybePrefix.asJsonLD,
+          schema / "defaultValue" -> defaultValue.asJsonLD
+        )
+      case ImplicitCommandParameter(resourceId, name, maybeDescription, maybePrefix, defaultValue) =>
+        JsonLD.entity(
+          resourceId.asEntityId,
+          entityTypes,
           schema / "name"         -> name.asJsonLD,
           schema / "description"  -> maybeDescription.asJsonLD,
           renku / "prefix"        -> maybePrefix.asJsonLD,
@@ -74,12 +93,17 @@ object CommandParameterBase {
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
       for {
         resourceId       <- cursor.downEntityId.as[ResourceId]
-        position         <- cursor.downField(renku / "position").as[Position]
+        maybePosition    <- cursor.downField(renku / "position").as[Option[Position]]
         name             <- cursor.downField(schema / "name").as[Name]
         maybeDescription <- cursor.downField(schema / "description").as[Option[Description]]
         maybePrefix      <- cursor.downField(renku / "prefix").as[Option[Prefix]]
         defaultValue     <- cursor.downField(schema / "defaultValue").as[ParameterDefaultValue]
-      } yield CommandParameter(resourceId, position, name, maybeDescription, maybePrefix, defaultValue)
+      } yield maybePosition match {
+        case Some(position) =>
+          ExplicitCommandParameter(resourceId, position, name, maybeDescription, maybePrefix, defaultValue)
+        case None =>
+          ImplicitCommandParameter(resourceId, name, maybeDescription, maybePrefix, defaultValue)
+      }
     }
   }
 
@@ -98,7 +122,7 @@ object CommandParameterBase {
                                         defaultValue:        InputDefaultValue,
                                         maybeEncodingFormat: Option[EncodingFormat]
   ) extends CommandInput
-      with ExplicitCommandParameter
+      with ExplicitParameter
 
   final case class MappedCommandInput(resourceId:          ResourceId,
                                       position:            Position,
@@ -109,7 +133,7 @@ object CommandParameterBase {
                                       maybeEncodingFormat: Option[EncodingFormat],
                                       mappedTo:            IOStream.In
   ) extends CommandInput
-      with ExplicitCommandParameter
+      with ExplicitParameter
 
   final case class ImplicitCommandInput(resourceId:          ResourceId,
                                         name:                Name,
@@ -122,7 +146,7 @@ object CommandParameterBase {
 
     val entityTypes: EntityTypes = EntityTypes of (renku / "CommandInput", renku / "CommandParameterBase")
 
-    implicit def commandInputEncoder[I <: CommandInput]: JsonLDEncoder[I] = JsonLDEncoder.instance {
+    implicit def encoder[I <: CommandInput]: JsonLDEncoder[I] = JsonLDEncoder.instance {
       case LocationCommandInput(resourceId,
                                 position,
                                 name,
@@ -240,7 +264,7 @@ object CommandParameterBase {
                                          folderCreation:      FolderCreation,
                                          maybeEncodingFormat: Option[EncodingFormat]
   ) extends CommandOutput
-      with ExplicitCommandParameter
+      with ExplicitParameter
 
   final case class MappedCommandOutput(resourceId:          ResourceId,
                                        position:            Position,
@@ -252,7 +276,7 @@ object CommandParameterBase {
                                        maybeEncodingFormat: Option[EncodingFormat],
                                        mappedTo:            IOStream.Out
   ) extends CommandOutput
-      with ExplicitCommandParameter
+      with ExplicitParameter
 
   case class ImplicitCommandOutput(resourceId:          ResourceId,
                                    name:                Name,
@@ -266,7 +290,7 @@ object CommandParameterBase {
 
     private val entityTypes = EntityTypes of (renku / "CommandOutput", renku / "CommandParameterBase")
 
-    implicit def commandOutputEncoder[O <: CommandOutput]: JsonLDEncoder[O] = JsonLDEncoder.instance {
+    implicit def encoder[O <: CommandOutput]: JsonLDEncoder[O] = JsonLDEncoder.instance {
       case LocationCommandOutput(resourceId,
                                  position,
                                  name,
