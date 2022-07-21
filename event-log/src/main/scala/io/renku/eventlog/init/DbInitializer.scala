@@ -150,6 +150,12 @@ object DbInitializer {
             currentStatus = TransformationNonRecoverableFailure,
             destinationStatus = TriplesGenerated,
             discardingStatuses = TriplesStore :: Nil
+          ),
+          FailedEventsRestorer[F](
+            "%Cannot decode JsonLDNull to Int, List())%",
+            currentStatus = TransformationNonRecoverableFailure,
+            destinationStatus = TriplesGenerated,
+            discardingStatuses = TriplesStore :: Nil
           )
         ),
         isMigrating
