@@ -24,8 +24,8 @@ import io.renku.graph.model.projects._
 import io.renku.graph.model.{SchemaVersion, persons}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.rest.KGProjectFinder._
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGProjectFinder[F[_]] {
@@ -33,8 +33,8 @@ private trait KGProjectFinder[F[_]] {
 }
 
 private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl(renkuConnectionConfig)
     with KGProjectFinder[F] {
 
   import cats.syntax.all._
@@ -183,6 +183,6 @@ private object KGProjectFinder {
   final case class ProjectCreator(maybeEmail: Option[persons.Email], name: persons.Name)
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] = for {
-    config <- RdfStoreConfig[F]()
+    config <- RenkuConnectionConfig[F]()
   } yield new KGProjectFinderImpl(config)
 }

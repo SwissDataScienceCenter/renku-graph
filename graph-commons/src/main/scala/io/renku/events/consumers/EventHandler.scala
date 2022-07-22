@@ -37,7 +37,7 @@ trait EventHandler[F[_]] {
   protected def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]]
 }
 
-abstract class EventHandlerWithProcessLimiter[F[_]: Monad](processesLimiter: ConcurrentProcessesLimiter[F])
+abstract class EventHandlerWithProcessLimiter[F[_]: Monad: Logger](processesLimiter: ConcurrentProcessesLimiter[F])
     extends EventHandler[F] {
 
   val categoryName: CategoryName
@@ -87,6 +87,11 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad](processesLimiter: Con
         projectId <- cursor.downField("project").downField("id").as[projects.Id]
       } yield CompoundEventId(id, projectId)
     }
+  }
+
+  protected def errorLogging[E](event: E)(implicit show: Show[E]): PartialFunction[Throwable, F[Unit]] = {
+    case NonFatal(exception) =>
+      Logger[F].error(exception)(show"$categoryName: $event failed")
   }
 
   protected implicit class LoggerOps(logger: Logger[F])(implicit ME: MonadThrow[F]) {

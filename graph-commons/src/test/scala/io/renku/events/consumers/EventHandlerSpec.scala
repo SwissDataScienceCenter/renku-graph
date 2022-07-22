@@ -27,6 +27,7 @@ import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
+import io.renku.interpreters.TestLogger
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -68,10 +69,12 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
         json"""{ "categoryName": ${categoryNames.generateOne.value} }"""
       )
 
-      (for {
-        process <- EventHandlingProcess[IO](EitherT.rightT[IO, EventSchedulingResult](Accepted))
-        result  <- handlerWithProcess(process).tryHandling(unsupportedEvent)
-      } yield result).unsafeRunSync() shouldBe UnsupportedEventType
+      {
+        for {
+          process <- EventHandlingProcess[IO](EitherT.rightT[IO, EventSchedulingResult](Accepted))
+          result  <- handlerWithProcess(process).tryHandling(unsupportedEvent)
+        } yield result
+      }.unsafeRunSync() shouldBe UnsupportedEventType
     }
   }
 
@@ -82,6 +85,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with should.Matchers with
     val eventRequestContent = EventRequestContent.NoPayload(
       json"""{ "categoryName": $anyCategoryName }"""
     )
+
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
 
     def handlerWithProcess(process: EventHandlingProcess[IO]): EventHandlerWithProcessLimiter[IO] =
       new EventHandlerWithProcessLimiter[IO](processesLimiter) {

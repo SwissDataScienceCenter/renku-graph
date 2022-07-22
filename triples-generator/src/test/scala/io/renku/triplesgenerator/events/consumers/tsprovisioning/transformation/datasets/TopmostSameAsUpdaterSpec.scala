@@ -28,7 +28,7 @@ import io.renku.graph.model.GraphModelGenerators.datasetTopmostSameAs
 import io.renku.graph.model.datasets.{InternalSameAs, ResourceId, TopmostSameAs}
 import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
-import io.renku.rdfstore.SparqlQuery
+import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.ProjectFunctions
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

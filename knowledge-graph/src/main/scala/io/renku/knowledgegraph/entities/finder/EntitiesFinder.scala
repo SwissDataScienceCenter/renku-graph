@@ -26,7 +26,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingResponse}
-import io.renku.rdfstore.{RdfStoreClientImpl, RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import model._
 import org.typelevel.log4cats.Logger
 
@@ -36,21 +36,21 @@ private[entities] trait EntitiesFinder[F[_]] {
 
 private[entities] object EntitiesFinder {
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
-    RdfStoreConfig[F]().map(new EntitiesFinderImpl(_))
+    RenkuConnectionConfig[F]().map(new EntitiesFinderImpl(_))
 }
 
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig,
-    entityQueries:  List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
-) extends RdfStoreClientImpl[F](rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig,
+    entityQueries:         List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
+) extends TSClientImpl[F](renkuConnectionConfig)
     with EntitiesFinder[F]
     with Paging[Entity] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import io.renku.graph.model.Schemas._
-  import io.renku.rdfstore.SparqlQuery
-  import io.renku.rdfstore.SparqlQuery.Prefixes
+  import io.renku.triplesstore.SparqlQuery
+  import io.renku.triplesstore.SparqlQuery.Prefixes
 
   override def findEntities(criteria: Criteria): F[PagingResponse[Entity]] = {
     implicit val resultsFinder: PagedResultsFinder[F, Entity] = pagedResultsFinder(query(criteria))

@@ -35,7 +35,7 @@ import io.renku.graph.model.testentities._
 import io.renku.http.rest.SortBy
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -44,7 +44,13 @@ import java.time.temporal.ChronoUnit.DAYS
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.util.Random
 
-class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matchers with InMemoryRdfStore with IOSpec {
+class EntitiesFinderSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with FinderSpecOps
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with IOSpec {
 
   "findEntities - no filters" should {
 
@@ -54,7 +60,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder.findEntities(Criteria()).unsafeRunSync().results shouldBe
         allEntitiesFrom(project).sortBy(_.name.value)
@@ -97,7 +103,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(loneProject, dsProject, planProject, notMatchingProject)
+      upload(to = renkuDataset, loneProject, dsProject, planProject, notMatchingProject)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -144,7 +150,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .generateOne
       val plan :: Nil = planProject.plans.toList
 
-      loadToStore(soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = renkuDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -181,7 +187,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .generateOne
       val plan :: Nil = planProject.plans.toList
 
-      loadToStore(soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = renkuDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -200,7 +206,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .modify(_.copy(path = projects.Path(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
         .generateOne
 
-      loadToStore(soleProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = renkuDataset, soleProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -227,7 +233,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         )
         .generateOne
 
-      loadToStore(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = renkuDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -249,7 +255,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Project))))
@@ -263,7 +269,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Dataset))))
@@ -277,7 +283,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Workflow))))
@@ -292,7 +298,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .modify(removeMembers())
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person, EntityType.Project))))
@@ -310,7 +316,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .modify(removeMembers())
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person))))
@@ -338,7 +344,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         )
         .generateOne
 
-      loadToStore(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = renkuDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(creators = Set(creator.name))))
@@ -367,7 +373,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         )
         .generateOne
 
-      loadToStore(soleProject, dsProject)
+      upload(to = renkuDataset, soleProject, dsProject)
 
       finder
         .findEntities(Criteria(Filters(creators = Set(randomiseCases(creator.name.show).generateAs(persons.Name)))))
@@ -397,7 +403,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         )
         .generateOne
 
-      loadToStore(soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = renkuDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(creators = Set(projectCreator.name, dsCreator.name))))
@@ -415,7 +421,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(creators = Set(personNames.generateOne))))
@@ -445,7 +451,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(publicProject, internalProject, privateProject)
+      upload(to = renkuDataset, publicProject, internalProject, privateProject)
 
       finder
         .findEntities(
@@ -468,7 +474,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(visibilities = visibilityNonPublic.generateSome.toSet)))
@@ -508,7 +514,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .generateOne
       val plan :: _ = project.plans.toList
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
@@ -562,7 +568,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         )
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
@@ -595,7 +601,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         )
         .generateOne
 
-      loadToStore(dsProject)
+      upload(to = renkuDataset, dsProject)
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
@@ -637,7 +643,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .generateOne
       val plan :: _ = project.plans.toList
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeUntil = until.some)))
@@ -690,7 +696,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         )
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeUntil = until.some)))
@@ -723,7 +729,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         )
         .generateOne
 
-      loadToStore(dsProject)
+      upload(to = renkuDataset, dsProject)
 
       finder
         .findEntities(Criteria(Filters(maybeUntil = until.some)))
@@ -797,7 +803,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .generateOne
       val plan :: _ = project.plans.toList
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some, maybeUntil = until.some)))
@@ -819,7 +825,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val direction = sortingDirections.generateOne
 
@@ -836,7 +842,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .withDatasets(datasetEntities(provenanceInternal))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val direction = sortingDirections.generateOne
 
@@ -876,7 +882,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
         .generateOne
       val plan :: Nil = project.plans.toList
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val direction = sortingDirections.generateOne
 
@@ -906,7 +912,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
 
     "return the only page" in new TestCase {
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val paging = PagingRequest(Page(1), PerPage(3))
 
@@ -923,7 +929,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
 
     "return the requested page with info if there are more" in new TestCase {
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val paging = PagingRequest(Page(Random.nextInt(3) + 1), PerPage(1))
 
@@ -944,7 +950,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
 
     "return no results if non-existing page requested" in new TestCase {
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       val paging = PagingRequest(Page(4), PerPage(1))
 
@@ -984,7 +990,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
 
     "return public entities only if no auth user is given" in new TestCase {
 
-      loadToStore(privateProject, internalProject, publicProject)
+      upload(to = renkuDataset, privateProject, internalProject, publicProject)
 
       finder.findEntities(Criteria()).unsafeRunSync().results shouldBe List
         .empty[model.Entity]
@@ -996,7 +1002,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
 
     "return public and internal entities only if auth user is given" in new TestCase {
 
-      loadToStore(privateProject, internalProject, publicProject)
+      upload(to = renkuDataset, privateProject, internalProject, publicProject)
 
       finder
         .findEntities(
@@ -1013,7 +1019,7 @@ class EntitiesFinderSpec extends AnyWordSpec with FinderSpecOps with should.Matc
 
     "return any visibility entities if the given auth user has access to them" in new TestCase {
 
-      loadToStore(privateProject, internalProject, publicProject)
+      upload(to = renkuDataset, privateProject, internalProject, publicProject)
 
       finder.findEntities(Criteria(maybeUser = member.toAuthUser.some)).unsafeRunSync().results shouldBe List
         .empty[model.Entity]

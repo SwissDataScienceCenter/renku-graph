@@ -153,6 +153,21 @@ class EventEndpointSpec
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
     }
 
+    s"$ServiceUnavailable if the handler returns EventSchedulingResult.ServiceUnavailable" in new TestCase {
+
+      val handlingResult = EventSchedulingResult.ServiceUnavailable(nonEmptyStrings().generateOne)
+
+      (eventConsumersRegistry.handle _)
+        .expects(*)
+        .returning(handlingResult.pure[IO])
+
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
+
+      response.status                           shouldBe ServiceUnavailable
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(handlingResult.reason)
+    }
+
     s"$InternalServerError if the handler returns $SchedulingError" in new TestCase {
 
       (eventConsumersRegistry.handle _)

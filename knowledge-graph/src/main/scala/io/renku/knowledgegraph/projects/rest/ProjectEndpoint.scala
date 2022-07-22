@@ -34,7 +34,7 @@ import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsEndpoint
 import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.knowledgegraph.projects.model._
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger

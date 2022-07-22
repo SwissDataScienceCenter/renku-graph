@@ -25,7 +25,7 @@ import io.renku.generators.CommonGraphGenerators.{accessTokens, authUsers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -43,7 +43,7 @@ import org.scalatest.featurespec.AnyFeatureSpec
 import sangria.ast.Document
 import sangria.macros._
 
-class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with RdfStoreProvisioning {
+class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSProvisioning {
 
   Feature("GraphQL query to find lineage") {
 
@@ -77,10 +77,10 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       */
     Scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
-      Given("some data in the RDF Store")
+      Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
       mockDataOnGitLabAPIs(project, exemplarData.project.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery
@@ -95,7 +95,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
 
     Scenario("As a user I would like to find project's lineage with a named GraphQL query") {
 
-      Given("some data in the RDF Store")
+      Given("some data in the Triples Store")
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient.POST(
@@ -128,11 +128,11 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
         )
       )
 
-      Given("some data in the RDF Store with a project I am a member of")
+      Given("some data in the Triples Store with a project I am a member of")
       val commitId = commitIds.generateOne
       val project  = dataProjects(accessibleExemplarData.project).generateOne
       mockDataOnGitLabAPIs(project, accessibleExemplarData.project.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       And("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
@@ -166,7 +166,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       val commitId = commitIds.generateOne
       val project  = dataProjects(privateExemplarData.project).generateOne
       mockDataOnGitLabAPIs(project, privateExemplarData.project.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       Given("I am authenticated")
       `GET <gitlabApi>/user returning OK`(user)
@@ -190,7 +190,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
     }
 
     Scenario("As an unauthenticated user I should not be able to find a lineage from a private project") {
-      Given("some data in the RDF Store with a project I am a member of")
+      Given("some data in the Triples Store with a project I am a member of")
       val exemplarData = LineageExemplarData(
         renkuProjectEntities(fixed(Visibility.Private)).generateOne.copy(
           path = model.projects.Path("unauthenticated/private-project")
@@ -199,7 +199,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       val commitId = commitIds.generateOne
       val project  = dataProjects(exemplarData.project).generateOne
       mockDataOnGitLabAPIs(project, exemplarData.project.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient.POST(namedLineageQuery,

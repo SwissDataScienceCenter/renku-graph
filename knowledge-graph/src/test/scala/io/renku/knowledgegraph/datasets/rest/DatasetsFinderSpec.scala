@@ -39,7 +39,7 @@ import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -48,9 +48,10 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class DatasetsFinderSpec
     extends AnyWordSpec
-    with InMemoryRdfStore
-    with ScalaCheckPropertyChecks
     with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with ScalaCheckPropertyChecks
     with IOSpec {
 
   "findDatasets - no phrase" should {
@@ -63,7 +64,7 @@ class DatasetsFinderSpec
           val (dataset1ImportedToProject2, project2) = publicProjectEntities.importDataset(dataset1).generateOne
           val (dataset3, project3) = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
-          loadToStore(project1, project2, project3)
+          upload(to = renkuDataset, project1, project2, project3)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -89,7 +90,7 @@ class DatasetsFinderSpec
             .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
             .toList
 
-          loadToStore(projects: _*)
+          upload(to = renkuDataset, projects: _*)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -110,7 +111,7 @@ class DatasetsFinderSpec
           val (dataset2, project2) = publicProjectEntities.importDataset(dataset).generateOne
           val (dataset3, project3) = publicProjectEntities.importDataset(dataset).generateOne
 
-          loadToStore(project1, project2, project3)
+          upload(to = renkuDataset, project1, project2, project3)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -131,7 +132,7 @@ class DatasetsFinderSpec
           val (dataset2, project2) = publicProjectEntities.importDataset(dataset).generateOne
           val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
 
-          loadToStore(List(project1, project2Updated))
+          upload(to = renkuDataset, List(project1, project2Updated))
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -152,7 +153,7 @@ class DatasetsFinderSpec
           val (dataset2, project2 ::~ project2Fork) =
             publicProjectEntities.importDataset(dataset).forkOnce().generateOne
 
-          loadToStore(project1, project2, project2Fork)
+          upload(to = renkuDataset, project1, project2, project2Fork)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -176,7 +177,7 @@ class DatasetsFinderSpec
           val ((_, dataset2Modified), project2) =
             publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceImportedExternal)).generateOne
 
-          loadToStore(project1, project2)
+          upload(to = renkuDataset, project1, project2)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -195,7 +196,7 @@ class DatasetsFinderSpec
             publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
           val (modification2, projectWithAllDatasets) = project.addDataset(modification1.createModification())
 
-          loadToStore(projectWithAllDatasets)
+          upload(to = renkuDataset, projectWithAllDatasets)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -213,7 +214,7 @@ class DatasetsFinderSpec
           val (dataset2, project2) =
             publicProjectEntities.addDataset(datasetEntities(provenanceImportedExternal)).generateOne
 
-          loadToStore(project1, project2)
+          upload(to = renkuDataset, project1, project2)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -234,7 +235,7 @@ class DatasetsFinderSpec
           val (dataset2, project2) = publicProjectEntities.importDataset(dataset).generateOne
           val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
 
-          loadToStore(project1, project2Updated)
+          upload(to = renkuDataset, project1, project2Updated)
 
           val result = datasetsFinder
             .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -255,7 +256,7 @@ class DatasetsFinderSpec
             .forkOnce()
             .generateOne
 
-          loadToStore(project, fork)
+          upload(to = renkuDataset, project, fork)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -274,7 +275,7 @@ class DatasetsFinderSpec
             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
           val (datasetModified, projectUpdated) = project.addDataset(dataset.createModification())
 
-          loadToStore(projectUpdated, fork)
+          upload(to = renkuDataset, projectUpdated, fork)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -299,7 +300,7 @@ class DatasetsFinderSpec
           val (modificationOfModificationOnFork, forkUpdated) =
             fork.addDataset(datasetModification.createModification())
 
-          loadToStore(project, forkUpdated)
+          upload(to = renkuDataset, project, forkUpdated)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -319,7 +320,7 @@ class DatasetsFinderSpec
           val (_, project2) =
             publicProjectEntities.addDatasetAndInvalidation(datasetEntities(provenanceImportedExternal)).generateOne
 
-          loadToStore(project1, project2)
+          upload(to = renkuDataset, project1, project2)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -335,7 +336,7 @@ class DatasetsFinderSpec
             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
           val forkUpdated = fork.addDatasets(dataset.invalidateNow)
 
-          loadToStore(project, forkUpdated)
+          upload(to = renkuDataset, project, forkUpdated)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -351,7 +352,7 @@ class DatasetsFinderSpec
             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).forkOnce().generateOne
           val afterForkingUpdated = project.addDatasets(dataset.invalidateNow)
 
-          loadToStore(afterForkingUpdated, fork)
+          upload(to = renkuDataset, afterForkingUpdated, fork)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -367,7 +368,7 @@ class DatasetsFinderSpec
             publicProjectEntities.addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
           val projectUpdated = project.addDatasets(datasetModified.invalidateNow)
 
-          loadToStore(projectUpdated)
+          upload(to = renkuDataset, projectUpdated)
 
           datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -401,7 +402,7 @@ class DatasetsFinderSpec
         val (_, projectWithoutPhrase) =
           publicProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateOne
 
-        loadToStore(project1, project2, project3, project4, project5, projectWithoutPhrase)
+        upload(to = renkuDataset, project1, project2, project3, project4, project5, projectWithoutPhrase)
 
         val result = datasetsFinder
           .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -420,7 +421,7 @@ class DatasetsFinderSpec
 
       val (_, project) = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       datasetsFinder
         .findDatasets(Some(phrases.generateOne), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -435,7 +436,7 @@ class DatasetsFinderSpec
         .addDatasetAndModification(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
         .generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -455,7 +456,7 @@ class DatasetsFinderSpec
         )
         .generateOne
 
-      loadToStore(project1, project2)
+      upload(to = renkuDataset, project1, project2)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -473,7 +474,7 @@ class DatasetsFinderSpec
       val (dataset2Modified, project2Updated) =
         project2.addDataset(dataset2.createModification(_.makeKeywordsContaining(phrase.value)))
 
-      loadToStore(project1, project2Updated)
+      upload(to = renkuDataset, project1, project2Updated)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -489,7 +490,7 @@ class DatasetsFinderSpec
         project.addDataset(dataset.createModification(_.makeKeywordsContaining(phrase.value)))
       val (_, projectUpdate2) = projectUpdate1.addDataset(datasetModification1.createModification())
 
-      loadToStore(projectUpdate2)
+      upload(to = renkuDataset, projectUpdate2)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -506,7 +507,7 @@ class DatasetsFinderSpec
         .generateOne
       val _ ::~ forkUpdated = fork.addDataset(dataset.createModification())
 
-      loadToStore(project, forkUpdated)
+      upload(to = renkuDataset, project, forkUpdated)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -522,7 +523,7 @@ class DatasetsFinderSpec
       val (datasetModified, forkUpdated) =
         fork.addDataset(dataset.createModification(_.makeKeywordsContaining(phrase.value)))
 
-      loadToStore(project, forkUpdated)
+      upload(to = renkuDataset, project, forkUpdated)
 
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -538,7 +539,7 @@ class DatasetsFinderSpec
           .addDatasetAndInvalidation(datasetEntities(provenanceInternal).modify(_.makeDescContaining(phrase.value)))
           .generateOne
 
-        loadToStore(project)
+        upload(to = renkuDataset, project)
 
         datasetsFinder
           .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -565,7 +566,7 @@ class DatasetsFinderSpec
 
       val (_, projectNonPhrased) = publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(project1, project2, project3, projectNonPhrased)
+      upload(to = renkuDataset, project1, project2, project3, projectNonPhrased)
 
       val results = datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -590,10 +591,11 @@ class DatasetsFinderSpec
         .addDataset(datasetEntities(provenanceImportedExternal).modify(_.makeKeywordsContaining(phrase.value)))
         .generateOne
 
-      loadToStore(project1,
-                  project2,
-                  project3,
-                  publicProjectEntities.addDataset(datasetEntities(provenanceImportedExternal)).generateOne._2
+      upload(to = renkuDataset,
+             project1,
+             project2,
+             project3,
+             publicProjectEntities.addDataset(datasetEntities(provenanceImportedExternal)).generateOne._2
       )
 
       val results = datasetsFinder
@@ -619,10 +621,11 @@ class DatasetsFinderSpec
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
         .generateOne
 
-      loadToStore(project1,
-                  project2,
-                  project3,
-                  publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2
+      upload(to = renkuDataset,
+             project1,
+             project2,
+             project3,
+             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2
       )
 
       val results = datasetsFinder
@@ -651,7 +654,8 @@ class DatasetsFinderSpec
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
         .generateOne
 
-      loadToStore(
+      upload(
+        to = renkuDataset,
         project1 ::
           project1Fork ::
           project2 ::
@@ -690,10 +694,11 @@ class DatasetsFinderSpec
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
         .generateOne
 
-      loadToStore(project1,
-                  project2,
-                  project3,
-                  publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2
+      upload(to = renkuDataset,
+             project1,
+             project2,
+             project3,
+             publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2
       )
 
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
@@ -724,7 +729,7 @@ class DatasetsFinderSpec
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
         .generateOne
 
-      loadToStore(project1, project2, project3)
+      upload(to = renkuDataset, project1, project2, project3)
 
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
 
@@ -747,7 +752,7 @@ class DatasetsFinderSpec
         val (_, privateProject) =
           renkuProjectEntities(fixed(nonPublic)).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-        loadToStore(publicProject, privateProject)
+        upload(to = renkuDataset, publicProject, privateProject)
 
         val result = datasetsFinder
           .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, maybeUser = None)
@@ -764,7 +769,7 @@ class DatasetsFinderSpec
         val (_, privateProjectWithPublicDataset) =
           renkuProjectEntities(fixed(nonPublic)).importDataset(publicDataset).generateOne
 
-        loadToStore(publicProject, privateProjectWithPublicDataset)
+        upload(to = renkuDataset, publicProject, privateProjectWithPublicDataset)
 
         val result = datasetsFinder
           .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -796,7 +801,7 @@ class DatasetsFinderSpec
           .addDataset(datasetEntities(provenanceInternal))
           .generateOne
 
-      loadToStore(publicProject, internalProjectWithAccess, privateProjectWithAccess)
+      upload(to = renkuDataset, publicProject, internalProjectWithAccess, privateProjectWithAccess)
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = None,
@@ -821,7 +826,7 @@ class DatasetsFinderSpec
       val (internalDatasetWithoutAccess, internalProjectWithoutAccess) =
         renkuProjectEntities(fixed(Visibility.Internal)).addDataset(datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(internalProjectWithoutAccess)
+      upload(to = renkuDataset, internalProjectWithoutAccess)
 
       datasetsFinder
         .findDatasets(maybePhrase = None,
@@ -840,7 +845,7 @@ class DatasetsFinderSpec
       val privateProjectWithoutAccess =
         renkuProjectEntities(fixed(Visibility.Private)).withDatasets(datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(privateProjectWithoutAccess)
+      upload(to = renkuDataset, privateProjectWithoutAccess)
 
       datasetsFinder
         .findDatasets(maybePhrase = None,
@@ -872,11 +877,12 @@ class DatasetsFinderSpec
           .importDataset(privateDatasetWithoutAccess)
           .generateOne
 
-        loadToStore(publicProject,
-                    internalProjectWithoutAccess,
-                    internalProjectWithAccess,
-                    privateProjectWithoutAccess,
-                    privateProjectWithAccess
+        upload(to = renkuDataset,
+               publicProject,
+               internalProjectWithoutAccess,
+               internalProjectWithAccess,
+               privateProjectWithoutAccess,
+               privateProjectWithAccess
         )
 
         val result = datasetsFinder
@@ -904,7 +910,8 @@ class DatasetsFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val datasetsFinder = new DatasetsFinderImpl[IO](renkuStoreConfig, new CreatorsFinderImpl[IO](renkuStoreConfig))
+    val datasetsFinder =
+      new DatasetsFinderImpl[IO](renkuDSConnectionInfo, new CreatorsFinderImpl[IO](renkuDSConnectionInfo))
   }
 
   private lazy val publicProjectEntities: Gen[RenkuProject.WithoutParent] = renkuProjectEntities(visibilityPublic)

@@ -26,8 +26,8 @@ import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuUrl, persons, projects}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGProjectMembersFinder[F[_]] {
@@ -35,9 +35,9 @@ private trait KGProjectMembersFinder[F[_]] {
 }
 
 private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig,
-    renkuUrl:       RenkuUrl
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig,
+    renkuUrl:              RenkuUrl
+) extends TSClientImpl(renkuConnectionConfig)
     with KGProjectMembersFinder[F] {
 
   import eu.timepit.refined.auto._
@@ -70,9 +70,9 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
 
 private object KGProjectMembersFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectMembersFinder[F]] = for {
-    rdfStoreConfig <- RdfStoreConfig[F]()
-    renkuUrl       <- RenkuUrlLoader[F]()
-  } yield new KGProjectMembersFinderImpl(rdfStoreConfig, renkuUrl)
+    renkuConnectionConfig <- RenkuConnectionConfig[F]()
+    renkuUrl              <- RenkuUrlLoader[F]()
+  } yield new KGProjectMembersFinderImpl(renkuConnectionConfig, renkuUrl)
 }
 
 private final case class KGProjectMember(resourceId: persons.ResourceId, gitLabId: persons.GitLabId)

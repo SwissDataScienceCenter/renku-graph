@@ -9,7 +9,7 @@ on:
       - reopened
       - closed
 env:
-  SBT_OPTS: "-Xmx2G"
+  SBT_OPTS: "-Xmx2G -XX:+UseG1GC"
 jobs:
   cleanup-previous-runs:
     runs-on: ubuntu-20.04
@@ -31,7 +31,7 @@ jobs:
       persist: ${{ steps.deploy-comment.outputs.persist}}
     steps:
       - id: deploy-comment
-        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v0.5.3
+        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.0.0
         with:
           string: /deploy
           pr_ref: ${{ github.event.number }}
@@ -43,7 +43,7 @@ jobs:
       name: renku-ci-gr-${{ github.event.number }}
     steps:
       - name: deploy-pr
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v0.5.3
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.0.0
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
@@ -71,7 +71,7 @@ jobs:
         id: findcomment
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-author: 'RenkuBot'
+          comment-author: "RenkuBot"
           body-includes: "You can access the deployment of this PR at"
       - name: Create comment pre deploy
         if: steps.findcomment.outputs.comment-id == 0
@@ -84,17 +84,18 @@ jobs:
 
   test-pr:
     runs-on: ubuntu-20.04
-    if: ${{ github.event.action != 'closed' && needs.check-deploy.outputs.pr-contains-string == 'true' && needs.check-deploy.outputs.test-enabled == 'true' }} 
-    needs: [ check-deploy, deploy-pr ]
+    if: ${{ github.event.action != 'closed' && needs.check-deploy.outputs.pr-contains-string == 'true' && needs.check-deploy.outputs.test-enabled == 'true' }}
+    needs: [check-deploy, deploy-pr]
     steps:
-    - uses: SwissDataScienceCenter/renku-actions/test-renku@v0.5.3
-      with:
-        renkubot-kubeconfig: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
-        renku-release: renku-ci-gr-${{ github.event.number }}
-        gitlab-token: ${{ secrets.DEV_GITLAB_TOKEN }}
-        persist: "${{ needs.check-deploy.outputs.persist }}"
-        ci-renku-values: ${{ secrets.CI_RENKU_VALUES }}
-        test-timeout-mins: "80"
+      - uses: SwissDataScienceCenter/renku-actions/test-renku@v1.0.0
+        with:
+          kubeconfig: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
+          renku-release: renku-ci-gr-${{ github.event.number }}
+          gitlab-token: ${{ secrets.DEV_GITLAB_TOKEN }}
+          persist: "${{ needs.check-deploy.outputs.persist }}"
+          s3-results-access-key: ${{ secrets.ACCEPTANCE_TESTS_BUCKET_ACCESS_KEY }}
+          s3-results-secret-key: ${{ secrets.ACCEPTANCE_TESTS_BUCKET_SECRET_KEY }}
+          test-timeout-mins: "80"
 
   cleanup:
     if: github.event.action == 'closed'
@@ -102,7 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: renku teardown
-        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v0.5.3
+        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.0.0
         env:
           HELM_RELEASE_REGEX: "^renku-ci-gr-${{ github.event.number }}$"
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}

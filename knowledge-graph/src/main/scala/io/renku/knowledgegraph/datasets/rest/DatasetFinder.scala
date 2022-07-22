@@ -25,7 +25,7 @@ import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import io.renku.knowledgegraph.datasets.model._
-import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private trait DatasetFinder[F[_]] {
@@ -88,7 +88,7 @@ private class DatasetFinderImpl[F[_]: Spawn](
 private object DatasetFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetFinder[F]] = for {
-    config           <- RdfStoreConfig[F]()
+    config           <- RenkuConnectionConfig[F]()
     baseDetailFinder <- BaseDetailsFinder[F](config)
     creatorsFinder   <- CreatorsFinder[F](config)
     partsFinder      <- PartsFinder[F](config)

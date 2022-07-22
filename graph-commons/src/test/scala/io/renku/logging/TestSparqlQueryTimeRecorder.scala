@@ -19,7 +19,7 @@
 package io.renku.logging
 
 import cats.MonadThrow
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 object TestSparqlQueryTimeRecorder {

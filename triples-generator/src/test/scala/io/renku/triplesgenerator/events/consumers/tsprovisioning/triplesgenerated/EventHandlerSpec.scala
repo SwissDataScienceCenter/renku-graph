@@ -19,6 +19,7 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesgenerated
 
 import CategoryGenerators._
+import cats.data.EitherT
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
@@ -26,16 +27,18 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.events
 import io.renku.events.EventRequestContent
+import io.renku.events.consumers.ConsumersModelGenerators.notHappySchedulingResults
 import io.renku.events.consumers.EventSchedulingResult._
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, Project}
+import io.renku.events.consumers.{EventHandler => _, _}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.zippedEventPayloads
 import io.renku.graph.model.events.{CompoundEventId, ZippedEventPayload}
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.Info
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,6 +51,8 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
       "schedule triples transformation " +
       s"and return $Accepted if event processor accepted the event" in new TestCase {
 
+        givenTsReady
+
         (eventBodyDeserializer.toEvent _)
           .expects(event.compoundEventId, event.project, zippedPayload)
           .returning(event.pure[IO])
@@ -56,49 +61,77 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
           .expects(event)
           .returning(().pure[IO])
 
-        val requestContent = toRequestContent((event.compoundEventId, event.project).asJson, zippedPayload)
+        val request = requestContent((event.compoundEventId, event.project).asJson, zippedPayload)
 
-        handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(Accepted)
+        val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
+
+        handlingProcess.process.value.unsafeRunSync()  shouldBe Right(Accepted)
+        handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
 
         logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
       }
 
     s"return $BadRequest if event payload is not present" in new TestCase {
 
-      val requestContent = EventRequestContent.NoPayload((event.compoundEventId, event.project).asJson)
+      givenTsReady
 
-      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Left(BadRequest)
+      val request = EventRequestContent.NoPayload((event.compoundEventId, event.project).asJson)
+
+      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe Left(BadRequest)
 
       logger.expectNoLogs()
     }
 
     s"return $BadRequest if event payload is malformed" in new TestCase {
 
-      val requestContent =
+      givenTsReady
+
+      val request =
         EventRequestContent.WithPayload((event.compoundEventId, event.project).asJson, jsons.generateOne.noSpaces)
 
-      handler.createHandlingProcess(requestContent).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
+      handler.createHandlingProcess(request).unsafeRunSync().process.value.unsafeRunSync() shouldBe Left(
         BadRequest
       )
 
       logger.expectNoLogs()
     }
 
-    s"return $Accepted when event processor fails processing the event" in new TestCase {
+    s"return $Accepted and release the processing flag when event processor fails processing the event" in new TestCase {
+
+      givenTsReady
 
       (eventBodyDeserializer.toEvent _)
         .expects(event.compoundEventId, event.project, zippedPayload)
         .returning(event.pure[IO])
 
+      val exception = exceptions.generateOne
       (eventProcessor.process _)
         .expects(event)
-        .returning(exceptions.generateOne.raiseError[IO, Unit])
+        .returning(exception.raiseError[IO, Unit])
 
-      val requestContent = toRequestContent((event.compoundEventId, event.project).asJson, zippedPayload)
+      val request = requestContent((event.compoundEventId, event.project).asJson, zippedPayload)
 
-      handler.createHandlingProcess(requestContent).unsafeRunSyncProcess() shouldBe Right(Accepted)
+      val handlingProcess = handler.createHandlingProcess(request).unsafeRunSync()
 
-      logger.loggedOnly(Info(show"$categoryName: $event -> $Accepted"))
+      handlingProcess.process.value.unsafeRunSync()  shouldBe Right(Accepted)
+      handlingProcess.waitToFinish().unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(
+        Info(show"$categoryName: $event -> $Accepted"),
+        Error(show"$categoryName: $event failed", exception)
+      )
+    }
+
+    "return failure if returned from the TS readiness check" in new TestCase {
+
+      val readinessState = notHappySchedulingResults.generateLeft[Accepted]
+      (() => tsReadinessChecker.verifyTSReady)
+        .expects()
+        .returning(EitherT(readinessState.pure[IO]))
+
+      val request = requestContent((event.compoundEventId, event.project).asJson, zippedPayload)
+
+      handler.createHandlingProcess(request).unsafeRunSyncProcess() shouldBe readinessState
     }
   }
 
@@ -108,11 +141,13 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
     val zippedPayload = zippedEventPayloads.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
+    val tsReadinessChecker         = mock[TSReadinessForEventsChecker[IO]]
     val eventProcessor             = mock[EventProcessor[IO]]
     val eventBodyDeserializer      = mock[EventBodyDeserializer[IO]]
     val concurrentProcessesLimiter = mock[ConcurrentProcessesLimiter[IO]]
     val subscriptionMechanism      = mock[SubscriptionMechanism[IO]]
     val handler = new EventHandler[IO](categoryName,
+                                       tsReadinessChecker,
                                        eventBodyDeserializer,
                                        subscriptionMechanism,
                                        concurrentProcessesLimiter,
@@ -121,8 +156,13 @@ class EventHandlerSpec extends AnyWordSpec with IOSpec with MockFactory with sho
 
     (subscriptionMechanism.renewSubscription _).expects().returns(IO.unit)
 
-    def toRequestContent(event: Json, payload: ZippedEventPayload): EventRequestContent =
+    def requestContent(event: Json, payload: ZippedEventPayload): EventRequestContent =
       events.EventRequestContent.WithPayload(event, payload)
+
+    def givenTsReady =
+      (() => tsReadinessChecker.verifyTSReady)
+        .expects()
+        .returning(EitherT(Accepted.asRight[EventSchedulingResult].pure[IO]))
   }
 
   private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Project)] =

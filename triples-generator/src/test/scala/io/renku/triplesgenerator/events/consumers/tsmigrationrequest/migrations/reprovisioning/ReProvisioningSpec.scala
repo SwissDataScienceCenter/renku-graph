@@ -74,7 +74,7 @@ class ReProvisioningSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
   "migrate" should {
 
-    "clear the RDF Store and reschedule all Commit Events for processing in the Log if store is outdated" in new TestCase {
+    "clear the Triples Store and reschedule all Commit Events for processing in the Log if store is outdated" in new TestCase {
 
       inSequence {
         (microserviceUrlFinder.findBaseUrl _).expects().returning(controller.pure[IO])

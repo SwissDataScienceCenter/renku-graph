@@ -45,25 +45,29 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends 
            "Get info about datasets, users, activities, and other entities".some,
            serviceVersion.value
       )
-    ).addServer(renkuLabServer)
-      .addPath(lineage.EndpointDoc.path)
-      .addSecurity(securityScheme)
+    ).addPath(lineage.EndpointDoc.path)
+      .addServer(server)
+      .addSecurity(privateToken)
+      .addSecurity(oAuth)
+      .addNoAuthSecurity
       .addResponsesToAll(authErrorResponses)
 
-  private lazy val localServer =
-    Server("http://localhost:{port}/{basePath}",
-           "Local server",
-           Map("port" -> Variable("8080"), "basePath" -> Variable("knowledge-graph/projects"))
+  private lazy val server: Server =
+    Server(
+      url = "/knowledge-graph",
+      description = "Renku Knowledge Graph API",
+      variables = Map.empty
     )
 
-  private lazy val devServer =
-    Server("http://dev.renku.ch/{basePath}", "Dev server", Map("basePath" -> Variable("knowledge-graph/projects")))
-
-  private lazy val renkuLabServer =
-    Server("http://renkulab.io/{basePath}", "Renku Lab server", Map("basePath" -> Variable("knowledge-graph/projects")))
-
-  private lazy val securityScheme = SecurityScheme(
+  private lazy val privateToken = SecurityScheme(
     "PRIVATE-TOKEN",
+    TokenType.ApiKey,
+    "User's Personal Access Token in GitLab".some,
+    In.Header
+  )
+
+  private lazy val oAuth = SecurityScheme(
+    "oauth_auth",
     TokenType.ApiKey,
     "User's Personal Access Token in GitLab".some,
     In.Header

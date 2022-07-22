@@ -32,7 +32,7 @@ import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links._
 import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsFinder.ProjectDataset
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
@@ -125,11 +125,11 @@ class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
 object ProjectDatasetsEndpoint {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectDatasetsEndpoint[F]] = for {
-    rdfStoreConfig        <- RdfStoreConfig[F]()
+    renkuConnectionConfig <- RenkuConnectionConfig[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     renkuResourceUrl      <- renku.ApiUrl[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
-    projectDatasetFinder  <- ProjectDatasetsFinder(rdfStoreConfig)
+    projectDatasetFinder  <- ProjectDatasetsFinder(renkuConnectionConfig)
   } yield new ProjectDatasetsEndpointImpl[F](
     projectDatasetFinder,
     renkuResourceUrl,

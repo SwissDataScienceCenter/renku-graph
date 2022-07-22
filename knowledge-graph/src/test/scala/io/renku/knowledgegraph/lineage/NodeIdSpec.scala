@@ -22,6 +22,7 @@ import LineageGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.views.RdfResource
 import io.renku.knowledgegraph.lineage.model.Node
+import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -32,7 +33,7 @@ class NodeIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
     "wrap the Node.Id in <>" in {
       forAll { resourceId: Node.Id =>
-        resourceId.showAs[RdfResource] shouldBe s"<${resourceId.value}>"
+        resourceId.showAs[RdfResource] shouldBe s"<${URIref.encode(resourceId.value)}>"
       }
     }
   }

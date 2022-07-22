@@ -24,12 +24,14 @@ import io.renku.config.ServiceVersion
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.cliVersions
+import eu.timepit.refined.auto._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -40,7 +42,8 @@ class MultipleProjectAgentsSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
-    with InMemoryRdfStore
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with MockFactory {
 
   "run" should {
@@ -51,10 +54,10 @@ class MultipleProjectAgentsSpec
       val correctProject = renkuProjectEntities(anyVisibility).generateOne.to[entities.RenkuProject.WithoutParent]
       val brokenProject  = renkuProjectEntities(anyVisibility).generateOne.to[entities.RenkuProject.WithoutParent]
 
-      loadToStore(correctProject, brokenProject)
+      upload(to = renkuDataset, correctProject, brokenProject)
 
       val otherAgent = cliVersions.generateOne
-      insertTriple(brokenProject.resourceId, "schema:agent", show"'$otherAgent'")
+      insert(to = renkuDataset, Triple(brokenProject.resourceId, schema / "agent", otherAgent))
 
       findAgents(brokenProject.resourceId) shouldBe Set(brokenProject.agent, otherAgent)
 
@@ -76,8 +79,8 @@ class MultipleProjectAgentsSpec
     implicit val timeRecorder:    SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     implicit val metricsRegistry: MetricsRegistry[IO]         = new MetricsRegistry.DisabledMetricsRegistry[IO]()
     val executionRegister = mock[MigrationExecutionRegister[IO]]
-    val recordsFinder     = RecordsFinder[IO](renkuStoreConfig)
-    val updateRunner      = UpdateQueryRunner[IO](renkuStoreConfig)
+    val recordsFinder     = RecordsFinder[IO](renkuDSConnectionInfo)
+    val updateRunner      = UpdateQueryRunner[IO](renkuDSConnectionInfo)
     val migration         = new MultipleProjectAgents[IO](executionRegister, recordsFinder, updateRunner)
 
     lazy val satisfyMocks = {
@@ -87,12 +90,18 @@ class MultipleProjectAgentsSpec
   }
 
   private def findAgents(id: projects.ResourceId): Set[CliVersion] =
-    runQuery(s"""|SELECT ?agent 
-                 |WHERE { 
-                 |  ${id.showAs[RdfResource]} a schema:Project;
-                 |                            schema:agent ?agent
-                 |}""".stripMargin)
-      .unsafeRunSync()
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch project agent",
+        Prefixes of schema -> "schema",
+        s"""|SELECT ?agent
+            |WHERE { 
+            |  ${id.showAs[RdfResource]} a schema:Project;
+            |                            schema:agent ?agent
+            |}""".stripMargin
+      )
+    ).unsafeRunSync()
       .map(row => CliVersion(row("agent")))
       .toSet
 }

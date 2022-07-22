@@ -27,11 +27,11 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.constraints.{NonBlank, RelativePath}
 import io.renku.tinytypes.{RelativePathTinyType, UrlTinyType}
+import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -41,9 +41,9 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
   import SameAs._
 
   "ResourceId" should {
-    "be renderable as RDF resource" in {
+    "be renderable as a URI encoded RDF resource" in {
       val id = datasetResourceIds.generateOne
-      id.showAs[RdfResource] shouldBe s"<${sparqlEncode(id.value)}>"
+      id.showAs[RdfResource] shouldBe s"<${URIref.encode(id.value)}>"
     }
   }
 

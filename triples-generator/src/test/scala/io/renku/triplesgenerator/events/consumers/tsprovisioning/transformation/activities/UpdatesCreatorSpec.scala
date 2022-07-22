@@ -22,10 +22,13 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.personResourceIds
+import eu.timepit.refined.auto._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
+import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -33,8 +36,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
-    with InMemoryRdfStore
     with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with ScalaCheckPropertyChecks {
 
   "queriesUnlinkingAuthors" should {
@@ -45,17 +49,18 @@ class UpdatesCreatorSpec
         .map(_.to[entities.RenkuProject])
         .generateOne
 
-      loadToStore(kgProject)
+      upload(to = renkuDataset, kgProject)
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
-      findAuthors(activity.resourceId) shouldBe Set(activity.author.resourceId)
+      findAuthors(activity.resourceId).map(_.value) shouldBe Set(activity.author.resourceId)
+        .map(id => URIref.encode(id.value))
 
       val newAuthor     = personEntities.generateOne.to[entities.Person]
       val modelActivity = activity.copy(author = newAuthor)
 
       UpdatesCreator
         .queriesUnlinkingAuthors(modelActivity, Set(activity.author.resourceId))
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findAuthors(activity.resourceId) shouldBe Set.empty
@@ -67,19 +72,20 @@ class UpdatesCreatorSpec
         .map(_.to[entities.RenkuProject])
         .generateOne
 
-      loadToStore(kgProject)
+      upload(to = renkuDataset, kgProject)
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
 
       val person = personEntities.generateOne.to[entities.Person]
-      loadToStore(person)
-      insertTriple(activity.resourceId, "prov:wasAssociatedWith", person.resourceId.showAs[RdfResource])
+      upload(to = renkuDataset, person)
+      insert(to = renkuDataset, Triple.edge(activity.resourceId, prov / "wasAssociatedWith", person.resourceId))
 
-      findAuthors(activity.resourceId) shouldBe Set(activity.author.resourceId, person.resourceId)
+      findAuthors(activity.resourceId).map(_.value) shouldBe Set(activity.author.resourceId, person.resourceId)
+        .map(id => URIref.encode(id.value))
 
       UpdatesCreator
         .queriesUnlinkingAuthors(activity, Set(activity.author.resourceId, personResourceIds.generateOne))
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findAuthors(activity.resourceId) shouldBe Set.empty
@@ -116,7 +122,7 @@ class UpdatesCreatorSpec
         .map(_.to[entities.RenkuProject])
         .generateOne
 
-      loadToStore(kgProject)
+      upload(to = renkuDataset, kgProject)
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
       findPersonAgents(activity.association.resourceId) shouldBe activity.association.maybePersonAgentResourceId.toSet
@@ -129,7 +135,7 @@ class UpdatesCreatorSpec
 
       UpdatesCreator
         .queriesUnlinkingAgents(modelActivity, activity.association.maybePersonAgentResourceId.toSet)
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findPersonAgents(activity.association.resourceId) shouldBe Set.empty
@@ -141,19 +147,19 @@ class UpdatesCreatorSpec
         .map(_.to[entities.RenkuProject])
         .generateOne
 
-      loadToStore(kgProject)
+      upload(to = renkuDataset, kgProject)
 
       val activity = kgProject.activities.headOption.getOrElse(fail("Expected activity"))
       val person   = personEntities.generateOne.to[entities.Person]
-      loadToStore(person)
-      insertTriple(activity.association.resourceId, "prov:agent", person.resourceId.showAs[RdfResource])
+      upload(to = renkuDataset, person)
+      insert(to = renkuDataset, Triple.edge(activity.association.resourceId, prov / "agent", person.resourceId))
 
       findPersonAgents(activity.association.resourceId) shouldBe
         activity.association.maybePersonAgentResourceId.toSet + person.resourceId
 
       UpdatesCreator
         .queriesUnlinkingAgents(activity, activity.association.maybePersonAgentResourceId.toSet + person.resourceId)
-        .runAll
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findPersonAgents(activity.association.resourceId) shouldBe Set.empty
@@ -196,33 +202,43 @@ class UpdatesCreatorSpec
     }
   }
 
-  private def findAuthors(resourceId: activities.ResourceId): Set[persons.ResourceId] =
-    runQuery(s"""|SELECT ?personId
-                 |WHERE {
-                 |  ${resourceId.showAs[RdfResource]} a prov:Activity;
-                 |                                    prov:wasAssociatedWith ?personId.
-                 |  ?personId a schema:Person.
-                 |}
-                 |""".stripMargin)
-      .unsafeRunSync()
-      .map(row => persons.ResourceId.from(row("personId")))
-      .sequence
-      .fold(throw _, identity)
-      .toSet
+  private def findAuthors(resourceId: activities.ResourceId): Set[persons.ResourceId] = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "fetch activity creator",
+      Prefixes of (prov -> "prov", schema -> "schema"),
+      s"""|SELECT ?personId
+          |WHERE {
+          |  ${resourceId.showAs[RdfResource]} a prov:Activity;
+          |                                    prov:wasAssociatedWith ?personId.
+          |  ?personId a schema:Person.
+          |}
+          |""".stripMargin
+    )
+  ).unsafeRunSync()
+    .map(row => persons.ResourceId.from(row("personId")))
+    .sequence
+    .fold(throw _, identity)
+    .toSet
 
-  private def findPersonAgents(resourceId: associations.ResourceId): Set[persons.ResourceId] =
-    runQuery(s"""|SELECT ?agentId
-                 |WHERE {
-                 |  ${resourceId.showAs[RdfResource]} a prov:Association;
-                 |                                    prov:agent ?agentId.
-                 |  ?agentId a schema:Person.
-                 |}
-                 |""".stripMargin)
-      .unsafeRunSync()
-      .map(row => persons.ResourceId.from(row("agentId")))
-      .sequence
-      .fold(throw _, identity)
-      .toSet
+  private def findPersonAgents(resourceId: associations.ResourceId): Set[persons.ResourceId] = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "fetch agent",
+      Prefixes.of(prov -> "prov", schema -> "schema"),
+      s"""|SELECT ?agentId
+          |WHERE {
+          |  ${resourceId.showAs[RdfResource]} a prov:Association;
+          |                                    prov:agent ?agentId.
+          |  ?agentId a schema:Person.
+          |}
+          |""".stripMargin
+    )
+  ).unsafeRunSync()
+    .map(row => persons.ResourceId.from(row("agentId")))
+    .sequence
+    .fold(throw _, identity)
+    .toSet
 
   private implicit class AssociationOps(association: entities.Association) {
     lazy val maybePersonAgentResourceId: Option[persons.ResourceId] = association match {

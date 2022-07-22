@@ -23,8 +23,8 @@ import cats.effect.kernel.Async
 import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, Name, OriginalIdentifier, SameAs, Title}
 import io.renku.graph.model.projects.Path
 import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait ProjectDatasetsFinder[F[_]] {
@@ -35,15 +35,15 @@ private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
   type ProjectDataset  = (Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig) =
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](renkuConnectionConfig: RenkuConnectionConfig) =
     MonadThrow[F].catchNonFatal(
-      new ProjectDatasetsFinderImpl[F](rdfStoreConfig)
+      new ProjectDatasetsFinderImpl[F](renkuConnectionConfig)
     )
 }
 
 private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl(renkuConnectionConfig)
     with ProjectDatasetsFinder[F] {
 
   import ProjectDatasetsFinderImpl._

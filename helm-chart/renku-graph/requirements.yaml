@@ -1,4 +1,8 @@
 dependencies:
 - name: certificates
-  version: "0.0.2"
+  version: "0.0.3"
   repository: "https://swissdatasciencecenter.github.io/helm-charts/"
+- name: renku-jena
+  version: "0.0.14"
+  repository: "https://swissdatasciencecenter.github.io/helm-charts/"
+  alias: jena

@@ -28,33 +28,37 @@ import io.renku.events.consumers.subscriptions.SubscriptionMechanism
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
     override val categoryName:  CategoryName,
+    tsReadinessChecker:         TSReadinessForEventsChecker[F],
     eventProcessor:             EventProcessor[F],
     eventBodyDeserializer:      EventBodyDeserializer[F],
     subscriptionMechanism:      SubscriptionMechanism[F],
     concurrentProcessesLimiter: ConcurrentProcessesLimiter[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](concurrentProcessesLimiter) {
   import eventBodyDeserializer.toCleanUpEvent
+  import tsReadinessChecker._
 
-  override def createHandlingProcess(
-      requestContent: EventRequestContent
-  ): F[EventHandlingProcess[F]] = EventHandlingProcess.withWaitingForCompletion[F](
-    deferred => startCleanUp(requestContent, deferred),
-    subscriptionMechanism.renewSubscription()
-  )
+  override def createHandlingProcess(requestContent: EventRequestContent): F[EventHandlingProcess[F]] =
+    EventHandlingProcess.withWaitingForCompletion[F](
+      verifyTSReady >> startCleanUp(requestContent, _),
+      subscriptionMechanism.renewSubscription()
+    )
 
   private def startCleanUp(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
-    cleanupEvent <- toCleanUpEvent(requestContent.event).toRightT(recoverTo = BadRequest)
-    result <- Spawn[F]
-                .start(eventProcessor.process(cleanupEvent.project) >> deferred.complete(()))
-                .toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(cleanupEvent))
-                .leftSemiflatTap(Logger[F].log(cleanupEvent))
+    event <- toCleanUpEvent(requestContent.event).toRightT(recoverTo = BadRequest)
+    result <-
+      Spawn[F]
+        .start(eventProcessor.process(event.project).recoverWith(errorLogging(event.project)) >> deferred.complete(()))
+        .toRightT
+        .map(_ => Accepted)
+        .semiflatTap(Logger[F].log(event))
+        .leftSemiflatTap(Logger[F].log(event))
   } yield result
 
   private implicit lazy val eventInfoToString: Show[CleanUpEvent] = Show.show { event =>
@@ -66,12 +70,14 @@ object EventHandler {
 
   private val singleProcess = 1
 
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       subscriptionMechanism: SubscriptionMechanism[F]
   ): F[EventHandler[F]] = for {
     concurrentProcessLimiter <- ConcurrentProcessesLimiter(Refined.unsafeApply(singleProcess))
+    tsReadinessChecker       <- TSReadinessForEventsChecker[F]
     eventProcessor           <- EventProcessor[F]
   } yield new EventHandler[F](categoryName,
+                              tsReadinessChecker,
                               eventProcessor,
                               EventBodyDeserializer[F],
                               subscriptionMechanism,

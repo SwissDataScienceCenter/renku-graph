@@ -26,8 +26,8 @@ import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons
 import io.renku.graph.model.persons.{Email, GitLabId, ResourceId}
 import io.renku.graph.model.views.RdfResource
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGPersonFinder[F[_]] {
@@ -36,12 +36,13 @@ private trait KGPersonFinder[F[_]] {
 
 private object KGPersonFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGPersonFinder[F]] = for {
-    rdfStoreConfig <- RdfStoreConfig[F]()
-  } yield new KGPersonFinderImpl(rdfStoreConfig)
+    renkuConnectionConfig <- RenkuConnectionConfig[F]()
+  } yield new KGPersonFinderImpl(renkuConnectionConfig)
 }
 
-private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig)
-    extends RdfStoreClientImpl(rdfStoreConfig)
+private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl(renkuConnectionConfig)
     with KGPersonFinder[F] {
 
   import eu.timepit.refined.auto._

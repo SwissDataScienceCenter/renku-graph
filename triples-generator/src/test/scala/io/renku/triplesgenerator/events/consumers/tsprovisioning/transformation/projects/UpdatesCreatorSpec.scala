@@ -27,7 +27,8 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
 import io.renku.testtools.IOSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -40,8 +41,9 @@ import java.time.Instant
 class UpdatesCreatorSpec
     extends AnyWordSpec
     with IOSpec
-    with InMemoryRdfStore
     with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with TableDrivenPropertyChecks
     with ScalaCheckPropertyChecks {
   import UpdatesCreator._
@@ -51,9 +53,10 @@ class UpdatesCreatorSpec
     "generate queries which delete the project name when changed" in {
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
-      prepareUpdates(project, toProjectMutableData(project).copy(name = projectNames.generateOne)).runAll
+      prepareUpdates(project, toProjectMutableData(project).copy(name = projectNames.generateOne))
+        .runAll(on = renkuDataset)
         .unsafeRunSync()
 
       findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeName = None))
@@ -70,11 +73,11 @@ class UpdatesCreatorSpec
     forAll(projectWithParentScenarios) { case (project, projectType) =>
       s"generate queries which deletes the $projectType's derivedFrom when changed" in {
 
-        loadToStore(project)
+        upload(to = renkuDataset, project)
 
         val kgProjectInfo = toProjectMutableData(project).copy(maybeParentId = projectResourceIds.generateSome)
 
-        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+        prepareUpdates(project, kgProjectInfo).runAll(on = renkuDataset).unsafeRunSync()
 
         findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = None))
       }
@@ -91,16 +94,18 @@ class UpdatesCreatorSpec
     forAll(projectWithoutParentScenarios) { case (project, projectType) =>
       s"generate queries which deletes the $projectType's derivedFrom when removed" in {
 
-        loadToStore(project)
+        upload(to = renkuDataset, project)
 
         val parentId = projectResourceIds.generateOne
-        loadToStore(JsonLD.edge(project.resourceId.asEntityId, prov / "wasDerivedFrom", parentId.asEntityId))
+        upload(to = renkuDataset,
+               JsonLD.edge(project.resourceId.asEntityId, prov / "wasDerivedFrom", parentId.asEntityId)
+        )
 
         findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = parentId.show.some))
 
         val kgProjectInfo = toProjectMutableData(project).copy(maybeParentId = parentId.some)
 
-        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+        prepareUpdates(project, kgProjectInfo).runAll(on = renkuDataset).unsafeRunSync()
 
         findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = None))
       }
@@ -109,9 +114,9 @@ class UpdatesCreatorSpec
     forAll(projectWithParentScenarios) { case (project, projectType) =>
       s"not generate queries which deletes the $projectType's derivedFrom when NOT changed" in {
 
-        loadToStore(project)
+        upload(to = renkuDataset, project)
 
-        prepareUpdates(project, toProjectMutableData(project)).runAll.unsafeRunSync()
+        prepareUpdates(project, toProjectMutableData(project)).runAll(on = renkuDataset).unsafeRunSync()
 
         findProjects shouldBe Set(CurrentProjectState.from(project))
       }
@@ -122,9 +127,9 @@ class UpdatesCreatorSpec
       val kgProjectInfo = toProjectMutableData(project)
         .copy(visibility = Gen.oneOf(projects.Visibility.all.filterNot(_ == project.visibility)).generateOne)
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
-      prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+      prepareUpdates(project, kgProjectInfo).runAll(on = renkuDataset).unsafeRunSync()
 
       findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeVisibility = None))
     }
@@ -133,13 +138,13 @@ class UpdatesCreatorSpec
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val kgProjectInfo = toProjectMutableData(project).copy(maybeDescription = projectDescriptions.generateSome)
 
-        loadToStore(project)
+        upload(to = renkuDataset, project)
 
-        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+        prepareUpdates(project, kgProjectInfo).runAll(on = renkuDataset).unsafeRunSync()
 
         findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeDesc = None))
 
-        clearDataset()
+        clear(renkuDataset)
       }
     }
 
@@ -147,9 +152,9 @@ class UpdatesCreatorSpec
       val project       = anyProjectEntities.generateOne.to[entities.Project]
       val kgProjectInfo = toProjectMutableData(project).copy(keywords = projectKeywords.generateSet(minElements = 1))
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
-      prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+      prepareUpdates(project, kgProjectInfo).runAll(on = renkuDataset).unsafeRunSync()
 
       findProjects shouldBe Set(CurrentProjectState.from(project).copy(keywords = Set.empty))
     }
@@ -158,13 +163,13 @@ class UpdatesCreatorSpec
       forAll(anyRenkuProjectEntities.map(_.to[entities.RenkuProject])) { project =>
         val kgProjectInfo = toProjectMutableData(project).copy(maybeAgent = cliVersions.generateSome)
 
-        loadToStore(project)
+        upload(to = renkuDataset, project)
 
-        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+        prepareUpdates(project, kgProjectInfo).runAll(on = renkuDataset).unsafeRunSync()
 
         findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeAgent = None))
 
-        clearDataset()
+        clear(renkuDataset)
       }
     }
 
@@ -172,22 +177,22 @@ class UpdatesCreatorSpec
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
         val kgProjectInfo = toProjectMutableData(project).copy(maybeCreatorId = personResourceIds.generateSome)
 
-        loadToStore(project)
+        upload(to = renkuDataset, project)
 
-        prepareUpdates(project, kgProjectInfo).runAll.unsafeRunSync()
+        prepareUpdates(project, kgProjectInfo).runAll(on = renkuDataset).unsafeRunSync()
 
         findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeCreatorId = None))
 
-        clearDataset()
+        clear(renkuDataset)
       }
     }
 
     "not generate queries when nothing changed" in {
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
-      prepareUpdates(project, toProjectMutableData(project)).runAll.unsafeRunSync()
+      prepareUpdates(project, toProjectMutableData(project)).runAll(on = renkuDataset).unsafeRunSync()
 
       findProjects shouldBe Set(CurrentProjectState.from(project))
     }
@@ -198,11 +203,11 @@ class UpdatesCreatorSpec
     "generate queries which delete the project dateCreated when changed" in {
       val project = anyProjectEntities.generateOne.to[entities.Project]
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
-      dateCreatedDeletion(project,
-                          toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateOne)
-      ).runAll.unsafeRunSync()
+      dateCreatedDeletion(project, toProjectMutableData(project).copy(dateCreated = projectCreatedDates().generateOne))
+        .runAll(on = renkuDataset)
+        .unsafeRunSync()
 
       findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeDateCreated = None))
     }
@@ -231,24 +236,28 @@ class UpdatesCreatorSpec
     )
   }
 
-  private def findProjects: Set[CurrentProjectState] = runQuery(
-    s"""|SELECT ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc 
-        |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
-        |WHERE {
-        |  ?id a schema:Project
-        |  OPTIONAL { ?id schema:name ?name } 
-        |  OPTIONAL { ?id schema:dateCreated ?dateCreated } 
-        |  OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent } 
-        |  OPTIONAL { ?id renku:projectVisibility ?visibility } 
-        |  OPTIONAL { ?id schema:description ?maybeDesc } 
-        |  OPTIONAL { ?id schema:keywords ?keyword } 
-        |  OPTIONAL { ?id schema:agent ?maybeAgent } 
-        |  OPTIONAL { ?id schema:creator ?maybeCreatorId } 
-        |}
-        |GROUP BY ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc ?maybeAgent ?maybeCreatorId
-        |""".stripMargin
-  )
-    .unsafeRunSync()
+  private def findProjects: Set[CurrentProjectState] = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of(
+      "fetch project data",
+      Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
+      s"""|SELECT ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc
+          |  (GROUP_CONCAT(?keyword; separator=',') AS ?keywords) ?maybeAgent ?maybeCreatorId
+          |WHERE {
+          |  ?id a schema:Project
+          |  OPTIONAL { ?id schema:name ?name } 
+          |  OPTIONAL { ?id schema:dateCreated ?dateCreated } 
+          |  OPTIONAL { ?id prov:wasDerivedFrom ?maybeParent } 
+          |  OPTIONAL { ?id renku:projectVisibility ?visibility } 
+          |  OPTIONAL { ?id schema:description ?maybeDesc } 
+          |  OPTIONAL { ?id schema:keywords ?keyword } 
+          |  OPTIONAL { ?id schema:agent ?maybeAgent } 
+          |  OPTIONAL { ?id schema:creator ?maybeCreatorId } 
+          |}
+          |GROUP BY ?name ?dateCreated ?maybeParent ?visibility ?maybeDesc ?maybeAgent ?maybeCreatorId
+          |""".stripMargin
+    )
+  ).unsafeRunSync()
     .map(row =>
       CurrentProjectState(
         maybeName = row.get("name"),

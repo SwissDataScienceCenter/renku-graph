@@ -26,7 +26,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.Config
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.Migrations
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
@@ -67,10 +67,7 @@ private class MigrationsRunnerImpl[F[_]: MonadThrow: Logger](migrations: List[Mi
 }
 
 private object MigrationsRunner {
-  def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
-      reProvisioningStatus: ReProvisioningStatus[F],
-      config:               Config
-  ): F[MigrationsRunner[F]] = for {
-    migrations <- Migrations[F](reProvisioningStatus, config)
-  } yield new MigrationsRunnerImpl[F](migrations)
+  def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
+      config: Config
+  ): F[MigrationsRunner[F]] = Migrations[F](config).map(new MigrationsRunnerImpl[F](_))
 }

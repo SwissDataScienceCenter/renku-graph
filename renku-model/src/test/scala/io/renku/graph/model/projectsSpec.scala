@@ -27,6 +27,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects._
 import io.renku.graph.model.views.RdfResource
 import io.renku.tinytypes.constraints.{RelativePath, Url}
+import org.apache.jena.util.URIref
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar}
 import org.scalatest.matchers.should
@@ -183,11 +184,9 @@ class ProjectResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
 
   "showAs[RdfResource]" should {
 
-    "wrap the ResourceId in <>" in {
-      import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
-
+    "URI encode and wrap the ResourceId in <>" in {
       forAll { resourceId: ResourceId =>
-        resourceId.showAs[RdfResource] shouldBe s"<${sparqlEncode(resourceId.value)}>"
+        resourceId.showAs[RdfResource] shouldBe s"<${URIref.encode(resourceId.value)}>"
       }
     }
   }

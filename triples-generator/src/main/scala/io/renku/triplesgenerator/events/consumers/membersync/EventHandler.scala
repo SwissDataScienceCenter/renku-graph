@@ -27,19 +27,23 @@ import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProce
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: Concurrent: Logger](
     override val categoryName: CategoryName,
+    tsReadinessChecker:        TSReadinessForEventsChecker[F],
     membersSynchronizer:       MembersSynchronizer[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   import io.renku.graph.model.projects
   import membersSynchronizer._
+  import tsReadinessChecker._
 
   override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
-    EventHandlingProcess[F](startSynchronizingMember(request))
+    EventHandlingProcess[F](verifyTSReady >> startSynchronizingMember(request))
 
   private def startSynchronizingMember(request: EventRequestContent) = for {
     projectPath <- fromEither[F](request.event.getProjectPath)
@@ -55,7 +59,9 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
 }
 
 private[events] object EventHandler {
-  def apply[F[_]: Async: Logger: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder]: F[EventHandler[F]] = for {
+  def apply[F[_]: Async: ReProvisioningStatus: GitLabClient: AccessTokenFinder: SparqlQueryTimeRecorder: Logger]
+      : F[EventHandler[F]] = for {
+    tsReadinessChecker  <- TSReadinessForEventsChecker[F]
     membersSynchronizer <- MembersSynchronizer[F]
-  } yield new EventHandler[F](categoryName, membersSynchronizer)
+  } yield new EventHandler[F](categoryName, tsReadinessChecker, membersSynchronizer)
 }

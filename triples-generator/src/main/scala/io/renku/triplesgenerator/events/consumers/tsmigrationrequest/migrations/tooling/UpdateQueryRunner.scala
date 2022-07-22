@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -30,10 +30,10 @@ private[migrations] trait UpdateQueryRunner[F[_]] {
 }
 
 private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl[F](rdfStoreConfig,
-                                idleTimeoutOverride = (16 minutes).some,
-                                requestTimeoutOverride = (15 minutes).some
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl[F](renkuConnectionConfig,
+                          idleTimeoutOverride = (16 minutes).some,
+                          requestTimeoutOverride = (15 minutes).some
     )
     with UpdateQueryRunner[F] {
 
@@ -42,7 +42,8 @@ private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
 private[migrations] object UpdateQueryRunner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[UpdateQueryRunner[F]] =
-    RdfStoreConfig[F]().map(new UpdateQueryRunnerImpl(_))
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): UpdateQueryRunner[F] =
-    new UpdateQueryRunnerImpl(rdfStoreConfig)
+    RenkuConnectionConfig[F]().map(new UpdateQueryRunnerImpl(_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      renkuConnectionConfig: RenkuConnectionConfig
+  ): UpdateQueryRunner[F] = new UpdateQueryRunnerImpl(renkuConnectionConfig)
 }

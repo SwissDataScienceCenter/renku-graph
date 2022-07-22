@@ -39,8 +39,6 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
-import scala.util.control.NonFatal
-
 private[events] class EventHandler[F[_]: Spawn: Concurrent: Logger](
     override val categoryName:  CategoryName,
     commitEventSynchronizer:    CommitsSynchronizer[F],
@@ -62,10 +60,7 @@ private[events] class EventHandler[F[_]: Spawn: Concurrent: Logger](
     event <- fromEither[F](request.event.as[GlobalCommitSyncEvent].leftMap(_ => BadRequest))
     result <-
       Spawn[F]
-        .start {
-          (synchronizeEvents(event) >> process.complete(())).void
-            .recoverWith(finishProcessAndLogError(process, event))
-        }
+        .start(synchronizeEvents(event).recoverWith(errorLogging(event)) >> process.complete(()))
         .toRightT
         .map(_ => Accepted)
         .semiflatTap(Logger[F] log event)
@@ -84,14 +79,6 @@ private[events] class EventHandler[F[_]: Spawn: Concurrent: Logger](
       id   <- cursor.downField("id").as[projects.Id]
       path <- cursor.downField("path").as[projects.Path]
     } yield Project(id, path)
-
-  private implicit lazy val eventInfoToString: GlobalCommitSyncEvent => String = _.show
-
-  private def finishProcessAndLogError(deferred: Deferred[F, Unit],
-                                       event:    GlobalCommitSyncEvent
-  ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    deferred.complete(()) >> Logger[F].logError(event, exception) >> exception.raiseError[F, Unit]
-  }
 }
 
 private[events] object EventHandler {

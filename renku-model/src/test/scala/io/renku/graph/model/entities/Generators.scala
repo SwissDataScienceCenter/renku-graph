@@ -30,13 +30,21 @@ import org.scalacheck.Gen
 
 private object Generators {
 
-  implicit lazy val commandParameterObjects: Gen[Position => Plan => CommandParameter] = for {
+  implicit lazy val explicitCommandParameterObjects: Gen[Position => Plan => CommandParameter] = for {
     name             <- commandParameterNames
     maybeDescription <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
     maybePrefix      <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue     <- nonEmptyStrings().toGeneratorOf(ParameterDefaultValue)
   } yield (position: Position) =>
-    (plan: Plan) => CommandParameter(position, name, maybeDescription, maybePrefix, defaultValue, plan)
+    (plan: Plan) => ExplicitCommandParameter(position, name, maybeDescription, maybePrefix, defaultValue, plan)
+
+  implicit lazy val implicitCommandParameterObjects: Gen[Position => Plan => CommandParameter] = for {
+    name             <- commandParameterNames
+    maybeDescription <- nonEmptyStrings().toGeneratorOf(Description).toGeneratorOfOptions
+    maybePrefix      <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
+    defaultValue     <- nonEmptyStrings().toGeneratorOf(ParameterDefaultValue)
+  } yield (_: Position) =>
+    (plan: Plan) => ImplicitCommandParameter(name, maybeDescription, maybePrefix, defaultValue, plan)
 
   implicit lazy val locationCommandInputObjects: Gen[Position => Plan => LocationCommandInput] = for {
     name                <- commandParameterNames

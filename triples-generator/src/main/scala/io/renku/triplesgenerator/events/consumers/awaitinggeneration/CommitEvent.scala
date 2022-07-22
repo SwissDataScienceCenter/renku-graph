@@ -18,10 +18,18 @@
 
 package io.renku.triplesgenerator.events.consumers.awaitinggeneration
 
+import cats.Show
+import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events._
 import io.renku.triplesgenerator.events.consumers.models.CategoryEvent
 
 private final case class CommitEvent(eventId: EventId, project: Project, commitId: CommitId) extends CategoryEvent {
   override val compoundEventId = CompoundEventId(eventId, project.id)
+}
+
+private object CommitEvent {
+  implicit lazy val show: Show[CommitEvent] = Show.show { event =>
+    show"${event.compoundEventId}, projectPath = ${event.project.path}"
+  }
 }

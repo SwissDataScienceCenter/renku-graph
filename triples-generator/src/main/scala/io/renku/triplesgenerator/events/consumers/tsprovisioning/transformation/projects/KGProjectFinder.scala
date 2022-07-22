@@ -23,16 +23,17 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{CliVersion, persons, projects}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGProjectFinder[F[_]] {
   def find(resourceId: projects.ResourceId): F[Option[ProjectMutableData]]
 }
 
-private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig)
-    extends RdfStoreClientImpl(rdfStoreConfig)
+private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl(renkuConnectionConfig)
     with KGProjectFinder[F] {
 
   import eu.timepit.refined.auto._
@@ -95,5 +96,5 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
 private object KGProjectFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] =
-    RdfStoreConfig[F]().map(new KGProjectFinderImpl(_))
+    RenkuConnectionConfig[F]().map(new KGProjectFinderImpl(_))
 }

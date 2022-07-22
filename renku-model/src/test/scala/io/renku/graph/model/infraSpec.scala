@@ -82,36 +82,42 @@ class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
 
     "consider the minor only if majors are the same" in {
       forAll(cliVersions, cliVersions) { (version1, version2) =>
-        val version2SameMajor = CliVersion(version2.show.replaceFirst(s"${version2.major}.", s"${version1.major}."))
+        whenever(version1.minor != version2.minor) {
+          val version2SameMajor = CliVersion(version2.show.replaceFirst(s"${version2.major}.", s"${version1.major}."))
 
-        val list = List(version1, version2SameMajor)
+          val list = List(version1, version2SameMajor)
 
-        if (version1.minor < version2SameMajor.minor) list.sorted shouldBe list
-        else list.sorted                                          shouldBe list.reverse
+          if (version1.minor < version2SameMajor.minor) list.sorted shouldBe list
+          else list.sorted                                          shouldBe list.reverse
+        }
       }
     }
 
     "consider the bugfix only if majors and minors are the same" in {
       forAll(cliVersions, cliVersions) { (version1, version2) =>
-        val version2SameMajorMinor = CliVersion(
-          version2.show
-            .replaceFirst(s"${version2.major}.${version2.minor}", s"${version1.major}.${version1.minor}")
-        )
+        whenever(version1.bugfix != version2.bugfix) {
+          val version2SameMajorMinor = CliVersion(
+            version2.show
+              .replaceFirst(s"${version2.major}.${version2.minor}", s"${version1.major}.${version1.minor}")
+          )
 
-        val list = List(version1, version2SameMajorMinor)
+          val list = List(version1, version2SameMajorMinor)
 
-        if (version1.bugfix < version2SameMajorMinor.bugfix) list.sorted shouldBe list
-        else list.sorted                                                 shouldBe list.reverse
+          if (version1.bugfix < version2SameMajorMinor.bugfix) list.sorted shouldBe list
+          else list.sorted                                                 shouldBe list.reverse
+        }
       }
     }
 
     "consider the dev part if all majors, minors and bugfix are the same" in {
       val semanticVersion = semanticVersions.generateOne
       forAll(devVersions(fixed(semanticVersion)), devVersions(fixed(semanticVersion))) { (version1, version2) =>
-        val list = List(version1, version2)
+        whenever(version1 != version2) {
+          val list = List(version1, version2)
 
-        if ((version1.show compareTo version2.show) < 0) list.sorted shouldBe list
-        else list.sorted                                             shouldBe list.reverse
+          if ((version1.show compareTo version2.show) < 0) list.sorted shouldBe list
+          else list.sorted                                             shouldBe list.reverse
+        }
       }
     }
   }

@@ -25,18 +25,18 @@ import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityR
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{datasets, projects}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 object DatasetIdRecordsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SecurityRecordFinder[F, datasets.Identifier]] =
-    RdfStoreConfig[F]().map(new DatasetIdRecordsFinderImpl(_))
+    RenkuConnectionConfig[F]().map(new DatasetIdRecordsFinderImpl(_))
 }
 
 private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl(renkuConnectionConfig)
     with SecurityRecordFinder[F, datasets.Identifier] {
 
   override def apply(id: datasets.Identifier): F[List[SecurityRecord]] =

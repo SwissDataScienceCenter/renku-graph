@@ -24,8 +24,8 @@ import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
-import io.renku.rdfstore.SparqlQuery
-import io.renku.rdfstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.SparqlQuery
+import io.renku.triplesstore.SparqlQuery.Prefixes
 
 private trait UpdatesCreator {
 

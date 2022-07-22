@@ -24,8 +24,8 @@ import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -35,13 +35,13 @@ private trait TriplesRemover[F[_]] {
 }
 
 private class TriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    removalBatchSize: Long Refined Positive,
-    rdfStoreConfig:   RdfStoreConfig,
-    idleTimeout:      Duration = 11 minutes,
-    requestTimeout:   Duration = 10 minutes
-) extends RdfStoreClientImpl(rdfStoreConfig,
-                             idleTimeoutOverride = idleTimeout.some,
-                             requestTimeoutOverride = requestTimeout.some
+    removalBatchSize:      Long Refined Positive,
+    renkuConnectionConfig: RenkuConnectionConfig,
+    idleTimeout:           Duration = 11 minutes,
+    requestTimeout:        Duration = 10 minutes
+) extends TSClientImpl(renkuConnectionConfig,
+                       idleTimeoutOverride = idleTimeout.some,
+                       requestTimeoutOverride = requestTimeout.some
     )
     with TriplesRemover[F] {
 
@@ -87,9 +87,9 @@ private object TriplesRemoverImpl {
   import io.renku.config.ConfigLoader._
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      rdfStoreConfig: RdfStoreConfig,
-      config:         Config = ConfigFactory.load()
+      renkuConnectionConfig: RenkuConnectionConfig,
+      config:                Config = ConfigFactory.load()
   ): F[TriplesRemover[F]] = for {
     removalBatchSize <- find[F, Long Refined Positive]("re-provisioning-removal-batch-size", config)
-  } yield new TriplesRemoverImpl(removalBatchSize, rdfStoreConfig)
+  } yield new TriplesRemoverImpl(removalBatchSize, renkuConnectionConfig)
 }

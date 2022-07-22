@@ -148,7 +148,7 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
         failure shouldBe a[DecodingFailure]
         failure.message shouldBe
-          show"Invalid Person with $invalidResourceId, gitLabId = ${gitLabId.some}, " +
+          show"Invalid Person with ${invalidResourceId.asEntityId}, gitLabId = ${gitLabId.some}, " +
           show"orcidId = ${Option.empty[persons.OrcidId]}, email = $maybeEmail"
       }
     }
@@ -166,7 +166,7 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
         failure shouldBe a[DecodingFailure]
         failure.message shouldBe
-          show"Invalid Person with $invalidResourceId, gitLabId = ${Option.empty[persons.GitLabId]}, " +
+          show"Invalid Person with ${invalidResourceId.asEntityId}, gitLabId = ${Option.empty[persons.GitLabId]}, " +
           show"orcidId = ${orcidId.some}, email = ${Option.empty[persons.Email]}"
       }
     }
@@ -185,7 +185,7 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
           failure shouldBe a[DecodingFailure]
           failure.message shouldBe
-            show"Invalid Person with $invalidResourceId, gitLabId = ${Option.empty[persons.GitLabId]}, " +
+            show"Invalid Person with ${invalidResourceId.asEntityId}, gitLabId = ${Option.empty[persons.GitLabId]}, " +
             show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${email.some}"
       }
     }
@@ -202,7 +202,7 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
 
         failure shouldBe a[DecodingFailure]
         failure.message shouldBe
-          show"Invalid Person with $invalidResourceId, gitLabId = ${Option.empty[persons.GitLabId]}, " +
+          show"Invalid Person with ${invalidResourceId.asEntityId}, gitLabId = ${Option.empty[persons.GitLabId]}, " +
           show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${Option.empty[persons.Email]}"
       }
     }

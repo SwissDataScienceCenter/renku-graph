@@ -24,8 +24,8 @@ import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, sentenceContaining}
-import io.renku.graph.acceptancetests.data.{RdfStoreData, dataProjects}
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
@@ -43,8 +43,8 @@ class CrossEntitiesSearchSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with RdfStoreProvisioning
-    with RdfStoreData {
+    with TSProvisioning
+    with TSData {
 
   Feature("GET knowledge-graph/entities") {
 
@@ -76,10 +76,10 @@ class CrossEntitiesSearchSpec
 
     Scenario("As a user I would like to be able to do cross-entity search by calling a REST endpoint") {
 
-      Given("there's relevant data in the RDF Store")
+      Given("there's relevant data in the Triples Store")
       val commitId = commitIds.generateOne
       mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the RDF store`(project, commitId)
+      `data in the Triples Store`(project, commitId)
 
       When("the user calls the GET knowledge-graph/entities")
       val response = knowledgeGraphClient GET s"knowledge-graph/entities?query=${urlEncode(commonPhrase.value)}"

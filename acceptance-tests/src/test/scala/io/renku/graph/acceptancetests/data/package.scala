@@ -31,7 +31,7 @@ import org.scalacheck.Gen
 
 import java.time.Instant.now
 
-package object data extends RdfStoreData {
+package object data extends TSData {
 
   implicit val cliVersion: CliVersion   = currentVersionPair.cliVersion
   val renkuApiUrl:         renku.ApiUrl = renku.ApiUrl("http://localhost:9004/knowledge-graph")

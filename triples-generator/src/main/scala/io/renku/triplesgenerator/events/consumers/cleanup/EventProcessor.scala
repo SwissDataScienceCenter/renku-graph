@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
 import org.typelevel.log4cats.Logger
 
