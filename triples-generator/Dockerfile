@@ -1,7 +1,7 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
 
-FROM openjdk:17-jdk-alpine as builder
+FROM openjdk:19-slim-bullseye as builder
 
 WORKDIR /work
 
@@ -15,7 +15,7 @@ RUN export PATH="/usr/local/sbt/bin:$PATH" && \
     sbt "project triples-generator" stage && \
     apk del .build-dependencies
 
-FROM openjdk:17-jdk-alpine
+FROM openjdk:19-slim-bullseye
 
 WORKDIR /opt/triples-generator
 
