@@ -30,7 +30,7 @@ jena:
   image:
     repository: renku/renku-jena
     pullPolicy: IfNotPresent
-    tag: '0.0.14'
+    tag: '0.0.15'
   users:
     admin:
       ## Admin user password
@@ -57,6 +57,7 @@ jena:
       configMap:
         name: shiro-ini
         defaultMode: 0555
+  additionalInitContainerScript: "find /fuseki -name tdb.lock -type f -delete && find /fuseki/configuration -name *.ttl -type f -empty -delete && echo clean-up done"
 
 webhookService:
   image:
