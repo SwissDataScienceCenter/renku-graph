@@ -8,12 +8,12 @@ WORKDIR /work
 COPY . .
 
 RUN export PATH="/usr/local/sbt/bin:$PATH" && \
-    apk update && apk add --no-cache --virtual .build-dependencies bash wget tar git && \
+    apt-get update && apt-get install -y bash wget tar git && \
     mkdir -p "/usr/local/sbt" && \
     wget -qO - "https://github.com/sbt/sbt/releases/download/v1.7.0/sbt-1.7.0.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
     sbt writeVersionToVersionConf && \
     sbt "project triples-generator" stage && \
-    apk del .build-dependencies
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives
 
 FROM openjdk:19-slim-bullseye
 
@@ -26,17 +26,19 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
 # Installing Renku and other dependencies
-RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc g++ make libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo tini && \
+RUN apt-get update && apt-get install -y tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc g++ make libxml2-dev libxslt-dev libc-dev yaml-dev 'rust>1.41.0' cargo tini && \
     python3 -m pip install --ignore-installed packaging && \
     python3 -m pip install --upgrade 'pip==22.0.4' && \
     python3 -m pip install jinja2 && \
     python3 -m pip install 'renku==1.5.0' 'sentry-sdk==1.5.5'  && \
-    chown -R daemon:daemon .
+    chown -R daemon:daemon . && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh
 
 ENV GID=1000
-RUN adduser --disabled-password -g "$GID" -D -u 1000 tguser && \
+RUN addgroup --gid "$GID" tguser && \
+    adduser --disabled-password --gid "$GID" --uid 1000 tguser && \
     chmod 555 -R /opt/triples-generator && \
     chmod 555 -R /entrypoint.sh
 
