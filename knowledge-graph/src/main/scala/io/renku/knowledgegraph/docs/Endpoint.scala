@@ -24,7 +24,7 @@ import io.circe.syntax._
 import io.renku.config.ServiceVersion
 import io.renku.knowledgegraph.docs.Implicits.StatusOps
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.lineage
+import io.renku.knowledgegraph.{entities, lineage}
 import org.http4s
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
@@ -46,6 +46,7 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends 
            serviceVersion.value
       )
     ).addPath(lineage.EndpointDoc.path)
+      .addPath(entities.EndpointDoc.path)
       .addServer(server)
       .addSecurity(privateToken)
       .addSecurity(oAuth)

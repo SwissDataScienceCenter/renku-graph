@@ -23,6 +23,8 @@ import io.renku.knowledgegraph.docs.Implicits._
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
 import io.renku.knowledgegraph.docs.model._
 import org.http4s
+import io.circe.literal._
+import io.renku.knowledgegraph.docs.model.Example.JsonExample
 
 object EndpointDoc {
   lazy val path: Path = Path("Entities", "Entities such as datasets, users, etc.".some, opMapping)
@@ -70,11 +72,37 @@ object EndpointDoc {
               "to filter by entity's creation date to <= the given date".some,
               required = false,
               Schema.String
+    ),
+    Parameter(
+      "sort",
+      In.Query,
+      "to filter by entity's creation date to <= the given date: matchingScore, name, date. the sorting has to be requested by giving the sort query parameter with the property name and sorting order (asc or desc). The default order is ascending so sort=name means the same as sort=name:asc.".some,
+      required = false,
+      Schema.String
+    ),
+    Parameter("page",
+              In.Query,
+              "the page query parameter is optional and defaults to 1.".some,
+              required = false,
+              Schema.String
+    ),
+    Parameter("per_page",
+              In.Query,
+              "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
+              required = false,
+              Schema.String
     )
   )
 
   private lazy val responses = Map(
-    http4s.Status.Ok.asDocStatus -> Response("OK", Map.empty, responseHeaders, Map.empty)
+    http4s.Status.Ok.asDocStatus -> Response(
+      "OK",
+      Map(
+        "json" -> MediaType(http4s.MediaType.application.json.asDocMediaType, "Sample entities", JsonExample(example))
+      ),
+      responseHeaders,
+      Map.empty
+    )
   )
 
   private lazy val responseHeaders = Map(
@@ -86,4 +114,83 @@ object EndpointDoc {
     "Prev-Page"   -> Header("The index of the previous page (optional)".some, Schema.Integer),
     "Link" -> Header("The set of prev/next/first/last link headers (prev and next are optional)".some, Schema.String)
   )
+
+  private val example =
+    json"""
+           [
+        {
+          "type": "project",
+          "matchingScore": 1.0055376,
+          "name": "name",
+          "path": "group/subgroup/name",
+          "namespace": "group/subgroup",
+          "visibility": "public",
+          "date": "2012-11-15T10:00:00.000Z",
+          "creator": "Jan Kowalski",
+          "keywords": [
+            "keyword1",
+            "keyword2"
+          ],
+          "description": "desc",
+          "_links": [
+            {
+              "rel": "details",
+              "href": "http://t:5511/projects/group/subgroup/name"
+            }
+          ]
+        },
+        {
+          "type": "dataset",
+          "matchingScore": 3.364836,
+          "name": "name",
+          "visibility": "public",
+          "date": "2012-11-15T10:00:00.000Z", 
+          "creators": [
+            "Jan Kowalski",
+            "Zoe"
+          ],
+          "keywords": [
+            "keyword1",
+            "keyword2"
+          ],
+          "description": "desc",
+          "images": [
+            {
+              "location": "image.png",
+              "_links":[
+                {
+                  "rel":  "view",
+                  "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
+                }
+              ]
+            }
+          ],
+          "_links": [
+            {
+              "rel": "details",
+              "href": "http://t:5511/datasets/122334344"
+            }
+          ]
+        },
+        {
+          "type": "workflow",
+          "matchingScore": 5.364836,
+          "name": "name",
+          "visibility": "public",
+          "date": "2012-11-15T10:00:00.000Z",
+          "keywords": [
+            "keyword1",
+            "keyword2"
+          ],
+          "description": "desc",
+          "_links": []
+        },
+        {
+          "type": "person",
+          "matchingScore": 4.364836,
+          "name": "name",
+          "_links": []
+        }
+        ]
+          """
 }

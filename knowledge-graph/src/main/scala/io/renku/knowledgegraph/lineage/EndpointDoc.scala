@@ -30,7 +30,7 @@ object EndpointDoc {
     "Lineage",
     "Get the lineage of a files".some,
     GET(
-      Uri / groupParam / projectParam / "files" / locationParam / "lineage",
+      Uri / "projects" / groupParam / projectParam / "files" / locationParam / "lineage",
       http4s.Status.Ok.asDocStatus,
       Response(
         "Lineage found",

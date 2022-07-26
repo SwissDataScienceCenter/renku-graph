@@ -32,6 +32,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec {
     "return the OpenAPI specification" in new TestCase {
 
       val contents = endpoint.`get /docs`.unsafeRunSync().as[String].unsafeRunSync()
+      println(contents)
 
       Option(new OpenAPIParser().readContents(contents, null, null).getOpenAPI).isEmpty shouldBe false
     }

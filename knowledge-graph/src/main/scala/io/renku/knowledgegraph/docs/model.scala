@@ -56,7 +56,7 @@ object model {
                                  components:     Option[Components],
                                  security:       List[SecurityRequirement]
   ) extends OpenApiDocument {
-    def addPath(path: Path): OpenApiDocument = copy(paths = paths + (path.template -> path))
+    def addPath(path: Path): CompleteDoc = copy(paths = paths + (path.template -> path))
 
     def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
 
