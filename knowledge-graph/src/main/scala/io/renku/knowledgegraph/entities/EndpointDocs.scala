@@ -26,7 +26,7 @@ import org.http4s
 import io.circe.literal._
 import io.renku.knowledgegraph.docs.model.Example.JsonExample
 
-object EndpointDoc {
+object EndpointDocs {
   lazy val path: Path = Path("Entities", "Entities such as datasets, users, etc.".some, opMapping)
 
   private lazy val operation = Operation.Get("Get various kinds of entities".some, parameters, None, responses, Nil)

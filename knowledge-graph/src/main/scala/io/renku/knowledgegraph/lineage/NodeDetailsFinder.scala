@@ -22,16 +22,16 @@ import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.circe.Decoder
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.knowledgegraph.lineage.model.{ExecutionInfo, Node}
+import io.renku.tinytypes.json.TinyTypeDecoders
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.tinytypes.json.TinyTypeDecoders
 import org.typelevel.log4cats.Logger
 
 private trait NodeDetailsFinder[F[_]] {
@@ -63,34 +63,34 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTi
   private implicit val nodeDecoder: Decoder[Option[Node]] = {
     implicit val locationDecoder: Decoder[Node.Location] = TinyTypeDecoders.stringDecoder(Node.Location)
     implicit val labelDecoder:    Decoder[Node.Label]    = TinyTypeDecoders.stringDecoder(Node.Label)
-    implicit val typeDecoder:     Decoder[Node.Type]     = TinyTypeDecoders.stringDecoder(Node.Type)
 
-    implicit lazy val fieldsDecoder: Decoder[Option[(Node.Location, Node.Type, Node.Label)]] = { cursor =>
+    implicit lazy val fieldsDecoder: Decoder[Option[(Node.Location, String, Node.Label)]] = { cursor =>
       for {
-        maybeNodeType <- cursor.downField("type").downField("value").as[Option[Node.Type]]
         maybeLocation <- cursor.downField("location").downField("value").as[Option[Node.Location]]
+        maybeNodeType <- cursor.downField("type").downField("value").as[Option[String]]
         maybeLabel    <- cursor.downField("label").downField("value").as[Option[Node.Label]].map(trimValue)
       } yield (maybeLocation, maybeNodeType, maybeLabel) mapN ((_, _, _))
     }
 
     lazy val trimValue: Option[Node.Label] => Option[Node.Label] = _.map(l => Node.Label(l.value.trim))
 
-    lazy val maybeToNode: List[(Node.Location, Node.Type, Node.Label)] => Option[Node] = {
-      case Nil => None
+    lazy val maybeToNode: List[(Node.Location, String, Node.Label)] => Either[DecodingFailure, Option[Node]] = {
+      case Nil => Option.empty.asRight
       case (location, typ, label) :: tail =>
-        Some {
-          tail.foldLeft(Node(location, label, Set(typ))) {
-            case (node, (`location`, t, `label`)) => node.copy(types = node.types + t)
-            case (node, _)                        => node
-          }
+        tail.foldLeft((location, Set(typ), label)) {
+          case (node, (`location`, t, `label`)) => (location, node._2 + t, label)
+          case (node, _)                        => node
+        } match {
+          case (`location`, types, `label`) =>
+            Node.Type.fromEntityTypes(types).bimap(err => DecodingFailure(err.getMessage, Nil), Node(location, label, _).some)
         }
     }
 
     _.downField("results")
       .downField("bindings")
-      .as[List[Option[(Node.Location, Node.Type, Node.Label)]]]
+      .as[List[Option[(Node.Location, String, Node.Label)]]]
       .map(_.flatten)
-      .map(maybeToNode)
+      .flatMap(maybeToNode)
   }
 
   private def failIf[T](no: T): Option[Node] => F[Node] = {

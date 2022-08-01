@@ -128,7 +128,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
     case GET -> Root / "knowledge-graph" / "graphql"   => schema()
-    case GET -> Root / "knowledge-graph" / "spec.json" => docsEndpoint.`get /docs`
+    case GET -> Root / "knowledge-graph" / "spec.json" => docsEndpoint.`get /spec.json`
     case GET -> Root / "ping"                          => Ok("pong")
   }
 

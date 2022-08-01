@@ -18,10 +18,8 @@
 
 package io.renku.knowledgegraph.lineage
 
-import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators._
-import io.renku.graph.model.entities.{Activity, Entity}
 import io.renku.knowledgegraph.lineage.model._
 import org.scalacheck.Gen
 
@@ -32,17 +30,18 @@ object LineageGenerators {
   implicit val nodeIds:       Gen[Node.Id]       = nonBlankStrings(minLength = 3) map (_.value) map Node.Id.apply
   implicit val nodeLocations: Gen[Node.Location] = relativePaths() map Node.Location.apply
   implicit val nodeLabels:    Gen[Node.Label]    = nonBlankStrings(minLength = 3) map (_.value) map Node.Label.apply
+  implicit val nodeTypes:     Gen[Node.Type]     = Gen.oneOf(Node.Type.all)
 
   val entityNodes: Gen[Node] = for {
     location <- nodeLocations
     label    <- nodeLabels
-    types    <- Gen.oneOf(Entity.fileEntityTypes, Entity.folderEntityTypes)
-  } yield Node(location, label, types.toList.map(t => Node.Type(t.show)).toSet)
+    typ      <- nodeTypes
+  } yield Node(location, label, typ)
 
   val processRunNodes: Gen[Node] = for {
     location <- nodeLocations
     label    <- nodeLabels
-  } yield Node(location, label, Activity.entityTypes.toList.map(t => Node.Type(t.show)).toSet)
+  } yield Node(location, label, Node.Type.ProcessRun)
 
   implicit val nodes: Gen[Node] = Gen.oneOf(processRunNodes, entityNodes)
 

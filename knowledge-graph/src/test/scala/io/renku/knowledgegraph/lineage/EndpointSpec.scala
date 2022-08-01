@@ -25,7 +25,6 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.Schemas.prov
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.server.EndpointTester.errorMessageEntityDecoder
@@ -52,21 +51,21 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
 
       (lineageFinder.find _)
         .expects(projectPath, location, maybeUser)
-        .returning(IO.pure(lineage.some))
+        .returning(lineage.some.pure[IO])
 
       val response      = endpoint.`GET /lineage`(projectPath, location, maybeUser).unsafeRunSync()
       val Right(result) = response.as[Json].unsafeRunSync().as[Lineage]
 
       response.status      shouldBe Ok
       response.contentType shouldBe Some(`Content-Type`(application.json))
-      result               shouldBe makeNodesWithOneType(lineage)
+      result               shouldBe lineage
     }
 
     "respond with NotFound if the lineage isn't returned from the finder" in new TestCase {
 
       (lineageFinder.find _)
         .expects(projectPath, location, maybeUser)
-        .returning(IO.pure(None))
+        .returning(Option.empty[Lineage].pure[IO])
 
       val response = endpoint.`GET /lineage`(projectPath, location, maybeUser).unsafeRunSync()
       val result   = response.as[InfoMessage].unsafeRunSync()
@@ -77,20 +76,17 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
     }
 
     "respond with InternalServerError if the lineage is returned from the finder but the encoder fails" in new TestCase {
-      val lineage   = lineages.generateOne
-      val exception = exceptions.generateOne
 
+      val exception = exceptions.generateOne
       (lineageFinder.find _)
         .expects(projectPath, location, maybeUser)
         .returning(exception.raiseError[IO, Option[Lineage]])
 
       val response = endpoint.`GET /lineage`(projectPath, location, maybeUser).unsafeRunSync()
-      val result   = response.as[Json].unsafeRunSync()
 
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Lineage generation failed")
-
     }
   }
 
@@ -121,22 +117,8 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
       for {
         location <- cursor.downField("location").as[String].map(Location)
         label    <- cursor.downField("label").as[String].map(Label)
-        types    <- cursor.downField("type").as[String].map(Type)
-      } yield Node(location, label, Set(types))
-    }
-
-    def makeNodesWithOneType(lineage: Lineage): Lineage =
-      lineage.copy(nodes = lineage.nodes.map(node => node.copy(types = Set(Type(node.singleWordType)))))
-
-    private implicit class NodeOps(node: Node) {
-
-      private lazy val FileTypes = Set(Type((prov / "Entity").show))
-
-      lazy val singleWordType: String = node.types match {
-        case types if types contains Type((prov / "Activity").show)   => "ProcessRun"
-        case types if types contains Type((prov / "Collection").show) => "Directory"
-        case FileTypes                                                => "File"
-      }
+        typ      <- cursor.downField("type").as[String].map(Type)
+      } yield Node(location, label, typ)
     }
   }
 }

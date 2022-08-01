@@ -111,31 +111,25 @@ class QuerySchemaSpec
       nodes = Set(sourceNode, targetNode)
     )
 
-    def json(lineage: Lineage) =
-      json"""
-      {
-        "data": {
-          "lineage": {
-            "nodes": ${Json.arr(lineage.nodes.map(toJson).toList: _*)},
-            "edges": ${Json.arr(lineage.edges.map(toJson).toList: _*)}
-          }
+    def json(lineage: Lineage) = json"""{
+      "data": {
+        "lineage": {
+          "nodes": ${Json.arr(lineage.nodes.map(toJson).toList: _*)},
+          "edges": ${Json.arr(lineage.edges.map(toJson).toList: _*)}
         }
-      }"""
+      }
+    }"""
 
-    private def toJson(node: Node) =
-      json"""
-      {
-        "id": ${node.location.value},
-        "location": ${node.location.value},
-        "label": ${node.label.value},
-        "type": ${node.singleWordType.fold(throw _, identity).name}
-      }"""
+    private def toJson(node: Node) = json"""{
+      "id": ${node.location.value},
+      "location": ${node.location.value},
+      "label": ${node.label.value},
+      "type": ${node.typ.value}
+    }"""
 
-    private def toJson(edge: Edge) =
-      json"""
-      {
-        "source" : ${edge.source.value},
-        "target" : ${edge.target.value}
-      }"""
+    private def toJson(edge: Edge) = json"""{
+      "source" : ${edge.source.value},
+      "target" : ${edge.target.value}
+    }"""
   }
 }

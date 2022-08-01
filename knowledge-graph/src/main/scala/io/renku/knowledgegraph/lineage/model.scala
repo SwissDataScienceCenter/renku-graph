@@ -20,6 +20,10 @@ package io.renku.knowledgegraph.lineage
 
 import cats.MonadThrow
 import cats.syntax.all._
+import io.circe.Encoder
+import io.circe.generic.semiauto.deriveEncoder
+import io.circe.literal._
+import io.renku.graph.model.entities.{Activity, Entity}
 import io.renku.jsonld.{EntityId, EntityType}
 import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
@@ -36,7 +40,6 @@ object model {
   private[lineage] final case class RunDateImpl(value: Instant) extends AnyVal with RunDate
   private[lineage] implicit object RunDate                      extends TinyTypeFactory[RunDate](RunDateImpl)
   private[lineage] type FromAndToNodes = (Set[Node.Location], Set[Node.Location])
-  private[lineage] type EdgeMapEntry   = (ExecutionInfo, FromAndToNodes)
   private[lineage] type EdgeMap        = Map[ExecutionInfo, FromAndToNodes]
 
   final case class Lineage private (edges: Set[Edge], nodes: Set[Node]) extends LineageOps
@@ -57,6 +60,8 @@ object model {
       edges.foldLeft(Set.empty[Node.Location]) { case (acc, Edge(source, target)) =>
         acc + source + target
       }
+
+    implicit val lineageEncoder: Encoder[Lineage] = deriveEncoder
   }
 
   trait LineageOps {
@@ -67,62 +72,69 @@ object model {
 
   final case class Edge(source: Node.Location, target: Node.Location)
 
-  final case class Node(location: Node.Location, label: Node.Label, types: Set[Node.Type])
+  object Edge {
+    implicit val edgeEncoder: Encoder[Edge] = Encoder.instance { edge =>
+      json"""{
+        "source": ${edge.source.value},
+        "target": ${edge.target.value}
+      }"""
+    }
+  }
+
+  final case class Node(location: Node.Location, label: Node.Label, typ: Node.Type)
 
   object Node {
     import io.renku.tinytypes.constraints.NonBlank
     import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
-    sealed trait Id extends Any with StringTinyType
-
-    private[lineage] final case class IdImpl(value: String) extends AnyVal with Id
-    object Id extends TinyTypeFactory[Id](IdImpl) with NonBlank[Id] {
-
+    final class Id private (val value: String) extends AnyVal with StringTinyType
+    object Id extends TinyTypeFactory[Id](new Id(_)) with NonBlank[Id] {
       import io.renku.graph.model.views.RdfResource
       import io.renku.tinytypes.Renderer
 
       implicit val rdfResourceRenderer: Renderer[RdfResource, Id] = value => s"<${URIref.encode(value.show)}>"
     }
 
-    sealed trait Label extends Any with StringTinyType
+    final class Label private (val value: String) extends AnyVal with StringTinyType
+    object Label                                  extends TinyTypeFactory[Label](new Label(_)) with NonBlank[Label]
 
-    private[lineage] final case class LabelImpl private (value: String) extends AnyVal with Label
-    object Label extends TinyTypeFactory[Label](LabelImpl) with NonBlank[Label]
+    sealed trait Type extends Any with StringTinyType with Product with Serializable
+    object Type extends TinyTypeFactory[Type](TypeInstantiator) {
 
-    sealed trait Type extends Any with StringTinyType
+      case object ProcessRun extends Type { val value: String = "ProcessRun" }
+      case object File       extends Type { val value: String = "File" }
+      case object Directory  extends Type { val value: String = "Directory" }
 
-    private[lineage] final case class TypeImpl private (value: String) extends AnyVal with Type
-    object Type extends TinyTypeFactory[Type](TypeImpl) with NonBlank[Type]
+      val all: Set[Type] = Set(ProcessRun, File, Directory)
 
-    sealed trait Location extends Any with StringTinyType
+      def fromEntityTypes(types: Set[String]): Either[IllegalArgumentException, Type] =
+        types.map(t => EntityType.of(t.show)) match {
+          case types if Activity.entityTypes.toList.toSet === types     => Right(ProcessRun)
+          case types if Entity.folderEntityTypes.toList.toSet === types => Right(Directory)
+          case types if Entity.fileEntityTypes.toList.toSet === types   => Right(File)
+          case types =>
+            Left(new IllegalArgumentException(s"${types.map(_.show).mkString(", ")} cannot be converted to a NodeType"))
+        }
+    }
 
-    private[lineage] final case class LocationImpl private (value: String) extends AnyVal with Location
-    object Location extends TinyTypeFactory[Location](LocationImpl) {
+    private object TypeInstantiator extends (String => Type) {
+      override def apply(value: String): Type = Type.all.find(_.value == value).getOrElse {
+        throw new IllegalArgumentException(s"'$value' unknown Node Type")
+      }
+    }
+
+    final class Location private (val value: String) extends AnyVal with StringTinyType
+    object Location extends TinyTypeFactory[Location](new Location(_)) with NonBlank[Location] {
       def unapply(value: String): Option[Location] = Location.from(value).toOption
     }
 
-    sealed trait SingleWordType extends Product with Serializable {
-      val name: String
-      override lazy val toString: String = name
-    }
-
-    object SingleWordType {
-      case object ProcessRun extends SingleWordType { val name: String = "ProcessRun" }
-      case object File       extends SingleWordType { val name: String = "File" }
-      case object Directory  extends SingleWordType { val name: String = "Directory" }
-    }
-
-    implicit class NodeOps(node: Node) {
-
-      import SingleWordType._
-      import io.renku.graph.model.entities.{Activity, Entity}
-
-      lazy val singleWordType: Either[Exception, SingleWordType] = node.types.map(t => EntityType.of(t.show)) match {
-        case types if Activity.entityTypes.toList.toSet === types     => Right(ProcessRun)
-        case types if Entity.folderEntityTypes.toList.toSet === types => Right(Directory)
-        case types if Entity.fileEntityTypes.toList.toSet === types   => Right(File)
-        case types => Left(new Exception(s"${types.map(_.show).mkString(", ")} cannot be converted to a NodeType"))
-      }
+    implicit val nodeEncoder: Encoder[Node] = Encoder.instance { node =>
+      json"""{
+        "id":       ${node.location.value},
+        "location": ${node.location.value},
+        "label":    ${node.label.value},
+        "type":     ${node.typ.show}
+      }"""
     }
   }
 }

@@ -268,7 +268,7 @@ class NodeDetailsFinderSpec
     lazy val toNode: Node = Node(
       Node.Location(nodeDef.location),
       Node.Label(nodeDef.label),
-      nodeDef.types.map(Node.Type.apply)
+      Node.Type.fromEntityTypes(nodeDef.types).fold(throw _, identity)
     )
   }
 }

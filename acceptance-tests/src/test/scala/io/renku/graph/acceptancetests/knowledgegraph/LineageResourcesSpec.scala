@@ -179,11 +179,11 @@ class LineageResourcesSpec
     Right {
       Set(
         json"""{"id": ${`zhbikes folder`.location},      "location": ${`zhbikes folder`.location},      "label": ${`zhbikes folder`.label},      "type": ${`zhbikes folder`.singleWordType}}""",
-        json"""{"id": ${`activity3 node`.location},      "location": ${`activity3 node`.location},     "label": ${`activity3 node`.label},     "type": ${`activity3 node`.singleWordType}}""",
+        json"""{"id": ${`activity3 node`.location},      "location": ${`activity3 node`.location},      "label": ${`activity3 node`.label},      "type": ${`activity3 node`.singleWordType}}""",
         json"""{"id": ${`clean_data entity`.location},   "location": ${`clean_data entity`.location},   "label": ${`clean_data entity`.label},   "type": ${`clean_data entity`.singleWordType}}""",
         json"""{"id": ${`bikesparquet entity`.location}, "location": ${`bikesparquet entity`.location}, "label": ${`bikesparquet entity`.label}, "type": ${`bikesparquet entity`.singleWordType}}""",
         json"""{"id": ${`plot_data entity`.location},    "location": ${`plot_data entity`.location},    "label": ${`plot_data entity`.label},    "type": ${`plot_data entity`.singleWordType}}""",
-        json"""{"id": ${`activity4 node`.location},      "location": ${`activity4 node`.location},     "label": ${`activity4 node`.label},     "type": ${`activity4 node`.singleWordType}}""",
+        json"""{"id": ${`activity4 node`.location},      "location": ${`activity4 node`.location},      "label": ${`activity4 node`.label},      "type": ${`activity4 node`.singleWordType}}""",
         json"""{"id": ${`grid_plot entity`.location},    "location": ${`grid_plot entity`.location},    "label": ${`grid_plot entity`.label},    "type": ${`grid_plot entity`.singleWordType}}"""
       )
     }

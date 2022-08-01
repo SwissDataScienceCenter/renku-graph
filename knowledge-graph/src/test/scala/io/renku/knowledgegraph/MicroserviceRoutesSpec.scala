@@ -629,7 +629,7 @@ class MicroserviceRoutesSpec
 
     s"return $Ok with OpenAPI json body" in new TestCase {
       val openApiJson = jsons.generateOne
-      (() => docsEndpoint.`get /docs`)
+      (() => docsEndpoint.`get /spec.json`)
         .expects()
         .returning(IO.pure(Response[IO](Ok).withEntity(openApiJson)))
 

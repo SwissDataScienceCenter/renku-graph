@@ -18,8 +18,6 @@
 
 package io.renku.knowledgegraph
 
-import cats.syntax.all._
-import io.renku.graph.model.entities.{Activity, Entity}
 import io.renku.jsonld.EntityId
 import io.renku.knowledgegraph.lineage.model._
 
@@ -51,13 +49,11 @@ package object lineage {
         case (locations, _)                         => locations
       }
 
-    lazy val locationNodes: Set[Node] = lineage.nodes.filter { node =>
-      Set(Entity.fileEntityTypes, Entity.folderEntityTypes)
-        .map(_.toList.map(_.show).toSet)
-        .contains(node.types.map(_.show))
-    }
+    lazy val locationNodes: Set[Node] = nodes(ofType = Set(Node.Type.File, Node.Type.Directory))
 
-    lazy val processRunNodes: Set[Node] = lineage.nodes
-      .filter(_.types.map(_.show) === Activity.entityTypes.toList.map(_.show).toSet)
+    lazy val processRunNodes: Set[Node] = nodes(ofType = Set(Node.Type.ProcessRun))
+
+    private def nodes(ofType: Set[Node.Type]): Set[Node] =
+      lineage.nodes.filter(node => ofType contains node.typ)
   }
 }
