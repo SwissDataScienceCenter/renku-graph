@@ -29,12 +29,17 @@ import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, TriplesStoreConfig}
+import io.renku.triplesstore.{InMemoryJenaForSpec, MigrationsDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class MigrationExecutionRegisterSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class MigrationExecutionRegisterSpec
+    extends AnyWordSpec
+    with IOSpec
+    with should.Matchers
+    with InMemoryJenaForSpec
+    with MigrationsDataset {
 
   "MigrationExecutionRegister" should {
 
@@ -49,8 +54,6 @@ class MigrationExecutionRegisterSpec extends AnyWordSpec with IOSpec with InMemo
     }
   }
 
-  override lazy val storeConfig: TriplesStoreConfig = migrationsStoreConfig
-
   private trait TestCase {
     val migrationName  = migrationNames.generateOne
     val serviceVersion = serviceVersions.generateOne
@@ -58,6 +61,6 @@ class MigrationExecutionRegisterSpec extends AnyWordSpec with IOSpec with InMemo
     private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val register = new MigrationExecutionRegisterImpl[IO](serviceVersion, migrationsStoreConfig)
+    val register = new MigrationExecutionRegisterImpl[IO](serviceVersion, migrationsDSConnectionInfo)
   }
 }

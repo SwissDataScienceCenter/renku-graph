@@ -32,7 +32,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import org.typelevel.log4cats.Logger

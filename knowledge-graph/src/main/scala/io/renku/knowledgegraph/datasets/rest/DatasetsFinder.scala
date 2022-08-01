@@ -34,8 +34,8 @@ import io.renku.knowledgegraph.datasets.model.DatasetCreator
 import io.renku.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.tinytypes.constraints.NonNegativeInt
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
@@ -50,10 +50,10 @@ private trait DatasetsFinder[F[_]] {
 
 private object DatasetsFinder {
 
-  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig,
+  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](renkuConnectionConfig: RenkuConnectionConfig,
                                                                     creatorsFinder: CreatorsFinder[F]
   ): F[DatasetsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new DatasetsFinderImpl[F](rdfStoreConfig, creatorsFinder))
+    MonadThrow[F].catchNonFatal(new DatasetsFinderImpl[F](renkuConnectionConfig, creatorsFinder))
 
   final case class DatasetSearchResult(
       id:                  Identifier,
@@ -76,9 +76,9 @@ private object DatasetsFinder {
 }
 
 private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig,
-    creatorsFinder: CreatorsFinder[F]
-) extends RdfStoreClientImpl[F](rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig,
+    creatorsFinder:        CreatorsFinder[F]
+) extends TSClientImpl[F](renkuConnectionConfig)
     with DatasetsFinder[F]
     with Paging[DatasetSearchResult] {
 

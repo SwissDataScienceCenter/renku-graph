@@ -26,17 +26,18 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec {
+
   "GET /spec.json" should {
+
     "return the OpenAPI specification" in new TestCase {
-      val contents: String = endpoint.`get /docs`.unsafeRunSync().as[String].unsafeRunSync()
-      println(contents)
-      val result = new OpenAPIParser().readContents(contents, null, null)
-      result.getOpenAPI shouldNot (be(null))
+
+      val contents = endpoint.`get /docs`.unsafeRunSync().as[String].unsafeRunSync()
+
+      Option(new OpenAPIParser().readContents(contents, null, null).getOpenAPI).isEmpty shouldBe false
     }
   }
 
   private trait TestCase {
     val endpoint = new EndpointImpl[IO](ServiceVersion("0.0.0"))
-
   }
 }

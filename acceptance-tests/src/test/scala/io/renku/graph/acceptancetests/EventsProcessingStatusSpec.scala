@@ -25,7 +25,7 @@ import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data._
-import io.renku.graph.acceptancetests.flows.{AccessTokenPresence, RdfStoreProvisioning}
+import io.renku.graph.acceptancetests.flows.{AccessTokenPresence, TSProvisioning}
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -43,7 +43,7 @@ class EventsProcessingStatusSpec
     with ModelImplicits
     with GivenWhenThen
     with GraphServices
-    with RdfStoreProvisioning
+    with TSProvisioning
     with AccessTokenPresence
     with Eventually
     with AcceptanceTestPatience
@@ -89,6 +89,6 @@ class EventsProcessingStatusSpec
     val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents)
 
     mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, allCommitIds)
-    `data in the RDF store`(project, allCommitIds)
+    `data in the Triples Store`(project, allCommitIds)
   }
 }

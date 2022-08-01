@@ -27,16 +27,17 @@ import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
-import io.renku.rdfstore.InMemoryRdfStore
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class WorkflowsEntitiesFinderSpec
     extends AnyWordSpec
-    with FinderSpecOps
     with should.Matchers
-    with InMemoryRdfStore
+    with FinderSpecOps
+    with InMemoryJenaForSpec
+    with RenkuDataset
     with IOSpec {
 
   "findEntities - in case of a forks with workflows" should {
@@ -48,7 +49,7 @@ class WorkflowsEntitiesFinderSpec
         .forkOnce()
       val plan :: Nil = fork.plans.toList
 
-      loadToStore(original, fork)
+      upload(to = renkuDataset, original, fork)
 
       val results = finder
         .findEntities(Criteria(Filters(entityTypes = Set(Filters.EntityType.Workflow))))
@@ -77,7 +78,7 @@ class WorkflowsEntitiesFinderSpec
       }
       val plan :: Nil = publicProject.plans.toList
 
-      loadToStore(original, fork)
+      upload(to = renkuDataset, original, fork)
 
       finder
         .findEntities(
@@ -103,7 +104,7 @@ class WorkflowsEntitiesFinderSpec
       }
       val plan :: Nil = internalProject.plans.toList
 
-      loadToStore(original, fork)
+      upload(to = renkuDataset, original, fork)
 
       finder
         .findEntities(
@@ -124,7 +125,7 @@ class WorkflowsEntitiesFinderSpec
         .generateOne
       val plan :: Nil = privateProject.plans.toList
 
-      loadToStore(privateProject)
+      upload(to = renkuDataset, privateProject)
 
       finder
         .findEntities(

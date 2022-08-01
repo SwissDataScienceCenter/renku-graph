@@ -115,7 +115,7 @@ object QueryEndpointImpl {
 
 object QueryEndpoint {
 
-  import io.renku.rdfstore.SparqlQueryTimeRecorder
+  import io.renku.triplesstore.SparqlQueryTimeRecorder
 
   def apply()(implicit
       executionContext: ExecutionContext,

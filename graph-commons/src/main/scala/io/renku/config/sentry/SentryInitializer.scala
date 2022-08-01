@@ -52,8 +52,5 @@ object SentryInitializer {
 
   def apply[F[_]: MonadThrow]: F[SentryInitializer[F]] = for {
     maybeSentryConfig <- SentryConfig[F]()
-  } yield new SentryInitializerImpl(
-    maybeSentryConfig,
-    sentryOptions => Sentry.init(sentryOptions)
-  )
+  } yield new SentryInitializerImpl(maybeSentryConfig, sentryOptions => Sentry.init(sentryOptions))
 }

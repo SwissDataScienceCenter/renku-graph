@@ -23,8 +23,8 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.schema
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
 import tooling.UpdateQueryMigration

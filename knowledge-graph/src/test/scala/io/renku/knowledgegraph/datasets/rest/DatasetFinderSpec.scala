@@ -30,7 +30,7 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.model._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -40,9 +40,10 @@ import scala.util.Random
 
 class DatasetFinderSpec
     extends AnyWordSpec
-    with InMemoryRdfStore
-    with ScalaCheckPropertyChecks
     with should.Matchers
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with ScalaCheckPropertyChecks
     with IOSpec {
 
   "findDataset" should {
@@ -54,11 +55,13 @@ class DatasetFinderSpec
           anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal),
           anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceNonModified)
         ) { case ((dataset, project), (_, otherProject)) =>
-          loadToStore(project, otherProject)
+          upload(to = renkuDataset, project, otherProject)
 
           datasetFinder
             .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
             .unsafeRunSync() shouldBe internalToNonModified(dataset, project).some
+
+          clear(renkuDataset)
         }
       }
 
@@ -72,7 +75,8 @@ class DatasetFinderSpec
           .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
           .generateOne
 
-        loadToStore(
+        upload(
+          to = renkuDataset,
           project1,
           project2,
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceNonModified)).generateOne._2
@@ -94,7 +98,7 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- a case when dataset is modified" in new TestCase {
+      "- a case where dataset is modified" in new TestCase {
         val commonSameAs = datasetExternalSameAs.toGenerateOfFixedValue
         val (_ ::~ dataset1Modified, project1) = anyRenkuProjectEntities(visibilityPublic)
           .addDatasetAndModification(datasetEntities(provenanceImportedExternal(commonSameAs)))
@@ -103,7 +107,7 @@ class DatasetFinderSpec
           .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
           .generateOne
 
-        loadToStore(project1, project2)
+        upload(to = renkuDataset, project1, project2)
 
         datasetFinder
           .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
@@ -115,13 +119,13 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- a case when unrelated projects are using the same dataset created in a Renku project" in new TestCase {
+      "- a case where unrelated projects are using the same dataset created in a Renku project" in new TestCase {
         forAll(anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal)) {
           case (sourceDataset, sourceProject) =>
             val (_, project1)        = (renkuProjectEntities(visibilityPublic) importDataset sourceDataset).generateOne
             val (dataset2, project2) = (renkuProjectEntities(visibilityPublic) importDataset sourceDataset).generateOne
 
-            loadToStore(sourceProject, project1, project2)
+            upload(to = renkuDataset, sourceProject, project1, project2)
 
             datasetFinder
               .findDataset(sourceDataset.identifier,
@@ -148,6 +152,8 @@ class DatasetFinderSpec
                   ).sorted
                 )
                 .some
+
+            clear(renkuDataset)
         }
       }
 
@@ -163,7 +169,7 @@ class DatasetFinderSpec
           provenanceInternal
         )).generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       datasetFinder
         .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -186,7 +192,7 @@ class DatasetFinderSpec
       val datasetWithInvalidatedPart = dataset.invalidatePartNow(partToInvalidate)
       val projectBothDatasets        = project.addDatasets(datasetWithInvalidatedPart)
 
-      loadToStore(projectBothDatasets)
+      upload(to = renkuDataset, projectBothDatasets)
 
       datasetFinder
         .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
@@ -205,7 +211,7 @@ class DatasetFinderSpec
       val (dataset, project) =
         (anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal)).generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       datasetFinder
         .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(projectPaths.generateOne)))
@@ -222,7 +228,7 @@ class DatasetFinderSpec
         .importDataset(dataset)
         .generateOne
 
-      loadToStore(project, otherProject)
+      upload(to = renkuDataset, project, otherProject)
 
       datasetFinder
         .findDataset(dataset.identifier, AuthContext(authUser.some, dataset.identifier, Set(project.path)))
@@ -239,7 +245,7 @@ class DatasetFinderSpec
         .importDataset(dataset)
         .generateOne
 
-      loadToStore(project, otherProject)
+      upload(to = renkuDataset, project, otherProject)
 
       datasetFinder
         .findDataset(dataset.identifier,
@@ -254,13 +260,13 @@ class DatasetFinderSpec
   "findDataset in case of forks" should {
 
     "return details of the dataset with the given id " +
-      "- a case when a Renku created dataset is defined on a project which has a fork" in new TestCase {
+      "- a case where a Renku created dataset is defined on a project which has a fork" in new TestCase {
         val (originalDataset, originalProject ::~ fork) = renkuProjectEntities(visibilityPublic)
           .addDataset(datasetEntities(provenanceInternal))
           .forkOnce()
           .generateOne
 
-        loadToStore(originalProject, fork)
+        upload(to = renkuDataset, originalProject, fork)
 
         assume(originalProject.datasets === fork.datasets,
                "Datasets on original project and its fork should be the same"
@@ -277,7 +283,7 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- a case when unrelated projects are sharing a dataset and one of the projects is forked" in new TestCase {
+      "- a case where unrelated projects are sharing a dataset and one of the projects is forked" in new TestCase {
         val commonSameAs = datasetExternalSameAs.toGenerateOfFixedValue
         val (dataset1, project1) = anyRenkuProjectEntities(visibilityPublic)
           .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
@@ -287,7 +293,7 @@ class DatasetFinderSpec
           .forkOnce()
           .generateOne
 
-        loadToStore(project1, project2, project2Fork)
+        upload(to = renkuDataset, project1, project2, project2Fork)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -311,13 +317,13 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- a case when a Renku created dataset is defined on a grandparent project with two levels of forks" in new TestCase {
+      "- a case where a Renku created dataset is defined on a grandparent project with two levels of forks" in new TestCase {
         forAll(anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal)) {
           case dataset ::~ grandparent =>
             val grandparentForked ::~ parent = grandparent.forkOnce()
             val parentForked ::~ child       = parent.forkOnce()
 
-            loadToStore(grandparentForked, parentForked, child)
+            upload(to = renkuDataset, grandparentForked, parentForked, child)
 
             assume(
               (grandparentForked.datasets === parentForked.datasets) && (parentForked.datasets === child.datasets),
@@ -336,16 +342,18 @@ class DatasetFinderSpec
                 )
                 .some
         }
+
+        clear(renkuDataset)
       }
 
     "return details of the modified dataset with the given id " +
-      "- case when modification is followed by forking" in new TestCase {
+      "- case where modification is followed by forking" in new TestCase {
         forAll(
           anyRenkuProjectEntities(visibilityPublic)
             .addDatasetAndModification(datasetEntities(provenanceInternal))
             .forkOnce()
         ) { case (original ::~ modified, project ::~ fork) =>
-          loadToStore(project, fork)
+          upload(to = renkuDataset, project, fork)
 
           datasetFinder
             .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -358,18 +366,20 @@ class DatasetFinderSpec
             modifiedToModified(modified, project)
               .copy(usedIn = List(project.to[DatasetProject], fork.to[DatasetProject]).sorted)
               .some
+
+          clear(renkuDataset)
         }
       }
 
     "return details of the modified dataset with the given id " +
-      "- case when modification is followed by forking and some other modification" in new TestCase {
+      "- case where modification is followed by forking and some other modification" in new TestCase {
         val (original ::~ modified, project ::~ fork) = anyRenkuProjectEntities(visibilityPublic)
           .addDatasetAndModification(datasetEntities(provenanceInternal))
           .forkOnce()
           .generateOne
         val (modifiedAgain, projectUpdated) = project.addDataset(modified.createModification())
 
-        loadToStore(projectUpdated, fork)
+        upload(to = renkuDataset, projectUpdated, fork)
 
         datasetFinder
           .findDataset(original.identifier, AuthContext(None, original.identifier, Set(projectUpdated.path)))
@@ -388,12 +398,12 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- case when forking is followed by modification" in new TestCase {
+      "- case where forking is followed by modification" in new TestCase {
         forAll(anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).forkOnce()) {
           case (original, project ::~ fork) =>
             val (modifiedOnFork, forkUpdated) = fork.addDataset(original.createModification())
 
-            loadToStore(project, forkUpdated)
+            upload(to = renkuDataset, project, forkUpdated)
 
             datasetFinder
               .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -406,6 +416,8 @@ class DatasetFinderSpec
               )
               .unsafeRunSync() shouldBe
               modifiedToModified(modifiedOnFork, forkUpdated).some
+
+            clear(renkuDataset)
         }
       }
 
@@ -416,21 +428,25 @@ class DatasetFinderSpec
             val invalidation         = original.invalidateNow
             val forkWithInvalidation = fork.addDatasets(invalidation)
 
-            loadToStore(project, forkWithInvalidation)
+            upload(to = renkuDataset, project, forkWithInvalidation)
 
             datasetFinder
-              .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
+              .findDataset(original.identifier, AuthContext.forUnknownUser(original.identifier, Set(project.path)))
               .unsafeRunSync() shouldBe
               internalToNonModified(original, project).some
 
             datasetFinder
-              .findDataset(invalidation.identifier, AuthContext(None, invalidation.identifier, Set(project.path)))
+              .findDataset(invalidation.identifier,
+                           AuthContext.forUnknownUser(invalidation.identifier, Set(project.path))
+              )
               .unsafeRunSync() shouldBe None
+
+            clear(renkuDataset)
         }
       }
 
     "return details of a fork dataset with the given id " +
-      "- case when the dataset on the parent is deleted" in new TestCase {
+      "- case where the dataset on the parent is deleted" in new TestCase {
         val (original, project ::~ fork) =
           anyRenkuProjectEntities(visibilityPublic)
             .addDataset(datasetEntities(provenanceInternal))
@@ -439,7 +455,7 @@ class DatasetFinderSpec
         val invalidation            = original.invalidateNow
         val projectWithInvalidation = project.addDatasets(invalidation)
 
-        loadToStore(projectWithInvalidation, fork)
+        upload(to = renkuDataset, projectWithInvalidation, fork)
 
         datasetFinder
           .findDataset(original.identifier, AuthContext(None, original.identifier, Set(fork.path)))
@@ -452,13 +468,13 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- a case when the user has no access to the original project" in new TestCase {
+      "- a case where the user has no access to the original project" in new TestCase {
         val (originalDataset, originalProject ::~ fork) = renkuProjectEntities(visibilityPublic)
           .addDataset(datasetEntities(provenanceInternal))
           .forkOnce()
           .generateOne
 
-        loadToStore(originalProject, fork)
+        upload(to = renkuDataset, originalProject, fork)
 
         assume(originalProject.datasets === fork.datasets,
                "Datasets on original project and its fork should be the same"
@@ -476,7 +492,7 @@ class DatasetFinderSpec
   "findDataset in the case of dataset import hierarchy" should {
 
     "return details of the dataset with the given id " +
-      "- case when the first dataset is imported from a third party provider" in new TestCase {
+      "- case where the first dataset is imported from a third party provider" in new TestCase {
         val commonSameAs = datasetExternalSameAs.toGenerateOfFixedValue
         val (dataset1, project1) = anyRenkuProjectEntities(visibilityPublic)
           .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
@@ -486,7 +502,7 @@ class DatasetFinderSpec
           .generateOne
         val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
 
-        loadToStore(project1, project2, project3)
+        upload(to = renkuDataset, project1, project2, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -507,13 +523,13 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- case when the first dataset is renku created" in new TestCase {
+      "- case where the first dataset is renku created" in new TestCase {
         val (dataset1, project1) =
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
         val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
 
-        loadToStore(project1, project2, project3)
+        upload(to = renkuDataset, project1, project2, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -534,14 +550,14 @@ class DatasetFinderSpec
       }
 
     "return details of the dataset with the given id " +
-      "- case when the sameAs hierarchy is broken by dataset modification" in new TestCase {
+      "- case where the sameAs hierarchy is broken by dataset modification" in new TestCase {
         val (dataset1, project1) =
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
         val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
         val (_, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2Modified).generateOne
 
-        loadToStore(project1, project2Updated, project3)
+        upload(to = renkuDataset, project1, project2Updated, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -558,14 +574,14 @@ class DatasetFinderSpec
       }
 
     "not return the details of a dataset" +
-      "- case when the latest import of the dataset has been invalidated" in new TestCase {
+      "- case where the latest import of the dataset has been invalidated" in new TestCase {
         val (dataset1, project1) =
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
         val dataset2Invalidation = dataset2.invalidateNow
         val project2Updated      = project2.addDatasets(dataset2Invalidation)
 
-        loadToStore(project1, project2Updated)
+        upload(to = renkuDataset, project1, project2Updated)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -582,7 +598,7 @@ class DatasetFinderSpec
       }
 
     "not return the details of a dataset" +
-      "- case when the original dataset has been invalidated" in new TestCase {
+      "- case where the original dataset has been invalidated" in new TestCase {
 
         val (dataset1, project1) =
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceInternal)).generateOne
@@ -590,7 +606,7 @@ class DatasetFinderSpec
         val dataset1Invalidation = dataset1.invalidateNow
         val project1Updated      = project1.addDatasets(dataset1Invalidation)
 
-        loadToStore(project1Updated, project2)
+        upload(to = renkuDataset, project1Updated, project2)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -606,14 +622,14 @@ class DatasetFinderSpec
       }
 
     "not return the details of a dataset" +
-      "- case when the latest modification of the dataset has been invalidated" in new TestCase {
+      "- case where the latest modification of the dataset has been invalidated" in new TestCase {
         val (dataset ::~ datasetModified, project) = anyRenkuProjectEntities(visibilityPublic)
           .addDatasetAndModification(datasetEntities(provenanceInternal))
           .generateOne
         val datasetInvalidation = datasetModified.invalidateNow
         val projectUpdated      = project.addDatasets(datasetInvalidation)
 
-        loadToStore(projectUpdated)
+        upload(to = renkuDataset, projectUpdated)
 
         datasetFinder
           .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
@@ -634,10 +650,10 @@ class DatasetFinderSpec
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val datasetFinder = new DatasetFinderImpl[IO](
-      new BaseDetailsFinderImpl[IO](renkuStoreConfig),
-      new CreatorsFinderImpl[IO](renkuStoreConfig),
-      new PartsFinderImpl[IO](renkuStoreConfig),
-      new ProjectsFinderImpl[IO](renkuStoreConfig)
+      new BaseDetailsFinderImpl[IO](renkuDSConnectionInfo),
+      new CreatorsFinderImpl[IO](renkuDSConnectionInfo),
+      new PartsFinderImpl[IO](renkuDSConnectionInfo),
+      new ProjectsFinderImpl[IO](renkuDSConnectionInfo)
     )
   }
 

@@ -22,15 +22,23 @@ import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
+import Schemas.renku
+import eu.timepit.refined.auto._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, TriplesStoreConfig}
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class RenkuVersionPairUpdaterSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with Matchers {
+class RenkuVersionPairUpdaterSpec
+    extends AnyWordSpec
+    with IOSpec
+    with Matchers
+    with InMemoryJenaForSpec
+    with MigrationsDataset {
 
   "update" should {
     "create a renku:VersionPair with the given version pair" in new TestCase {
@@ -46,8 +54,6 @@ class RenkuVersionPairUpdaterSpec extends AnyWordSpec with IOSpec with InMemoryR
     }
   }
 
-  override lazy val storeConfig: TriplesStoreConfig = migrationsStoreConfig
-
   private trait TestCase {
     val currentRenkuVersionPair      = renkuVersionPairs.generateOne
     val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
@@ -55,18 +61,23 @@ class RenkuVersionPairUpdaterSpec extends AnyWordSpec with IOSpec with InMemoryR
     private implicit val renkuUrl:     RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl[IO](migrationsStoreConfig)
+    val renkuVersionPairUpdater = new RenkuVersionPairUpdaterImpl[IO](migrationsDSConnectionInfo)
 
-    def findPairInDb: Set[RenkuVersionPair] =
-      runQuery(s"""|SELECT DISTINCT ?schemaVersion ?cliVersion 
-                   |WHERE {
-                   |   ?id a renku:VersionPair;
-                   |       renku:schemaVersion ?schemaVersion ;
-                   |       renku:cliVersion ?cliVersion.
-                   |}
-                   |""".stripMargin)
-        .unsafeRunSync()
-        .map(row => RenkuVersionPair(CliVersion(row("cliVersion")), SchemaVersion(row("schemaVersion"))))
-        .toSet
+    def findPairInDb: Set[RenkuVersionPair] = runSelect(
+      on = migrationsDataset,
+      SparqlQuery.of(
+        "fetch version pair info",
+        Prefixes of renku -> "renku",
+        s"""|SELECT DISTINCT ?schemaVersion ?cliVersion
+            |WHERE {
+            |   ?id a renku:VersionPair;
+            |         renku:schemaVersion ?schemaVersion ;
+            |         renku:cliVersion ?cliVersion.
+            |}
+            |""".stripMargin
+      )
+    ).unsafeRunSync()
+      .map(row => RenkuVersionPair(CliVersion(row("cliVersion")), SchemaVersion(row("schemaVersion"))))
+      .toSet
   }
 }

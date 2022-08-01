@@ -32,6 +32,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.sentences
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
+import org.scalacheck.Gen.asciiPrintableChar
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -103,7 +104,7 @@ class StatusUpdaterSpec
 
   private lazy val url     = subscriberUrls.generateOne
   private lazy val version = serviceVersions.generateOne
-  private lazy val message = sentences().map(_.value).generateAs(MigrationMessage)
+  private lazy val message = sentences(charsGenerator = asciiPrintableChar).map(_.value).generateAs(MigrationMessage)
 
   private trait TestCase {
     val changeDate = changeDates.generateOne

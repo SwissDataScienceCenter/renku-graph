@@ -23,8 +23,8 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
@@ -33,8 +33,8 @@ private trait StatsFinder[F[_]] {
 }
 
 private class StatsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl[F](rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl[F](renkuConnectionConfig)
     with StatsFinder[F] {
 
   import EntityCount._
@@ -112,6 +112,6 @@ private object EntityCount {
 
 private object StatsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[StatsFinder[F]] = for {
-    config <- RdfStoreConfig[F]()
+    config <- RenkuConnectionConfig[F]()
   } yield new StatsFinderImpl[F](config)
 }

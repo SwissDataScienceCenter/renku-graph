@@ -54,8 +54,8 @@ object GraphModelGenerators {
     nonBlankStrings(minLength = 4).map(v => Affiliation(v.value))
 
   implicit val personEmails: Gen[persons.Email] = {
-    val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~".toList))
-    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$%&*+-/=?_~.".toList))
+    val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!$&*+-/=?_~".toList))
+    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf("!#$&*+-/=?_~.".toList))
     val beforeAts = for {
       firstChar  <- firstCharGen
       otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
@@ -137,8 +137,8 @@ object GraphModelGenerators {
 
   implicit val datasetOriginalIdentifiers: Gen[OriginalIdentifier] =
     datasetIdentifiers map (id => OriginalIdentifier(id.toString))
-  implicit val datasetTitles:       Gen[datasets.Title] = nonEmptyStrings() map datasets.Title.apply
-  implicit val datasetNames:        Gen[datasets.Name]  = nonEmptyStrings() map datasets.Name.apply
+  implicit val datasetTitles:       Gen[datasets.Title] = nonEmptyStrings(minLength = 4) map datasets.Title.apply
+  implicit val datasetNames:        Gen[datasets.Name]  = nonEmptyStrings(minLength = 4) map datasets.Name.apply
   implicit val datasetDescriptions: Gen[Description]    = paragraphs() map (_.value) map Description.apply
   implicit val datasetImageUris:    Gen[ImageUri]       = Gen.oneOf(relativePaths(), httpUrls()) map ImageUri.apply
   implicit val datasetExternalSameAs: Gen[ExternalSameAs] =

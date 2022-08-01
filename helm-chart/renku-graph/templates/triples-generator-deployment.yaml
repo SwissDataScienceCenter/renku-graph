@@ -49,24 +49,18 @@ spec:
               value: {{ .Values.gitlab.url }}
             - name: GITLAB_RATE_LIMIT
               value: {{ .Values.triplesGenerator.gitlab.rateLimit }}
-            - name: JENA_DATASET_NAME
-              {{- if .Values.global.graph.jena.dataset }}
-              value: {{ .Values.global.graph.jena.dataset }}
-              {{- else }}
-              value: {{ .Release.Namespace }}
-              {{- end }}
             - name: JENA_BASE_URL
               value: "http://{{ template "jena.fullname" . }}-master:{{ .Values.jena.service.port }}"
             - name: JENA_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "jena.fullname" . }}
-                  key: jena-admin-password
+                  name: {{ include "jena.fullname" . }}
+                  key: jena-users-admin-password
             - name: JENA_RENKU_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ template "jena.fullname" . }}
-                  key: jena-renku-password
+                  key: jena-users-renku-password
             - name: RENKU_DISABLE_VERSION_CHECK
               value: "true"
             - name: RE_PROVISIONING_REMOVAL_BATCH_SIZE

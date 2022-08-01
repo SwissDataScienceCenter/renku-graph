@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.graph.model.projects
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -33,14 +33,15 @@ private trait ProjectsFinder[F[_]] {
 
 private object ProjectsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](query: SparqlQuery): F[ProjectsFinder[F]] =
-    RdfStoreConfig[F]().map(new ProjectsFinderImpl(query, _))
+    RenkuConnectionConfig[F]().map(new ProjectsFinderImpl(query, _))
 }
 
-private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](query: SparqlQuery,
-                                                                               rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl[F](rdfStoreConfig,
-                                idleTimeoutOverride = (16 minutes).some,
-                                requestTimeoutOverride = (15 minutes).some
+private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    query:                 SparqlQuery,
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl[F](renkuConnectionConfig,
+                          idleTimeoutOverride = (16 minutes).some,
+                          requestTimeoutOverride = (15 minutes).some
     )
     with ProjectsFinder[F] {
 

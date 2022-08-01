@@ -25,8 +25,8 @@ import io.circe.Decoder.decodeList
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets._
 import io.renku.knowledgegraph.datasets.model.DatasetPart
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait PartsFinder[F[_]] {
@@ -34,8 +34,8 @@ private trait PartsFinder[F[_]] {
 }
 
 private class PartsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    rdfStoreConfig: RdfStoreConfig
-) extends RdfStoreClientImpl(rdfStoreConfig)
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl(renkuConnectionConfig)
     with PartsFinder[F] {
 
   import PartsFinderImpl._
@@ -83,6 +83,7 @@ private object PartsFinderImpl {
 
 private object PartsFinder {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](rdfStoreConfig: RdfStoreConfig): F[PartsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new PartsFinderImpl[F](rdfStoreConfig))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+      renkuConnectionConfig: RenkuConnectionConfig
+  ): F[PartsFinder[F]] = MonadThrow[F].catchNonFatal(new PartsFinderImpl[F](renkuConnectionConfig))
 }

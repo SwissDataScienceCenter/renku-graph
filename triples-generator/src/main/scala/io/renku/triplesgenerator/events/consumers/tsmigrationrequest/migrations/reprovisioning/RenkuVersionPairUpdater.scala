@@ -24,8 +24,8 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.{RenkuUrl, RenkuVersionPair}
 import io.renku.jsonld.syntax._
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 trait RenkuVersionPairUpdater[F[_]] {
@@ -33,9 +33,9 @@ trait RenkuVersionPairUpdater[F[_]] {
 }
 
 private class RenkuVersionPairUpdaterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    storeConfig:     MigrationsStoreConfig
+    storeConfig:     MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
-    extends RdfStoreClientImpl(storeConfig)
+    extends TSClientImpl(storeConfig)
     with RenkuVersionPairUpdater[F] {
 
   override def update(versionPair: RenkuVersionPair): F[Unit] =

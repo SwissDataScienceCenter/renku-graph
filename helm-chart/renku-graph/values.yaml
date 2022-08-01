@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 global:
-  ## Specify a secret that containes the certificate
+  ## Specify a secret that contains the certificate
   ## if you would like to use a custom CA. The key for the secret
   ## should have the .crt extension otherwise it is ignored. The
   ## keys across all secrets are mounted as files in one location so
@@ -14,6 +14,50 @@ global:
       tag: '0.0.2'
     customCAs: []
       # - secret:
+  graph:
+    dbEventLog:
+      postgresPassword:
+        # Password for the `eventlog` user
+        # Generate one using: `openssl rand -hex 16`
+        value:
+  tokenRepository:
+    postgresPassword:
+      # Password for the `tokenstorage` user
+      # Generate one using: `openssl rand -hex 16`
+      value:
+
+jena:
+  image:
+    repository: renku/renku-jena
+    pullPolicy: IfNotPresent
+    tag: '0.0.15'
+  users:
+    admin:
+      ## Admin user password
+      ## Generate one using: `openssl rand -hex 16`
+      password:
+    renku:
+      ## Dataset user password
+      ## Generate one using: `openssl rand -hex 16`
+      password:
+  persistence:
+    accessModes:
+      - ReadWriteOnce
+    size: 10Gi
+  additionalEnvironmentVariables:
+    - name: JVM_ARGS
+      value: -Xmx2G -Xms2G
+  additionalVolumeMounts:
+    - name: shiro
+      mountPath: /fuseki/shiro.ini
+      subPath: shiro.ini
+      readOnly: true
+  additionalVolumes:
+    - name: shiro
+      configMap:
+        name: shiro-ini
+        defaultMode: 0555
+  additionalInitContainerScript: "find /fuseki -name tdb.lock -type f -delete && find /fuseki/configuration -name *.ttl -type f -empty -delete && echo clean-up done"
 
 webhookService:
   image:

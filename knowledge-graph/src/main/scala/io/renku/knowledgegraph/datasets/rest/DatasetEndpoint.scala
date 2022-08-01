@@ -35,7 +35,7 @@ import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.knowledgegraph.datasets.model._
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.rdfstore.SparqlQueryTimeRecorder
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger

@@ -1,11 +1,6 @@
 # triples-generator
 
-This is a microservice which:
-
-- listens to notification from the Event Log,
-- clones the Git project, checks out the commit `id` in order to create RDF triples by invoking `renku log --format rdf`
-  ,
-- uploads the generated triples to Jena Fuseki
+This microservice deals with all Triples Store administrative and provisioning events.
 
 ## API
 

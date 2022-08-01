@@ -20,22 +20,28 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest
 package migrations
 
 import cats.effect.IO
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.datasetTopmostSameAs
 import io.renku.graph.model.datasets
 import io.renku.graph.model.datasets.TopmostSameAs
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.views.RdfResource
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.metrics.MetricsRegistry
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import tooling.UpdateQueryMigration
 
-class MultipleTopmostSameAsOnInternalDSSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class MultipleTopmostSameAsOnInternalDSSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "query" should {
 
@@ -46,19 +52,19 @@ class MultipleTopmostSameAsOnInternalDSSpec extends AnyWordSpec with should.Matc
           .addDataset(datasetEntities(provenanceInternal))
           .generateOne
 
-        loadToStore(dsProject)
+        upload(to = renkuDataset, dsProject)
 
         val illegalTopmost1 = datasetTopmostSameAs.generateOne
-        insertTriple(ds.entityId, "renku:topmostSameAs", illegalTopmost1.showAs[RdfResource])
+        insert(to = renkuDataset, Triple.edge(ds.entityId, renku / "topmostSameAs", illegalTopmost1))
         val illegalTopmost2 = datasetTopmostSameAs.generateOne
-        insertTriple(ds.entityId, "renku:topmostSameAs", illegalTopmost2.showAs[RdfResource])
+        insert(to = renkuDataset, Triple.edge(ds.entityId, renku / "topmostSameAs", illegalTopmost2))
 
         findTopmostSameAs(ds.identification.identifier) shouldBe Set(illegalTopmost1,
                                                                      illegalTopmost2,
                                                                      ds.provenance.topmostSameAs
         )
 
-        runUpdate(MultipleTopmostSameAsOnInternalDS.query).unsafeRunSync() shouldBe ()
+        runUpdate(on = renkuDataset, MultipleTopmostSameAsOnInternalDS.query).unsafeRunSync() shouldBe ()
 
         findTopmostSameAs(ds.identification.identifier) shouldBe Set(TopmostSameAs(ds.entityId))
       }
@@ -74,12 +80,19 @@ class MultipleTopmostSameAsOnInternalDSSpec extends AnyWordSpec with should.Matc
   }
 
   private def findTopmostSameAs(id: datasets.Identifier): Set[datasets.TopmostSameAs] =
-    runQuery(s"""|SELECT ?topmostSameAs 
-                 |WHERE { 
-                 |  ?id a schema:Dataset;
-                 |      schema:identifier '$id';
-                 |      renku:topmostSameAs ?topmostSameAs
-                 |}""".stripMargin)
+    runSelect(
+      on = renkuDataset,
+      SparqlQuery.of(
+        "fetch topmostSameAs",
+        Prefixes.of(renku -> "renku", schema -> "schema"),
+        s"""|SELECT ?topmostSameAs
+            |WHERE { 
+            |  ?id a schema:Dataset;
+            |      schema:identifier '$id';
+            |      renku:topmostSameAs ?topmostSameAs
+            |}""".stripMargin
+      )
+    )
       .unsafeRunSync()
       .map(row => datasets.TopmostSameAs(row("topmostSameAs")))
       .toSet

@@ -39,7 +39,7 @@ private class EventHandler[F[_]: Concurrent: Logger](override val categoryName: 
 
   override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess.withWaitingForCompletion[F](
-      processing => startProcessingEvent(request, processing),
+      startProcessingEvent(request, _),
       releaseProcess = subscriptionMechanism.renewSubscription()
     )
 
@@ -48,7 +48,7 @@ private class EventHandler[F[_]: Concurrent: Logger](override val categoryName: 
   private def startProcessingEvent(request: EventRequestContent, processing: Deferred[F, Unit]) = for {
     event <- fromEither(request.event.getProject).map(p => ProjectSyncEvent(p.id, p.path))
     result <- Spawn[F]
-                .start(syncProjectInfo(event) >> processing.complete(()))
+                .start(syncProjectInfo(event).recoverWith(errorLogging(event)) >> processing.complete(()))
                 .toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(event))

@@ -24,7 +24,7 @@ import cats.kernel.Semigroup
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.graph.model.entities.Project
-import io.renku.rdfstore.SparqlQuery
+import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 
 private[tsprovisioning] final case class TransformationStep[F[_]](

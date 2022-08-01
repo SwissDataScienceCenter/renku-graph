@@ -45,7 +45,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
-import io.renku.rdfstore._
+import io.renku.triplesstore._
 import org.http4s.Status
 import org.http4s.Status._
 import org.scalacheck.{Arbitrary, Gen}
@@ -89,17 +89,36 @@ object CommonGraphGenerators {
     password <- basicAuthPasswords
   } yield BasicAuthCredentials(username, password)
 
-  def rateLimits[Target]: Gen[RateLimit[Target]] =
-    for {
-      items <- positiveLongs()
-      unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
-    } yield RateLimit[Target](items, per = unit)
+  def rateLimits[Target]: Gen[RateLimit[Target]] = for {
+    items <- positiveLongs()
+    unit  <- Gen.oneOf(RateLimitUnit.Second, RateLimitUnit.Minute, RateLimitUnit.Hour, RateLimitUnit.Day)
+  } yield RateLimit[Target](items, per = unit)
 
-  implicit val rdfStoreConfigs: Gen[RdfStoreConfig] = for {
-    fusekiUrl       <- httpUrls() map FusekiBaseUrl.apply
-    datasetName     <- nonEmptyStrings() map DatasetName.apply
+  val datasetConfigFiles: Gen[DatasetConfigFile] = nonEmptyStrings().map { v =>
+    new DatasetConfigFile {
+      override lazy val value: String = v
+    }
+  }
+
+  implicit val adminConnectionConfigs: Gen[AdminConnectionConfig] = for {
+    url         <- httpUrls() map FusekiUrl.apply
+    credentials <- basicAuthCredentials
+  } yield AdminConnectionConfig(url, credentials)
+
+  implicit val datasetConnectionConfigs: Gen[DatasetConnectionConfig] = for {
+    url         <- httpUrls() map FusekiUrl.apply
+    dataset     <- nonEmptyStrings().toGeneratorOf(DatasetName)
+    credentials <- basicAuthCredentials
+  } yield new DatasetConnectionConfig {
+    override val fusekiUrl       = url
+    override val datasetName     = dataset
+    override val authCredentials = credentials
+  }
+
+  implicit val renkuConnectionConfigs: Gen[RenkuConnectionConfig] = for {
+    fusekiUrl       <- httpUrls() map FusekiUrl.apply
     authCredentials <- basicAuthCredentials
-  } yield RdfStoreConfig(fusekiUrl, datasetName, authCredentials)
+  } yield RenkuConnectionConfig(fusekiUrl, authCredentials)
 
   implicit val microserviceBaseUrls: Gen[MicroserviceBaseUrl] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
@@ -193,7 +212,7 @@ object CommonGraphGenerators {
     .from[Try, Result](results, PagingRequest(page, perPage), total)
     .fold(throw _, identity)
 
-  implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls() map FusekiBaseUrl.apply
+  implicit val fusekiUrls: Gen[FusekiUrl] = httpUrls() map FusekiUrl.apply
 
   implicit lazy val certificates: Gen[Certificate] =
     nonBlankStrings()

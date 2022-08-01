@@ -114,7 +114,7 @@ object EventLog extends TypeSerializers {
     session.prepare(command).use(_.execute(projectId)).void
   }
 
-  def startDB()(implicit ioRuntime: IORuntime, logger: Logger[IO]): IO[Unit] = for {
+  def startDB()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- Applicative[IO].unlessA(postgresContainer.container.isRunning)(IO(postgresContainer.start()))
     _ <- logger.info("event_log DB started")
   } yield ()

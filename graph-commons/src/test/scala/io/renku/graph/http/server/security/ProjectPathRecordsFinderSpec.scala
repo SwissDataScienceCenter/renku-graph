@@ -25,19 +25,24 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemoryRdfStore with should.Matchers {
+class ProjectPathRecordsFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset
+    with should.Matchers {
 
   "apply" should {
 
     "return SecurityRecords with project visibility and all project members" in new TestCase {
       val project = anyProjectEntities.generateOne
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       recordsFinder(project.path).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
@@ -47,7 +52,7 @@ class ProjectPathRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemory
     "return SecurityRecords with project visibility and no member is project has none" in new TestCase {
       val project = renkuProjectEntities(anyVisibility).generateOne.copy(members = Set.empty)
 
-      loadToStore(project)
+      upload(to = renkuDataset, project)
 
       recordsFinder(project.path).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, Set.empty)
@@ -64,6 +69,6 @@ class ProjectPathRecordsFinderSpec extends AnyWordSpec with IOSpec with InMemory
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val recordsFinder = new ProjectPathRecordsFinderImpl[IO](renkuStoreConfig)
+    val recordsFinder = new ProjectPathRecordsFinderImpl[IO](renkuDSConnectionInfo)
   }
 }

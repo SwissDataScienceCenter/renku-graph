@@ -21,9 +21,9 @@ package io.renku.graph.model.views
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 
-trait EntityIdJsonLdOps[TT <: StringTinyType] {
+trait EntityIdJsonLdOps[TT <: TinyType { type V = String }] {
   self: TinyTypeFactory[TT] =>
 
   implicit lazy val encoder: EntityIdEncoder[TT] =

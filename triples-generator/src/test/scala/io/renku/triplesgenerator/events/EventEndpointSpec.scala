@@ -35,7 +35,6 @@ import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -56,9 +55,7 @@ class EventEndpointSpec
 
   "processEvent" should {
 
-    s"$BadRequest if the request is not a multipart request" in new TestCase {
-
-      givenReProvisioningStatusSet(false)
+    s"return $BadRequest if the request is not a multipart request" in new TestCase {
 
       val response = endpoint.processEvent(Request()).unsafeRunSync()
 
@@ -67,9 +64,7 @@ class EventEndpointSpec
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
     }
 
-    s"$BadRequest if there is no event part in the request" in new TestCase {
-
-      givenReProvisioningStatusSet(false)
+    s"return $BadRequest if there is no event part in the request" in new TestCase {
 
       override lazy val request =
         Request[IO]().addParts(Part.formData[IO](nonEmptyStrings().generateOne, nonEmptyStrings().generateOne))
@@ -81,9 +76,7 @@ class EventEndpointSpec
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
     }
 
-    s"$BadRequest if the event part in the request is malformed" in new TestCase {
-
-      givenReProvisioningStatusSet(false)
+    s"return $BadRequest if the event part in the request is malformed" in new TestCase {
 
       override lazy val request = Request[IO]().addParts(Part.formData[IO]("event", ""))
 
@@ -105,10 +98,8 @@ class EventEndpointSpec
       }
     )
     forAll(scenarios) { (scenarioName, requestContents) =>
-      s"$Accepted if one of the handlers accepts the given $scenarioName request" in new TestCase {
+      s"return $Accepted if one of handlers accepts the given $scenarioName request" in new TestCase {
         override val requestContent: EventRequestContent = requestContents.generateOne
-
-        givenReProvisioningStatusSet(false)
 
         (subscriptionsRegistry.handle _)
           .expects(where(eventRequestEquals(requestContent)))
@@ -122,8 +113,7 @@ class EventEndpointSpec
       }
     }
 
-    s"$BadRequest if none of the handlers supports the given payload" in new TestCase {
-      givenReProvisioningStatusSet(false)
+    s"return $BadRequest if none of handlers supports the given payload" in new TestCase {
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -136,8 +126,7 @@ class EventEndpointSpec
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Unsupported Event Type")
     }
 
-    s"$BadRequest if one of the handlers supports the given payload but it's malformed" in new TestCase {
-      givenReProvisioningStatusSet(false)
+    s"return $BadRequest if one of handlers supports the given payload but it's malformed" in new TestCase {
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -150,8 +139,7 @@ class EventEndpointSpec
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event")
     }
 
-    s"$TooManyRequests if the handler returns ${EventSchedulingResult.Busy}" in new TestCase {
-      givenReProvisioningStatusSet(false)
+    s"return $TooManyRequests if handler returns ${EventSchedulingResult.Busy}" in new TestCase {
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -164,8 +152,7 @@ class EventEndpointSpec
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
     }
 
-    s"$InternalServerError if the handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
-      givenReProvisioningStatusSet(false)
+    s"return $InternalServerError if handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -178,9 +165,21 @@ class EventEndpointSpec
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
     }
 
-    s"$InternalServerError if the handler fails" in new TestCase {
+    s"return $ServiceUnavailable if handler returns EventSchedulingResult.ServiceUnavailable" in new TestCase {
 
-      givenReProvisioningStatusSet(false)
+      val handlingResult = EventSchedulingResult.ServiceUnavailable(nonEmptyStrings().generateOne)
+      (subscriptionsRegistry.handle _)
+        .expects(*)
+        .returning(handlingResult.pure[IO])
+
+      val response = (request >>= endpoint.processEvent).unsafeRunSync()
+
+      response.status                          shouldBe ServiceUnavailable
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage(handlingResult.reason)
+    }
+
+    s"return $InternalServerError if handler fails" in new TestCase {
 
       (subscriptionsRegistry.handle _)
         .expects(*)
@@ -191,19 +190,6 @@ class EventEndpointSpec
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
-    }
-
-    s"return $ServiceUnavailable if re-provisioning flag set to true" in new TestCase {
-
-      givenReProvisioningStatusSet(true)
-
-      val response = (request >>= endpoint.processEvent).unsafeRunSync()
-
-      response.status      shouldBe ServiceUnavailable
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage(
-        "Temporarily unavailable: currently re-provisioning"
-      )
     }
   }
 
@@ -229,14 +215,7 @@ class EventEndpointSpec
     lazy val request: IO[Request[IO]] = Request[IO](Method.POST, uri"events").addParts(multipartParts: _*)
 
     val subscriptionsRegistry = mock[EventConsumersRegistry[IO]]
-
-    val reProvisioningStatus = mock[ReProvisioningStatus[IO]]
-    val endpoint             = new EventEndpointImpl[IO](subscriptionsRegistry, reProvisioningStatus)
-
-    def givenReProvisioningStatusSet(flag: Boolean) =
-      (reProvisioningStatus.underReProvisioning _)
-        .expects()
-        .returning(flag.pure[IO])
+    val endpoint              = new EventEndpointImpl[IO](subscriptionsRegistry)
   }
 
   private def eventRequestEquals(eventRequestContent: EventRequestContent): EventRequestContent => Boolean = {

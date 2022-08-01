@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.dataProjects
-import io.renku.graph.acceptancetests.flows.RdfStoreProvisioning
+import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -38,7 +38,7 @@ class FastTractEventRouteSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with RdfStoreProvisioning
+    with TSProvisioning
     with Eventually
     with AcceptanceTestPatience {
 

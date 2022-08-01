@@ -27,7 +27,7 @@ import io.renku.graph.model.entities
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -36,15 +36,16 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class KGProjectFinderSpec
     extends AnyWordSpec
     with IOSpec
-    with InMemoryRdfStore
+    with should.Matchers
     with ScalaCheckPropertyChecks
-    with should.Matchers {
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "find" should {
 
     "return project's mutable properties for a given ResourceId" in new TestCase {
       forAll(anyProjectEntities.map(_.to[entities.Project])) { project =>
-        loadToStore(project)
+        upload(to = renkuDataset, project)
 
         finder.find(project.resourceId).unsafeRunSync() shouldBe toProjectMutableData(project).some
       }
@@ -59,7 +60,7 @@ class KGProjectFinderSpec
           case p: entities.NonRenkuProject.WithoutParent => p.copy(keywords = Set.empty)
         }
 
-        loadToStore(projectNoKeywords)
+        upload(to = renkuDataset, projectNoKeywords)
 
         finder.find(project.resourceId).unsafeRunSync() shouldBe
           toProjectMutableData(project).copy(keywords = Set.empty).some
@@ -74,6 +75,6 @@ class KGProjectFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new KGProjectFinderImpl[IO](renkuStoreConfig)
+    val finder = new KGProjectFinderImpl[IO](renkuDSConnectionInfo)
   }
 }

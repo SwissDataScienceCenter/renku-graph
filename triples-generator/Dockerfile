@@ -1,22 +1,21 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
 
-FROM openjdk:18-jdk-alpine as builder
+FROM openjdk:17-jdk-alpine as builder
 
 WORKDIR /work
 
 COPY . .
 
-RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
-    export PATH="/usr/local/sbt/bin:$PATH" && \
+RUN export PATH="/usr/local/sbt/bin:$PATH" && \
     apk update && apk add --no-cache --virtual .build-dependencies bash wget tar git && \
     mkdir -p "/usr/local/sbt" && \
-    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.6.2/sbt-1.6.2.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.7.0/sbt-1.7.0.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
     sbt writeVersionToVersionConf && \
     sbt "project triples-generator" stage && \
     apk del .build-dependencies
 
-FROM openjdk:18-jdk-alpine
+FROM openjdk:17-jdk-alpine
 
 WORKDIR /opt/triples-generator
 
@@ -31,7 +30,7 @@ RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py
     python3 -m pip install --ignore-installed packaging && \
     python3 -m pip install --upgrade 'pip==22.0.4' && \
     python3 -m pip install jinja2 && \
-    python3 -m pip install 'renku==1.5.0' 'sentry-sdk==1.5.5'  && \
+    python3 -m pip install 'renku==1.6.0' 'sentry-sdk==1.5.5'  && \
     chown -R daemon:daemon .
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh

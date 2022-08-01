@@ -25,13 +25,18 @@ import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.Schemas.schema
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class UpdateQueryRunnerSpec extends AnyWordSpec with should.Matchers with IOSpec with InMemoryRdfStore {
+class UpdateQueryRunnerSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with IOSpec
+    with InMemoryJenaForSpec
+    with RenkuDataset {
 
   "run" should {
 
@@ -52,10 +57,15 @@ class UpdateQueryRunnerSpec extends AnyWordSpec with should.Matchers with IOSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val runner = new UpdateQueryRunnerImpl[IO](renkuStoreConfig)
+    val runner = new UpdateQueryRunnerImpl[IO](renkuDSConnectionInfo)
   }
 
-  private def findString = runQuery("SELECT ?str WHERE { <http://localhost/test> schema:name ?str }")
-    .unsafeRunSync()
+  private def findString = runSelect(
+    on = renkuDataset,
+    SparqlQuery.of("find triple",
+                   Prefixes of (schema -> "schema"),
+                   "SELECT ?str WHERE { <http://localhost/test> schema:name ?str }"
+    )
+  ).unsafeRunSync()
     .map(_("str"))
 }

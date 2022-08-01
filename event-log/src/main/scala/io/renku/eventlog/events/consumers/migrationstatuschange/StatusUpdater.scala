@@ -25,7 +25,7 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.Sent
 import io.renku.eventlog.events.consumers.migrationstatuschange.Event.{ToNonRecoverableFailure, ToRecoverableFailure}
-import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers}
+import io.renku.eventlog._
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.metrics.LabeledHistogram
 
@@ -51,14 +51,16 @@ private class StatusUpdaterImpl[F[_]: Async: SessionResource](queriesExecTimes: 
   private def update(event: Event) = measureExecutionTime {
     SqlStatement
       .named(s"${categoryName.value.toLowerCase} - update")
-      .command[MigrationStatus ~ ChangeDate ~ SubscriberUrl ~ ServiceVersion](sql"""
+      .command[MigrationStatus ~ ChangeDate ~ Option[MigrationMessage] ~ SubscriberUrl ~ ServiceVersion](sql"""
         UPDATE ts_migration
-        SET status = $migrationStatusEncoder, change_date = $changeDateEncoder, message = #${getMessage(event)}
+        SET status = $migrationStatusEncoder, change_date = $changeDateEncoder, message = ${migrationMessageEncoder.opt}
         WHERE subscriber_url = $subscriberUrlEncoder 
           AND subscriber_version = $serviceVersionEncoder
           AND status = '#${Sent.value}'
         """.command)
-      .arguments(event.newStatus ~ ChangeDate(now()) ~ event.subscriberUrl ~ event.subscriberVersion)
+      .arguments(
+        event.newStatus ~ ChangeDate(now()) ~ getMessage(event) ~ event.subscriberUrl ~ event.subscriberVersion
+      )
       .build
       .flatMapResult {
         case Completion.Update(0 | 1) => ().pure[F]
@@ -67,10 +69,10 @@ private class StatusUpdaterImpl[F[_]: Async: SessionResource](queriesExecTimes: 
       }
   }
 
-  private def getMessage: Event => String = {
-    case ToNonRecoverableFailure(_, _, message) => show"'$message'"
-    case ToRecoverableFailure(_, _, message)    => show"'$message'"
-    case _                                      => "NULL"
+  private def getMessage: Event => Option[MigrationMessage] = {
+    case ToNonRecoverableFailure(_, _, message) => message.some
+    case ToRecoverableFailure(_, _, message)    => message.some
+    case _                                      => None
   }
 }
 

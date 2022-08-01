@@ -28,8 +28,8 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
-import io.renku.rdfstore.SparqlQuery.Prefixes
-import io.renku.rdfstore._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
 
@@ -40,9 +40,9 @@ private[migrations] trait MigrationExecutionRegister[F[_]] {
 
 private class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     serviceVersion:  ServiceVersion,
-    storeConfig:     MigrationsStoreConfig
+    storeConfig:     MigrationsConnectionConfig
 )(implicit renkuUrl: RenkuUrl)
-    extends RdfStoreClientImpl(storeConfig)
+    extends TSClientImpl(storeConfig)
     with MigrationExecutionRegister[F] {
 
   import MigrationExecutionRegister._
@@ -77,7 +77,7 @@ private[migrations] object MigrationExecutionRegister {
     RenkuUrlLoader[F]() flatMap { implicit renkuUrl =>
       for {
         serviceVersion <- ServiceVersion.readFromConfig[F]()
-        storeConfig    <- MigrationsStoreConfig[F]()
+        storeConfig    <- MigrationsConnectionConfig[F]()
       } yield new MigrationExecutionRegisterImpl[F](serviceVersion, storeConfig)
     }
 

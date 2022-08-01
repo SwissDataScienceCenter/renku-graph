@@ -41,14 +41,16 @@ object EventSchedulingResult {
   case object Busy                                       extends EventSchedulingResult
   case object UnsupportedEventType                       extends EventSchedulingResult
   case object BadRequest                                 extends EventSchedulingResult
+  final case class ServiceUnavailable(reason: String)    extends EventSchedulingResult
   final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
 
   implicit def show[SE <: EventSchedulingResult]: Show[SE] = Show.show {
-    case Accepted             => "Accepted"
-    case Busy                 => "Busy"
-    case UnsupportedEventType => "UnsupportedEventType"
-    case BadRequest           => "BadRequest"
-    case SchedulingError(_)   => "SchedulingError"
+    case Accepted                   => "Accepted"
+    case Busy                       => "Busy"
+    case UnsupportedEventType       => "UnsupportedEventType"
+    case BadRequest                 => "BadRequest"
+    case ServiceUnavailable(reason) => s"ServiceUnavailable: $reason"
+    case SchedulingError(_)         => "SchedulingError"
   }
 }
 
