@@ -98,7 +98,7 @@ jobs:
       name: renku-kg-dev
     steps:
       - name: deploy-development
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.0.0
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.1.0
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
@@ -122,7 +122,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs: deploy-to-graph
     steps:
-      - uses: SwissDataScienceCenter/renku-actions/test-renku@v1.0.0
+      - uses: SwissDataScienceCenter/renku-actions/test-renku@v1.1.0
         with:
           kubeconfig: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
           renku-release: renku-kg-dev
