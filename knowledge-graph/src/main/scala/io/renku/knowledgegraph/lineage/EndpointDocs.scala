@@ -18,11 +18,13 @@
 
 package io.renku.knowledgegraph.lineage
 import cats.syntax.all._
-import io.circe.literal._
+import io.circe.syntax._
 import io.renku.knowledgegraph.docs.Implicits._
 import io.renku.knowledgegraph.docs.model.Example.JsonExample
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
+import io.renku.knowledgegraph.lineage.model.Node.{Label, Location, Type}
+import io.renku.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import org.http4s
 
 object EndpointDocs {
@@ -36,7 +38,10 @@ object EndpointDocs {
       Response(
         "Lineage found",
         Map(
-          "json" -> MediaType(http4s.MediaType.application.json.asDocMediaType, "Sample Lineage", JsonExample(example))
+          "json" -> MediaType(http4s.MediaType.application.json.asDocMediaType,
+                              "Sample Lineage",
+                              JsonExample(example.asJson)
+          )
         )
       )
     )
@@ -54,38 +59,24 @@ object EndpointDocs {
   private lazy val locationParam =
     Parameter.in("location", Schema.String, "The path of the file".some)
 
-  private val example = json"""{
-    "lineage": {
-      "edges": [
-        {
-          "source": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
-          "target": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87"
-        },
-        {
-          "source": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "target": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet"
-        }
-      ],
-      "nodes": [
-        {
-          "id": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
-          "location": "data/zhbikes",
-          "label": "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297",
-          "type": "Directory"
-        },
-        {
-          "id": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "location": ".renku/workflow/3144e9aa470441cf905f94105e1d27ca_python.cwl",
-          "label": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet",
-          "type": "ProcessRun"
-        },
-        {
-          "id": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
-          "location": "data/preprocessed/zhbikes.parquet",
-          "label": "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "type": "File"
-        }
-      ]
-    }
-  }"""
+  private val example = {
+
+    val inputNode = Node(Location("data/zhbikes"), Label("data/zhbikes@bbdc429"), Type.Directory)
+
+    val processNode = Node(
+      Location(".renku/workflow/3144e9a_python.cwl"),
+      Label("renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet"),
+      Type.ProcessRun
+    )
+    val outputNode =
+      Node(Location("data/preprocessed/zhbikes.parquet"), Label("data/preprocessed/zhbikes.parquet@1aaf360"), Type.File)
+
+    Lineage(
+      edges = Set(
+        Edge(inputNode.location, processNode.location),
+        Edge(processNode.location, outputNode.location)
+      ),
+      nodes = Set(inputNode, processNode, outputNode)
+    )
+  }
 }

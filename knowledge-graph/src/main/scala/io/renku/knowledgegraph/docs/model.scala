@@ -25,6 +25,7 @@ import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
 
 object model {
+
   trait OpenApiDocument {
     def openApiVersion: String
     def info:           Info
@@ -56,11 +57,12 @@ object model {
                                  components:     Option[Components],
                                  security:       List[SecurityRequirement]
   ) extends OpenApiDocument {
+
     def addPath(path: Path): CompleteDoc = copy(paths = paths + (path.template -> path))
 
     def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
 
-    def addNoAuthSecurity: CompleteDoc =
+    def addNoAuthSecurity(): CompleteDoc =
       copy(security = security :+ SecurityRequirementNoAuth)
 
     def addSecurity(securityScheme: SecurityScheme) = {
@@ -90,8 +92,8 @@ object model {
 
   case class Variable(default: String)
   object Uri {
-    def /(nextPart: Parameter) = Uri(List(ParameterPart(nextPart)))
-    def /(nextPart: String)    = Uri(List(StringPart(nextPart)))
+    def /(nextPart: Parameter): Uri = Uri(List(ParameterPart(nextPart)))
+    def /(nextPart: String):    Uri = Uri(List(StringPart(nextPart)))
     def getTemplate(parts: List[UriPart]): String =
       parts
         .map {
@@ -103,14 +105,11 @@ object model {
         .mkString("")
 
   }
+
   private[model] case class Uri(parts: List[UriPart]) {
     def show: Show[Uri] = Show.show(_ => parts.map(_.show).mkString("/"))
     def /(nextPart: Parameter) = copy(parts :+ ParameterPart(nextPart))
     def /(nextPart: String)    = copy(parts :+ StringPart(nextPart))
-  }
-
-  trait WithOperation {
-    def operation: Operation
   }
 
   private[model] case class UriOp(operation: Operation, parts: List[UriPart]) {
@@ -140,6 +139,7 @@ object model {
   }
 
   object Path {
+
     def apply(summary: String, description: Option[String] = None, opMapping: OpMapping): Path =
       PathImpl(summary, description, List(opMapping.operation), opMapping.operation.parameters, opMapping.template)
 
@@ -162,7 +162,6 @@ object model {
         case ParameterPart(parameter) => Some(parameter)
         case _                        => None
       }
-
   }
 
   private case class PathWithUri(summary:     String,
@@ -222,7 +221,7 @@ object model {
   case class Parameter(name: String, in: In, description: Option[String], required: Boolean, schema: Schema)
 
   object Parameter {
-    def in(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true) =
+    def in(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true): Parameter =
       Parameter(name, In.Path, description, required, schema)
   }
 
@@ -247,18 +246,19 @@ object model {
     final case object Cookie extends In {
       def value: String = "cookie"
     }
-
   }
 
   final case class RequestBody(description: String, content: Map[String, MediaType])
+
   final case class MediaType(name: String, examples: Map[String, Example])
   object MediaType {
     def apply(name: String, exampleName: String, example: Example): MediaType =
       MediaType(name, Map(exampleName -> example))
   }
+
   final case class Response(
       description: String,
-      content:     Map[String, MediaType],
+      content:     Map[String, MediaType] = Map.empty,
       headers:     Map[String, Header] = Map.empty,
       links:       Map[String, Link] = Map.empty
   )
@@ -289,7 +289,9 @@ object model {
       }
     }
   }
+
   final case class Header(description: Option[String], schema: Schema)
+
   final case class Link()
 
   sealed trait TokenType extends Product with Serializable {
@@ -325,12 +327,14 @@ object model {
 
   object OAuthFlows {
     import OAuthFlowType._
+
     def apply(flow: OAuthFlow): OAuthFlows = flow.`type` match {
       case Implicit          => OAuthFlowsImpl(Some(flow), None, None, None)
       case Password          => OAuthFlowsImpl(None, Some(flow), None, None)
       case ClientCredentials => OAuthFlowsImpl(None, None, Some(flow), None)
       case AuthorizationCode => OAuthFlowsImpl(None, None, None, Some(flow))
     }
+
     final case class OAuthFlow(
         `type`:           OAuthFlowType,
         authorizationUrl: String,
@@ -360,16 +364,17 @@ object model {
         override def value: String = "authorizationCode"
       }
     }
-
   }
 
   sealed trait Schema {
     def `type`: String
   }
   object Schema {
+
     final case object String extends Schema {
       val `type`: String = "string"
     }
+
     final case object Integer extends Schema {
       val `type`: String = "integer"
     }
@@ -389,13 +394,15 @@ object model {
     def summary: Option[String]
     type T
   }
+
   object Example {
+
     case class JsonExample(value: Json, summary: Option[String] = None) extends Example {
       type T = Json
     }
+
     case class StringExample(value: String, summary: Option[String] = None) extends Example {
       type T = String
     }
   }
-
 }

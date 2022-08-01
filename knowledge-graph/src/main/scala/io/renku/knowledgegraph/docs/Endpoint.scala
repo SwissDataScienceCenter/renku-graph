@@ -30,35 +30,33 @@ import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
 
 trait Endpoint[F[_]] {
-  def `get /docs`: F[http4s.Response[F]]
+  def `get /spec.json`: F[http4s.Response[F]]
 }
 
 private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends Http4sDsl[F] with Endpoint[F] {
   import Encoders._
 
-  override def `get /docs`: F[http4s.Response[F]] = Ok(doc.asJson)
+  override def `get /spec.json`: F[http4s.Response[F]] = Ok(doc.asJson)
 
-  lazy val doc: OpenApiDocument =
-    OpenApiDocument(
-      openApiVersion = "3.0.3",
-      Info("Knowledge Graph API",
-           "Get info about datasets, users, activities, and other entities".some,
-           serviceVersion.value
-      )
-    ).addPath(lineage.EndpointDoc.path)
-      .addPath(entities.EndpointDoc.path)
-      .addServer(server)
-      .addSecurity(privateToken)
-      .addSecurity(oAuth)
-      .addNoAuthSecurity
-      .addResponsesToAll(authErrorResponses)
-
-  private lazy val server: Server =
-    Server(
-      url = "/knowledge-graph",
-      description = "Renku Knowledge Graph API",
-      variables = Map.empty
+  lazy val doc: OpenApiDocument = OpenApiDocument(
+    openApiVersion = "3.0.3",
+    Info("Knowledge Graph API",
+         "Get info about datasets, users, activities, and other entities".some,
+         serviceVersion.value
     )
+  ).addServer(server)
+    .addPath(lineage.EndpointDocs.path)
+    .addPath(entities.EndpointDocs.path)
+    .addSecurity(privateToken)
+    .addSecurity(oAuth)
+    .addNoAuthSecurity()
+    .addResponsesToAll(authErrorResponses)
+
+  private lazy val server = Server(
+    url = "/knowledge-graph",
+    description = "Renku Knowledge Graph API",
+    variables = Map.empty
+  )
 
   private lazy val privateToken = SecurityScheme(
     "PRIVATE-TOKEN",
@@ -75,25 +73,17 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends 
   )
 
   val authErrorResponses = Map(
-    http4s.Status.Unauthorized.asDocStatus -> Response("If given auth header cannot be authenticated",
-                                                       Map.empty,
-                                                       Map.empty,
-                                                       Map.empty
+    http4s.Status.Unauthorized.asDocStatus -> Response(
+      "If given auth header cannot be authenticated"
     ),
     http4s.Status.NotFound.asDocStatus -> Response(
-      "If there is no project with the given namespace/name or user is not authorised to access this project",
-      Map.empty,
-      Map.empty,
-      Map.empty
+      "If there is no project with the given namespace/name or user is not authorised to access this project"
     ),
-    http4s.Status.InternalServerError.asDocStatus -> Response("Otherwise", Map.empty, Map.empty, Map.empty)
+    http4s.Status.InternalServerError.asDocStatus -> Response("Otherwise")
   )
-
 }
-object Endpoint {
 
-  def apply[F[_]: Async]: F[Endpoint[F]] = {
-    val serviceVersion: F[ServiceVersion] = ServiceVersion.readFromConfig[F]()
-    serviceVersion.map(new EndpointImpl[F](_)).widen[Endpoint[F]]
-  }
+object Endpoint {
+  def apply[F[_]: Async]: F[Endpoint[F]] =
+    ServiceVersion.readFromConfig[F]().map(new EndpointImpl[F](_)).widen[Endpoint[F]]
 }
