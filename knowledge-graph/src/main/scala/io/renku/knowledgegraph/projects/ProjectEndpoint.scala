@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.rest
+package io.renku.knowledgegraph.projects
 
 import cats.effect._
 import cats.syntax.all._

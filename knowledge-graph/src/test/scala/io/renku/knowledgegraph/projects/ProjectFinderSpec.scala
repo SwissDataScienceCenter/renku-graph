@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.rest
+package io.renku.knowledgegraph.projects
 
+import Converters._
+import ProjectsGenerators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
@@ -30,11 +32,8 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectPathToPath
 import io.renku.http.client.AccessToken
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.projects.model
-import io.renku.knowledgegraph.projects.rest.Converters._
-import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
-import io.renku.knowledgegraph.projects.rest.KGProjectFinder.KGProject
-import io.renku.knowledgegraph.projects.rest.ProjectsGenerators._
+import io.renku.knowledgegraph.projects.GitLabProjectFinder.GitLabProject
+import io.renku.knowledgegraph.projects.KGProjectFinder.KGProject
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

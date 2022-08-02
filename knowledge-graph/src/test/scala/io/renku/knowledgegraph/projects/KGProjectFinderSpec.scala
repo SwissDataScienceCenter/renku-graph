@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.rest
+package io.renku.knowledgegraph.projects
 
+import Converters._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
@@ -25,11 +26,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.projects.rest.Converters._
-import io.renku.knowledgegraph.projects.rest.KGProjectFinder.KGProject
+import io.renku.knowledgegraph.projects.KGProjectFinder.KGProject
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

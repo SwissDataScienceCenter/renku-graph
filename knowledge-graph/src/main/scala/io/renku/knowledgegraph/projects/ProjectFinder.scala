@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.rest
+package io.renku.knowledgegraph.projects
 
+import GitLabProjectFinder.GitLabProject
+import KGProjectFinder.{KGParent, KGProject}
 import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
@@ -27,8 +29,6 @@ import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.projects.model._
-import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
-import io.renku.knowledgegraph.projects.rest.KGProjectFinder.{KGParent, KGProject}
 import org.typelevel.log4cats.Logger
 
 import scala.util.Try

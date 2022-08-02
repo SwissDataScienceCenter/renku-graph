@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.rest
+package io.renku.knowledgegraph.projects
 
+import GitLabProjectFinder.GitLabProject
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -27,7 +28,6 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.knowledgegraph.projects.model.Forking.ForksCount
 import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
 import io.renku.knowledgegraph.projects.model._
-import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 

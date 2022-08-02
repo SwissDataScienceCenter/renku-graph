@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.rest
+package io.renku.knowledgegraph.projects
 
+import ProjectsGenerators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.syntax._
@@ -27,8 +28,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.SchemaVersion
-import io.renku.graph.model.projects._
 import io.renku.graph.model.persons.{Email, Name => UserName}
+import io.renku.graph.model.projects._
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.{Href, Rel}
@@ -42,7 +43,6 @@ import io.renku.knowledgegraph.projects.model.Project._
 import io.renku.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import io.renku.knowledgegraph.projects.model.Urls._
 import io.renku.knowledgegraph.projects.model._
-import io.renku.knowledgegraph.projects.rest.ProjectsGenerators._
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._

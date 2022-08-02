@@ -53,7 +53,7 @@ import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.knowledgegraph.lineage.LineageGenerators._
 import io.renku.knowledgegraph.lineage.model.Node.Location
-import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
+import io.renku.knowledgegraph.projects.ProjectEndpoint
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET

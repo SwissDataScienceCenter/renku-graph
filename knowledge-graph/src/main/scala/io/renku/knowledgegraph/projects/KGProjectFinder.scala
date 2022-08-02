@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.rest
+package io.renku.knowledgegraph.projects
 
+import KGProjectFinder._
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects._
 import io.renku.graph.model.{SchemaVersion, persons}
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.projects.rest.KGProjectFinder._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -105,8 +105,8 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def recordsDecoder(path: Path): Decoder[List[KGProject]] = {
     import Decoder._
     import io.circe.DecodingFailure
-    import io.renku.graph.model.projects._
     import io.renku.graph.model.persons
+    import io.renku.graph.model.projects._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     val toSetOfKeywords: Option[String] => Decoder.Result[Set[Keyword]] =

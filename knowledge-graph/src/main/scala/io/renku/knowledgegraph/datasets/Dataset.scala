@@ -29,7 +29,7 @@ import io.renku.graph.model.persons.{Affiliation, Email}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.{GitLabUrl, persons, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
-import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
+import io.renku.knowledgegraph.projects.ProjectEndpoint
 import io.renku.tinytypes.json.TinyTypeEncoders._
 
 sealed trait Dataset extends Product with Serializable {

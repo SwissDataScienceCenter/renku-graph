@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.rest
+package io.renku.knowledgegraph.projects
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

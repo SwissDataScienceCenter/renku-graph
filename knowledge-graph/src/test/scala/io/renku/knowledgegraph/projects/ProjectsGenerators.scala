@@ -16,28 +16,27 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects.rest
+package io.renku.knowledgegraph.projects
 
+import Converters._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{httpUrls => urls, _}
-import io.renku.graph.model.GraphModelGenerators._
+import io.renku.generators.Generators.{httpUrls => urls, nonBlankStrings, nonEmptyList, nonNegativeInts, timestampsNotInTheFuture}
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities}
 import io.renku.graph.model.projects.Path
-import io.renku.graph.model.projects.ResourceId._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.graph.model.testentities.{Project => _, _}
+import io.renku.knowledgegraph.projects.GitLabProjectFinder.GitLabProject
+import io.renku.knowledgegraph.projects.KGProjectFinder.KGProject
 import io.renku.knowledgegraph.projects.model.Forking.ForksCount
-import io.renku.knowledgegraph.projects.model.Permissions.{apply => _, _}
+import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
-import io.renku.knowledgegraph.projects.model.Statistics._
+import io.renku.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import io.renku.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import io.renku.knowledgegraph.projects.model._
-import io.renku.knowledgegraph.projects.rest.Converters._
-import io.renku.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
-import io.renku.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import org.scalacheck.Gen
 
 private object ProjectsGenerators {
 
-  implicit val projects: Gen[Project] = for {
+  implicit val resourceProjects: Gen[Project] = for {
     kgProject     <- anyProjectEntities.map(_.to[KGProject])
     gitLabProject <- gitLabProjects
   } yield Project(
