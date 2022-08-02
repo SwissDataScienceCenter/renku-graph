@@ -21,12 +21,10 @@ package io.renku.knowledgegraph.datasets
 import ProjectDatasetsFinder.ProjectDataset
 import cats.effect._
 import cats.syntax.all._
-import io.circe.literal._
+import io.circe.Encoder
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.datasets.{DerivedFrom, ImageUri, SameAs}
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
@@ -53,12 +51,14 @@ class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
     with TinyTypeEncoders
     with ProjectDatasetsEndpoint[F] {
 
-  import ProjectDatasetsFinder.SameAsOrDerived
   import executionTimeRecorder._
   import org.http4s.circe._
 
+  private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
+  private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
+
   def getProjectDatasets(projectPath: projects.Path): F[Response[F]] = measureExecutionTime {
-    implicit val encoder: Encoder[ProjectDataset] = datasetEncoder(projectPath)
+    implicit val encoder: Encoder[ProjectDataset] = ProjectDatasetEncoder.encoder(projectPath)
 
     projectDatasetsFinder
       .findProjectDatasets(projectPath)
@@ -77,49 +77,6 @@ class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
   private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[F], String] = {
     case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
   }
-
-  private implicit val sameAsOrDerivedEncoder: Encoder[SameAsOrDerived] = Encoder.instance[SameAsOrDerived] {
-    case Left(sameAs: SameAs)            => json"""{"sameAs": ${sameAs.toString}}"""
-    case Right(derivedFrom: DerivedFrom) => json"""{"derivedFrom": ${derivedFrom.toString}}"""
-  }
-
-  private def datasetEncoder(projectPath: projects.Path): Encoder[ProjectDataset] =
-    Encoder.instance[ProjectDataset] { case (id, originalId, title, name, sameAsOrDerived, images) =>
-      json"""{
-          "identifier": ${id.toString},
-          "versions": {
-            "initial": ${originalId.toString}
-          },
-          "title": ${title.toString},
-          "name": ${name.toString},
-          "images": ${images -> projectPath}
-        }"""
-        .deepMerge(sameAsOrDerived.asJson)
-        .deepMerge(
-          _links(
-            Rel("details")         -> Href(renkuApiUrl / "datasets" / id),
-            Rel("initial-version") -> Href(renkuApiUrl / "datasets" / originalId)
-          )
-        )
-    }
-
-  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
-    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
-      Json.arr(imageUris.map {
-        case uri: ImageUri.Relative =>
-          json"""{
-            "location": $uri  
-          }""" deepMerge _links(
-            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
-          )
-        case uri: ImageUri.Absolute =>
-          json"""{
-            "location": $uri  
-          }""" deepMerge _links(
-            Link(Rel("view") -> Href(uri.show))
-          )
-      }: _*)
-    }
 }
 
 object ProjectDatasetsEndpoint {

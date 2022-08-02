@@ -24,7 +24,7 @@ import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.EndpointTester._
-import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs}
+import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
 import io.renku.knowledgegraph.projects
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import io.renku.knowledgegraph.docs.model.Operation.GET
@@ -64,11 +64,16 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
     (() => projectEndpoint.path)
       .expects()
       .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "entities")))
+    private val projectDatasetsEndpoint = mock[ProjectDatasetsEndpointDocs]
+    (() => projectDatasetsEndpoint.path)
+      .expects()
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "datasets")))
 
     val endpoint = new EndpointImpl[IO](datasetsSearchEndpoint,
                                         datasetEndpoint,
                                         entitiesEndpoint,
                                         projectEndpoint,
+                                        projectDatasetsEndpoint,
                                         serviceVersions.generateOne
     )
   }

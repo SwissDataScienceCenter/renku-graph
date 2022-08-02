@@ -22,7 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.ServiceVersion
-import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs}
+import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
 import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph.{entities, lineage, projects}
 import org.http4s
@@ -34,10 +34,11 @@ trait Endpoint[F[_]] {
 }
 
 private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEndpointDocs,
-                                        datasetEndpoint:  DatasetEndpointDocs,
-                                        entitiesEndpoint: entities.EndpointDocs,
-                                        projectEndpoint:  projects.ProjectEndpointDocs,
-                                        serviceVersion:   ServiceVersion
+                                        datasetEndpoint:         DatasetEndpointDocs,
+                                        entitiesEndpoint:        entities.EndpointDocs,
+                                        projectEndpoint:         projects.ProjectEndpointDocs,
+                                        projectDatasetsEndpoint: ProjectDatasetsEndpointDocs,
+                                        serviceVersion:          ServiceVersion
 ) extends Http4sDsl[F]
     with Endpoint[F] {
   import Encoders._
@@ -54,8 +55,9 @@ private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEnd
     .addPath(datasetsSearchEndpoint.path)
     .addPath(datasetEndpoint.path)
     .addPath(entitiesEndpoint.path)
-    .addPath(lineage.EndpointDocs.path)
     .addPath(projectEndpoint.path)
+    .addPath(projectDatasetsEndpoint.path)
+    .addPath(lineage.EndpointDocs.path)
     .addSecurity(privateToken)
     .addSecurity(oAuth)
     .addNoAuthSecurity()
@@ -82,15 +84,17 @@ private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEnd
 
 object Endpoint {
   def apply[F[_]: Async]: F[Endpoint[F]] = for {
-    datasetsSearchEndpoint <- DatasetSearchEndpointDocs[F]
-    datasetEndpoint        <- DatasetEndpointDocs[F]
-    entitiesEndpoint       <- entities.EndpointDocs[F]
-    projectEndpoint        <- projects.ProjectEndpointDocs[F]
-    serviceVersion         <- ServiceVersion.readFromConfig[F]()
+    datasetsSearchEndpoint  <- DatasetSearchEndpointDocs[F]
+    datasetEndpoint         <- DatasetEndpointDocs[F]
+    entitiesEndpoint        <- entities.EndpointDocs[F]
+    projectEndpoint         <- projects.ProjectEndpointDocs[F]
+    projectDatasetsEndpoint <- ProjectDatasetsEndpointDocs[F]
+    serviceVersion          <- ServiceVersion.readFromConfig[F]()
   } yield new EndpointImpl[F](datasetsSearchEndpoint,
                               datasetEndpoint,
                               entitiesEndpoint,
                               projectEndpoint,
+                              projectDatasetsEndpoint,
                               serviceVersion
   )
 }

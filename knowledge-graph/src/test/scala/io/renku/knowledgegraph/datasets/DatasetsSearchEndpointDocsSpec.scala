@@ -26,7 +26,7 @@ import io.renku.graph.model.GraphModelGenerators.gitLabUrls
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import org.scalatest.wordspec.AnyWordSpec
 
-class DatasetSearchEndpointDocsSpec extends AnyWordSpec {
+class DatasetsSearchEndpointDocsSpec extends AnyWordSpec {
 
   "path" should {
 
