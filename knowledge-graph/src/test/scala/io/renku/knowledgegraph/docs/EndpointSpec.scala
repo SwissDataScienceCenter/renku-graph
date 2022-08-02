@@ -24,6 +24,8 @@ import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.EndpointTester._
+import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs}
+import io.renku.knowledgegraph.projects
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model.{Path, Uri}
@@ -46,11 +48,28 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
 
   private trait TestCase {
 
+    private val datasetsSearchEndpoint = mock[DatasetSearchEndpointDocs]
+    (() => datasetsSearchEndpoint.path)
+      .expects()
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "datasets")))
+    private val datasetEndpoint = mock[DatasetEndpointDocs]
+    (() => datasetEndpoint.path)
+      .expects()
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "datasets" / "1234")))
     private val entitiesEndpoint = mock[entities.EndpointDocs]
     (() => entitiesEndpoint.path)
       .expects()
       .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "entities")))
+    private val projectEndpoint = mock[projects.ProjectEndpointDocs]
+    (() => projectEndpoint.path)
+      .expects()
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "entities")))
 
-    val endpoint = new EndpointImpl[IO](entitiesEndpoint, serviceVersions.generateOne)
+    val endpoint = new EndpointImpl[IO](datasetsSearchEndpoint,
+                                        datasetEndpoint,
+                                        entitiesEndpoint,
+                                        projectEndpoint,
+                                        serviceVersions.generateOne
+    )
   }
 }

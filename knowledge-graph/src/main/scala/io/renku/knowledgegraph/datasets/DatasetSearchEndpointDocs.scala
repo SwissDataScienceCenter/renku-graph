@@ -19,10 +19,12 @@
 package io.renku.knowledgegraph.datasets
 
 import DatasetSearchResult._
+import cats.MonadThrow
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
+import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
@@ -33,6 +35,13 @@ import java.time.Instant
 
 trait DatasetSearchEndpointDocs {
   def path: Path
+}
+
+object DatasetSearchEndpointDocs {
+  def apply[F[_]: MonadThrow]: F[DatasetSearchEndpointDocs] = for {
+    gitLabUrl <- GitLabUrlLoader[F]()
+    apiUrl    <- renku.ApiUrl[F]()
+  } yield new DatasetSearchEndpointDocsImpl()(gitLabUrl, apiUrl)
 }
 
 private class DatasetSearchEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl)
