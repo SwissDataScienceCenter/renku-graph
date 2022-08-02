@@ -18,10 +18,20 @@
 
 package io.renku.knowledgegraph.entities
 
-import io.circe.{Decoder, Encoder}
-import io.renku.graph.model.{datasets, persons, plans, projects}
+import cats.syntax.all._
+import io.circe.literal._
+import io.circe.syntax._
+import io.circe.{Decoder, Encoder, Json}
+import io.renku.config.renku
+import io.renku.graph.model._
+import io.renku.http.rest.Links.{Href, Link, Rel, _links}
+import io.renku.json.JsonOps._
+import io.renku.knowledgegraph.datasets.rest.DatasetEndpoint
+import io.renku.knowledgegraph.entities.Endpoint.Criteria
+import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
+import io.renku.tinytypes.json.TinyTypeEncoders._
 import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
 
 import java.time.Instant
@@ -54,6 +64,29 @@ object model {
       override type Date = projects.DateCreated
     }
 
+    object Project {
+      private[entities] implicit def encoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[model.Entity.Project] =
+        Encoder.instance { project =>
+          json"""{
+            "type":          ${Criteria.Filters.EntityType.Project.value},
+            "matchingScore": ${project.matchingScore},
+            "name":          ${project.name},
+            "path":          ${project.path},
+            "namespace":     ${project.path.toNamespaces.mkString("/")},
+            "visibility":    ${project.visibility},
+            "date":          ${project.date},
+            "keywords":      ${project.keywords}
+          }"""
+            .addIfDefined("creator" -> project.maybeCreator)
+            .addIfDefined("description" -> project.maybeDescription)
+            .deepMerge(
+              _links(
+                Link(Rel("details") -> ProjectEndpoint.href(renkuApiUrl, project.path))
+              )
+            )
+        }
+    }
+
     final case class Dataset(
         matchingScore:       MatchingScore,
         identifier:          datasets.Identifier,
@@ -70,6 +103,49 @@ object model {
       override type Date = datasets.Date
     }
 
+    object Dataset {
+      private[entities] implicit def encoder(implicit
+          gitLabUrl:   GitLabUrl,
+          renkuApiUrl: renku.ApiUrl
+      ): Encoder[model.Entity.Dataset] = {
+
+        implicit lazy val imagesEncoder: Encoder[(List[datasets.ImageUri], projects.Path)] =
+          Encoder.instance[(List[datasets.ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+            Json.arr(imageUris.map {
+              case uri: datasets.ImageUri.Relative =>
+                json"""{
+                  "location": $uri
+                }""" deepMerge _links(
+                  Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+                )
+              case uri: datasets.ImageUri.Absolute =>
+                json"""{
+                  "location": $uri
+                }""" deepMerge _links(Link(Rel("view") -> Href(uri.show)))
+            }: _*)
+          }
+
+        Encoder.instance { ds =>
+          json"""{
+            "type":          ${Criteria.Filters.EntityType.Dataset.value},
+            "matchingScore": ${ds.matchingScore},
+            "name":          ${ds.name},
+            "visibility":    ${ds.visibility},
+            "date":          ${ds.date},
+            "creators":      ${ds.creators},
+            "keywords":      ${ds.keywords},
+            "images":        ${(ds.images -> ds.exemplarProjectPath).asJson}
+          }"""
+            .addIfDefined("description" -> ds.maybeDescription)
+            .deepMerge(
+              _links(
+                Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, ds.identifier))
+              )
+            )
+        }
+      }
+    }
+
     final case class Workflow(
         matchingScore:    MatchingScore,
         name:             plans.Name,
@@ -80,6 +156,21 @@ object model {
     ) extends Entity {
       override type Name = plans.Name
       override type Date = plans.DateCreated
+    }
+
+    object Workflow {
+      private[entities] implicit lazy val encoder: Encoder[model.Entity.Workflow] =
+        Encoder.instance { workflow =>
+          json"""{
+            "type":          ${Criteria.Filters.EntityType.Workflow.value},
+            "matchingScore": ${workflow.matchingScore},
+            "name":          ${workflow.name},
+            "visibility":    ${workflow.visibility},
+            "date":          ${workflow.date},
+            "keywords":      ${workflow.keywords}
+          }"""
+            .addIfDefined("description" -> workflow.maybeDescription)
+        }
     }
 
     final case class Person(
@@ -96,6 +187,15 @@ object model {
         override val value: Instant = Instant.EPOCH
       }
       type DateCreationFiller = DateCreationFiller.type
+
+      private[entities] implicit lazy val encoder: Encoder[model.Entity.Person] =
+        Encoder.instance { person =>
+          json"""{
+            "type":          ${Criteria.Filters.EntityType.Person.value},
+            "matchingScore": ${person.matchingScore},
+            "name":          ${person.name}
+          }"""
+        }
     }
   }
 

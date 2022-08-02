@@ -175,11 +175,12 @@ Sorting:
 
 **Response**
 
-| Status                     | Description                                    |
-|----------------------------|------------------------------------------------|
-| OK (200)                   | If results are found; `[]` if nothing is found |
+| Status                     | Description                                      |
+|----------------------------|--------------------------------------------------|
+| OK (200)                   | If results are found; `[]` if nothing is found   |
 | BAD_REQUEST (400)          | If illegal values for query parameters are given |
-| INTERNAL SERVER ERROR (500)| Otherwise                                      |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated     |
+| INTERNAL SERVER ERROR (500)| Otherwise                                        |
 
 Response headers:
 

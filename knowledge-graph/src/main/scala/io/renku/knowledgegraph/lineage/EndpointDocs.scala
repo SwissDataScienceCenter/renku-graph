@@ -17,47 +17,49 @@
  */
 
 package io.renku.knowledgegraph.lineage
+
 import cats.syntax.all._
-import io.circe.syntax._
-import io.renku.knowledgegraph.docs.Implicits._
-import io.renku.knowledgegraph.docs.model.Example.JsonExample
+import io.renku.http.InfoMessage
+import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph.lineage.model.Node.{Label, Location, Type}
 import io.renku.knowledgegraph.lineage.model.{Edge, Lineage, Node}
-import org.http4s
 
 object EndpointDocs {
 
   lazy val path: Path = Path(
     "Lineage",
-    "Get the lineage of a files".some,
+    "Finds lineage of the given file".some,
     GET(
-      Uri / "projects" / groupParam / projectParam / "files" / locationParam / "lineage",
-      http4s.Status.Ok.asDocStatus,
-      Response(
-        "Lineage found",
-        Map(
-          "json" -> MediaType(http4s.MediaType.application.json.asDocMediaType,
-                              "Sample Lineage",
-                              JsonExample(example.asJson)
+      Uri / "projects" / group / projectName / "files" / location / "lineage",
+      Status.Ok -> Response("Lineage found", Contents(MediaType.`application/json`("Sample Lineage", example))),
+      Status.Unauthorized -> Response(
+        "Unauthorized",
+        Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
+      ),
+      Status.NotFound -> Response(
+        "Lineage not found",
+        Contents(
+          MediaType.`application/json`("Reason",
+                                       InfoMessage("No lineage for project: namespace/project file: some/file")
           )
         )
+      ),
+      Status.InternalServerError -> Response("Error",
+                                             Contents(MediaType.`application/json`("Reason", InfoMessage("Message")))
       )
     )
   )
 
-  private lazy val groupParam = Parameter.in(
+  private lazy val group = Parameter.in(
     "group(s)",
     Schema.String,
     description = "Group name(s). Names are url-encoded, slashes are not. (e.g. group1/group2/.../groupN)".some
   )
 
-  private lazy val projectParam =
-    Parameter.in("project name", Schema.String, "Project name".some)
-
-  private lazy val locationParam =
-    Parameter.in("location", Schema.String, "The path of the file".some)
+  private lazy val projectName = Parameter.in("project name", Schema.String, "Project name".some)
+  private lazy val location    = Parameter.in("location", Schema.String, "The path of the file".some)
 
   private val example = {
 

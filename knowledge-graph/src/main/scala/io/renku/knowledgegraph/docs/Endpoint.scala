@@ -22,7 +22,6 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.ServiceVersion
-import io.renku.knowledgegraph.docs.Implicits.StatusOps
 import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph.{entities, lineage}
 import org.http4s
@@ -33,7 +32,9 @@ trait Endpoint[F[_]] {
   def `get /spec.json`: F[http4s.Response[F]]
 }
 
-private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends Http4sDsl[F] with Endpoint[F] {
+private class EndpointImpl[F[_]: Async](entitiesEndpoint: entities.EndpointDocs, serviceVersion: ServiceVersion)
+    extends Http4sDsl[F]
+    with Endpoint[F] {
   import Encoders._
 
   override def `get /spec.json`: F[http4s.Response[F]] = Ok(doc.asJson)
@@ -46,16 +47,14 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends 
     )
   ).addServer(server)
     .addPath(lineage.EndpointDocs.path)
-    .addPath(entities.EndpointDocs.path)
+    .addPath(entitiesEndpoint.path)
     .addSecurity(privateToken)
     .addSecurity(oAuth)
     .addNoAuthSecurity()
-    .addResponsesToAll(authErrorResponses)
 
   private lazy val server = Server(
     url = "/knowledge-graph",
-    description = "Renku Knowledge Graph API",
-    variables = Map.empty
+    description = "Renku Knowledge Graph API"
   )
 
   private lazy val privateToken = SecurityScheme(
@@ -71,19 +70,11 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends 
     "User's Personal Access Token in GitLab".some,
     In.Header
   )
-
-  val authErrorResponses = Map(
-    http4s.Status.Unauthorized.asDocStatus -> Response(
-      "If given auth header cannot be authenticated"
-    ),
-    http4s.Status.NotFound.asDocStatus -> Response(
-      "If there is no project with the given namespace/name or user is not authorised to access this project"
-    ),
-    http4s.Status.InternalServerError.asDocStatus -> Response("Otherwise")
-  )
 }
 
 object Endpoint {
-  def apply[F[_]: Async]: F[Endpoint[F]] =
-    ServiceVersion.readFromConfig[F]().map(new EndpointImpl[F](_)).widen[Endpoint[F]]
+  def apply[F[_]: Async]: F[Endpoint[F]] = for {
+    entitiesEndpoint <- entities.EndpointDocs[F]
+    serviceVersion   <- ServiceVersion.readFromConfig[F]()
+  } yield new EndpointImpl[F](entitiesEndpoint, serviceVersion)
 }

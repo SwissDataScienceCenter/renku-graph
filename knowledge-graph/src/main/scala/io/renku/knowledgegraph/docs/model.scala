@@ -20,7 +20,8 @@ package io.renku.knowledgegraph.docs
 
 import cats.Show
 import cats.syntax.all._
-import io.circe.Json
+import io.circe.{Encoder, Json}
+import io.renku.knowledgegraph.docs.model.Example.JsonExample
 import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
 
@@ -45,8 +46,10 @@ object model {
                                         servers:        List[Server],
                                         paths:          Map[String, Path]
   ) {
+
     def addPath(path: Path): CompleteDoc =
       CompleteDoc(openApiVersion, info, servers, paths + (path.template -> path), None, Nil)
+
     def addServer(server: Server): DocWithInfo = copy(openApiVersion, info, servers :+ server, paths)
   }
 
@@ -72,25 +75,14 @@ object model {
       }
       copy(security = security :+ SecurityRequirementAuth(securityScheme.name, Nil), components = newComponents.some)
     }
-
-    def addResponsesToAll(responses: Map[Status, Response]): CompleteDoc =
-      copy(paths = paths.map { case (template, path) =>
-        (template,
-         PathImpl(path.summary,
-                  path.description,
-                  path.operations.map(op => op.copy(responses = op.responses ++ responses)),
-                  path.parameters,
-                  path.template
-         )
-        )
-      })
   }
 
   case class Info(title: String, description: Option[String], version: String)
 
-  case class Server(url: String, description: String, variables: Map[String, Variable])
+  case class Server(url: String, description: String, variables: Map[String, Variable] = Map.empty)
 
   case class Variable(default: String)
+
   object Uri {
     def /(nextPart: Parameter): Uri = Uri(List(ParameterPart(nextPart)))
     def /(nextPart: String):    Uri = Uri(List(StringPart(nextPart)))
@@ -119,15 +111,15 @@ object model {
   }
 
   trait UriPart {
-    def show: Show[UriPart]
+    val show: Show[UriPart]
   }
 
   case class StringPart(value: String) extends UriPart {
-    def show: Show[UriPart] = Show.show(_ => value)
+    override val show: Show[UriPart] = Show.show(_ => value)
   }
 
   case class ParameterPart(parameter: Parameter) extends UriPart {
-    def show: Show[UriPart] = Show.show(_ => s"{${parameter.name}}")
+    override val show: Show[UriPart] = Show.show(_ => s"{${parameter.name}}")
   }
 
   trait Path {
@@ -157,11 +149,10 @@ object model {
     def addUri(uri: Uri): PathWithUri =
       PathWithUri(summary, description, getParameters(uri.parts), Uri.getTemplate(uri.parts))
 
-    private def getParameters(parts: List[UriPart]) =
-      parts.flatMap {
-        case ParameterPart(parameter) => Some(parameter)
-        case _                        => None
-      }
+    private def getParameters(parts: List[UriPart]) = parts.flatMap {
+      case ParameterPart(parameter) => Some(parameter)
+      case _                        => None
+    }
   }
 
   private case class PathWithUri(summary:     String,
@@ -189,25 +180,18 @@ object model {
     def requestBody: Option[RequestBody]
     def responses:   Map[Status, Response]
     def security:    List[SecurityRequirement]
-    def copy(summary:     Option[String] = summary, // TODO: make this generic
-             parameters:  List[Parameter] = parameters,
-             requestBody: Option[RequestBody] = requestBody,
-             responses:   Map[Status, Response] = responses,
-             security:    List[SecurityRequirement] = security
-    ) = this match {
-      case _: Operation.Get => Operation.Get(summary, parameters, requestBody, responses, security)
-    }
   }
 
   object Operation {
-    def GET(uri: Uri, status: Status, response: Response): OpMapping = {
+
+    def GET(uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
       val template = Uri.getTemplate(uri.parts)
       val parameters = uri.parts.flatMap {
         case ParameterPart(parameter) => Some(parameter)
         case _                        => None
       }
 
-      OpMapping(template, Get("".some, parameters, None, Map(status -> response), Nil))
+      OpMapping(template, Get("".some, parameters, None, statusAndResponse.toMap, Nil))
     }
 
     case class Get(summary:     Option[String],
@@ -225,26 +209,23 @@ object model {
       Parameter(name, In.Path, description, required, schema)
   }
 
-  sealed trait In extends Product with Serializable {
-    def value: String
-  }
-
+  sealed trait In extends Product with Serializable { val value: String }
   object In {
 
     final case object Query extends In {
-      def value: String = "query"
+      override val value: String = "query"
     }
 
     final case object Header extends In {
-      def value: String = "header"
+      override val value: String = "header"
     }
 
     final case object Path extends In {
-      def value: String = "path"
+      override val value: String = "path"
     }
 
     final case object Cookie extends In {
-      def value: String = "cookie"
+      override val value: String = "cookie"
     }
   }
 
@@ -252,8 +233,15 @@ object model {
 
   final case class MediaType(name: String, examples: Map[String, Example])
   object MediaType {
+
     def apply(name: String, exampleName: String, example: Example): MediaType =
       MediaType(name, Map(exampleName -> example))
+
+    def `application/json`(exampleName: String, example: Json): MediaType =
+      MediaType("application/json", Map(exampleName -> JsonExample(example)))
+
+    def `application/json`[P](exampleName: String, example: P)(implicit encoder: Encoder[P]): MediaType =
+      MediaType("application/json", Map(exampleName -> JsonExample(encoder(example))))
   }
 
   final case class Response(
@@ -263,29 +251,42 @@ object model {
       links:       Map[String, Link] = Map.empty
   )
 
-  case class Status(code: Int, name: String)
+  object Contents {
+    def apply(mediaTypes: MediaType*): Map[String, MediaType] =
+      mediaTypes.map(media => media.name -> media).toMap
+  }
+
+  class Status(val code: Int, val name: String)
+  object Status {
+
+    def apply(code: Int, name: String): Status = new Status(code, name)
+
+    case object Ok extends Status(200, "Ok")
+
+    case object BadRequest   extends Status(400, "Bad Request")
+    case object Unauthorized extends Status(401, "Unauthorized")
+    case object NotFound     extends Status(404, "Not Found")
+
+    case object InternalServerError extends Status(500, "Internal Server Error")
+  }
 
   trait SecurityRequirement
   final case class SecurityRequirementAuth(schemeName: String, scopeNames: List[String]) extends SecurityRequirement
   final object SecurityRequirementNoAuth                                                 extends SecurityRequirement
 
   final case class SecurityScheme(name: String, `type`: TokenType, description: Option[String], in: In)
-
   object SecurityScheme {
 
-    sealed trait SchemeType {
-      def value: String
-    }
-
+    sealed trait SchemeType { val value: String }
     object SchemeType {
       final case object BearerToken extends SchemeType {
-        def value: String = "Bearer"
+        override val value: String = "Bearer"
       }
       final case object BasicToken extends SchemeType {
-        def value: String = "Basic"
+        override val value: String = "Basic"
       }
       final case object OAuth2Token extends SchemeType {
-        def value: String = "OAuth"
+        override val value: String = "OAuth"
       }
     }
   }
@@ -297,7 +298,6 @@ object model {
   sealed trait TokenType extends Product with Serializable {
     def value: String
   }
-
   object TokenType {
     case object ApiKey extends TokenType {
       override def value: String = "apiKey"
@@ -343,25 +343,23 @@ object model {
         refreshUrl:       Option[String] = None
     )
 
-    sealed trait OAuthFlowType {
-      def value: String
-    }
+    sealed trait OAuthFlowType { val value: String }
 
     object OAuthFlowType {
       final case object Implicit extends OAuthFlowType {
-        override def value: String = "implicit"
+        override val value: String = "implicit"
       }
 
       final case object Password extends OAuthFlowType {
-        override def value: String = "password"
+        override val value: String = "password"
       }
 
       final case object ClientCredentials extends OAuthFlowType {
-        override def value: String = "clientCredentials"
+        override val value: String = "clientCredentials"
       }
 
       final case object AuthorizationCode extends OAuthFlowType {
-        override def value: String = "authorizationCode"
+        override val value: String = "authorizationCode"
       }
     }
   }

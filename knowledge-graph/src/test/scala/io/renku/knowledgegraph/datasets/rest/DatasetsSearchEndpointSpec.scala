@@ -74,7 +74,7 @@ class DatasetsSearchEndpointSpec
 
         response.status        shouldBe Ok
         response.contentType   shouldBe Some(`Content-Type`(application.json))
-        response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
+        response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](pagingResponse)
         response
           .as[List[Json]]
           .unsafeRunSync() should contain theSameElementsAs (pagingResponse.results map toJson)
@@ -95,7 +95,7 @@ class DatasetsSearchEndpointSpec
       response.status                         shouldBe Ok
       response.contentType                    shouldBe Some(`Content-Type`(application.json))
       response.as[List[Json]].unsafeRunSync() shouldBe empty
-      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](pagingResponse)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](pagingResponse)
 
       logger.loggedOnly(warn(maybePhrase))
     }

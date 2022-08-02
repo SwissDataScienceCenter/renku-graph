@@ -66,7 +66,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
         response.status        shouldBe Ok
         response.contentType   shouldBe Some(`Content-Type`(application.json))
-        response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](results)
+        response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
         implicit val decoder: Decoder[model.Entity] = entitiesDecoder(possibleEntities = results.results)
         response.as[List[model.Entity]].unsafeRunSync() shouldBe results.results
       }
@@ -80,7 +80,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
       response.status        shouldBe Ok
       response.contentType   shouldBe Some(`Content-Type`(application.json))
-      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, ResourceUrl](results)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
       implicit val decoder: Decoder[model.Entity] = entitiesDecoder(possibleEntities = results.results)
       response.as[List[model.Entity]].unsafeRunSync() shouldBe Nil
     }
