@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
 import cats.data.NonEmptyList
 import cats.effect.IO
@@ -30,9 +30,9 @@ import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.datasets._
-import io.renku.graph.model.projects.Path
-import io.renku.graph.model.testentities._
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
+import io.renku.graph.model.projects.Path
+import io.renku.graph.model.testentities.{Dataset => _, _}
 import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
@@ -42,8 +42,7 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
-import io.renku.knowledgegraph.datasets.model
-import io.renku.knowledgegraph.datasets.model._
+import io.renku.knowledgegraph.datasets.Dataset._
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._
@@ -87,9 +86,9 @@ class DatasetEndpointSpec
 
         val response = endpoint.getDataset(dataset.id, authContext).unsafeRunSync()
 
-        response.status                            shouldBe Ok
-        response.contentType                       shouldBe Some(`Content-Type`(MediaType.application.json))
-        response.as[model.Dataset].unsafeRunSync() shouldBe dataset
+        response.status                      shouldBe Ok
+        response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+        response.as[Dataset].unsafeRunSync() shouldBe dataset
         response.as[Json].unsafeRunSync()._links shouldBe Links
           .of(
             Self                   -> Href(renkuApiUrl / "datasets" / dataset.id),
@@ -143,7 +142,7 @@ class DatasetEndpointSpec
       (datasetsFinder
         .findDataset(_: Identifier, _: AuthContext[Identifier]))
         .expects(identifier, authContext)
-        .returning(Option.empty[model.Dataset].pure[IO])
+        .returning(Option.empty[Dataset].pure[IO])
 
       val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
 
@@ -164,7 +163,7 @@ class DatasetEndpointSpec
       (datasetsFinder
         .findDataset(_: Identifier, _: AuthContext[Identifier]))
         .expects(identifier, authContext)
-        .returning(exception.raiseError[IO, Option[model.Dataset]])
+        .returning(exception.raiseError[IO, Option[Dataset]])
 
       val response = endpoint.getDataset(identifier, authContext).unsafeRunSync()
 
@@ -188,9 +187,9 @@ class DatasetEndpointSpec
     val endpoint = new DatasetEndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
   }
 
-  private implicit val datasetEntityDecoder: EntityDecoder[IO, model.Dataset] = jsonOf[IO, model.Dataset]
+  private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]
 
-  private implicit lazy val datasetDecoder: Decoder[model.Dataset] = cursor =>
+  private implicit lazy val datasetDecoder: Decoder[Dataset] = cursor =>
     for {
       id               <- cursor.downField("identifier").as[Identifier]
       title            <- cursor.downField("title").as[Title]
@@ -199,7 +198,7 @@ class DatasetEndpointSpec
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       published        <- cursor.downField("published").as[(NonEmptyList[DatasetCreator], Option[DatePublished])]
       maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
-      parts            <- cursor.downField("hasPart").as[List[model.DatasetPart]]
+      parts            <- cursor.downField("hasPart").as[List[Dataset.DatasetPart]]
       project          <- cursor.downField("project").as[DatasetProject]
       usedIn           <- cursor.downField("usedIn").as[List[DatasetProject]]
       keywords         <- cursor.downField("keywords").as[List[Keyword]]
@@ -269,10 +268,10 @@ class DatasetEndpointSpec
       maybeAffiliation <- cursor.downField("affiliation").as[Option[Affiliation]]
     } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
 
-  private implicit lazy val partDecoder: Decoder[model.DatasetPart] = cursor =>
+  private implicit lazy val partDecoder: Decoder[Dataset.DatasetPart] = cursor =>
     for {
       location <- cursor.downField("atLocation").as[PartLocation]
-    } yield model.DatasetPart(location)
+    } yield Dataset.DatasetPart(location)
 
   private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {

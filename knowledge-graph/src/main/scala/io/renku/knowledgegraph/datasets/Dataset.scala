@@ -16,77 +16,81 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
-import cats.MonadThrow
-import cats.effect._
+import Dataset._
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.http.server.security.Authorizer.AuthContext
-import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, Identifier, ImageUri}
-import io.renku.http.InfoMessage._
+import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, OriginalIdentifier, PartLocation, ResourceId, SameAs, Title}
+import io.renku.graph.model.persons.{Affiliation, Email}
+import io.renku.graph.model.projects.Path
+import io.renku.graph.model.{GitLabUrl, persons, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
-import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.knowledgegraph.datasets.model._
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
-import io.renku.logging.ExecutionTimeRecorder
-import io.renku.triplesstore.SparqlQueryTimeRecorder
-import org.http4s.Response
-import org.http4s.dsl.Http4sDsl
-import org.typelevel.log4cats.Logger
+import io.renku.tinytypes.json.TinyTypeEncoders._
 
-import scala.util.control.NonFatal
-
-trait DatasetEndpoint[F[_]] {
-  def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]]
+sealed trait Dataset extends Product with Serializable {
+  val resourceId:       ResourceId
+  val id:               Identifier
+  val title:            Title
+  val name:             Name
+  val maybeDescription: Option[Description]
+  val creators:         List[DatasetCreator]
+  val date:             Date
+  val parts:            List[DatasetPart]
+  val project:          DatasetProject
+  val usedIn:           List[DatasetProject]
+  val keywords:         List[Keyword]
+  val versions:         DatasetVersions
+  val images:           List[ImageUri]
 }
 
-class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
-    datasetFinder:         DatasetFinder[F],
-    renkuApiUrl:           renku.ApiUrl,
-    gitLabUrl:             GitLabUrl,
-    executionTimeRecorder: ExecutionTimeRecorder[F]
-) extends Http4sDsl[F]
-    with DatasetEndpoint[F] {
+object Dataset {
 
-  import executionTimeRecorder._
-  import io.renku.tinytypes.json.TinyTypeEncoders._
-  import org.http4s.circe._
+  final case class NonModifiedDataset(resourceId:       ResourceId,
+                                      id:               Identifier,
+                                      title:            Title,
+                                      name:             Name,
+                                      sameAs:           SameAs,
+                                      versions:         DatasetVersions,
+                                      maybeDescription: Option[Description],
+                                      creators:         List[DatasetCreator],
+                                      date:             Date,
+                                      parts:            List[DatasetPart],
+                                      project:          DatasetProject,
+                                      usedIn:           List[DatasetProject],
+                                      keywords:         List[Keyword],
+                                      images:           List[ImageUri]
+  ) extends Dataset
 
-  def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]] = measureExecutionTime {
-    datasetFinder
-      .findDataset(identifier, authContext)
-      .flatMap(toHttpResult(identifier))
-      .recoverWith(httpResult(identifier))
-  } map logExecutionTimeWhen(finishedSuccessfully(identifier))
+  final case class ModifiedDataset(resourceId:       ResourceId,
+                                   id:               Identifier,
+                                   title:            Title,
+                                   name:             Name,
+                                   derivedFrom:      DerivedFrom,
+                                   versions:         DatasetVersions,
+                                   maybeDescription: Option[Description],
+                                   creators:         List[DatasetCreator],
+                                   date:             DateCreated,
+                                   parts:            List[DatasetPart],
+                                   project:          DatasetProject,
+                                   usedIn:           List[DatasetProject],
+                                   keywords:         List[Keyword],
+                                   images:           List[ImageUri]
+  ) extends Dataset
 
-  private def toHttpResult(
-      identifier: Identifier
-  ): Option[Dataset] => F[Response[F]] = {
-    case None          => NotFound(InfoMessage(s"No dataset with '$identifier' id found"))
-    case Some(dataset) => Ok(dataset.asJson)
-  }
+  final case class DatasetCreator(maybeEmail: Option[Email], name: persons.Name, maybeAffiliation: Option[Affiliation])
 
-  private def httpResult(
-      identifier: Identifier
-  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(s"Finding dataset with '$identifier' id failed")
-    Logger[F].error(exception)(errorMessage.value) >>
-      InternalServerError(errorMessage)
-  }
+  final case class DatasetPart(location: PartLocation)
+  final case class DatasetVersions(initial: OriginalIdentifier)
 
-  private def finishedSuccessfully(identifier: Identifier): PartialFunction[Response[F], String] = {
-    case response if response.status == Ok || response.status == NotFound =>
-      s"Finding '$identifier' dataset finished"
-  }
+  final case class DatasetProject(path: Path, name: projects.Name)
 
   // format: off
-  private implicit lazy val datasetEncoder: Encoder[Dataset] = Encoder.instance[Dataset] { dataset =>
+  implicit def encoder(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): Encoder[Dataset] = Encoder.instance[Dataset] { dataset =>
     Json.obj(
       List(
         ("identifier" -> dataset.id.asJson).some,
@@ -143,12 +147,13 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
     }"""
   }
 
-  private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
-    json"""{
+  private implicit def projectEncoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[DatasetProject] =
+    Encoder.instance[DatasetProject] { project =>
+      json"""{
       "path": ${project.path},
       "name": ${project.name}
     }""" deepMerge _links(Link(Rel("project-details") -> ProjectEndpoint.href(renkuApiUrl, project.path)))
-  }
+    }
 
   private implicit lazy val versionsEncoder: Encoder[DatasetVersions] = Encoder.instance[DatasetVersions] { versions =>
     json"""{
@@ -156,7 +161,7 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
     }"""
   }
 
-  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], DatasetProject)] =
+  private implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], DatasetProject)] =
     Encoder.instance[(List[ImageUri], DatasetProject)] { case (imageUris, project) =>
       Json.arr(imageUris.map {
         case uri: ImageUri.Relative =>
@@ -173,17 +178,4 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
           )
       }: _*)
     }
-}
-
-object DatasetEndpoint {
-
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetEndpoint[F]] = for {
-    datasetFinder         <- DatasetFinder[F]
-    renkuApiUrl           <- renku.ApiUrl[F]()
-    gitLabUrl             <- GitLabUrlLoader[F]()
-    executionTimeRecorder <- ExecutionTimeRecorder[F]()
-  } yield new DatasetEndpointImpl[F](datasetFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
-
-  def href(renkuApiUrl: renku.ApiUrl, identifier: Identifier): Href =
-    Href(renkuApiUrl / "datasets" / identifier)
 }

@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
+import ProjectDatasetsFinder.ProjectDataset
 import cats.effect._
 import cats.syntax.all._
 import io.circe.literal._
@@ -30,10 +31,9 @@ import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links._
-import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsFinder.ProjectDataset
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.tinytypes.json.TinyTypeEncoders
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger

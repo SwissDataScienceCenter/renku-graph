@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
+import DatasetSearchResult._
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
@@ -25,8 +26,6 @@ import io.renku.config.renku
 import io.renku.graph.model._
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
-import io.renku.knowledgegraph.datasets.model.DatasetCreator
-import io.renku.knowledgegraph.datasets.rest.DatasetSearchResult._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
@@ -43,7 +42,7 @@ private class DatasetSearchEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, ren
     "Free-Text Dataset search",
     "Finds Datasets by the given criteria".some,
     GET(
-      Uri / "entities" / query / sort / page / perPage,
+      Uri / "datasets" / query / sort / page / perPage,
       Status.Ok -> Response("Found datasets",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
@@ -107,9 +106,9 @@ private class DatasetSearchEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, ren
       datasets.Name("name"),
       datasets.Description("Some project").some,
       List(
-        DatasetCreator(persons.Email("jan@mail.com").some,
-                       persons.Name("Jan Kowalski"),
-                       persons.Affiliation("SDSC").some
+        Dataset.DatasetCreator(persons.Email("jan@mail.com").some,
+                               persons.Name("Jan Kowalski"),
+                               persons.Affiliation("SDSC").some
         )
       ),
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),

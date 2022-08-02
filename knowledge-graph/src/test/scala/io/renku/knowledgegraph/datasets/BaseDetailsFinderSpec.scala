@@ -16,17 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets.ResourceId
-import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.{Dataset => _, _}
 import io.renku.graph.model.{RenkuUrl, datasets, testentities}
 import io.renku.jsonld.syntax._
-import io.renku.knowledgegraph.datasets.model
 import io.renku.tinytypes.json.TinyTypeEncoders
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -38,7 +37,7 @@ class BaseDetailsFinderSpec
     with should.Matchers
     with TinyTypeEncoders {
 
-  import BaseDetailsFinderImpl._
+  import io.renku.knowledgegraph.datasets.BaseDetailsFinderImpl._
 
   "non-modified dataset decoder" should {
 
@@ -62,7 +61,7 @@ class BaseDetailsFinderSpec
           .generateOne
       ) foreach { case (dataset, project, nonModifiedDataset) =>
         nonModifiedToResultSet(project, dataset, blankStrings().generateOne)
-          .as[Option[model.Dataset]](maybeDatasetDecoder(dataset.identification.identifier)) shouldBe
+          .as[Option[Dataset]](maybeDatasetDecoder(dataset.identification.identifier)) shouldBe
           nonModifiedDataset
             .copy(creators = List.empty)
             .copy(maybeDescription = None)
@@ -84,7 +83,7 @@ class BaseDetailsFinderSpec
         blankStrings()
       ) { case ((_ ::~ dataset, project), description) =>
         modifiedToResultSet(project, dataset, description)
-          .as[Option[model.Dataset]](maybeDatasetDecoder(dataset.identification.identifier)) shouldBe
+          .as[Option[Dataset]](maybeDatasetDecoder(dataset.identification.identifier)) shouldBe
           modifiedToModified(dataset, project)
             .copy(creators = List.empty)
             .copy(maybeDescription = None)

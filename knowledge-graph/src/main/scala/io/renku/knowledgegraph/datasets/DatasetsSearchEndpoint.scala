@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
+import DatasetsSearchEndpoint.Query._
+import DatasetsSearchEndpoint.Sort
 import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
@@ -29,8 +31,6 @@ import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query._
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}

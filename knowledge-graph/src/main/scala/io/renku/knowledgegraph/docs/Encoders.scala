@@ -31,10 +31,10 @@ object Encoders {
   implicit val docEncoder: Encoder[OpenApiDocument] = Encoder.instance { doc =>
     val components: Json = doc.components.map(c => json"""{"components": $c}""").getOrElse(JsonObject.empty.asJson)
     json"""{
-      "openapi": ${doc.openApiVersion},
-      "info": ${doc.info},
-      "servers": ${doc.servers},
-      "paths": ${doc.paths},
+      "openapi":  ${doc.openApiVersion},
+      "info":     ${doc.info},
+      "servers":  ${doc.servers},
+      "paths":    ${doc.paths},
       "security": ${doc.security}
     }""" deepMerge components
   }
@@ -65,10 +65,10 @@ object Encoders {
       .map { case (status, response) =>
         json"""{
           ${status.code}: {
-               "description": ${response.description},
-               "content": ${response.content},
-               "links": ${response.links},
-               "headers": ${response.headers}
+            "description": ${response.description},
+            "content":     ${response.content},
+            "links":       ${response.links},
+            "headers":     ${response.headers}
           } 
         }"""
       }
@@ -149,11 +149,11 @@ object Encoders {
   }
   implicit def exampleEncoder: Encoder[model.Example] = Encoder.instance { example =>
     val value = example match {
-      case JsonExample(value, _)   => json"""{"value": $value }"""
-      case StringExample(value, _) => json"""{"value": $value }"""
+      case JsonExample(value, _)   => json"""{"value": $value}"""
+      case StringExample(value, _) => json"""{"value": $value}"""
 
     }
-    val summary = example.summary.map(s => json"""{"summary": $s }""").getOrElse(empty)
+    val summary = example.summary.map(s => json"""{"summary": $s}""").getOrElse(empty)
 
     value deepMerge summary
   }

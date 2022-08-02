@@ -99,9 +99,9 @@ object model {
   }
 
   private[model] case class Uri(parts: List[UriPart]) {
-    def show: Show[Uri] = Show.show(_ => parts.map(_.show).mkString("/"))
-    def /(nextPart: Parameter) = copy(parts :+ ParameterPart(nextPart))
-    def /(nextPart: String)    = copy(parts :+ StringPart(nextPart))
+    def show:                   Show[Uri] = Show.show(_ => parts.map(_.show).mkString("/"))
+    def /(nextPart: Parameter): Uri       = copy(parts :+ ParameterPart(nextPart))
+    def /(nextPart: String):    Uri       = copy(parts :+ StringPart(nextPart))
   }
 
   private[model] case class UriOp(operation: Operation, parts: List[UriPart]) {

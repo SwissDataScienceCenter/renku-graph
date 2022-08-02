@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
 import cats.data.NonEmptyList
 import io.circe.Decoder
@@ -25,14 +25,14 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.blankStrings
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.persons.{Email, Name}
-import io.renku.knowledgegraph.datasets.model.DatasetCreator
+import io.renku.knowledgegraph.datasets.Dataset.DatasetCreator
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  import CreatorsFinder._
+  import io.renku.knowledgegraph.datasets.CreatorsFinder._
 
   "dataset creator decoder" should {
 

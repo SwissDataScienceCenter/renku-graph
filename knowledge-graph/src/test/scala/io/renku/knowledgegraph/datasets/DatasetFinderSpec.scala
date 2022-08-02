@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -28,10 +28,10 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.datasets.SameAs
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.datasets.model._
+import io.renku.knowledgegraph.datasets.Dataset._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

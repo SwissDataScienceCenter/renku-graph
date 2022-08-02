@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
+import Dataset._
 import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.effect.{Async, Spawn}
 import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
-import io.renku.knowledgegraph.datasets.model._
 import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 

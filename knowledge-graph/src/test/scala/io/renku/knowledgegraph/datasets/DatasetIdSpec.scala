@@ -16,25 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
-import io.renku.config.renku
-import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
-import io.renku.graph.model.GraphModelGenerators.gitLabUrls
-import io.renku.knowledgegraph.docs.OpenApiTester._
+import io.renku.graph.model.GraphModelGenerators._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DatasetSearchEndpointDocsSpec extends AnyWordSpec {
+class DatasetIdSpec extends AnyWordSpec with should.Matchers {
 
-  "path" should {
+  "unapply" should {
 
-    "return a valid Path object" in {
-      validatePath(new DatasetSearchEndpointDocsImpl().path)
+    "convert valid dataset id as string to Identifier" in {
+      val id = datasetIdentifiers.generateOne
+      DatasetId.unapply(id.toString) shouldBe Some(id)
+    }
+
+    "return None if string value is blank" in {
+      DatasetId.unapply(" ") shouldBe None
     }
   }
-
-  private implicit lazy val renkuUrl:  renku.ApiUrl = renkuApiUrls.generateOne
-  private implicit lazy val gitLabUrl: GitLabUrl    = gitLabUrls.generateOne
 }

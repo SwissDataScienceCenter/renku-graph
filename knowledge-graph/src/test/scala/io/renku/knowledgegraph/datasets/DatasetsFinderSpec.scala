@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -33,11 +33,11 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.datasets.model.DatasetCreator
-import io.renku.knowledgegraph.datasets.rest.DatasetSearchResult._
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
+import io.renku.knowledgegraph.datasets.Dataset.DatasetCreator
+import io.renku.knowledgegraph.datasets.DatasetSearchResult._
+import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
+import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
+import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore._

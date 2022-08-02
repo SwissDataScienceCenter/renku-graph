@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
 import cats.MonadThrow
 import cats.effect.Async
@@ -27,7 +27,6 @@ import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
-import io.renku.knowledgegraph.datasets.model.Dataset
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -140,12 +139,12 @@ private object BaseDetailsFinder {
 
 private object BaseDetailsFinderImpl {
 
+  import Dataset._
   import io.circe.Decoder
   import Decoder._
   import io.renku.graph.model.datasets._
-  import io.renku.knowledgegraph.datasets.model._
-  import io.renku.triplesstore.ResultsDecoder._
   import io.renku.tinytypes.json.TinyTypeDecoders._
+  import io.renku.triplesstore.ResultsDecoder._
 
   private lazy val createDataset: (ResourceId,
                                    Identifier,
@@ -199,7 +198,7 @@ private object BaseDetailsFinderImpl {
       ).asLeft[Dataset]
   }
 
-  private[rest] def maybeDatasetDecoder(dsId: Identifier): Decoder[Option[Dataset]] =
+  private[datasets] def maybeDatasetDecoder(dsId: Identifier): Decoder[Option[Dataset]] =
     ResultsDecoder[Option, Dataset] { implicit cursor =>
       for {
         resourceId       <- extract[ResourceId]("datasetId")

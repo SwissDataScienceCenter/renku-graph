@@ -30,7 +30,7 @@ import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.json.JsonOps._
-import io.renku.knowledgegraph.datasets.rest.ProjectDatasetsEndpoint
+import io.renku.knowledgegraph.datasets.ProjectDatasetsEndpoint
 import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.knowledgegraph.projects.model._
 import io.renku.logging.ExecutionTimeRecorder

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets.rest
+package io.renku.knowledgegraph.datasets
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -40,10 +40,10 @@ import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
-import io.renku.knowledgegraph.datasets.model.DatasetCreator
-import io.renku.knowledgegraph.datasets.rest.DatasetSearchResult._
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
+import io.renku.knowledgegraph.datasets.Dataset.DatasetCreator
+import io.renku.knowledgegraph.datasets.DatasetSearchResult._
+import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.{Phrase, query}
+import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
@@ -124,7 +124,7 @@ class DatasetsSearchEndpointSpec
 
   "Sort.properties" should {
 
-    import DatasetsSearchEndpoint.Sort._
+    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
 
     "list only name, datePublished and projectsCount" in {
       DatasetsSearchEndpoint.Sort.properties shouldBe Set(TitleProperty,

@@ -26,7 +26,7 @@ import io.renku.config.renku
 import io.renku.graph.model._
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
-import io.renku.knowledgegraph.datasets.rest.DatasetEndpoint
+import io.renku.knowledgegraph.datasets.DatasetEndpoint
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
 import io.renku.tinytypes._

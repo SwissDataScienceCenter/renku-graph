@@ -82,7 +82,9 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTi
           case (node, _)                        => node
         } match {
           case (`location`, types, `label`) =>
-            Node.Type.fromEntityTypes(types).bimap(err => DecodingFailure(err.getMessage, Nil), Node(location, label, _).some)
+            Node.Type
+              .fromEntityTypes(types)
+              .bimap(err => DecodingFailure(err.getMessage, Nil), Node(location, label, _).some)
         }
     }
 
