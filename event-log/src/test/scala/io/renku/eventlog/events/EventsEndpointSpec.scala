@@ -73,7 +73,7 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
       response.status                              shouldBe Ok
       response.contentType                         shouldBe Some(`Content-Type`(application.json))
       response.as[List[EventInfo]].unsafeRunSync() shouldBe Nil
-      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, EventLogUrl](pagingResponse)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[EventLogUrl](pagingResponse)
     }
 
     s"$Ok with array of events if there are events found" in new TestCase {
@@ -89,7 +89,7 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
       response.status                              shouldBe Ok
       response.contentType                         shouldBe Some(`Content-Type`(application.json))
       response.as[List[EventInfo]].unsafeRunSync() shouldBe pagingResponse.results
-      response.headers.headers should contain allElementsOf PagingHeaders.from[IO, EventLogUrl](pagingResponse)
+      response.headers.headers should contain allElementsOf PagingHeaders.from[EventLogUrl](pagingResponse)
     }
 
     s"$InternalServerError when an error happens while fetching the events" in new TestCase {
