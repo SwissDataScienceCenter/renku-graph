@@ -16,17 +16,25 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.datasets.rest
 
+import io.renku.config.renku
+import io.renku.generators.CommonGraphGenerators.renkuApiUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.GraphModelGenerators.gitLabUrls
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import org.scalatest.wordspec.AnyWordSpec
 
-class EndpointDocsSpec extends AnyWordSpec {
+class DatasetSearchEndpointDocsSpec extends AnyWordSpec {
 
   "path" should {
 
     "return a valid Path object" in {
-      validatePath(EndpointDocs.path)
+      validatePath(new DatasetSearchEndpointDocsImpl().path)
     }
   }
+
+  private implicit lazy val renkuUrl:  renku.ApiUrl = renkuApiUrls.generateOne
+  private implicit lazy val gitLabUrl: GitLabUrl    = gitLabUrls.generateOne
 }

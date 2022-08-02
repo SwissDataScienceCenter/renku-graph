@@ -34,13 +34,13 @@ import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
-import io.renku.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
+import io.renku.knowledgegraph.datasets.rest.DatasetSearchResult._
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore._
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

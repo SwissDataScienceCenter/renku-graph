@@ -24,20 +24,17 @@ import cats.{MonadThrow, Parallel}
 import io.renku.config._
 import io.renku.config.renku.ResourceUrl
 import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.datasets.{Date, DatePublished, ImageUri}
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.GitLabUrl
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
-import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.datasets.model.DatasetCreator
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query._
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
@@ -61,13 +58,12 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
 ) extends Http4sDsl[F]
     with DatasetsSearchEndpoint[F] {
 
-  import DatasetsFinder.DatasetSearchResult
+  import DatasetSearchResult._
   import PagingRequest.Decoders._
   import executionTimeRecorder._
-  import io.circe.literal._
-  import io.circe.{Encoder, Json}
-  import io.renku.json.JsonOps._
-  import io.renku.tinytypes.json.TinyTypeEncoders._
+
+  private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
+  private implicit lazy val glUrl:  GitLabUrl    = gitLabUrl
 
   def searchForDatasets(maybePhrase: Option[Phrase],
                         sort:        Sort.By,
@@ -102,66 +98,6 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
         .map(phrase => s"Finding datasets containing '$phrase' phrase finished")
         .getOrElse("Finding all datasets finished")
   }
-
-  private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id,
-                             title,
-                             name,
-                             maybeDescription,
-                             creators,
-                             date,
-                             exemplarProjectPath,
-                             projectsCount,
-                             keywords,
-                             images
-        ) =>
-      json"""{
-        "identifier": $id,
-        "title": $title,
-        "name": $name,
-        "published": ${creators -> date},
-        "date": ${date.instant},
-        "projectsCount": $projectsCount,
-        "keywords": $keywords,
-        "images": ${images -> exemplarProjectPath}
-      }"""
-        .addIfDefined("description" -> maybeDescription)
-        .deepMerge(_links(Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, id))))
-  }
-
-  private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] = Encoder.instance {
-    case (creators, DatePublished(date)) => json"""{
-      "creator": $creators,
-      "datePublished": $date
-    }"""
-    case (creators, _) => json"""{
-      "creator": $creators
-    }"""
-  }
-
-  private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
-    case DatasetCreator(maybeEmail, name, _) => json"""{
-      "name": $name
-    }""" addIfDefined ("email" -> maybeEmail)
-  }
-
-  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
-    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
-      Json.arr(imageUris.map {
-        case uri: ImageUri.Relative =>
-          json"""{
-            "location": $uri  
-          }""" deepMerge _links(
-            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
-          )
-        case uri: ImageUri.Absolute =>
-          json"""{
-            "location": $uri  
-          }""" deepMerge _links(
-            Link(Rel("view") -> Href(uri.show))
-          )
-      }: _*)
-    }
 }
 
 object DatasetsSearchEndpoint {
@@ -195,12 +131,12 @@ object DatasetsSearchEndpoint {
 
     type PropertyType = SearchProperty
 
-    sealed trait SearchProperty extends Property
+    sealed abstract class SearchProperty(override val name: String) extends Property(name)
 
-    final case object TitleProperty         extends Property("title") with SearchProperty
-    final case object DateProperty          extends Property("date") with SearchProperty
-    final case object DatePublishedProperty extends Property("datePublished") with SearchProperty
-    final case object ProjectsCountProperty extends Property("projectsCount") with SearchProperty
+    final case object TitleProperty         extends SearchProperty("title")
+    final case object DateProperty          extends SearchProperty("date")
+    final case object DatePublishedProperty extends SearchProperty("datePublished")
+    final case object ProjectsCountProperty extends SearchProperty("projectsCount")
 
     override lazy val properties: Set[SearchProperty] = Set(
       TitleProperty,

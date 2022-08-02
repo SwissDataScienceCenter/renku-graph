@@ -23,21 +23,19 @@ import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
+import io.circe.literal._
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
+import io.renku.graph.model.datasets.{DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.knowledgegraph.datasets.model.DatasetCreator
-import io.renku.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.tinytypes.constraints.NonNegativeInt
-import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 import org.typelevel.log4cats.Logger
 
 private trait DatasetsFinder[F[_]] {
@@ -54,25 +52,6 @@ private object DatasetsFinder {
                                                                     creatorsFinder: CreatorsFinder[F]
   ): F[DatasetsFinder[F]] =
     MonadThrow[F].catchNonFatal(new DatasetsFinderImpl[F](renkuConnectionConfig, creatorsFinder))
-
-  final case class DatasetSearchResult(
-      id:                  Identifier,
-      title:               Title,
-      name:                Name,
-      maybeDescription:    Option[Description],
-      creators:            List[DatasetCreator],
-      date:                Date,
-      exemplarProjectPath: projects.Path,
-      projectsCount:       ProjectsCount,
-      keywords:            List[Keyword],
-      images:              List[ImageUri]
-  )
-
-  final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
-
-  implicit object ProjectsCount
-      extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_))
-      with NonNegativeInt[ProjectsCount]
 }
 
 private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder](
@@ -201,7 +180,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
 }
 
 private object DatasetsFinderImpl {
-  import DatasetsFinder.ProjectsCount
+  import DatasetSearchResult.ProjectsCount
   import io.circe.Decoder
 
   implicit val recordsDecoder: Decoder[DatasetSearchResult] = { cursor =>

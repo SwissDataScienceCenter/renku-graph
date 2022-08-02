@@ -43,9 +43,6 @@ object EndpointDocs {
     gitLabUrl <- GitLabUrlLoader[F]()
     apiUrl    <- renku.ApiUrl[F]()
   } yield new EndpointDocsImpl()(gitLabUrl, apiUrl)
-
-  def apply(gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): EndpointDocs =
-    new EndpointDocsImpl()(gitLabUrl, renkuApiUrl)
 }
 
 private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends EndpointDocs {
@@ -54,7 +51,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     "Cross-Entity search",
     "Finds entities by the given criteria".some,
     GET(
-      Uri / "entities" / queryParam / typeParam / creatorParam / visibilityParam / sinceParam / untilParam / sortParam / pageParam / perPageParam,
+      Uri / "entities" / query / `type` / creator / visibility / since / until / sort / page / perPage,
       Status.Ok -> Response("Found entities",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
@@ -73,59 +70,59 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     )
   )
 
-  private lazy val queryParam = Parameter("query",
-                                          In.Query,
-                                          "to filter by matching field (e.g., title, keyword, description, etc.)".some,
-                                          required = false,
-                                          Schema.String
+  private lazy val query = Parameter("query",
+                                     In.Query,
+                                     "to filter by matching field (e.g., title, keyword, description, etc.)".some,
+                                     required = false,
+                                     Schema.String
   )
-  private lazy val typeParam = Parameter(
+  private lazy val `type` = Parameter(
     "type",
     In.Query,
     "to filter by entity type(s); allowed values: project, dataset, workflow, and person; multiple type parameters allowed".some,
     required = false,
     Schema.String
   )
-  private lazy val creatorParam = Parameter(
+  private lazy val creator = Parameter(
     "creator",
     In.Query,
     "to filter by creator(s); the filter would require creator's name; multiple creator parameters allowed".some,
     required = false,
     Schema.String
   )
-  private lazy val visibilityParam = Parameter(
+  private lazy val visibility = Parameter(
     "visibility",
     In.Query,
     "to filter by visibility(ies) (restricted vs. public); allowed values: public, internal, private; multiple visibility parameters allowed".some,
     required = false,
     Schema.String
   )
-  private lazy val sinceParam = Parameter("since",
-                                          In.Query,
-                                          "to filter by entity's creation date to >= the given date".some,
-                                          required = false,
-                                          Schema.String
+  private lazy val since = Parameter("since",
+                                     In.Query,
+                                     "to filter by entity's creation date to >= the given date".some,
+                                     required = false,
+                                     Schema.String
   )
-  private lazy val untilParam = Parameter("until",
-                                          In.Query,
-                                          "to filter by entity's creation date to <= the given date".some,
-                                          required = false,
-                                          Schema.String
+  private lazy val until = Parameter("until",
+                                     In.Query,
+                                     "to filter by entity's creation date to <= the given date".some,
+                                     required = false,
+                                     Schema.String
   )
-  private lazy val sortParam = Parameter(
+  private lazy val sort = Parameter(
     "sort",
     In.Query,
-    "to filter by entity's creation date to <= the given date: matchingScore, name, date. the sorting has to be requested by giving the sort query parameter with the property name and sorting order (asc or desc). The default order is ascending so sort=name means the same as sort=name:asc.".some,
+    "the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `matchingScore`, `name` and `date`".some,
     required = false,
     Schema.String
   )
-  private lazy val pageParam = Parameter("page",
-                                         In.Query,
-                                         "the page query parameter is optional and defaults to 1.".some,
-                                         required = false,
-                                         Schema.String
+  private lazy val page = Parameter("page",
+                                    In.Query,
+                                    "the page query parameter is optional and defaults to 1.".some,
+                                    required = false,
+                                    Schema.String
   )
-  private lazy val perPageParam = Parameter(
+  private lazy val perPage = Parameter(
     "per_page",
     In.Query,
     "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
@@ -143,7 +140,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     "Link" -> Header("The set of prev/next/first/last link headers (prev and next are optional)".some, Schema.String)
   )
 
-  private def example(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) = Json.arr(
+  private lazy val example = Json.arr(
     Project(
       MatchingScore(1),
       projects.Path("group/subgroup/name"),

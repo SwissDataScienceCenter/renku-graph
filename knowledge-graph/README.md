@@ -39,6 +39,7 @@ NOTES:
 |----------------------------|------------------------------------------------------------------------------------------------|
 | OK (200)                   | If there are datasets for the project or `[]` if nothing is found                              |
 | BAD_REQUEST (400)          | If the `query` parameter is blank or `sort` is invalid or `page` or `per_page` is not positive |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                   |
 | INTERNAL SERVER ERROR (500)| Otherwise                                                                                      |
 
 Response headers:
