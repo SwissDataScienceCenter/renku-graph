@@ -35,6 +35,6 @@ class EndpointDocsSpec extends AnyWordSpec {
     }
   }
 
-  private implicit lazy val renkuUrl: renku.ApiUrl = renkuApiUrls.generateOne
-  private implicit lazy val gitLabUrl: GitLabUrl = gitLabUrls.generateOne
+  private implicit lazy val renkuUrl:  renku.ApiUrl = renkuApiUrls.generateOne
+  private implicit lazy val gitLabUrl: GitLabUrl    = gitLabUrls.generateOne
 }

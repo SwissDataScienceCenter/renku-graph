@@ -42,7 +42,7 @@ private class DatasetSearchEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, ren
     "Free-Text Dataset search",
     "Finds Datasets by the given criteria".some,
     GET(
-      Uri / "datasets" / query / sort / page / perPage,
+      Uri / "datasets" :? query & sort & page & perPage,
       Status.Ok -> Response("Found datasets",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
@@ -61,32 +61,29 @@ private class DatasetSearchEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, ren
     )
   )
 
-  private lazy val query = Parameter(
+  private lazy val query = Parameter.Query(
     "query",
-    In.Query,
+    Schema.String,
     "to filter by matching field (e.g., title, keyword, description, or creator name)".some,
-    required = false,
-    Schema.String
+    required = false
   )
-  private lazy val sort = Parameter(
+  private lazy val sort = Parameter.Query(
     "sort",
-    In.Query,
+    Schema.String,
     "the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`, `datePublished`, `date` and `projectsCount`".some,
-    required = false,
-    Schema.String
+    required = false
   )
-  private lazy val page = Parameter("page",
-                                    In.Query,
-                                    "the page query parameter is optional and defaults to 1.".some,
-                                    required = false,
-                                    Schema.String
+  private lazy val page = Parameter.Query(
+    "page",
+    Schema.Integer,
+    "the page query parameter is optional and defaults to 1.".some,
+    required = false
   )
-  private lazy val perPage = Parameter(
+  private lazy val perPage = Parameter.Query(
     "per_page",
-    In.Query,
+    Schema.Integer,
     "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
-    required = false,
-    Schema.String
+    required = false
   )
 
   private lazy val responseHeaders = Map(

@@ -57,11 +57,7 @@ private class DatasetEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiU
     )
   )
 
-  private lazy val identifier = Parameter.in(
-    "identifier",
-    Schema.String,
-    "to filter by matching field (e.g., title, keyword, description, or creator name)".some
-  )
+  private lazy val identifier = Parameter.Path("identifier", Schema.String, "Dataset identifier".some)
 
   private lazy val example = (Dataset
     .NonModifiedDataset(

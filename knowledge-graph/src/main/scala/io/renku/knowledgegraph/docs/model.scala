@@ -84,13 +84,15 @@ object model {
   case class Variable(default: String)
 
   object Uri {
+
     def /(nextPart: Parameter): Uri = Uri(List(ParameterPart(nextPart)))
     def /(nextPart: String):    Uri = Uri(List(StringPart(nextPart)))
+
     def getTemplate(parts: List[UriPart]): String =
       parts
-        .map {
-          case ParameterPart(parameter) => s"{${parameter.name}}"
-          case StringPart(value)        => value
+        .collect {
+          case ParameterPart(parameter: Parameter.Path) => s"{${parameter.name}}"
+          case StringPart(value)                        => value
         }
         .mkString("/")
         .prepended("/")
@@ -99,15 +101,11 @@ object model {
   }
 
   private[model] case class Uri(parts: List[UriPart]) {
-    def show:                   Show[Uri] = Show.show(_ => parts.map(_.show).mkString("/"))
-    def /(nextPart: Parameter): Uri       = copy(parts :+ ParameterPart(nextPart))
-    def /(nextPart: String):    Uri       = copy(parts :+ StringPart(nextPart))
-  }
-
-  private[model] case class UriOp(operation: Operation, parts: List[UriPart]) {
-    def show: Show[UriOp] = Show.show(_ => parts.map(_.show).mkString("/"))
-    def /(nextPart: Parameter) = copy(parts = parts :+ ParameterPart(nextPart))
-    def /(nextPart: String)    = copy(parts = parts :+ StringPart(nextPart))
+    def show:                          Show[Uri] = Show.show(_ => parts.map(_.show).mkString("/"))
+    def /(nextPart: Parameter.Path):   Uri       = copy(parts :+ ParameterPart(nextPart))
+    def /(nextPart: String):           Uri       = copy(parts :+ StringPart(nextPart))
+    def :?(nextPart: Parameter.Query): Uri       = copy(parts :+ ParameterPart(nextPart))
+    def &(nextPart: Parameter.Query):  Uri       = copy(parts :+ ParameterPart(nextPart))
   }
 
   trait UriPart {
@@ -135,33 +133,7 @@ object model {
     def apply(summary: String, description: Option[String] = None, opMapping: OpMapping): Path =
       PathImpl(summary, description, List(opMapping.operation), opMapping.operation.parameters, opMapping.template)
 
-    def apply(summary: String, description: String): PathWithDescriptors =
-      PathWithDescriptors(summary, description.some)
-
     case class OpMapping(template: String, operation: Operation)
-  }
-
-  private[model] case class PathWithDescriptors(summary: String, description: Option[String]) {
-
-    def addSingleOperation(uriOp: UriOp): PathImpl =
-      PathImpl(summary, description, List(uriOp.operation), getParameters(uriOp.parts), Uri.getTemplate(uriOp.parts))
-
-    def addUri(uri: Uri): PathWithUri =
-      PathWithUri(summary, description, getParameters(uri.parts), Uri.getTemplate(uri.parts))
-
-    private def getParameters(parts: List[UriPart]) = parts.flatMap {
-      case ParameterPart(parameter) => Some(parameter)
-      case _                        => None
-    }
-  }
-
-  private case class PathWithUri(summary:     String,
-                                 description: Option[String],
-                                 parameters:  List[Parameter],
-                                 template:    String
-  ) {
-    def addGet(operation: Operation.Get): PathImpl =
-      PathImpl(summary, description, List(operation), parameters, template)
   }
 
   private case class PathImpl(summary:     String,
@@ -169,10 +141,7 @@ object model {
                               operations:  List[Operation],
                               parameters:  List[Parameter],
                               template:    String
-  ) extends Path {
-    def addGet(operation: Operation.Get): PathImpl =
-      PathImpl(summary, description, operations :+ operation, parameters, template)
-  }
+  ) extends Path
 
   sealed trait Operation extends Product with Serializable {
     def summary:     Option[String]
@@ -185,13 +154,12 @@ object model {
   object Operation {
 
     def GET(uri: Uri, statusAndResponse: (Status, Response)*): OpMapping = {
-      val template = Uri.getTemplate(uri.parts)
       val parameters = uri.parts.flatMap {
         case ParameterPart(parameter) => Some(parameter)
         case _                        => None
       }
 
-      OpMapping(template, Get("".some, parameters, None, statusAndResponse.toMap, Nil))
+      OpMapping(Uri.getTemplate(uri.parts), Get("".some, parameters, None, statusAndResponse.toMap, Nil))
     }
 
     case class Get(summary:     Option[String],
@@ -202,15 +170,44 @@ object model {
     ) extends Operation
   }
 
-  case class Parameter(name: String, in: In, description: Option[String], required: Boolean, schema: Schema)
-
+  sealed trait Parameter {
+    type InType <: In
+    val name:        String
+    val in:          InType
+    val description: Option[String]
+    val required:    Boolean
+    val schema:      Schema
+  }
   object Parameter {
-    def in(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true): Parameter =
-      Parameter(name, In.Path, description, required, schema)
+
+    final case class Path(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true)
+        extends Parameter {
+      override type InType = In.Path.type
+      override val in: InType = In.Path
+    }
+    final case class Query(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true)
+        extends Parameter {
+      override type InType = In.Query.type
+      override val in: InType = In.Query
+    }
+    final case class Header(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true)
+        extends Parameter {
+      override type InType = In.Header.type
+      override val in: InType = In.Header
+    }
+    final case class Cookie(name: String, schema: Schema, description: Option[String] = None, required: Boolean = true)
+        extends Parameter {
+      override type InType = In.Cookie.type
+      override val in: InType = In.Cookie
+    }
   }
 
   sealed trait In extends Product with Serializable { val value: String }
   object In {
+
+    final case object Path extends In {
+      override val value: String = "path"
+    }
 
     final case object Query extends In {
       override val value: String = "query"
@@ -218,10 +215,6 @@ object model {
 
     final case object Header extends In {
       override val value: String = "header"
-    }
-
-    final case object Path extends In {
-      override val value: String = "path"
     }
 
     final case object Cookie extends In {
@@ -364,17 +357,15 @@ object model {
     }
   }
 
-  sealed trait Schema {
-    def `type`: String
-  }
+  sealed trait Schema { val `type`: String }
   object Schema {
 
     final case object String extends Schema {
-      val `type`: String = "string"
+      override val `type`: String = "string"
     }
 
     final case object Integer extends Schema {
-      val `type`: String = "integer"
+      override val `type`: String = "integer"
     }
   }
 

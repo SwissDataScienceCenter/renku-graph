@@ -32,7 +32,7 @@ object EndpointDocs {
     "Lineage",
     "Finds lineage of the given file".some,
     GET(
-      Uri / "projects" / group / projectName / "files" / location / "lineage",
+      Uri / "projects" / namespace / projectName / "files" / location / "lineage",
       Status.Ok -> Response("Lineage found", Contents(MediaType.`application/json`("Sample Lineage", example))),
       Status.Unauthorized -> Response(
         "Unauthorized",
@@ -52,14 +52,15 @@ object EndpointDocs {
     )
   )
 
-  private lazy val group = Parameter.in(
-    "group(s)",
+  private lazy val namespace = Parameter.Path(
+    "namespace",
     Schema.String,
-    description = "Group name(s). Names are url-encoded, slashes are not. (e.g. group1/group2/.../groupN)".some
+    description =
+      "Namespace(s) as there might be multiple. Each namespace needs to be url-encoded and separated with a non url-encoded '/'".some
   )
 
-  private lazy val projectName = Parameter.in("project name", Schema.String, "Project name".some)
-  private lazy val location    = Parameter.in("location", Schema.String, "The path of the file".some)
+  private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
+  private lazy val location    = Parameter.Path("location", Schema.String, "The path of the file".some)
 
   private val example = {
 

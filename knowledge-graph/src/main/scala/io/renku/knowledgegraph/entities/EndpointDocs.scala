@@ -51,7 +51,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     "Cross-Entity search",
     "Finds entities by the given criteria".some,
     GET(
-      Uri / "entities" / query / `type` / creator / visibility / since / until / sort / page / perPage,
+      Uri / "entities" :? query & `type` & creator & visibility & since & until & sort & page & perPage,
       Status.Ok -> Response("Found entities",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
@@ -70,64 +70,59 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     )
   )
 
-  private lazy val query = Parameter("query",
-                                     In.Query,
-                                     "to filter by matching field (e.g., title, keyword, description, etc.)".some,
-                                     required = false,
-                                     Schema.String
+  private lazy val query = Parameter.Query(
+    "query",
+    Schema.String,
+    "to filter by matching value in name/title, namespace, creator, keyword and description".some,
+    required = false
   )
-  private lazy val `type` = Parameter(
+  private lazy val `type` = Parameter.Query(
     "type",
-    In.Query,
+    Schema.String,
     "to filter by entity type(s); allowed values: project, dataset, workflow, and person; multiple type parameters allowed".some,
-    required = false,
-    Schema.String
+    required = false
   )
-  private lazy val creator = Parameter(
+  private lazy val creator = Parameter.Query(
     "creator",
-    In.Query,
+    Schema.String,
     "to filter by creator(s); the filter would require creator's name; multiple creator parameters allowed".some,
-    required = false,
-    Schema.String
+    required = false
   )
-  private lazy val visibility = Parameter(
+  private lazy val visibility = Parameter.Query(
     "visibility",
-    In.Query,
+    Schema.String,
     "to filter by visibility(ies) (restricted vs. public); allowed values: public, internal, private; multiple visibility parameters allowed".some,
-    required = false,
-    Schema.String
+    required = false
   )
-  private lazy val since = Parameter("since",
-                                     In.Query,
-                                     "to filter by entity's creation date to >= the given date".some,
-                                     required = false,
-                                     Schema.String
+  private lazy val since = Parameter.Query(
+    "since",
+    Schema.String,
+    "to filter by entity's creation date to >= the given date".some,
+    required = false
   )
-  private lazy val until = Parameter("until",
-                                     In.Query,
-                                     "to filter by entity's creation date to <= the given date".some,
-                                     required = false,
-                                     Schema.String
+  private lazy val until = Parameter.Query(
+    "until",
+    Schema.String,
+    "to filter by entity's creation date to <= the given date".some,
+    required = false
   )
-  private lazy val sort = Parameter(
+  private lazy val sort = Parameter.Query(
     "sort",
-    In.Query,
+    Schema.String,
     "the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `matchingScore`, `name` and `date`".some,
-    required = false,
-    Schema.String
+    required = false
   )
-  private lazy val page = Parameter("page",
-                                    In.Query,
-                                    "the page query parameter is optional and defaults to 1.".some,
-                                    required = false,
-                                    Schema.String
+  private lazy val page = Parameter.Query(
+    "page",
+    Schema.Integer,
+    "the page query parameter is optional and defaults to 1.".some,
+    required = false
   )
-  private lazy val perPage = Parameter(
+  private lazy val perPage = Parameter.Query(
     "per_page",
-    In.Query,
+    Schema.Integer,
     "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
-    required = false,
-    Schema.String
+    required = false
   )
 
   private lazy val responseHeaders = Map(

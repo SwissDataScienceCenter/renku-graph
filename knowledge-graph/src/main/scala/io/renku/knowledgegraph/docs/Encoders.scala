@@ -55,7 +55,7 @@ object Encoders {
 
     json"""{
       "parameters": ${path.parameters},
-      "summary": ${path.summary}
+      "summary":    ${path.summary}
     }""" deepMerge description deepMerge operations
   }
   implicit val operationEncoder: Encoder[model.Operation] = Encoder.instance { operation =>
@@ -74,12 +74,22 @@ object Encoders {
       }
       .foldLeft(empty)((acc, opJson) => acc deepMerge opJson)
     json"""{
-      "security": ${operation.security},
+      "security":   ${operation.security},
       "parameters": ${operation.parameters},
-      "responses": $responses
+      "responses":  $responses
     }""" deepMerge summary deepMerge requestBody
   }
-  implicit val parameterEncoder: Encoder[model.Parameter] = deriveEncoder
+  implicit val parameterEncoder: Encoder[model.Parameter] = Encoder.instance { param =>
+    json"""{
+      ${s"${param.name}Param"}: {
+        "name":        ${param.name},
+        "in":          ${param.in.value},
+        "description": ${param.description.getOrElse("")},
+        "required":    ${param.required},
+        "schema":      ${param.schema}
+      }
+    }"""
+  }
   implicit val schemaEncoder: Encoder[model.Schema] = Encoder.instance { schema =>
     json"""{"type": ${schema.`type`}}"""
   }
@@ -89,7 +99,7 @@ object Encoders {
     }
     json"""{
       "description": ${requestBody.description},
-      "content": $content
+      "content":     $content
     }""" deepMerge content
   }
   implicit val mediaTypeEncoder: Encoder[model.MediaType] = Encoder.instance { mediaType =>
@@ -128,14 +138,14 @@ object Encoders {
     val refreshUrl = flow.refreshUrl.map(s => json"""{"refreshUrl": $s }""").getOrElse(empty)
     json"""{
       "authorizationUrl": ${flow.authorizationUrl},
-      "tokenUrl": ${flow.tokenUrl},
-      "scopes": ${flow.scopes}
+      "tokenUrl":         ${flow.tokenUrl},
+      "scopes":           ${flow.scopes}
     }""" deepMerge refreshUrl
   }
   implicit val componentsEncoder: Encoder[model.Components] = Encoder.instance { components =>
     json"""{
-      "schemas": ${components.schemas},
-      "examples": ${components.examples},
+      "schemas":         ${components.schemas},
+      "examples":        ${components.examples},
       "securitySchemes": ${components.securitySchemes}
     }"""
   }
@@ -144,7 +154,7 @@ object Encoders {
     json"""{
       "name": ${scheme.name},
       "type": ${scheme.`type`.value},
-      "in": ${scheme.in}
+      "in":   ${scheme.in}
     }""" deepMerge description
   }
   implicit def exampleEncoder: Encoder[model.Example] = Encoder.instance { example =>
