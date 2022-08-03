@@ -81,13 +81,11 @@ object Encoders {
   }
   implicit val parameterEncoder: Encoder[model.Parameter] = Encoder.instance { param =>
     json"""{
-      ${s"${param.name}Param"}: {
-        "name":        ${param.name},
-        "in":          ${param.in.value},
-        "description": ${param.description.getOrElse("")},
-        "required":    ${param.required},
-        "schema":      ${param.schema}
-      }
+      "name":        ${param.name},
+      "in":          ${param.in.value},
+      "description": ${param.description.getOrElse("")},
+      "required":    ${param.required},
+      "schema":      ${param.schema}
     }"""
   }
   implicit val schemaEncoder: Encoder[model.Schema] = Encoder.instance { schema =>
