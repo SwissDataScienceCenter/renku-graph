@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import ProjectsGenerators._
 import cats.effect.IO
@@ -37,15 +37,15 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
-import io.renku.knowledgegraph.projects.model.Forking.ForksCount
-import io.renku.knowledgegraph.projects.model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
-import io.renku.knowledgegraph.projects.model.Project._
-import io.renku.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import io.renku.knowledgegraph.projects.model.Urls._
-import io.renku.knowledgegraph.projects.model._
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._
+import model.Forking.ForksCount
+import model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
+import model.Project._
+import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
+import model.Urls._
+import model._
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -56,14 +56,9 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectEndpointSpec
-    extends AnyWordSpec
-    with MockFactory
-    with ScalaCheckPropertyChecks
-    with should.Matchers
-    with IOSpec {
+class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers with IOSpec {
 
-  "getProject" should {
+  "GET /projects/:path" should {
 
     "respond with OK and the found project details" in new TestCase {
       forAll { project: Project =>
@@ -72,7 +67,7 @@ class ProjectEndpointSpec
           .expects(project.path, maybeAuthUser)
           .returning(project.some.pure[IO])
 
-        val response = endpoint.getProject(project.path, maybeAuthUser).unsafeRunSync()
+        val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser).unsafeRunSync()
 
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -101,7 +96,7 @@ class ProjectEndpointSpec
         .expects(path, maybeAuthUser)
         .returning(None.pure[IO])
 
-      val response = endpoint.getProject(path, maybeAuthUser).unsafeRunSync()
+      val response = endpoint.`GET /projects/:path`(path, maybeAuthUser).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -122,7 +117,7 @@ class ProjectEndpointSpec
         .expects(path, maybeAuthUser)
         .returning(exception.raiseError[IO, Option[Project]])
 
-      val response = endpoint.getProject(path, maybeAuthUser).unsafeRunSync()
+      val response = endpoint.`GET /projects/:path`(path, maybeAuthUser).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -138,7 +133,7 @@ class ProjectEndpointSpec
     val projectFinder         = mock[ProjectFinder[IO]]
     val renkuApiUrl           = renkuApiUrls.generateOne
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint              = new ProjectEndpointImpl[IO](projectFinder, renkuApiUrl, executionTimeRecorder)
+    val endpoint              = new EndpointImpl[IO](projectFinder, renkuApiUrl, executionTimeRecorder)
   }
 
   private implicit val projectEntityDecoder: EntityDecoder[IO, Project] = jsonOf[IO, Project]

@@ -42,7 +42,6 @@ import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
-import io.renku.knowledgegraph.projects.ProjectEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -58,7 +57,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     entitiesEndpoint:        entities.Endpoint[F],
     queryEndpoint:           QueryEndpoint[F],
     lineageEndpoint:         lineage.Endpoint[F],
-    projectEndpoint:         ProjectEndpoint[F],
+    projectEndpoint:         projectdetails.Endpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     docsEndpoint:            docs.Endpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
@@ -216,7 +215,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     case projectPathParts =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-        .semiflatMap(getProject(_, maybeAuthUser))
+        .semiflatMap(`GET /projects/:path`(_, maybeAuthUser))
         .merge
   }
 
@@ -261,7 +260,7 @@ private object MicroserviceRoutes {
         entitiesEndpoint        <- entities.Endpoint[IO]
         queryEndpoint           <- QueryEndpoint()
         lineageEndpoint         <- lineage.Endpoint[IO]
-        projectEndpoint         <- ProjectEndpoint[IO]
+        projectEndpoint         <- projectdetails.Endpoint[IO]
         projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
         docsEndpoint            <- docs.Endpoint[IO]
         authenticator           <- GitLabAuthenticator[IO]

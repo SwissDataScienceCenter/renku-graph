@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import cats.effect._
 import cats.syntax.all._
@@ -29,7 +29,7 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.knowledgegraph.projects.model._
+import io.renku.knowledgegraph.projectdetails.model._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.Response
@@ -38,23 +38,23 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait ProjectEndpoint[F[_]] {
-  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]]
+trait Endpoint[F[_]] {
+  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]]
 }
 
-class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
+class EndpointImpl[F[_]: MonadThrow: Logger](
     projectFinder:         ProjectFinder[F],
     renkuApiUrl:           renku.ApiUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
-    with ProjectEndpoint[F] {
+    with Endpoint[F] {
 
   import executionTimeRecorder._
   import io.circe.syntax._
   import org.http4s.circe._
   private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
 
-  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]] = measureExecutionTime {
+  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]] = measureExecutionTime {
     projectFinder
       .findProject(path, maybeAuthUser)
       .flatMap(toHttpResult(path))
@@ -79,18 +79,14 @@ class ProjectEndpointImpl[F[_]: MonadThrow: Logger](
   }
 }
 
-object ProjectEndpoint {
+object Endpoint {
 
-  def apply[F[_]: Parallel: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]
-      : F[ProjectEndpoint[F]] = for {
-    projectFinder         <- ProjectFinder[F]
-    renkuResourceUrl      <- renku.ApiUrl[F]()
-    executionTimeRecorder <- ExecutionTimeRecorder[F]()
-  } yield new ProjectEndpointImpl[F](
-    projectFinder,
-    renkuResourceUrl,
-    executionTimeRecorder
-  )
+  def apply[F[_]: Parallel: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] =
+    for {
+      projectFinder         <- ProjectFinder[F]
+      renkuResourceUrl      <- renku.ApiUrl[F]()
+      executionTimeRecorder <- ExecutionTimeRecorder[F]()
+    } yield new EndpointImpl[F](projectFinder, renkuResourceUrl, executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
     Href(renkuApiUrl / "projects" / projectPath)

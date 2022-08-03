@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import cats.data.Validated
 import cats.syntax.all._
@@ -32,10 +32,10 @@ import io.renku.graph.model.{SchemaVersion, persons}
 import io.renku.http.rest.Links.{Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph.datasets.ProjectDatasetsEndpoint
-import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 import io.renku.tinytypes.json.TinyTypeEncoders._
+import model.Permissions._
 import model.Statistics._
 
 import java.net.{MalformedURLException, URL}
@@ -200,7 +200,7 @@ private object model {
     implicit object ReadmeUrl extends TinyTypeFactory[ReadmeUrl](new ReadmeUrl(_)) with Url[ReadmeUrl]
   }
 
-  private[projects] implicit def encoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[Project] =
+  private[projectdetails] implicit def encoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[Project] =
     Encoder.instance[Project] { project =>
       json"""{
         "identifier": ${project.id},
@@ -216,7 +216,7 @@ private object model {
         "permissions":${project.permissions},
         "statistics": ${project.statistics}
       }""" deepMerge _links(
-        Link(Rel.Self        -> ProjectEndpoint.href(renkuApiUrl, project.path)),
+        Link(Rel.Self        -> Endpoint.href(renkuApiUrl, project.path)),
         Link(Rel("datasets") -> ProjectDatasetsEndpoint.href(renkuApiUrl, project.path))
       ).addIfDefined("description" -> project.maybeDescription)
         .addIfDefined("version" -> project.maybeVersion)

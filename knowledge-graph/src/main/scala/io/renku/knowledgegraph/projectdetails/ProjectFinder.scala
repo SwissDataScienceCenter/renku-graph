@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import GitLabProjectFinder.GitLabProject
 import KGProjectFinder.{KGParent, KGProject}
@@ -28,7 +28,7 @@ import io.renku.graph.model.projects.Path
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.projects.model._
+import model._
 import org.typelevel.log4cats.Logger
 
 import scala.util.Try

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
@@ -24,12 +24,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectEndpointDocsSpec extends AnyWordSpec {
+class EndpointDocsSpec extends AnyWordSpec {
 
   "path" should {
 
     "return a valid Path object" in {
-      validatePath(new ProjectEndpointDocsImpl().path)
+      validatePath(new EndpointDocsImpl().path)
     }
   }
 

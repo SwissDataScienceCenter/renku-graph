@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import cats.MonadThrow
 import cats.syntax.all._
@@ -26,26 +26,25 @@ import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.projects.model.Forking.ForksCount
-import io.renku.knowledgegraph.projects.model.Permissions.{AccessLevel, GroupAccessLevel}
-import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
-import io.renku.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import io.renku.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
-import io.renku.knowledgegraph.projects.model.{Creation, Creator, Forking, ParentProject, Permissions, Project, Statistics, Urls}
+import io.renku.knowledgegraph.projectdetails.model.Forking.ForksCount
+import io.renku.knowledgegraph.projectdetails.model.Permissions.{AccessLevel, GroupAccessLevel}
+import io.renku.knowledgegraph.projectdetails.model.Project.{DateUpdated, StarsCount}
+import io.renku.knowledgegraph.projectdetails.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
+import io.renku.knowledgegraph.projectdetails.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import io.renku.knowledgegraph.projectdetails.model.{Creation, Creator, Forking, ParentProject, Permissions, Project, Statistics, Urls}
 
 import java.time.Instant
 
-trait ProjectEndpointDocs {
+trait EndpointDocs {
   def path: Path
 }
 
-object ProjectEndpointDocs {
-  def apply[F[_]: MonadThrow]: F[ProjectEndpointDocs] = for {
-    apiUrl <- renku.ApiUrl[F]()
-  } yield new ProjectEndpointDocsImpl()(apiUrl)
+object EndpointDocs {
+  def apply[F[_]: MonadThrow]: F[EndpointDocs] =
+    renku.ApiUrl[F]().map(new EndpointDocsImpl()(_))
 }
 
-private class ProjectEndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends ProjectEndpointDocs {
+private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends EndpointDocs {
 
   override lazy val path: Path = Path(
     "Project details",

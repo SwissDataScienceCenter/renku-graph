@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
+import KGProjectFinder._
 import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.syntax._
-import io.renku.knowledgegraph.projects.KGProjectFinder._
 
 private object Converters extends Converters
 
