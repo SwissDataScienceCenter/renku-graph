@@ -22,77 +22,77 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.ServiceVersion
-import io.renku.knowledgegraph.docs.Implicits.StatusOps
+import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.lineage
+import io.renku.knowledgegraph.{entities, lineage, projects}
 import org.http4s
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
 
 trait Endpoint[F[_]] {
-  def `get /docs`: F[http4s.Response[F]]
+  def `get /spec.json`: F[http4s.Response[F]]
 }
 
-private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion) extends Http4sDsl[F] with Endpoint[F] {
+private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEndpointDocs,
+                                        datasetEndpoint:         DatasetEndpointDocs,
+                                        entitiesEndpoint:        entities.EndpointDocs,
+                                        projectEndpoint:         projects.ProjectEndpointDocs,
+                                        projectDatasetsEndpoint: ProjectDatasetsEndpointDocs,
+                                        serviceVersion:          ServiceVersion
+) extends Http4sDsl[F]
+    with Endpoint[F] {
   import Encoders._
 
-  override def `get /docs`: F[http4s.Response[F]] = Ok(doc.asJson)
+  override def `get /spec.json`: F[http4s.Response[F]] = Ok(doc.asJson)
 
-  lazy val doc: OpenApiDocument =
-    OpenApiDocument(
-      openApiVersion = "3.0.3",
-      Info("Knowledge Graph API",
-           "Get info about datasets, users, activities, and other entities".some,
-           serviceVersion.value
-      )
-    ).addPath(lineage.EndpointDoc.path)
-      .addServer(server)
-      .addSecurity(privateToken)
-      .addSecurity(oAuth)
-      .addNoAuthSecurity
-      .addResponsesToAll(authErrorResponses)
-
-  private lazy val server: Server =
-    Server(
-      url = "/knowledge-graph",
-      description = "Renku Knowledge Graph API",
-      variables = Map.empty
+  lazy val doc: OpenApiDocument = OpenApiDocument(
+    openApiVersion = "3.0.3",
+    Info("Knowledge Graph API",
+         "Get info about datasets, users, activities, and other entities".some,
+         serviceVersion.value
     )
+  ).addServer(server)
+    .addPath(datasetsSearchEndpoint.path)
+    .addPath(datasetEndpoint.path)
+    .addPath(entitiesEndpoint.path)
+    .addPath(projectEndpoint.path)
+    .addPath(projectDatasetsEndpoint.path)
+    .addPath(lineage.EndpointDocs.path)
+    .addSecurity(privateToken)
+    .addSecurity(openIdConnect)
+    .addNoAuthSecurity()
 
-  private lazy val privateToken = SecurityScheme(
-    "PRIVATE-TOKEN",
-    TokenType.ApiKey,
-    "User's Personal Access Token in GitLab".some,
-    In.Header
+  private lazy val server = Server(
+    url = "/knowledge-graph",
+    description = "Renku Knowledge Graph API"
   )
 
-  private lazy val oAuth = SecurityScheme(
-    "oauth_auth",
-    TokenType.ApiKey,
-    "User's Personal Access Token in GitLab".some,
-    In.Header
+  private lazy val privateToken = SecurityScheme.ApiKey(
+    id = "private-token",
+    name = "PRIVATE-TOKEN",
+    description = "User's Personal Access Token in GitLab".some
   )
 
-  val authErrorResponses = Map(
-    http4s.Status.Unauthorized.asDocStatus -> Response("If given auth header cannot be authenticated",
-                                                       Map.empty,
-                                                       Map.empty,
-                                                       Map.empty
-    ),
-    http4s.Status.NotFound.asDocStatus -> Response(
-      "If there is no project with the given namespace/name or user is not authorised to access this project",
-      Map.empty,
-      Map.empty,
-      Map.empty
-    ),
-    http4s.Status.InternalServerError.asDocStatus -> Response("Otherwise", Map.empty, Map.empty, Map.empty)
+  private lazy val openIdConnect = SecurityScheme.OpenIdConnect(
+    id = "oauth_auth",
+    name = "oauth_auth",
+    openIdConnectUrl = "/auth/realms/Renku/.well-known/openid-configuration"
   )
-
 }
-object Endpoint {
 
-  def apply[F[_]: Async]: F[Endpoint[F]] = {
-    val serviceVersion: F[ServiceVersion] = ServiceVersion.readFromConfig[F]()
-    serviceVersion.map(new EndpointImpl[F](_)).widen[Endpoint[F]]
-  }
+object Endpoint {
+  def apply[F[_]: Async]: F[Endpoint[F]] = for {
+    datasetsSearchEndpoint  <- DatasetSearchEndpointDocs[F]
+    datasetEndpoint         <- DatasetEndpointDocs[F]
+    entitiesEndpoint        <- entities.EndpointDocs[F]
+    projectEndpoint         <- projects.ProjectEndpointDocs[F]
+    projectDatasetsEndpoint <- ProjectDatasetsEndpointDocs[F]
+    serviceVersion          <- ServiceVersion.readFromConfig[F]()
+  } yield new EndpointImpl[F](datasetsSearchEndpoint,
+                              datasetEndpoint,
+                              entitiesEndpoint,
+                              projectEndpoint,
+                              projectDatasetsEndpoint,
+                              serviceVersion
+  )
 }

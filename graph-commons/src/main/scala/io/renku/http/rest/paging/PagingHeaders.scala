@@ -36,22 +36,21 @@ object PagingHeaders {
   val PrevPage:   CIString = ci"Prev-Page"
   val Link:       CIString = ci"Link"
 
-  def from[F[_], ResourceUrl <: UrlTinyType](response: PagingResponse[_])(implicit
-      resourceUrl:                                     ResourceUrl,
-      resourceUrlOps:                                  UrlOps[ResourceUrl]
-  ): Set[Header.Raw] =
-    Set(
-      Some(Header.Raw(Total, response.pagingInfo.total.toString)),
-      Some(Header.Raw(TotalPages, totalPages(response.pagingInfo).toString)),
-      Some(Header.Raw(PerPage, response.pagingInfo.pagingRequest.perPage.toString)),
-      Some(Header.Raw(Page, response.pagingInfo.pagingRequest.page.toString)),
-      nextPage(response.pagingInfo),
-      prevPage(response.pagingInfo),
-      nextLink(response.pagingInfo),
-      prevLink(response.pagingInfo),
-      firstLink,
-      lastLink(response.pagingInfo)
-    ).flatten
+  def from[ResourceUrl <: UrlTinyType](response: PagingResponse[_])(implicit
+      resourceUrl:                               ResourceUrl,
+      resourceUrlOps:                            UrlOps[ResourceUrl]
+  ): Set[Header.Raw] = Set(
+    Some(Header.Raw(Total, response.pagingInfo.total.toString)),
+    Some(Header.Raw(TotalPages, totalPages(response.pagingInfo).toString)),
+    Some(Header.Raw(PerPage, response.pagingInfo.pagingRequest.perPage.toString)),
+    Some(Header.Raw(Page, response.pagingInfo.pagingRequest.page.toString)),
+    nextPage(response.pagingInfo),
+    prevPage(response.pagingInfo),
+    nextLink(response.pagingInfo),
+    prevLink(response.pagingInfo),
+    firstLink,
+    lastLink(response.pagingInfo)
+  ).flatten
 
   private def totalPages(pagingInfo: PagingInfo): Int = {
     val pages = pagingInfo.total.value / pagingInfo.pagingRequest.perPage.value.toFloat

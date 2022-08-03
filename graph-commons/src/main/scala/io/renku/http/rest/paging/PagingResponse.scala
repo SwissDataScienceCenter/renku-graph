@@ -79,10 +79,9 @@ object PagingResponse {
         resourceUrl:    ResourceUrl,
         resourceUrlOps: UrlOps[ResourceUrl],
         encoder:        Encoder[Result]
-    ): Response[F] =
-      Response[F](Status.Ok)
-        .withEntity(response.results.asJson)
-        .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
+    ): Response[F] = Response[F](Status.Ok)
+      .withEntity(response.results.asJson)
+      .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
 
     private implicit def resultsEntityEncoder[F[_]](implicit encoder: Encoder[Result]): EntityEncoder[F, Json] =
       jsonEncoderOf[F, Json]
