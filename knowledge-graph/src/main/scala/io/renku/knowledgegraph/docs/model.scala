@@ -50,7 +50,7 @@ object model {
     def addPath(path: Path): CompleteDoc =
       CompleteDoc(openApiVersion, info, servers, paths + (path.template -> path), None, Nil)
 
-    def addServer(server: Server): DocWithInfo = copy(openApiVersion, info, servers :+ server, paths)
+    def addServer(server: Server): DocWithInfo = copy(openApiVersion, info, server :: servers, paths)
   }
 
   private case class CompleteDoc(openApiVersion: String,
@@ -63,18 +63,18 @@ object model {
 
     def addPath(path: Path): CompleteDoc = copy(paths = paths + (path.template -> path))
 
-    def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, servers :+ server, paths)
+    def addServer(server: Server): CompleteDoc = copy(openApiVersion, info, server :: servers, paths)
 
     def addNoAuthSecurity(): CompleteDoc =
-      copy(security = security :+ SecurityRequirementNoAuth)
+      copy(security = SecurityRequirementNoAuth :: security)
 
-    def addSecurity(securityScheme: SecurityScheme) = {
-      val newComponents = {
-        val c = this.components.getOrElse(Components.empty)
-        c.copy(securitySchemes = c.securitySchemes + (securityScheme.name -> securityScheme))
-      }
-      copy(security = security :+ SecurityRequirementAuth(securityScheme.name, Nil), components = newComponents.some)
-    }
+    def addSecurity(securityScheme: SecurityScheme) = copy(
+      security = SecurityRequirementAuth(securityScheme.id, Nil) :: security,
+      components = {
+        val c = components.getOrElse(Components.empty)
+        c.copy(securitySchemes = c.securitySchemes + (securityScheme.id -> securityScheme))
+      }.some
+    )
   }
 
   case class Info(title: String, description: Option[String], version: String)
@@ -267,20 +267,23 @@ object model {
   final case class SecurityRequirementAuth(schemeName: String, scopeNames: List[String]) extends SecurityRequirement
   final object SecurityRequirementNoAuth                                                 extends SecurityRequirement
 
-  final case class SecurityScheme(name: String, `type`: TokenType, description: Option[String], in: In)
+  sealed trait SecurityScheme {
+    val id:          String
+    val `type`:      TokenType
+    val description: Option[String]
+  }
   object SecurityScheme {
-
-    sealed trait SchemeType { val value: String }
-    object SchemeType {
-      final case object BearerToken extends SchemeType {
-        override val value: String = "Bearer"
-      }
-      final case object BasicToken extends SchemeType {
-        override val value: String = "Basic"
-      }
-      final case object OAuth2Token extends SchemeType {
-        override val value: String = "OAuth"
-      }
+    final case class ApiKey(id: String, name: String, description: Option[String] = None, in: In = In.Header)
+        extends SecurityScheme {
+      override val `type`: TokenType = TokenType.ApiKey
+    }
+    final case class OpenIdConnect(id:               String,
+                                   name:             String,
+                                   openIdConnectUrl: String,
+                                   description:      Option[String] = None,
+                                   in:               In = In.Header
+    ) extends SecurityScheme {
+      override val `type`: TokenType = TokenType.OpenIdConnect
     }
   }
 
@@ -288,21 +291,13 @@ object model {
 
   final case class Link()
 
-  sealed trait TokenType extends Product with Serializable {
-    def value: String
-  }
+  sealed trait TokenType extends Product with Serializable { val value: String }
   object TokenType {
     case object ApiKey extends TokenType {
-      override def value: String = "apiKey"
-    }
-    case object OAuth2 extends TokenType {
-      override def value: String = "oauth2"
+      override val value: String = "apiKey"
     }
     case object OpenIdConnect extends TokenType {
-      override def value: String = "openIdConnect"
-    }
-    case object Http extends TokenType {
-      override def value: String = "http"
+      override val value: String = "openIdConnect"
     }
   }
 

@@ -25,7 +25,7 @@ import io.circe.{Encoder, Json, JsonObject}
 import io.renku.knowledgegraph.docs.model.Example.{JsonExample, StringExample}
 import io.renku.knowledgegraph.docs.model._
 
-object Encoders {
+private object Encoders {
 
   private val empty = Json.obj()
   implicit val docEncoder: Encoder[OpenApiDocument] = Encoder.instance { doc =>
@@ -147,20 +147,27 @@ object Encoders {
       "securitySchemes": ${components.securitySchemes}
     }"""
   }
-  implicit val securitySchemeEncoder: Encoder[model.SecurityScheme] = Encoder.instance { scheme =>
-    val description = scheme.description.map(s => json"""{"description": $s }""").getOrElse(empty)
-    json"""{
-      "name": ${scheme.name},
-      "type": ${scheme.`type`.value},
-      "in":   ${scheme.in}
-    }""" deepMerge description
+  implicit val securitySchemeEncoder: Encoder[model.SecurityScheme] = Encoder.instance {
+    case sch: SecurityScheme.ApiKey =>
+      val description = sch.description.map(s => json"""{"description": $s }""").getOrElse(empty)
+      json"""{
+        "name": ${sch.name},
+        "type": ${sch.`type`.value},
+        "in":   ${sch.in}
+      }""" deepMerge description
+    case sch: SecurityScheme.OpenIdConnect =>
+      val description = sch.description.map(s => json"""{"description": $s }""").getOrElse(empty)
+      json"""{
+        "openIdConnectUrl": ${sch.openIdConnectUrl},
+        "type":             ${sch.`type`.value}
+      }""" deepMerge description
   }
   implicit def exampleEncoder: Encoder[model.Example] = Encoder.instance { example =>
     val value = example match {
       case JsonExample(value, _)   => json"""{"value": $value}"""
       case StringExample(value, _) => json"""{"value": $value}"""
-
     }
+
     val summary = example.summary.map(s => json"""{"summary": $s}""").getOrElse(empty)
 
     value deepMerge summary

@@ -59,7 +59,7 @@ private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEnd
     .addPath(projectDatasetsEndpoint.path)
     .addPath(lineage.EndpointDocs.path)
     .addSecurity(privateToken)
-    .addSecurity(oAuth)
+    .addSecurity(openIdConnect)
     .addNoAuthSecurity()
 
   private lazy val server = Server(
@@ -67,18 +67,16 @@ private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEnd
     description = "Renku Knowledge Graph API"
   )
 
-  private lazy val privateToken = SecurityScheme(
-    "PRIVATE-TOKEN",
-    TokenType.ApiKey,
-    "User's Personal Access Token in GitLab".some,
-    In.Header
+  private lazy val privateToken = SecurityScheme.ApiKey(
+    id = "private-token",
+    name = "PRIVATE-TOKEN",
+    description = "User's Personal Access Token in GitLab".some
   )
 
-  private lazy val oAuth = SecurityScheme(
-    "oauth_auth",
-    TokenType.ApiKey,
-    "User's Personal Access Token in GitLab".some,
-    In.Header
+  private lazy val openIdConnect = SecurityScheme.OpenIdConnect(
+    id = "oauth_auth",
+    name = "oauth_auth",
+    openIdConnectUrl = "/auth/realms/Renku/.well-known/openid-configuration"
   )
 }
 
