@@ -50,7 +50,7 @@ private class DatasetEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiU
     "Dataset details",
     "Finds Datasets details".some,
     GET(
-      Uri / "entities" / identifier,
+      Uri / "datasets" / identifier,
       Status.Ok -> Response("Dataset details", Contents(MediaType.`application/json`("Sample response", example))),
       Status.Unauthorized -> Response(
         "Unauthorized",
