@@ -44,7 +44,7 @@ trait Endpoint[F[_]] {
 
 class EndpointImpl[F[_]: MonadThrow: Logger](
     projectFinder:         ProjectFinder[F],
-    renkuApiUrl:           renku.ApiUrl,
+    projectJsonEncoder:    JsonEncoder,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
     with Endpoint[F] {
@@ -52,18 +52,18 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
   import executionTimeRecorder._
   import io.circe.syntax._
   import org.http4s.circe._
-  private implicit lazy val apiUrl: renku.ApiUrl = renkuApiUrl
 
-  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]] = measureExecutionTime {
-    projectFinder
-      .findProject(path, maybeAuthUser)
-      .flatMap(toHttpResult(path))
-      .recoverWith(httpResult(path))
-  } map logExecutionTimeWhen(finishedSuccessfully(path))
+  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]] =
+    measureExecutionTime {
+      projectFinder
+        .findProject(path, maybeAuthUser)
+        .flatMap(toHttpResult(path))
+        .recoverWith(httpResult(path))
+    } map logExecutionTimeWhen(finishedSuccessfully(path))
 
   private def toHttpResult(path: projects.Path): Option[Project] => F[Response[F]] = {
-    case None          => NotFound(InfoMessage(s"No '$path' project found"))
-    case Some(project) => Ok(project.asJson)
+    case None          => NotFound(InfoMessage(s"No '$path' project found").asJson)
+    case Some(project) => Ok(projectJsonEncoder.encode(project))
   }
 
   private def httpResult(path: projects.Path): PartialFunction[Throwable, F[Response[F]]] = {
@@ -84,9 +84,9 @@ object Endpoint {
   def apply[F[_]: Parallel: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] =
     for {
       projectFinder         <- ProjectFinder[F]
-      renkuResourceUrl      <- renku.ApiUrl[F]()
+      projectJsonEncoder    <- JsonEncoder[F]
       executionTimeRecorder <- ExecutionTimeRecorder[F]()
-    } yield new EndpointImpl[F](projectFinder, renkuResourceUrl, executionTimeRecorder)
+    } yield new EndpointImpl[F](projectFinder, projectJsonEncoder, executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
     Href(renkuApiUrl / "projects" / projectPath)

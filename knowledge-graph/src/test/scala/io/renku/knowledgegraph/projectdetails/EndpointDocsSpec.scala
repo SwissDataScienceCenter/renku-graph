@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projectdetails
 
-import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.knowledgegraph.docs.OpenApiTester._
@@ -27,11 +26,8 @@ import org.scalatest.wordspec.AnyWordSpec
 class EndpointDocsSpec extends AnyWordSpec {
 
   "path" should {
-
     "return a valid Path object" in {
-      validatePath(new EndpointDocsImpl().path)
+      validatePath(new EndpointDocsImpl(new JsonEncoderImpl(renkuApiUrls.generateOne)).path)
     }
   }
-
-  private implicit lazy val renkuUrl: renku.ApiUrl = renkuApiUrls.generateOne
 }

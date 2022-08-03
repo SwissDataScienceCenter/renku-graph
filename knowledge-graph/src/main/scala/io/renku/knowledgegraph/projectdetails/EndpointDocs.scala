@@ -20,7 +20,6 @@ package io.renku.knowledgegraph.projectdetails
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.config.renku
 import io.renku.graph.model.{SchemaVersion, persons, projects}
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
@@ -31,7 +30,7 @@ import io.renku.knowledgegraph.projectdetails.model.Permissions.{AccessLevel, Gr
 import io.renku.knowledgegraph.projectdetails.model.Project.{DateUpdated, StarsCount}
 import io.renku.knowledgegraph.projectdetails.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
 import io.renku.knowledgegraph.projectdetails.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
-import io.renku.knowledgegraph.projectdetails.model.{Creation, Creator, Forking, ParentProject, Permissions, Project, Statistics, Urls}
+import io.renku.knowledgegraph.projectdetails.model._
 
 import java.time.Instant
 
@@ -41,17 +40,19 @@ trait EndpointDocs {
 
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[EndpointDocs] =
-    renku.ApiUrl[F]().map(new EndpointDocsImpl()(_))
+    JsonEncoder[F].map(new EndpointDocsImpl(_))
 }
 
-private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends EndpointDocs {
+private class EndpointDocsImpl(jsonEncoder: JsonEncoder) extends EndpointDocs {
 
   override lazy val path: Path = Path(
     "Project details",
     "Finds Project details".some,
     GET(
       Uri / "projects" / namespace / projectName,
-      Status.Ok -> Response("Details found", Contents(MediaType.`application/json`("Sample data", example))),
+      Status.Ok -> Response("Details found",
+                            Contents(MediaType.`application/json`("Sample data", jsonEncoder encode example))
+      ),
       Status.Unauthorized -> Response(
         "Unauthorized",
         Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))

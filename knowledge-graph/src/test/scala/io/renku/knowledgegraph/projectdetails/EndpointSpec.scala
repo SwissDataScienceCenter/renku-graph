@@ -21,35 +21,22 @@ package io.renku.knowledgegraph.projectdetails
 import ProjectsGenerators._
 import cats.effect.IO
 import cats.syntax.all._
+import io.circe.Json
 import io.circe.syntax._
-import io.circe.{Decoder, DecodingFailure, Json}
-import io.renku.generators.CommonGraphGenerators.{authUsers, renkuApiUrls}
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.SchemaVersion
-import io.renku.graph.model.persons.{Email, Name => UserName}
-import io.renku.graph.model.projects._
 import io.renku.http.InfoMessage._
-import io.renku.http.rest.Links
-import io.renku.http.rest.Links.{Href, Rel}
 import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.tinytypes.json.TinyTypeDecoders._
-import model.Forking.ForksCount
-import model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
-import model.Project._
-import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import model.Urls._
 import model._
 import org.http4s.MediaType._
 import org.http4s.Status._
-import org.http4s._
-import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -61,30 +48,24 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
   "GET /projects/:path" should {
 
     "respond with OK and the found project details" in new TestCase {
-      forAll { project: Project =>
-        val maybeAuthUser = authUsers.generateOption
-        (projectFinder.findProject _)
-          .expects(project.path, maybeAuthUser)
-          .returning(project.some.pure[IO])
+      val project       = resourceProjects.generateOne
+      val maybeAuthUser = authUsers.generateOption
+      (projectFinder.findProject _)
+        .expects(project.path, maybeAuthUser)
+        .returning(project.some.pure[IO])
 
-        val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser).unsafeRunSync()
+      val json = jsons.generateOne
+      (jsonEncoder.encode _).expects(project).returns(json)
 
-        response.status      shouldBe Ok
-        response.contentType shouldBe Some(`Content-Type`(application.json))
+      val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser).unsafeRunSync()
 
-        response.as[Project].unsafeRunSync() shouldBe project
-        response.as[Json].unsafeRunSync()._links shouldBe Right(
-          Links.of(
-            Rel.Self        -> Href(renkuApiUrl / "projects" / project.path),
-            Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets")
-          )
-        )
+      response.status                   shouldBe Ok
+      response.contentType              shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe json
 
-        logger.loggedOnly(
-          Warn(s"Finding '${project.path}' details finished${executionTimeRecorder.executionTimeInfo}")
-        )
-        logger.reset()
-      }
+      logger.loggedOnly(
+        Warn(s"Finding '${project.path}' details finished${executionTimeRecorder.executionTimeInfo}")
+      )
     }
 
     "respond with NOT_FOUND if there is no project with the given path" in new TestCase {
@@ -131,112 +112,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectFinder         = mock[ProjectFinder[IO]]
-    val renkuApiUrl           = renkuApiUrls.generateOne
+    val jsonEncoder           = mock[JsonEncoder]
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint              = new EndpointImpl[IO](projectFinder, renkuApiUrl, executionTimeRecorder)
+    val endpoint              = new EndpointImpl[IO](projectFinder, jsonEncoder, executionTimeRecorder)
   }
-
-  private implicit val projectEntityDecoder: EntityDecoder[IO, Project] = jsonOf[IO, Project]
-
-  private implicit lazy val projectDecoder: Decoder[Project] = cursor =>
-    for {
-      id               <- cursor.downField("identifier").as[Id]
-      path             <- cursor.downField("path").as[Path]
-      name             <- cursor.downField("name").as[Name]
-      maybeDescription <- cursor.downField("description").as[Option[Description]]
-      visibility       <- cursor.downField("visibility").as[Visibility]
-      created          <- cursor.downField("created").as[Creation]
-      updatedAt        <- cursor.downField("updatedAt").as[DateUpdated]
-      urls             <- cursor.downField("urls").as[Urls]
-      forks            <- cursor.downField("forking").as[Forking]
-      keywords         <- cursor.downField("keywords").as[Set[Keyword]]
-      starsCount       <- cursor.downField("starsCount").as[StarsCount]
-      permissions      <- cursor.downField("permissions").as[Permissions]
-      statistics       <- cursor.downField("statistics").as[Statistics]
-      maybeVersion     <- cursor.downField("version").as[Option[SchemaVersion]]
-    } yield Project(id,
-                    path,
-                    name,
-                    maybeDescription,
-                    visibility,
-                    created,
-                    updatedAt,
-                    urls,
-                    forks,
-                    keywords,
-                    starsCount,
-                    permissions,
-                    statistics,
-                    maybeVersion
-    )
-
-  private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
-    for {
-      date    <- cursor.downField("dateCreated").as[DateCreated]
-      creator <- cursor.downField("creator").as[Option[Creator]]
-    } yield Creation(date, creator)
-
-  private implicit lazy val creatorDecoder: Decoder[Creator] = cursor =>
-    for {
-      name       <- cursor.downField("name").as[UserName]
-      maybeEmail <- cursor.downField("email").as[Option[Email]]
-    } yield Creator(maybeEmail, name)
-
-  private implicit lazy val forkingDecoder: Decoder[Forking] = cursor =>
-    for {
-      count       <- cursor.downField("forksCount").as[ForksCount]
-      maybeParent <- cursor.downField("parent").as[Option[ParentProject]]
-    } yield Forking(count, maybeParent)
-
-  private implicit lazy val parentDecoder: Decoder[ParentProject] = cursor =>
-    for {
-      path    <- cursor.downField("path").as[Path]
-      name    <- cursor.downField("name").as[Name]
-      created <- cursor.downField("created").as[Creation]
-    } yield ParentProject(path, name, created)
-
-  private implicit lazy val urlsDecoder: Decoder[Urls] = cursor =>
-    for {
-      ssh         <- cursor.downField("ssh").as[SshUrl]
-      http        <- cursor.downField("http").as[HttpUrl]
-      web         <- cursor.downField("web").as[WebUrl]
-      maybeReadme <- cursor.downField("readme").as[Option[ReadmeUrl]]
-    } yield Urls(ssh, http, web, maybeReadme)
-
-  private implicit lazy val permissionsDecoder: Decoder[Permissions] = cursor => {
-    def maybeAccessLevel(name: String) = cursor.downField(name).as[Option[AccessLevel]]
-
-    for {
-      maybeProjectAccessLevel <- maybeAccessLevel("projectAccess").map(_.map(ProjectAccessLevel))
-      maybeGroupAccessLevel   <- maybeAccessLevel("groupAccess").map(_.map(GroupAccessLevel))
-      permissions <- (maybeProjectAccessLevel, maybeGroupAccessLevel) match {
-                       case (Some(project), Some(group)) => Right(Permissions(project, group))
-                       case (Some(project), None)        => Right(Permissions(project))
-                       case (None, Some(group))          => Right(Permissions(group))
-                       case _ => Left(DecodingFailure("Neither projectAccess nor groupAccess", Nil))
-                     }
-    } yield permissions
-  }
-
-  private implicit lazy val accessLevelDecoder: Decoder[AccessLevel] = cursor =>
-    for {
-      name <- cursor.downField("level").downField("name").as[String]
-      accessLevel <- cursor
-                       .downField("level")
-                       .downField("value")
-                       .as[Int]
-                       .flatMap(AccessLevel.from)
-                       .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
-    } yield
-      if (accessLevel.name.value == name) accessLevel
-      else throw new Exception(s"$name does not match $accessLevel")
-
-  private implicit lazy val statisticsDecoder: Decoder[Statistics] = cursor =>
-    for {
-      commitsCount     <- cursor.downField("commitsCount").as[CommitsCount]
-      storageSize      <- cursor.downField("storageSize").as[StorageSize]
-      repositorySize   <- cursor.downField("repositorySize").as[RepositorySize]
-      lfsSize          <- cursor.downField("lfsObjectsSize").as[LsfObjectsSize]
-      jobArtifactsSize <- cursor.downField("jobArtifactsSize").as[JobArtifactsSize]
-    } yield Statistics(commitsCount, storageSize, repositorySize, lfsSize, jobArtifactsSize)
 }
