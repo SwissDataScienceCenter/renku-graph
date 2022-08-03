@@ -23,7 +23,6 @@ import cats.data.{Kleisli, OptionT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.http.client.UrlEncoder.urlEncode
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -35,6 +34,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
+import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.SortBy
 import io.renku.http.rest.SortBy.Direction
 import io.renku.http.rest.paging.PagingRequest
@@ -46,14 +46,14 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
-import io.renku.knowledgegraph.datasets.rest._
+import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.{Phrase, query}
+import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
+import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
+import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.knowledgegraph.lineage.LineageGenerators._
 import io.renku.knowledgegraph.lineage.model.Node.Location
-import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
+import io.renku.knowledgegraph.projects.ProjectEndpoint
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
@@ -629,7 +629,7 @@ class MicroserviceRoutesSpec
 
     s"return $Ok with OpenAPI json body" in new TestCase {
       val openApiJson = jsons.generateOne
-      (() => docsEndpoint.`get /docs`)
+      (() => docsEndpoint.`get /spec.json`)
         .expects()
         .returning(IO.pure(Response[IO](Ok).withEntity(openApiJson)))
 

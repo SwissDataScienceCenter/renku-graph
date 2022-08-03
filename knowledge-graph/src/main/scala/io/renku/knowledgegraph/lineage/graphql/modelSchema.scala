@@ -32,17 +32,17 @@ private object modelSchema {
       Field("label", StringType, Some("Node label"), resolve = _.value.label.toString),
       Field(
         "type",
-        EnumType(
+        EnumType[Node.Type](
           "NodeType",
           description = None,
           values = List(
-            EnumValue(Node.SingleWordType.ProcessRun.name, value = Node.SingleWordType.ProcessRun),
-            EnumValue(Node.SingleWordType.Directory.name, value = Node.SingleWordType.Directory),
-            EnumValue(Node.SingleWordType.File.name, value = Node.SingleWordType.File)
+            EnumValue(Node.Type.ProcessRun.value, value = Node.Type.ProcessRun),
+            EnumValue(Node.Type.Directory.value, value = Node.Type.Directory),
+            EnumValue(Node.Type.File.value, value = Node.Type.File)
           )
         ),
         Some("Node type"),
-        resolve = _.value.singleWordType.fold[Node.SingleWordType](throw _, identity)
+        resolve = _.value.typ
       )
     )
   )

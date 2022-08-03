@@ -71,38 +71,24 @@ class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
     }
   }
 
-  "singleWordType" should {
+  "Node.Type.fromEntityTypes" should {
 
-    s"return '${Node.SingleWordType.ProcessRun}' if node contains Activity types" in {
-      val node = entityNodes.generateOne.copy(
-        types = Activity.entityTypes.toList.map(_.show).map(Node.Type(_)).toSet
-      )
-
-      node.singleWordType shouldBe Right(Node.SingleWordType.ProcessRun)
+    "return 'ProcessRun' if node contains Activity types" in {
+      Node.Type.fromEntityTypes(Activity.entityTypes.toList.map(_.show).toSet) shouldBe Right(Node.Type.ProcessRun)
     }
 
-    s"return '${Node.SingleWordType.File}' if node contains File Entity types" in {
-      val node = entityNodes.generateOne.copy(
-        types = Entity.fileEntityTypes.toList.map(_.show).map(Node.Type(_)).toSet
-      )
-
-      node.singleWordType shouldBe Right(Node.SingleWordType.File)
+    "return 'File' if node contains File Entity types" in {
+      Node.Type.fromEntityTypes(Entity.fileEntityTypes.toList.map(_.show).toSet) shouldBe Right(Node.Type.File)
     }
 
-    s"return '${Node.SingleWordType.Directory}' if node contains File Entity types" in {
-      val node = entityNodes.generateOne.copy(
-        types = Entity.folderEntityTypes.toList.map(_.show).map(Node.Type(_)).toSet
-      )
-
-      node.singleWordType shouldBe Right(Node.SingleWordType.Directory)
+    "return 'Directory' if node contains File Entity types" in {
+      Node.Type.fromEntityTypes(Entity.folderEntityTypes.toList.map(_.show).toSet) shouldBe Right(Node.Type.Directory)
     }
 
     "return an Exception there's no match to the given types" in {
       val types = Set(schema / "Dataset", schema / "Project").map(_.show)
 
-      val Left(exception) = entityNodes.generateOne
-        .copy(types = types.map(Node.Type.apply))
-        .singleWordType
+      val Left(exception) = Node.Type.fromEntityTypes(types)
 
       exception.getMessage shouldBe s"${types.mkString(", ")} cannot be converted to a NodeType"
     }

@@ -39,10 +39,10 @@ import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
-import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
-import io.renku.knowledgegraph.datasets.rest._
+import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
+import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
-import io.renku.knowledgegraph.projects.rest.ProjectEndpoint
+import io.renku.knowledgegraph.projects.ProjectEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -87,8 +87,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   }
 
   private lazy val `GET /dataset routes`: AuthedRoutes[Option[AuthUser], F] = {
-    import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.query
-    import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort.sort
+    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.query
+    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort.sort
 
     AuthedRoutes.of {
       case GET -> Root / "knowledge-graph" / "datasets"
@@ -128,7 +128,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
     case GET -> Root / "knowledge-graph" / "graphql"   => schema()
-    case GET -> Root / "knowledge-graph" / "spec.json" => docsEndpoint.`get /docs`
+    case GET -> Root / "knowledge-graph" / "spec.json" => docsEndpoint.`get /spec.json`
     case GET -> Root / "ping"                          => Ok("pong")
   }
 
@@ -139,8 +139,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
       maybePerPage:  Option[ValidatedNel[ParseFailure, PerPage]],
       maybeAuthUser: Option[AuthUser]
   ): F[Response[F]] = {
-    import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-    import io.renku.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
+    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
+    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
 
     (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
      maybeSort getOrElse Validated.validNel(Sort.By(TitleProperty, Direction.Asc)),
