@@ -19,17 +19,24 @@
 package io.renku.knowledgegraph.projectdetails
 
 import ProjectsGenerators._
-import io.circe.Encoder
-import io.circe.literal._
-import io.circe.syntax._
+import cats.syntax.all._
+import io.circe.Decoder._
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.http.rest.Links.{Link, Rel, _links}
-import io.renku.json.JsonOps._
-import io.renku.knowledgegraph.datasets.ProjectDatasetsEndpoint
-import io.renku.tinytypes.json.TinyTypeEncoders._
-import model.Permissions._
+import io.renku.graph.model.SchemaVersion
+import io.renku.graph.model.persons.{Email, Name => UserName}
+import io.renku.graph.model.projects._
+import io.renku.http.rest.Links
+import io.renku.http.rest.Links.{Href, Rel}
+import io.renku.http.server.EndpointTester._
+import io.renku.tinytypes.json.TinyTypeDecoders._
+import model.Forking.ForksCount
+import model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
+import model.Project._
+import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
+import model.Urls._
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -41,7 +48,16 @@ class JsonEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
     "convert the model.Project object to Json" in {
       forAll { project: Project =>
-        (encoder encode project) shouldBe project.asJson(testEncoder)
+        val json = encoder encode project
+
+        json.as(decoder(project)) shouldBe project.asRight
+        json._links shouldBe Right(
+          Links.of(
+            Rel.Self        -> Href(renkuApiUrl / "projects" / project.path),
+            Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets")
+          )
+        )
+
       }
     }
   }
@@ -49,90 +65,109 @@ class JsonEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
   private lazy val renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne
   private lazy val encoder = new JsonEncoderImpl(renkuApiUrl)
 
-  private lazy val testEncoder: Encoder[Project] = Encoder.instance[Project] { project =>
-    json"""{
-      "identifier": ${project.id},
-      "path":       ${project.path},
-      "name":       ${project.name},
-      "visibility": ${project.visibility},
-      "created":    ${project.created},
-      "updatedAt":  ${project.updatedAt},
-      "urls":       ${project.urls},
-      "forking":    ${project.forking},
-      "keywords":   ${project.keywords.toList.sorted},
-      "starsCount": ${project.starsCount},
-      "permissions":${project.permissions},
-      "statistics": ${project.statistics}
-    }""" deepMerge _links(
-      Link(Rel.Self        -> Endpoint.href(renkuApiUrl, project.path)),
-      Link(Rel("datasets") -> ProjectDatasetsEndpoint.href(renkuApiUrl, project.path))
-    ).addIfDefined("description" -> project.maybeDescription)
-      .addIfDefined("version" -> project.maybeVersion)
+  private def decoder(project: Project): Decoder[Project] = cursor =>
+    for {
+      id               <- cursor.downField("identifier").as[Id]
+      path             <- cursor.downField("path").as[Path]
+      name             <- cursor.downField("name").as[Name]
+      maybeDescription <- cursor.downField("description").as[Option[Description]]
+      visibility       <- cursor.downField("visibility").as[Visibility]
+      created          <- cursor.downField("created").as[Creation](creationDecoder(project.created))
+      updatedAt        <- cursor.downField("updatedAt").as[DateUpdated]
+      urls             <- cursor.downField("urls").as[Urls]
+      forks            <- cursor.downField("forking").as(forkingDecoder(project.forking))
+      keywords         <- cursor.downField("keywords").as[Set[Keyword]]
+      starsCount       <- cursor.downField("starsCount").as[StarsCount]
+      permissions      <- cursor.downField("permissions").as[Permissions]
+      statistics       <- cursor.downField("statistics").as[Statistics]
+      maybeVersion     <- cursor.downField("version").as[Option[SchemaVersion]]
+    } yield Project(
+      project.resourceId,
+      id,
+      path,
+      name,
+      maybeDescription,
+      visibility,
+      created,
+      updatedAt,
+      urls,
+      forks,
+      keywords,
+      starsCount,
+      permissions,
+      statistics,
+      maybeVersion
+    )
+
+  private def creationDecoder(creation: Creation): Decoder[Creation] = cursor =>
+    for {
+      date    <- cursor.downField("dateCreated").as[DateCreated]
+      creator <- cursor.downField("creator").as(decodeOption(creatorDecoder(creation.maybeCreator)))
+    } yield Creation(date, creator)
+
+  private def creatorDecoder(maybeCreator: Option[Creator]): Decoder[Creator] = cursor =>
+    for {
+      name       <- cursor.downField("name").as[UserName]
+      maybeEmail <- cursor.downField("email").as[Option[Email]]
+      creator    <- maybeCreator.toRight(DecodingFailure(show"'$name' creator expected but found None", Nil))
+    } yield Creator(creator.resourceId, maybeEmail, name)
+
+  private def forkingDecoder(forking: Forking): Decoder[Forking] = cursor =>
+    for {
+      count       <- cursor.downField("forksCount").as[ForksCount]
+      maybeParent <- cursor.downField("parent").as(decodeOption(parentDecoder(forking.maybeParent)))
+    } yield Forking(count, maybeParent)
+
+  private def parentDecoder(maybeParent: Option[ParentProject]): Decoder[ParentProject] = cursor =>
+    for {
+      path    <- cursor.downField("path").as[Path]
+      name    <- cursor.downField("name").as[Name]
+      parent  <- maybeParent.toRight(DecodingFailure(show"'$path' parent project expected but found None", Nil))
+      created <- cursor.downField("created").as(creationDecoder(parent.created))
+    } yield ParentProject(parent.resourceId, path, name, created)
+
+  private implicit lazy val urlsDecoder: Decoder[Urls] = cursor =>
+    for {
+      ssh         <- cursor.downField("ssh").as[SshUrl]
+      http        <- cursor.downField("http").as[HttpUrl]
+      web         <- cursor.downField("web").as[WebUrl]
+      maybeReadme <- cursor.downField("readme").as[Option[ReadmeUrl]]
+    } yield Urls(ssh, http, web, maybeReadme)
+
+  private implicit lazy val permissionsDecoder: Decoder[Permissions] = cursor => {
+    def maybeAccessLevel(name: String) = cursor.downField(name).as[Option[AccessLevel]]
+
+    for {
+      maybeProjectAccessLevel <- maybeAccessLevel("projectAccess").map(_.map(ProjectAccessLevel))
+      maybeGroupAccessLevel   <- maybeAccessLevel("groupAccess").map(_.map(GroupAccessLevel))
+      permissions <- (maybeProjectAccessLevel, maybeGroupAccessLevel) match {
+                       case (Some(project), Some(group)) => Right(Permissions(project, group))
+                       case (Some(project), None)        => Right(Permissions(project))
+                       case (None, Some(group))          => Right(Permissions(group))
+                       case _ => Left(DecodingFailure("Neither projectAccess nor groupAccess", Nil))
+                     }
+    } yield permissions
   }
 
-  private implicit lazy val creatorEncoder: Encoder[Creator] = Encoder.instance[Creator] { creator =>
-    json"""{
-      "name":  ${creator.name}
-    }""" addIfDefined ("email" -> creator.maybeEmail)
-  }
+  private implicit lazy val accessLevelDecoder: Decoder[AccessLevel] = cursor =>
+    for {
+      name <- cursor.downField("level").downField("name").as[String]
+      accessLevel <- cursor
+                       .downField("level")
+                       .downField("value")
+                       .as[Int]
+                       .flatMap(AccessLevel.from)
+                       .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+    } yield
+      if (accessLevel.name.value == name) accessLevel
+      else throw new Exception(s"$name does not match $accessLevel")
 
-  private implicit lazy val urlsEncoder: Encoder[Urls] = Encoder.instance[Urls] { urls =>
-    json"""{
-      "ssh":    ${urls.ssh},
-      "http":   ${urls.http},
-      "web":    ${urls.web}
-    }""" addIfDefined ("readme" -> urls.maybeReadme)
-  }
-
-  private implicit lazy val forkingEncoder: Encoder[Forking] = Encoder.instance[Forking] { forks =>
-    json"""{
-      "forksCount": ${forks.forksCount}
-    }""" addIfDefined ("parent" -> forks.maybeParent)
-  }
-
-  private implicit lazy val parentProjectEncoder: Encoder[ParentProject] = Encoder.instance[ParentProject] { parent =>
-    json"""{
-      "path":    ${parent.path},
-      "name":    ${parent.name},
-      "created": ${parent.created}
-    }"""
-  }
-
-  private implicit lazy val creationEncoder: Encoder[Creation] = Encoder.instance[Creation] { created =>
-    json"""{
-      "dateCreated": ${created.date}
-    }""" addIfDefined ("creator" -> created.maybeCreator)
-  }
-
-  private implicit lazy val permissionsEncoder: Encoder[Permissions] = Encoder.instance[Permissions] {
-    case ProjectAndGroupPermissions(projectAccessLevel, groupAccessLevel) => json"""{
-      "projectAccess": ${projectAccessLevel.accessLevel},
-      "groupAccess":   ${groupAccessLevel.accessLevel}
-    }"""
-    case ProjectPermissions(accessLevel) => json"""{
-      "projectAccess": ${accessLevel.accessLevel}
-    }"""
-    case GroupPermissions(accessLevel) => json"""{
-      "groupAccess": ${accessLevel.accessLevel}
-    }"""
-  }
-
-  private implicit lazy val accessLevelEncoder: Encoder[AccessLevel] = Encoder.instance[AccessLevel] { level =>
-    json"""{
-      "level": {
-        "name":  ${level.name.value},
-        "value": ${level.value.value}
-      }
-    }"""
-  }
-
-  private implicit lazy val statisticsEncoder: Encoder[Statistics] = Encoder.instance[Statistics] { stats =>
-    json"""{
-      "commitsCount":     ${stats.commitsCount},
-      "storageSize":      ${stats.storageSize},
-      "repositorySize":   ${stats.repositorySize},
-      "lfsObjectsSize":   ${stats.lsfObjectsSize},
-      "jobArtifactsSize": ${stats.jobArtifactsSize}
-    }"""
-  }
+  private implicit lazy val statisticsDecoder: Decoder[Statistics] = cursor =>
+    for {
+      commitsCount     <- cursor.downField("commitsCount").as[CommitsCount]
+      storageSize      <- cursor.downField("storageSize").as[StorageSize]
+      repositorySize   <- cursor.downField("repositorySize").as[RepositorySize]
+      lfsSize          <- cursor.downField("lfsObjectsSize").as[LsfObjectsSize]
+      jobArtifactsSize <- cursor.downField("jobArtifactsSize").as[JobArtifactsSize]
+    } yield Statistics(commitsCount, storageSize, repositorySize, lfsSize, jobArtifactsSize)
 }

@@ -19,11 +19,12 @@
 package io.renku.knowledgegraph.projectdetails
 
 import ProjectsGenerators._
+import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.entities
-import io.renku.jsonld.syntax._
-import io.renku.jsonld.{JsonLD, JsonLDEncoder}
+import io.renku.graph.model._
+import io.renku.jsonld.JsonLDDecoder
+import io.renku.knowledgegraph.projectdetails.model.Project.DateUpdated
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,45 +36,63 @@ class JsonLdEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheck
 
     "convert the model.Project object to Json" in {
       forAll { project: Project =>
-        (JsonLdEncoder encode project) shouldBe project.asJsonLD(testEncoder)
+        println((JsonLdEncoder encode project).toJson)
+        (JsonLdEncoder encode project).cursor.as(decoder(project)) shouldBe project.asRight
       }
     }
   }
 
-  private lazy val testEncoder: JsonLDEncoder[Project] = JsonLDEncoder.instance { project =>
-    JsonLD.entity(
-      project.resourceId.asEntityId,
-      entities.Project.entityTypes,
-      schema / "identifier"       -> project.id.asJsonLD,
-      renku / "projectPath"       -> project.path.asJsonLD,
-      schema / "name"             -> project.name.asJsonLD,
-      schema / "description"      -> project.maybeDescription.asJsonLD,
-      renku / "projectVisibility" -> project.visibility.asJsonLD,
-      schema / "dateCreated"      -> project.created.date.asJsonLD,
-      schema / "creator"          -> project.created.maybeCreator.asJsonLD,
-      schema / "dateModified"     -> project.updatedAt.asJsonLD,
-      schema / "keywords"         -> project.keywords.asJsonLD,
-      schema / "schemaVersion"    -> project.maybeVersion.asJsonLD,
-      prov / "wasDerivedFrom"     -> project.forking.maybeParent.asJsonLD
-    )
+  private def decoder(project: Project): JsonLDDecoder[Project] = JsonLDDecoder.entity(entities.Project.entityTypes) {
+    cursor =>
+      for {
+        resourceId   <- cursor.downEntityId.as[projects.ResourceId]
+        identifier   <- cursor.downField(schema / "identifier").as[projects.Id]
+        path         <- cursor.downField(renku / "projectPath").as[projects.Path]
+        name         <- cursor.downField(schema / "name").as[projects.Name]
+        maybeDesc    <- cursor.downField(schema / "description").as[Option[projects.Description]]
+        visibility   <- cursor.downField(renku / "projectVisibility").as[projects.Visibility]
+        dateCreated  <- cursor.downField(schema / "dateCreated").as[projects.DateCreated]
+        maybeCreator <- cursor.downField(schema / "creator").as[Option[Creator]]
+        dateUpdated  <- cursor.downField(schema / "dateModified").as[DateUpdated]
+        maybeParent  <- cursor.downField(prov / "wasDerivedFrom").as[Option[ParentProject]]
+        keywords     <- cursor.downField(schema / "keywords").as[List[projects.Keyword]]
+        maybeVersion <- cursor.downField(schema / "schemaVersion").as[Option[SchemaVersion]]
+      } yield Project(
+        resourceId,
+        identifier,
+        path,
+        name,
+        maybeDesc,
+        visibility,
+        Creation(dateCreated, maybeCreator),
+        dateUpdated,
+        project.urls,
+        Forking(project.forking.forksCount, maybeParent),
+        keywords.toSet,
+        project.starsCount,
+        project.permissions,
+        project.statistics,
+        maybeVersion
+      )
   }
 
-  private implicit lazy val creatorEncoder: JsonLDEncoder[Creator] = JsonLDEncoder.instance { creator =>
-    JsonLD.entity(creator.resourceId.asEntityId,
-                  entities.Person.entityTypes,
-                  schema / "name"  -> creator.name.asJsonLD,
-                  schema / "email" -> creator.maybeEmail.asJsonLD
-    )
-  }
+  private implicit lazy val creatorDecoder: JsonLDDecoder[Creator] =
+    JsonLDDecoder.entity(entities.Person.entityTypes) { cursor =>
+      for {
+        resourceId <- cursor.downEntityId.as[persons.ResourceId]
+        maybeEmail <- cursor.downField(schema / "email").as[Option[persons.Email]]
+        name       <- cursor.downField(schema / "name").as[persons.Name]
+      } yield Creator(resourceId, maybeEmail, name)
+    }
 
-  private implicit lazy val parentDecoder: JsonLDEncoder[ParentProject] = JsonLDEncoder.instance { parent =>
-    JsonLD.entity(
-      parent.resourceId.asEntityId,
-      entities.Project.entityTypes,
-      renku / "projectPath"  -> parent.path.asJsonLD,
-      schema / "name"        -> parent.name.asJsonLD,
-      schema / "dateCreated" -> parent.created.date.asJsonLD,
-      schema / "creator"     -> parent.created.maybeCreator.asJsonLD
-    )
-  }
+  private implicit lazy val parentDecoder: JsonLDDecoder[ParentProject] =
+    JsonLDDecoder.entity(entities.Project.entityTypes) { cursor =>
+      for {
+        resourceId   <- cursor.downEntityId.as[projects.ResourceId]
+        path         <- cursor.downField(renku / "projectPath").as[projects.Path]
+        name         <- cursor.downField(schema / "name").as[projects.Name]
+        dateCreated  <- cursor.downField(schema / "dateCreated").as[projects.DateCreated]
+        maybeCreator <- cursor.downField(schema / "creator").as[Option[Creator]]
+      } yield ParentProject(resourceId, path, name, Creation(dateCreated, maybeCreator))
+    }
 }
