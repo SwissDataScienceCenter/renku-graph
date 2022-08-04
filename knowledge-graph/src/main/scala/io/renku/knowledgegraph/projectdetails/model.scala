@@ -24,7 +24,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
-import io.renku.graph.model.projects.{DateCreated, Description, Id, Keyword, Name, Path, Visibility}
+import io.renku.graph.model.projects.{DateCreated, Description, Id, Keyword, Name, Path, ResourceId, Visibility}
+import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.graph.model.{SchemaVersion, persons}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
@@ -38,7 +39,8 @@ private object model {
   import Project._
   import Urls._
 
-  final case class Project(id:               Id,
+  final case class Project(resourceId:       ResourceId,
+                           id:               Id,
                            path:             Path,
                            name:             Name,
                            maybeDescription: Option[Description],
@@ -63,11 +65,12 @@ private object model {
     implicit object DateUpdated
         extends TinyTypeFactory[DateUpdated](new DateUpdated(_))
         with InstantNotInTheFuture[DateUpdated]
+        with TinyTypeJsonLDOps[DateUpdated]
   }
 
   final case class Creation(date: DateCreated, maybeCreator: Option[Creator])
 
-  final case class Creator(maybeEmail: Option[persons.Email], name: persons.Name)
+  final case class Creator(resourceId: persons.ResourceId, maybeEmail: Option[persons.Email], name: persons.Name)
 
   final case class Forking(forksCount: ForksCount, maybeParent: Option[ParentProject])
 
@@ -76,7 +79,7 @@ private object model {
     implicit object ForksCount extends TinyTypeFactory[ForksCount](new ForksCount(_)) with NonNegativeInt[ForksCount]
   }
 
-  final case class ParentProject(path: Path, name: Name, created: Creation)
+  final case class ParentProject(resourceId: ResourceId, path: Path, name: Name, created: Creation)
 
   sealed trait Permissions extends Product with Serializable
 

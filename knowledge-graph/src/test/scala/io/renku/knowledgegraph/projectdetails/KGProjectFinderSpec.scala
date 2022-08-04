@@ -19,7 +19,6 @@
 package io.renku.knowledgegraph.projectdetails
 
 import Converters._
-import KGProjectFinder.KGProject
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.authUsers
@@ -50,7 +49,7 @@ class KGProjectFinderSpec
         upload(to = renkuDataset, anyProjectEntities.generateOne, project)
 
         kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
-          project.to[KGProject].some
+          project.to(kgProjectConverter).some
       }
     }
 
@@ -61,7 +60,7 @@ class KGProjectFinderSpec
         upload(to = renkuDataset, project, project.parent)
 
         kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
-          project.to[KGProject].some
+          project.to(kgProjectConverter).some
       }
     }
 
@@ -80,7 +79,7 @@ class KGProjectFinderSpec
       upload(to = renkuDataset, project, parent)
 
       kgProjectFinder.findProject(project.path, user.some).unsafeRunSync() shouldBe
-        project.to[KGProject].some
+        project.to(kgProjectConverter).some
     }
 
     "return details of the project with the given path without info about the parent " +
@@ -102,7 +101,7 @@ class KGProjectFinderSpec
         upload(to = renkuDataset, project, parent)
 
         kgProjectFinder.findProject(project.path, Some(user)).unsafeRunSync() shouldBe Some {
-          project.to[KGProject].copy(maybeParent = None)
+          project.to(kgProjectConverter).copy(maybeParent = None)
         }
       }
 

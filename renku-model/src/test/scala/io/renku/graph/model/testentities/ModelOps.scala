@@ -52,6 +52,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
   abstract class AbstractProjectOps[P <: Project](project: P)(implicit
       renkuUrl:                                            RenkuUrl
   ) {
+    lazy val resourceId: projects.ResourceId = projects.ResourceId(project.asEntityId)
 
     def to[T](implicit convert: P => T): T = convert(project)
   }

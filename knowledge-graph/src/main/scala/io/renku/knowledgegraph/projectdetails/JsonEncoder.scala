@@ -43,27 +43,26 @@ private class JsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends JsonEncoder {
 
   override def encode(project: model.Project): Json = project.asJson
 
-  private implicit lazy val encoder: Encoder[Project] =
-    Encoder.instance[Project] { project =>
-      json"""{
-          "identifier": ${project.id},
-          "path":       ${project.path},
-          "name":       ${project.name},
-          "visibility": ${project.visibility},
-          "created":    ${project.created},
-          "updatedAt":  ${project.updatedAt},
-          "urls":       ${project.urls},
-          "forking":    ${project.forking},
-          "keywords":   ${project.keywords.toList.sorted},
-          "starsCount": ${project.starsCount},
-          "permissions":${project.permissions},
-          "statistics": ${project.statistics}
-        }""" deepMerge _links(
-        Link(Rel.Self        -> Endpoint.href(renkuApiUrl, project.path)),
-        Link(Rel("datasets") -> ProjectDatasetsEndpoint.href(renkuApiUrl, project.path))
-      ).addIfDefined("description" -> project.maybeDescription)
-        .addIfDefined("version" -> project.maybeVersion)
-    }
+  private implicit lazy val encoder: Encoder[Project] = Encoder.instance[Project] { project =>
+    json"""{
+      "identifier": ${project.id},
+      "path":       ${project.path},
+      "name":       ${project.name},
+      "visibility": ${project.visibility},
+      "created":    ${project.created},
+      "updatedAt":  ${project.updatedAt},
+      "urls":       ${project.urls},
+      "forking":    ${project.forking},
+      "keywords":   ${project.keywords.toList.sorted},
+      "starsCount": ${project.starsCount},
+      "permissions":${project.permissions},
+      "statistics": ${project.statistics}
+    }""" deepMerge _links(
+      Link(Rel.Self        -> Endpoint.href(renkuApiUrl, project.path)),
+      Link(Rel("datasets") -> ProjectDatasetsEndpoint.href(renkuApiUrl, project.path))
+    ).addIfDefined("description" -> project.maybeDescription)
+      .addIfDefined("version" -> project.maybeVersion)
+  }
 
   private implicit lazy val creatorEncoder: Encoder[Creator] = Encoder.instance[Creator] { creator =>
     json"""{

@@ -79,13 +79,18 @@ private class EndpointDocsImpl(jsonEncoder: JsonEncoder) extends EndpointDocs {
   private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
 
   private val example = Project(
+    projects.ResourceId("http://renkulab.io/projects/namespace/name"),
     projects.Id(123),
     projects.Path("namespace/name"),
     projects.Name("name"),
     projects.Description("description").some,
     projects.Visibility.Public,
-    Creation(projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
-             Creator(persons.Email("john@mail.com").some, persons.Name("John")).some
+    Creation(
+      projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+      Creator(persons.ResourceId("http://renkulab.io/persons/2"),
+              persons.Email("john@mail.com").some,
+              persons.Name("John")
+      ).some
     ),
     DateUpdated(Instant.parse("2012-11-16T10:00:00.000Z")),
     Urls(
@@ -97,10 +102,15 @@ private class EndpointDocsImpl(jsonEncoder: JsonEncoder) extends EndpointDocs {
     Forking(
       ForksCount(1),
       ParentProject(
+        projects.ResourceId("http://renkulab.io/projects/namespace/fork"),
         projects.Path("namespace/fork"),
         projects.Name("fork"),
-        Creation(projects.DateCreated(Instant.parse("2012-11-17T10:00:00.000Z")),
-                 Creator(persons.Email("goeff@mail.com").some, persons.Name("Goeff")).some
+        Creation(
+          projects.DateCreated(Instant.parse("2012-11-17T10:00:00.000Z")),
+          Creator(persons.ResourceId("http://renkulab.io/persons/3"),
+                  persons.Email("goeff@mail.com").some,
+                  persons.Name("Goeff")
+          ).some
         )
       ).some
     ),

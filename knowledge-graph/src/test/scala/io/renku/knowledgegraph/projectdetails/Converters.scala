@@ -20,34 +20,36 @@ package io.renku.knowledgegraph.projectdetails
 
 import KGProjectFinder._
 import cats.syntax.all._
-import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
-import io.renku.jsonld.syntax._
 
 private object Converters extends Converters
 
 private trait Converters {
 
-  implicit lazy val entitiesToKGProject: Project => KGProject = {
+  lazy val kgProjectConverter: Project => KGProject = {
     case project: RenkuProject.WithParent =>
       KGProject(
+        project.resourceId,
         project.path,
         project.name,
-        ProjectCreation(project.dateCreated,
-                        project.maybeCreator.map(person => ProjectCreator(person.maybeEmail, person.name))
+        ProjectCreation(
+          project.dateCreated,
+          project.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
         ),
         project.visibility,
-        project.parent.to[KGParent].some,
+        project.parent.to(kgParentConverter).some,
         project.version.some,
         project.maybeDescription,
         project.keywords
       )
     case project: RenkuProject.WithoutParent =>
       KGProject(
+        project.resourceId,
         project.path,
         project.name,
-        ProjectCreation(project.dateCreated,
-                        project.maybeCreator.map(person => ProjectCreator(person.maybeEmail, person.name))
+        ProjectCreation(
+          project.dateCreated,
+          project.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
         ),
         project.visibility,
         maybeParent = None,
@@ -57,23 +59,27 @@ private trait Converters {
       )
     case project: NonRenkuProject.WithParent =>
       KGProject(
+        project.resourceId,
         project.path,
         project.name,
-        ProjectCreation(project.dateCreated,
-                        project.maybeCreator.map(person => ProjectCreator(person.maybeEmail, person.name))
+        ProjectCreation(
+          project.dateCreated,
+          project.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
         ),
         project.visibility,
-        project.parent.to[KGParent].some,
+        project.parent.to(kgParentConverter).some,
         maybeVersion = None,
         project.maybeDescription,
         project.keywords
       )
     case project: NonRenkuProject.WithoutParent =>
       KGProject(
+        project.resourceId,
         project.path,
         project.name,
-        ProjectCreation(project.dateCreated,
-                        project.maybeCreator.map(person => ProjectCreator(person.maybeEmail, person.name))
+        ProjectCreation(
+          project.dateCreated,
+          project.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
         ),
         project.visibility,
         maybeParent = None,
@@ -84,12 +90,14 @@ private trait Converters {
     case other => throw new IllegalArgumentException(s"Project of unsupported type $other")
   }
 
-  implicit lazy val entitiesToParent: Project => KGParent = project =>
+  private lazy val kgParentConverter: Project => KGParent = parent =>
     KGParent(
-      projects.ResourceId(project.asEntityId),
-      project.name,
-      ProjectCreation(project.dateCreated,
-                      project.maybeCreator.map(person => ProjectCreator(person.maybeEmail, person.name))
+      parent.resourceId,
+      parent.path,
+      parent.name,
+      ProjectCreation(
+        parent.dateCreated,
+        parent.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
       )
     )
 }
