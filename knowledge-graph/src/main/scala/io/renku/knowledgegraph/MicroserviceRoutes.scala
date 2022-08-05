@@ -121,8 +121,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   private lazy val otherAuthRoutes: AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
     case authReq @ POST -> Root / "knowledge-graph" / "graphql" as maybeUser => handleQuery(authReq.req, maybeUser)
-    case GET -> "knowledge-graph" /: "projects" /: path as maybeUser => routeToProjectsEndpoints(path, maybeUser)
-
+    case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
+      routeToProjectsEndpoints(path, maybeUser)(authReq.req)
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
@@ -202,9 +202,9 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
       .merge
 
   private def routeToProjectsEndpoints(
-      path:          Path,
-      maybeAuthUser: Option[AuthUser]
-  ): F[Response[F]] = path.segments.toList.map(_.toString) match {
+      path:           Path,
+      maybeAuthUser:  Option[AuthUser]
+  )(implicit request: Request[F]): F[Response[F]] = path.segments.toList.map(_.toString) match {
     case projectPathParts :+ "datasets" =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))

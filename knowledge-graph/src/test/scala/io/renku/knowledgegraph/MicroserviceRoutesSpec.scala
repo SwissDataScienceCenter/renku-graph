@@ -512,11 +512,10 @@ class MicroserviceRoutesSpec
         .expects(projectPath, maybeAuthUser)
         .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
 
+      implicit val req: Request[IO] = Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
       (projectEndpoint.`GET /projects/:path` _).expects(projectPath, maybeAuthUser).returning(Response[IO](Ok).pure[IO])
 
-      routes(maybeAuthUser)
-        .call(Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath")))
-        .status shouldBe Ok
+      routes(maybeAuthUser).call(req).status shouldBe Ok
 
       routesMetrics.clearRegistry()
     }

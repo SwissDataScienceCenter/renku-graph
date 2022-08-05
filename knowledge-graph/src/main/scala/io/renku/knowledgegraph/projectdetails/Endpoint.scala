@@ -29,48 +29,68 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.projectdetails.model._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.triplesstore.SparqlQueryTimeRecorder
-import org.http4s.Response
+import org.http4s.MediaType.application
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 trait Endpoint[F[_]] {
-  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]]
+  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser])(implicit
+      request:                    Request[F]
+  ): F[Response[F]]
 }
 
 class EndpointImpl[F[_]: MonadThrow: Logger](
     projectFinder:         ProjectFinder[F],
     projectJsonEncoder:    JsonEncoder,
+    projectJsonLdEncoder:  JsonLdEncoder,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
   import executionTimeRecorder._
   import io.circe.syntax._
-  import org.http4s.circe._
+  import io.renku.http.jsonld4s._
+  import io.renku.http.server.endpoint._
+  import org.http4s.circe.jsonEncoder
 
-  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser]): F[Response[F]] =
-    measureExecutionTime {
-      projectFinder
-        .findProject(path, maybeAuthUser)
-        .flatMap(toHttpResult(path))
-        .recoverWith(httpResult(path))
-    } map logExecutionTimeWhen(finishedSuccessfully(path))
+  def `GET /projects/:path`(path: projects.Path, maybeAuthUser: Option[AuthUser])(implicit
+      request:                    Request[F]
+  ): F[Response[F]] = measureExecutionTime {
+    projectFinder
+      .findProject(path, maybeAuthUser)
+      .flatMap(toHttpResult(path))
+      .recoverWith(httpResult(path))
+  } map logExecutionTimeWhen(finishedSuccessfully(path))
 
-  private def toHttpResult(path: projects.Path): Option[Project] => F[Response[F]] = {
-    case None          => NotFound(InfoMessage(s"No '$path' project found").asJson)
-    case Some(project) => Ok(projectJsonEncoder.encode(project))
+  private def toHttpResult(path: projects.Path)(implicit request: Request[F]): Option[Project] => F[Response[F]] = {
+    case None =>
+      val message = InfoMessage(s"No '$path' project found")
+      whenAccept(
+        application.`ld+json` --> NotFound(message.asJsonLD),
+        application.json      --> NotFound(message.asJson)
+      )(default = NotFound(message.asJson))
+    case Some(project) =>
+      whenAccept(
+        application.`ld+json` --> Ok(projectJsonLdEncoder encode project),
+        application.json      --> Ok(projectJsonEncoder encode project)
+      )(default = Ok(projectJsonEncoder encode project))
   }
 
-  private def httpResult(path: projects.Path): PartialFunction[Throwable, F[Response[F]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding '$path' project failed")
-      Logger[F].error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  private def httpResult(path: projects.Path)(implicit
+      request:                 Request[F]
+  ): PartialFunction[Throwable, F[Response[F]]] = { case NonFatal(exception) =>
+    val message = ErrorMessage(s"Finding '$path' project failed")
+    Logger[F].error(exception)(message.value) >> whenAccept(
+      application.`ld+json` --> InternalServerError(message.asJsonLD),
+      application.json      --> InternalServerError(message.asJson)
+    )(default = InternalServerError(message.asJson))
   }
 
   private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[F], String] = {
@@ -84,9 +104,9 @@ object Endpoint {
   def apply[F[_]: Parallel: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] =
     for {
       projectFinder         <- ProjectFinder[F]
-      projectJsonEncoder    <- JsonEncoder[F]
+      jsonEncoder           <- JsonEncoder[F]
       executionTimeRecorder <- ExecutionTimeRecorder[F]()
-    } yield new EndpointImpl[F](projectFinder, projectJsonEncoder, executionTimeRecorder)
+    } yield new EndpointImpl[F](projectFinder, jsonEncoder, JsonLdEncoder, executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
     Href(renkuApiUrl / "projects" / projectPath)

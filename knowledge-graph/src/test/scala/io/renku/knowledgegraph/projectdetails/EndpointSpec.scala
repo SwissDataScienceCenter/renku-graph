@@ -22,90 +22,132 @@ import ProjectsGenerators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Json
-import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.http.InfoMessage._
 import io.renku.http.server.EndpointTester._
-import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import model._
-import org.http4s.MediaType._
+import org.http4s.MediaType.application
 import org.http4s.Status._
-import org.http4s.headers.`Content-Type`
+import org.http4s.headers.{Accept, `Content-Type`}
+import org.http4s.{Headers, Request}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers with IOSpec {
+class EndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with TableDrivenPropertyChecks
+    with should.Matchers
+    with IOSpec {
 
   "GET /projects/:path" should {
 
-    "respond with OK and the found project details" in new TestCase {
-      val project       = resourceProjects.generateOne
-      val maybeAuthUser = authUsers.generateOption
-      (projectFinder.findProject _)
-        .expects(project.path, maybeAuthUser)
-        .returning(project.some.pure[IO])
-
-      val json = jsons.generateOne
-      (jsonEncoder.encode _).expects(project).returns(json)
-
-      val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser).unsafeRunSync()
-
-      response.status                   shouldBe Ok
-      response.contentType              shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync() shouldBe json
-
-      logger.loggedOnly(
-        Warn(s"Finding '${project.path}' details finished${executionTimeRecorder.executionTimeInfo}")
+    forAll {
+      Table(
+        "case"                     -> "request",
+        "no Accept"                -> Request[IO](),
+        "Accept: application/json" -> Request[IO](headers = Headers(Accept(application.json)))
       )
+    } { case (caze, request) =>
+      "respond with OK with application/json and the found project details " +
+        s"when there's $caze header in the request" in new TestCase {
+          val project       = resourceProjects.generateOne
+          val maybeAuthUser = authUsers.generateOption
+          (projectFinder.findProject _)
+            .expects(project.path, maybeAuthUser)
+            .returning(project.some.pure[IO])
+
+          val json = jsons.generateOne
+          (jsonEncoder.encode _).expects(project).returns(json)
+
+          val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(request).unsafeRunSync()
+
+          response.status                   shouldBe Ok
+          response.contentType              shouldBe Some(`Content-Type`(application.json))
+          response.as[Json].unsafeRunSync() shouldBe json
+
+          logger.loggedOnly(
+            Warn(s"Finding '${project.path}' details finished${executionTimeRecorder.executionTimeInfo}")
+          )
+          logger.reset()
+        }
     }
 
-    "respond with NOT_FOUND if there is no project with the given path" in new TestCase {
+    "respond with OK with application/ld+json and the found project details " +
+      "when there's Accept: application/ld+json header in the request" in new TestCase {
+        val project       = resourceProjects.generateOne
+        val maybeAuthUser = authUsers.generateOption
+        (projectFinder.findProject _)
+          .expects(project.path, maybeAuthUser)
+          .returning(project.some.pure[IO])
 
-      val path          = projectPaths.generateOne
-      val maybeAuthUser = authUsers.generateOption
+        val jsonLD = jsonLDEntities.generateOne
+        (jsonLdEncoder.encode _).expects(project).returns(jsonLD)
 
-      (projectFinder.findProject _)
-        .expects(path, maybeAuthUser)
-        .returning(None.pure[IO])
+        val request  = Request[IO](headers = Headers(Accept(application.`ld+json`)))
+        val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(request).unsafeRunSync()
 
-      val response = endpoint.`GET /projects/:path`(path, maybeAuthUser).unsafeRunSync()
+        response.status                   shouldBe Ok
+        response.contentType              shouldBe Some(`Content-Type`(application.`ld+json`))
+        response.as[Json].unsafeRunSync() shouldBe jsonLD.toJson
 
-      response.status      shouldBe NotFound
-      response.contentType shouldBe Some(`Content-Type`(application.json))
+        logger.loggedOnly(
+          Warn(s"Finding '${project.path}' details finished${executionTimeRecorder.executionTimeInfo}")
+        )
+      }
 
-      response.as[Json].unsafeRunSync() shouldBe InfoMessage(s"No '$path' project found").asJson
-
-      logger.loggedOnly(
-        Warn(s"Finding '$path' details finished${executionTimeRecorder.executionTimeInfo}")
+    forAll {
+      Table(
+        ("case", "request", "content-type"),
+        ("no Accept", Request[IO](), application.json),
+        ("Accept: application/json", Request[IO](headers = Headers(Accept(application.json))), application.json),
+        ("Accept: application/ld+json",
+         Request[IO](headers = Headers(Accept(application.`ld+json`))),
+         application.`ld+json`
+        )
       )
-    }
+    } { case (caze, request, contentType) =>
+      s"respond with NOT_FOUND if there is no project with the given path - $caze header" in new TestCase {
 
-    "respond with INTERNAL_SERVER_ERROR if finding project details fails" in new TestCase {
+        val path          = projectPaths.generateOne
+        val maybeAuthUser = authUsers.generateOption
 
-      val path          = projectPaths.generateOne
-      val maybeAuthUser = authUsers.generateOption
-      val exception     = exceptions.generateOne
-      (projectFinder.findProject _)
-        .expects(path, maybeAuthUser)
-        .returning(exception.raiseError[IO, Option[Project]])
+        (projectFinder.findProject _).expects(path, maybeAuthUser).returning(None.pure[IO])
 
-      val response = endpoint.`GET /projects/:path`(path, maybeAuthUser).unsafeRunSync()
+        val response = endpoint.`GET /projects/:path`(path, maybeAuthUser)(request).unsafeRunSync()
 
-      response.status      shouldBe InternalServerError
-      response.contentType shouldBe Some(`Content-Type`(application.json))
+        response.status                          shouldBe NotFound
+        response.contentType                     shouldBe Some(`Content-Type`(contentType))
+        response.as[Json].unsafeRunSync().noSpaces should include(s"No '$path' project found")
+      }
 
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(s"Finding '$path' project failed").asJson
+      s"respond with INTERNAL_SERVER_ERROR if finding project details fails - $caze header" in new TestCase {
 
-      logger.loggedOnly(Error(s"Finding '$path' project failed", exception))
+        val path          = projectPaths.generateOne
+        val maybeAuthUser = authUsers.generateOption
+        val exception     = exceptions.generateOne
+        (projectFinder.findProject _)
+          .expects(path, maybeAuthUser)
+          .returning(exception.raiseError[IO, Option[Project]])
+
+        val response = endpoint.`GET /projects/:path`(path, maybeAuthUser)(request).unsafeRunSync()
+
+        response.status      shouldBe InternalServerError
+        response.contentType shouldBe Some(`Content-Type`(contentType))
+
+        response.as[Json].unsafeRunSync().noSpaces should include(s"Finding '$path' project failed")
+
+        logger.loggedOnly(Error(s"Finding '$path' project failed", exception))
+      }
     }
   }
 
@@ -113,7 +155,8 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectFinder         = mock[ProjectFinder[IO]]
     val jsonEncoder           = mock[JsonEncoder]
+    val jsonLdEncoder         = mock[JsonLdEncoder]
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint              = new EndpointImpl[IO](projectFinder, jsonEncoder, executionTimeRecorder)
+    val endpoint              = new EndpointImpl[IO](projectFinder, jsonEncoder, jsonLdEncoder, executionTimeRecorder)
   }
 }
