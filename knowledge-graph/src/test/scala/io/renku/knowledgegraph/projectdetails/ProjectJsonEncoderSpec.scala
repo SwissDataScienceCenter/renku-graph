@@ -42,7 +42,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class JsonEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "encode" should {
 
@@ -63,7 +63,7 @@ class JsonEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
   }
 
   private lazy val renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne
-  private lazy val encoder = new JsonEncoderImpl(renkuApiUrl)
+  private lazy val encoder = new ProjectJsonEncoderImpl(renkuApiUrl)
 
   private def decoder(project: Project): Decoder[Project] = cursor =>
     for {

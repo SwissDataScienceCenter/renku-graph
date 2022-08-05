@@ -27,7 +27,9 @@ class EndpointDocsSpec extends AnyWordSpec {
 
   "path" should {
     "return a valid Path object" in {
-      validatePath(new EndpointDocsImpl(new JsonEncoderImpl(renkuApiUrls.generateOne)).path)
+      validatePath(
+        new EndpointDocsImpl(new ProjectJsonEncoderImpl(renkuApiUrls.generateOne), ProjectJsonLDEncoder).path
+      )
     }
   }
 }

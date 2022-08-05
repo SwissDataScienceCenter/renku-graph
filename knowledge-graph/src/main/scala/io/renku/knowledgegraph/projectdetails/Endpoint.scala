@@ -48,8 +48,8 @@ trait Endpoint[F[_]] {
 
 class EndpointImpl[F[_]: MonadThrow: Logger](
     projectFinder:         ProjectFinder[F],
-    projectJsonEncoder:    JsonEncoder,
-    projectJsonLdEncoder:  JsonLdEncoder,
+    projectJsonEncoder:    ProjectJsonEncoder,
+    projectJsonLDEncoder:  ProjectJsonLDEncoder,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
     with Endpoint[F] {
@@ -78,7 +78,7 @@ class EndpointImpl[F[_]: MonadThrow: Logger](
       )(default = NotFound(message.asJson))
     case Some(project) =>
       whenAccept(
-        application.`ld+json` --> Ok(projectJsonLdEncoder encode project),
+        application.`ld+json` --> Ok(projectJsonLDEncoder encode project),
         application.json      --> Ok(projectJsonEncoder encode project)
       )(default = Ok(projectJsonEncoder encode project))
   }
@@ -104,9 +104,9 @@ object Endpoint {
   def apply[F[_]: Parallel: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] =
     for {
       projectFinder         <- ProjectFinder[F]
-      jsonEncoder           <- JsonEncoder[F]
+      jsonEncoder           <- ProjectJsonEncoder[F]
       executionTimeRecorder <- ExecutionTimeRecorder[F]()
-    } yield new EndpointImpl[F](projectFinder, jsonEncoder, JsonLdEncoder, executionTimeRecorder)
+    } yield new EndpointImpl[F](projectFinder, jsonEncoder, ProjectJsonLDEncoder, executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, projectPath: projects.Path): Href =
     Href(renkuApiUrl / "projects" / projectPath)

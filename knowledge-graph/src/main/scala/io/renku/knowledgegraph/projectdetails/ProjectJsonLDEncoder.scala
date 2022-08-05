@@ -24,11 +24,11 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import model._
 
-private trait JsonLdEncoder {
+private trait ProjectJsonLDEncoder {
   def encode(project: model.Project): JsonLD
 }
 
-private object JsonLdEncoder extends JsonLdEncoder {
+private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
 
   override def encode(project: model.Project): JsonLD = project.asJsonLD
 

@@ -30,14 +30,13 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class JsonLdEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "encode" should {
 
     "convert the model.Project object to Json" in {
       forAll { project: Project =>
-        println((JsonLdEncoder encode project).toJson)
-        (JsonLdEncoder encode project).cursor.as(decoder(project)) shouldBe project.asRight
+        (ProjectJsonLDEncoder encode project).cursor.as(decoder(project)) shouldBe project.asRight
       }
     }
   }

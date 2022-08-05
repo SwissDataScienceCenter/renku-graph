@@ -40,18 +40,23 @@ trait EndpointDocs {
 
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[EndpointDocs] =
-    JsonEncoder[F].map(new EndpointDocsImpl(_))
+    ProjectJsonEncoder[F].map(new EndpointDocsImpl(_, ProjectJsonLDEncoder))
 }
 
-private class EndpointDocsImpl(jsonEncoder: JsonEncoder) extends EndpointDocs {
+private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJsonLDEncoder: ProjectJsonLDEncoder)
+    extends EndpointDocs {
 
   override lazy val path: Path = Path(
     "Project details",
     "Finds Project details".some,
     GET(
       Uri / "projects" / namespace / projectName,
-      Status.Ok -> Response("Details found",
-                            Contents(MediaType.`application/json`("Sample data", jsonEncoder encode example))
+      Status.Ok -> Response(
+        "Details found",
+        Contents(
+          MediaType.`application/json`("Sample data", projectJsonEncoder encode example),
+          MediaType.`application/ld+json`("Sample data", projectJsonLDEncoder encode example)
+        )
       ),
       Status.Unauthorized -> Response(
         "Unauthorized",

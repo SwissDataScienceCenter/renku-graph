@@ -67,7 +67,7 @@ class EndpointSpec
             .returning(project.some.pure[IO])
 
           val json = jsons.generateOne
-          (jsonEncoder.encode _).expects(project).returns(json)
+          (projectJsonEncoder.encode _).expects(project).returns(json)
 
           val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(request).unsafeRunSync()
 
@@ -91,7 +91,7 @@ class EndpointSpec
           .returning(project.some.pure[IO])
 
         val jsonLD = jsonLDEntities.generateOne
-        (jsonLdEncoder.encode _).expects(project).returns(jsonLD)
+        (projectJsonLDEncoder.encode _).expects(project).returns(jsonLD)
 
         val request  = Request[IO](headers = Headers(Accept(application.`ld+json`)))
         val response = endpoint.`GET /projects/:path`(project.path, maybeAuthUser)(request).unsafeRunSync()
@@ -154,9 +154,9 @@ class EndpointSpec
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val projectFinder         = mock[ProjectFinder[IO]]
-    val jsonEncoder           = mock[JsonEncoder]
-    val jsonLdEncoder         = mock[JsonLdEncoder]
+    val projectJsonEncoder    = mock[ProjectJsonEncoder]
+    val projectJsonLDEncoder  = mock[ProjectJsonLDEncoder]
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint              = new EndpointImpl[IO](projectFinder, jsonEncoder, jsonLdEncoder, executionTimeRecorder)
+    val endpoint = new EndpointImpl[IO](projectFinder, projectJsonEncoder, projectJsonLDEncoder, executionTimeRecorder)
   }
 }
