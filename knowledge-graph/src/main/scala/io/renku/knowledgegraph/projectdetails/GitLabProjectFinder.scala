@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import GitLabProjectFinder.GitLabProject
 import cats.effect.kernel.Async
@@ -25,9 +25,9 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Id, Visibility}
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.knowledgegraph.projects.model.Forking.ForksCount
-import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
-import io.renku.knowledgegraph.projects.model._
+import model.Forking.ForksCount
+import model.Project.{DateUpdated, StarsCount}
+import model._
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.typelevel.log4cats.Logger
 
@@ -55,12 +55,12 @@ private class GitLabProjectFinderImpl[F[_]: Async: GitLabClient: Logger] extends
   }
 
   private implicit lazy val projectDecoder: EntityDecoder[F, GitLabProject] = {
-    import io.renku.knowledgegraph.projects.model.Forking.ForksCount
-    import io.renku.knowledgegraph.projects.model.Permissions._
-    import io.renku.knowledgegraph.projects.model.Project.StarsCount
-    import io.renku.knowledgegraph.projects.model.Statistics._
-    import io.renku.knowledgegraph.projects.model.Urls
-    import io.renku.knowledgegraph.projects.model.Urls._
+    import model.Forking.ForksCount
+    import model.Permissions._
+    import model.Project.StarsCount
+    import model.Statistics._
+    import model.Urls
+    import model.Urls._
 
     implicit val maybeAccessLevelDecoder: Decoder[Option[AccessLevel]] =
       _.as[Option[Json]].flatMap {

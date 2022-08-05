@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.knowledgegraph.projects.model.Permissions.AccessLevel
-import io.renku.knowledgegraph.projects.model.Urls._
+import model.Permissions.AccessLevel
+import model.Urls._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

@@ -496,6 +496,8 @@ in the request for non-public projects. Supported headers are:
 - `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
 - There's no need for a security headers for public projects
 
+The resource supports `application/json` and `application/ld+json` `Accept` headers.
+
 **Response**
 
 | Status                     | Description                                                                                            |
@@ -505,7 +507,7 @@ in the request for non-public projects. Supported headers are:
 | NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access the project |
 | INTERNAL SERVER ERROR (500)| Otherwise                                                                                              |
 
-Response body example:
+Response body example for `Accept: application/json`:
 
 ```
 {
@@ -568,6 +570,71 @@ Response body example:
     {  
       "rel":"datasets",
       "href":"http://t:5511/projects/namespace/project-name/datasets"
+    }
+  ]
+}
+```
+
+Response body example for `Accept: application/ld+json`:
+
+```
+{
+  "@id" : "http://wwywiir:3577/yobqsDoboi/projects/d_llli5Zo/2nTaozqw/llosas_/__-6h3a",
+  "@type" : [
+    "http://www.w3.org/ns/prov#Location",
+    "http://schema.org/Project"
+  ],
+  "https://swissdatasciencecenter.github.io/renku-ontology#projectPath" : {
+    "@value" : "d_llli5Zo/2nTaozqw/llosas_/__-6h3a"
+  },
+  "http://schema.org/description" : {
+    "@value" : "Zs oJtagvqvIn diw cywpaj ordCPacr vnnkjj cgtzizxkb clfPe xuhrqT vK"
+  },
+  "http://schema.org/dateModified" : {
+    "@type" : "http://www.w3.org/2001/XMLSchema#dateTime",
+    "@value" : "1990-07-16T21:51:12.949Z"
+  },
+  "http://schema.org/identifier" : {
+    "@value" : 402288
+  },
+  "http://schema.org/creator" : {
+    "@id" : "http://wwywiir:3577/yobqsDoboi/persons/69212174",
+    "@type" : [
+      "http://www.w3.org/ns/prov#Person",
+      "http://schema.org/Person"
+    ],
+    "http://schema.org/email" : {
+      "@value" : "kpgj2u65iv@nezifs"
+    },
+    "http://schema.org/name" : {
+      "@value" : "flawal dolBA`ql"
+    }
+  },
+  "http://schema.org/schemaVersion" : {
+    "@value" : "42.31.9"
+  },
+  "https://swissdatasciencecenter.github.io/renku-ontology#projectVisibility" : {
+    "@value" : "internal"
+  },
+  "http://schema.org/name" : {
+    "@value" : "__-6h3a"
+  },
+  "http://schema.org/dateCreated" : {
+    "@type" : "http://www.w3.org/2001/XMLSchema#dateTime",
+    "@value" : "2007-01-27T17:58:52.739Z"
+  },
+  "http://schema.org/keywords" : [
+    {
+      "@value" : "bNalprNSye"
+    },
+    {
+      "@value" : "jffkdfe"
+    },
+    {
+      "@value" : "qscrvP"
+    },
+    {
+      "@value" : "ywnzgRbu"
     }
   ]
 }

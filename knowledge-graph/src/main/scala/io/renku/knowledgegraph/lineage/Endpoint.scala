@@ -23,7 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.graph.model.projects
-import io.renku.http.InfoMessage.infoMessageEntityEncoder
+import io.renku.http.InfoMessage.messageJsonEntityEncoder
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.knowledgegraph.lineage.model.Lineage

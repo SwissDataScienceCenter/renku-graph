@@ -24,7 +24,7 @@ import io.circe.syntax._
 import io.renku.config.ServiceVersion
 import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.{entities, lineage, projects}
+import io.renku.knowledgegraph.{entities, lineage, projectdetails}
 import org.http4s
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
@@ -36,7 +36,7 @@ trait Endpoint[F[_]] {
 private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEndpointDocs,
                                         datasetEndpoint:         DatasetEndpointDocs,
                                         entitiesEndpoint:        entities.EndpointDocs,
-                                        projectEndpoint:         projects.ProjectEndpointDocs,
+                                        projectEndpoint:         projectdetails.EndpointDocs,
                                         projectDatasetsEndpoint: ProjectDatasetsEndpointDocs,
                                         serviceVersion:          ServiceVersion
 ) extends Http4sDsl[F]
@@ -85,7 +85,7 @@ object Endpoint {
     datasetsSearchEndpoint  <- DatasetSearchEndpointDocs[F]
     datasetEndpoint         <- DatasetEndpointDocs[F]
     entitiesEndpoint        <- entities.EndpointDocs[F]
-    projectEndpoint         <- projects.ProjectEndpointDocs[F]
+    projectEndpoint         <- projectdetails.EndpointDocs[F]
     projectDatasetsEndpoint <- ProjectDatasetsEndpointDocs[F]
     serviceVersion          <- ServiceVersion.readFromConfig[F]()
   } yield new EndpointImpl[F](datasetsSearchEndpoint,

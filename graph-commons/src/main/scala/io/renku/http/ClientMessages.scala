@@ -22,6 +22,9 @@ import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty
 import io.circe._
 import io.renku.data.{ErrorMessage => DataErrorMessage}
+import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.jsonld.syntax._
+import io.renku.jsonld._
 import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
 
@@ -33,11 +36,20 @@ object ErrorMessage {
 
   def apply(exception: Throwable): ErrorMessage = DataErrorMessage.withExceptionMessage(exception)
 
-  implicit val errorMessageEncoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
+  implicit val errorMessageJsonEncoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
     Json.obj("message" -> Json.fromString(message.value))
   }
 
-  implicit def errorMessageEntityEncoder[F[_]]: EntityEncoder[F, ErrorMessage] = jsonEncoderOf[F, ErrorMessage]
+  implicit def errorMessageJsonEntityEncoder[F[_]]: EntityEncoder[F, ErrorMessage] = jsonEncoderOf[F, ErrorMessage]
+
+  implicit val errorMessageJsonLDEncoder: JsonLDEncoder[ErrorMessage] = JsonLDEncoder.instance[ErrorMessage] {
+    message =>
+      JsonLD.entity(
+        EntityId.blank,
+        EntityTypes.of(renku / "Error"),
+        schema / "description" -> message.value.asJsonLD
+      )
+  }
 }
 
 object InfoMessage {
@@ -52,9 +64,17 @@ object InfoMessage {
         identity
       )
 
-  implicit val infoMessageEncoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
+  implicit val messageJsonEncoder: Encoder[InfoMessage] = Encoder.instance[InfoMessage] { message =>
     Json.obj("message" -> Json.fromString(message.value))
   }
 
-  implicit def infoMessageEntityEncoder[F[_]]: EntityEncoder[F, InfoMessage] = jsonEncoderOf[F, InfoMessage]
+  implicit def messageJsonEntityEncoder[F[_]]: EntityEncoder[F, InfoMessage] = jsonEncoderOf[F, InfoMessage]
+
+  implicit val messageJsonLDEncoder: JsonLDEncoder[InfoMessage] = JsonLDEncoder.instance[InfoMessage] { message =>
+    JsonLD.entity(
+      EntityId.blank,
+      EntityTypes.of(renku / "Info"),
+      schema / "description" -> message.value.asJsonLD
+    )
+  }
 }

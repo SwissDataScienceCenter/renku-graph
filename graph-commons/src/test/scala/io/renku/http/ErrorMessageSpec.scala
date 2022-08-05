@@ -20,6 +20,9 @@ package io.renku.http
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityTypes, JsonLD}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -27,6 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
 
   "ErrorMessage" should {
+    import ErrorMessage._
 
     "be instantiatable from a non blank String" in {
       val line1                 = nonEmptyStrings().generateOne
@@ -68,6 +72,35 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
       val message = ErrorMessage(exception)
 
       message.value shouldBe s"${exception.getClass.getName}"
+    }
+
+    "be encodable to JSON-LD" in {
+      val exception = new Exception(blankStrings().generateOne)
+      val message   = ErrorMessage(exception)
+
+      val jsonLD = message.asJsonLD
+
+      jsonLD shouldBe JsonLD.entity(
+        jsonLD.entityId.getOrElse(fail("No entityId found")),
+        EntityTypes.of(renku / "Error"),
+        schema / "description" -> s"${exception.getClass.getName}".asJsonLD
+      )
+    }
+  }
+
+  "InfoMessage" should {
+    import InfoMessage._
+
+    "be encodable to JSON-LD" in {
+      val message = InfoMessage(nonEmptyStrings().generateOne)
+
+      val jsonLD = message.asJsonLD
+
+      jsonLD shouldBe JsonLD.entity(
+        jsonLD.entityId.getOrElse(fail("No entityId found")),
+        EntityTypes.of(renku / "Info"),
+        schema / "description" -> s"${message.value}".asJsonLD
+      )
     }
   }
 

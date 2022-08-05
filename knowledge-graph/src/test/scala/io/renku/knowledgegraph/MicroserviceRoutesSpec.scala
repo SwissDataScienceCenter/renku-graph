@@ -31,6 +31,7 @@ import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
@@ -53,7 +54,6 @@ import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.knowledgegraph.lineage.LineageGenerators._
 import io.renku.knowledgegraph.lineage.model.Node.Location
-import io.renku.knowledgegraph.projects.ProjectEndpoint
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
@@ -513,11 +513,13 @@ class MicroserviceRoutesSpec
         .expects(projectPath, maybeAuthUser)
         .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
 
-      (projectEndpoint.getProject _).expects(projectPath, maybeAuthUser).returning(Response[IO](Ok).pure[IO])
+      val request = Request[IO](GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+      (projectEndpoint
+        .`GET /projects/:path`(_: projects.Path, _: Option[AuthUser])(_: Request[IO]))
+        .expects(projectPath, maybeAuthUser, request)
+        .returning(Response[IO](Ok).pure[IO])
 
-      routes(maybeAuthUser)
-        .call(Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath")))
-        .status shouldBe Ok
+      routes(maybeAuthUser).call(request).status shouldBe Ok
 
       routesMetrics.clearRegistry()
     }
@@ -653,7 +655,7 @@ class MicroserviceRoutesSpec
     val entitiesEndpoint        = mock[entities.Endpoint[IO]]
     val queryEndpoint           = mock[QueryEndpoint[IO]]
     val lineageEndpoint         = mock[lineage.Endpoint[IO]]
-    val projectEndpoint         = mock[ProjectEndpoint[IO]]
+    val projectEndpoint         = mock[projectdetails.Endpoint[IO]]
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
     val docsEndpoint            = mock[docs.Endpoint[IO]]
     val projectPathAuthorizer   = mock[Authorizer[IO, model.projects.Path]]

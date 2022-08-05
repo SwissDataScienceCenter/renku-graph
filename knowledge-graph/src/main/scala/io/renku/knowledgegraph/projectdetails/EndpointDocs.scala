@@ -16,43 +16,48 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import cats.MonadThrow
 import cats.syntax.all._
-import io.renku.config.renku
 import io.renku.graph.model.{SchemaVersion, persons, projects}
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.projects.model.Forking.ForksCount
-import io.renku.knowledgegraph.projects.model.Permissions.{AccessLevel, GroupAccessLevel}
-import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
-import io.renku.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import io.renku.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
-import io.renku.knowledgegraph.projects.model.{Creation, Creator, Forking, ParentProject, Permissions, Project, Statistics, Urls}
+import io.renku.knowledgegraph.projectdetails.model.Forking.ForksCount
+import io.renku.knowledgegraph.projectdetails.model.Permissions.{AccessLevel, GroupAccessLevel}
+import io.renku.knowledgegraph.projectdetails.model.Project.{DateUpdated, StarsCount}
+import io.renku.knowledgegraph.projectdetails.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
+import io.renku.knowledgegraph.projectdetails.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import io.renku.knowledgegraph.projectdetails.model._
 
 import java.time.Instant
 
-trait ProjectEndpointDocs {
+trait EndpointDocs {
   def path: Path
 }
 
-object ProjectEndpointDocs {
-  def apply[F[_]: MonadThrow]: F[ProjectEndpointDocs] = for {
-    apiUrl <- renku.ApiUrl[F]()
-  } yield new ProjectEndpointDocsImpl()(apiUrl)
+object EndpointDocs {
+  def apply[F[_]: MonadThrow]: F[EndpointDocs] =
+    ProjectJsonEncoder[F].map(new EndpointDocsImpl(_, ProjectJsonLDEncoder))
 }
 
-private class ProjectEndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends ProjectEndpointDocs {
+private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJsonLDEncoder: ProjectJsonLDEncoder)
+    extends EndpointDocs {
 
   override lazy val path: Path = Path(
     "Project details",
     "Finds Project details".some,
     GET(
       Uri / "projects" / namespace / projectName,
-      Status.Ok -> Response("Details found", Contents(MediaType.`application/json`("Sample data", example))),
+      Status.Ok -> Response(
+        "Details found",
+        Contents(
+          MediaType.`application/json`("Sample data", projectJsonEncoder encode example),
+          MediaType.`application/ld+json`("Sample data", projectJsonLDEncoder encode example)
+        )
+      ),
       Status.Unauthorized -> Response(
         "Unauthorized",
         Contents(MediaType.`application/json`("Invalid token", InfoMessage("Unauthorized")))
@@ -79,13 +84,18 @@ private class ProjectEndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) exte
   private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
 
   private val example = Project(
+    projects.ResourceId("http://renkulab.io/projects/namespace/name"),
     projects.Id(123),
     projects.Path("namespace/name"),
     projects.Name("name"),
     projects.Description("description").some,
     projects.Visibility.Public,
-    Creation(projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
-             Creator(persons.Email("john@mail.com").some, persons.Name("John")).some
+    Creation(
+      projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+      Creator(persons.ResourceId("http://renkulab.io/persons/2"),
+              persons.Email("john@mail.com").some,
+              persons.Name("John")
+      ).some
     ),
     DateUpdated(Instant.parse("2012-11-16T10:00:00.000Z")),
     Urls(
@@ -97,10 +107,15 @@ private class ProjectEndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) exte
     Forking(
       ForksCount(1),
       ParentProject(
+        projects.ResourceId("http://renkulab.io/projects/namespace/fork"),
         projects.Path("namespace/fork"),
         projects.Name("fork"),
-        Creation(projects.DateCreated(Instant.parse("2012-11-17T10:00:00.000Z")),
-                 Creator(persons.Email("goeff@mail.com").some, persons.Name("Goeff")).some
+        Creation(
+          projects.DateCreated(Instant.parse("2012-11-17T10:00:00.000Z")),
+          Creator(persons.ResourceId("http://renkulab.io/persons/3"),
+                  persons.Email("goeff@mail.com").some,
+                  persons.Name("Goeff")
+          ).some
         )
       ).some
     ),
