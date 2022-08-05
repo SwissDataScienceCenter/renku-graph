@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.testtools.IOSpec
+import org.http4s.MediaRange.`*/*`
 import org.http4s.MediaType.application
 import org.http4s.headers.Accept
 import org.http4s.{Headers, Request, Response, Status}
@@ -48,6 +49,17 @@ class ResponseToolsSpec extends AnyWordSpec with should.Matchers with IOSpec wit
 
       response.map(_.status).unsafeRunSync()         shouldBe Status.Ok
       response.flatMap(_.as[String]).unsafeRunSync() shouldBe body
+    }
+
+    "return the default result for 'Accept: */*'" in new TestCase {
+      implicit val request: Request[IO] = Request(headers = Headers(Accept(`*/*`)))
+
+      val response = whenAccept {
+        application.json --> Response[IO](Status.Ok).withEntity(bodyFactory()).pure[IO]
+      }(default = Response[IO](Status.Accepted).pure[IO])
+
+      response.map(_.status).unsafeRunSync()         shouldBe Status.Accepted
+      response.flatMap(_.as[String]).unsafeRunSync() shouldBe ""
     }
 
     "return the default result when no Accept header" in new TestCase {
