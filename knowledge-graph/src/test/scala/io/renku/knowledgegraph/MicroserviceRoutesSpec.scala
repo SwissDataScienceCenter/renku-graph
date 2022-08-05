@@ -31,6 +31,7 @@ import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
@@ -512,10 +513,13 @@ class MicroserviceRoutesSpec
         .expects(projectPath, maybeAuthUser)
         .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
 
-      implicit val req: Request[IO] = Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
-      (projectEndpoint.`GET /projects/:path` _).expects(projectPath, maybeAuthUser).returning(Response[IO](Ok).pure[IO])
+      val request = Request[IO](GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+      (projectEndpoint
+        .`GET /projects/:path`(_: projects.Path, _: Option[AuthUser])(_: Request[IO]))
+        .expects(projectPath, maybeAuthUser, request)
+        .returning(Response[IO](Ok).pure[IO])
 
-      routes(maybeAuthUser).call(req).status shouldBe Ok
+      routes(maybeAuthUser).call(request).status shouldBe Ok
 
       routesMetrics.clearRegistry()
     }
