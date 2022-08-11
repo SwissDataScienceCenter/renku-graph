@@ -26,6 +26,7 @@ import io.renku.graph.model.generations.ResourceId
 import io.renku.graph.model.{activities, generations}
 import io.renku.jsonld.JsonLDDecoder.decodeList
 import io.renku.jsonld._
+import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax.JsonEncoderOps
 
 final case class Generation(resourceId: ResourceId, activityResourceId: activities.ResourceId, entity: OutputEntity)
@@ -59,4 +60,9 @@ object Generation {
                   }
       } yield Generation(resourceId, activityResourceId, entity)
     }
+
+  lazy val ontology: Type = Type.Def(
+    Class(prov / "Generation"),
+    ObjectProperty(prov / "activity", Activity.ontologyClass)
+  )
 }

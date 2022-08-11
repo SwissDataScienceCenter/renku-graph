@@ -53,6 +53,7 @@ sealed trait PlanOps {
 }
 
 object Plan {
+  import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -105,4 +106,23 @@ object Plan {
                  maybeInvalidationTime
     )
   }
+
+  lazy val ontology: Type = Type.Def(
+    Class(prov / "Plan"),
+    ObjectProperties(
+      ObjectProperty(renku / "hasArguments", CommandParameterBase.CommandParameter.ontology),
+      ObjectProperty(renku / "hasInputs", CommandParameterBase.CommandInput.ontology),
+      ObjectProperty(renku / "hasOutputs", CommandParameterBase.CommandOutput.ontology)
+    ),
+    DataProperties(
+      DataProperty(schema / "name", xsd / "string"),
+      DataProperty(schema / "description", xsd / "string"),
+      DataProperty(renku / "command", xsd / "string"),
+      DataProperty(schema / "dateCreated", xsd / "dateTime"),
+      DataProperty(schema / "programmingLanguage", xsd / "string"),
+      DataProperty(schema / "keywords", xsd / "string"),
+      DataProperty(renku / "successCodes", xsd / "int"),
+      DataProperty(prov / "invalidatedAtTime", xsd / "dateTime")
+    )
+  )
 }

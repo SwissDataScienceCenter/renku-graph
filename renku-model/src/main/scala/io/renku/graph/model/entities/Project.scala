@@ -25,6 +25,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.projects._
 import io.renku.jsonld.JsonLDDecoder
+import io.renku.jsonld.ontology._
 import monocle.{Lens, Traversal}
 
 sealed trait Project extends Product with Serializable {
@@ -389,6 +390,34 @@ object Project {
 
   def decoder(gitLabInfo: GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Project] =
     ProjectJsonLDDecoder(gitLabInfo)
+
+  lazy val ontology: Type = {
+    val projectClass = Class(schema / "Project")
+    Type.Def(
+      projectClass,
+      ObjectProperties(
+        ObjectProperty(schema / "agent", Agent.ontology),
+        ObjectProperty(schema / "creator", Person.ontology),
+        ObjectProperty(schema / "member", Person.ontology),
+        ObjectProperty(renku / "hasActivity", Activity.ontology),
+        ObjectProperty(renku / "hasPlan", Plan.ontology),
+        ObjectProperty(renku / "hasDataset", Dataset.ontology),
+        ObjectProperty(prov / "wasDerivedFrom", projectClass)
+      ),
+      DataProperties(
+        DataProperty(schema / "name", xsd / "string"),
+        DataProperty(renku / "projectPath", xsd / "string"),
+        DataProperty(renku / "projectNamespaces", xsd / "string"),
+        DataProperty(schema / "description", xsd / "string"),
+        DataProperty(schema / "dateCreated", xsd / "dateTime"),
+        DataProperty.top(renku / "projectVisibility",
+                         DataPropertyRange(NonEmptyList.fromListUnsafe(projects.Visibility.all.toList))
+        ),
+        DataProperty(schema / "keywords", xsd / "string"),
+        DataProperty(schema / "schemaVersion", xsd / "string")
+      )
+    )
+  }
 
   final case class GitLabProjectInfo(id:               Id,
                                      name:             Name,
