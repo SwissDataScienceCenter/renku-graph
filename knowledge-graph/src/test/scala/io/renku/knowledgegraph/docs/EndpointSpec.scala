@@ -25,7 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.EndpointTester._
 import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
-import io.renku.knowledgegraph.projectdetails
+import io.renku.knowledgegraph.{ontology, projectdetails}
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model.{Path, Uri}
@@ -59,21 +59,31 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
     private val entitiesEndpoint = mock[entities.EndpointDocs]
     (() => entitiesEndpoint.path)
       .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "entities")))
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "entities")))
+    private val ontologyEndpoint = mock[ontology.EndpointDocs]
+    (() => ontologyEndpoint.path)
+      .expects()
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "ontology")))
     private val projectEndpoint = mock[projectdetails.EndpointDocs]
     (() => projectEndpoint.path)
       .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "entities")))
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "namespace" / "name")))
     private val projectDatasetsEndpoint = mock[ProjectDatasetsEndpointDocs]
     (() => projectDatasetsEndpoint.path)
       .expects()
       .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "datasets")))
+    private val docsEndpoint = mock[EndpointDocs]
+    (() => docsEndpoint.path)
+      .expects()
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "spec.json")))
 
     val endpoint = new EndpointImpl[IO](datasetsSearchEndpoint,
                                         datasetEndpoint,
                                         entitiesEndpoint,
+                                        ontologyEndpoint,
                                         projectEndpoint,
                                         projectDatasetsEndpoint,
+                                        docsEndpoint,
                                         serviceVersions.generateOne
     )
   }

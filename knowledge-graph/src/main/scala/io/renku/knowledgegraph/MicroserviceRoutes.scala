@@ -57,6 +57,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     entitiesEndpoint:        entities.Endpoint[F],
     queryEndpoint:           QueryEndpoint[F],
     lineageEndpoint:         lineage.Endpoint[F],
+    ontologyEndpoint:        ontology.Endpoint[F],
     projectEndpoint:         projectdetails.Endpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     docsEndpoint:            docs.Endpoint[F],
@@ -74,6 +75,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
   import projectEndpoint._
+  import ontologyEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
   import queryEndpoint._
   import routesMetrics._
@@ -126,9 +128,10 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "knowledge-graph" / "graphql"   => schema()
-    case GET -> Root / "knowledge-graph" / "spec.json" => docsEndpoint.`get /spec.json`
-    case GET -> Root / "ping"                          => Ok("pong")
+    case GET -> Root / "knowledge-graph" / "graphql"        => schema()
+    case req @ GET -> Root / "knowledge-graph" / "ontology" => `GET /ontology`(req)
+    case GET -> Root / "knowledge-graph" / "spec.json"      => docsEndpoint.`get /spec.json`
+    case GET -> Root / "ping"                               => Ok("pong")
   }
 
   private def searchForDatasets(
@@ -260,6 +263,7 @@ private object MicroserviceRoutes {
         entitiesEndpoint        <- entities.Endpoint[IO]
         queryEndpoint           <- QueryEndpoint()
         lineageEndpoint         <- lineage.Endpoint[IO]
+        ontologyEndpoint        <- ontology.Endpoint[IO]
         projectEndpoint         <- projectdetails.Endpoint[IO]
         projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
         docsEndpoint            <- docs.Endpoint[IO]
@@ -273,6 +277,7 @@ private object MicroserviceRoutes {
                                      entitiesEndpoint,
                                      queryEndpoint,
                                      lineageEndpoint,
+                                     ontologyEndpoint,
                                      projectEndpoint,
                                      projectDatasetsEndpoint,
                                      docsEndpoint,
