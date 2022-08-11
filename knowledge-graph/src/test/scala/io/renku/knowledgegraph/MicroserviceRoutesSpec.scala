@@ -435,7 +435,7 @@ class MicroserviceRoutesSpec
 
       val request  = Request[IO](Method.GET, uri"/knowledge-graph/ontology")
       val response = Response[IO](httpStatuses.generateOne)
-      (ontologyEndpoint.`GET /ontology` _).expects(request).returning(response.pure[IO])
+      (ontologyEndpoint.`GET /ontology`(_: Request[IO])).expects(request).returning(response.pure[IO])
 
       routes().call(request).status shouldBe response.status
     }
