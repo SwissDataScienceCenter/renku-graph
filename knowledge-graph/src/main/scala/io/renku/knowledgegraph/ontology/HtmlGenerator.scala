@@ -34,10 +34,24 @@ private object HtmlGenerator {
 
   val generationPath:                       Path = Path.of("ontology")
   private[ontology] val ontologyJsonLDFile: Path = Path.of("ontology.jsonld")
+  private[ontology] val ontologyConfFile:   Path = Path.of("ontology.properties")
+  private[ontology] val ontologyConfig = Seq(
+    "abstract"               -> "Renku Ontology",
+    "ontologyTitle"          -> "Renku Ontology",
+    "ontologyName"           -> "Renku Ontology",
+    "ontologyPrefix"         -> "renku",
+    "ontologyNamespaceURI"   -> "https://swissdatasciencecenter.github.io/renku-ontology#",
+    "ontologyRevisionNumber" -> "9",
+    "authors"                -> "Renku Team",
+    "authorsInstitution"     -> "Swiss Data Science Center",
+    "authorsInstitutionURI"  -> "https://datascience.ch",
+    "licenseName"            -> "Licensed under the Apache License, Version 2.0",
+    "licenseURI"             -> "https://www.apache.org/licenses/LICENSE-2.0"
+  )
 
   def apply[F[_]: Async] = new HtmlGeneratorImpl[F](generationPath, OntologyGenerator())
 
-  private[ontology] val generateHtml: (Path, Path) => Unit = { (ontologyFile, generationPath) =>
+  private[ontology] val generateHtml: (Path, Path, Path) => Unit = { (ontologyFile, ontologyConfFile, generationPath) =>
     GuiController.main(
       List(
         "-ontFile",
@@ -45,7 +59,7 @@ private object HtmlGenerator {
         "-outFolder",
         generationPath.toString,
         "-confFile",
-        Thread.currentThread().getContextClassLoader.getResource("ontology.properties").toString,
+        ontologyConfFile.toString,
         "-rewriteAll",
         "-webVowl",
         "-uniteSections"
@@ -57,7 +71,7 @@ private object HtmlGenerator {
 private class HtmlGeneratorImpl[F[_]: Async](
     override val generationPath: Path,
     ontologyGenerator:           OntologyGenerator,
-    generateHtml:                (Path, Path) => Unit = HtmlGenerator.generateHtml
+    generateHtml:                (Path, Path, Path) => Unit = HtmlGenerator.generateHtml
 ) extends HtmlGenerator[F] {
   import HtmlGenerator._
 
@@ -68,13 +82,28 @@ private class HtmlGeneratorImpl[F[_]: Async](
 
   private lazy val readinessFlag: Deferred[F, Unit] = Deferred.unsafe[F, Unit]
   private lazy val generationProcess: F[Unit] =
-    Sync[F].delay[Unit](writeToFile(ontologyGenerator.getOntology)) >>
-      Sync[F].delay[Unit](generateHtml(generationPath resolve ontologyJsonLDFile, generationPath)) >>
+    Sync[F].delay[Unit](createDirectory()) >>
+      Sync[F].delay[Unit](writeToFile(ontologyGenerator.getOntology)) >>
+      Sync[F].delay[Unit](writeOntologyProperties()) >>
+      Sync[F].delay[Unit](
+        generateHtml(generationPath resolve ontologyJsonLDFile, generationPath resolve ontologyConfFile, generationPath)
+      ) >>
       readinessFlag.complete(()).void
 
-  private def writeToFile(ontology: JsonLD): Unit = {
+  private def createDirectory(): Unit = {
     if (!Files.isDirectory(generationPath)) Files.createDirectory(generationPath)
+    ()
+  }
+
+  private def writeToFile(ontology: JsonLD): Unit = {
     Files.writeString(generationPath resolve ontologyJsonLDFile, ontology.toJson.spaces2)
+    ()
+  }
+
+  private def writeOntologyProperties(): Unit = {
+    Files.writeString(generationPath resolve ontologyConfFile,
+                      ontologyConfig.map { case (key, value) => s"$key=$value" }.mkString("\n")
+    )
     ()
   }
 }
