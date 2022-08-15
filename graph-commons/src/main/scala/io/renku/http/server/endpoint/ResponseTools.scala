@@ -22,7 +22,7 @@ import cats.syntax.all._
 import cats.{Applicative, Eval}
 import io.renku.http.ErrorMessage
 import org.http4s.headers.Accept
-import org.http4s.{MediaType, Request, Response, Status}
+import org.http4s.{MediaRange, MediaType, Request, Response, Status}
 
 trait ResponseTools {
 
@@ -36,24 +36,27 @@ trait ResponseTools {
   def whenAccept[F[_]: Applicative](
       mapping: AcceptMapping[F]*
   )(default:   => F[Response[F]])(implicit request: Request[F]): F[Response[F]] = {
-    def notSupported(accept: Accept) =
-      Response[F](Status.BadRequest)
-        .withEntity(
-          ErrorMessage(s"Accept: ${accept.values.map(_.mediaRange.toString()).intercalate(", ")} not supported").value
-        )
-        .pure[F]
+    def notSupported(accept: Accept) = Response[F](Status.BadRequest)
+      .withEntity(
+        ErrorMessage(s"Accept: ${accept.values.map(_.mediaRange.toString()).intercalate(", ")} not supported").value
+      )
+      .pure[F]
 
     request.headers
       .get[Accept]
-      .map(accept =>
-        accept.values.toList
-          .map(_.mediaRange)
-          .collect(mr => mapping.find(_.mediaType.satisfiedBy(mr)))
-          .flatten
-          .headOption
-          .map(_.response.value)
-          .getOrElse(notSupported(accept))
-      )
+      .map { accept =>
+        accept.values.toList.map(_.mediaRange) match {
+          case Nil                     => default
+          case MediaRange.`*/*` :: Nil => default
+          case acceptRanges =>
+            acceptRanges
+              .collect(mr => mapping.find(_.mediaType.satisfiedBy(mr)))
+              .flatten
+              .headOption
+              .map(_.response.value)
+              .getOrElse(notSupported(accept))
+        }
+      }
       .getOrElse(default)
   }
 }
