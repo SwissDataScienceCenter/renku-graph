@@ -39,13 +39,16 @@ private object HtmlGenerator {
 
   private[ontology] val generateHtml: (Path, Path) => Unit = { (ontologyFile, generationPath) =>
     GuiController.main(
-      List("-ontFile",
-           ontologyFile.toString,
-           "-outFolder",
-           generationPath.toString,
-           "-rewriteAll",
-           "-webVowl",
-           "-uniteSections"
+      List(
+        "-ontFile",
+        ontologyFile.toString,
+        "-outFolder",
+        generationPath.toString,
+        "-confFile",
+        Thread.currentThread().getContextClassLoader.getResource("ontology.properties").toString,
+        "-rewriteAll",
+        "-webVowl",
+        "-uniteSections"
       ).toArray
     )
   }
