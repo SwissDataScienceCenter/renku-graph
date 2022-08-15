@@ -491,9 +491,9 @@ Response body example:
 
 #### GET /api/knowledge-graph/ontology
 
-Returns ontology used in the Knowledge Graph.
+Returns ontology used in the Knowledge Graph as HTML page or JSON-LD.
 
-The response payload is `content-type: application/ld+json`.
+The resource supports `text/html` and `application/ld+json` `Accept` headers.
 
 **Response**
 
@@ -502,7 +502,8 @@ The response payload is `content-type: application/ld+json`.
 | OK (200)                   | If generating ontology was successful |
 | INTERNAL SERVER ERROR (500)| Otherwise                             |
 
-Response body example:
+Response body example for `Accept: application/ld+json`:
+
 ```json
 [
   {

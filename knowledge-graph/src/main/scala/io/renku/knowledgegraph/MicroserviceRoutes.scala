@@ -18,11 +18,10 @@
 
 package io.renku.knowledgegraph
 
-import cats.MonadThrow
 import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.unsafe.IORuntime
-import cats.effect.{IO, Resource}
+import cats.effect.{Async, IO, Resource}
 import cats.syntax.all._
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
@@ -51,7 +50,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class MicroserviceRoutes[F[_]: MonadThrow](
+private class MicroserviceRoutes[F[_]: Async](
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
     datasetEndpoint:         DatasetEndpoint[F],
     entitiesEndpoint:        entities.Endpoint[F],
@@ -72,10 +71,10 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import datasetIdAuthorizer.{authorize => authorizeDatasetId}
   import entitiesEndpoint._
   import lineageEndpoint._
+  import ontologyEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
   import projectEndpoint._
-  import ontologyEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
   import queryEndpoint._
   import routesMetrics._
@@ -128,10 +127,10 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "knowledge-graph" / "graphql"        => schema()
-    case req @ GET -> Root / "knowledge-graph" / "ontology" => `GET /ontology`(req)
-    case GET -> Root / "knowledge-graph" / "spec.json"      => docsEndpoint.`get /spec.json`
-    case GET -> Root / "ping"                               => Ok("pong")
+    case GET -> Root / "knowledge-graph" / "graphql"          => schema()
+    case req @ GET -> "knowledge-graph" /: "ontology" /: path => `GET /ontology`(path)(req)
+    case GET -> Root / "knowledge-graph" / "spec.json"        => docsEndpoint.`get /spec.json`
+    case GET -> Root / "ping"                                 => Ok("pong")
   }
 
   private def searchForDatasets(

@@ -21,31 +21,44 @@ package io.renku.knowledgegraph.ontology
 import cats.effect.Async
 import cats.syntax.all._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{Request, Response}
+import org.http4s.headers.{Accept, Location}
+import org.http4s.{Headers, Request, Response, StaticFile, Uri}
 import org.typelevel.log4cats.Logger
 
 trait Endpoint[F[_]] {
-  def `GET /ontology`(implicit request: Request[F]): F[Response[F]]
+  def `GET /ontology`(path: Uri.Path)(implicit request: Request[F]): F[Response[F]]
 }
 
 object Endpoint {
-  def apply[F[_]: Async: Logger]: F[Endpoint[F]] = new EndpointImpl[F](OntologyGenerator(), HtmlGenerator).pure[F].widen
+  def apply[F[_]: Async: Logger]: F[Endpoint[F]] =
+    new EndpointImpl[F](OntologyGenerator(), HtmlGenerator[F]).pure[F].widen
 }
 
-private class EndpointImpl[F[_]: Async: Logger](ontologyGenerator: OntologyGenerator, htmlGenerator: HtmlGenerator)
+private class EndpointImpl[F[_]: Async: Logger](ontologyGenerator: OntologyGenerator, htmlGenerator: HtmlGenerator[F])
     extends Http4sDsl[F]
     with Endpoint[F] {
 
+  import fs2.io.file.Path.fromNioPath
   import io.renku.http.jsonld4s._
   import io.renku.http.server.endpoint._
-  import org.http4s.headers.`Content-Type`
   import org.http4s.MediaType.{application, text}
 
-  override def `GET /ontology`(implicit request: Request[F]): F[Response[F]] =
+  override def `GET /ontology`(path: Uri.Path)(implicit request: Request[F]): F[Response[F]] =
     whenAccept(
-      text.html             --> htmlResponse,
-      application.`ld+json` --> Ok(ontologyGenerator.getOntology)
-    )(default = htmlResponse)
+      text.html              --> pageResponse(path),
+      text.plain             --> pageResponse(path),
+      text.css               --> pageResponse(path),
+      application.javascript --> pageResponse(path),
+      application.json       --> pageResponse(path),
+      application.`ld+json`  --> Ok(ontologyGenerator.getOntology)
+    )(default = pageResponse(path))
 
-  private lazy val htmlResponse = Ok(htmlGenerator.getHtml).map(_.withContentType(`Content-Type`(text.html)))
+  private def pageResponse(path: Uri.Path)(implicit request: Request[F]) = htmlGenerator.generateHtml >> {
+    if (path.isEmpty)
+      Response[F](SeeOther, headers = Headers(Location(request.uri / "index-en.html"), Accept(text.html))).pure[F]
+    else
+      StaticFile
+        .fromPath(fromNioPath(htmlGenerator.generationPath resolve path.toString()), Some(request))
+        .getOrElseF(NotFound(s"Ontology '$path' resource cannot be found"))
+  }
 }

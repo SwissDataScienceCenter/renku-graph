@@ -28,7 +28,8 @@ private trait OntologyGenerator {
 }
 
 private object OntologyGenerator {
-  def apply(): OntologyGenerator = new OntologyGeneratorImpl(generateOntology(Project.ontology, Schemas.renku))
+  private val instance = new OntologyGeneratorImpl(generateOntology(Project.ontology, Schemas.renku))
+  def apply(): OntologyGenerator = instance
 }
 
 private class OntologyGeneratorImpl(generate: => JsonLD) extends OntologyGenerator {
