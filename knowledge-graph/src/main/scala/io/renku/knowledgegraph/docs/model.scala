@@ -21,7 +21,8 @@ package io.renku.knowledgegraph.docs
 import cats.Show
 import cats.syntax.all._
 import io.circe.{Encoder, Json}
-import io.renku.knowledgegraph.docs.model.Example.JsonExample
+import io.renku.jsonld.JsonLD
+import io.renku.knowledgegraph.docs.model.Example.{JsonExample, JsonLDExample}
 import io.renku.knowledgegraph.docs.model.OAuthFlows.OAuthFlow
 import io.renku.knowledgegraph.docs.model.Path.OpMapping
 
@@ -230,8 +231,13 @@ object model {
     def apply(name: String, exampleName: String, example: Example): MediaType =
       MediaType(name, Map(exampleName -> example))
 
+    lazy val `text/html`: MediaType = MediaType("text/html", Map.empty)
+
     def `application/json`(exampleName: String, example: Json): MediaType =
       MediaType("application/json", Map(exampleName -> JsonExample(example)))
+
+    def `application/ld+json`(exampleName: String, example: JsonLD): MediaType =
+      MediaType("application/ld+json", Map(exampleName -> JsonLDExample(example)))
 
     def `application/json`[P](exampleName: String, example: P)(implicit encoder: Encoder[P]): MediaType =
       MediaType("application/json", Map(exampleName -> JsonExample(encoder(example))))
@@ -384,7 +390,9 @@ object model {
     case class JsonExample(value: Json, summary: Option[String] = None) extends Example {
       type T = Json
     }
-
+    case class JsonLDExample(value: JsonLD, summary: Option[String] = None) extends Example {
+      type T = JsonLD
+    }
     case class StringExample(value: String, summary: Option[String] = None) extends Example {
       type T = String
     }

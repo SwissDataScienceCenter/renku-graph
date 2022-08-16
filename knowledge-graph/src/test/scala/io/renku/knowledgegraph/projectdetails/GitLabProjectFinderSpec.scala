@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
+import GitLabProjectFinder.GitLabProject
 import ProjectsGenerators._
 import cats.effect.IO
 import cats.syntax.all._
@@ -34,12 +35,11 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.projects.GitLabProjectFinder.GitLabProject
-import io.renku.knowledgegraph.projects.model.Permissions
-import io.renku.knowledgegraph.projects.model.Permissions._
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import io.renku.tinytypes.json.TinyTypeEncoders._
+import model.Permissions
+import model.Permissions._
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Request, Response, Status, Uri}
 import org.scalamock.scalatest.MockFactory

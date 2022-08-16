@@ -20,7 +20,7 @@ package io.renku.graph.acceptancetests.tooling
 
 import cats.Monad
 import cats.effect.unsafe.IORuntime
-import cats.effect.{IO, Temporal}
+import cats.effect.{Async, IO, Temporal}
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -35,7 +35,7 @@ import io.renku.webhookservice.crypto.HookTokenCrypto
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.{Accepted, Ok}
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
-import org.http4s.{Header, Headers, Method, Status, Uri}
+import org.http4s.{Header, Headers, Method, Request, Response, Status, Uri}
 import org.scalatest.Assertions.fail
 import org.scalatest.matchers.should
 import org.typelevel.ci._
@@ -112,6 +112,21 @@ object KnowledgeGraphClient {
         }"""
       }
     }
+
+    def `GET /knowledge-graph/ontology`(implicit ioRuntime: IORuntime): (Status, Headers, String) = {
+      import io.renku.http.server.EndpointTester.stringEntityDecoder
+      val responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[(Status, Headers, String)]] = {
+        case (status, _, response) =>
+          response
+            .as[String](implicitly[Async[IO]], stringEntityDecoder)
+            .map(pageBody => (status, response.headers, pageBody))
+      }
+
+      for {
+        uri      <- validateUri(s"$baseUrl/knowledge-graph/ontology/index-en.html")
+        response <- send(request(Method.GET, uri))(responseMapping)
+      } yield response
+    }.unsafeRunSync()
   }
 }
 
@@ -214,9 +229,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
     } yield
       if (status == Ok) ServiceUp
       else ServiceDown
-  } recover { case NonFatal(_) =>
-    ServiceDown
-  }
+  } recover { case NonFatal(_) => ServiceDown }
 
   protected lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ClientResponse]] = {
     case (status, _, response) => response.as[Json].map(json => ClientResponse(status, json, response.headers))

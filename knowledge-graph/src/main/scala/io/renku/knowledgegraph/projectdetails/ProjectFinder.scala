@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import GitLabProjectFinder.GitLabProject
 import KGProjectFinder.{KGParent, KGProject}
@@ -28,10 +28,8 @@ import io.renku.graph.model.projects.Path
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.projects.model._
+import model._
 import org.typelevel.log4cats.Logger
-
-import scala.util.Try
 
 private trait ProjectFinder[F[_]] {
   def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[Project]]
@@ -54,6 +52,7 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
     OptionT(findAccessToken(path)) >>= { implicit accessToken => OptionT(findProjectInGitLab(path)) }
 
   private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) = Project(
+    resourceId = kgProject.resourceId,
     id = gitLabProject.id,
     path = path,
     name = kgProject.name,
@@ -61,7 +60,7 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
     visibility = kgProject.visibility,
     created = Creation(
       date = kgProject.created.date,
-      maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
+      kgProject.created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
     ),
     updatedAt = gitLabProject.updatedAt,
     urls = gitLabProject.urls,
@@ -75,12 +74,13 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
 
   private implicit class ParentOps(maybeParent: Option[KGParent]) {
     lazy val toParentProject: Option[ParentProject] =
-      (maybeParent -> maybeParent.flatMap(_.resourceId.as[Try, Path].toOption)) mapN { case (parent, path) =>
+      maybeParent.map { case KGParent(resourceId, path, name, created) =>
         ParentProject(
+          resourceId,
           path,
-          parent.name,
-          Creation(parent.created.date,
-                   parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
+          name,
+          Creation(created.date,
+                   created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
           )
         )
       }

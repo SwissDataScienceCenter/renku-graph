@@ -16,22 +16,6 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.http
 
-import io.renku.config.renku
-import io.renku.generators.CommonGraphGenerators.renkuApiUrls
-import io.renku.generators.Generators.Implicits._
-import io.renku.knowledgegraph.docs.OpenApiTester._
-import org.scalatest.wordspec.AnyWordSpec
-
-class ProjectEndpointDocsSpec extends AnyWordSpec {
-
-  "path" should {
-
-    "return a valid Path object" in {
-      validatePath(new ProjectEndpointDocsImpl().path)
-    }
-  }
-
-  private implicit lazy val renkuUrl: renku.ApiUrl = renkuApiUrls.generateOne
-}
+package object jsonld4s extends JsonLD4sInstances

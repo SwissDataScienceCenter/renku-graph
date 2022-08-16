@@ -20,10 +20,11 @@ package io.renku.graph.model.entities
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.associations.ResourceId
+import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.jsonld._
+import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
 
 sealed trait Association {
@@ -78,4 +79,10 @@ object Association {
       case Some(agent) => Association.WithPersonAgent(resourceId, agent, plan).asRight
       case None        => DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
     }
+
+  lazy val ontology: Type = Type.Def(
+    Class(prov / "Association"),
+    ObjectProperty(prov / "agent", Agent.ontology),
+    ObjectProperty(prov / "hadPlan", Plan.ontology)
+  )
 }

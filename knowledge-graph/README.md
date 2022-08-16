@@ -5,19 +5,21 @@ This is a microservice which provides API for the Graph DB.
 ## API
 The following routes may be slightly different when accessed via the main renku api, which uses the gateway service (e.g. /api/kg/datasets)
 
-| Method | Path                                                                     | Description                                                          |
-|--------|--------------------------------------------------------------------------|----------------------------------------------------------------------|
+| Method | Path                                                                         | Description                                                          |
+|--------|------------------------------------------------------------------------------|----------------------------------------------------------------------|
 | GET    | ```/api/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                   |
 | GET    | ```/api/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                   |
 | GET    | ```/api/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                   |
 | GET    | ```/api/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                      |
 | POST   | ```/api/knowledge-graph/graphql```                                           | GraphQL query endpoint                                               |
+| GET    | ```/api/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                         |
 | GET    | ```/api/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`       |
 | GET    | ```/api/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                |
 | GET    | ```/api/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project |
-| GET    | ```/metrics```                                                           | Serves Prometheus metrics                                            |
-| GET    | ```/ping```                                                              | To check if service is healthy                                       |
-| GET    | ```/version```                                                           | Returns info about service version                                   |
+| GET    | ```/api/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources             |
+| GET    | ```/metrics```                                                               | Serves Prometheus metrics                                            |
+| GET    | ```/ping```                                                                  | To check if service is healthy                                       |
+| GET    | ```/version```                                                               | Returns info about service version                                   |
 
 #### GET /api/knowledge-graph/datasets
 
@@ -487,6 +489,67 @@ Response body example:
 }
 ```
 
+#### GET /api/knowledge-graph/ontology
+
+Returns ontology used in the Knowledge Graph as HTML page or JSON-LD.
+
+The resource supports `text/html` and `application/ld+json` `Accept` headers.
+
+**Response**
+
+| Status                     | Description                           |
+|----------------------------|---------------------------------------|
+| OK (200)                   | If generating ontology was successful |
+| INTERNAL SERVER ERROR (500)| Otherwise                             |
+
+Response body example for `Accept: application/ld+json`:
+
+```json
+[
+  {
+    "@id" : "https://swissdatasciencecenter.github.io/renku-ontology",
+    "@type" : "http://www.w3.org/2002/07/owl#Ontology",
+    "http://www.w3.org/2002/07/owl#imports" : [
+      {
+        "@id" : "http://www.w3.org/ns/oa#"
+      }
+    ]
+  },
+  {
+    "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf",
+    "@type" : "http://www.w3.org/2002/07/owl#Class"
+  },
+  {
+    "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/name",
+    "@type" : "http://www.w3.org/2002/07/owl#DatatypeProperty",
+    "http://www.w3.org/2000/01/rdf-schema#domain" : [
+      {
+        "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf"
+      }
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#range" : [
+      {
+        "@id" : "http://www.w3.org/2001/XMLSchema#string"
+      }
+    ]
+  },
+  {
+    "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/number",
+    "@type" : "http://www.w3.org/2002/07/owl#DatatypeProperty",
+    "http://www.w3.org/2000/01/rdf-schema#domain" : [
+      {
+        "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf"
+      }
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#range" : [
+      {
+        "@id" : "http://www.w3.org/2001/XMLSchema#number"
+      }
+    ]
+  }
+]
+```
+
 #### GET /api/knowledge-graph/projects/:namespace/:name
 
 Finds details of the project with the given `namespace/name`. The endpoint requires an authorization token to be passed
@@ -495,6 +558,8 @@ in the request for non-public projects. Supported headers are:
 - `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
 - `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
 - There's no need for a security headers for public projects
+
+The resource supports `application/json` and `application/ld+json` `Accept` headers.
 
 **Response**
 
@@ -505,7 +570,7 @@ in the request for non-public projects. Supported headers are:
 | NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access the project |
 | INTERNAL SERVER ERROR (500)| Otherwise                                                                                              |
 
-Response body example:
+Response body example for `Accept: application/json`:
 
 ```
 {
@@ -568,6 +633,71 @@ Response body example:
     {  
       "rel":"datasets",
       "href":"http://t:5511/projects/namespace/project-name/datasets"
+    }
+  ]
+}
+```
+
+Response body example for `Accept: application/ld+json`:
+
+```
+{
+  "@id" : "http://wwywiir:3577/yobqsDoboi/projects/d_llli5Zo/2nTaozqw/llosas_/__-6h3a",
+  "@type" : [
+    "http://www.w3.org/ns/prov#Location",
+    "http://schema.org/Project"
+  ],
+  "https://swissdatasciencecenter.github.io/renku-ontology#projectPath" : {
+    "@value" : "d_llli5Zo/2nTaozqw/llosas_/__-6h3a"
+  },
+  "http://schema.org/description" : {
+    "@value" : "Zs oJtagvqvIn diw cywpaj ordCPacr vnnkjj cgtzizxkb clfPe xuhrqT vK"
+  },
+  "http://schema.org/dateModified" : {
+    "@type" : "http://www.w3.org/2001/XMLSchema#dateTime",
+    "@value" : "1990-07-16T21:51:12.949Z"
+  },
+  "http://schema.org/identifier" : {
+    "@value" : 402288
+  },
+  "http://schema.org/creator" : {
+    "@id" : "http://wwywiir:3577/yobqsDoboi/persons/69212174",
+    "@type" : [
+      "http://www.w3.org/ns/prov#Person",
+      "http://schema.org/Person"
+    ],
+    "http://schema.org/email" : {
+      "@value" : "kpgj2u65iv@nezifs"
+    },
+    "http://schema.org/name" : {
+      "@value" : "flawal dolBA`ql"
+    }
+  },
+  "http://schema.org/schemaVersion" : {
+    "@value" : "42.31.9"
+  },
+  "https://swissdatasciencecenter.github.io/renku-ontology#projectVisibility" : {
+    "@value" : "internal"
+  },
+  "http://schema.org/name" : {
+    "@value" : "__-6h3a"
+  },
+  "http://schema.org/dateCreated" : {
+    "@type" : "http://www.w3.org/2001/XMLSchema#dateTime",
+    "@value" : "2007-01-27T17:58:52.739Z"
+  },
+  "http://schema.org/keywords" : [
+    {
+      "@value" : "bNalprNSye"
+    },
+    {
+      "@value" : "jffkdfe"
+    },
+    {
+      "@value" : "qscrvP"
+    },
+    {
+      "@value" : "ywnzgRbu"
     }
   ]
 }

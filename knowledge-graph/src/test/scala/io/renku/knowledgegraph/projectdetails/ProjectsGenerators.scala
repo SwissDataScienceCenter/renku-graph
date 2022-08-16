@@ -16,30 +16,29 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projects
+package io.renku.knowledgegraph.projectdetails
 
 import Converters._
+import GitLabProjectFinder.GitLabProject
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{httpUrls => urls, nonBlankStrings, nonEmptyList, nonNegativeInts, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities}
-import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.{Project => _, _}
-import io.renku.knowledgegraph.projects.GitLabProjectFinder.GitLabProject
-import io.renku.knowledgegraph.projects.KGProjectFinder.KGProject
-import io.renku.knowledgegraph.projects.model.Forking.ForksCount
-import io.renku.knowledgegraph.projects.model.Permissions._
-import io.renku.knowledgegraph.projects.model.Project.{DateUpdated, StarsCount}
-import io.renku.knowledgegraph.projects.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import io.renku.knowledgegraph.projects.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
-import io.renku.knowledgegraph.projects.model._
+import model.Forking.ForksCount
+import model.Permissions._
+import model.Project.{DateUpdated, StarsCount}
+import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
+import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import model._
 import org.scalacheck.Gen
 
 private object ProjectsGenerators {
 
   implicit val resourceProjects: Gen[Project] = for {
-    kgProject     <- anyProjectEntities.map(_.to[KGProject])
+    kgProject     <- anyProjectEntities.map(_.to(kgProjectConverter))
     gitLabProject <- gitLabProjects
   } yield Project(
+    resourceId = kgProject.resourceId,
     id = gitLabProject.id,
     path = kgProject.path,
     name = kgProject.name,
@@ -47,7 +46,7 @@ private object ProjectsGenerators {
     visibility = kgProject.visibility,
     created = Creation(
       date = kgProject.created.date,
-      maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
+      kgProject.created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
     ),
     updatedAt = gitLabProject.updatedAt,
     urls = gitLabProject.urls,
@@ -55,10 +54,12 @@ private object ProjectsGenerators {
       gitLabProject.forksCount,
       kgProject.maybeParent.map { parent =>
         ParentProject(
-          parent.resourceId.toUnsafe[Path],
+          parent.resourceId,
+          parent.path,
           parent.name,
-          Creation(parent.created.date,
-                   parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
+          Creation(
+            parent.created.date,
+            parent.created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
           )
         )
       }

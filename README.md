@@ -58,6 +58,7 @@ Hence, we are trying to find and then follow good patterns in naming, code organ
 * obviously the rules above can be always lifted if favour of readability;
 * code should be formatted with the rules defined in the `.scalafmt.conf` file;
 * once code readability issue is found, it should be either fix straight away or an issue should be created.
+* jsonLD should be used instead of jsonLd or jsonld
 
 #### Releasing
 

@@ -38,8 +38,9 @@ final case class Activity(resourceId:  ResourceId,
 
 object Activity {
   import io.renku.graph.model.GitLabApiUrl
-  import io.renku.graph.model.Schemas._
+  import io.renku.graph.model.Schemas.{prov, renku}
   import io.renku.jsonld._
+  import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
 
   val entityTypes: EntityTypes = EntityTypes of (prov / "Activity")
@@ -141,4 +142,18 @@ object Activity {
             .toEither
       } yield activity
     }
+
+  lazy val ontologyClass: Class = Class(prov / "Activity")
+  lazy val ontology: Type = Type.Def(
+    ontologyClass,
+    ObjectProperties(
+      ObjectProperty(prov / "wasAssociatedWith", Agent.ontology, Person.ontology),
+      ObjectProperty(prov / "qualifiedAssociation", Association.ontology),
+      ObjectProperty(prov / "qualifiedUsage", Usage.ontology),
+      ObjectProperty(renku / "parameter", ParameterValue.ontology)
+    ),
+    DataProperties(DataProperty(prov / "startedAtTime", xsd / "dateTime"),
+                   DataProperty(prov / "endedAtTime", xsd / "dateTime")
+    )
+  )
 }

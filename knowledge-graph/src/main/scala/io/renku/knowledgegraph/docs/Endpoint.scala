@@ -24,7 +24,7 @@ import io.circe.syntax._
 import io.renku.config.ServiceVersion
 import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.{entities, lineage, projects}
+import io.renku.knowledgegraph._
 import org.http4s
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
@@ -36,8 +36,10 @@ trait Endpoint[F[_]] {
 private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEndpointDocs,
                                         datasetEndpoint:         DatasetEndpointDocs,
                                         entitiesEndpoint:        entities.EndpointDocs,
-                                        projectEndpoint:         projects.ProjectEndpointDocs,
+                                        ontologyEndpoint:        ontology.EndpointDocs,
+                                        projectEndpoint:         projectdetails.EndpointDocs,
                                         projectDatasetsEndpoint: ProjectDatasetsEndpointDocs,
+                                        docsEndpoint:            EndpointDocs,
                                         serviceVersion:          ServiceVersion
 ) extends Http4sDsl[F]
     with Endpoint[F] {
@@ -55,9 +57,11 @@ private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEnd
     .addPath(datasetsSearchEndpoint.path)
     .addPath(datasetEndpoint.path)
     .addPath(entitiesEndpoint.path)
+    .addPath(ontologyEndpoint.path)
     .addPath(projectEndpoint.path)
     .addPath(projectDatasetsEndpoint.path)
     .addPath(lineage.EndpointDocs.path)
+    .addPath(docsEndpoint.path)
     .addSecurity(privateToken)
     .addSecurity(openIdConnect)
     .addNoAuthSecurity()
@@ -85,14 +89,18 @@ object Endpoint {
     datasetsSearchEndpoint  <- DatasetSearchEndpointDocs[F]
     datasetEndpoint         <- DatasetEndpointDocs[F]
     entitiesEndpoint        <- entities.EndpointDocs[F]
-    projectEndpoint         <- projects.ProjectEndpointDocs[F]
+    ontologyEndpoint        <- ontology.EndpointDocs[F]
+    projectEndpoint         <- projectdetails.EndpointDocs[F]
     projectDatasetsEndpoint <- ProjectDatasetsEndpointDocs[F]
+    docsEndpointEndpoint    <- EndpointDocs[F]
     serviceVersion          <- ServiceVersion.readFromConfig[F]()
   } yield new EndpointImpl[F](datasetsSearchEndpoint,
                               datasetEndpoint,
                               entitiesEndpoint,
+                              ontologyEndpoint,
                               projectEndpoint,
                               projectDatasetsEndpoint,
+                              docsEndpointEndpoint,
                               serviceVersion
   )
 }

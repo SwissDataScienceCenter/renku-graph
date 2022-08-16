@@ -22,7 +22,7 @@ import io.circe.generic.semiauto.deriveEncoder
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json, JsonObject}
-import io.renku.knowledgegraph.docs.model.Example.{JsonExample, StringExample}
+import io.renku.knowledgegraph.docs.model.Example.{JsonExample, JsonLDExample, StringExample}
 import io.renku.knowledgegraph.docs.model._
 
 private object Encoders {
@@ -165,6 +165,7 @@ private object Encoders {
   implicit def exampleEncoder: Encoder[model.Example] = Encoder.instance { example =>
     val value = example match {
       case JsonExample(value, _)   => json"""{"value": $value}"""
+      case JsonLDExample(value, _) => json"""{"value": ${value.toJson}}"""
       case StringExample(value, _) => json"""{"value": $value}"""
     }
 

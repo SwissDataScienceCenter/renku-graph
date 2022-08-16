@@ -18,11 +18,10 @@
 
 package io.renku.knowledgegraph
 
-import cats.MonadThrow
 import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.unsafe.IORuntime
-import cats.effect.{IO, Resource}
+import cats.effect.{Async, IO, Resource}
 import cats.syntax.all._
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
@@ -42,7 +41,6 @@ import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
-import io.renku.knowledgegraph.projects.ProjectEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -52,13 +50,14 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class MicroserviceRoutes[F[_]: MonadThrow](
+private class MicroserviceRoutes[F[_]: Async](
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
     datasetEndpoint:         DatasetEndpoint[F],
     entitiesEndpoint:        entities.Endpoint[F],
     queryEndpoint:           QueryEndpoint[F],
     lineageEndpoint:         lineage.Endpoint[F],
-    projectEndpoint:         ProjectEndpoint[F],
+    ontologyEndpoint:        ontology.Endpoint[F],
+    projectEndpoint:         projectdetails.Endpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     docsEndpoint:            docs.Endpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
@@ -72,6 +71,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import datasetIdAuthorizer.{authorize => authorizeDatasetId}
   import entitiesEndpoint._
   import lineageEndpoint._
+  import ontologyEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
   import projectEndpoint._
@@ -122,14 +122,15 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 
   private lazy val otherAuthRoutes: AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
     case authReq @ POST -> Root / "knowledge-graph" / "graphql" as maybeUser => handleQuery(authReq.req, maybeUser)
-    case GET -> "knowledge-graph" /: "projects" /: path as maybeUser => routeToProjectsEndpoints(path, maybeUser)
-
+    case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
+      routeToProjectsEndpoints(path, maybeUser)(authReq.req)
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "knowledge-graph" / "graphql"   => schema()
-    case GET -> Root / "knowledge-graph" / "spec.json" => docsEndpoint.`get /spec.json`
-    case GET -> Root / "ping"                          => Ok("pong")
+    case GET -> Root / "knowledge-graph" / "graphql"          => schema()
+    case req @ GET -> "knowledge-graph" /: "ontology" /: path => `GET /ontology`(path)(req)
+    case GET -> Root / "knowledge-graph" / "spec.json"        => docsEndpoint.`get /spec.json`
+    case GET -> Root / "ping"                                 => Ok("pong")
   }
 
   private def searchForDatasets(
@@ -203,9 +204,9 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
       .merge
 
   private def routeToProjectsEndpoints(
-      path:          Path,
-      maybeAuthUser: Option[AuthUser]
-  ): F[Response[F]] = path.segments.toList.map(_.toString) match {
+      path:           Path,
+      maybeAuthUser:  Option[AuthUser]
+  )(implicit request: Request[F]): F[Response[F]] = path.segments.toList.map(_.toString) match {
     case projectPathParts :+ "datasets" =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
@@ -216,7 +217,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     case projectPathParts =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-        .semiflatMap(getProject(_, maybeAuthUser))
+        .semiflatMap(`GET /projects/:path`(_, maybeAuthUser))
         .merge
   }
 
@@ -261,7 +262,8 @@ private object MicroserviceRoutes {
         entitiesEndpoint        <- entities.Endpoint[IO]
         queryEndpoint           <- QueryEndpoint()
         lineageEndpoint         <- lineage.Endpoint[IO]
-        projectEndpoint         <- ProjectEndpoint[IO]
+        ontologyEndpoint        <- ontology.Endpoint[IO]
+        projectEndpoint         <- projectdetails.Endpoint[IO]
         projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
         docsEndpoint            <- docs.Endpoint[IO]
         authenticator           <- GitLabAuthenticator[IO]
@@ -274,6 +276,7 @@ private object MicroserviceRoutes {
                                      entitiesEndpoint,
                                      queryEndpoint,
                                      lineageEndpoint,
+                                     ontologyEndpoint,
                                      projectEndpoint,
                                      projectDatasetsEndpoint,
                                      docsEndpoint,

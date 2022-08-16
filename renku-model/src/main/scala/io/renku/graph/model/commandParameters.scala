@@ -27,7 +27,8 @@ import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.entityModel.{Location, LocationLike}
 import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
 import io.renku.jsonld._
-import io.renku.jsonld.syntax.JsonEncoderOps
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonBlank, PositiveInt, Url}
 
@@ -155,5 +156,10 @@ object commandParameters {
                     }
         } yield stdOut
       }
+
+    lazy val ontology: Type = Type.Def(
+      Class(renku / "IOStream"),
+      DataProperty(renku / "streamType", DataPropertyRange(StdIn.name, StdOut.name, StdErr.name))
+    )
   }
 }

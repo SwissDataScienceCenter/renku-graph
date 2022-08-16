@@ -28,7 +28,7 @@ import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph.datasets.DatasetEndpoint
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
-import io.renku.knowledgegraph.projects.ProjectEndpoint
+import io.renku.knowledgegraph.projectdetails
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
 import io.renku.tinytypes.json.TinyTypeEncoders._
@@ -81,7 +81,7 @@ object model {
             .addIfDefined("description" -> project.maybeDescription)
             .deepMerge(
               _links(
-                Link(Rel("details") -> ProjectEndpoint.href(renkuApiUrl, project.path))
+                Link(Rel("details") -> projectdetails.Endpoint.href(renkuApiUrl, project.path))
               )
             )
         }

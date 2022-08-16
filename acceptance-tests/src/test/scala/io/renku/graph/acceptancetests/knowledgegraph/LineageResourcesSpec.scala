@@ -94,7 +94,6 @@ class LineageResourcesSpec
 
       lineageJson.downField("edges").as[List[Json]].map(_.toSet) shouldBe theExpectedEdges(exemplarData)
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes(exemplarData)
-
     }
   }
 

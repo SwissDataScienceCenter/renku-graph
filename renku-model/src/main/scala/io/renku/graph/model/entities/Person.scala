@@ -25,6 +25,7 @@ import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId
 import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.jsonld.JsonLDDecoder.{Result, decodeList}
 import io.renku.jsonld._
+import io.renku.jsonld.ontology._
 
 sealed trait Person extends PersonAlgebra with Product with Serializable {
   type Id <: ResourceId
@@ -219,4 +220,21 @@ object Person {
 
   private def and(additionalType: String): Cursor => Result[Boolean] =
     _.downField(schema / "additionalType").as[String].map(_ == additionalType)
+
+  lazy val ontology: Type = {
+    val sameAsType = Type.Def(
+      Class(schema / "URL"),
+      DataProperty(schema / "identifier", xsd / "string", xsd / "int"),
+      DataProperty(schema / "additionalType", DataPropertyRange("Orcid", "GitLab"))
+    )
+
+    Type.Def(
+      Class(schema / "Person"),
+      ObjectProperties(ObjectProperty(schema / "sameAs", sameAsType)),
+      DataProperties(DataProperty(schema / "email", xsd / "string"),
+                     DataProperty(schema / "name", xsd / "string"),
+                     DataProperty(schema / "affiliation", xsd / "string")
+      )
+    )
+  }
 }
