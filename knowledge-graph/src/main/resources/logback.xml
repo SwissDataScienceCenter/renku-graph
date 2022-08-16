@@ -24,6 +24,14 @@
         <appender-ref ref="SENTRY"/>
     </logger>
 
+    <logger name="widoco.Configuration" level="ERROR">
+        <appender-ref ref="ASYNC_STDOUT"/>
+    </logger>
+
+    <logger name="org.semanticweb.owlapi.util.SAXParsers" level="ERROR">
+        <appender-ref ref="ASYNC_STDOUT"/>
+    </logger>
+
     <root level="WARN">
         <appender-ref ref="ASYNC_STDOUT"/>
         <appender-ref ref="SENTRY"/>

@@ -231,6 +231,8 @@ object model {
     def apply(name: String, exampleName: String, example: Example): MediaType =
       MediaType(name, Map(exampleName -> example))
 
+    lazy val `text/html`: MediaType = MediaType("text/html", Map.empty)
+
     def `application/json`(exampleName: String, example: Json): MediaType =
       MediaType("application/json", Map(exampleName -> JsonExample(example)))
 

@@ -32,8 +32,9 @@ final case class PublicationEvent(resourceId:        ResourceId,
 )
 
 object PublicationEvent {
-  import io.renku.graph.model.Schemas._
+  import io.renku.graph.model.Schemas.schema
   import io.renku.jsonld._
+  import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
 
   private val entityTypes = EntityTypes of schema / "PublicationEvent"
@@ -85,4 +86,23 @@ object PublicationEvent {
              else DecodingFailure(show"Publication Event $about does not point to $url", Nil).asLeft
       } yield about
     }
+
+  val ontology: ReverseProperty = ReverseProperty(dsClass =>
+    Type.Def(
+      Class(schema / "PublicationEvent"),
+      ObjectProperties(
+        ObjectProperty(schema / "about",
+                       Type.Def(
+                         Class(schema / "URL"),
+                         ObjectProperty(schema / "url", dsClass)
+                       )
+        )
+      ),
+      DataProperties(
+        DataProperty(schema / "description", xsd / "string"),
+        DataProperty(schema / "name", xsd / "string"),
+        DataProperty(schema / "startDate", xsd / "dateTime")
+      )
+    )
+  )
 }

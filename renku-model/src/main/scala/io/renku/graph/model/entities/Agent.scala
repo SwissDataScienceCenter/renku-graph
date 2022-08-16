@@ -21,6 +21,7 @@ package io.renku.graph.model.entities
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.agents._
 import io.renku.jsonld._
+import io.renku.jsonld.ontology._
 
 final case class Agent(resourceId: ResourceId, name: Name)
 
@@ -45,4 +46,9 @@ object Agent {
       label      <- cursor.downField(schema / "name").as[Name]
     } yield Agent(resourceId, label)
   }
+
+  lazy val ontology: Type = Type.Def(
+    Class(prov / "SoftwareAgent"),
+    DataProperty(schema / "name", xsd / "string")
+  )
 }

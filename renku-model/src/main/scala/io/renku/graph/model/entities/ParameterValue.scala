@@ -60,6 +60,7 @@ object ParameterValue {
   }
 
   import io.renku.jsonld.JsonLDEncoder._
+  import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -134,4 +135,17 @@ object ParameterValue {
         }
     } yield parameterValue
   }
+
+  lazy val ontology: Type = Type.Def(
+    Class(renku / "ParameterValue"),
+    ObjectProperties(
+      ObjectProperty(
+        schema / "valueReference",
+        CommandParameterBase.CommandParameter.ontology,
+        CommandParameterBase.CommandInput.ontology,
+        CommandParameterBase.CommandOutput.ontology
+      )
+    ),
+    DataProperties(DataProperty(schema / "value", xsd / "string"))
+  )
 }

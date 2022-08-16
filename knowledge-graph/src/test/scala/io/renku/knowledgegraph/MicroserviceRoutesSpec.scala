@@ -246,80 +246,6 @@ class MicroserviceRoutesSpec
     }
   }
 
-  "GET /knowledge-graph/projects/:projectId/files/:location/lineage" should {
-    def lineageUri(projectPath: ProjectPath, location: Location) =
-      Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.show}/files/${urlEncode(location.show)}/lineage")
-
-    s"return $Ok when the lineage is found" in new TestCase {
-      val projectPath   = projectPaths.generateOne
-      val location      = nodeLocations.generateOne
-      val maybeAuthUser = authUsers.generateOption
-      val uri           = lineageUri(projectPath, location)
-      val request       = Request[IO](Method.GET, uri)
-
-      val responseBody = jsons.generateOne
-
-      (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
-
-      (lineageEndpoint.`GET /lineage` _)
-        .expects(projectPath, location, maybeAuthUser)
-        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
-
-      val response = routes(maybeAuthUser).call(request)
-
-      response.status      shouldBe Ok
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.body[Json]  shouldBe responseBody
-    }
-
-    s"return $NotFound for a lineage which isn't found" in new TestCase {
-      val projectPath   = projectPaths.generateOne
-      val location      = nodeLocations.generateOne
-      val maybeAuthUser = authUsers.generateOption
-      val uri           = lineageUri(projectPath, location)
-
-      (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
-
-      (lineageEndpoint.`GET /lineage` _)
-        .expects(projectPath, location, maybeAuthUser)
-        .returning(Response[IO](NotFound).pure[IO])
-
-      val response = routes(maybeAuthUser).call(Request[IO](Method.GET, uri))
-
-      response.status shouldBe NotFound
-    }
-
-    "authenticate user from the request if given" in new TestCase {
-
-      val projectPath   = projectPaths.generateOne
-      val location      = nodeLocations.generateOne
-      val maybeAuthUser = authUsers.generateOption
-      val request       = Request[IO](Method.GET, lineageUri(projectPath, location))
-
-      val responseBody = jsons.generateOne
-
-      (projectPathAuthorizer.authorize _)
-        .expects(projectPath, maybeAuthUser)
-        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
-
-      (lineageEndpoint.`GET /lineage` _)
-        .expects(projectPath, location, maybeAuthUser)
-        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
-
-      routes(maybeAuthUser).call(request).status shouldBe Ok
-    }
-
-    s"return $Unauthorized when user authentication fails" in new TestCase {
-      routes(givenAuthFailing())
-        .call(Request[IO](Method.GET, lineageUri(projectPaths.generateOne, nodeLocations.generateOne)))
-        .status shouldBe Unauthorized
-    }
-  }
-
   "GET /knowledge-graph/entities" should {
     import entities.Endpoint.Criteria.Sorting._
     import entities.Endpoint.Criteria._
@@ -503,6 +429,21 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "GET /knowledge-graph/ontology" should {
+
+    "return generated ontology" in new TestCase {
+
+      val request  = Request[IO](Method.GET, uri"/knowledge-graph/ontology")
+      val response = Response[IO](httpStatuses.generateOne)
+      (ontologyEndpoint
+        .`GET /ontology`(_: Uri.Path)(_: Request[IO]))
+        .expects(Uri.Path.empty, request)
+        .returning(response.pure[IO])
+
+      routes().call(request).status shouldBe response.status
+    }
+  }
+
   "GET /knowledge-graph/projects/:namespace/../:name" should {
 
     s"return $Ok for valid path parameters" in new TestCase {
@@ -607,6 +548,80 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "GET /knowledge-graph/projects/:projectId/files/:location/lineage" should {
+    def lineageUri(projectPath: ProjectPath, location: Location) =
+      Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.show}/files/${urlEncode(location.show)}/lineage")
+
+    s"return $Ok when the lineage is found" in new TestCase {
+      val projectPath   = projectPaths.generateOne
+      val location      = nodeLocations.generateOne
+      val maybeAuthUser = authUsers.generateOption
+      val uri           = lineageUri(projectPath, location)
+      val request       = Request[IO](Method.GET, uri)
+
+      val responseBody = jsons.generateOne
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, maybeAuthUser)
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+
+      (lineageEndpoint.`GET /lineage` _)
+        .expects(projectPath, location, maybeAuthUser)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      val response = routes(maybeAuthUser).call(request)
+
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[Json]  shouldBe responseBody
+    }
+
+    s"return $NotFound for a lineage which isn't found" in new TestCase {
+      val projectPath   = projectPaths.generateOne
+      val location      = nodeLocations.generateOne
+      val maybeAuthUser = authUsers.generateOption
+      val uri           = lineageUri(projectPath, location)
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, maybeAuthUser)
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+
+      (lineageEndpoint.`GET /lineage` _)
+        .expects(projectPath, location, maybeAuthUser)
+        .returning(Response[IO](NotFound).pure[IO])
+
+      val response = routes(maybeAuthUser).call(Request[IO](Method.GET, uri))
+
+      response.status shouldBe NotFound
+    }
+
+    "authenticate user from the request if given" in new TestCase {
+
+      val projectPath   = projectPaths.generateOne
+      val location      = nodeLocations.generateOne
+      val maybeAuthUser = authUsers.generateOption
+      val request       = Request[IO](Method.GET, lineageUri(projectPath, location))
+
+      val responseBody = jsons.generateOne
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, maybeAuthUser)
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+
+      (lineageEndpoint.`GET /lineage` _)
+        .expects(projectPath, location, maybeAuthUser)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      routes(maybeAuthUser).call(request).status shouldBe Ok
+    }
+
+    s"return $Unauthorized when user authentication fails" in new TestCase {
+      routes(givenAuthFailing())
+        .call(Request[IO](Method.GET, lineageUri(projectPaths.generateOne, nodeLocations.generateOne)))
+        .status shouldBe Unauthorized
+    }
+  }
+
   "GET /metrics" should {
 
     s"return $Ok with some prometheus metrics" in new TestCase {
@@ -655,6 +670,7 @@ class MicroserviceRoutesSpec
     val entitiesEndpoint        = mock[entities.Endpoint[IO]]
     val queryEndpoint           = mock[QueryEndpoint[IO]]
     val lineageEndpoint         = mock[lineage.Endpoint[IO]]
+    val ontologyEndpoint        = mock[ontology.Endpoint[IO]]
     val projectEndpoint         = mock[projectdetails.Endpoint[IO]]
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
     val docsEndpoint            = mock[docs.Endpoint[IO]]
@@ -674,6 +690,7 @@ class MicroserviceRoutesSpec
         entitiesEndpoint,
         queryEndpoint,
         lineageEndpoint,
+        ontologyEndpoint,
         projectEndpoint,
         projectDatasetsEndpoint,
         docsEndpoint,

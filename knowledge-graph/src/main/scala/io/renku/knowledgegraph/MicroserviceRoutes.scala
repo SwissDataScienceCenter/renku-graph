@@ -18,11 +18,10 @@
 
 package io.renku.knowledgegraph
 
-import cats.MonadThrow
 import cats.data.Validated.Valid
 import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.unsafe.IORuntime
-import cats.effect.{IO, Resource}
+import cats.effect.{Async, IO, Resource}
 import cats.syntax.all._
 import io.renku.graph.http.server.security._
 import io.renku.graph.model
@@ -51,12 +50,13 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private class MicroserviceRoutes[F[_]: MonadThrow](
+private class MicroserviceRoutes[F[_]: Async](
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
     datasetEndpoint:         DatasetEndpoint[F],
     entitiesEndpoint:        entities.Endpoint[F],
     queryEndpoint:           QueryEndpoint[F],
     lineageEndpoint:         lineage.Endpoint[F],
+    ontologyEndpoint:        ontology.Endpoint[F],
     projectEndpoint:         projectdetails.Endpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     docsEndpoint:            docs.Endpoint[F],
@@ -71,6 +71,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   import datasetIdAuthorizer.{authorize => authorizeDatasetId}
   import entitiesEndpoint._
   import lineageEndpoint._
+  import ontologyEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
   import projectEndpoint._
@@ -126,9 +127,10 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
   }
 
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
-    case GET -> Root / "knowledge-graph" / "graphql"   => schema()
-    case GET -> Root / "knowledge-graph" / "spec.json" => docsEndpoint.`get /spec.json`
-    case GET -> Root / "ping"                          => Ok("pong")
+    case GET -> Root / "knowledge-graph" / "graphql"          => schema()
+    case req @ GET -> "knowledge-graph" /: "ontology" /: path => `GET /ontology`(path)(req)
+    case GET -> Root / "knowledge-graph" / "spec.json"        => docsEndpoint.`get /spec.json`
+    case GET -> Root / "ping"                                 => Ok("pong")
   }
 
   private def searchForDatasets(
@@ -260,6 +262,7 @@ private object MicroserviceRoutes {
         entitiesEndpoint        <- entities.Endpoint[IO]
         queryEndpoint           <- QueryEndpoint()
         lineageEndpoint         <- lineage.Endpoint[IO]
+        ontologyEndpoint        <- ontology.Endpoint[IO]
         projectEndpoint         <- projectdetails.Endpoint[IO]
         projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
         docsEndpoint            <- docs.Endpoint[IO]
@@ -273,6 +276,7 @@ private object MicroserviceRoutes {
                                      entitiesEndpoint,
                                      queryEndpoint,
                                      lineageEndpoint,
+                                     ontologyEndpoint,
                                      projectEndpoint,
                                      projectDatasetsEndpoint,
                                      docsEndpoint,

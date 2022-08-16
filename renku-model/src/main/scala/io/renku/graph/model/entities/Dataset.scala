@@ -37,10 +37,11 @@ final case class Dataset[+P <: Provenance](identification:    Identification,
 
 object Dataset {
 
-  import io.renku.graph.model.Schemas._
+  import io.renku.graph.model.Schemas.{prov, renku, schema}
   import io.renku.jsonld.JsonLDDecoder._
   import io.renku.jsonld.JsonLDEncoder._
   import io.renku.jsonld._
+  import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
 
   def from[P <: Provenance](identification:    Identification,
@@ -450,6 +451,12 @@ object Dataset {
           position   <- cursor.downField(schema / "position").as[ImagePosition]
         } yield Image(resourceId, uri, position)
     }
+
+    val ontology: Type = Type.Def(
+      Class(schema / "ImageObject"),
+      DataProperty(schema / "contentUrl", xsd / "string"),
+      DataProperty(schema / "position", xsd / "int")
+    )
   }
 
   val entityTypes: EntityTypes = EntityTypes of (schema / "Dataset", prov / "Entity")
@@ -508,6 +515,35 @@ object Dataset {
             .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
       } yield dataset
     }
+
+  val ontologyClass = Class(schema / "Dataset", ParentClass(prov / "Entity"))
+  lazy val ontology: Type =
+    Type.Def(
+      ontologyClass,
+      ObjectProperties(
+        ObjectProperty(schema / "sameAs", SameAs.ontology),
+        ObjectProperty(prov / "wasDerivedFrom", DerivedFrom.ontology),
+        ObjectProperty(schema / "creator", Person.ontology),
+        ObjectProperty(renku / "topmostSameAs", ontologyClass),
+        ObjectProperty(renku / "topmostDerivedFrom", ontologyClass),
+        ObjectProperty(schema / "image", Image.ontology),
+        ObjectProperty(schema / "hasPart", DatasetPart.ontology)
+      ),
+      DataProperties(
+        DataProperty(schema / "identifier", xsd / "string"),
+        DataProperty(schema / "name", xsd / "string"),
+        DataProperty(renku / "slug", xsd / "string"),
+        DataProperty(schema / "dateCreated", xsd / "dateTime"),
+        DataProperty(schema / "datePublished", xsd / "date"),
+        DataProperty(renku / "originalIdentifier", xsd / "string"),
+        DataProperty(prov / "invalidatedAtTime", xsd / "dateTime"),
+        DataProperty(schema / "description", xsd / "string"),
+        DataProperty(schema / "keywords", xsd / "string"),
+        DataProperty(schema / "license", xsd / "string"),
+        DataProperty(schema / "version", xsd / "string")
+      ),
+      ReverseProperties(PublicationEvent.ontology)
+    )
 }
 
 trait DatasetOps[+P <: Provenance] {

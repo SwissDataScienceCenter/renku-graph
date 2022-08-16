@@ -57,8 +57,9 @@ object DatasetPart {
       case _ => ().validNel[String]
     }
 
-  import io.renku.graph.model.Schemas._
+  import io.renku.graph.model.Schemas.{prov, renku, schema}
   import io.renku.jsonld._
+  import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
 
   private val entityTypes = EntityTypes of (prov / "Entity", schema / "DigitalDocument")
@@ -89,4 +90,17 @@ object DatasetPart {
                 .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
     } yield part
   }
+
+  val ontology: Type = Type.Def(
+    Class(schema / "DigitalDocument", ParentClass(prov / "Entity")),
+    ObjectProperties(
+      ObjectProperty(prov / "entity", Entity.ontology)
+    ),
+    DataProperties(
+      DataProperty(renku / "external", xsd / "boolean"),
+      DataProperty(schema / "dateCreated", xsd / "dateTime"),
+      DataProperty(renku / "source", xsd / "string"),
+      DataProperty(prov / "invalidatedAtTime", xsd / "dateTime")
+    )
+  )
 }

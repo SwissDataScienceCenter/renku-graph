@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,19 +16,17 @@
  * limitations under the License.
  */
 
-name := "knowledge-graph"
+package io.renku.knowledgegraph.docs
 
-Test / fork := true
+import io.renku.knowledgegraph.docs.OpenApiTester._
+import org.scalatest.wordspec.AnyWordSpec
 
-// log4j-core is needed only by widoco
-libraryDependencies += "org.apache.logging.log4j" % "log4j-core"      % "2.18.0"
-libraryDependencies += "ch.qos.logback"           % "logback-classic" % "1.2.11"
+class EndpointDocsSpec extends AnyWordSpec {
 
-libraryDependencies += "com.github.dgarijo" % "widoco" % "1.4.17"
+  "path" should {
 
-libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.0.33"
-
-libraryDependencies += "org.sangria-graphql" %% "sangria"       % "3.0.1"
-libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2"
-
-resolvers += "jitpack" at "https://jitpack.io"
+    "return a valid Path object" in {
+      validatePath(new EndpointDocsImpl().path)
+    }
+  }
+}

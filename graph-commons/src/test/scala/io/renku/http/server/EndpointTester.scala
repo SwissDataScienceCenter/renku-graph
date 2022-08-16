@@ -41,6 +41,8 @@ object EndpointTester {
   implicit val jsonListEntityDecoder: EntityDecoder[IO, List[Json]] = jsonOf[IO, List[Json]]
   implicit val jsonEntityEncoder:     EntityEncoder[IO, Json]       = jsonEncoderOf[IO, Json]
 
+  implicit val stringEntityDecoder: EntityDecoder[IO, String] = EntityDecoder.text
+
   implicit class ResourceEndpointOps(routes: Resource[IO, Kleisli[IO, Request[IO], Response[IO]]]) {
 
     def call(request: Request[IO])(implicit runtime: IORuntime) = new {

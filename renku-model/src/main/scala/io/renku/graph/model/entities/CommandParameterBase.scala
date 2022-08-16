@@ -39,6 +39,7 @@ sealed trait ExplicitParameter {
 
 object CommandParameterBase {
 
+  import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
@@ -105,6 +106,15 @@ object CommandParameterBase {
           ImplicitCommandParameter(resourceId, name, maybeDescription, maybePrefix, defaultValue)
       }
     }
+
+    lazy val ontology: Type = Type.Def(
+      Class(renku / "CommandParameter", ParentClass(renku / "CommandParameterBase")),
+      DataProperty(renku / "position", xsd / "int"),
+      DataProperty(schema / "name", xsd / "string"),
+      DataProperty(schema / "description", xsd / "string"),
+      DataProperty(renku / "prefix", xsd / "string"),
+      DataProperty(schema / "defaultValue", xsd / "string")
+    )
   }
 
   sealed trait CommandInputOrOutput extends CommandParameterBase
@@ -247,6 +257,19 @@ object CommandParameterBase {
         )
       case _ => ImplicitCommandInput(resourceId, name, maybePrefix, defaultValue, maybeEncodingFormat)
     }
+
+    lazy val ontology: Type = Type.Def(
+      Class(renku / "CommandInput", ParentClass(renku / "CommandParameterBase")),
+      ObjectProperties(ObjectProperty(renku / "mappedTo", IOStream.ontology)),
+      DataProperties(
+        DataProperty(renku / "position", xsd / "int"),
+        DataProperty(schema / "name", xsd / "string"),
+        DataProperty(schema / "description", xsd / "string"),
+        DataProperty(renku / "prefix", xsd / "string"),
+        DataProperty(schema / "defaultValue", xsd / "string"),
+        DataProperty(schema / "encodingFormat", xsd / "string")
+      )
+    )
   }
 
   sealed trait CommandOutput extends CommandInputOrOutput {
@@ -405,5 +428,19 @@ object CommandParameterBase {
       case _ =>
         ImplicitCommandOutput(resourceId, name, maybePrefix, defaultValue, folderCreation, maybeEncodingFormat)
     }
+
+    lazy val ontology: Type = Type.Def(
+      Class(renku / "CommandOutput", ParentClass(renku / "CommandParameterBase")),
+      ObjectProperties(ObjectProperty(renku / "mappedTo", IOStream.ontology)),
+      DataProperties(
+        DataProperty(renku / "position", xsd / "int"),
+        DataProperty(schema / "name", xsd / "string"),
+        DataProperty(schema / "description", xsd / "string"),
+        DataProperty(renku / "prefix", xsd / "string"),
+        DataProperty(schema / "defaultValue", xsd / "string"),
+        DataProperty(renku / "createFolder", xsd / "boolean"),
+        DataProperty(schema / "encodingFormat", xsd / "string")
+      )
+    )
   }
 }

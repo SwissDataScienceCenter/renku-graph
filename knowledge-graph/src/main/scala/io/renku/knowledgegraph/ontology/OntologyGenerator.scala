@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,19 +16,22 @@
  * limitations under the License.
  */
 
-name := "knowledge-graph"
+package io.renku.knowledgegraph.ontology
 
-Test / fork := true
+import io.renku.graph.model.Schemas
+import io.renku.graph.model.entities.Project
+import io.renku.jsonld.JsonLD
+import io.renku.jsonld.ontology.generateOntology
 
-// log4j-core is needed only by widoco
-libraryDependencies += "org.apache.logging.log4j" % "log4j-core"      % "2.18.0"
-libraryDependencies += "ch.qos.logback"           % "logback-classic" % "1.2.11"
+private trait OntologyGenerator {
+  def getOntology: JsonLD
+}
 
-libraryDependencies += "com.github.dgarijo" % "widoco" % "1.4.17"
+private object OntologyGenerator {
+  private val instance = new OntologyGeneratorImpl(generateOntology(Project.ontology, Schemas.renku))
+  def apply(): OntologyGenerator = instance
+}
 
-libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.0.33"
-
-libraryDependencies += "org.sangria-graphql" %% "sangria"       % "3.0.1"
-libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2"
-
-resolvers += "jitpack" at "https://jitpack.io"
+private class OntologyGeneratorImpl(generate: => JsonLD) extends OntologyGenerator {
+  override def getOntology: JsonLD = generate
+}
