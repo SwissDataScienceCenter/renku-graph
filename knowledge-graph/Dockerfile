@@ -30,7 +30,8 @@ RUN apk add --no-cache tzdata curl bash tini && \
 
 ENV GID=1000
 RUN adduser --disabled-password -g "$GID" -D -u 1000 kguser && \
-    chmod 555 -R /opt/knowledge-graph
+    chown -R kguser /opt/knowledge-graph && \
+    chmod 755 -R /opt/knowledge-graph
 
 USER kguser
 
