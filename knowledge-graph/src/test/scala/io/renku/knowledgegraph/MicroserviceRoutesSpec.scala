@@ -93,7 +93,7 @@ class MicroserviceRoutesSpec
         .returning(IO.pure(Response[IO](Ok)))
 
       routes(maybeAuthUser)
-        .call(Request[IO](Method.GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase)))
+        .call(Request[IO](GET, uri"/knowledge-graph/datasets".withQueryParam(query.parameterName, phrase)))
         .status shouldBe Ok
     }
 
@@ -110,12 +110,12 @@ class MicroserviceRoutesSpec
         )
         .returning(IO.pure(Response[IO](Ok)))
 
-      routes(maybeAuthUser).call(Request[IO](Method.GET, uri"/knowledge-graph/datasets")).status shouldBe Ok
+      routes(maybeAuthUser).call(Request[IO](GET, uri"/knowledge-graph/datasets")).status shouldBe Ok
     }
 
     s"return $Unauthorized when user authentication failed" in new TestCase {
       routes(givenAuthFailing())
-        .call(Request[IO](Method.GET, uri"/knowledge-graph/datasets"))
+        .call(Request[IO](GET, uri"/knowledge-graph/datasets"))
         .status shouldBe Unauthorized
     }
 
@@ -127,7 +127,7 @@ class MicroserviceRoutesSpec
 
         val phrase = phrases.generateOne
         val request = Request[IO](
-          Method.GET,
+          GET,
           uri"/knowledge-graph/datasets"
             .withQueryParam("query", phrase.value)
             .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
@@ -150,7 +150,7 @@ class MicroserviceRoutesSpec
         val maybeAuthUser = authUsers.generateOption
 
         val request = Request[IO](
-          Method.GET,
+          GET,
           uri"/knowledge-graph/datasets"
             .withQueryParam("query", phrase.value)
             .withQueryParam("page", page.value)
@@ -179,7 +179,7 @@ class MicroserviceRoutesSpec
 
         val response = routes().call {
           Request(
-            Method.GET,
+            GET,
             uri"/knowledge-graph/datasets"
               .withQueryParam("query", blankStrings().generateOne)
               .withQueryParam("sort", s"$sortProperty:${Direction.Asc}")
@@ -214,19 +214,19 @@ class MicroserviceRoutesSpec
       (datasetEndpoint.getDataset _).expects(id, authContext).returning(IO.pure(Response[IO](Ok)))
 
       routes(maybeAuthUser)
-        .call(Request(Method.GET, uri"/knowledge-graph/datasets" / id.value))
+        .call(Request(GET, uri"/knowledge-graph/datasets" / id.value))
         .status shouldBe Ok
     }
 
     s"return $NotFound when no :id path parameter given" in new TestCase {
       routes()
-        .call(Request(Method.GET, uri"/knowledge-graph/datasets/"))
+        .call(Request(GET, uri"/knowledge-graph/datasets/"))
         .status shouldBe NotFound
     }
 
     s"return $Unauthorized when user authentication failed" in new TestCase {
       routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
-        .call(Request(Method.GET, uri"/knowledge-graph/datasets" / datasetIdentifiers.generateOne.value))
+        .call(Request(GET, uri"/knowledge-graph/datasets" / datasetIdentifiers.generateOne.value))
         .status shouldBe Unauthorized
     }
 
@@ -238,7 +238,7 @@ class MicroserviceRoutesSpec
         .expects(id, maybeAuthUser)
         .returning(leftT[IO, AuthContext[model.datasets.Identifier]](AuthorizationFailure))
 
-      val response = routes(maybeAuthUser).call(Request(Method.GET, uri"/knowledge-graph/datasets" / id.show))
+      val response = routes(maybeAuthUser).call(Request(GET, uri"/knowledge-graph/datasets" / id.show))
 
       response.status             shouldBe NotFound
       response.contentType        shouldBe Some(`Content-Type`(application.json))
@@ -339,7 +339,7 @@ class MicroserviceRoutesSpec
       )
     } { (uri, criteria) =>
       s"read the query parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
-        val request = Request[IO](Method.GET, uri)
+        val request = Request[IO](GET, uri)
 
         val responseBody = jsons.generateOne
         (entitiesEndpoint.`GET /entities` _)
@@ -357,7 +357,7 @@ class MicroserviceRoutesSpec
     s"return $BadRequest for invalid parameter values" in new TestCase {
       val response = routes()
         .call(
-          Request[IO](Method.GET, uri"/knowledge-graph/entities" +? ("visibility" -> nonEmptyStrings().generateOne))
+          Request[IO](GET, uri"/knowledge-graph/entities" +? ("visibility" -> nonEmptyStrings().generateOne))
         )
 
       response.status             shouldBe BadRequest
@@ -369,7 +369,7 @@ class MicroserviceRoutesSpec
       val since = sinceParams.generateOne
       val until = localDates(max = since.value.minusDays(1)).generateAs(Filters.Until)
       val response = routes().call {
-        Request[IO](Method.GET, uri"/knowledge-graph/entities" +? ("since" -> since.show) +? ("until" -> until.show))
+        Request[IO](GET, uri"/knowledge-graph/entities" +? ("since" -> since.show) +? ("until" -> until.show))
       }
 
       response.status             shouldBe BadRequest
@@ -379,7 +379,7 @@ class MicroserviceRoutesSpec
 
     "authenticate user from the request if given" in new TestCase {
       val maybeAuthUser = authUsers.generateOption
-      val request       = Request[IO](Method.GET, uri"/knowledge-graph/entities")
+      val request       = Request[IO](GET, uri"/knowledge-graph/entities")
 
       val responseBody = jsons.generateOne
       (entitiesEndpoint.`GET /entities` _)
@@ -391,7 +391,7 @@ class MicroserviceRoutesSpec
 
     s"return $Unauthorized when user authentication fails" in new TestCase {
       routes(givenAuthFailing())
-        .call(Request[IO](Method.GET, uri"/knowledge-graph/entities"))
+        .call(Request[IO](GET, uri"/knowledge-graph/entities"))
         .status shouldBe Unauthorized
     }
   }
@@ -403,7 +403,7 @@ class MicroserviceRoutesSpec
       (queryEndpoint.schema _).expects().returning(Response[IO](Ok).pure[IO])
 
       routes()
-        .call(Request(Method.GET, uri"/knowledge-graph/graphql"))
+        .call(Request(GET, uri"/knowledge-graph/graphql"))
         .status shouldBe Ok
     }
   }
@@ -433,7 +433,7 @@ class MicroserviceRoutesSpec
 
     "return generated ontology" in new TestCase {
 
-      val request  = Request[IO](Method.GET, uri"/knowledge-graph/ontology")
+      val request  = Request[IO](GET, uri"/knowledge-graph/ontology")
       val response = Response[IO](httpStatuses.generateOne)
       (ontologyEndpoint
         .`GET /ontology`(_: Uri.Path)(_: Request[IO]))
@@ -470,7 +470,7 @@ class MicroserviceRoutesSpec
       val namespace     = nonBlankStrings().generateOne.value
 
       val response = routes(maybeAuthUser).call(
-        Request(Method.GET, uri"/knowledge-graph/projects" / namespace)
+        Request(GET, uri"/knowledge-graph/projects" / namespace)
       )
 
       response.status            shouldBe NotFound
@@ -480,7 +480,7 @@ class MicroserviceRoutesSpec
 
     s"return $Unauthorized when user authentication fails" in new TestCase {
       routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
-        .call(Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}")))
+        .call(Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}")))
         .status shouldBe Unauthorized
     }
 
@@ -493,7 +493,7 @@ class MicroserviceRoutesSpec
         .returning(leftT[IO, AuthContext[model.projects.Path]](AuthorizationFailure))
 
       val response = routes(maybeAuthUser).call(
-        Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+        Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
       )
 
       response.status             shouldBe NotFound
@@ -515,7 +515,7 @@ class MicroserviceRoutesSpec
       (projectDatasetsEndpoint.getProjectDatasets _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
 
       routes(maybeAuthUser)
-        .call(Request(Method.GET, Uri.unsafeFromString(s"/knowledge-graph/projects/$projectPath/datasets")))
+        .call(Request(GET, Uri.unsafeFromString(s"/knowledge-graph/projects/$projectPath/datasets")))
         .status shouldBe Ok
 
       routesMetrics.clearRegistry()
@@ -524,7 +524,7 @@ class MicroserviceRoutesSpec
     s"return $Unauthorized when user authentication fails" in new TestCase {
       routes(givenAuthIfNeededMiddleware(returning = OptionT.none[IO, Option[AuthUser]]))
         .call(
-          Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}/datasets"))
+          Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/${projectPaths.generateOne}/datasets"))
         )
         .status shouldBe Unauthorized
     }
@@ -539,7 +539,7 @@ class MicroserviceRoutesSpec
 
       val response = routes(maybeAuthUser)
         .call(
-          Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
+          Request(GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath/datasets"))
         )
 
       response.status             shouldBe NotFound
@@ -557,7 +557,7 @@ class MicroserviceRoutesSpec
       val location      = nodeLocations.generateOne
       val maybeAuthUser = authUsers.generateOption
       val uri           = lineageUri(projectPath, location)
-      val request       = Request[IO](Method.GET, uri)
+      val request       = Request[IO](GET, uri)
 
       val responseBody = jsons.generateOne
 
@@ -590,7 +590,7 @@ class MicroserviceRoutesSpec
         .expects(projectPath, location, maybeAuthUser)
         .returning(Response[IO](NotFound).pure[IO])
 
-      val response = routes(maybeAuthUser).call(Request[IO](Method.GET, uri))
+      val response = routes(maybeAuthUser).call(Request[IO](GET, uri))
 
       response.status shouldBe NotFound
     }
@@ -600,7 +600,7 @@ class MicroserviceRoutesSpec
       val projectPath   = projectPaths.generateOne
       val location      = nodeLocations.generateOne
       val maybeAuthUser = authUsers.generateOption
-      val request       = Request[IO](Method.GET, lineageUri(projectPath, location))
+      val request       = Request[IO](GET, lineageUri(projectPath, location))
 
       val responseBody = jsons.generateOne
 
@@ -617,28 +617,8 @@ class MicroserviceRoutesSpec
 
     s"return $Unauthorized when user authentication fails" in new TestCase {
       routes(givenAuthFailing())
-        .call(Request[IO](Method.GET, lineageUri(projectPaths.generateOne, nodeLocations.generateOne)))
+        .call(Request[IO](GET, lineageUri(projectPaths.generateOne, nodeLocations.generateOne)))
         .status shouldBe Unauthorized
-    }
-  }
-
-  "GET /metrics" should {
-
-    s"return $Ok with some prometheus metrics" in new TestCase {
-      val response = routes().call(Request(Method.GET, uri"/metrics"))
-
-      response.status     shouldBe Ok
-      response.body[String] should include("server_response_duration_seconds")
-    }
-  }
-
-  "GET /ping" should {
-
-    s"return $Ok with 'pong' body" in new TestCase {
-      val response = routes().call(Request(Method.GET, uri"/ping"))
-
-      response.status       shouldBe Ok
-      response.body[String] shouldBe "pong"
     }
   }
 
@@ -650,10 +630,76 @@ class MicroserviceRoutesSpec
         .expects()
         .returning(IO.pure(Response[IO](Ok).withEntity(openApiJson)))
 
-      val response = routes().call(Request(Method.GET, uri"/knowledge-graph/spec.json"))
+      val response = routes().call(Request(GET, uri"/knowledge-graph/spec.json"))
 
       response.status     shouldBe Ok
       response.body[Json] shouldBe openApiJson
+    }
+  }
+
+  "GET /knowledge-graph/users/:id/projects" should {
+    import users.projects.Endpoint._
+
+    val userId = personGitLabIds.generateOne
+
+    forAll {
+      Table(
+        "uri"                                                   -> "criteria",
+        uri"/knowledge-graph/users" / userId.value / "projects" -> Criteria(userId)
+      )
+    } { (uri, criteria) =>
+      s"read the query parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
+        val request = Request[IO](GET, uri)
+
+        val responseBody = jsons.generateOne
+        (usersProjectsEndpoint.`GET /users/:id/projects` _)
+          .expects(criteria, request)
+          .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+        val response = routes().call(request)
+
+        response.status      shouldBe Ok
+        response.contentType shouldBe Some(`Content-Type`(application.json))
+        response.body[Json]  shouldBe responseBody
+      }
+
+      "authenticate user from the request if given" in new TestCase {
+        val maybeAuthUser = authUsers.generateOption
+        val request       = Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects")
+
+        val responseBody = jsons.generateOne
+        (usersProjectsEndpoint.`GET /users/:id/projects` _)
+          .expects(Criteria(userId, maybeUser = maybeAuthUser), request)
+          .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+        routes(maybeAuthUser).call(request).status shouldBe Ok
+      }
+
+      s"return $Unauthorized when user authentication fails" in new TestCase {
+        routes(givenAuthFailing())
+          .call(Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects"))
+          .status shouldBe Unauthorized
+      }
+    }
+  }
+
+  "GET /metrics" should {
+
+    s"return $Ok with some prometheus metrics" in new TestCase {
+      val response = routes().call(Request(GET, uri"/metrics"))
+
+      response.status     shouldBe Ok
+      response.body[String] should include("server_response_duration_seconds")
+    }
+  }
+
+  "GET /ping" should {
+
+    s"return $Ok with 'pong' body" in new TestCase {
+      val response = routes().call(Request(GET, uri"/ping"))
+
+      response.status       shouldBe Ok
+      response.body[String] shouldBe "pong"
     }
   }
 
@@ -674,6 +720,7 @@ class MicroserviceRoutesSpec
     val projectEndpoint         = mock[projectdetails.Endpoint[IO]]
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
     val docsEndpoint            = mock[docs.Endpoint[IO]]
+    val usersProjectsEndpoint   = mock[users.projects.Endpoint[IO]]
     val projectPathAuthorizer   = mock[Authorizer[IO, model.projects.Path]]
     val datasetIdAuthorizer     = mock[Authorizer[IO, model.datasets.Identifier]]
     val routesMetrics           = TestRoutesMetrics()
@@ -694,6 +741,7 @@ class MicroserviceRoutesSpec
         projectEndpoint,
         projectDatasetsEndpoint,
         docsEndpoint,
+        usersProjectsEndpoint,
         middleware,
         projectPathAuthorizer,
         datasetIdAuthorizer,
