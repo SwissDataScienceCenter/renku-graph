@@ -42,9 +42,13 @@ private class EndpointDocsImpl() extends EndpointDocs {
     description = None,
     GET(
       Uri / "ontology",
-      Status.Ok -> Response("Ontology", Contents(MediaType.`application/ld+json`("Sample response", example))),
+      Status.Ok -> Response("Ontology",
+                            Contents(MediaType.`text/html`, MediaType.`application/ld+json`("Sample response", example))
+      ),
       Status.InternalServerError -> Response("Error",
-                                             Contents(MediaType.`application/json`("Reason", ErrorMessage("Message")))
+                                             Contents(MediaType.`text/html`,
+                                                      MediaType.`application/json`("Reason", ErrorMessage("Message"))
+                                             )
       )
     )
   )
