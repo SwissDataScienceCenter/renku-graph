@@ -164,15 +164,17 @@ object CommonGraphGenerators {
     serviceVersion <- serviceVersions
   } yield SentryConfig(dsn, environment, serviceName, serviceVersion)
 
-  implicit val rels: Gen[Rel] = nonEmptyStrings() map Rel.apply
+  implicit val rels:        Gen[Rel]          = nonEmptyStrings() map Rel.apply
+  implicit val linkMethods: Gen[Links.Method] = Gen.oneOf(Links.Method.all)
   implicit val hrefs: Gen[Href] = for {
     baseUrl <- httpUrls()
     path    <- relativePaths()
   } yield Href(s"$baseUrl/$path")
   implicit val linkObjects: Gen[Link] = for {
-    rel  <- rels
-    href <- hrefs
-  } yield Link(rel, href)
+    rel    <- rels
+    href   <- hrefs
+    method <- linkMethods
+  } yield Link(rel, href, method)
   implicit val linksObjects: Gen[Links] = nonEmptyList(linkObjects) map Links.apply
 
   implicit lazy val sortingDirections: Gen[SortBy.Direction] = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
