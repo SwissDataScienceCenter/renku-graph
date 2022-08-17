@@ -37,6 +37,24 @@ object PagingResponse {
 
   def from[F[_]: MonadThrow, Result](
       results:       List[Result],
+      pagingRequest: PagingRequest
+  ): F[PagingResponse[Result]] = {
+    val total = Total(results.size)
+    results
+      .sliding(pagingRequest.perPage.value, pagingRequest.perPage.value)
+      .toList
+      .get(pagingRequest.page.value - 1)
+      .map(_.pure[F])
+      .getOrElse(
+        new IllegalArgumentException(
+          s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: ${pagingRequest.page} and perPage: ${pagingRequest.perPage}"
+        ).raiseError[F, List[Result]]
+      )
+      .flatMap(from(_, pagingRequest, total))
+  }
+
+  def from[F[_]: MonadThrow, Result](
+      results:       List[Result],
       pagingRequest: PagingRequest,
       total:         Total
   ): F[PagingResponse[Result]] = {

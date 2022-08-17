@@ -18,17 +18,16 @@
 
 package io.renku.knowledgegraph.users.projects
 
-import Endpoint._
 import cats.effect.IO
 import cats.syntax.all._
 import finder.ProjectsFinder
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.config.renku
 import io.renku.config.renku.ResourceUrl
-import io.renku.generators.CommonGraphGenerators.{authUsers, pagingRequests, pagingResponses}
+import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, relativePaths}
-import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, renkuUrls}
+import io.renku.graph.model.GraphModelGenerators.renkuUrls
 import io.renku.graph.model.{persons, projects}
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
@@ -45,7 +44,6 @@ import org.http4s.Status.{InternalServerError, Ok}
 import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
 import org.http4s.{EntityDecoder, Request, Uri}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -64,7 +62,6 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         response.status        shouldBe Ok
         response.contentType   shouldBe Some(`Content-Type`(application.json))
         response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
-        implicit val decoder: Decoder[model.Project] = projectDecoder(possibleProjects = results.results)
         response.as[List[model.Project]].unsafeRunSync() shouldBe results.results.map(sortKeywords)
       }
     }
@@ -78,7 +75,6 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
       response.status        shouldBe Ok
       response.contentType   shouldBe Some(`Content-Type`(application.json))
       response.headers.headers should contain allElementsOf PagingHeaders.from[ResourceUrl](results)
-      implicit val decoder: Decoder[model.Project] = projectDecoder(possibleProjects = results.results)
       response.as[List[model.Project]].unsafeRunSync() shouldBe Nil
     }
 
@@ -114,16 +110,11 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
     val endpoint       = new EndpointImpl[IO](projectsFinder, renkuUrl, renkuApiUrl)
   }
 
-  private lazy val criterias: Gen[Criteria] = for {
-    userId        <- personGitLabIds
-    maybeAuthUser <- authUsers.toGeneratorOfOptions
-  } yield Criteria(userId, maybeAuthUser)
-
   private implicit def httpEntityDecoder(implicit
       projectDecoder: Decoder[model.Project]
   ): EntityDecoder[IO, List[model.Project]] = jsonOf[IO, List[model.Project]]
 
-  private def projectDecoder(possibleProjects: List[model.Project]): Decoder[model.Project] = cursor => {
+  private implicit val projectDecoder: Decoder[model.Project] = cursor => {
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     cursor._links >>= {
@@ -146,6 +137,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
         } yield model.Project.Activated(name, path, visibility, date, maybeCreator, keywords, maybeDesc)
       case links if links.get(Links.Rel("activation")).isDefined =>
         for {
+          id           <- cursor.downField("id").as[projects.Id]
           path         <- cursor.downField("path").as[projects.Path]
           name         <- cursor.downField("name").as[projects.Name]
           visibility   <- cursor.downField("visibility").as[projects.Visibility]
@@ -153,12 +145,6 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
           maybeCreator <- cursor.downField("creator").as[Option[persons.Name]]
           keywords     <- cursor.downField("keywords").as[List[projects.Keyword]]
           maybeDesc    <- cursor.downField("description").as[Option[projects.Description]]
-          id <- possibleProjects.collect {
-                  case p: model.Project.NotActivated if p.path == path => p.id
-                } match {
-                  case id :: Nil => id.asRight
-                  case _         => DecodingFailure(s"Project $path not expected in the results", Nil).asLeft
-                }
           _ <- links
                  .get(Links.Rel("activation"))
                  .toRight(DecodingFailure("No 'activation' link", Nil))

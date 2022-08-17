@@ -116,8 +116,7 @@ class GitLabProjectFinderSpec
       )
   }
 
-  private def projectJson(project: GitLabProject): Json =
-    json"""{
+  private def projectJson(project: GitLabProject): Json = json"""{
     "id":               ${project.id},
     "visibility":       ${project.visibility},
     "ssh_url_to_repo":  ${project.urls.ssh},

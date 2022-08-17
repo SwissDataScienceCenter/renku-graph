@@ -39,6 +39,7 @@ trait RenkuProjectEntitiesGenerators {
   self: EntitiesGenerators =>
 
   lazy val visibilityPublic:    Gen[Visibility] = fixed(Visibility.Public)
+  lazy val visibilityPrivate:   Gen[Visibility] = fixed(Visibility.Private)
   lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
   lazy val anyVisibility:       Gen[Visibility] = projectVisibilities
 

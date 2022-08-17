@@ -83,6 +83,7 @@ private object model {
       implicit def encoder(implicit renkuUrl: RenkuUrl): Encoder[NotActivated] =
         Encoder.instance[NotActivated] { project =>
           json"""{
+            "id":          ${project.id.value},
             "path":        ${project.path.value},
             "name":        ${project.name.value},
             "visibility":  ${project.visibility.value},

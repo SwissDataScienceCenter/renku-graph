@@ -25,8 +25,10 @@ import finder._
 import io.renku.config.renku
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{RenkuUrl, persons}
-import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
+import io.renku.http.client.GitLabClient
+import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 import org.typelevel.log4cats.Logger
@@ -39,9 +41,12 @@ trait Endpoint[F[_]] {
 
 object Endpoint {
 
-  final case class Criteria(userId: persons.GitLabId, maybeUser: Option[AuthUser] = None)
+  final case class Criteria(userId:    persons.GitLabId,
+                            paging:    PagingRequest = PagingRequest.default,
+                            maybeUser: Option[AuthUser] = None
+  )
 
-  def apply[F[_]: Async: Logger]: F[Endpoint[F]] = for {
+  def apply[F[_]: Async: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     projectsFinder <- ProjectsFinder[F]
     renkuUrl       <- RenkuUrlLoader()
     renkuApiUrl    <- renku.ApiUrl()

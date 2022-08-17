@@ -24,7 +24,7 @@ import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.rest.paging.model.{PerPage, Total}
+import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.TestTinyTypes.UrlTestType
 import org.scalacheck.Gen
@@ -126,6 +126,47 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
           }
         }
       }
+  }
+
+  "from with no total given" should {
+
+    "calculate the total from the given results if results size <= perPage - case of the first page" in {
+      val paging  = pagingRequests.generateOne.copy(page = Page(1))
+      val results = nonBlankStrings().generateNonEmptyList(maxElements = paging.perPage.asRefined).toList
+
+      val Success(actual) = PagingResponse.from[Try, NonBlank](results, paging)
+
+      actual.results                  shouldBe results
+      actual.pagingInfo.pagingRequest shouldBe paging
+      actual.pagingInfo.total         shouldBe Total(results.size)
+    }
+
+    "calculate the total from the given results if results size <= perPage - case not of the first page" in {
+      val paging = pagingRequests.generateOne.copy(page = Page(2))
+      val results = nonBlankStrings()
+        .generateNonEmptyList(minElements = Refined.unsafeApply(paging.perPage.value + 1),
+                              maxElements = Refined.unsafeApply(paging.page.value * paging.perPage.value)
+        )
+        .toList
+
+      val Success(actual) = PagingResponse.from[Try, NonBlank](results, paging)
+
+      actual.results                  shouldBe results.drop(paging.perPage.value)
+      actual.pagingInfo.pagingRequest shouldBe paging
+      actual.pagingInfo.total         shouldBe Total(results.size)
+    }
+
+    "fail if requested page and perPage is beyond the number of results" in {
+      val paging = pagingRequests.generateOne.copy(page = ints(min = 2, max = 5).generateAs(Page))
+      val results = nonBlankStrings()
+        .generateNonEmptyList(maxElements = Refined.unsafeApply(paging.perPage.value - 1))
+        .toList
+
+      val Failure(exception) = PagingResponse.from[Try, NonBlank](results, paging)
+
+      exception shouldBe an[IllegalArgumentException]
+      exception.getMessage shouldBe s"PagingResponse cannot be instantiated for ${results.size} results, total: ${results.size}, page: ${paging.page} and perPage: ${paging.perPage}"
+    }
   }
 
   "updateResults" should {
