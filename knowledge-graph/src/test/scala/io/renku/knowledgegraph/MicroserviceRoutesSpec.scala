@@ -664,6 +664,7 @@ class MicroserviceRoutesSpec
       }
 
       "authenticate user from the request if given" in new TestCase {
+
         val maybeAuthUser = authUsers.generateOption
         val request       = Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects")
 
