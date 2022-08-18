@@ -156,6 +156,16 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
       actual.pagingInfo.total         shouldBe Total(results.size)
     }
 
+    "accept an empty results list if page 1 requested" in {
+      val paging = pagingRequests.generateOne.copy(page = Page(1))
+
+      val Success(actual) = PagingResponse.from[Try, NonBlank](List.empty, paging)
+
+      actual.results                  shouldBe Nil
+      actual.pagingInfo.pagingRequest shouldBe paging
+      actual.pagingInfo.total         shouldBe Total(0)
+    }
+
     "fail if requested page and perPage is beyond the number of results" in {
       val paging = pagingRequests.generateOne.copy(page = ints(min = 2, max = 5).generateAs(Page))
       val results = nonBlankStrings()
