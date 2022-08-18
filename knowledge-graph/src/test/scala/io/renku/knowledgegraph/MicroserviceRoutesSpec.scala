@@ -50,8 +50,6 @@ import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
 import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
-import io.renku.knowledgegraph.lineage.LineageGenerators._
-import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
@@ -65,6 +63,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import projects.files.lineage.LineageGenerators._
+import projects.files.lineage.model.Node.Location
 
 import scala.language.reflectiveCalls
 
@@ -743,7 +743,7 @@ class MicroserviceRoutesSpec
     val datasetEndpoint         = mock[DatasetEndpoint[IO]]
     val entitiesEndpoint        = mock[entities.Endpoint[IO]]
     val queryEndpoint           = mock[QueryEndpoint[IO]]
-    val lineageEndpoint         = mock[lineage.Endpoint[IO]]
+    val lineageEndpoint         = mock[projects.files.lineage.Endpoint[IO]]
     val ontologyEndpoint        = mock[ontology.Endpoint[IO]]
     val projectDetailsEndpoint  = mock[projects.details.Endpoint[IO]]
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]

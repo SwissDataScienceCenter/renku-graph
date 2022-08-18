@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.MonadThrow
 import cats.syntax.all._
 import io.renku.jsonld.EntityId
-import io.renku.knowledgegraph.lineage.model.Node.Location
-import io.renku.knowledgegraph.lineage.model._
+import model.Node._
+import model._
 
 private trait EdgesTrimmer[F[_]] {
   def trim(edges: EdgeMap, location: Location): F[EdgeMap]

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.effect._
 import cats.syntax.all._
@@ -28,9 +28,10 @@ import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
 import io.renku.graph.model.views.RdfResource
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.EntityId
-import io.renku.knowledgegraph.lineage.model._
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import model.Node.Location
+import model._
 import org.typelevel.log4cats.Logger
 
 private trait EdgesFinder[F[_]] {
@@ -43,7 +44,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 ) extends TSClientImpl(renkuConnectionConfig)
     with EdgesFinder[F] {
 
-  private type EdgeData = (ExecutionInfo, Option[Node.Location], Option[Node.Location])
+  private type EdgeData = (ExecutionInfo, Option[Location], Option[Node.Location])
 
   override def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): F[EdgeMap] =
     queryEdges(using = query(projectPath, maybeUser)) map toNodesLocations

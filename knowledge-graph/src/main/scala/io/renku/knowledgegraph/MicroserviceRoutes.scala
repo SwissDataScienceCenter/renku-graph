@@ -55,7 +55,7 @@ private class MicroserviceRoutes[F[_]: Async](
     datasetEndpoint:         DatasetEndpoint[F],
     entitiesEndpoint:        entities.Endpoint[F],
     queryEndpoint:           QueryEndpoint[F],
-    lineageEndpoint:         lineage.Endpoint[F],
+    lineageEndpoint:         projects.files.lineage.Endpoint[F],
     ontologyEndpoint:        ontology.Endpoint[F],
     projectDetailsEndpoint:  projects.details.Endpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
@@ -242,7 +242,7 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private def getLineage(projectPathParts: List[String], location: String, maybeAuthUser: Option[AuthUser]) = {
-    import io.renku.knowledgegraph.lineage.model.Node.Location
+    import projects.files.lineage.model.Node.Location
 
     def toLocation(location: String): EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
       Location
@@ -281,7 +281,7 @@ private object MicroserviceRoutes {
         datasetEndpoint         <- DatasetEndpoint[IO]
         entitiesEndpoint        <- entities.Endpoint[IO]
         queryEndpoint           <- QueryEndpoint()
-        lineageEndpoint         <- lineage.Endpoint[IO]
+        lineageEndpoint         <- projects.files.lineage.Endpoint[IO]
         ontologyEndpoint        <- ontology.Endpoint[IO]
         projectDetailsEndpoint  <- projects.details.Endpoint[IO]
         projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]

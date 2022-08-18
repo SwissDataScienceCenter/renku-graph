@@ -16,25 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
-import LineageGenerators._
-import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.views.RdfResource
-import io.renku.knowledgegraph.lineage.model.Node
-import org.apache.jena.util.URIref
-import org.scalatest.matchers.should
+import io.renku.knowledgegraph.docs.OpenApiTester._
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class NodeIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class EndpointDocsSpec extends AnyWordSpec {
 
-  "showAs[RdfResource]" should {
+  "path" should {
 
-    "wrap the Node.Id in <>" in {
-      forAll { resourceId: Node.Id =>
-        resourceId.showAs[RdfResource] shouldBe s"<${URIref.encode(resourceId.value)}>"
-      }
+    "return a valid Path object" in {
+      validatePath(EndpointDocs.path)
     }
   }
 }

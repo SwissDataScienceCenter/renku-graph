@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.relativePaths
-import io.renku.knowledgegraph.lineage.model.Node.Location
+import model.Node.Location
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

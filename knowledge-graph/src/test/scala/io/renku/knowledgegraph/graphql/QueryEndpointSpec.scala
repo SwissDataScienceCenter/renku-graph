@@ -155,7 +155,7 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
     }
   }
 
-  private val queryAnalysisErrors =
+  private lazy val queryAnalysisErrors =
     nonEmptyStrings()
       .map { message =>
         new Exception(message) with QueryAnalysisError {

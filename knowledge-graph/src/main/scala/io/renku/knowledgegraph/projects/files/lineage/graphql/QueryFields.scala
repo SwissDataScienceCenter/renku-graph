@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage.graphql
+package io.renku.knowledgegraph.projects.files.lineage
+package graphql
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
@@ -24,7 +25,7 @@ import eu.timepit.refined.auto._
 import io.renku.knowledgegraph.graphql.Arguments._
 import io.renku.knowledgegraph.graphql.CommonQueryFields._
 import io.renku.knowledgegraph.graphql.LineageQueryContext
-import io.renku.knowledgegraph.lineage.model.Node.Location
+import model.Node.Location
 import sangria.schema._
 
 object QueryFields {

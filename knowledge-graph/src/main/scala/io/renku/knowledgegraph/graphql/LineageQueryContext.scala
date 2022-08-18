@@ -22,7 +22,7 @@ import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.lineage.LineageFinder
+import io.renku.knowledgegraph.projects.files.lineage.LineageFinder
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 

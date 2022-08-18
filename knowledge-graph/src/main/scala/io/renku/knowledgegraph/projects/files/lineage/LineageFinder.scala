@@ -16,16 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.graph.model.projects.Path
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.lineage.model.Node.Location
-import io.renku.knowledgegraph.lineage.model._
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import model.Node.Location
+import model._
 import org.typelevel.log4cats.Logger
 
 trait LineageFinder[F[_]] {

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.syntax.all._
 import io.renku.http.InfoMessage
@@ -24,8 +24,9 @@ import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.lineage.model.Node.{Label, Location, Type}
-import io.renku.knowledgegraph.lineage.model.{Edge, Lineage, Node}
+import model.Node.Type.{Directory, File, ProcessRun}
+import model.Node.{Label, Location}
+import model.{Edge, Lineage, Node}
 
 object EndpointDocs extends docs.EndpointDocs {
 
@@ -65,15 +66,15 @@ object EndpointDocs extends docs.EndpointDocs {
 
   private lazy val example = {
 
-    val inputNode = Node(Location("data/zhbikes"), Label("data/zhbikes@bbdc429"), Type.Directory)
+    val inputNode = Node(Location("data/zhbikes"), Label("data/zhbikes@bbdc429"), Directory)
 
     val processNode = Node(
       Location(".renku/workflow/3144e9a_python.cwl"),
       Label("renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet"),
-      Type.ProcessRun
+      ProcessRun
     )
     val outputNode =
-      Node(Location("data/preprocessed/zhbikes.parquet"), Label("data/preprocessed/zhbikes.parquet@1aaf360"), Type.File)
+      Node(Location("data/preprocessed/zhbikes.parquet"), Label("data/preprocessed/zhbikes.parquet@1aaf360"), File)
 
     Lineage(
       edges = Set(

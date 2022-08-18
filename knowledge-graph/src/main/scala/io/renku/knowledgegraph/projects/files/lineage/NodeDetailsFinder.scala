@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.Parallel
 import cats.effect.Async
@@ -28,10 +28,10 @@ import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{RenkuUrl, projects}
-import io.renku.knowledgegraph.lineage.model.{ExecutionInfo, Node}
 import io.renku.tinytypes.json.TinyTypeDecoders
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
+import model.{ExecutionInfo, Node}
 import org.typelevel.log4cats.Logger
 
 private trait NodeDetailsFinder[F[_]] {

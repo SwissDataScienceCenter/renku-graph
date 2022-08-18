@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.MonadThrow
 import cats.syntax.all._
@@ -25,13 +25,14 @@ import io.circe.generic.semiauto.deriveEncoder
 import io.circe.literal._
 import io.renku.graph.model.entities.{Activity, Entity}
 import io.renku.jsonld.{EntityId, EntityType}
-import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
 import org.apache.jena.util.URIref
 
 import java.time.Instant
 
 object model {
+
+  import Node.Location
 
   private[lineage] final case class ExecutionInfo(entityId: EntityId, date: RunDate)
 

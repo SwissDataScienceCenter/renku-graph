@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage.graphql
+package io.renku.knowledgegraph.projects.files.lineage
+package graphql
 
-import io.renku.knowledgegraph.lineage.model._
+import model._
 import sangria.schema._
 
 private object modelSchema {

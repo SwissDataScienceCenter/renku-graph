@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
 import cats.Parallel
 import cats.effect.Async
@@ -26,9 +26,9 @@ import io.renku.graph.model.projects
 import io.renku.http.InfoMessage.messageJsonEntityEncoder
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.knowledgegraph.lineage.model.Lineage
-import io.renku.knowledgegraph.lineage.model.Node.Location
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import model.Lineage
+import model.Node.Location
 import org.http4s.Response
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl

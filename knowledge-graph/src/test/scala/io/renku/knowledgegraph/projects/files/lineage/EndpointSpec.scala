@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
+import LineageGenerators._
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.{Decoder, Json}
@@ -30,10 +31,9 @@ import io.renku.http.InfoMessage.InfoMessage
 import io.renku.http.server.EndpointTester.errorMessageEntityDecoder
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.lineage.LineageGenerators._
-import io.renku.knowledgegraph.lineage.model.Node.{Label, Location, Type}
-import io.renku.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import io.renku.testtools.IOSpec
+import model.Node.{Label, Location, Type}
+import model.{Edge, Lineage, Node}
 import org.http4s.MediaType.application
 import org.http4s.Status.{InternalServerError, NotFound, Ok}
 import org.http4s.circe.jsonDecoder

@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
+import LineageGenerators._
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.jsonld.EntityId
-import io.renku.knowledgegraph.lineage.LineageGenerators._
-import io.renku.knowledgegraph.lineage.model.Node.Location
-import io.renku.knowledgegraph.lineage.model._
+import model.Node.Location
+import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

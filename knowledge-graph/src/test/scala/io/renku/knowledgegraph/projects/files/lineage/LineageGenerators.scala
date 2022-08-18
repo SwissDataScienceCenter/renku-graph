@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.lineage
+package io.renku.knowledgegraph.projects.files.lineage
 
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators._
-import io.renku.knowledgegraph.lineage.model._
+import model._
 import org.scalacheck.Gen
 
 import scala.util.Try

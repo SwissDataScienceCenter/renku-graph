@@ -16,14 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph
+package io.renku.knowledgegraph.projects.files
 
 import io.renku.jsonld.EntityId
-import io.renku.knowledgegraph.lineage.model._
 
 import java.time.Instant
 
 package object lineage {
+  import model._
 
   private[lineage] implicit class LineageOps(lineage: Lineage) {
 
