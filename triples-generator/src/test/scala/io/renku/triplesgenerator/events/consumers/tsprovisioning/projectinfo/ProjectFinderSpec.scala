@@ -201,7 +201,7 @@ class ProjectFinderSpec
       "name":                ${project.name},
       "created_at":          ${project.dateCreated},
       "visibility":          ${project.visibility},
-      "tag_list":            ${project.keywords.map(_.value) + blankStrings().generateOne}
+      "topics":              ${project.keywords.map(_.value) + blankStrings().generateOne}
     }"""
       .addIfDefined("forked_from_project" -> project.maybeParentPath)(parentPathEncoder)
       .addIfDefined("creator_id" -> project.maybeCreator.map(_.gitLabId))

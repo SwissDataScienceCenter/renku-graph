@@ -24,18 +24,15 @@ import io.circe.literal._
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.jsonld.parser._
+import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
-trait EndpointDocs {
-  def path: Path
-}
-
 object EndpointDocs {
-  def apply[F[_]: MonadThrow]: F[EndpointDocs] = new EndpointDocsImpl().pure[F].widen
+  def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = new EndpointDocsImpl().pure[F].widen
 }
 
-private class EndpointDocsImpl() extends EndpointDocs {
+private class EndpointDocsImpl() extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
     "Knowledge Graph ontology",

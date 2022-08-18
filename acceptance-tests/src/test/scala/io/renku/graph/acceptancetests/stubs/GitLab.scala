@@ -84,6 +84,52 @@ trait GitLab {
     ()
   }
 
+  def `GET <gitlabApi>/users/:id returning OK`(id: persons.GitLabId, person: Person)(implicit
+      accessToken:                                 AccessToken
+  ): Unit = {
+    stubFor {
+      get(s"/api/v4/users/$id").withAccessTokenInHeader
+        .willReturn(
+          okJson(json"""{
+            "id":       ${id.value},
+            "username": ${person.name.value},
+            "name":     ${person.name.value}
+          }""".noSpaces)
+        )
+    }
+    ()
+  }
+
+  def `GET <gitlabApi>/users/:id/projects returning OK`(
+      userId:             persons.GitLabId,
+      project:            data.Project
+  )(implicit accessToken: AccessToken): Unit = {
+    stubFor {
+      get(s"/api/v4/users/$userId/projects").withAccessTokenInHeader
+        .willReturn(okJson {
+          json"""[{
+            "id":                  ${project.id.value},
+            "description":         ${project.entitiesProject.maybeDescription.map(_.value.asJson).getOrElse(Json.Null)},
+            "visibility":          ${project.entitiesProject.visibility.value.toLowerCase},
+            "topics":              ${project.entitiesProject.keywords.map(_.value)},
+            "name":                ${project.name.value},
+            "path_with_namespace": ${project.path.value},
+            "created_at":          ${project.entitiesProject.dateCreated.value},
+            "creator_id":          ${project.entitiesProject.maybeCreator
+              .flatMap(_.maybeGitLabId.map(_.value.asJson))
+              .getOrElse(Json.Null)}
+          }]""".noSpaces
+        })
+    }
+
+    project.entitiesProject.maybeCreator.flatMap(c => c.maybeGitLabId.map(c -> _)) foreach {
+      case (creator, creatorId) =>
+        `GET <gitlabApi>/users/:id returning OK`(creatorId, creator)
+    }
+
+    ()
+  }
+
   def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(
       maybeAuthor:        Option[Person],
       project:            data.Project,
@@ -353,7 +399,7 @@ trait GitLab {
       "web_url":              ${project.urls.web.value},
       "readme_url":           ${project.urls.maybeReadme.map(_.value)},
       "forks_count":          ${project.entitiesProject.forksCount.value},
-      "tag_list":             ${project.entitiesProject.keywords.map(_.value).toList},
+      "topics":               ${project.entitiesProject.keywords.map(_.value).toList},
       "star_count":           ${project.starsCount.value},
       "created_at":           ${project.entitiesProject.dateCreated.value},
       "creator_id":           ${project.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId.map(_.value))},
@@ -391,17 +437,7 @@ trait GitLab {
     }
 
     (project.entitiesProject.maybeCreator -> project.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId)) mapN {
-      (creator, creatorId) =>
-        stubFor {
-          get(s"/api/v4/users/$creatorId").withAccessTokenInHeader
-            .willReturn(
-              okJson(json"""{
-                "id":   ${creatorId.value},
-                "username": ${creator.name.value},
-                "name": ${creator.name.value}
-              }""".noSpaces)
-            )
-        }
+      (creator, creatorId) => `GET <gitlabApi>/users/:id returning OK`(creatorId, creator)
     }
 
     `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)

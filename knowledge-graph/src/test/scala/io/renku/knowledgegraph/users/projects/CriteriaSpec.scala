@@ -16,16 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.tinytypes.constraints
+package io.renku.knowledgegraph.users.projects
 
-import eu.timepit.refined.numeric.Positive
-import io.renku.tinytypes._
+import Endpoint.Criteria.Filters.ActivationState
+import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.randomiseCases
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-trait PositiveInt[TT <: TinyType { type V = Int }] extends Constraints[TT] with RefinedValue[TT, Positive] {
-  self: TinyTypeFactory[TT] =>
+class CriteriaSpec extends AnyWordSpec with should.Matchers {
 
-  addConstraint(
-    check = _ > 0,
-    message = _ => s"$typeName cannot be <= 0"
-  )
+  "ActivationState" should {
+
+    ActivationState.all foreach { state =>
+      s"instantiate from ${state.show}" in {
+        ActivationState.from(randomiseCases(state.show).generateOne) shouldBe state.asRight
+      }
+    }
+  }
 }

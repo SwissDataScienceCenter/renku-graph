@@ -60,6 +60,7 @@ private class MicroserviceRoutes[F[_]: Async](
     projectEndpoint:         projectdetails.Endpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     docsEndpoint:            docs.Endpoint[F],
+    usersProjectsEndpoint:   users.projects.Endpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
     projectPathAuthorizer:   Authorizer[F, model.projects.Path],
     datasetIdAuthorizer:     Authorizer[F, model.datasets.Identifier],
@@ -83,7 +84,7 @@ private class MicroserviceRoutes[F[_]: Async](
     (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
-    `GET /dataset routes` <+> `GET /entities routes` <+> otherAuthRoutes
+    `GET /dataset routes` <+> `GET /entities routes` <+> `GET /users/:id/project route` <+> otherAuthRoutes
   }
 
   private lazy val `GET /dataset routes`: AuthedRoutes[Option[AuthUser], F] = {
@@ -119,6 +120,25 @@ private class MicroserviceRoutes[F[_]: Async](
     }
   }
   // format: on
+
+  private lazy val `GET /users/:id/project route`: AuthedRoutes[Option[AuthUser], F] = {
+    import users.binders._
+    import users.projects.Endpoint._
+    import Criteria.Filters
+    import Criteria.Filters.ActivationState._
+    import Criteria.Filters._
+    import usersProjectsEndpoint._
+
+    AuthedRoutes.of {
+      case req @ GET -> Root / "knowledge-graph" / "users" / GitLabId(id) / "projects"
+          :? activationState(maybeState) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
+        (maybeState getOrElse ActivationState.All.validNel, PagingRequest(maybePage, maybePerPage))
+          .mapN { (activationState, paging) =>
+            `GET /users/:id/projects`(Criteria(userId = id, Filters(activationState), paging, maybeUser), req.req)
+          }
+          .fold(toBadRequest, identity)
+    }
+  }
 
   private lazy val otherAuthRoutes: AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
     case authReq @ POST -> Root / "knowledge-graph" / "graphql" as maybeUser => handleQuery(authReq.req, maybeUser)
@@ -266,6 +286,7 @@ private object MicroserviceRoutes {
         projectEndpoint         <- projectdetails.Endpoint[IO]
         projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
         docsEndpoint            <- docs.Endpoint[IO]
+        usersProjectsEndpoint   <- users.projects.Endpoint[IO]
         authenticator           <- GitLabAuthenticator[IO]
         authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
         projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
@@ -280,6 +301,7 @@ private object MicroserviceRoutes {
                                      projectEndpoint,
                                      projectDatasetsEndpoint,
                                      docsEndpoint,
+                                     usersProjectsEndpoint,
                                      authMiddleware,
                                      projectPathAuthorizer,
                                      datasetIdAuthorizer,

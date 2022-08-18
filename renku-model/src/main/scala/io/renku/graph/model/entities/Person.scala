@@ -147,8 +147,8 @@ object Person {
         )
     }
 
-  private val sameAsTypes:                EntityTypes = EntityTypes.of(schema / "URL")
-  private val gitLabSameAsAdditionalType: String      = "GitLab"
+  private val sameAsTypes:        EntityTypes = EntityTypes.of(schema / "URL")
+  val gitLabSameAsAdditionalType: String      = "GitLab"
 
   def toGitLabSameAsEntityId(gitLabId: GitLabId)(implicit gitLabApiUrl: GitLabApiUrl): EntityId =
     EntityId of (gitLabApiUrl / "users" / gitLabId).show

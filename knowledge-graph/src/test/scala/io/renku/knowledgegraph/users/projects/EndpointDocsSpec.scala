@@ -16,16 +16,25 @@
  * limitations under the License.
  */
 
-package io.renku.tinytypes.constraints
+package io.renku.knowledgegraph.users.projects
 
-import eu.timepit.refined.numeric.Positive
-import io.renku.tinytypes._
+import io.renku.config.renku
+import io.renku.generators.CommonGraphGenerators.renkuApiUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators.renkuUrls
+import io.renku.graph.model.RenkuUrl
+import io.renku.knowledgegraph.docs.OpenApiTester._
+import org.scalatest.wordspec.AnyWordSpec
 
-trait PositiveInt[TT <: TinyType { type V = Int }] extends Constraints[TT] with RefinedValue[TT, Positive] {
-  self: TinyTypeFactory[TT] =>
+class EndpointDocsSpec extends AnyWordSpec {
 
-  addConstraint(
-    check = _ > 0,
-    message = _ => s"$typeName cannot be <= 0"
-  )
+  "path" should {
+
+    "return a valid Path object" in {
+      validatePath(new EndpointDocsImpl().path)
+    }
+  }
+
+  private implicit lazy val renkuUrl:    RenkuUrl     = renkuUrls.generateOne
+  private implicit lazy val renkuApiUrl: renku.ApiUrl = renkuApiUrls.generateOne
 }

@@ -23,28 +23,25 @@ import cats.syntax.all._
 import io.renku.graph.model.{SchemaVersion, persons, projects}
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
+import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
-import io.renku.knowledgegraph.projectdetails.model.Forking.ForksCount
-import io.renku.knowledgegraph.projectdetails.model.Permissions.{AccessLevel, GroupAccessLevel}
-import io.renku.knowledgegraph.projectdetails.model.Project.{DateUpdated, StarsCount}
-import io.renku.knowledgegraph.projectdetails.model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import io.renku.knowledgegraph.projectdetails.model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
-import io.renku.knowledgegraph.projectdetails.model._
+import model.Forking.ForksCount
+import model.Permissions.{AccessLevel, GroupAccessLevel}
+import model.Project.{DateUpdated, StarsCount}
+import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
+import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
+import model._
 
 import java.time.Instant
 
-trait EndpointDocs {
-  def path: Path
-}
-
 object EndpointDocs {
-  def apply[F[_]: MonadThrow]: F[EndpointDocs] =
+  def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] =
     ProjectJsonEncoder[F].map(new EndpointDocsImpl(_, ProjectJsonLDEncoder))
 }
 
 private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJsonLDEncoder: ProjectJsonLDEncoder)
-    extends EndpointDocs {
+    extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
     "Project details",

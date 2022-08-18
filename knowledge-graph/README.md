@@ -3,30 +3,32 @@
 This is a microservice which provides API for the Graph DB.
 
 ## API
-The following routes may be slightly different when accessed via the main renku api, which uses the gateway service (e.g. /api/kg/datasets)
 
-| Method | Path                                                                         | Description                                                          |
-|--------|------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| GET    | ```/api/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                   |
-| GET    | ```/api/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                   |
-| GET    | ```/api/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                   |
-| GET    | ```/api/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                      |
-| POST   | ```/api/knowledge-graph/graphql```                                           | GraphQL query endpoint                                               |
-| GET    | ```/api/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                         |
-| GET    | ```/api/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`       |
-| GET    | ```/api/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                |
-| GET    | ```/api/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project |
-| GET    | ```/api/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources             |
-| GET    | ```/metrics```                                                               | Serves Prometheus metrics                                            |
-| GET    | ```/ping```                                                                  | To check if service is healthy                                       |
-| GET    | ```/version```                                                               | Returns info about service version                                   |
+The following routes may be slightly different when accessed via the main Renku API, which uses the gateway service (e.g. /api/kg/datasets)
 
-#### GET /api/knowledge-graph/datasets
+| Method | Path                                                                     | Description                                                          |
+|--------|--------------------------------------------------------------------------|----------------------------------------------------------------------|
+| GET    | ```/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                   |
+| GET    | ```/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                   |
+| GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                   |
+| GET    | ```/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                      |
+| POST   | ```/knowledge-graph/graphql```                                           | GraphQL query endpoint                                               |
+| GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                         |
+| GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`       |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project |
+| GET    | ```/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources             |
+| GET    | ```/knowledge-graph/users/:id/projects```                                | Returns all user's projects                                          |
+| GET    | ```/metrics```                                                           | Serves Prometheus metrics                                            |
+| GET    | ```/ping```                                                              | To check if service is healthy                                       |
+| GET    | ```/version```                                                           | Returns info about service version                                   |
+
+#### GET /knowledge-graph/datasets
 
 Finds datasets which `title`, `description`, `keywords`, or creator `name` matches the given `phrase` or returns all the
 datasets if no `query` parameter is given.
 
-NOTES:
+**NOTES:**
 
 * the `query` query parameter has to be url-encoded and it cannot be blank.
 * the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`,
@@ -35,7 +37,6 @@ NOTES:
 * the `per_page` query parameter is optional and defaults to `20`.
 
 **Response**
-****
 
 | Status                     | Description                                                                                    |
 |----------------------------|------------------------------------------------------------------------------------------------|
@@ -59,18 +60,18 @@ Response headers:
 Link response header example:
 
 Assuming the total is `30` and the
-URL `https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
+URL `https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
 
 ```
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
 ```
 
 Response body example:
 
-```
+```json
 [
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
@@ -144,11 +145,11 @@ Response body example:
 ]
 ```
 
-#### GET /api/knowledge-graph/entities
+#### GET /knowledge-graph/entities
 
 Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 
-Filtering:
+**Filtering:**
 * `query`      - to filter by matching field (e.g., title, keyword, description, etc. as specified below)
 * `type`       - to filter by entity type(s); allowed values: `project`, `dataset`, `workflow`, and `person`; multiple `type` parameters allowed
 * `creator`    - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
@@ -165,7 +166,7 @@ When the `query` parameter is given, the match is done on the following fields:
 * keyword
 * description
 
-Sorting:
+**Sorting:**
 * `matchingScore` - to sort by match score
 * `name` - to sort by entity name - **default when no `query` parameter is given**
 * `date` - to sort by entity creation date
@@ -197,13 +198,13 @@ Response headers:
 | `Prev-Page`   | The index of the previous page (optional)                                             |
 | `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
 
-Assuming the total is `30` and the URL is `https://renku/api/knowledge-graph/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links are added to the response:
+Assuming the total is `30` and the URL is `https://renku/knowledge-graph/entities?query=phrase&sort=name:asc&page=2&per_page=10` the following links are added to the response:
 
 ```
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
-Link: <https://renku/api/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="next"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="first"
+Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&per_page=10>; rel="last"
 ```
 
 Response body example:
@@ -286,7 +287,7 @@ Response body example:
 ]
 ```
 
-#### GET /api/knowledge-graph/datasets/:id
+#### GET /knowledge-graph/datasets/:id
 
 Finds details of the dataset with the given `id`.
 
@@ -301,7 +302,7 @@ Finds details of the dataset with the given `id`.
 
 Response body example:
 
-```
+```json
 {
   "_links" : [
     {
@@ -401,7 +402,7 @@ Response body example:
 }
 ```
 
-#### GET /api/knowledge-graph/graphql
+#### GET /knowledge-graph/graphql
 
 Returns Knowledge Graph GraphQL endpoint schema.
 
@@ -415,10 +416,10 @@ Returns Knowledge Graph GraphQL endpoint schema.
 **A curl command example**
 
 ```
-curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/api/knowledge-graph/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
+curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/knowledge-graph/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
 ```
 
-#### POST /api/knowledge-graph/graphql
+#### POST /knowledge-graph/graphql
 
 Endpoint to perform GraphQL queries on the Knowledge Graph data.
 
@@ -436,7 +437,7 @@ Endpoint to perform GraphQL queries on the Knowledge Graph data.
 
 Query example:
 
-```
+```json
 {
   "query": "{ 
     lineage(projectPath: \"namespace/project\", filePath: \"zhbikes.parquet\") {
@@ -450,7 +451,7 @@ Query example:
 
 Response body example:
 
-```
+```json
 {
   "data": {
     "lineage": {
@@ -489,7 +490,7 @@ Response body example:
 }
 ```
 
-#### GET /api/knowledge-graph/ontology
+#### GET /knowledge-graph/ontology
 
 Returns ontology used in the Knowledge Graph as HTML page or JSON-LD.
 
@@ -550,7 +551,7 @@ Response body example for `Accept: application/ld+json`:
 ]
 ```
 
-#### GET /api/knowledge-graph/projects/:namespace/:name
+#### GET /knowledge-graph/projects/:namespace/:name
 
 Finds details of the project with the given `namespace/name`. The endpoint requires an authorization token to be passed
 in the request for non-public projects. Supported headers are:
@@ -572,7 +573,7 @@ The resource supports `application/json` and `application/ld+json` `Accept` head
 
 Response body example for `Accept: application/json`:
 
-```
+```json
 {
   "identifier":  123,
   "path":        "namespace/project-name", 
@@ -640,7 +641,7 @@ Response body example for `Accept: application/json`:
 
 Response body example for `Accept: application/ld+json`:
 
-```
+```json
 {
   "@id" : "http://wwywiir:3577/yobqsDoboi/projects/d_llli5Zo/2nTaozqw/llosas_/__-6h3a",
   "@type" : [
@@ -703,7 +704,7 @@ Response body example for `Accept: application/ld+json`:
 }
 ```
 
-#### GET /api/knowledge-graph/projects/:namespace/:name/datasets
+#### GET /knowledge-graph/projects/:namespace/:name/datasets
 
 Finds list of datasets of the project with the given `namespace/name`.
 
@@ -718,7 +719,7 @@ Finds list of datasets of the project with the given `namespace/name`.
 
 Response body example:
 
-```
+```json
 [  
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
@@ -783,16 +784,16 @@ Response body example:
 ]
 ```
 
-#### GET /api/knowledge-graph/projects/:namespace/:name/files/:location/lineage
+#### GET /knowledge-graph/projects/:namespace/:name/files/:location/lineage
 
 Fetches lineage for a given project `namespace`/`name` and file `location` (URL-encoded relative path to the file). This endpoint is intended to replace the graphql endpoint.
 
-| Status                     | Description                                                       |
-|----------------------------|-------------------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                      |
+| Status                     | Description                                                                                             |
+|----------------------------|---------------------------------------------------------------------------------------------------------|
+| OK (200)                   | If there are datasets for the project or `[]` if nothing is found                                       |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                            |
 | NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access this project |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                                                               |
 
 
 Response body example:
@@ -834,7 +835,7 @@ Response body example:
 }
 ```
 
-#### GET /api/knowledge-graph/spec.json
+#### GET /knowledge-graph/spec.json
 
 Returns OpenApi json spec 
 
@@ -842,6 +843,83 @@ Returns OpenApi json spec
 |----------------------------|----------------------|
 | OK (200)                   | If spec is found     |
 | INTERNAL SERVER ERROR (500)| Otherwise            |
+
+#### GET /knowledge-graph/users/:id/projects
+
+Returns all projects of the user with the given GitLab id.
+
+**Filtering:**
+* `state`      - to filter by project state; allowed values: 'ACTIVATED', 'NOT_ACTIVATED', 'ALL'; default value is 'ALL'
+
+**Paging:**
+* the `page` query parameter is optional and defaults to `1`.
+* the `per_page` query parameter is optional and defaults to `20`; max value is `100`.
+
+**Response**
+
+| Status                     | Description                                         |
+|----------------------------|-----------------------------------------------------|
+| OK (200)                   | If results are found; `[]` if no projects are found |
+| BAD_REQUEST (400)          | If illegal values for query parameters are given    |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated        |
+| INTERNAL SERVER ERROR (500)| Otherwise                                           |
+
+Response headers:
+
+| Header        | Description                                                                           |
+|---------------|---------------------------------------------------------------------------------------|
+| `Total`       | The total number of items                                                             |
+| `Total-Pages` | The total number of pages                                                             |
+| `Per-Page`    | The number of items per page                                                          |
+| `Page`        | The index of the current page (starting at 1)                                         |
+| `Next-Page`   | The index of the next page (optional)                                                 |
+| `Prev-Page`   | The index of the previous page (optional)                                             |
+| `Link`        | The set of `prev`/`next`/`first`/`last` link headers (`prev` and `next` are optional) |
+
+Response body example:
+
+```json
+[
+  {
+    "name":        "name",
+    "path":        "group/subgroup/name",
+    "visibility":  "public",
+    "date":        "2012-11-15T10:00:00.000Z",
+    "creator":     "Jan Kowalski",
+    "description": "desc",
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
+    "_links": [
+      {
+        "rel": "details",
+        "href": "http://t:5511/projects/group/subgroup/name"
+      }
+    ]
+  },
+  {
+    "id":          123,
+    "name":        "name",
+    "path":        "group/subgroup/name",
+    "visibility":  "public",
+    "date":        "2012-11-15T10:00:00.000Z",
+    "creator":     "Jan Kowalski",
+    "description": "desc",
+    "keywords": [
+      "keyword1",
+      "keyword2"
+    ],
+    "_links": [
+      {
+        "rel": "activation",
+        "href": "http://t:5511/projects/123/webhooks",
+        "method": "POST"
+      }
+    ]
+  }
+]
+```
 
 #### GET /metrics  (Internal use only)
 

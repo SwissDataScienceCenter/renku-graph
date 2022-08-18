@@ -27,6 +27,7 @@ import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
+import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph.entities.model.Entity._
@@ -34,18 +35,14 @@ import io.renku.knowledgegraph.entities.model.MatchingScore
 
 import java.time.Instant
 
-trait EndpointDocs {
-  def path: Path
-}
-
 object EndpointDocs {
-  def apply[F[_]: MonadThrow]: F[EndpointDocs] = for {
+  def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
     gitLabUrl <- GitLabUrlLoader[F]()
     apiUrl    <- renku.ApiUrl[F]()
   } yield new EndpointDocsImpl()(gitLabUrl, apiUrl)
 }
 
-private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends EndpointDocs {
+private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
     "Cross-Entity search",

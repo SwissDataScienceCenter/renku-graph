@@ -16,40 +16,38 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph.users.projects
 
-import DatasetSearchResult._
 import cats.MonadThrow
-import cats.syntax.all._
+import cats.implicits._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
-import io.renku.graph.config.GitLabUrlLoader
+import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model._
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
-import io.renku.knowledgegraph.docs.EndpointDocs
+import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
 import java.time.Instant
 
-object DatasetSearchEndpointDocs {
-  def apply[F[_]: MonadThrow]: F[EndpointDocs] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-    apiUrl    <- renku.ApiUrl[F]()
-  } yield new DatasetSearchEndpointDocsImpl()(gitLabUrl, apiUrl)
+object EndpointDocs {
+  def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
+    renkuUrl <- RenkuUrlLoader[F]()
+    apiUrl   <- renku.ApiUrl[F]()
+  } yield new EndpointDocsImpl()(renkuUrl, apiUrl)
 }
 
-private class DatasetSearchEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl)
-    extends EndpointDocs {
+private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    "Free-Text Dataset search",
-    "Finds Datasets by the given criteria".some,
+    "Cross-Entity search",
+    "Finds entities by the given criteria".some,
     GET(
-      Uri / "datasets" :? query & sort & page & perPage,
-      Status.Ok -> Response("Found datasets",
+      Uri / "users" / userId / "projects" :? state,
+      Status.Ok -> Response("Found projects",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
       ),
@@ -67,33 +65,20 @@ private class DatasetSearchEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, ren
     )
   )
 
-  private lazy val query = Parameter.Query(
-    "query",
-    Schema.String,
-    "to filter by matching field (e.g., title, keyword, description, or creator name)".some,
-    required = false
-  )
-  private lazy val sort = Parameter.Query(
-    "sort",
-    Schema.String,
-    "the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`, `datePublished`, `date` and `projectsCount`".some,
-    required = false
-  )
-  private lazy val page = Parameter.Query(
-    "page",
+  private lazy val userId = Parameter.Path(
+    "userId",
     Schema.Integer,
-    "the page query parameter is optional and defaults to 1.".some,
-    required = false
+    "User's GitLab identifier".some
   )
-  private lazy val perPage = Parameter.Query(
-    "per_page",
-    Schema.Integer,
-    "the per_page query parameter is optional and defaults to 20; max value is 100.".some,
+  private lazy val state = Parameter.Query(
+    "state",
+    Schema.String,
+    "to filter by project state; allowed values: 'ACTIVATED', 'NOT_ACTIVATED', 'ALL'; default value is 'ALL'".some,
     required = false
   )
 
   private lazy val responseHeaders = Map(
-    "Total"       -> Header("The total number of entities".some, Schema.Integer),
+    "Total"       -> Header("The total number of projects".some, Schema.Integer),
     "Total-Pages" -> Header("The total number of pages".some, Schema.Integer),
     "Per-Page"    -> Header("The number of items per page".some, Schema.Integer),
     "Page"        -> Header("The index of the current page (starting at 1)".some, Schema.Integer),
@@ -103,22 +88,28 @@ private class DatasetSearchEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, ren
   )
 
   private lazy val example = Json.arr(
-    DatasetSearchResult(
-      datasets.Identifier("123444"),
-      datasets.Title("title"),
-      datasets.Name("name"),
-      datasets.Description("Some project").some,
-      List(
-        Dataset.DatasetCreator(persons.Email("jan@mail.com").some,
-                               persons.Name("Jan Kowalski"),
-                               persons.Affiliation("SDSC").some
-        )
-      ),
-      datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
-      projects.Path("group/subgroup/name"),
-      ProjectsCount(1),
-      List(datasets.Keyword("key")),
-      List(datasets.ImageUri("image.png"))
-    ).asJson
+    model.Project
+      .Activated(
+        projects.Name("name"),
+        projects.Path("group/subgroup/name"),
+        projects.Visibility.Public,
+        projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+        persons.Name("Jan Kowalski").some,
+        List(projects.Keyword("key")),
+        projects.Description("Some project").some
+      )
+      .asJson,
+    model.Project
+      .NotActivated(
+        projects.Id(1),
+        projects.Name("name"),
+        projects.Path("group/subgroup/name"),
+        projects.Visibility.Public,
+        projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+        persons.Name("Jan Kowalski").some,
+        List(projects.Keyword("key")),
+        projects.Description("Some project").some
+      )
+      .asJson
   )
 }

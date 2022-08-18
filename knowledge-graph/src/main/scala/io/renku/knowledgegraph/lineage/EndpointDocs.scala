@@ -21,14 +21,15 @@ package io.renku.knowledgegraph.lineage
 import cats.syntax.all._
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
+import io.renku.knowledgegraph.docs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph.lineage.model.Node.{Label, Location, Type}
 import io.renku.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 
-object EndpointDocs {
+object EndpointDocs extends docs.EndpointDocs {
 
-  lazy val path: Path = Path(
+  override val path: Path = Path(
     "Lineage",
     "Finds lineage of the given file".some,
     GET(
@@ -62,7 +63,7 @@ object EndpointDocs {
   private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
   private lazy val location    = Parameter.Path("location", Schema.String, "The path of the file".some)
 
-  private val example = {
+  private lazy val example = {
 
     val inputNode = Node(Location("data/zhbikes"), Label("data/zhbikes@bbdc429"), Type.Directory)
 

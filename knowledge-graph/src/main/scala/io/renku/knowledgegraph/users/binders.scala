@@ -16,16 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.tinytypes.constraints
+package io.renku.knowledgegraph.users
 
-import eu.timepit.refined.numeric.Positive
-import io.renku.tinytypes._
+import cats.syntax.all._
+import io.renku.graph.model.persons
 
-trait PositiveInt[TT <: TinyType { type V = Int }] extends Constraints[TT] with RefinedValue[TT, Positive] {
-  self: TinyTypeFactory[TT] =>
+object binders {
 
-  addConstraint(
-    check = _ > 0,
-    message = _ => s"$typeName cannot be <= 0"
-  )
+  object GitLabId {
+    def unapply(value: String): Option[persons.GitLabId] =
+      value.toIntOption >>= (persons.GitLabId.from(_).toOption)
+  }
 }
