@@ -23,7 +23,8 @@ import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.ServiceVersion
 import io.renku.knowledgegraph._
-import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
+import io.renku.knowledgegraph.datasets.details.DatasetEndpointDocs
+import io.renku.knowledgegraph.datasets.{DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
 import io.renku.knowledgegraph.docs.model._
 import org.http4s
 import org.http4s.circe.jsonEncoder

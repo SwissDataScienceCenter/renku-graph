@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph.datasets.details
 
 import cats.data.NonEmptyList
 import cats.effect.IO
@@ -42,7 +42,8 @@ import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
-import io.renku.knowledgegraph.datasets.Dataset._
+import io.renku.knowledgegraph.datasets.Dataset.{DatasetCreator, DatasetProject, DatasetVersions, ModifiedDataset, NonModifiedDataset}
+import io.renku.knowledgegraph.datasets.{Dataset, importedExternalToNonModified, modifiedToModified}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.json.TinyTypeDecoders._

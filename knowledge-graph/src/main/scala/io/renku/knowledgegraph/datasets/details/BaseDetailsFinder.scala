@@ -17,6 +17,7 @@
  */
 
 package io.renku.knowledgegraph.datasets
+package details
 
 import cats.MonadThrow
 import cats.effect.Async

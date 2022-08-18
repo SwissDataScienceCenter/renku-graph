@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.datasets
 
+import Dataset.DatasetCreator
 import cats.data.NonEmptyList
 import io.circe.Decoder
 import io.circe.literal._
@@ -25,14 +26,13 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.blankStrings
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.persons.{Email, Name}
-import io.renku.knowledgegraph.datasets.Dataset.DatasetCreator
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  import io.renku.knowledgegraph.datasets.CreatorsFinder._
+  import CreatorsFinder.creatorsDecoder
 
   "dataset creator decoder" should {
 
@@ -57,8 +57,8 @@ class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
     "results": {
       "bindings": [
         {
-          "email": {"value": ${email.value}},
-          "name": {"value": ${name.value}},
+          "email":       {"value": ${email.value}},
+          "name":        {"value": ${name.value}},
           "affiliation": {"value": $blank}
         }
       ]

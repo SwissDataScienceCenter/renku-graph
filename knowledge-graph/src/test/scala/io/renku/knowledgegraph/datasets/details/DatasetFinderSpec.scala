@@ -17,6 +17,7 @@
  */
 
 package io.renku.knowledgegraph.datasets
+package details
 
 import cats.effect.IO
 import cats.syntax.all._

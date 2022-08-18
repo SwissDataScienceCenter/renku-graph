@@ -18,6 +18,10 @@
 
 package io.renku.knowledgegraph.datasets
 
+import Dataset.DatasetCreator
+import DatasetSearchResult._
+import DatasetsSearchEndpoint.Query.{Phrase, query}
+import DatasetsSearchEndpoint.Sort
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -40,10 +44,6 @@ import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
-import io.renku.knowledgegraph.datasets.Dataset.DatasetCreator
-import io.renku.knowledgegraph.datasets.DatasetSearchResult._
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.{Phrase, query}
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application

@@ -49,6 +49,7 @@ import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.{Phrase, qu
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
 import io.renku.knowledgegraph.datasets._
+import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application

@@ -40,6 +40,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets._
+import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder

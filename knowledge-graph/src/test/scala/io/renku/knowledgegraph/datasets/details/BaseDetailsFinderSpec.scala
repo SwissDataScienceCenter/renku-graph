@@ -17,6 +17,7 @@
  */
 
 package io.renku.knowledgegraph.datasets
+package details
 
 import cats.syntax.all._
 import io.circe.literal._
@@ -37,7 +38,7 @@ class BaseDetailsFinderSpec
     with should.Matchers
     with TinyTypeEncoders {
 
-  import io.renku.knowledgegraph.datasets.BaseDetailsFinderImpl._
+  import io.renku.knowledgegraph.datasets.details.BaseDetailsFinderImpl._
 
   "non-modified dataset decoder" should {
 

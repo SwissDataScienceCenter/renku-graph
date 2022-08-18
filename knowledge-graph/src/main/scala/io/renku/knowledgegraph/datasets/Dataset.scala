@@ -29,6 +29,7 @@ import io.renku.graph.model.persons.{Affiliation, Email}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.{GitLabUrl, persons, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
+import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
 import io.renku.knowledgegraph.projects.details.Endpoint
 import io.renku.tinytypes.json.TinyTypeEncoders._
 
