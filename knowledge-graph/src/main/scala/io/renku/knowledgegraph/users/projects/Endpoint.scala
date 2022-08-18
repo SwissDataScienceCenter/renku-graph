@@ -86,7 +86,7 @@ object Endpoint {
     }
 
     private lazy val activationStateFactory: String => ActivationState = value =>
-      ActivationState.all.find(_.value == value).getOrElse {
+      ActivationState.all.find(_.value equalsIgnoreCase value).getOrElse {
         throw new IllegalArgumentException(s"'$value' unknown ActivationState")
       }
   }

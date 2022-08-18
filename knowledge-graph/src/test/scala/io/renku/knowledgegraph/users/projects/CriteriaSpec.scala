@@ -20,6 +20,8 @@ package io.renku.knowledgegraph.users.projects
 
 import Endpoint.Criteria.Filters.ActivationState
 import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.randomiseCases
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -29,7 +31,7 @@ class CriteriaSpec extends AnyWordSpec with should.Matchers {
 
     ActivationState.all foreach { state =>
       s"instantiate from ${state.show}" in {
-        ActivationState.from(state.show) shouldBe state.asRight
+        ActivationState.from(randomiseCases(state.show).generateOne) shouldBe state.asRight
       }
     }
   }
