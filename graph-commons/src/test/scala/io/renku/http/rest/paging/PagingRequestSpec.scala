@@ -46,7 +46,7 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
       Map("page" -> Seq("abc")) match {
         case PagingRequest.Decoders.page(actual) =>
           actual shouldBe Some(Validated.invalidNel {
-            ParseFailure("'abc' not a valid Page number", "")
+            ParseFailure("'abc' not a valid 'page' value", "")
           })
       }
     }
@@ -55,7 +55,7 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
       Map("page" -> Seq("0")) match {
         case PagingRequest.Decoders.page(actual) =>
           actual shouldBe Some(Validated.invalidNel {
-            ParseFailure("'0' not a valid Page number", "")
+            ParseFailure("'0' not a valid 'page' value", "")
           })
       }
     }
@@ -81,7 +81,7 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
       Map("per_page" -> Seq("abc")) match {
         case PagingRequest.Decoders.perPage(actual) =>
           actual shouldBe Validated.invalidNel {
-            ParseFailure("'abc' not a valid PerPage value", "")
+            ParseFailure("'abc' not a valid 'per_page' value", "")
           }.some
       }
     }
@@ -90,7 +90,7 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
       Map("per_page" -> Seq("0")) match {
         case PagingRequest.Decoders.perPage(actual) =>
           actual shouldBe Validated.invalidNel {
-            ParseFailure("'0' not a valid PerPage value", "")
+            ParseFailure("'0' not a valid 'per_page' value", "")
           }.some
       }
     }
@@ -100,7 +100,7 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
       Map("per_page" -> Seq(overPerPageMax.toString)) match {
         case PagingRequest.Decoders.perPage(actual) =>
           actual shouldBe Validated.invalidNel {
-            ParseFailure(s"'$overPerPageMax' not a valid PerPage value. Max value is ${PerPage.max}", "")
+            ParseFailure(s"'$overPerPageMax' not a valid 'per_page' value. Max value is ${PerPage.max}", "")
           }.some
       }
     }
@@ -151,5 +151,5 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     }
   }
 
-  private val parseFailures: Gen[ParseFailure] = sentences() map (v => ParseFailure(v.value, ""))
+  private lazy val parseFailures: Gen[ParseFailure] = sentences() map (v => ParseFailure(v.value, ""))
 }

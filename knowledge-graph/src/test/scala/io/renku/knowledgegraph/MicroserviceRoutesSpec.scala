@@ -643,9 +643,22 @@ class MicroserviceRoutesSpec
     val userId = personGitLabIds.generateOne
 
     forAll {
+      val commonUri = uri"/knowledge-graph/users" / userId.value / "projects"
       Table(
-        "uri"                                                   -> "criteria",
-        uri"/knowledge-graph/users" / userId.value / "projects" -> Criteria(userId)
+        "uri"     -> "criteria",
+        commonUri -> Criteria(userId),
+        pages
+          .map(page =>
+            commonUri +? ("page" -> page.show) -> Criteria(userId, paging = PagingRequest.default.copy(page = page))
+          )
+          .generateOne,
+        perPages
+          .map(perPage =>
+            commonUri +? ("per_page" -> perPage.show) -> Criteria(userId,
+                                                                  paging = PagingRequest.default.copy(perPage = perPage)
+            )
+          )
+          .generateOne
       )
     } { (uri, criteria) =>
       s"read the query parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
@@ -662,25 +675,36 @@ class MicroserviceRoutesSpec
         response.contentType shouldBe Some(`Content-Type`(application.json))
         response.body[Json]  shouldBe responseBody
       }
+    }
 
-      "authenticate user from the request if given" in new TestCase {
+    s"return $BadRequest for invalid parameter values" in new TestCase {
+      val response = routes()
+        .call(
+          Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects" +? ("per_page" -> -1))
+        )
 
-        val maybeAuthUser = authUsers.generateOption
-        val request       = Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects")
+      response.status             shouldBe BadRequest
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe ErrorMessage("'-1' not a valid 'per_page' value")
+    }
 
-        val responseBody = jsons.generateOne
-        (usersProjectsEndpoint.`GET /users/:id/projects` _)
-          .expects(Criteria(userId, maybeUser = maybeAuthUser), request)
-          .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+    "authenticate user from the request if given" in new TestCase {
 
-        routes(maybeAuthUser).call(request).status shouldBe Ok
-      }
+      val maybeAuthUser = authUsers.generateOption
+      val request       = Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects")
 
-      s"return $Unauthorized when user authentication fails" in new TestCase {
-        routes(givenAuthFailing())
-          .call(Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects"))
-          .status shouldBe Unauthorized
-      }
+      val responseBody = jsons.generateOne
+      (usersProjectsEndpoint.`GET /users/:id/projects` _)
+        .expects(Criteria(userId, maybeUser = maybeAuthUser), request)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      routes(maybeAuthUser).call(request).status shouldBe Ok
+    }
+
+    s"return $Unauthorized when user authentication fails" in new TestCase {
+      routes(givenAuthFailing())
+        .call(Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects"))
+        .status shouldBe Unauthorized
     }
   }
 

@@ -124,9 +124,17 @@ private class MicroserviceRoutes[F[_]: Async](
   private lazy val `GET /users/:id/project route`: AuthedRoutes[Option[AuthUser], F] = {
     import users.binders._
     import users.projects.Endpoint._
+    import usersProjectsEndpoint._
 
-    AuthedRoutes.of { case req @ GET -> Root / "knowledge-graph" / "users" / GitLabId(id) / "projects" as maybeUser =>
-      usersProjectsEndpoint.`GET /users/:id/projects`(Criteria(userId = id, maybeUser = maybeUser), req.req)
+    AuthedRoutes.of {
+      case req @ GET -> Root / "knowledge-graph" / "users" / GitLabId(id) / "projects"
+          :? page(maybePage) +& perPage(maybePerPage) as maybeUser =>
+        PagingRequest(maybePage, maybePerPage)
+          .map { paging =>
+            `GET /users/:id/projects`(Criteria(userId = id, paging, maybeUser), req.req)
+          }
+          .fold(toBadRequest, identity)
+
     }
   }
 
