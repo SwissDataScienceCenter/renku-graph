@@ -27,24 +27,20 @@ import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
+import io.renku.knowledgegraph.docs.EndpointDocs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
 import java.time.Instant
 
-trait DatasetEndpointDocs {
-  def path: Path
-}
-
 object DatasetEndpointDocs {
-  def apply[F[_]: MonadThrow]: F[DatasetEndpointDocs] = for {
+  def apply[F[_]: MonadThrow]: F[EndpointDocs] = for {
     gitLabUrl <- GitLabUrlLoader[F]()
     apiUrl    <- renku.ApiUrl[F]()
   } yield new DatasetEndpointDocsImpl()(gitLabUrl, apiUrl)
 }
 
-private class DatasetEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl)
-    extends DatasetEndpointDocs {
+private class DatasetEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends EndpointDocs {
 
   override lazy val path: Path = Path(
     "Dataset details",

@@ -26,7 +26,7 @@ import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
-private trait EndpointDocs {
+trait EndpointDocs {
   def path: Path
 }
 

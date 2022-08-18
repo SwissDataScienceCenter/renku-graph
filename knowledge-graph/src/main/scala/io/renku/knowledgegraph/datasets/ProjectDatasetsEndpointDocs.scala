@@ -29,22 +29,19 @@ import io.renku.graph.model.{GitLabUrl, datasets, projects}
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.datasets.ProjectDatasetsFinder.ProjectDataset
+import io.renku.knowledgegraph.docs.EndpointDocs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
-trait ProjectDatasetsEndpointDocs {
-  def path: Path
-}
-
 object ProjectDatasetsEndpointDocs {
-  def apply[F[_]: MonadThrow]: F[ProjectDatasetsEndpointDocs] = for {
+  def apply[F[_]: MonadThrow]: F[EndpointDocs] = for {
     gitLabUrl <- GitLabUrlLoader[F]()
     apiUrl    <- renku.ApiUrl[F]()
   } yield new ProjectDatasetsEndpointDocsImpl()(gitLabUrl, apiUrl)
 }
 
 private class ProjectDatasetsEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl)
-    extends ProjectDatasetsEndpointDocs {
+    extends EndpointDocs {
 
   override lazy val path: Path = Path(
     "Project Datasets",
