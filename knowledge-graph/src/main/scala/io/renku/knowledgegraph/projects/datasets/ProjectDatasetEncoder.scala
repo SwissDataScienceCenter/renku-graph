@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph.projects.datasets
 
 import cats.syntax.all._
 import io.circe.literal._
@@ -26,9 +26,10 @@ import io.renku.config.renku
 import io.renku.graph.model.datasets.{DerivedFrom, ImageUri, SameAs}
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
-import io.renku.knowledgegraph.datasets.ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 
 private object ProjectDatasetEncoder {
+
+  import ProjectDatasetsFinder._
 
   private implicit val sameAsOrDerivedEncoder: Encoder[SameAsOrDerived] = Encoder.instance[SameAsOrDerived] {
     case Left(sameAs: SameAs)            => json"""{"sameAs": ${sameAs.toString}}"""
@@ -40,14 +41,14 @@ private object ProjectDatasetEncoder {
   )(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): Encoder[ProjectDataset] =
     Encoder.instance[ProjectDataset] { case (id, originalId, title, name, sameAsOrDerived, images) =>
       json"""{
-          "identifier": ${id.toString},
-          "versions": {
-            "initial": ${originalId.toString}
-          },
-          "title": ${title.toString},
-          "name": ${name.toString},
-          "images": ${images -> projectPath}
-        }"""
+        "identifier": ${id.toString},
+        "versions": {
+          "initial": ${originalId.toString}
+        },
+        "title": ${title.toString},
+        "name": ${name.toString},
+        "images": ${images -> projectPath}
+      }"""
         .deepMerge(sameAsOrDerived.asJson)
         .deepMerge(
           _links(

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph.projects.datasets
 
 import ProjectDatasetsFinder.ProjectDataset
 import cats.effect._

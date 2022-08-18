@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph.projects.datasets
 
 import ProjectDatasetEncoder.encoder
+import ProjectDatasetsFinder.ProjectDataset
 import cats.MonadThrow
 import cats.syntax.all._
 import io.circe.syntax._
@@ -28,7 +29,6 @@ import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.{GitLabUrl, datasets, projects}
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
-import io.renku.knowledgegraph.datasets.ProjectDatasetsFinder.ProjectDataset
 import io.renku.knowledgegraph.docs.EndpointDocs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._

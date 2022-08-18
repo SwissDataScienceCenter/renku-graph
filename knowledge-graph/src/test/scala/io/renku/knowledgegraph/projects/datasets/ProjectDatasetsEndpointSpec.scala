@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph.projects.datasets
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -54,7 +54,7 @@ class ProjectDatasetsEndpointSpec
     with TinyTypeEncoders
     with IOSpec {
 
-  import io.renku.knowledgegraph.datasets.ProjectDatasetsFinder._
+  import ProjectDatasetsFinder._
 
   "getProjectDatasets" should {
 

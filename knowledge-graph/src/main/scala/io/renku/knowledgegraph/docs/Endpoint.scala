@@ -24,8 +24,9 @@ import io.circe.syntax._
 import io.renku.config.ServiceVersion
 import io.renku.knowledgegraph._
 import io.renku.knowledgegraph.datasets.details.DatasetEndpointDocs
-import io.renku.knowledgegraph.datasets.{DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
+import io.renku.knowledgegraph.datasets.{DatasetSearchEndpointDocs}
 import io.renku.knowledgegraph.docs.model._
+import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsEndpointDocs
 import org.http4s
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
