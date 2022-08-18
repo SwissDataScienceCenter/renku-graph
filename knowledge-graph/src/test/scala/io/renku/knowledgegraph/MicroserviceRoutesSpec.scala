@@ -638,7 +638,9 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/users/:id/projects" should {
+    import users.projects.Endpoint.Criteria._
     import users.projects.Endpoint._
+    import users.projects._
 
     val userId = personGitLabIds.generateOne
 
@@ -647,6 +649,9 @@ class MicroserviceRoutesSpec
       Table(
         "uri"     -> "criteria",
         commonUri -> Criteria(userId),
+        activationStates
+          .map(state => commonUri +? ("state" -> state.show) -> Criteria(userId, Filters(state), PagingRequest.default))
+          .generateOne,
         pages
           .map(page =>
             commonUri +? ("page" -> page.show) -> Criteria(userId, paging = PagingRequest.default.copy(page = page))
@@ -680,12 +685,12 @@ class MicroserviceRoutesSpec
     s"return $BadRequest for invalid parameter values" in new TestCase {
       val response = routes()
         .call(
-          Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects" +? ("per_page" -> -1))
+          Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects" +? ("state" -> -1))
         )
 
       response.status             shouldBe BadRequest
       response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe ErrorMessage("'-1' not a valid 'per_page' value")
+      response.body[ErrorMessage] shouldBe ErrorMessage("'state' parameter with invalid value")
     }
 
     "authenticate user from the request if given" in new TestCase {

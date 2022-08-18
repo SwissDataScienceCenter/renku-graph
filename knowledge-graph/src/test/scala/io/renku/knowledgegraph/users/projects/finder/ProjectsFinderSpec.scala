@@ -19,10 +19,12 @@
 package io.renku.knowledgegraph.users.projects
 package finder
 
+import Endpoint.Criteria.Filters
+import Endpoint.Criteria.Filters._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
-import io.renku.http.rest.paging.PagingResponse
 import io.renku.http.rest.paging.model.Total
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -36,28 +38,67 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
     "combine results from both TS and GitLab favouring TS projects when having the same path" in new TestCase {
 
-      val criteria      = criterias.generateOne
+      val criteria      = criterias.generateOne.copy(filters = Filters(ActivationState.All))
       val commonProject = notActivatedProjects.generateOne
 
-      val tsProjects = commonProject.toActivated :: activatedProjects.generateList()
+      val tsProjects = commonProject.toActivated :: activatedProjects.generateList(maxElements = 4)
       (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(tsProjects.pure[Try])
 
-      val glProjects = notActivatedProjects.generateList()
+      val glProjects = notActivatedProjects.generateList(maxElements = 4)
       (glProjectsFinder.findProjectsInGL _)
         .expects(criteria)
         .returning((commonProject :: glProjects).pure[Try])
 
       val Success(actualResults) = finder.findProjects(criteria)
 
-      val expectedProjects         = (tsProjects ::: glProjects).sortBy(_.name)
-      val Success(expectedResults) = PagingResponse.from[Try, model.Project](expectedProjects, criteria.paging)
-      actualResults.results          shouldBe expectedResults.results
-      actualResults.pagingInfo.total shouldBe expectedResults.pagingInfo.total
+      val expectedProjects = (tsProjects ::: glProjects).sortBy(_.name)
+      actualResults.results          shouldBe expectedProjects
+      actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
+    }
+
+    "return not activated projects only if ActivationState is set to 'NotActivated'" in new TestCase {
+
+      val criteria      = criterias.generateOne.copy(filters = Filters(ActivationState.NotActivated))
+      val commonProject = notActivatedProjects.generateOne
+
+      val tsProjects = commonProject.toActivated :: activatedProjects.generateList(maxElements = 4)
+      (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(tsProjects.pure[Try])
+
+      val glProjects = notActivatedProjects.generateList(maxElements = 4)
+      (glProjectsFinder.findProjectsInGL _)
+        .expects(criteria)
+        .returning((commonProject :: glProjects).pure[Try])
+
+      val Success(actualResults) = finder.findProjects(criteria)
+
+      val expectedProjects = glProjects.sortBy(_.name)
+      actualResults.results          shouldBe expectedProjects
+      actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
+    }
+
+    "return activated projects only if ActivationState is set to 'Activated'" in new TestCase {
+
+      val criteria      = criterias.generateOne.copy(filters = Filters(ActivationState.Activated))
+      val commonProject = notActivatedProjects.generateOne
+
+      val tsProjects = commonProject.toActivated :: activatedProjects.generateList(maxElements = 4)
+      (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(tsProjects.pure[Try])
+
+      val glProjects = notActivatedProjects.generateList(maxElements = 4)
+      (glProjectsFinder.findProjectsInGL _)
+        .expects(criteria)
+        .returning((commonProject :: glProjects).pure[Try])
+
+      val Success(actualResults) = finder.findProjects(criteria)
+
+      val expectedProjects = tsProjects.sortBy(_.name)
+      actualResults.results          shouldBe expectedProjects
+      actualResults.pagingInfo.total shouldBe Total(expectedProjects.size)
     }
 
     "fail if finding projects in TS fails" in new TestCase {
 
-      val criteria = criterias.generateOne
+      val criteria = criterias.generateOne.copy(filters = Filters(ActivationState.All))
 
       val exception = exceptions.generateOne
       (tsProjectsFinder.findProjectsInTS _)
@@ -71,7 +112,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
     "fail if finding projects in GL fails" in new TestCase {
 
-      val criteria = criterias.generateOne
+      val criteria = criterias.generateOne.copy(filters = Filters(ActivationState.All))
 
       (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(List.empty.pure[Try])
 
@@ -85,7 +126,7 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
 
     "return an empty List if no projects found" in new TestCase {
 
-      val criteria = criterias.generateOne
+      val criteria = criterias.generateOne.copy(filters = Filters(ActivationState.All))
 
       (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(List.empty.pure[Try])
       (glProjectsFinder.findProjectsInGL _).expects(criteria).returning(List.empty.pure[Try])

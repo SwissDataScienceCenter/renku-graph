@@ -28,9 +28,11 @@ import io.renku.graph.model.{RenkuUrl, persons}
 import io.renku.http.client.GitLabClient
 import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.security.model.AuthUser
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{Request, Response}
+import org.http4s.dsl.io.OptionalValidatingQueryParamDecoderMatcher
+import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Request, Response}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -41,10 +43,53 @@ trait Endpoint[F[_]] {
 
 object Endpoint {
 
+  import Criteria.Filters._
+  import Criteria._
+
   final case class Criteria(userId:    persons.GitLabId,
+                            filters:   Filters = Filters(),
                             paging:    PagingRequest = PagingRequest.default,
                             maybeUser: Option[AuthUser] = None
   )
+
+  object Criteria {
+
+    final case class Filters(state: ActivationState = ActivationState.All)
+    object Filters {
+
+      sealed trait ActivationState extends StringTinyType with Product with Serializable
+      object ActivationState extends TinyTypeFactory[ActivationState](activationStateFactory) {
+
+        val all: Set[ActivationState] = Set(Activated, NotActivated, All)
+
+        final case object Activated extends ActivationState {
+          override val value: String = "ACTIVATED"
+        }
+        final case object NotActivated extends ActivationState {
+          override val value: String = "NOT_ACTIVATED"
+        }
+        final case object All extends ActivationState {
+          override val value: String = "ALL"
+        }
+
+        private implicit val queryParameterDecoder: QueryParamDecoder[ActivationState] =
+          (value: QueryParameterValue) =>
+            ActivationState
+              .from(value.value)
+              .leftMap(_ => ParseFailure(s"'${activationState.parameterName}' parameter with invalid value", ""))
+              .toValidatedNel
+
+        object activationState extends OptionalValidatingQueryParamDecoderMatcher[ActivationState]("state") {
+          val parameterName: String = "state"
+        }
+      }
+    }
+
+    private lazy val activationStateFactory: String => ActivationState = value =>
+      ActivationState.all.find(_.value == value).getOrElse {
+        throw new IllegalArgumentException(s"'$value' unknown ActivationState")
+      }
+  }
 
   def apply[F[_]: Async: GitLabClient: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     projectsFinder <- ProjectsFinder[F]

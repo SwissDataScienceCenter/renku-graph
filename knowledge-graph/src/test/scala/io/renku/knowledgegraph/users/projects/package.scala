@@ -26,13 +26,17 @@ import io.renku.graph.model.testentities._
 import io.renku.http.rest.paging.PagingRequest
 import org.scalacheck.Gen
 import projects.Endpoint.Criteria
+import projects.Endpoint.Criteria.Filters
 
 package object projects {
 
+  lazy val activationStates: Gen[Filters.ActivationState] = Gen.oneOf(Filters.ActivationState.all)
+
   private[projects] lazy val criterias: Gen[Criteria] = for {
-    userId        <- personGitLabIds
-    maybeAuthUser <- authUsers.toGeneratorOfOptions
-  } yield Criteria(userId, paging = PagingRequest.default, maybeAuthUser)
+    userId          <- personGitLabIds
+    activationState <- activationStates
+    maybeAuthUser   <- authUsers.toGeneratorOfOptions
+  } yield Criteria(userId, Filters(activationState), PagingRequest.default, maybeAuthUser)
 
   private[projects] val activatedProjects: Gen[model.Project.Activated] =
     anyProjectEntities.map(_.to[model.Project.Activated])

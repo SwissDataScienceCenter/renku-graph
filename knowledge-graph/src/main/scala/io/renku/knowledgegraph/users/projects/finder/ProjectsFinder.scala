@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.users.projects
 package finder
 
+import Endpoint.Criteria.Filters._
 import Endpoint._
 import cats.MonadThrow
 import cats.effect.Async
@@ -49,6 +50,7 @@ private class ProjectsFinderImpl[F[_]: MonadThrow](
   override def findProjects(criteria: Criteria): F[PagingResponse[model.Project]] =
     (findProjectsInTS(criteria) -> findProjectsInGL(criteria))
       .mapN(mergeFavouringActivated)
+      .map(filterBy(criteria.filters.state))
       .map(_.sortBy(_.name))
       .flatMap(PagingResponse.from[F, model.Project](_, criteria.paging))
 
@@ -60,4 +62,12 @@ private class ProjectsFinderImpl[F[_]: MonadThrow](
         case (all, glProj)                                      => glProj :: all
       }
   }
+
+  private def filterBy(activationState: ActivationState): List[model.Project] => List[model.Project] = projects =>
+    if (activationState == ActivationState.All) projects
+    else
+      projects.filter {
+        case _: model.Project.Activated    => activationState == ActivationState.Activated
+        case _: model.Project.NotActivated => activationState == ActivationState.NotActivated
+      }
 }
