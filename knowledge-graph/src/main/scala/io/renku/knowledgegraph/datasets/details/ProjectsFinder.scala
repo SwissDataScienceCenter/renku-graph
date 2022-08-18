@@ -30,7 +30,7 @@ import io.renku.graph.model.datasets.Identifier
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.datasets.Dataset.DatasetProject
+import Dataset.DatasetProject
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger

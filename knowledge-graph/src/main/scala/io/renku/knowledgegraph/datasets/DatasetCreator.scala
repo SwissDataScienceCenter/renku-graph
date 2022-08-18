@@ -16,20 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph
+package io.renku.knowledgegraph.datasets
 
-import eu.timepit.refined.auto._
-import io.renku.generators.CommonGraphGenerators.sortBys
-import io.renku.generators.Generators.nonBlankStrings
-import io.renku.graph.model.testentities.Person
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
-import org.scalacheck.Gen
+import io.renku.graph.model.persons
 
-package object datasets {
-
-  val phrases: Gen[Phrase] = nonBlankStrings(minLength = 5) map (_.value) map Phrase.apply
-  implicit val searchEndpointSorts: Gen[DatasetsSearchEndpoint.Sort.By] = sortBys(DatasetsSearchEndpoint.Sort)
-
-  implicit lazy val personToCreator: Person => DatasetCreator =
-    person => DatasetCreator(person.maybeEmail, person.name, person.maybeAffiliation)
-}
+final case class DatasetCreator(maybeEmail:       Option[persons.Email],
+                                name:             persons.Name,
+                                maybeAffiliation: Option[persons.Affiliation]
+)

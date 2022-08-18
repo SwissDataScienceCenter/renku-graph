@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.datasets
 
-import Dataset.DatasetCreator
 import DatasetSearchResult._
 import DatasetsSearchEndpoint.Query.{Phrase, query}
 import DatasetsSearchEndpoint.Sort
@@ -170,16 +169,16 @@ class DatasetsSearchEndpointSpec
                                images
           ) =>
         json"""{
-          "identifier": $id,
-          "title": $title,
-          "name": $name,
-          "published": ${creators -> date},
-          "date": ${date.instant},
+          "identifier":    $id,
+          "title":         $title,
+          "name":          $name,
+          "published":     ${creators -> date},
+          "date":          ${date.instant},
           "projectsCount": ${projectsCount.value},
-          "keywords": ${keywords.map(_.value)},
-          "images": ${images -> exemplarProjectPath},
+          "keywords":      ${keywords.map(_.value)},
+          "images":        ${images -> exemplarProjectPath},
           "_links": [{
-            "rel": "details",
+            "rel":  "details",
             "href": ${(renkuApiUrl / "datasets" / id).value}
           }]
         }""" addIfDefined "description" -> maybeDescription
@@ -188,7 +187,7 @@ class DatasetsSearchEndpointSpec
     private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] =
       Encoder.instance[(List[DatasetCreator], Date)] {
         case (creators, DatePublished(date)) => json"""{
-          "creator": $creators,
+          "creator":       $creators,
           "datePublished": $date
         }"""
         case (creators, _) => json"""{
@@ -208,14 +207,14 @@ class DatasetsSearchEndpointSpec
           case uri: ImageUri.Relative => json"""{
             "location": $uri,
             "_links": [{
-              "rel": "view",
+              "rel":  "view",
               "href": ${s"$gitLabUrl/$exemplarProjectPath/raw/master/$uri"}
             }]
           }"""
           case uri: ImageUri.Absolute => json"""{
             "location": $uri,
             "_links": [{
-              "rel": "view",
+              "rel":  "view",
               "href": $uri
             }]
           }"""

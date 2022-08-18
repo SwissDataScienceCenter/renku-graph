@@ -17,6 +17,7 @@
  */
 
 package io.renku.knowledgegraph.datasets
+package details
 
 import Dataset._
 import cats.syntax.all._
@@ -25,11 +26,9 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, OriginalIdentifier, PartLocation, ResourceId, SameAs, Title}
-import io.renku.graph.model.persons.{Affiliation, Email}
 import io.renku.graph.model.projects.Path
-import io.renku.graph.model.{GitLabUrl, persons, projects}
+import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
-import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
 import io.renku.knowledgegraph.projects.details.Endpoint
 import io.renku.tinytypes.json.TinyTypeEncoders._
 
@@ -82,8 +81,6 @@ object Dataset {
                                    keywords:         List[Keyword],
                                    images:           List[ImageUri]
   ) extends Dataset
-
-  final case class DatasetCreator(maybeEmail: Option[Email], name: persons.Name, maybeAffiliation: Option[Affiliation])
 
   final case class DatasetPart(location: PartLocation)
   final case class DatasetVersions(initial: OriginalIdentifier)

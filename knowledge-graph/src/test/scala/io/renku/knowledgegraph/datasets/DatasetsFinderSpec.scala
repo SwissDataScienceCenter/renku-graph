@@ -33,7 +33,6 @@ import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
-import io.renku.knowledgegraph.datasets.Dataset.DatasetCreator
 import io.renku.knowledgegraph.datasets.DatasetSearchResult._
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort

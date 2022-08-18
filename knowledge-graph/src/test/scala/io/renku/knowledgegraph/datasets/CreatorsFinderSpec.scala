@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.datasets
 
-import Dataset.DatasetCreator
 import cats.data.NonEmptyList
 import io.circe.Decoder
 import io.circe.literal._
