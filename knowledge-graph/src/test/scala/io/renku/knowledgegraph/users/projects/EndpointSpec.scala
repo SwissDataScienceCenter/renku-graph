@@ -153,11 +153,10 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
                    Either.cond(link.href.value == expected.show,
                                (),
                                DecodingFailure(s"$link not equal $expected", Nil)
-                   ) >>
-                     Either.cond(link.href.value == expected.show,
-                                 (),
-                                 DecodingFailure(s"$link not equal $expected", Nil)
-                     )
+                   ) >> Either.cond(link.href.value == expected.show,
+                                    (),
+                                    DecodingFailure(s"$link not equal $expected", Nil)
+                   )
                  }
         } yield model.Project.NotActivated(id, name, path, visibility, date, maybeCreator, keywords, maybeDesc)
       case _ => fail("Neither 'details' nor 'activation' link in the response")
