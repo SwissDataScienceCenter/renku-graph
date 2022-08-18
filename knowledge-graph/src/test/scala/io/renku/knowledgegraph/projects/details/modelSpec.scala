@@ -16,13 +16,14 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projectdetails
+package io.renku.knowledgegraph.projects.details
 
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import model.Permissions.AccessLevel
-import model.Urls._
+import model.Permissions.AccessLevel._
+import model.Urls.{HttpUrl, SshUrl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -71,11 +72,11 @@ class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
     val scenarios = Table(
       ("level", "expected AccessLevel", "expected name"),
-      (10, AccessLevel.Guest, "Guest"),
-      (20, AccessLevel.Reporter, "Reporter"),
-      (30, AccessLevel.Developer, "Developer"),
-      (40, AccessLevel.Maintainer, "Maintainer"),
-      (50, AccessLevel.Owner, "Owner")
+      (10, Guest, "Guest"),
+      (20, Reporter, "Reporter"),
+      (30, Developer, "Developer"),
+      (40, Maintainer, "Maintainer"),
+      (50, Owner, "Owner")
     )
     forAll(scenarios) { (level, expectedInstance, expectedName) =>
       s"return $expectedInstance for $level level" in {

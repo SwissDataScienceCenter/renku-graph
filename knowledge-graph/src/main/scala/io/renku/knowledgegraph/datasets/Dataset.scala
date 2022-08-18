@@ -29,7 +29,7 @@ import io.renku.graph.model.persons.{Affiliation, Email}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.{GitLabUrl, persons, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
-import io.renku.knowledgegraph.projectdetails
+import io.renku.knowledgegraph.projects.details.Endpoint
 import io.renku.tinytypes.json.TinyTypeEncoders._
 
 sealed trait Dataset extends Product with Serializable {
@@ -152,7 +152,7 @@ object Dataset {
       json"""{
         "path": ${project.path},
         "name": ${project.name}
-      }""" deepMerge _links(Link(Rel("project-details") -> projectdetails.Endpoint.href(renkuApiUrl, project.path)))
+      }""" deepMerge _links(Link(Rel("project-details") -> Endpoint.href(renkuApiUrl, project.path)))
     }
 
   private implicit lazy val versionsEncoder: Encoder[DatasetVersions] = Encoder.instance[DatasetVersions] { versions =>

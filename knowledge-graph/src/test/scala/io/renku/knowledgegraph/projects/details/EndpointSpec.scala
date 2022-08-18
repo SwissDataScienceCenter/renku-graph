@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projectdetails
+package io.renku.knowledgegraph.projects.details
 
 import ProjectsGenerators._
 import cats.effect.IO
@@ -30,9 +30,9 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
+import io.renku.knowledgegraph.projects.details.model.Project
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
-import model._
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s.headers.{Accept, `Content-Type`}

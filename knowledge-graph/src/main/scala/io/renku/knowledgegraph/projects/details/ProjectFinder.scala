@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projectdetails
+package io.renku.knowledgegraph.projects.details
 
 import GitLabProjectFinder.GitLabProject
 import KGProjectFinder.{KGParent, KGProject}

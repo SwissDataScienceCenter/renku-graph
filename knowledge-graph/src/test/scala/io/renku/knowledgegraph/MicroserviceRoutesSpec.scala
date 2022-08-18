@@ -31,8 +31,6 @@ import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -455,8 +453,8 @@ class MicroserviceRoutesSpec
         .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
 
       val request = Request[IO](GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
-      (projectEndpoint
-        .`GET /projects/:path`(_: projects.Path, _: Option[AuthUser])(_: Request[IO]))
+      (projectDetailsEndpoint
+        .`GET /projects/:path`(_: model.projects.Path, _: Option[AuthUser])(_: Request[IO]))
         .expects(projectPath, maybeAuthUser, request)
         .returning(Response[IO](Ok).pure[IO])
 
@@ -549,7 +547,7 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/projects/:projectId/files/:location/lineage" should {
-    def lineageUri(projectPath: ProjectPath, location: Location) =
+    def lineageUri(projectPath: model.projects.Path, location: Location) =
       Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.show}/files/${urlEncode(location.show)}/lineage")
 
     s"return $Ok when the lineage is found" in new TestCase {
@@ -747,7 +745,7 @@ class MicroserviceRoutesSpec
     val queryEndpoint           = mock[QueryEndpoint[IO]]
     val lineageEndpoint         = mock[lineage.Endpoint[IO]]
     val ontologyEndpoint        = mock[ontology.Endpoint[IO]]
-    val projectEndpoint         = mock[projectdetails.Endpoint[IO]]
+    val projectDetailsEndpoint  = mock[projects.details.Endpoint[IO]]
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
     val docsEndpoint            = mock[docs.Endpoint[IO]]
     val usersProjectsEndpoint   = mock[users.projects.Endpoint[IO]]
@@ -768,7 +766,7 @@ class MicroserviceRoutesSpec
         queryEndpoint,
         lineageEndpoint,
         ontologyEndpoint,
-        projectEndpoint,
+        projectDetailsEndpoint,
         projectDatasetsEndpoint,
         docsEndpoint,
         usersProjectsEndpoint,

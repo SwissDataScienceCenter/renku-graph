@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projectdetails
+package io.renku.knowledgegraph.projects.details
 
 import cats.effect._
 import cats.syntax.all._
@@ -30,9 +30,9 @@ import io.renku.http.rest.Links.Href
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.jsonld.syntax._
-import io.renku.knowledgegraph.projectdetails.model._
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.triplesstore.SparqlQueryTimeRecorder
+import model._
 import org.http4s.MediaType.application
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}

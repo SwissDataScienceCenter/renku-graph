@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projectdetails
+package io.renku.knowledgegraph.projects.details
 
 import ProjectsGenerators._
 import cats.syntax.all._
@@ -34,9 +34,9 @@ import io.renku.http.server.EndpointTester._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import model.Forking.ForksCount
 import model.Permissions.{AccessLevel, GroupAccessLevel, ProjectAccessLevel}
-import model.Project._
+import model.Project.{DateUpdated, StarsCount}
 import model.Statistics.{CommitsCount, JobArtifactsSize, LsfObjectsSize, RepositorySize, StorageSize}
-import model.Urls._
+import model.Urls.{HttpUrl, ReadmeUrl, SshUrl, WebUrl}
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -114,7 +114,7 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
 
   private def forkingDecoder(forking: Forking): Decoder[Forking] = cursor =>
     for {
-      count       <- cursor.downField("forksCount").as[ForksCount]
+      count       <- cursor.downField("forksCount").as[Forking.ForksCount]
       maybeParent <- cursor.downField("parent").as(decodeOption(parentDecoder(forking.maybeParent)))
     } yield Forking(count, maybeParent)
 

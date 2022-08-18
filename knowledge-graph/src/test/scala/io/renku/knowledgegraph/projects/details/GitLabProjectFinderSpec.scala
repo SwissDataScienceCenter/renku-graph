@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projectdetails
+package io.renku.knowledgegraph.projects.details
 
 import GitLabProjectFinder.GitLabProject
 import ProjectsGenerators._
@@ -150,8 +150,7 @@ class GitLabProjectFinderSpec
     }"""
   }
 
-  private def toJson(accessLevel: AccessLevel): Json =
-    json"""{
+  private def toJson(accessLevel: AccessLevel): Json = json"""{
     "access_level": ${accessLevel.value.value}
   }"""
 }

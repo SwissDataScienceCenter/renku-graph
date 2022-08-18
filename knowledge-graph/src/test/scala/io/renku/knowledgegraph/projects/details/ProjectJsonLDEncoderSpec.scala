@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.projectdetails
+package io.renku.knowledgegraph.projects.details
 
 import ProjectsGenerators._
 import cats.syntax.all._
@@ -24,7 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model._
 import io.renku.jsonld.JsonLDDecoder
-import io.renku.knowledgegraph.projectdetails.model.Project.DateUpdated
+import model.Project.DateUpdated
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
