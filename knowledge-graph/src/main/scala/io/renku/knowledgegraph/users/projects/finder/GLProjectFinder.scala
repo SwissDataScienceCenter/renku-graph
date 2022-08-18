@@ -76,18 +76,18 @@ private class GLProjectFinderImpl[F[_]: Async: GitLabClient: Logger](creatorFind
 
     implicit val decoder: Decoder[ProjectAndCreator] = cursor =>
       for {
-        id             <- cursor.downField("id").as[projects.Id]
-        name           <- cursor.downField("name").as[projects.Name]
-        path           <- cursor.downField("path_with_namespace").as[projects.Path]
-        visibility     <- cursor.downField("visibility").as[projects.Visibility]
-        dateCreated    <- cursor.downField("created_at").as[projects.DateCreated]
-        maybeCreatorId <- cursor.downField("creator_id").as[Option[persons.GitLabId]]
-        keywords       <- cursor.downField("topics").as[List[Option[projects.Keyword]]].map(_.flatten)
-        maybeDesc      <- cursor.downField("description").as[Option[projects.Description]]
+        id              <- cursor.downField("id").as[projects.Id]
+        name            <- cursor.downField("name").as[projects.Name]
+        path            <- cursor.downField("path_with_namespace").as[projects.Path]
+        maybeVisibility <- cursor.downField("visibility").as[Option[projects.Visibility]]
+        dateCreated     <- cursor.downField("created_at").as[projects.DateCreated]
+        maybeCreatorId  <- cursor.downField("creator_id").as[Option[persons.GitLabId]]
+        keywords        <- cursor.downField("topics").as[List[Option[projects.Keyword]]].map(_.flatten)
+        maybeDesc       <- cursor.downField("description").as[Option[projects.Description]]
       } yield model.Project.NotActivated(id,
                                          name,
                                          path,
-                                         visibility,
+                                         maybeVisibility.getOrElse(projects.Visibility.Public),
                                          dateCreated,
                                          maybeCreator = None,
                                          keywords.sorted,

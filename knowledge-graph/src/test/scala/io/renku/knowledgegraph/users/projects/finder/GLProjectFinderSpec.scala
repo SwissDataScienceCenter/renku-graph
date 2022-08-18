@@ -30,7 +30,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
-import io.renku.graph.model.persons
+import io.renku.graph.model.{persons, projects}
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
@@ -82,8 +82,10 @@ class GLProjectFinderSpec
     }
 
     "map OK response from GitLab to list of NotActivated" in new TestCase {
-      val project        = notActivatedProjects.generateOne
+
+      val project        = notActivatedProjects.generateOne.copy(visibility = projects.Visibility.Public)
       val maybeCreatorId = project.maybeCreator.map(_ => personGitLabIds.generateOne)
+
       mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(List(project -> maybeCreatorId).asJson))
         .unsafeRunSync() shouldBe List(
         project.copy(maybeCreator = None, keywords = project.keywords.sorted) -> maybeCreatorId
@@ -133,17 +135,19 @@ class GLProjectFinderSpec
 
   private def uri(criteria: Criteria) = uri"users" / criteria.userId.show / "projects"
 
-  private implicit lazy val projectEncoder: Encoder[(model.Project.NotActivated, Option[persons.GitLabId])] =
+  private implicit lazy val projectEncoder: Encoder[(model.Project.NotActivated, Option[persons.GitLabId])] = {
+    import io.renku.tinytypes.json.TinyTypeEncoders._
     Encoder.instance { case (project, maybeCreatorId) =>
       json"""{
         "id":                  ${project.id.value},
         "description":         ${project.maybeDesc.map(_.value.asJson).getOrElse(Json.Null)},
-        "visibility":          ${project.visibility.value.toLowerCase},
         "topics":              ${project.keywords.map(_.value)},
         "name":                ${project.name.value},
         "path_with_namespace": ${project.path.value},
         "created_at":          ${project.dateCreated.value},
         "creator_id":          ${maybeCreatorId.map(_.value.asJson).getOrElse(Json.Null)}
       }"""
+        .addIfDefined("visibility" -> Option.when(project.visibility != projects.Visibility.Public)(project.visibility))
     }
+  }
 }
