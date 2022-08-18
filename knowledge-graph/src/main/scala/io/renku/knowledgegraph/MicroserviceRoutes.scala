@@ -40,7 +40,9 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets._
+import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
 import io.renku.knowledgegraph.graphql.QueryEndpoint
+import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -55,9 +57,9 @@ private class MicroserviceRoutes[F[_]: Async](
     datasetEndpoint:         DatasetEndpoint[F],
     entitiesEndpoint:        entities.Endpoint[F],
     queryEndpoint:           QueryEndpoint[F],
-    lineageEndpoint:         lineage.Endpoint[F],
+    lineageEndpoint:         projects.files.lineage.Endpoint[F],
     ontologyEndpoint:        ontology.Endpoint[F],
-    projectEndpoint:         projectdetails.Endpoint[F],
+    projectDetailsEndpoint:  projects.details.Endpoint[F],
     projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
     docsEndpoint:            docs.Endpoint[F],
     usersProjectsEndpoint:   users.projects.Endpoint[F],
@@ -75,7 +77,7 @@ private class MicroserviceRoutes[F[_]: Async](
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
   import projectDatasetsEndpoint._
-  import projectEndpoint._
+  import projectDetailsEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
   import queryEndpoint._
   import routesMetrics._
@@ -242,7 +244,7 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private def getLineage(projectPathParts: List[String], location: String, maybeAuthUser: Option[AuthUser]) = {
-    import io.renku.knowledgegraph.lineage.model.Node.Location
+    import projects.files.lineage.model.Node.Location
 
     def toLocation(location: String): EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
       Location
@@ -281,9 +283,9 @@ private object MicroserviceRoutes {
         datasetEndpoint         <- DatasetEndpoint[IO]
         entitiesEndpoint        <- entities.Endpoint[IO]
         queryEndpoint           <- QueryEndpoint()
-        lineageEndpoint         <- lineage.Endpoint[IO]
+        lineageEndpoint         <- projects.files.lineage.Endpoint[IO]
         ontologyEndpoint        <- ontology.Endpoint[IO]
-        projectEndpoint         <- projectdetails.Endpoint[IO]
+        projectDetailsEndpoint  <- projects.details.Endpoint[IO]
         projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
         docsEndpoint            <- docs.Endpoint[IO]
         usersProjectsEndpoint   <- users.projects.Endpoint[IO]
@@ -298,7 +300,7 @@ private object MicroserviceRoutes {
                                      queryEndpoint,
                                      lineageEndpoint,
                                      ontologyEndpoint,
-                                     projectEndpoint,
+                                     projectDetailsEndpoint,
                                      projectDatasetsEndpoint,
                                      docsEndpoint,
                                      usersProjectsEndpoint,

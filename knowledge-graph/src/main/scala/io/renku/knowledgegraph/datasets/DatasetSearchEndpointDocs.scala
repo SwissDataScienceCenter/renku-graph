@@ -109,9 +109,9 @@ private class DatasetSearchEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, ren
       datasets.Name("name"),
       datasets.Description("Some project").some,
       List(
-        Dataset.DatasetCreator(persons.Email("jan@mail.com").some,
-                               persons.Name("Jan Kowalski"),
-                               persons.Affiliation("SDSC").some
+        DatasetCreator(persons.Email("jan@mail.com").some,
+                       persons.Name("Jan Kowalski"),
+                       persons.Affiliation("SDSC").some
         )
       ),
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),

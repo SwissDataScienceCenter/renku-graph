@@ -36,7 +36,6 @@ import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.knowledgegraph.projectdetails
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
@@ -131,7 +130,8 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
                  .get(Links.Rel("details"))
                  .toRight(DecodingFailure("No 'details' link", Nil))
                  .flatMap { link =>
-                   val expected = projectdetails.Endpoint.href(renkuApiUrl, path)
+                   import io.renku.knowledgegraph.projects.details.{Endpoint => ProjectDetailsEndpoint}
+                   val expected = ProjectDetailsEndpoint.href(renkuApiUrl, path)
                    Either.cond(link.href.value == expected.show, (), DecodingFailure(s"$link not equal $expected", Nil))
                  }
         } yield model.Project.Activated(name, path, visibility, date, maybeCreator, keywords, maybeDesc)

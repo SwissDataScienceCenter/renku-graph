@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.graphql
+package io.renku.knowledgegraph
+package graphql
 
 import cats.effect.IO
 import io.circe.Json
@@ -25,17 +26,17 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects.Path
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.lineage
-import io.renku.knowledgegraph.lineage.LineageFinder
-import io.renku.knowledgegraph.lineage.LineageGenerators._
-import io.renku.knowledgegraph.lineage.model.Node.Location
-import io.renku.knowledgegraph.lineage.model._
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import projects.files.lineage
+import projects.files.lineage.LineageFinder
+import projects.files.lineage.LineageGenerators._
+import projects.files.lineage.model.Node.Location
+import projects.files.lineage.model._
 import sangria.ast.Document
 import sangria.execution.Executor
 import sangria.macros._

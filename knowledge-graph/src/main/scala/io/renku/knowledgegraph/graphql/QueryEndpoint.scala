@@ -26,7 +26,7 @@ import cats.syntax.all._
 import io.circe.Json
 import io.renku.http.ErrorMessage
 import io.renku.http.server.security.model.AuthUser
-import io.renku.knowledgegraph.lineage.graphql.QueryFields
+import io.renku.knowledgegraph.projects.files.lineage.graphql.QueryFields
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
 import org.typelevel.log4cats.Logger

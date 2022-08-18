@@ -23,8 +23,10 @@ import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.ServiceVersion
 import io.renku.knowledgegraph._
-import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
+import io.renku.knowledgegraph.datasets.DatasetSearchEndpointDocs
+import io.renku.knowledgegraph.datasets.details.DatasetEndpointDocs
 import io.renku.knowledgegraph.docs.model._
+import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsEndpointDocs
 import org.http4s
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
@@ -84,7 +86,7 @@ object Endpoint {
     datasetEndpoint         <- DatasetEndpointDocs[F]
     entitiesEndpoint        <- entities.EndpointDocs[F]
     ontologyEndpoint        <- ontology.EndpointDocs[F]
-    projectEndpoint         <- projectdetails.EndpointDocs[F]
+    projectEndpoint         <- projects.details.EndpointDocs[F]
     projectDatasetsEndpoint <- ProjectDatasetsEndpointDocs[F]
     userProjectsEndpoint    <- users.projects.EndpointDocs[F]
     docsEndpointEndpoint    <- EndpointDocs[F]
@@ -95,7 +97,7 @@ object Endpoint {
                               entitiesEndpoint,
                               ontologyEndpoint,
                               projectEndpoint,
-                              lineage.EndpointDocs,
+                              projects.files.lineage.EndpointDocs,
                               projectDatasetsEndpoint,
                               docsEndpointEndpoint,
                               userProjectsEndpoint

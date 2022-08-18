@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.datasets
 
-import Dataset.DatasetCreator
 import DatasetSearchResult.ProjectsCount
 import cats.syntax.all._
 import io.circe.literal._
@@ -28,6 +27,7 @@ import io.renku.graph.model.datasets.{Date, DatePublished, Description, Identifi
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
+import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
 import io.renku.tinytypes.constraints.NonNegativeInt
 import io.renku.tinytypes.json.TinyTypeEncoders._
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
@@ -63,14 +63,14 @@ object DatasetSearchResult {
                              images
         ) =>
       json"""{
-        "identifier": $id,
-        "title": $title,
-        "name": $name,
-        "published": ${creators -> date},
-        "date": ${date.instant},
+        "identifier":    $id,
+        "title":         $title,
+        "name":          $name,
+        "published":     ${creators -> date},
+        "date":          ${date.instant},
         "projectsCount": $projectsCount,
-        "keywords": $keywords,
-        "images": ${images -> exemplarProjectPath}
+        "keywords":      $keywords,
+        "images":        ${images -> exemplarProjectPath}
       }"""
         .addIfDefined("description" -> maybeDescription)
         .deepMerge(_links(Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, id))))
@@ -78,7 +78,7 @@ object DatasetSearchResult {
 
   private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] = Encoder.instance {
     case (creators, DatePublished(date)) => json"""{
-    "creator": $creators,
+    "creator":       $creators,
     "datePublished": $date
   }"""
     case (creators, _) => json"""{

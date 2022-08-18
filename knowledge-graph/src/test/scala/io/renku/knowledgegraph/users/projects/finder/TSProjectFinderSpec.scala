@@ -88,11 +88,6 @@ class TSProjectFinderSpec
         .modify(replaceMembers(Set(authUser)))
         .generateOne
 
-      println(privateProjectWithMatchingMemberAndAuthUser.name)
-      println(privateProjectWithMatchingMemberOnly.name)
-      println(nonPrivateProjectWithMatchingMemberOnly.name)
-      println(projectWithMatchingAuthUserOnly.name)
-
       upload(
         to = renkuDataset,
         privateProjectWithMatchingMemberAndAuthUser,

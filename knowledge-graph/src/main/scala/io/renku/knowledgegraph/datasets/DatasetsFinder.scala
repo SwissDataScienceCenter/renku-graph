@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.datasets
 
-import Dataset.DatasetCreator
 import DatasetsSearchEndpoint.Query.Phrase
 import DatasetsSearchEndpoint.Sort
 import cats.effect.Async

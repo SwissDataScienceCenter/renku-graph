@@ -31,8 +31,6 @@ import io.renku.graph.http.server.security.Authorizer
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects
-import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -51,9 +49,9 @@ import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.{Phrase, qu
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
 import io.renku.knowledgegraph.datasets._
+import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
 import io.renku.knowledgegraph.graphql.QueryEndpoint
-import io.renku.knowledgegraph.lineage.LineageGenerators._
-import io.renku.knowledgegraph.lineage.model.Node.Location
+import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsEndpoint
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
@@ -67,6 +65,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import projects.files.lineage.LineageGenerators._
+import projects.files.lineage.model.Node.Location
 
 import scala.language.reflectiveCalls
 
@@ -455,8 +455,8 @@ class MicroserviceRoutesSpec
         .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
 
       val request = Request[IO](GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
-      (projectEndpoint
-        .`GET /projects/:path`(_: projects.Path, _: Option[AuthUser])(_: Request[IO]))
+      (projectDetailsEndpoint
+        .`GET /projects/:path`(_: model.projects.Path, _: Option[AuthUser])(_: Request[IO]))
         .expects(projectPath, maybeAuthUser, request)
         .returning(Response[IO](Ok).pure[IO])
 
@@ -549,7 +549,7 @@ class MicroserviceRoutesSpec
   }
 
   "GET /knowledge-graph/projects/:projectId/files/:location/lineage" should {
-    def lineageUri(projectPath: ProjectPath, location: Location) =
+    def lineageUri(projectPath: model.projects.Path, location: Location) =
       Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.show}/files/${urlEncode(location.show)}/lineage")
 
     s"return $Ok when the lineage is found" in new TestCase {
@@ -745,9 +745,9 @@ class MicroserviceRoutesSpec
     val datasetEndpoint         = mock[DatasetEndpoint[IO]]
     val entitiesEndpoint        = mock[entities.Endpoint[IO]]
     val queryEndpoint           = mock[QueryEndpoint[IO]]
-    val lineageEndpoint         = mock[lineage.Endpoint[IO]]
+    val lineageEndpoint         = mock[projects.files.lineage.Endpoint[IO]]
     val ontologyEndpoint        = mock[ontology.Endpoint[IO]]
-    val projectEndpoint         = mock[projectdetails.Endpoint[IO]]
+    val projectDetailsEndpoint  = mock[projects.details.Endpoint[IO]]
     val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
     val docsEndpoint            = mock[docs.Endpoint[IO]]
     val usersProjectsEndpoint   = mock[users.projects.Endpoint[IO]]
@@ -768,7 +768,7 @@ class MicroserviceRoutesSpec
         queryEndpoint,
         lineageEndpoint,
         ontologyEndpoint,
-        projectEndpoint,
+        projectDetailsEndpoint,
         projectDatasetsEndpoint,
         docsEndpoint,
         usersProjectsEndpoint,
