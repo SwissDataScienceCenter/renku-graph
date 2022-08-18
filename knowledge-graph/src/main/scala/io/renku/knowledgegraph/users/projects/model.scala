@@ -25,7 +25,9 @@ import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.graph.model.{RenkuUrl, persons, projects}
 import io.renku.http.rest.Links.{Href, Link, Method, Rel, _links}
+import io.renku.json.JsonOps._
 import io.renku.knowledgegraph.projectdetails
+import io.renku.tinytypes.json.TinyTypeEncoders._
 
 private object model {
 
@@ -55,16 +57,19 @@ private object model {
       implicit def encoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[Activated] =
         Encoder.instance[Activated] { project =>
           json"""{
-            "path":        ${project.path.value},
-            "name":        ${project.name.value},
-            "visibility":  ${project.visibility.value},
-            "date":        ${project.dateCreated.value},
-            "creator":     ${project.maybeCreator.map(_.value)},
-            "keywords":    ${project.keywords.sorted.map(_.value)},
-            "description": ${project.maybeDesc.map(_.value)}
-          }""" deepMerge _links(
-            Link(Rel("details") -> projectdetails.Endpoint.href(renkuApiUrl, project.path))
-          )
+            "path":        ${project.path},
+            "name":        ${project.name},
+            "visibility":  ${project.visibility},
+            "date":        ${project.dateCreated},
+            "keywords":    ${project.keywords.sorted.map(_.value)}
+          }"""
+            .addIfDefined("creator" -> project.maybeCreator)
+            .addIfDefined("description" -> project.maybeDesc)
+            .deepMerge(
+              _links(
+                Link(Rel("details") -> projectdetails.Endpoint.href(renkuApiUrl, project.path))
+              )
+            )
         }
     }
 
@@ -83,20 +88,23 @@ private object model {
       implicit def encoder(implicit renkuUrl: RenkuUrl): Encoder[NotActivated] =
         Encoder.instance[NotActivated] { project =>
           json"""{
-            "id":          ${project.id.value},
-            "path":        ${project.path.value},
-            "name":        ${project.name.value},
-            "visibility":  ${project.visibility.value},
-            "date":        ${project.dateCreated.value},
-            "creator":     ${project.maybeCreator.map(_.value)},
-            "keywords":    ${project.keywords.sorted.map(_.value)},
-            "description": ${project.maybeDesc.map(_.value)}
-          }""" deepMerge _links(
-            Link(Rel("activation"),
-                 Href(renkuUrl / "api" / "projects" / project.id.show / "graph" / "webhooks"),
-                 Method.POST
+            "id":          ${project.id},
+            "path":        ${project.path},
+            "name":        ${project.name},
+            "visibility":  ${project.visibility},
+            "date":        ${project.dateCreated},
+            "keywords":    ${project.keywords.sorted.map(_.value)}
+          }"""
+            .addIfDefined("creator" -> project.maybeCreator)
+            .addIfDefined("description" -> project.maybeDesc)
+            .deepMerge(
+              _links(
+                Link(Rel("activation"),
+                     Href(renkuUrl / "api" / "projects" / project.id.show / "graph" / "webhooks"),
+                     Method.POST
+                )
+              )
             )
-          )
         }
     }
 

@@ -139,13 +139,13 @@ class GLProjectFinderSpec
     import io.renku.tinytypes.json.TinyTypeEncoders._
     Encoder.instance { case (project, maybeCreatorId) =>
       json"""{
-        "id":                  ${project.id.value},
-        "description":         ${project.maybeDesc.map(_.value.asJson).getOrElse(Json.Null)},
-        "topics":              ${project.keywords.map(_.value)},
-        "name":                ${project.name.value},
-        "path_with_namespace": ${project.path.value},
-        "created_at":          ${project.dateCreated.value},
-        "creator_id":          ${maybeCreatorId.map(_.value.asJson).getOrElse(Json.Null)}
+        "id":                  ${project.id},
+        "description":         ${project.maybeDesc.map(_.asJson).getOrElse(Json.Null)},
+        "topics":              ${project.keywords},
+        "name":                ${project.name},
+        "path_with_namespace": ${project.path},
+        "created_at":          ${project.dateCreated},
+        "creator_id":          ${maybeCreatorId.map(_.asJson).getOrElse(Json.Null)}
       }"""
         .addIfDefined("visibility" -> Option.when(project.visibility != projects.Visibility.Public)(project.visibility))
     }
