@@ -33,13 +33,16 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
   override def query(criteria: Endpoint.Criteria) =
     (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
       import criteria._
+      // format: off
       s"""|{
           |  SELECT DISTINCT ?entityType ?matchingScore ?name
           |  WHERE {
           |    {
           |      SELECT (SAMPLE(?id) AS ?personId) ?name (MAX(?score) AS ?matchingScore)
           |      WHERE {
-          |        (?id ?score) text:query (schema:name '${filters.query}').
+          |        ${filters.onQuery(
+                   s"""(?id ?score) text:query (schema:name '${filters.query}').""",
+                   matchingScoreVariableName = "?score")}
           |        ?id a schema:Person;
           |            schema:name ?name.
           |        ${filters.maybeOnCreatorName("?name")}
@@ -50,6 +53,7 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
           |  }
           |}
           |""".stripMargin
+    // format: on
     }
 
   override def decoder[EE >: Entity.Person]: Decoder[EE] = { implicit cursor =>

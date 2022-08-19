@@ -33,6 +33,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
 
   override def query(criteria: Endpoint.Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
+    // format: off
     s"""|{
         |  SELECT ?entityType ?matchingScore ?wkId ?name ?visibilities ?date ?maybeDescription
         |    (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
@@ -40,7 +41,8 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |    {
         |      SELECT ?wkId ?matchingScore ?date (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
         |      WHERE {
-        |        {
+        |        ${filters.onQuery(
+    s"""|        {
         |          SELECT ?wkId (MAX(?score) AS ?matchingScore)
         |          WHERE {
         |            (?wkId ?score) text:query (schema:name schema:keywords schema:description '${filters.query}').
@@ -48,7 +50,9 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |          }
         |          GROUP BY ?wkId
         |        }
-        |        ?wkId schema:name ?name;
+        |""")}
+        |        ?wkId a prov:Plan;
+        |              schema:name ?name;
         |              schema:dateCreated ?date;
         |              ^renku:hasPlan ?projectId.
         |        ?projectId renku:projectVisibility ?visibility
@@ -66,6 +70,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |  GROUP BY ?entityType ?matchingScore ?wkId ?name ?visibilities ?date ?maybeDescription
         |}
         |""".stripMargin
+    // format: on
   }
 
   override def decoder[EE >: Entity.Workflow]: Decoder[EE] = { implicit cursor =>

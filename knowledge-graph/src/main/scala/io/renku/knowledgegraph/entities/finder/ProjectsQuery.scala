@@ -42,13 +42,15 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
 
   override def query(criteria: Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
+    // format: off
     s"""|{
         |  SELECT ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName
         |    ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
-        |  WHERE { 
-        |    {
+        |  WHERE {
+        |    ${filters.onQuery(
+    s"""|    {
         |      SELECT ?projectId (MAX(?score) AS ?matchingScore)
-        |      WHERE { 
+        |      WHERE {
         |        {
         |          (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query}')
         |        } {
@@ -61,8 +63,10 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
         |      }
         |      GROUP BY ?projectId
         |    }
+        |""")}
         |    BIND ('project' AS ?entityType)
-        |    ?projectId schema:name ?name;
+        |    ?projectId a schema:Project;
+        |               schema:name ?name;
         |               renku:projectPath ?path;
         |               renku:projectVisibility ?visibility;
         |               schema:dateCreated ?date.
@@ -77,6 +81,7 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
         |  GROUP BY ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName ?maybeDescription
         |}
         |""".stripMargin
+    // format: on
   }
 
   override def decoder[EE >: Entity.Project]: Decoder[EE] = { implicit cursor =>

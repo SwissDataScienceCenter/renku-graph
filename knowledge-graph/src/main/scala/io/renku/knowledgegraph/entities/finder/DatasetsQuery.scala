@@ -47,6 +47,7 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
 
   override def query(criteria: Endpoint.Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
+    // format: off
     s"""|{
         |  SELECT ?entityType ?matchingScore ?name ?idsPathsVisibilities ?sameAs
         |    ?maybeDateCreated ?maybeDatePublished ?date
@@ -65,7 +66,8 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |            (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds)
         |            (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
         |          WHERE {
-        |            {
+        |            ${filters.onQuery(
+    s"""|            {
         |              SELECT ?dsId (MAX(?score) AS ?matchingScore)
         |              WHERE {
         |                {
@@ -80,7 +82,9 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |              }
         |              GROUP BY ?dsId
         |            }
-        |            ?dsId renku:topmostSameAs ?sameAs;
+        |""")}
+        |            ?dsId a schema:Dataset;
+        |                  renku:topmostSameAs ?sameAs;
         |                  ^renku:hasDataset ?projectId.
         |            OPTIONAL {
         |            ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
@@ -122,6 +126,7 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |    BIND ('dataset' AS ?entityType)
         |  }
         |}""".stripMargin
+    // format: on
   }
 
   override def decoder[EE >: Entity.Dataset]: Decoder[EE] = { implicit cursor =>
