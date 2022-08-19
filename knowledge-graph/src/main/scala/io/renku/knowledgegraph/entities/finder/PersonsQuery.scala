@@ -52,12 +52,12 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
           |""".stripMargin
     }
 
-  override def decoder[EE >: Entity.Person]: Decoder[EE] = { cursor =>
+  override def decoder[EE >: Entity.Person]: Decoder[EE] = { implicit cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     for {
-      matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-      name          <- cursor.downField("name").downField("value").as[persons.Name]
+      matchingScore <- extract[MatchingScore]("matchingScore")
+      name          <- extract[persons.Name]("name")
     } yield Entity.Person(matchingScore, name)
   }
 }

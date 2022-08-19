@@ -68,8 +68,9 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |""".stripMargin
   }
 
-  override def decoder[EE >: Entity.Workflow]: Decoder[EE] = { cursor =>
+  override def decoder[EE >: Entity.Workflow]: Decoder[EE] = { implicit cursor =>
     import DecodingTools._
+    import cats.syntax.all._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     lazy val selectBroaderVisibility: List[projects.Visibility] => projects.Visibility = list =>
@@ -79,21 +80,14 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         .getOrElse(projects.Visibility.Private)
 
     for {
-      matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-      name          <- cursor.downField("name").downField("value").as[plans.Name]
-      dateCreated   <- cursor.downField("date").downField("value").as[plans.DateCreated]
-      visibility <- cursor
-                      .downField("visibilities")
-                      .downField("value")
-                      .as[Option[String]]
+      matchingScore <- extract[MatchingScore]("matchingScore")
+      name          <- extract[plans.Name]("name")
+      dateCreated   <- extract[plans.DateCreated]("date")
+      visibility <- extract[Option[String]]("visibilities")
                       .flatMap(toListOf[projects.Visibility, projects.Visibility.type](projects.Visibility))
                       .map(selectBroaderVisibility)
-      keywords <- cursor
-                    .downField("keywords")
-                    .downField("value")
-                    .as[Option[String]]
-                    .flatMap(toListOf[plans.Keyword, plans.Keyword.type](plans.Keyword))
-      maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[plans.Description]]
+      keywords <- extract[Option[String]]("keywords") >>= toListOf[plans.Keyword, plans.Keyword.type](plans.Keyword)
+      maybeDescription <- extract[Option[plans.Description]]("maybeDescription")
     } yield Entity.Workflow(matchingScore, name, visibility, dateCreated, keywords, maybeDescription)
   }
 }
