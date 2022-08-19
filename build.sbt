@@ -230,13 +230,15 @@ lazy val commonSettings = Seq(
 import sbtrelease.Vcs
 
 lazy val writeVersionToChart = taskKey[Unit]("Write release version to Chart.yaml")
-writeVersionToChart := writeVersion(version => s"version: $version",
+writeVersionToChart := writeVersion(lineToChange = "version",
+                                    version => s"version: $version",
                                     streams.value.log,
                                     root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
 )
 
 lazy val writeVersionToVersionConf = taskKey[Unit]("Write release version to version.conf files")
 writeVersionToVersionConf := writeVersion(
+  lineToChange = "version",
   version => s"""version = "$version"""",
   streams.value.log,
   eventLog.base / "src" / "main" / "resources" / "version.conf",
@@ -247,23 +249,31 @@ writeVersionToVersionConf := writeVersion(
   knowledgeGraph.base / "src" / "main" / "resources" / "version.conf"
 )
 
-def writeVersion(createLine: String => String, log: Logger, to: File*): Unit = {
-  val versionLine = createLine(readTag)
-  to foreach write(versionLine, log)
+lazy val writeVersionToVersionSbt = taskKey[Unit]("Write release version to version.sbt file")
+writeVersionToVersionSbt := writeVersion(
+  lineToChange = "ThisBuild / version",
+  version => s"""ThisBuild / version := "$version"""",
+  streams.value.log,
+  root.base / "version.sbt"
+)
+
+def writeVersion(lineToChange: String, createLine: String => String, log: Logger, to: File*): Unit = {
+  val newVersionLine = createLine(readTag)
+  to foreach write(lineToChange, newVersionLine, log)
 }
 
-def write(versionLine: String, log: Logger)(file: File): Unit = {
+def write(lineToChange: String, newVersionLine: String, log: Logger)(file: File): Unit = {
 
   val fileLines = IO.readLines(file)
 
   val updatedLines = fileLines.map {
-    case line if line.startsWith("version") => versionLine
-    case line                               => line
+    case line if line startsWith lineToChange => newVersionLine
+    case line                                 => line
   }
 
   IO.writeLines(file, updatedLines)
 
-  log.info(s"'$versionLine' written to $file")
+  log.info(s"'$newVersionLine' written to $file")
 }
 
 def readTag: String =
