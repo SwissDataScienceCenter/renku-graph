@@ -51,7 +51,8 @@ package object finder {
 
     import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 
-    lazy val query: String = filters.maybeQuery.map(_.value).getOrElse("*")
+    private val queryAll: String = "*"
+    lazy val query:       String = filters.maybeQuery.map(_.value).getOrElse(queryAll)
 
     def whenRequesting(entityType: Filters.EntityType, predicates: Boolean*)(query: => String): Option[String] = {
       val typeMatching = filters.entityTypes match {
@@ -60,6 +61,10 @@ package object finder {
       }
       Option.when(typeMatching && predicates.forall(_ == true))(query)
     }
+
+    def onQuery(snippet: String, matchingScoreVariableName: String = "?matchingScore"): String =
+      if (query.trim != queryAll) snippet
+      else s"BIND(xsd:float(1.0) AS $matchingScoreVariableName)"
 
     lazy val withNoOrPublicVisibility: Boolean = filters.visibilities match {
       case v if v.isEmpty => true

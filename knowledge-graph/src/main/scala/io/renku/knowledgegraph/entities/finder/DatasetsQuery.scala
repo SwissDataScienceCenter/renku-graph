@@ -47,6 +47,7 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
 
   override def query(criteria: Endpoint.Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
+    // format: off
     s"""|{
         |  SELECT ?entityType ?matchingScore ?name ?idsPathsVisibilities ?sameAs
         |    ?maybeDateCreated ?maybeDatePublished ?date
@@ -65,7 +66,8 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |            (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds)
         |            (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
         |          WHERE {
-        |            {
+        |            ${filters.onQuery(
+    s"""|            {
         |              SELECT ?dsId (MAX(?score) AS ?matchingScore)
         |              WHERE {
         |                {
@@ -80,7 +82,9 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |              }
         |              GROUP BY ?dsId
         |            }
-        |            ?dsId renku:topmostSameAs ?sameAs;
+        |""")}
+        |            ?dsId a schema:Dataset;
+        |                  renku:topmostSameAs ?sameAs;
         |                  ^renku:hasDataset ?projectId.
         |            OPTIONAL {
         |            ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
@@ -122,9 +126,10 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |    BIND ('dataset' AS ?entityType)
         |  }
         |}""".stripMargin
+    // format: on
   }
 
-  override def decoder[EE >: Entity.Dataset]: Decoder[EE] = { cursor =>
+  override def decoder[EE >: Entity.Dataset]: Decoder[EE] = { implicit cursor =>
     import DecodingTools._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
@@ -168,36 +173,22 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         }
 
     for {
-      matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-      name          <- cursor.downField("name").downField("value").as[datasets.Name]
-      sameAs        <- cursor.downField("sameAs").downField("value").as[datasets.SameAs]
-      idPathAndVisibility <- cursor
-                               .downField("idsPathsVisibilities")
-                               .downField("value")
-                               .as[Option[String]]
+      matchingScore <- extract[MatchingScore]("matchingScore")
+      name          <- extract[datasets.Name]("name")
+      sameAs        <- extract[datasets.SameAs]("sameAs")
+      idPathAndVisibility <- extract[Option[String]]("idsPathsVisibilities")
                                .flatMap(toListOfIdsPathsAndVisibilities)
                                .map(selectBroaderVisibilityTuple(or = sameAs))
-      maybeDateCreated <- cursor.downField("maybeDateCreated").downField("value").as[Option[datasets.DateCreated]]
-      maybeDatePublished <-
-        cursor.downField("maybeDatePublished").downField("value").as[Option[datasets.DatePublished]]
+      maybeDateCreated   <- extract[Option[datasets.DateCreated]]("maybeDateCreated")
+      maybeDatePublished <- extract[Option[datasets.DatePublished]]("maybeDatePublished")
       date <-
         Either.fromOption(maybeDateCreated.orElse(maybeDatePublished), ifNone = DecodingFailure("No dataset date", Nil))
-      creators <- cursor
-                    .downField("creatorsNames")
-                    .downField("value")
-                    .as[Option[String]]
-                    .flatMap(toListOf[persons.Name, persons.Name.type](persons.Name))
-      keywords <- cursor
-                    .downField("keywords")
-                    .downField("value")
-                    .as[Option[String]]
-                    .flatMap(toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword))
-      maybeDesc <- cursor.downField("maybeDescription").downField("value").as[Option[datasets.Description]]
-      images <- cursor
-                  .downField("images")
-                  .downField("value")
-                  .as[Option[String]]
-                  .flatMap(toListOfImageUris[datasets.ImageUri, datasets.ImageUri.type](datasets.ImageUri))
+      creators <- extract[Option[String]]("creatorsNames") >>= toListOf[persons.Name, persons.Name.type](persons.Name)
+      keywords <-
+        extract[Option[String]]("keywords") >>= toListOf[datasets.Keyword, datasets.Keyword.type](datasets.Keyword)
+      maybeDesc <- extract[Option[datasets.Description]]("maybeDescription")
+      images <- extract[Option[String]]("images") >>=
+                  toListOfImageUris[datasets.ImageUri, datasets.ImageUri.type](datasets.ImageUri)
     } yield Entity.Dataset(matchingScore,
                            idPathAndVisibility._1,
                            name,
