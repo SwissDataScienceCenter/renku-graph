@@ -29,6 +29,8 @@ package object knowledgegraph {
   import io.renku.graph.model.testentities
   import io.renku.graph.model.testentities._
   import io.renku.http.rest.Links.{Href, Link, Rel, _links}
+  import io.renku.json.JsonOps._
+  import io.renku.tinytypes.json.TinyTypeEncoders._
 
   def fullJson(project: Project): Json = json"""{
     "identifier":  ${project.id.value}, 
@@ -50,46 +52,43 @@ package object knowledgegraph {
       "jobArtifactsSize": ${project.statistics.jobArtifactsSize.value}
     },
     "version": ${project.entitiesProject.version.value}
-  }""" deepMerge {
-    _links(
-      Link(Rel.Self        -> Href(renkuApiUrl / "projects" / project.path)),
-      Link(Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets"))
-    )
-  } deepMerge {
-    project.entitiesProject.maybeDescription
-      .map(description => json"""{"description": ${description.value} }""")
-      .getOrElse(Json.obj())
-  }
+  }"""
+    .deepMerge {
+      _links(
+        Link(Rel.Self        -> Href(renkuApiUrl / "projects" / project.path)),
+        Link(Rel("datasets") -> Href(renkuApiUrl / "projects" / project.path / "datasets"))
+      )
+    }
+    .addIfDefined("description" -> project.entitiesProject.maybeDescription)
 
   private implicit class UrlsOps(urls: Urls) {
-    import io.renku.json.JsonOps.JsonOps
 
     lazy val toJson: Json = json"""{
-      "ssh":       ${urls.ssh.value},
-      "http":      ${urls.http.value},
-      "web":       ${urls.web.value}
-    }""" addIfDefined ("readme" -> urls.maybeReadme.map(_.value))
+      "ssh":  ${urls.ssh.value},
+      "http": ${urls.http.value},
+      "web":  ${urls.web.value}
+    }""" addIfDefined ("readme" -> urls.maybeReadme)
   }
 
   private implicit lazy val forkingEncoder: Encoder[(ForksCount, testentities.RenkuProject)] =
     Encoder.instance {
       case (forksCount, project: testentities.RenkuProject.WithParent) => json"""{
-      "forksCount": ${forksCount.value},
-      "parent": {
-        "path":    ${project.parent.path.value},
-        "name":    ${project.parent.name.value},
-        "created": ${(project.parent.dateCreated, project.parent.maybeCreator)}
-      }
-    }"""
+        "forksCount": ${forksCount.value},
+        "parent": {
+          "path":    ${project.parent.path.value},
+          "name":    ${project.parent.name.value},
+          "created": ${(project.parent.dateCreated, project.parent.maybeCreator)}
+        }
+      }"""
       case (forksCount, _) => json"""{
-      "forksCount": ${forksCount.value}
-    }"""
+        "forksCount": ${forksCount.value}
+      }"""
     }
 
   private implicit lazy val createdEncoder: Encoder[(DateCreated, Option[Person])] = Encoder.instance {
     case (dateCreated, Some(creator)) => json"""{
       "dateCreated": ${dateCreated.value},
-      "creator": $creator
+      "creator":     $creator
     }"""
     case (dateCreated, _) => json"""{
       "dateCreated": ${dateCreated.value}
@@ -97,13 +96,13 @@ package object knowledgegraph {
   }
 
   private implicit lazy val personEncoder: Encoder[Person] = Encoder.instance {
-    case Person(name, Some(email), _, _, _) => json"""{
-      "name": ${name.value},
+    case Person(name, Some(email), _, _, maybeAffiliation) => json"""{
+      "name":  ${name.value},
       "email": ${email.value}
-    }"""
-    case Person(name, _, _, _, _) => json"""{
+    }""" addIfDefined ("affiliation" -> maybeAffiliation)
+    case Person(name, _, _, _, maybeAffiliation) => json"""{
       "name": ${name.value}
-    }"""
+    }""" addIfDefined ("affiliation" -> maybeAffiliation)
   }
 
   private lazy val toJson: Permissions => Json = {

@@ -49,9 +49,9 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     name = "project by id",
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
     s"""|SELECT ?resourceId ?name ?visibility ?maybeDescription ?dateCreated 
-        |       ?maybeCreatorResourceId ?maybeCreatorName ?maybeCreatorEmail 
+        |       ?maybeCreatorResourceId ?maybeCreatorName ?maybeCreatorEmail ?maybeCreatorAffiliation
         |       ?maybeParentResourceId ?maybeParentPath ?maybeParentName ?maybeParentDateCreated 
-        |       ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail 
+        |       ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeParentCreatorAffiliation
         |       ?maybeSchemaVersion (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
         |WHERE {
         |  ?resourceId a schema:Project;
@@ -67,6 +67,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |    ?maybeCreatorResourceId a schema:Person;
         |                            schema:name ?maybeCreatorName.
         |    OPTIONAL { ?maybeCreatorResourceId schema:email ?maybeCreatorEmail }
+        |    OPTIONAL { ?maybeCreatorResourceId schema:affiliation ?maybeCreatorAffiliation }
         |  }
         |  OPTIONAL {
         |    ?resourceId prov:wasDerivedFrom ?maybeParentResourceId.
@@ -80,13 +81,14 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |      ?maybeParentCreatorResourceId a schema:Person;
         |                            schema:name ?maybeParentCreatorName.
         |      OPTIONAL { ?maybeParentCreatorResourceId schema:email ?maybeParentCreatorEmail }
+        |      OPTIONAL { ?maybeParentCreatorResourceId schema:affiliation ?maybeParentCreatorAffiliation }
         |    }
         |  }
         |}
         |GROUP BY ?resourceId ?name ?visibility ?maybeDescription ?dateCreated
-        |         ?maybeCreatorResourceId ?maybeCreatorName ?maybeCreatorEmail 
+        |         ?maybeCreatorResourceId ?maybeCreatorName ?maybeCreatorEmail ?maybeCreatorAffiliation
         |         ?maybeParentResourceId ?maybeParentPath ?maybeParentName ?maybeParentDateCreated 
-        |         ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail 
+        |         ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeParentCreatorAffiliation
         |         ?maybeSchemaVersion
         |""".stripMargin
   )
@@ -121,30 +123,32 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
     ResultsDecoder[Option, KGProject] { implicit cur =>
       for {
-        resourceId                   <- extract[ResourceId]("resourceId")
-        name                         <- extract[Name]("name")
-        visibility                   <- extract[Visibility]("visibility")
-        dateCreated                  <- extract[DateCreated]("dateCreated")
-        maybeDescription             <- extract[Option[Description]]("maybeDescription")
-        keywords                     <- extract[Option[String]]("keywords").flatMap(toSetOfKeywords)
-        maybeCreatorResourceId       <- extract[Option[persons.ResourceId]]("maybeCreatorResourceId")
-        maybeCreatorName             <- extract[Option[persons.Name]]("maybeCreatorName")
-        maybeCreatorEmail            <- extract[Option[persons.Email]]("maybeCreatorEmail")
-        maybeParentResourceId        <- extract[Option[ResourceId]]("maybeParentResourceId")
-        maybeParentPath              <- extract[Option[Path]]("maybeParentPath")
-        maybeParentName              <- extract[Option[Name]]("maybeParentName")
-        maybeParentDateCreated       <- extract[Option[DateCreated]]("maybeParentDateCreated")
-        maybeParentCreatorResourceId <- extract[Option[persons.ResourceId]]("maybeParentCreatorResourceId")
-        maybeParentCreatorName       <- extract[Option[persons.Name]]("maybeParentCreatorName")
-        maybeParentCreatorEmail      <- extract[Option[persons.Email]]("maybeParentCreatorEmail")
-        maybeVersion                 <- extract[Option[SchemaVersion]]("maybeSchemaVersion")
+        resourceId                    <- extract[ResourceId]("resourceId")
+        name                          <- extract[Name]("name")
+        visibility                    <- extract[Visibility]("visibility")
+        dateCreated                   <- extract[DateCreated]("dateCreated")
+        maybeDescription              <- extract[Option[Description]]("maybeDescription")
+        keywords                      <- extract[Option[String]]("keywords").flatMap(toSetOfKeywords)
+        maybeCreatorResourceId        <- extract[Option[persons.ResourceId]]("maybeCreatorResourceId")
+        maybeCreatorName              <- extract[Option[persons.Name]]("maybeCreatorName")
+        maybeCreatorEmail             <- extract[Option[persons.Email]]("maybeCreatorEmail")
+        maybeCreatorAffiliation       <- extract[Option[persons.Affiliation]]("maybeCreatorAffiliation")
+        maybeParentResourceId         <- extract[Option[ResourceId]]("maybeParentResourceId")
+        maybeParentPath               <- extract[Option[Path]]("maybeParentPath")
+        maybeParentName               <- extract[Option[Name]]("maybeParentName")
+        maybeParentDateCreated        <- extract[Option[DateCreated]]("maybeParentDateCreated")
+        maybeParentCreatorResourceId  <- extract[Option[persons.ResourceId]]("maybeParentCreatorResourceId")
+        maybeParentCreatorName        <- extract[Option[persons.Name]]("maybeParentCreatorName")
+        maybeParentCreatorEmail       <- extract[Option[persons.Email]]("maybeParentCreatorEmail")
+        maybeParentCreatorAffiliation <- extract[Option[persons.Affiliation]]("maybeParentCreatorAffiliation")
+        maybeVersion                  <- extract[Option[SchemaVersion]]("maybeSchemaVersion")
       } yield KGProject(
         resourceId,
         path,
         name,
         ProjectCreation(dateCreated,
                         (maybeCreatorResourceId, maybeCreatorName).mapN { case (id, name) =>
-                          ProjectCreator(id, maybeCreatorEmail, name)
+                          ProjectCreator(id, name, maybeCreatorEmail, maybeCreatorAffiliation)
                         }
         ),
         visibility,
@@ -154,10 +158,11 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
               parentId,
               path,
               name,
-              ProjectCreation(dateCreated,
-                              (maybeParentCreatorResourceId, maybeParentCreatorName).mapN { case (id, name) =>
-                                ProjectCreator(id, maybeParentCreatorEmail, name)
-                              }
+              ProjectCreation(
+                dateCreated,
+                (maybeParentCreatorResourceId, maybeParentCreatorName).mapN { case (id, name) =>
+                  ProjectCreator(id, name, maybeParentCreatorEmail, maybeParentCreatorAffiliation)
+                }
               )
             )
         },
@@ -186,7 +191,11 @@ private object KGProjectFinder {
 
   final case class KGParent(resourceId: ResourceId, path: Path, name: Name, created: ProjectCreation)
 
-  final case class ProjectCreator(resourceId: persons.ResourceId, maybeEmail: Option[persons.Email], name: persons.Name)
+  final case class ProjectCreator(resourceId:       persons.ResourceId,
+                                  name:             persons.Name,
+                                  maybeEmail:       Option[persons.Email],
+                                  maybeAffiliation: Option[persons.Affiliation]
+  )
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] =
     RenkuConnectionConfig[F]().map(new KGProjectFinderImpl(_))

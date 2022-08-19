@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.projects.details
 import Converters._
 import GitLabProjectFinder.GitLabProject
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{httpUrls => urls, nonBlankStrings, nonEmptyList, nonNegativeInts, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{nonBlankStrings, nonEmptyList, nonNegativeInts, timestampsNotInTheFuture, httpUrls => urls}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities}
 import io.renku.graph.model.testentities.{Project => _, _}
 import model.Forking.ForksCount
@@ -46,7 +46,7 @@ private object ProjectsGenerators {
     visibility = kgProject.visibility,
     created = Creation(
       date = kgProject.created.date,
-      kgProject.created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
+      kgProject.created.maybeCreator.map(toModelCreator)
     ),
     updatedAt = gitLabProject.updatedAt,
     urls = gitLabProject.urls,
@@ -59,7 +59,7 @@ private object ProjectsGenerators {
           parent.name,
           Creation(
             parent.created.date,
-            parent.created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
+            parent.created.maybeCreator.map(toModelCreator)
           )
         )
       }

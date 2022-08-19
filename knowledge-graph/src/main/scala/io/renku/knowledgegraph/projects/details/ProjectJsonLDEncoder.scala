@@ -36,25 +36,27 @@ private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
     JsonLD.entity(
       project.resourceId.asEntityId,
       entities.Project.entityTypes,
-      schema / "identifier"       -> project.id.asJsonLD,
-      renku / "projectPath"       -> project.path.asJsonLD,
-      schema / "name"             -> project.name.asJsonLD,
-      schema / "description"      -> project.maybeDescription.asJsonLD,
-      renku / "projectVisibility" -> project.visibility.asJsonLD,
-      schema / "dateCreated"      -> project.created.date.asJsonLD,
-      schema / "creator"          -> project.created.maybeCreator.asJsonLD,
-      schema / "dateModified"     -> project.updatedAt.asJsonLD,
-      schema / "keywords"         -> project.keywords.asJsonLD,
-      schema / "schemaVersion"    -> project.maybeVersion.asJsonLD,
-      prov / "wasDerivedFrom"     -> project.forking.maybeParent.asJsonLD
+      schema / "identifier"        -> project.id.asJsonLD,
+      renku  / "projectPath"       -> project.path.asJsonLD,
+      schema / "name"              -> project.name.asJsonLD,
+      schema / "description"       -> project.maybeDescription.asJsonLD,
+      renku  / "projectVisibility" -> project.visibility.asJsonLD,
+      schema / "dateCreated"       -> project.created.date.asJsonLD,
+      schema / "creator"           -> project.created.maybeCreator.asJsonLD,
+      schema / "dateModified"      -> project.updatedAt.asJsonLD,
+      schema / "keywords"          -> project.keywords.asJsonLD,
+      schema / "schemaVersion"     -> project.maybeVersion.asJsonLD,
+      prov   / "wasDerivedFrom"    -> project.forking.maybeParent.asJsonLD
     )
   }
 
   private implicit lazy val creatorEncoder: JsonLDEncoder[Creator] = JsonLDEncoder.instance { creator =>
-    JsonLD.entity(creator.resourceId.asEntityId,
-                  entities.Person.entityTypes,
-                  schema / "name"  -> creator.name.asJsonLD,
-                  schema / "email" -> creator.maybeEmail.asJsonLD
+    JsonLD.entity(
+      creator.resourceId.asEntityId,
+      entities.Person.entityTypes,
+      schema / "name"        -> creator.name.asJsonLD,
+      schema / "email"       -> creator.maybeEmail.asJsonLD,
+      schema / "affiliation" -> creator.maybeAffiliation.asJsonLD
     )
   }
 
@@ -62,7 +64,7 @@ private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
     JsonLD.entity(
       parent.resourceId.asEntityId,
       entities.Project.entityTypes,
-      renku / "projectPath"  -> parent.path.asJsonLD,
+      renku  / "projectPath" -> parent.path.asJsonLD,
       schema / "name"        -> parent.name.asJsonLD,
       schema / "dateCreated" -> parent.created.date.asJsonLD,
       schema / "creator"     -> parent.created.maybeCreator.asJsonLD

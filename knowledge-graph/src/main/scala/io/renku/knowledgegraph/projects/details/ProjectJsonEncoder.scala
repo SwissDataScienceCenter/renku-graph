@@ -66,67 +66,69 @@ private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJ
 
   private implicit lazy val creatorEncoder: Encoder[Creator] = Encoder.instance[Creator] { creator =>
     json"""{
-        "name":  ${creator.name}
-      }""" addIfDefined ("email" -> creator.maybeEmail)
+      "name": ${creator.name}
+    }"""
+      .addIfDefined("email" -> creator.maybeEmail)
+      .addIfDefined("affiliation" -> creator.maybeAffiliation)
   }
 
   private implicit lazy val urlsEncoder: Encoder[Urls] = Encoder.instance[Urls] { urls =>
     json"""{
-        "ssh":    ${urls.ssh},
-        "http":   ${urls.http},
-        "web":    ${urls.web}
-      }""" addIfDefined ("readme" -> urls.maybeReadme)
+      "ssh":  ${urls.ssh},
+      "http": ${urls.http},
+      "web":  ${urls.web}
+    }""" addIfDefined ("readme" -> urls.maybeReadme)
   }
 
   private implicit lazy val forkingEncoder: Encoder[Forking] = Encoder.instance[Forking] { forks =>
     json"""{
-        "forksCount": ${forks.forksCount}
-      }""" addIfDefined ("parent" -> forks.maybeParent)
+      "forksCount": ${forks.forksCount}
+    }""" addIfDefined ("parent" -> forks.maybeParent)
   }
 
   private implicit lazy val parentProjectEncoder: Encoder[ParentProject] = Encoder.instance[ParentProject] { parent =>
     json"""{
-        "path":    ${parent.path},
-        "name":    ${parent.name},
-        "created": ${parent.created}
-      }"""
+      "path":    ${parent.path},
+      "name":    ${parent.name},
+      "created": ${parent.created}
+    }"""
   }
 
   private implicit lazy val creationEncoder: Encoder[Creation] = Encoder.instance[Creation] { created =>
     json"""{
-        "dateCreated": ${created.date}
-      }""" addIfDefined ("creator" -> created.maybeCreator)
+      "dateCreated": ${created.date}
+    }""" addIfDefined ("creator" -> created.maybeCreator)
   }
 
   private implicit lazy val permissionsEncoder: Encoder[Permissions] = Encoder.instance[Permissions] {
     case ProjectAndGroupPermissions(projectAccessLevel, groupAccessLevel) => json"""{
-        "projectAccess": ${projectAccessLevel.accessLevel},
-        "groupAccess":   ${groupAccessLevel.accessLevel}
-      }"""
+      "projectAccess": ${projectAccessLevel.accessLevel},
+      "groupAccess":   ${groupAccessLevel.accessLevel}
+    }"""
     case ProjectPermissions(accessLevel) => json"""{
-        "projectAccess": ${accessLevel.accessLevel}
-      }"""
+      "projectAccess": ${accessLevel.accessLevel}
+    }"""
     case GroupPermissions(accessLevel) => json"""{
-        "groupAccess": ${accessLevel.accessLevel}
-      }"""
+      "groupAccess": ${accessLevel.accessLevel}
+    }"""
   }
 
   private implicit lazy val accessLevelEncoder: Encoder[AccessLevel] = Encoder.instance[AccessLevel] { level =>
     json"""{
-        "level": {
-          "name":  ${level.name.value},
-          "value": ${level.value.value}
-        }
-      }"""
+      "level": {
+        "name":  ${level.name.value},
+        "value": ${level.value.value}
+      }
+    }"""
   }
 
   private implicit lazy val statisticsEncoder: Encoder[Statistics] = Encoder.instance[Statistics] { stats =>
     json"""{
-        "commitsCount":     ${stats.commitsCount},
-        "storageSize":      ${stats.storageSize},
-        "repositorySize":   ${stats.repositorySize},
-        "lfsObjectsSize":   ${stats.lsfObjectsSize},
-        "jobArtifactsSize": ${stats.jobArtifactsSize}
-      }"""
+      "commitsCount":     ${stats.commitsCount},
+      "storageSize":      ${stats.storageSize},
+      "repositorySize":   ${stats.repositorySize},
+      "lfsObjectsSize":   ${stats.lsfObjectsSize},
+      "jobArtifactsSize": ${stats.jobArtifactsSize}
+    }"""
   }
 }
