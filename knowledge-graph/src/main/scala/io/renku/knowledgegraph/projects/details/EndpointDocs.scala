@@ -90,8 +90,9 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
     Creation(
       projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
       Creator(persons.ResourceId("http://renkulab.io/persons/2"),
+              persons.Name("John"),
               persons.Email("john@mail.com").some,
-              persons.Name("John")
+              persons.Affiliation("SDSC").some
       ).some
     ),
     DateUpdated(Instant.parse("2012-11-16T10:00:00.000Z")),
@@ -110,8 +111,9 @@ private class EndpointDocsImpl(projectJsonEncoder: ProjectJsonEncoder, projectJs
         Creation(
           projects.DateCreated(Instant.parse("2012-11-17T10:00:00.000Z")),
           Creator(persons.ResourceId("http://renkulab.io/persons/3"),
+                  persons.Name("Goeff"),
                   persons.Email("goeff@mail.com").some,
-                  persons.Name("Goeff")
+                  persons.Affiliation("SDSC").some
           ).some
         )
       ).some

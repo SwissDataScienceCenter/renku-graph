@@ -201,9 +201,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
       visibility = kgProject.visibility,
       created = model.Creation(
         kgProject.created.date,
-        kgProject.created.maybeCreator.map(creator =>
-          model.Creator(creator.resourceId, creator.maybeEmail, creator.name)
-        )
+        kgProject.created.maybeCreator.map(toModelCreator)
       ),
       updatedAt = gitLabProject.updatedAt,
       urls = gitLabProject.urls,
@@ -216,9 +214,7 @@ class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matcher
             parent.name,
             model.Creation(
               parent.created.date,
-              parent.created.maybeCreator.map(creator =>
-                model.Creator(creator.resourceId, creator.maybeEmail, creator.name)
-              )
+              parent.created.maybeCreator.map(toModelCreator)
             )
           )
         }

@@ -51,10 +51,12 @@ private object ProjectJsonLDEncoder extends ProjectJsonLDEncoder {
   }
 
   private implicit lazy val creatorEncoder: JsonLDEncoder[Creator] = JsonLDEncoder.instance { creator =>
-    JsonLD.entity(creator.resourceId.asEntityId,
-                  entities.Person.entityTypes,
-                  schema / "name"  -> creator.name.asJsonLD,
-                  schema / "email" -> creator.maybeEmail.asJsonLD
+    JsonLD.entity(
+      creator.resourceId.asEntityId,
+      entities.Person.entityTypes,
+      schema / "name"        -> creator.name.asJsonLD,
+      schema / "email"       -> creator.maybeEmail.asJsonLD,
+      schema / "affiliation" -> creator.maybeAffiliation.asJsonLD
     )
   }
 

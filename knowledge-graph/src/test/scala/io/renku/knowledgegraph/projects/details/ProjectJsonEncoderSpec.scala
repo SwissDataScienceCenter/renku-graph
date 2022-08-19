@@ -26,7 +26,7 @@ import io.renku.config.renku
 import io.renku.generators.CommonGraphGenerators.renkuApiUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.SchemaVersion
-import io.renku.graph.model.persons.{Email, Name => UserName}
+import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.{Href, Rel}
@@ -107,10 +107,11 @@ class ProjectJsonEncoderSpec extends AnyWordSpec with should.Matchers with Scala
 
   private def creatorDecoder(maybeCreator: Option[Creator]): Decoder[Creator] = cursor =>
     for {
-      name       <- cursor.downField("name").as[UserName]
-      maybeEmail <- cursor.downField("email").as[Option[Email]]
-      creator    <- maybeCreator.toRight(DecodingFailure(show"'$name' creator expected but found None", Nil))
-    } yield Creator(creator.resourceId, maybeEmail, name)
+      name             <- cursor.downField("name").as[UserName]
+      maybeEmail       <- cursor.downField("email").as[Option[Email]]
+      maybeAffiliation <- cursor.downField("affiliation").as[Option[Affiliation]]
+      creator          <- maybeCreator.toRight(DecodingFailure(show"'$name' creator expected but found None", Nil))
+    } yield Creator(creator.resourceId, name, maybeEmail, maybeAffiliation)
 
   private def forkingDecoder(forking: Forking): Decoder[Forking] = cursor =>
     for {

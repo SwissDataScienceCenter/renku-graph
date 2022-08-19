@@ -70,7 +70,11 @@ private object model {
 
   final case class Creation(date: DateCreated, maybeCreator: Option[Creator])
 
-  final case class Creator(resourceId: persons.ResourceId, maybeEmail: Option[persons.Email], name: persons.Name)
+  final case class Creator(resourceId:       persons.ResourceId,
+                           name:             persons.Name,
+                           maybeEmail:       Option[persons.Email],
+                           maybeAffiliation: Option[persons.Affiliation]
+  )
 
   final case class Forking(forksCount: ForksCount, maybeParent: Option[ParentProject])
 

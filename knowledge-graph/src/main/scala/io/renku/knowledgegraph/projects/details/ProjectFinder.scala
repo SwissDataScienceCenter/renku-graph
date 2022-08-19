@@ -60,7 +60,9 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
     visibility = kgProject.visibility,
     created = Creation(
       date = kgProject.created.date,
-      kgProject.created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
+      kgProject.created.maybeCreator.map(creator =>
+        Creator(creator.resourceId, creator.name, creator.maybeEmail, creator.maybeAffiliation)
+      )
     ),
     updatedAt = gitLabProject.updatedAt,
     urls = gitLabProject.urls,
@@ -80,7 +82,9 @@ private class ProjectFinderImpl[F[_]: MonadThrow: Parallel: AccessTokenFinder](
           path,
           name,
           Creation(created.date,
-                   created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
+                   created.maybeCreator.map(creator =>
+                     Creator(creator.resourceId, creator.name, creator.maybeEmail, creator.maybeAffiliation)
+                   )
           )
         )
       }

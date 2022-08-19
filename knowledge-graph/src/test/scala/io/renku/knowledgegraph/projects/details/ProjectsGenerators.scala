@@ -46,7 +46,7 @@ private object ProjectsGenerators {
     visibility = kgProject.visibility,
     created = Creation(
       date = kgProject.created.date,
-      kgProject.created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
+      kgProject.created.maybeCreator.map(toModelCreator)
     ),
     updatedAt = gitLabProject.updatedAt,
     urls = gitLabProject.urls,
@@ -59,7 +59,7 @@ private object ProjectsGenerators {
           parent.name,
           Creation(
             parent.created.date,
-            parent.created.maybeCreator.map(creator => Creator(creator.resourceId, creator.maybeEmail, creator.name))
+            parent.created.maybeCreator.map(toModelCreator)
           )
         )
       }

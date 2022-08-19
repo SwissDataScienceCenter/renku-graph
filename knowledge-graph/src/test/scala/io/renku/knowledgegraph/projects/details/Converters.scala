@@ -34,7 +34,7 @@ private trait Converters {
         project.name,
         ProjectCreation(
           project.dateCreated,
-          project.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
+          project.maybeCreator.map(_.to(projectCreatorConverter))
         ),
         project.visibility,
         project.parent.to(kgParentConverter).some,
@@ -49,7 +49,7 @@ private trait Converters {
         project.name,
         ProjectCreation(
           project.dateCreated,
-          project.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
+          project.maybeCreator.map(_.to(projectCreatorConverter))
         ),
         project.visibility,
         maybeParent = None,
@@ -64,7 +64,7 @@ private trait Converters {
         project.name,
         ProjectCreation(
           project.dateCreated,
-          project.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
+          project.maybeCreator.map(_.to(projectCreatorConverter))
         ),
         project.visibility,
         project.parent.to(kgParentConverter).some,
@@ -79,7 +79,7 @@ private trait Converters {
         project.name,
         ProjectCreation(
           project.dateCreated,
-          project.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
+          project.maybeCreator.map(_.to(projectCreatorConverter))
         ),
         project.visibility,
         maybeParent = None,
@@ -97,7 +97,13 @@ private trait Converters {
       parent.name,
       ProjectCreation(
         parent.dateCreated,
-        parent.maybeCreator.map(person => ProjectCreator(person.resourceId, person.maybeEmail, person.name))
+        parent.maybeCreator.map(_.to(projectCreatorConverter))
       )
     )
+
+  private lazy val projectCreatorConverter: Person => ProjectCreator = person =>
+    ProjectCreator(person.resourceId, person.name, person.maybeEmail, person.maybeAffiliation)
+
+  lazy val toModelCreator: ProjectCreator => model.Creator = creator =>
+    model.Creator(creator.resourceId, creator.name, creator.maybeEmail, creator.maybeAffiliation)
 }

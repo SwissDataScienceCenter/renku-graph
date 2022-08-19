@@ -78,10 +78,11 @@ class ProjectJsonLDEncoderSpec extends AnyWordSpec with should.Matchers with Sca
   private implicit lazy val creatorDecoder: JsonLDDecoder[Creator] =
     JsonLDDecoder.entity(entities.Person.entityTypes) { cursor =>
       for {
-        resourceId <- cursor.downEntityId.as[persons.ResourceId]
-        maybeEmail <- cursor.downField(schema / "email").as[Option[persons.Email]]
-        name       <- cursor.downField(schema / "name").as[persons.Name]
-      } yield Creator(resourceId, maybeEmail, name)
+        resourceId       <- cursor.downEntityId.as[persons.ResourceId]
+        name             <- cursor.downField(schema / "name").as[persons.Name]
+        maybeEmail       <- cursor.downField(schema / "email").as[Option[persons.Email]]
+        maybeAffiliation <- cursor.downField(schema / "affiliation").as[Option[persons.Affiliation]]
+      } yield Creator(resourceId, name, maybeEmail, maybeAffiliation)
     }
 
   private implicit lazy val parentDecoder: JsonLDDecoder[ParentProject] =

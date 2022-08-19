@@ -583,8 +583,9 @@ Response body example for `Accept: application/json`:
   "created": {
     "dateCreated": "2001-09-05T10:48:29.457Z",
     "creator": { // optional
-      "name":  "author name",
-      "email": "author@mail.org" // optional
+      "name":        "author name",
+      "email":       "author@mail.org", // optional
+      "affiliation": "SDSC" // optional
     }
   },
   "updatedAt":  "2001-10-06T10:48:29.457Z",
@@ -602,8 +603,9 @@ Response body example for `Accept: application/json`:
       "created": {
         "dateCreated": "2001-09-04T10:48:29.457Z",
         "creator": { // optional
-          "name":  "parent author name", 
-          "email": "parent.author@mail.org" // optional
+          "name":        "parent author name", 
+          "email":       "parent.author@mail.org", // optional
+          "affiliation": "SDSC" // optional
         }
       }
     }
