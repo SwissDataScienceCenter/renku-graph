@@ -23,3 +23,7 @@ import io.renku.graph.model.datasets
 object DatasetId {
   def unapply(value: String): Option[datasets.Identifier] = datasets.Identifier.from(value).toOption
 }
+
+object DatasetName {
+  def unapply(value: String): Option[datasets.Name] = datasets.Name.from(value).toOption
+}

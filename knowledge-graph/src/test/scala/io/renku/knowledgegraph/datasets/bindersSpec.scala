@@ -23,9 +23,9 @@ import io.renku.graph.model.GraphModelGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DatasetIdSpec extends AnyWordSpec with should.Matchers {
+class bindersSpec extends AnyWordSpec with should.Matchers {
 
-  "unapply" should {
+  "DatasetId.unapply" should {
 
     "convert valid dataset id as string to Identifier" in {
       val id = datasetIdentifiers.generateOne
@@ -34,6 +34,18 @@ class DatasetIdSpec extends AnyWordSpec with should.Matchers {
 
     "return None if string value is blank" in {
       DatasetId.unapply(" ") shouldBe None
+    }
+  }
+
+  "DatasetName.unapply" should {
+
+    "convert valid dataset name as string to Name" in {
+      val name = datasetNames.generateOne
+      DatasetName.unapply(name.toString) shouldBe Some(name)
+    }
+
+    "return None if string value is blank" in {
+      DatasetName.unapply(" ") shouldBe None
     }
   }
 }
