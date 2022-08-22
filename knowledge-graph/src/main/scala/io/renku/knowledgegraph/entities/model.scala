@@ -73,6 +73,7 @@ object model {
             "name":          ${project.name},
             "path":          ${project.path},
             "namespace":     ${project.path.toNamespaces.mkString("/")},
+            "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
             "visibility":    ${project.visibility},
             "date":          ${project.date},
             "keywords":      ${project.keywords}
@@ -85,6 +86,21 @@ object model {
               )
             )
         }
+
+      private type NamespaceInfo = (Rel, List[projects.Namespace])
+
+      private lazy val toDetailedInfo: List[projects.Namespace] => Json = _.foldLeft(List.empty[NamespaceInfo]) {
+        case (Nil, namespace) => List(Rel(namespace.show) -> List(namespace))
+        case (all @ (_, lastNamespaces) :: _, namespace) =>
+          all ::: (Rel(namespace.show) -> (lastNamespaces ::: namespace :: Nil)) :: Nil
+      }.asJson
+
+      private implicit lazy val namespaceEncoder: Encoder[NamespaceInfo] = Encoder.instance { case (rel, namespaces) =>
+        json"""{
+          "rel":       $rel,
+          "namespace": ${namespaces.map(_.show).mkString("/")}
+        }"""
+      }
     }
 
     final case class Dataset(

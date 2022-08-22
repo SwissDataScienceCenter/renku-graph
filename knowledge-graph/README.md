@@ -212,41 +212,42 @@ Response body example:
 ```json
 [
   {
-    "type": "project",
+    "type":          "project",
     "matchingScore": 1.0055376,
-    "name": "name",
-    "path": "group/subgroup/name",
-    "namespace": "group/subgroup",
-    "visibility": "public",
-    "date": "2012-11-15T10:00:00.000Z",
-    "creator": "Jan Kowalski",
-    "keywords": [
-      "keyword1",
-      "keyword2"
+    "name":          "name",
+    "path":          "group/subgroup/name",
+    "namespace":     "group/subgroup",
+    "namespaces": [
+      {
+        rel:       "group",
+        namespace: "group"
+      },
+      {
+        rel:       "subgroup",
+        namespace: "group/subgroup"
+      }
     ],
-    "description": "desc",
+    "visibility":    "public",
+    "date":          "2012-11-15T10:00:00.000Z",
+    "creator":       "Jan Kowalski",
+    "keywords":      [ "keyword1", "keyword2" ],
+    "description":   "desc",
     "_links": [
       {
-        "rel": "details",
+        "rel":  "details",
         "href": "http://t:5511/projects/group/subgroup/name"
       }
     ]
   },
   {
-    "type": "dataset",
+    "type":          "dataset",
     "matchingScore": 3.364836,
-    "name": "name",
-    "visibility": "public",
-    "date": "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
-    "creators": [
-      "Jan Kowalski",
-      "Zoe"
-    ],
-    "keywords": [
-      "keyword1",
-      "keyword2"
-    ],
-    "description": "desc",
+    "name":          "name",
+    "visibility":    "public",
+    "date":          "2012-11-15T10:00:00.000Z", // either datePublished or dateCreated
+    "creators":      [ "Jan Kowalski", "Zoe" ],
+    "keywords":      [ "keyword1", "keyword2" ],
+    "description":   "desc",
     "images": [
       {
         "location": "image.png",
@@ -260,29 +261,26 @@ Response body example:
     ],
     "_links": [
       {
-        "rel": "details",
+        "rel":  "details",
         "href": "http://t:5511/datasets/122334344"
       }
     ]
   },
   {
-    "type": "workflow",
+    "type":          "workflow",
     "matchingScore": 5.364836,
-    "name": "name",
-    "visibility": "public",
-    "date": "2012-11-15T10:00:00.000Z",
-    "keywords": [
-      "keyword1",
-      "keyword2"
-    ],
-    "description": "desc",
-    "_links": []
+    "name":          "name",
+    "visibility":    "public",
+    "date":          "2012-11-15T10:00:00.000Z",
+    "keywords":      [ "keyword1", "keyword2" ],
+    "description":   "desc",
+    "_links":        []
   },
   {
-    "type": "person",
+    "type":          "person",
     "matchingScore": 4.364836,
-    "name": "name",
-    "_links": []
+    "name":          "name",
+    "_links":        []
   }
 ]
 ```
