@@ -51,7 +51,7 @@ object projects {
   }
 
   final class Namespace private (val value: String) extends AnyVal with StringTinyType
-  object Namespace
+  implicit object Namespace
       extends TinyTypeFactory[Namespace](new Namespace(_))
       with NonBlank[Namespace]
       with TinyTypeJsonLDOps[Namespace]

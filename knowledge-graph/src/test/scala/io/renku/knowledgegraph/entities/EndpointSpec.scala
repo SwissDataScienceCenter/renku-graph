@@ -164,21 +164,38 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       }
     }
 
+    implicit val namespacesListDecoder: Decoder[(Rel, projects.Namespace)] = Decoder.instance { cursor =>
+      (cursor.downField("rel").as[Rel] -> cursor.downField("namespace").as[projects.Namespace]).mapN(_ -> _)
+    }
+
+    def expectedNamespaces(path: projects.Path) = path.toNamespaces
+      .foldLeft(List.empty[(Rel, List[projects.Namespace])]) {
+        case (Nil, namespace) => List(Rel(namespace.show) -> List(namespace))
+        case (all @ (_, prevNamespaces) :: _, namespace) =>
+          all ::: (Rel(namespace.show), prevNamespaces ::: namespace :: Nil) :: Nil
+      }
+      .map { case (rel, namespaces) => rel -> projects.Namespace(namespaces.map(_.show).mkString("/")) }
+
     cursor.downField("type").as[Endpoint.Criteria.Filters.EntityType] >>= {
       case Endpoint.Criteria.Filters.EntityType.Project =>
         for {
           score        <- cursor.downField("matchingScore").as[MatchingScore]
           name         <- cursor.downField("name").as[projects.Name]
           path         <- cursor.downField("path").as[projects.Path]
-          namespace    <- cursor.downField("namespace").as[String]
+          namespace    <- cursor.downField("namespace").as[projects.Namespace]
+          namespaces   <- cursor.downField("namespaces").as[List[(Rel, projects.Namespace)]]
           visibility   <- cursor.downField("visibility").as[projects.Visibility]
           date         <- cursor.downField("date").as[projects.DateCreated]
           maybeCreator <- cursor.downField("creator").as[Option[persons.Name]]
           keywords     <- cursor.downField("keywords").as[List[projects.Keyword]]
           maybeDesc    <- cursor.downField("description").as[Option[projects.Description]]
-          _ <- Either.cond(path.value startsWith namespace,
+          _ <- Either.cond(path.show startsWith namespace.show,
                            (),
-                           DecodingFailure(s"'$path' does not start with '$namespace'", Nil)
+                           DecodingFailure(show"'$path' does not start with '$namespace'", Nil)
+               )
+          _ <- Either.cond(namespaces == expectedNamespaces(path),
+                           (),
+                           DecodingFailure(show"'$namespaces' do not match '${expectedNamespaces(path)}'", Nil)
                )
           _ <- cursor._links
                  .flatMap(_.get(Links.Rel("details")).toRight(DecodingFailure("No project details link", Nil)))
