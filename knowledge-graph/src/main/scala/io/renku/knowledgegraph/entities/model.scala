@@ -36,7 +36,7 @@ import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
 
 import java.time.Instant
 
-object model {
+private object model {
 
   sealed trait Entity extends Product with Serializable {
     type Name <: StringTinyType
