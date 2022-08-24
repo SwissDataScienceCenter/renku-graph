@@ -18,7 +18,9 @@
 
 package io.renku.knowledgegraph.projects.datasets.tags
 
+import io.renku.config.renku
 import io.renku.graph.model.{datasets, publicationEvents}
+import io.renku.knowledgegraph
 
 private object model {
 
@@ -27,4 +29,31 @@ private object model {
                        maybeDesc: Option[publicationEvents.Description],
                        datasetId: datasets.Identifier
   )
+
+  object Tag {
+
+    import io.circe.Encoder
+
+    implicit def modelEncoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[model.Tag] = Encoder.instance {
+      tag =>
+        import io.circe.literal._
+        import io.renku.http.rest.Links._
+        import io.renku.json.JsonOps._
+        import io.renku.tinytypes.json.TinyTypeEncoders._
+
+        json"""{
+        "name": ${tag.name},
+        "date": ${tag.startDate}
+      }"""
+          .addIfDefined("description" -> tag.maybeDesc)
+          .deepMerge(
+            _links(
+              Link(
+                Rel("dataset-details") ->
+                  knowledgegraph.datasets.details.DatasetEndpoint.href(renkuApiUrl, tag.datasetId)
+              )
+            )
+          )
+    }
+  }
 }

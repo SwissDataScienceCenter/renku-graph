@@ -23,7 +23,6 @@ import Endpoint._
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
-import io.circe.Encoder
 import io.renku.config.renku
 import io.renku.graph
 import io.renku.graph.model.RenkuUrl
@@ -61,42 +60,28 @@ private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],
 ) extends Http4sDsl[F]
     with Endpoint[F] {
 
+  import io.circe.Encoder._
   import io.circe.Json
-  import io.circe.literal._
   import io.circe.syntax._
   import io.renku.http.ErrorMessage
   import io.renku.http.ErrorMessage._
-  import io.renku.http.rest.Links._
   import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
-  import io.renku.json.JsonOps._
-  import io.renku.tinytypes.json.TinyTypeEncoders._
   import org.http4s.circe.jsonEncoderOf
   import org.http4s.{EntityEncoder, Header, Status}
 
   import scala.util.control.NonFatal
+
+  private implicit val apiUrl: renku.ApiUrl = renkuApiUrl
 
   override def `GET /projects/:path/datasets/:name/tags`(criteria: Criteria)(implicit
       request:                                                     Request[F]
   ): F[Response[F]] = tagsFinder.findTags(criteria) map toHttpResponse(request) recoverWith httpResult
 
   private def toHttpResponse(request: Request[F])(response: PagingResponse[model.Tag]): Response[F] = {
-    implicit val resourceUrl: renku.ResourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
+    val resourceUrl = renku.ResourceUrl(show"$renkuUrl${request.uri}")
     Response[F](Status.Ok)
       .withEntity(response.results.asJson)
-      .putHeaders(PagingHeaders.from(response).toSeq.map(Header.ToRaw.rawToRaw): _*)
-  }
-
-  private implicit lazy val modelEncoder: Encoder[model.Tag] = Encoder.instance { tag =>
-    json"""{
-      "name": ${tag.name},
-      "date": ${tag.startDate}
-    }"""
-      .addIfDefined("description" -> tag.maybeDesc)
-      .deepMerge(
-        _links(
-          Link(Rel("dataset-details") -> datasets.details.DatasetEndpoint.href(renkuApiUrl, tag.datasetId))
-        )
-      )
+      .putHeaders(PagingHeaders.from(response)(resourceUrl, renku.ResourceUrl).toSeq.map(Header.ToRaw.rawToRaw): _*)
   }
 
   private implicit lazy val responseEntityEncoder: EntityEncoder[F, Json] = jsonEncoderOf[F, Json]

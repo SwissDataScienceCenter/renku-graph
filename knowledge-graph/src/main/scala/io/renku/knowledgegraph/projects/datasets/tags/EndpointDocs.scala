@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.users.projects
+package io.renku.knowledgegraph.projects.datasets.tags
 
 import cats.MonadThrow
 import cats.implicits._
 import io.circe.Json
 import io.circe.syntax._
 import io.renku.config.renku
-import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model._
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
@@ -34,20 +33,18 @@ import io.renku.knowledgegraph.docs.model._
 import java.time.Instant
 
 object EndpointDocs {
-  def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
-    renkuUrl <- RenkuUrlLoader[F]()
-    apiUrl   <- renku.ApiUrl[F]()
-  } yield new EndpointDocsImpl()(renkuUrl, apiUrl)
+  def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] =
+    renku.ApiUrl[F]().map(new EndpointDocsImpl()(_))
 }
 
-private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
+private class EndpointDocsImpl()(implicit renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
-    "User Projects search",
-    "Finds Projects of the user with the given userId".some,
+    "Project Dataset tags search",
+    "Finds tags of the Dataset with the given name on the project with given path".some,
     GET(
-      Uri / "users" / userId / "projects" :? state,
-      Status.Ok -> Response("Found projects",
+      Uri / "projects" / namespace / projectName / "datasets" / dsName / "tags",
+      Status.Ok -> Response("Found tags",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
       ),
@@ -65,17 +62,16 @@ private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku
     )
   )
 
-  private lazy val userId = Parameter.Path(
-    "userId",
-    Schema.Integer,
-    "User's GitLab identifier".some
-  )
-  private lazy val state = Parameter.Query(
-    "state",
+  private lazy val namespace = Parameter.Path(
+    "namespace",
     Schema.String,
-    "to filter by project state; allowed values: 'ACTIVATED', 'NOT_ACTIVATED', 'ALL'; default value is 'ALL'".some,
-    required = false
+    description =
+      "Namespace(s) as there might be multiple. Each namespace needs to be url-encoded and separated with a non url-encoded '/'".some
   )
+
+  private lazy val projectName = Parameter.Path("projectName", Schema.String, "Project name".some)
+
+  private lazy val dsName = Parameter.Path("dsName", Schema.String, "Dataset name".some)
 
   private lazy val responseHeaders = Map(
     "Total"       -> Header("The total number of projects".some, Schema.Integer),
@@ -88,27 +84,12 @@ private class EndpointDocsImpl()(implicit renkuUrl: RenkuUrl, renkuApiUrl: renku
   )
 
   private lazy val example = Json.arr(
-    model.Project
-      .Activated(
-        projects.Name("name"),
-        projects.Path("group/subgroup/name"),
-        projects.Visibility.Public,
-        projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
-        persons.Name("Jan Kowalski").some,
-        List(projects.Keyword("key")),
-        projects.Description("Some project").some
-      )
-      .asJson,
-    model.Project
-      .NotActivated(
-        projects.Id(1),
-        projects.Name("name"),
-        projects.Path("group/subgroup/name"),
-        projects.Visibility.Public,
-        projects.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
-        persons.Name("Jan Kowalski").some,
-        List(projects.Keyword("key")),
-        projects.Description("Some project").some
+    model
+      .Tag(
+        publicationEvents.Name("name"),
+        publicationEvents.StartDate(Instant.parse("2012-11-15T10:00:00.000Z")),
+        publicationEvents.Description("Some project").some,
+        datasets.Identifier("1234456777")
       )
       .asJson
   )
