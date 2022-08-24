@@ -40,7 +40,6 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets._
-import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
@@ -54,7 +53,7 @@ import scala.concurrent.ExecutionContext
 
 private class MicroserviceRoutes[F[_]: Async](
     datasetsSearchEndpoint:     DatasetsSearchEndpoint[F],
-    datasetEndpoint:            DatasetEndpoint[F],
+    datasetDetailsEndpoint:     datasets.details.Endpoint[F],
     entitiesEndpoint:           entities.Endpoint[F],
     queryEndpoint:              QueryEndpoint[F],
     lineageEndpoint:            projects.files.lineage.Endpoint[F],
@@ -71,7 +70,7 @@ private class MicroserviceRoutes[F[_]: Async](
     versionRoutes:              version.Routes[F]
 ) extends Http4sDsl[F] {
 
-  import datasetEndpoint._
+  import datasetDetailsEndpoint._
   import datasetIdAuthorizer.{authorize => authorizeDatasetId}
   import entitiesEndpoint._
   import lineageEndpoint._
@@ -299,7 +298,7 @@ private object MicroserviceRoutes {
     AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
       for {
         datasetsSearchEndpoint     <- DatasetsSearchEndpoint[IO]
-        datasetEndpoint            <- DatasetEndpoint[IO]
+        datasetDetailsEndpoint     <- datasets.details.Endpoint[IO]
         entitiesEndpoint           <- entities.Endpoint[IO]
         queryEndpoint              <- QueryEndpoint()
         lineageEndpoint            <- projects.files.lineage.Endpoint[IO]
@@ -315,7 +314,7 @@ private object MicroserviceRoutes {
         datasetIdAuthorizer        <- Authorizer.using(DatasetIdRecordsFinder[IO])
         versionRoutes              <- version.Routes[IO]
       } yield new MicroserviceRoutes(datasetsSearchEndpoint,
-                                     datasetEndpoint,
+                                     datasetDetailsEndpoint,
                                      entitiesEndpoint,
                                      queryEndpoint,
                                      lineageEndpoint,

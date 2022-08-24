@@ -57,7 +57,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetEndpointSpec
+class EndpointSpec
     extends AnyWordSpec
     with MockFactory
     with ScalaCheckPropertyChecks
@@ -185,7 +185,7 @@ class DatasetEndpointSpec
     val datasetsFinder        = mock[DatasetFinder[IO]]
     val renkuApiUrl           = renkuApiUrls.generateOne
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint = new DatasetEndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
+    val endpoint = new EndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
   }
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]

@@ -49,7 +49,7 @@ private object model {
           _links(
             Link(
               Rel("dataset-details") ->
-                knowledgegraph.datasets.details.DatasetEndpoint.href(renkuApiUrl, tag.datasetId)
+                knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, tag.datasetId)
             )
           )
         )

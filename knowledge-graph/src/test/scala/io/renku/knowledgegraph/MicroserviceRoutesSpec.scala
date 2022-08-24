@@ -49,7 +49,6 @@ import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.{Phrase, qu
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
 import io.renku.knowledgegraph.datasets._
-import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsEndpoint
 import io.renku.testtools.IOSpec
@@ -211,7 +210,7 @@ class MicroserviceRoutesSpec
         .expects(id, maybeAuthUser)
         .returning(rightT[IO, EndpointSecurityException](authContext))
 
-      (datasetEndpoint.getDataset _).expects(id, authContext).returning(IO.pure(Response[IO](Ok)))
+      (datasetDetailsEndpoint.getDataset _).expects(id, authContext).returning(IO.pure(Response[IO](Ok)))
 
       routes(maybeAuthUser)
         .call(Request(GET, uri"/knowledge-graph/datasets" / id.value))
@@ -828,7 +827,7 @@ class MicroserviceRoutesSpec
   private trait TestCase {
 
     val datasetsSearchEndpoint     = mock[DatasetsSearchEndpoint[IO]]
-    val datasetEndpoint            = mock[DatasetEndpoint[IO]]
+    val datasetDetailsEndpoint     = mock[datasets.details.Endpoint[IO]]
     val entitiesEndpoint           = mock[entities.Endpoint[IO]]
     val queryEndpoint              = mock[QueryEndpoint[IO]]
     val lineageEndpoint            = mock[projects.files.lineage.Endpoint[IO]]
@@ -850,7 +849,7 @@ class MicroserviceRoutesSpec
     def routes(middleware: AuthMiddleware[IO, Option[AuthUser]]): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] =
       new MicroserviceRoutes[IO](
         datasetsSearchEndpoint,
-        datasetEndpoint,
+        datasetDetailsEndpoint,
         entitiesEndpoint,
         queryEndpoint,
         lineageEndpoint,

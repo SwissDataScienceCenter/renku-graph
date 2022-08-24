@@ -39,17 +39,17 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait DatasetEndpoint[F[_]] {
+trait Endpoint[F[_]] {
   def getDataset(identifier: Identifier, authContext: AuthContext[Identifier]): F[Response[F]]
 }
 
-class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
+class EndpointImpl[F[_]: MonadThrow: Logger](
     datasetFinder:         DatasetFinder[F],
     renkuApiUrl:           renku.ApiUrl,
     gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
-    with DatasetEndpoint[F] {
+    with Endpoint[F] {
 
   import executionTimeRecorder._
   import org.http4s.circe._
@@ -85,14 +85,14 @@ class DatasetEndpointImpl[F[_]: MonadThrow: Logger](
   }
 }
 
-object DatasetEndpoint {
+object Endpoint {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetEndpoint[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     datasetFinder         <- DatasetFinder[F]
     renkuApiUrl           <- renku.ApiUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
-  } yield new DatasetEndpointImpl[F](datasetFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
+  } yield new EndpointImpl[F](datasetFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
 
   def href(renkuApiUrl: renku.ApiUrl, identifier: Identifier): Href =
     Href(renkuApiUrl / "datasets" / identifier)
