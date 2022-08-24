@@ -20,6 +20,7 @@ package io.renku.http.rest.paging
 
 import cats.syntax.all._
 import io.renku.http.rest.paging.model._
+import org.http4s.Query
 
 final case class PagingRequest(page: Page, perPage: PerPage)
 
@@ -50,6 +51,7 @@ object PagingRequest {
     object page extends OptionalValidatingQueryParamDecoderMatcher[Page]("page") {
       val parameterName:               String = "page"
       def errorMessage(value: String): String = s"'$value' not a valid '$parameterName' value"
+      def find(query: Query): Option[ValidatedNel[ParseFailure, Page]] = page.unapply(query.multiParams).flatten
     }
 
     private implicit val perPageParameterDecoder: QueryParamDecoder[PerPage] =
@@ -66,6 +68,7 @@ object PagingRequest {
     object perPage extends OptionalValidatingQueryParamDecoderMatcher[PerPage]("per_page") {
       val parameterName:               String = "per_page"
       def errorMessage(value: String): String = s"'$value' not a valid '$parameterName' value"
+      def find(query: Query): Option[ValidatedNel[ParseFailure, PerPage]] = perPage.unapply(query.multiParams).flatten
     }
   }
 }

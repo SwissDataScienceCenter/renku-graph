@@ -167,7 +167,8 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
     }
 
     "fail if requested page and perPage is beyond the number of results" in {
-      val paging = pagingRequests.generateOne.copy(page = Gen.oneOf(2, 3, 4, 5).generateAs(Page))
+      val paging =
+        PagingRequest(page = Gen.oneOf(2, 3, 4, 5).generateAs(Page), perPage = ints(2, 100).generateAs[PerPage])
       val results = nonBlankStrings()
         .generateNonEmptyList(maxElements = Refined.unsafeApply(paging.perPage.value - 1))
         .toList

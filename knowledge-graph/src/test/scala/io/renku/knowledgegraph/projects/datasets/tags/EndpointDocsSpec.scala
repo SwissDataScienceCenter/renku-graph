@@ -16,20 +16,25 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.entities
-package finder
+package io.renku.knowledgegraph.projects.datasets.tags
 
-import io.circe.Decoder
-import io.renku.knowledgegraph.entities.Endpoint.Criteria
-import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
-import io.renku.triplesstore.ResultsDecoder
+import io.renku.config.renku
+import io.renku.generators.CommonGraphGenerators.renkuApiUrls
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GitLabUrl
+import io.renku.graph.model.GraphModelGenerators.gitLabUrls
+import io.renku.knowledgegraph.docs.OpenApiTester._
+import org.scalatest.wordspec.AnyWordSpec
 
-private[entities] trait EntityQuery[+E <: model.Entity] extends ResultsDecoder with Product with Serializable {
-  val entityType:      EntityType
-  val selectVariables: Set[String]
-  def query(criteria: Criteria): Option[String]
-  def decoder[EE >: E]: Decoder[EE]
+class EndpointDocsSpec extends AnyWordSpec {
 
-  def getDecoder[EE >: E](entityType: EntityType): Option[Decoder[EE]] =
-    Option.when(entityType == this.entityType)(decoder[EE])
+  "path" should {
+
+    "return a valid Path object" in {
+      validatePath(new EndpointDocsImpl().path)
+    }
+  }
+
+  private implicit lazy val renkuUrl:  renku.ApiUrl = renkuApiUrls.generateOne
+  private implicit lazy val gitLabUrl: GitLabUrl    = gitLabUrls.generateOne
 }

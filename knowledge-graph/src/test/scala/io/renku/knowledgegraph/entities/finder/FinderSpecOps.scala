@@ -42,11 +42,11 @@ trait FinderSpecOps {
     val finder = new EntitiesFinderImpl[IO](renkuDSConnectionInfo)
   }
 
-  protected implicit class PagingResponseOps(response: PagingResponse[model.Entity]) {
+  protected[finder] implicit class PagingResponseOps(response: PagingResponse[model.Entity]) {
     lazy val resultsWithSkippedMatchingScore: List[model.Entity] = response.results.skipMatchingScore
   }
 
-  protected implicit class ResultsOps(results: List[model.Entity]) {
+  protected[finder] implicit class ResultsOps(results: List[model.Entity]) {
     lazy val skipMatchingScore: List[model.Entity] = results.map {
       case proj:     model.Entity.Project  => proj.copy(matchingScore = model.MatchingScore.min)
       case ds:       model.Entity.Dataset  => ds.copy(matchingScore = model.MatchingScore.min)
@@ -60,7 +60,7 @@ trait FinderSpecOps {
     }
   }
 
-  protected implicit class EntityOps(entity: model.Entity) {
+  protected[finder] implicit class EntityOps(entity: model.Entity) {
     lazy val dateAsInstant: Instant = entity match {
       case proj:     model.Entity.Project  => proj.date.value
       case ds:       model.Entity.Dataset  => ds.date.instant
@@ -69,10 +69,10 @@ trait FinderSpecOps {
     }
   }
 
-  protected def allEntitiesFrom(project: RenkuProject): List[model.Entity] =
+  protected[finder] def allEntitiesFrom(project: RenkuProject): List[model.Entity] =
     List.empty[model.Entity].addAllEntitiesFrom(project)
 
-  protected implicit class EntitiesOps(entities: List[model.Entity]) {
+  protected[finder] implicit class EntitiesOps(entities: List[model.Entity]) {
 
     def addAllEntitiesFrom(project: RenkuProject): List[model.Entity] = {
       List(project.to[model.Entity.Project])

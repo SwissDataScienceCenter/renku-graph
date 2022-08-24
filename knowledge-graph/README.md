@@ -6,22 +6,23 @@ This is a microservice which provides API for the Graph DB.
 
 The following routes may be slightly different when accessed via the main Renku API, which uses the gateway service (e.g. /api/kg/datasets)
 
-| Method | Path                                                                     | Description                                                          |
-|--------|--------------------------------------------------------------------------|----------------------------------------------------------------------|
-| GET    | ```/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                   |
-| GET    | ```/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                   |
-| GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                   |
-| GET    | ```/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                      |
-| POST   | ```/knowledge-graph/graphql```                                           | GraphQL query endpoint                                               |
-| GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                         |
-| GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`       |
-| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                |
-| GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project |
-| GET    | ```/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources             |
-| GET    | ```/knowledge-graph/users/:id/projects```                                | Returns all user's projects                                          |
-| GET    | ```/metrics```                                                           | Serves Prometheus metrics                                            |
-| GET    | ```/ping```                                                              | To check if service is healthy                                       |
-| GET    | ```/version```                                                           | Returns info about service version                                   |
+| Method | Path                                                                     | Description                                                                          |
+|--------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| GET    | ```/knowledge-graph/datasets```                                          | Returns datasets filtered by the given predicates.                                   |
+| GET    | ```/knowledge-graph/datasets/:id```                                      | Returns details of the dataset with the given `id`                                   |
+| GET    | ```/knowledge-graph/entities```                                          | Returns entities filtered by the given predicates`                                   |
+| GET    | ```/knowledge-graph/graphql```                                           | Returns GraphQL endpoint schema                                                      |
+| POST   | ```/knowledge-graph/graphql```                                           | GraphQL query endpoint                                                               |
+| GET    | ```/knowledge-graph/ontology```                                          | Returns ontology used in the Knowledge Graph                                         |
+| GET    | ```/knowledge-graph/projects/:namespace/:name```                         | Returns details of the project with the given `namespace/name`                       |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets```                | Returns datasets of the project with the given `path`                                |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags```   | Returns tags of the dataset with the given `dsName` on project with the given `path` |
+| GET    | ```/knowledge-graph/projects/:namespace/:name/files/:location/lineage``` | Returns the lineage for a the path (location) of a file on a project                 |
+| GET    | ```/knowledge-graph/spec.json```                                         | Returns OpenAPI specification of the service's resources                             |
+| GET    | ```/knowledge-graph/users/:id/projects```                                | Returns all user's projects                                                          |
+| GET    | ```/metrics```                                                           | Serves Prometheus metrics                                                            |
+| GET    | ```/ping```                                                              | To check if service is healthy                                                       |
+| GET    | ```/version```                                                           | Returns info about service version                                                   |
 
 #### GET /knowledge-graph/datasets
 
@@ -781,6 +782,37 @@ Response body example:
          }
       ]
    }
+]
+```
+
+#### GET /knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags
+
+Finds list of tags existing on the Dataset with the given `dsName` on the project with the given `namespace/name`.
+
+**Response**
+
+| Status                     | Description                                                                                   |
+|----------------------------|-----------------------------------------------------------------------------------------------|
+| OK (200)                   | If tags are found or `[]` if nothing is found                                                 |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                  |
+| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access it |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                                                     |
+
+Response body example:
+
+```json
+[
+  {
+    "name":        "name",
+    "date":        "2012-11-15T10:00:00.000Z",
+    "description": "desc",
+    "_links": [
+      {
+        "rel": "dataset-details",
+        "href": "http://t:5511/knowledge-graph/datasets/1232444"
+      }
+    ]
+  }
 ]
 ```
 

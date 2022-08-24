@@ -548,6 +548,92 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "GET /knowledge-graph/projects/:namespace/../:name/datasets/:dsName/tags" should {
+    import projects.datasets.tags.Endpoint._
+
+    val projectPath = projectPaths.generateOne
+    val datasetName = datasetNames.generateOne
+    val projectDsTagsUri = projectPath.toNamespaces.foldLeft(uri"/knowledge-graph/projects")(
+      _ / _.show.value
+    ) / projectPath.toName.show / "datasets" / datasetName.show / "tags"
+
+    forAll {
+      Table(
+        "uri"            -> "criteria",
+        projectDsTagsUri -> Criteria(projectPath, datasetName),
+        pages
+          .map(page =>
+            projectDsTagsUri +? ("page" -> page.show) -> Criteria(projectPath,
+                                                                  datasetName,
+                                                                  PagingRequest.default.copy(page = page)
+            )
+          )
+          .generateOne,
+        perPages
+          .map(perPage =>
+            projectDsTagsUri +? ("per_page" -> perPage.show) -> Criteria(projectPath,
+                                                                         datasetName,
+                                                                         PagingRequest.default.copy(perPage = perPage)
+            )
+          )
+          .generateOne
+      )
+    } { (uri, criteria) =>
+      s"read the parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
+        val request = Request[IO](GET, uri)
+
+        (projectPathAuthorizer.authorize _)
+          .expects(projectPath, None)
+          .returning(rightT[IO, EndpointSecurityException](AuthContext.forUnknownUser(projectPath, Set(projectPath))))
+
+        val responseBody = jsons.generateOne
+        (projectDatasetTagsEndpoint
+          .`GET /projects/:path/datasets/:name/tags`(_: Criteria)(_: Request[IO]))
+          .expects(criteria, request)
+          .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+        val response = routes().call(request)
+
+        response.status      shouldBe Ok
+        response.contentType shouldBe Some(`Content-Type`(application.json))
+        response.body[Json]  shouldBe responseBody
+      }
+    }
+
+    s"return $BadRequest for invalid parameter values" in new TestCase {
+
+      val invalidPerPage = nonEmptyStrings().generateOne
+
+      val response = routes().call(Request[IO](GET, projectDsTagsUri +? ("per_page" -> invalidPerPage)))
+
+      response.status             shouldBe BadRequest
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe ErrorMessage(s"'$invalidPerPage' not a valid 'per_page' value")
+    }
+
+    "authenticate user from the request if given" in new TestCase {
+
+      val maybeAuthUser = authUsers.generateOption
+      val request       = Request[IO](GET, projectDsTagsUri)
+
+      (projectPathAuthorizer.authorize _)
+        .expects(projectPath, maybeAuthUser)
+        .returning(rightT[IO, EndpointSecurityException](AuthContext(maybeAuthUser, projectPath, Set(projectPath))))
+
+      val responseBody = jsons.generateOne
+      (projectDatasetTagsEndpoint
+        .`GET /projects/:path/datasets/:name/tags`(_: Criteria)(_: Request[IO]))
+        .expects(Criteria(projectPath, datasetName, maybeUser = maybeAuthUser), request)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      routes(maybeAuthUser).call(request).status shouldBe Ok
+    }
+
+    s"return $Unauthorized when user authentication fails" in new TestCase {
+      routes(givenAuthFailing()).call(Request[IO](GET, projectDsTagsUri)).status shouldBe Unauthorized
+    }
+  }
+
   "GET /knowledge-graph/projects/:projectId/files/:location/lineage" should {
     def lineageUri(projectPath: model.projects.Path, location: Location) =
       Uri.unsafeFromString(s"knowledge-graph/projects/${projectPath.show}/files/${urlEncode(location.show)}/lineage")
@@ -741,20 +827,21 @@ class MicroserviceRoutesSpec
 
   private trait TestCase {
 
-    val datasetsSearchEndpoint  = mock[DatasetsSearchEndpoint[IO]]
-    val datasetEndpoint         = mock[DatasetEndpoint[IO]]
-    val entitiesEndpoint        = mock[entities.Endpoint[IO]]
-    val queryEndpoint           = mock[QueryEndpoint[IO]]
-    val lineageEndpoint         = mock[projects.files.lineage.Endpoint[IO]]
-    val ontologyEndpoint        = mock[ontology.Endpoint[IO]]
-    val projectDetailsEndpoint  = mock[projects.details.Endpoint[IO]]
-    val projectDatasetsEndpoint = mock[ProjectDatasetsEndpoint[IO]]
-    val docsEndpoint            = mock[docs.Endpoint[IO]]
-    val usersProjectsEndpoint   = mock[users.projects.Endpoint[IO]]
-    val projectPathAuthorizer   = mock[Authorizer[IO, model.projects.Path]]
-    val datasetIdAuthorizer     = mock[Authorizer[IO, model.datasets.Identifier]]
-    val routesMetrics           = TestRoutesMetrics()
-    val versionRoutes           = mock[version.Routes[IO]]
+    val datasetsSearchEndpoint     = mock[DatasetsSearchEndpoint[IO]]
+    val datasetEndpoint            = mock[DatasetEndpoint[IO]]
+    val entitiesEndpoint           = mock[entities.Endpoint[IO]]
+    val queryEndpoint              = mock[QueryEndpoint[IO]]
+    val lineageEndpoint            = mock[projects.files.lineage.Endpoint[IO]]
+    val ontologyEndpoint           = mock[ontology.Endpoint[IO]]
+    val projectDetailsEndpoint     = mock[projects.details.Endpoint[IO]]
+    val projectDatasetsEndpoint    = mock[ProjectDatasetsEndpoint[IO]]
+    val projectDatasetTagsEndpoint = mock[projects.datasets.tags.Endpoint[IO]]
+    val docsEndpoint               = mock[docs.Endpoint[IO]]
+    val usersProjectsEndpoint      = mock[users.projects.Endpoint[IO]]
+    val projectPathAuthorizer      = mock[Authorizer[IO, model.projects.Path]]
+    val datasetIdAuthorizer        = mock[Authorizer[IO, model.datasets.Identifier]]
+    val routesMetrics              = TestRoutesMetrics()
+    val versionRoutes              = mock[version.Routes[IO]]
 
     def routes(maybeAuthUser: Option[AuthUser] = None): Resource[IO, Kleisli[IO, Request[IO], Response[IO]]] = routes(
       givenAuthIfNeededMiddleware(returning = OptionT.some[IO](maybeAuthUser))
@@ -770,6 +857,7 @@ class MicroserviceRoutesSpec
         ontologyEndpoint,
         projectDetailsEndpoint,
         projectDatasetsEndpoint,
+        projectDatasetTagsEndpoint,
         docsEndpoint,
         usersProjectsEndpoint,
         middleware,

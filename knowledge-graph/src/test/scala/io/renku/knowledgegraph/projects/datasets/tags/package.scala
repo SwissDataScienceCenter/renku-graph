@@ -16,24 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph.projects.datasets
 
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import io.renku.generators.Generators._
+import io.renku.graph.model.testentities._
+import org.scalacheck.Gen
 
-class DatasetIdSpec extends AnyWordSpec with should.Matchers {
+package object tags {
 
-  "unapply" should {
-
-    "convert valid dataset id as string to Identifier" in {
-      val id = datasetIdentifiers.generateOne
-      DatasetId.unapply(id.toString) shouldBe Some(id)
-    }
-
-    "return None if string value is blank" in {
-      DatasetId.unapply(" ") shouldBe None
-    }
-  }
+  private[tags] val modelTags: Gen[model.Tag] = for {
+    dataset      <- datasetEntities(provenanceNonModified).decoupledFromProject
+    eventFactory <- publicationEventFactories(timestampsNotInTheFuture.generateOne)
+    event = eventFactory(dataset)
+  } yield model.Tag(event.name, event.startDate, event.maybeDescription, dataset.identification.identifier)
 }

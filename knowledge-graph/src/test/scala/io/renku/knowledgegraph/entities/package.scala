@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph
 
-import entities.model._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{localDatesNotInTheFuture, nonBlankStrings}
@@ -29,24 +28,27 @@ import org.scalacheck.Gen.choose
 
 package object entities {
   import Endpoint.Criteria._
+  import entities.model._
 
   val queryParams: Gen[Filters.Query]      = nonBlankStrings(minLength = 5).map(v => Filters.Query(v.value))
   val typeParams:  Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
   val sinceParams: Gen[Filters.Since]      = localDatesNotInTheFuture.toGeneratorOf(Filters.Since)
   val untilParams: Gen[Filters.Until]      = localDatesNotInTheFuture.toGeneratorOf(Filters.Until)
 
-  val matchingScores: Gen[MatchingScore] = choose(MatchingScore.min.value, 10f).toGeneratorOf(MatchingScore)
+  private[entities] val matchingScores: Gen[MatchingScore] =
+    choose(MatchingScore.min.value, 10f).toGeneratorOf(MatchingScore)
 
-  val modelProjects: Gen[model.Entity.Project] = anyProjectEntities.map(_.to[model.Entity.Project])
-  val modelDatasets: Gen[model.Entity.Dataset] =
+  private[entities] val modelProjects: Gen[model.Entity.Project] = anyProjectEntities.map(_.to[model.Entity.Project])
+  private[entities] val modelDatasets: Gen[model.Entity.Dataset] =
     anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).map(_.to[model.Entity.Dataset])
-  val modelWorkflows: Gen[model.Entity.Workflow] =
+  private[entities] val modelWorkflows: Gen[model.Entity.Workflow] =
     anyRenkuProjectEntities.withActivities(activityEntities(planEntities())) map { project =>
       val plan :: Nil = project.plans.toList
       (plan -> project).to[model.Entity.Workflow]
     }
-  val modelPersons:  Gen[model.Entity.Person] = personEntities.map(_.to[model.Entity.Person])
-  val modelEntities: Gen[model.Entity]        = Gen.oneOf(modelProjects, modelDatasets, modelWorkflows, modelPersons)
+  private[entities] val modelPersons: Gen[model.Entity.Person] = personEntities.map(_.to[model.Entity.Person])
+  private[entities] val modelEntities: Gen[model.Entity] =
+    Gen.oneOf(modelProjects, modelDatasets, modelWorkflows, modelPersons)
 
   private[entities] implicit def projectConverter[P <: testentities.Project]: P => Entity.Project = project =>
     Entity.Project(
