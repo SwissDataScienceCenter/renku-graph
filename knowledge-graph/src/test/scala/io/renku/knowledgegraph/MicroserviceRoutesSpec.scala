@@ -560,7 +560,23 @@ class MicroserviceRoutesSpec
     forAll {
       Table(
         "uri"            -> "criteria",
-        projectDsTagsUri -> Criteria(projectPath, datasetName)
+        projectDsTagsUri -> Criteria(projectPath, datasetName),
+        pages
+          .map(page =>
+            projectDsTagsUri +? ("page" -> page.show) -> Criteria(projectPath,
+                                                                  datasetName,
+                                                                  PagingRequest.default.copy(page = page)
+            )
+          )
+          .generateOne,
+        perPages
+          .map(perPage =>
+            projectDsTagsUri +? ("per_page" -> perPage.show) -> Criteria(projectPath,
+                                                                         datasetName,
+                                                                         PagingRequest.default.copy(perPage = perPage)
+            )
+          )
+          .generateOne
       )
     } { (uri, criteria) =>
       s"read the parameters from $uri, pass them to the endpoint and return received response" in new TestCase {
@@ -584,16 +600,16 @@ class MicroserviceRoutesSpec
       }
     }
 
-//    s"return $BadRequest for invalid parameter values" in new TestCase {
-//      val response = routes()
-//        .call(
-//          Request[IO](GET, uri"/knowledge-graph/users" / userId.value / "projects" +? ("state" -> -1))
-//        )
-//
-//      response.status             shouldBe BadRequest
-//      response.contentType        shouldBe Some(`Content-Type`(application.json))
-//      response.body[ErrorMessage] shouldBe ErrorMessage("'state' parameter with invalid value")
-//    }
+    s"return $BadRequest for invalid parameter values" in new TestCase {
+
+      val invalidPerPage = nonEmptyStrings().generateOne
+
+      val response = routes().call(Request[IO](GET, projectDsTagsUri +? ("per_page" -> invalidPerPage)))
+
+      response.status             shouldBe BadRequest
+      response.contentType        shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe ErrorMessage(s"'$invalidPerPage' not a valid 'per_page' value")
+    }
 
     "authenticate user from the request if given" in new TestCase {
 

@@ -236,12 +236,18 @@ private class MicroserviceRoutes[F[_]: Async](
   )(implicit request: Request[F]): F[Response[F]] = path.segments.toList.map(_.toString) match {
     case projectPathParts :+ "datasets" :+ datasets.DatasetName(dsName) :+ "tags" =>
       import projects.datasets.tags.Endpoint._
-      projectPathParts.toProjectPath
-        .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-        .semiflatMap(path =>
-          `GET /projects/:path/datasets/:name/tags`(Criteria(path, dsName, maybeUser = maybeAuthUser))
+
+      PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
+        .map(paging =>
+          projectPathParts.toProjectPath
+            .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
+            .semiflatMap(path =>
+              `GET /projects/:path/datasets/:name/tags`(Criteria(path, dsName, paging, maybeAuthUser))
+            )
+            .merge
         )
-        .merge
+        .fold(toBadRequest, identity)
+
     case projectPathParts :+ "datasets" =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
