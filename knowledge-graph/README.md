@@ -39,12 +39,12 @@ datasets if no `query` parameter is given.
 
 **Response**
 
-| Status                     | Description                                                                                    |
-|----------------------------|------------------------------------------------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project or `[]` if nothing is found                              |
-| BAD_REQUEST (400)          | If the `query` parameter is blank or `sort` is invalid or `page` or `per_page` is not positive |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                   |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                                                      |
+| Status                       | Description                                                                                    |
+|------------------------------|------------------------------------------------------------------------------------------------|
+| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                              |
+| BAD_REQUEST (400)            | If the `query` parameter is blank or `sort` is invalid or `page` or `per_page` is not positive |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                   |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                      |
 
 Response headers:
 
@@ -180,12 +180,12 @@ When the `query` parameter is given, the match is done on the following fields:
 
 **Response**
 
-| Status                     | Description                                      |
-|----------------------------|--------------------------------------------------|
-| OK (200)                   | If results are found; `[]` if nothing is found   |
-| BAD_REQUEST (400)          | If illegal values for query parameters are given |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated     |
-| INTERNAL SERVER ERROR (500)| Otherwise                                        |
+| Status                       | Description                                      |
+|------------------------------|--------------------------------------------------|
+| OK (200)                     | If results are found; `[]` if nothing is found   |
+| BAD_REQUEST (400)            | If illegal values for query parameters are given |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated     |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                        |
 
 Response headers:
 
@@ -292,12 +292,12 @@ Finds details of the dataset with the given `id`.
 
 **Response**
 
-| Status                     | Description                                                                                       |
-|----------------------------|---------------------------------------------------------------------------------------------------|
-| OK (200)                   | If dataset details are found                                                                      |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                      |
-| NOT_FOUND (404)            | If dataset is not found or user is not authorised to access project where this dataset belongs to |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                                                         |
+| Status                       | Description                                                                                       |
+|------------------------------|---------------------------------------------------------------------------------------------------|
+| OK (200)                     | If dataset details are found                                                                      |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                      |
+| NOT_FOUND (404)              | If dataset is not found or user is not authorised to access project where this dataset belongs to |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                         |
 
 Response body example:
 
@@ -305,33 +305,37 @@ Response body example:
 {
   "_links" : [
     {
-      "rel" : "self",
+      "rel" :  "self",
       "href" : "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
     },
     {
-      "rel" : "initial-version",
+      "rel" :  "initial-version",
       "href" : "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "rel" :  "tags",
+      "href" : "https://zemdgsw:9540/knowledge-graph/projects/namespace1/project1-name/datasets/dataset-name/tags"
     }
   ],
   "identifier" : "22222222-2222-2222-2222-222222222222",
   "versions" : {
     "initial": "11111111-1111-1111-1111-111111111111"
   },
-  "title" : "dataset title",
-  "name" : "dataset alternate name",
-  "url" : "http://host/url1",                     // optional property
-  "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
+  "title" :       "dataset title",
+  "name" :        "dataset-name",
+  "url" :         "http://host/url1",                     // optional property
+  "sameAs" :      "http://host/url2",                  // optional property when no "derivedFrom" exists
   "derivedFrom" : "http://host/url1",             // optional property when no "sameAs" exists
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
   "published" : {
     "datePublished" : "2012-10-14",               // optional property
     "creator" : [
       {
-        "name" : "e wmtnxmcguz"
+        "name" :        "e wmtnxmcguz"
         "affiliation" : "SDSC"                    // optional property
       },
       {
-        "name" : "iilmadw vcxabmh",
+        "name" :  "iilmadw vcxabmh",
         "email" : "ticUnrW@cBmrdomoa"             // optional property
       }
     ]
@@ -348,7 +352,7 @@ Response body example:
   "project":  {
     "_links" : [
       {
-        "rel" : "project-details",
+        "rel" :  "project-details",
         "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
       }
     ],
@@ -359,7 +363,7 @@ Response body example:
     {
       "_links" : [
         {
-          "rel" : "project-details",
+          "rel" :  "project-details",
           "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
         }
       ],
@@ -369,7 +373,7 @@ Response body example:
     {
       "_links" : [
         {
-          "rel" : "project-details",
+          "rel" :  "project-details",
           "href" : "https://zemdgsw:9540/projects/namespace2/project2-name"
         }
       ],
@@ -407,10 +411,10 @@ Returns Knowledge Graph GraphQL endpoint schema.
 
 **Response**
 
-| Status                     | Description                    |
-|----------------------------|--------------------------------|
-| OK (200)                   | Schema of the GraphQL endpoint |
-| INTERNAL SERVER ERROR (500)| Otherwise                      |
+| Status                       | Description                    |
+|------------------------------|--------------------------------|
+| OK (200)                     | Schema of the GraphQL endpoint |
+| INTERNAL SERVER ERROR (500)  | Otherwise                      |
 
 **A curl command example**
 
@@ -424,11 +428,11 @@ Endpoint to perform GraphQL queries on the Knowledge Graph data.
 
 **Response**
 
-| Status                     | Description                                  |
-|----------------------------|----------------------------------------------|
-| OK (200)                   | Body containing queried data                 |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated |
-| INTERNAL SERVER ERROR (500)| Otherwise                                    |
+| Status                       | Description                                  |
+|------------------------------|----------------------------------------------|
+| OK (200)                     | Body containing queried data                 |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                    |
 
 **Available queries**
 
@@ -497,10 +501,10 @@ The resource supports `text/html` and `application/ld+json` `Accept` headers.
 
 **Response**
 
-| Status                     | Description                           |
-|----------------------------|---------------------------------------|
-| OK (200)                   | If generating ontology was successful |
-| INTERNAL SERVER ERROR (500)| Otherwise                             |
+| Status                       | Description                           |
+|------------------------------|---------------------------------------|
+| OK (200)                     | If generating ontology was successful |
+| INTERNAL SERVER ERROR (500)  | Otherwise                             |
 
 Response body example for `Accept: application/ld+json`:
 
@@ -563,12 +567,12 @@ The resource supports `application/json` and `application/ld+json` `Accept` head
 
 **Response**
 
-| Status                     | Description                                                                                            |
-|----------------------------|--------------------------------------------------------------------------------------------------------|
-| OK (200)                   | If project with the given `namespace/name` can be found                                                |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                           |
-| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access the project |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                                                              |
+| Status                       | Description                                                                                            |
+|------------------------------|--------------------------------------------------------------------------------------------------------|
+| OK (200)                     | If project with the given `namespace/name` can be found                                                |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                           |
+| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access the project |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                              |
 
 Response body example for `Accept: application/json`:
 
@@ -629,11 +633,11 @@ Response body example for `Accept: application/json`:
   "version": "9",  // optional
   "_links":[  
     {  
-      "rel":"self",
+      "rel": "self",
       "href":"http://t:5511/projects/namespace/project-name"
     },
     {  
-      "rel":"datasets",
+      "rel": "datasets",
       "href":"http://t:5511/projects/namespace/project-name/datasets"
     }
   ]
@@ -656,7 +660,7 @@ Response body example for `Accept: application/ld+json`:
     "@value" : "Zs oJtagvqvIn diw cywpaj ordCPacr vnnkjj cgtzizxkb clfPe xuhrqT vK"
   },
   "http://schema.org/dateModified" : {
-    "@type" : "http://www.w3.org/2001/XMLSchema#dateTime",
+    "@type" :  "http://www.w3.org/2001/XMLSchema#dateTime",
     "@value" : "1990-07-16T21:51:12.949Z"
   },
   "http://schema.org/identifier" : {
@@ -711,12 +715,12 @@ Finds list of datasets of the project with the given `namespace/name`.
 
 **Response**
 
-| Status                     | Description                                                       |
-|----------------------------|-------------------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project or `[]` if nothing is found |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                      |
-| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access this project |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                         |
+| Status                       | Description                                                                                             |
+|------------------------------|---------------------------------------------------------------------------------------------------------|
+| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                                       |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                            |
+| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access this project |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                               |
 
 Response body example:
 
@@ -727,20 +731,24 @@ Response body example:
       "versions" : {
         "initial": "11111111-1111-1111-1111-111111111111"
       },
-      "title": "rmDaYfpehl",
-      "name": "mniouUnmal",
-      "sameAs": "http://host/url1",
+      "title":        "rmDaYfpehl",
+      "name":         "mniouUnmal",
+      "sameAs":       "http://host/url1",
       "derivedFrom" : "http://host/url1",
       "images": [],
       "_links": [  
-         {  
-            "rel": "details",
-            "href": "http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
-         },
-         {
-           "rel" : "initial-version",
-           "href" : "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
-         }
+        {  
+           "rel":  "details",
+           "href": "http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
+        },
+        {
+          "rel" :  "initial-version",
+          "href" : "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
+        },
+        {
+          "rel" :  "tags",
+          "href" : "https://zemdgsw:9540/knowledge-graph/projects/namespace/name/datasets/mniouUnmal/tags"
+        }
       ]
    },
    {  
@@ -748,8 +756,8 @@ Response body example:
       "versions" : {
         "initial": "22222222-2222-2222-2222-222222222222"
       },
-      "name": "a",
-      "sameAs" : "http://host/url2",        // optional property when no "derivedFrom" exists
+      "name":         "a",
+      "sameAs" :      "http://host/url2",        // optional property when no "derivedFrom" exists
       "derivedFrom" : "http://host/url2",   // optional property when no "sameAs" exists
       "images": [
         {
@@ -772,14 +780,18 @@ Response body example:
         }
       ],
       "_links": [  
-         {  
-            "rel": "details",
-            "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
-         },
-         {
-           "rel" : "initial-version",
-           "href" : "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
-         }
+        {  
+           "rel":  "details",
+           "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+        },
+        {
+          "rel" :  "initial-version",
+          "href" : "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
+        },
+        {
+          "rel" :  "tags",
+          "href" : "https://zemdgsw:9540/knowledge-graph/projects/namespace/name/datasets/a/tags"
+        }
       ]
    }
 ]
@@ -791,12 +803,12 @@ Finds list of tags existing on the Dataset with the given `dsName` on the projec
 
 **Response**
 
-| Status                     | Description                                                                                   |
-|----------------------------|-----------------------------------------------------------------------------------------------|
-| OK (200)                   | If tags are found or `[]` if nothing is found                                                 |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                  |
-| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access it |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                                                     |
+| Status                       | Description                                                                                   |
+|------------------------------|-----------------------------------------------------------------------------------------------|
+| OK (200)                     | If tags are found or `[]` if nothing is found                                                 |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                  |
+| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access it |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                     |
 
 Response body example:
 
@@ -820,12 +832,12 @@ Response body example:
 
 Fetches lineage for a given project `namespace`/`name` and file `location` (URL-encoded relative path to the file). This endpoint is intended to replace the graphql endpoint.
 
-| Status                     | Description                                                                                             |
-|----------------------------|---------------------------------------------------------------------------------------------------------|
-| OK (200)                   | If there are datasets for the project or `[]` if nothing is found                                       |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                            |
-| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access this project |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                                                               |
+| Status                       | Description                                                                                             |
+|------------------------------|---------------------------------------------------------------------------------------------------------|
+| OK (200)                     | If there are datasets for the project or `[]` if nothing is found                                       |
+| UNAUTHORIZED (401)           | If given auth header cannot be authenticated                                                            |
+| NOT_FOUND (404)              | If there is no project with the given `namespace/name` or user is not authorised to access this project |
+| INTERNAL SERVER ERROR (500)  | Otherwise                                                                                               |
 
 
 Response body example:
@@ -871,10 +883,10 @@ Response body example:
 
 Returns OpenApi json spec 
 
-| Status                     | Description          |
-|----------------------------|----------------------|
-| OK (200)                   | If spec is found     |
-| INTERNAL SERVER ERROR (500)| Otherwise            |
+| Status                       | Description      |
+|------------------------------|------------------|
+| OK (200)                     | If spec is found |
+| INTERNAL SERVER ERROR (500)  | Otherwise        |
 
 #### GET /knowledge-graph/users/:id/projects
 
@@ -889,12 +901,12 @@ Returns all projects of the user with the given GitLab id.
 
 **Response**
 
-| Status                     | Description                                         |
-|----------------------------|-----------------------------------------------------|
-| OK (200)                   | If results are found; `[]` if no projects are found |
-| BAD_REQUEST (400)          | If illegal values for query parameters are given    |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated        |
-| INTERNAL SERVER ERROR (500)| Otherwise                                           |
+| Status                      | Description                                         |
+|-----------------------------|-----------------------------------------------------|
+| OK (200)                    | If results are found; `[]` if no projects are found |
+| BAD_REQUEST (400)           | If illegal values for query parameters are given    |
+| UNAUTHORIZED (401)          | If given auth header cannot be authenticated        |
+| INTERNAL SERVER ERROR (500) | Otherwise                                           |
 
 Response headers:
 
@@ -959,10 +971,10 @@ Serves Prometheus metrics.
 
 **Response**
 
-| Status                     | Description          |
-|----------------------------|----------------------|
-| OK (200)                   | If metrics are found |
-| INTERNAL SERVER ERROR (500)| Otherwise            |
+| Status                       | Description          |
+|------------------------------|----------------------|
+| OK (200)                     | If metrics are found |
+| INTERNAL SERVER ERROR (500)  | Otherwise            |
 
 #### GET /ping (Internal use only)
 
@@ -970,10 +982,10 @@ Verifies service health.
 
 **Response**
 
-| Status                     | Description             |
-|----------------------------|-------------------------|
-| OK (200)                   | If service is healthy   |
-| INTERNAL SERVER ERROR (500)| Otherwise               |
+| Status                       | Description           |
+|------------------------------|-----------------------|
+| OK (200)                     | If service is healthy |
+| INTERNAL SERVER ERROR (500)  | Otherwise             |
 
 #### GET /version  (Internal use only)
 
@@ -981,10 +993,10 @@ Returns info about service version
 
 **Response**
 
-| Status                     | Description            |
-|----------------------------|------------------------|
-| OK (200)                   | If version is returned |
-| INTERNAL SERVER ERROR (500)| Otherwise              |
+| Status                       | Description            |
+|------------------------------|------------------------|
+| OK (200)                     | If version is returned |
+| INTERNAL SERVER ERROR (500)  | Otherwise              |
 
 Response body example:
 

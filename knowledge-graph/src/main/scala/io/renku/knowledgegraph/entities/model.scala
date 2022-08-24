@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.entities
 
+import Endpoint.Criteria
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
@@ -26,9 +27,7 @@ import io.renku.config.renku
 import io.renku.graph.model._
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
-import io.renku.knowledgegraph.datasets.details.DatasetEndpoint
-import io.renku.knowledgegraph.entities.Endpoint.Criteria
-import io.renku.knowledgegraph.projects.details
+import io.renku.knowledgegraph
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
 import io.renku.tinytypes.json.TinyTypeEncoders._
@@ -82,7 +81,7 @@ private object model {
             .addIfDefined("description" -> project.maybeDescription)
             .deepMerge(
               _links(
-                Link(Rel("details") -> details.Endpoint.href(renkuApiUrl, project.path))
+                Link(Rel("details") -> knowledgegraph.projects.details.Endpoint.href(renkuApiUrl, project.path))
               )
             )
         }
@@ -155,7 +154,7 @@ private object model {
             .addIfDefined("description" -> ds.maybeDescription)
             .deepMerge(
               _links(
-                Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, ds.identifier))
+                Link(Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, ds.identifier))
               )
             )
         }

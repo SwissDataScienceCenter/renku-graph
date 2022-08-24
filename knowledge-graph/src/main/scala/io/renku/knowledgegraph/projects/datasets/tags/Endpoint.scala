@@ -25,7 +25,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.config.renku
 import io.renku.graph
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, datasets}
+import io.renku.http.rest.Links.Href
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.SparqlQueryTimeRecorder
@@ -52,6 +53,9 @@ object Endpoint {
     renkuUrl    <- RenkuUrlLoader()
     renkuApiUrl <- renku.ApiUrl()
   } yield new EndpointImpl(tagsFinder, renkuUrl, renkuApiUrl)
+
+  def href(renkuApiUrl: renku.ApiUrl, projectPath: graph.model.projects.Path, name: datasets.Name): Href =
+    Href(renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags")
 }
 
 private class EndpointImpl[F[_]: Async: Logger](tagsFinder: TagsFinder[F],

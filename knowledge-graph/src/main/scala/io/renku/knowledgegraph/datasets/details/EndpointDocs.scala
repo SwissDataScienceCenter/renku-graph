@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph
+package datasets
 package details
 
 import Dataset._
@@ -28,20 +29,19 @@ import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
-import io.renku.knowledgegraph.docs.EndpointDocs
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model._
 
 import java.time.Instant
 
-object DatasetEndpointDocs {
-  def apply[F[_]: MonadThrow]: F[EndpointDocs] = for {
+object EndpointDocs {
+  def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
     gitLabUrl <- GitLabUrlLoader[F]()
     apiUrl    <- renku.ApiUrl[F]()
-  } yield new DatasetEndpointDocsImpl()(gitLabUrl, apiUrl)
+  } yield new EndpointDocsImpl()(gitLabUrl, apiUrl)
 }
 
-private class DatasetEndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends EndpointDocs {
+private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
     "Dataset details",

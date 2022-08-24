@@ -80,11 +80,11 @@ private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion,
 object Endpoint {
   def apply[F[_]: Async]: F[Endpoint[F]] = for {
     datasetsEndpoint           <- datasets.DatasetSearchEndpointDocs[F]
-    datasetDetailsEndpoint     <- datasets.details.DatasetEndpointDocs[F]
+    datasetDetailsEndpoint     <- datasets.details.EndpointDocs[F]
     entitiesEndpoint           <- entities.EndpointDocs[F]
     ontologyEndpoint           <- ontology.EndpointDocs[F]
     projectDetailsEndpoint     <- projects.details.EndpointDocs[F]
-    projectDatasetsEndpoint    <- projects.datasets.ProjectDatasetsEndpointDocs[F]
+    projectDatasetsEndpoint    <- projects.datasets.EndpointDocs[F]
     projectDatasetTagsEndpoint <- projects.datasets.tags.EndpointDocs[F]
     userProjectsEndpoint       <- users.projects.EndpointDocs[F]
     docsEndpointEndpoint       <- EndpointDocs[F]

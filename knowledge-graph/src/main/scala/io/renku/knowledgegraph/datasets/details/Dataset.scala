@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph
+package datasets
 package details
 
 import Dataset._
@@ -25,11 +26,10 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.config.renku
+import io.renku.graph.model
+import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, OriginalIdentifier, PartLocation, ResourceId, SameAs, Title}
-import io.renku.graph.model.projects.Path
-import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
-import io.renku.knowledgegraph.projects.details.Endpoint
 import io.renku.tinytypes.json.TinyTypeEncoders._
 
 sealed trait Dataset extends Product with Serializable {
@@ -85,7 +85,7 @@ object Dataset {
   final case class DatasetPart(location: PartLocation)
   final case class DatasetVersions(initial: OriginalIdentifier)
 
-  final case class DatasetProject(path: Path, name: projects.Name)
+  final case class DatasetProject(path: model.projects.Path, name: model.projects.Name)
 
   // format: off
   implicit def encoder(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): Encoder[Dataset] = Encoder.instance[Dataset] { dataset =>
@@ -113,8 +113,9 @@ object Dataset {
         ("images" -> (dataset.images, dataset.project).asJson).some
       ).flatten: _*
     ) deepMerge _links(
-      Rel.Self -> DatasetEndpoint.href(renkuApiUrl, dataset.id),
-      Rel("initial-version") -> DatasetEndpoint.href(renkuApiUrl, dataset.versions.initial.value)
+      Rel.Self -> Endpoint.href(renkuApiUrl, dataset.id),
+      Rel("initial-version") -> Endpoint.href(renkuApiUrl, dataset.versions.initial.value),
+      Rel("tags") -> projects.datasets.tags.Endpoint.href(renkuApiUrl, dataset.project.path, dataset.name),
     )
   }
   // format: on
@@ -150,7 +151,7 @@ object Dataset {
       json"""{
         "path": ${project.path},
         "name": ${project.name}
-      }""" deepMerge _links(Link(Rel("project-details") -> Endpoint.href(renkuApiUrl, project.path)))
+      }""" deepMerge _links(Link(Rel("project-details") -> projects.details.Endpoint.href(renkuApiUrl, project.path)))
     }
 
   private implicit lazy val versionsEncoder: Encoder[DatasetVersions] = Encoder.instance[DatasetVersions] { versions =>
