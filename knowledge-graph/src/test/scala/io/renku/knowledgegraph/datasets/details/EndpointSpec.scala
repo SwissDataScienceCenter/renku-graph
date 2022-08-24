@@ -57,12 +57,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EndpointSpec
-    extends AnyWordSpec
-    with MockFactory
-    with ScalaCheckPropertyChecks
-    with should.Matchers
-    with IOSpec {
+class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers with IOSpec {
 
   "getDataset" should {
 
@@ -93,7 +88,8 @@ class EndpointSpec
         response.as[Json].unsafeRunSync()._links shouldBe Links
           .of(
             Self                   -> Href(renkuApiUrl / "datasets" / dataset.id),
-            Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.versions.initial)
+            Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.versions.initial),
+            Rel("tags") -> Href(renkuApiUrl / "projects" / dataset.project.path / "datasets" / dataset.name / "tags")
           )
           .asRight
 
@@ -185,7 +181,7 @@ class EndpointSpec
     val datasetsFinder        = mock[DatasetFinder[IO]]
     val renkuApiUrl           = renkuApiUrls.generateOne
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint = new EndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
+    val endpoint              = new EndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
   }
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]

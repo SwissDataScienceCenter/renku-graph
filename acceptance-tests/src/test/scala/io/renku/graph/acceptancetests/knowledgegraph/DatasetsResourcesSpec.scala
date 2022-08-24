@@ -35,7 +35,7 @@ import io.renku.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.testentities.{::~, Dataset, Person}
-import io.renku.graph.model.{projects, testentities}
+import io.renku.graph.model.{projects, publicationEvents, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.{Href, Rel, _links}
@@ -143,6 +143,28 @@ class DatasetsResourcesSpec
       Then("he should get OK response with project details")
       getInitialVersionResponse._1                 shouldBe Ok
       findIdentifier(getInitialVersionResponse._2) shouldBe dataset2.identifier
+
+      When("user fetches dataset's tags using the 'tags' link")
+      val dsTagsLink = foundDatasetDetails.hcursor._links
+        .get(Rel("tags"))
+        .getOrFail("No link with rel 'tags'")
+
+      val (getTagsResponseStatus, getTagsJsons) = restClient
+        .GET(dsTagsLink.toString, user.accessToken)
+        .flatMap(response => response.as[List[Json]].map(json => response.status -> json))
+        .unsafeRunSync()
+
+      Then("he should get OK response with the dataset's tags")
+      getTagsResponseStatus shouldBe Ok
+      getTagsJsons
+        .map(_.hcursor.downField("name").as[publicationEvents.Name])
+        .sequence
+        .fold(fail(_), identity) shouldBe {
+        val events =
+          if (expectedDataset == dataset1) dataset1.publicationEvents
+          else List(dataset2, dataset2Modified).flatMap(_.publicationEvents)
+        events.sortBy(_.startDate).reverse.map(_.name)
+      }
     }
 
     Scenario("As a user I should not to be able to see project's datasets if I don't have rights to the project") {
@@ -466,8 +488,8 @@ trait DatasetsResources {
       "versions": {
         "initial": ${dataset.provenance.originalIdentifier.value}
       },
-      "title": ${dataset.identification.title.value},
-      "name": ${dataset.identification.name.value},
+      "title":  ${dataset.identification.title.value},
+      "name":   ${dataset.identification.name.value},
       "images": ${dataset.additionalInfo.images -> projectPath}
     }"""
       .deepMerge(
@@ -500,14 +522,14 @@ trait DatasetsResources {
     dataset.identification.identifier shouldBe actualIdentifier
 
     json"""{
-      "identifier": ${actualIdentifier.value},
-      "title": ${dataset.identification.title.value},
-      "name": ${dataset.identification.name.value},
-      "published": ${dataset.provenance.creators -> dataset.provenance.date},
-      "date": ${dataset.provenance.date.instant},
+      "identifier":    ${actualIdentifier.value},
+      "title":         ${dataset.identification.title.value},
+      "name":          ${dataset.identification.name.value},
+      "published":     ${dataset.provenance.creators -> dataset.provenance.date},
+      "date":          ${dataset.provenance.date.instant},
       "projectsCount": $projectsCount,
-      "keywords": ${dataset.additionalInfo.keywords.sorted.map(_.value)},
-      "images": ${dataset.additionalInfo.images -> projectPath}
+      "keywords":      ${dataset.additionalInfo.keywords.sorted.map(_.value)},
+      "images":        ${dataset.additionalInfo.images -> projectPath}
     }"""
       .addIfDefined("description" -> dataset.additionalInfo.maybeDescription)
       .deepMerge {

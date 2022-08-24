@@ -114,7 +114,8 @@ object Dataset {
       ).flatten: _*
     ) deepMerge _links(
       Rel.Self -> Endpoint.href(renkuApiUrl, dataset.id),
-      Rel("initial-version") -> Endpoint.href(renkuApiUrl, dataset.versions.initial.value)
+      Rel("initial-version") -> Endpoint.href(renkuApiUrl, dataset.versions.initial.value),
+      Rel("tags") -> projects.datasets.tags.Endpoint.href(renkuApiUrl, dataset.project.path, dataset.name),
     )
   }
   // format: on
