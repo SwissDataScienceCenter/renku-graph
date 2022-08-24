@@ -20,12 +20,14 @@ package io.renku.knowledgegraph
 package projects.datasets.tags
 
 import Endpoint._
+import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Encoder
 import io.renku.config.renku
 import io.renku.graph
 import io.renku.graph.model.RenkuUrl
+import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -40,12 +42,13 @@ object Endpoint {
 
   final case class Criteria(projectPath: graph.model.projects.Path,
                             datasetName: graph.model.datasets.Name,
+                            paging:      PagingRequest = PagingRequest.default,
                             maybeUser:   Option[AuthUser] = None
   )
 
   import io.renku.graph.config.RenkuUrlLoader
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     tagsFinder  <- TagsFinder[F]
     renkuUrl    <- RenkuUrlLoader()
     renkuApiUrl <- renku.ApiUrl()

@@ -238,7 +238,9 @@ private class MicroserviceRoutes[F[_]: Async](
       import projects.datasets.tags.Endpoint._
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
-        .semiflatMap(path => `GET /projects/:path/datasets/:name/tags`(Criteria(path, dsName, maybeAuthUser)))
+        .semiflatMap(path =>
+          `GET /projects/:path/datasets/:name/tags`(Criteria(path, dsName, maybeUser = maybeAuthUser))
+        )
         .merge
     case projectPathParts :+ "datasets" =>
       projectPathParts.toProjectPath

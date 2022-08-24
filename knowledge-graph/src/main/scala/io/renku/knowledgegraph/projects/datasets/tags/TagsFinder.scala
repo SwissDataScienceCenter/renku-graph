@@ -19,10 +19,11 @@
 package io.renku.knowledgegraph.projects.datasets.tags
 
 import Endpoint.Criteria
+import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.http.rest.paging.PagingResponse
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.http.rest.paging.{Paging, PagingResponse}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 private trait TagsFinder[F[_]] {
@@ -30,11 +31,54 @@ private trait TagsFinder[F[_]] {
 }
 
 private object TagsFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TagsFinder[F]] =
-    new TagsFinderImpl[F].pure[F].widen
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[TagsFinder[F]] =
+    RenkuConnectionConfig[F]().map(new TagsFinderImpl(_))
 }
 
-private class TagsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder] extends TagsFinder[F] {
+private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
+    renkuConnectionConfig: RenkuConnectionConfig
+) extends TSClientImpl[F](renkuConnectionConfig)
+    with TagsFinder[F]
+    with Paging[model.Tag] {
 
-  override def findTags(criteria: Criteria): F[PagingResponse[model.Tag]] = ???
+  import eu.timepit.refined.auto._
+  import io.circe.Decoder
+  import io.renku.graph.model.Schemas._
+  import io.renku.graph.model.{datasets, publicationEvents}
+  import io.renku.http.rest.paging.Paging.PagedResultsFinder
+  import io.renku.triplesstore.SparqlQuery
+  import io.renku.triplesstore.SparqlQuery.Prefixes
+
+  override def findTags(criteria: Criteria): F[PagingResponse[model.Tag]] = {
+    implicit val resultsFinder: PagedResultsFinder[F, model.Tag] = pagedResultsFinder(query(criteria))
+    findPage[F](criteria.paging)
+  }
+
+  private def query(criteria: Criteria) = SparqlQuery.of(
+    name = "project ds tags search",
+    Prefixes of (renku -> "renku", schema -> "schema"),
+    s"""|SELECT DISTINCT ?name ?startDate ?maybeDesc ?dsIdentifier
+        |WHERE {
+        |  ?projId a schema:Project;
+        |          renku:hasDataset ?dsId.
+        |  ?dsId renku:slug '${criteria.datasetName}';
+        |        schema:identifier ?dsIdentifier.
+        |  ?eventId schema:about/schema:url ?dsId;
+        |           schema:name ?name;
+        |           schema:startDate ?startDate.
+        |  OPTIONAL { ?eventId schema:description ?maybeDesc }
+        |}
+        |ORDER BY DESC(?startDate)
+        |""".stripMargin
+  )
+
+  private implicit lazy val tagDecoder: Decoder[model.Tag] = { implicit cursor =>
+    import io.renku.tinytypes.json.TinyTypeDecoders._
+    for {
+      name         <- extract[publicationEvents.Name]("name")
+      startDate    <- extract[publicationEvents.StartDate]("startDate")
+      maybeDesc    <- extract[Option[publicationEvents.Description]]("maybeDesc")
+      dsIdentifier <- extract[datasets.Identifier]("dsIdentifier")
+    } yield model.Tag(name, startDate, maybeDesc, dsIdentifier)
+  }
 }

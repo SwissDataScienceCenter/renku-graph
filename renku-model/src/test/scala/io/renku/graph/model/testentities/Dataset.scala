@@ -67,6 +67,8 @@ object Dataset {
       override lazy val topmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
     }
 
+    sealed trait NonImported extends Provenance with Product with Serializable
+
     sealed trait ImportedInternal extends NonModified with Product with Serializable {
       val sameAs: InternalSameAs
     }
@@ -75,7 +77,8 @@ object Dataset {
                               originalIdentifier: OriginalIdentifier,
                               date:               DateCreated,
                               creators:           NonEmptyList[Person]
-    ) extends NonModified {
+    ) extends NonModified
+        with NonImported {
       override type D = DateCreated
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
     }
@@ -116,7 +119,8 @@ object Dataset {
                               date:                  DateCreated,
                               creators:              NonEmptyList[Person],
                               maybeInvalidationTime: Option[InvalidationTime]
-    ) extends Provenance {
+    ) extends Provenance
+        with NonImported {
       override type D = DateCreated
       override lazy val topmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
     }

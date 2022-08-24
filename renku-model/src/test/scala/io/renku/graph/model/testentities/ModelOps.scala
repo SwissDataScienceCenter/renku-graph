@@ -269,7 +269,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
     def createModification(
         modifier: Dataset[Dataset.Provenance.Modified] => Dataset[Dataset.Provenance.Modified] = identity
     ): DatasetGenFactory[Provenance.Modified] =
-      (projectDate => modifiedDatasetEntities(dataset, projectDate)).modify(modifier)
+      ((projectDate: projects.DateCreated) => modifiedDatasetEntities(dataset, projectDate)).modify(modifier)
 
     def makeNameContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
@@ -299,6 +299,10 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def makeDescContaining(phrase: String): Dataset[P] =
       replaceDSDesc(to = sentenceContaining(Refined.unsafeApply(phrase)).map(Description.apply).generateSome)(dataset)
+
+    def replacePublicationEvents(eventFactories: List[Dataset[Provenance] => PublicationEvent])(implicit
+        ev:                                      P <:< Provenance.NonImported
+    ): Dataset[P] = dataset.copy(publicationEventFactories = eventFactories)
   }
 
   type ProvenanceImportFactory[OldProvenance <: Dataset.Provenance, NewProvenance <: Dataset.Provenance] =

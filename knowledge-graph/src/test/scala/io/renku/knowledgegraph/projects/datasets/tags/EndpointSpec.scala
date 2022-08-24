@@ -31,7 +31,7 @@ import io.renku.graph.model.GraphModelGenerators.{datasetNames, projectPaths, re
 import io.renku.graph.model.publicationEvents
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
-import io.renku.http.rest.paging.{PagingHeaders, PagingResponse}
+import io.renku.http.rest.paging.{PagingHeaders, PagingRequest, PagingResponse}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
@@ -114,7 +114,7 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with MockFactory wit
     projectPath <- projectPaths
     datasetName <- datasetNames
     maybeUser   <- authUsers.toGeneratorOfOptions
-  } yield Criteria(projectPath, datasetName, maybeUser)
+  } yield Criteria(projectPath, datasetName, PagingRequest.default, maybeUser)
 
   private def tagsDecoder(possibleTags: List[model.Tag]): Decoder[model.Tag] = Decoder.instance { cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
