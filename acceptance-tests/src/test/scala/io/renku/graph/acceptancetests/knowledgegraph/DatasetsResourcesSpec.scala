@@ -86,10 +86,9 @@ class DatasetsResourcesSpec
       )
 
       When("user then fetches details of the chosen dataset with the link from the response")
-      val someDatasetDetailsLink = Random
-        .shuffle(foundDatasets)
-        .headOption
-        .flatMap(_._links.get(Rel("details")))
+      val someDatasetJson = Random.shuffle(foundDatasets).head
+      val someDatasetDetailsLink = someDatasetJson._links
+        .get(Rel("details"))
         .getOrFail(message = "No link with rel 'details'")
       val datasetDetailsResponse = (restClient GET someDatasetDetailsLink.toString)
         .flatMap(response => response.as[Json].map(json => response.status -> json))
@@ -147,7 +146,7 @@ class DatasetsResourcesSpec
       When("user fetches dataset's tags using the 'tags' link")
       val dsTagsLink = foundDatasetDetails.hcursor._links
         .get(Rel("tags"))
-        .getOrFail("No link with rel 'tags'")
+        .getOrFail("No link with rel 'tags' in the Dataset Details response")
 
       val (getTagsResponseStatus, getTagsJsons) = restClient
         .GET(dsTagsLink.toString, user.accessToken)
@@ -165,6 +164,11 @@ class DatasetsResourcesSpec
           else List(dataset2, dataset2Modified).flatMap(_.publicationEvents)
         events.sortBy(_.startDate).reverse.map(_.name)
       }
+
+      And("the 'tags' links on Project's Datasets and Dataset's Details resources are the same")
+      dsTagsLink shouldBe someDatasetJson._links
+        .get(Rel("tags"))
+        .getOrFail("No link with rel 'tags' in the Project Datasets response")
     }
 
     Scenario("As a user I should not to be able to see project's datasets if I don't have rights to the project") {
@@ -495,7 +499,10 @@ trait DatasetsResources {
       .deepMerge(
         _links(
           Rel("details")         -> Href(renkuApiUrl / "datasets" / dataset.identification.identifier),
-          Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.provenance.originalIdentifier)
+          Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.provenance.originalIdentifier),
+          Rel("tags") -> Href(
+            renkuApiUrl / "projects" / projectPath / "datasets" / dataset.identification.name / "tags"
+          )
         )
       )
       .deepMerge(provenanceEncoder(dataset.provenance))

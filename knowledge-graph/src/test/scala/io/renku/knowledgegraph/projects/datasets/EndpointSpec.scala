@@ -144,6 +144,9 @@ class EndpointSpec
           }, {
             "rel":  "initial-version",
             "href": ${renkuApiUrl / "datasets" / originalId}
+          }, {
+            "rel":  "tags",
+            "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags"}
           }]
         }"""
       case (id, originalId, title, name, Right(derivedFrom), images) =>
@@ -162,6 +165,9 @@ class EndpointSpec
           }, {
             "rel":  "initial-version",
             "href": ${renkuApiUrl / "datasets" / originalId}
+          }, {
+            "rel":  "tags",
+            "href": ${renkuApiUrl / "projects" / projectPath / "datasets" / name / "tags"}
           }]
         }"""
     }
