@@ -38,18 +38,18 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait ProjectDatasetsEndpoint[F[_]] {
+trait Endpoint[F[_]] {
   def getProjectDatasets(projectPath: projects.Path): F[Response[F]]
 }
 
-class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
+class EndpointImpl[F[_]: MonadCancelThrow: Logger](
     projectDatasetsFinder: ProjectDatasetsFinder[F],
     renkuApiUrl:           renku.ApiUrl,
     gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
     with TinyTypeEncoders
-    with ProjectDatasetsEndpoint[F] {
+    with Endpoint[F] {
 
   import executionTimeRecorder._
   import org.http4s.circe._
@@ -79,15 +79,15 @@ class ProjectDatasetsEndpointImpl[F[_]: MonadCancelThrow: Logger](
   }
 }
 
-object ProjectDatasetsEndpoint {
+object Endpoint {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ProjectDatasetsEndpoint[F]] = for {
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     renkuConnectionConfig <- RenkuConnectionConfig[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     renkuResourceUrl      <- renku.ApiUrl[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
     projectDatasetFinder  <- ProjectDatasetsFinder(renkuConnectionConfig)
-  } yield new ProjectDatasetsEndpointImpl[F](
+  } yield new EndpointImpl[F](
     projectDatasetFinder,
     renkuResourceUrl,
     gitLabUrl,

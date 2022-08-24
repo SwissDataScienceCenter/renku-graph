@@ -84,7 +84,7 @@ object Endpoint {
     entitiesEndpoint           <- entities.EndpointDocs[F]
     ontologyEndpoint           <- ontology.EndpointDocs[F]
     projectDetailsEndpoint     <- projects.details.EndpointDocs[F]
-    projectDatasetsEndpoint    <- projects.datasets.ProjectDatasetsEndpointDocs[F]
+    projectDatasetsEndpoint    <- projects.datasets.EndpointDocs[F]
     projectDatasetTagsEndpoint <- projects.datasets.tags.EndpointDocs[F]
     userProjectsEndpoint       <- users.projects.EndpointDocs[F]
     docsEndpointEndpoint       <- EndpointDocs[F]

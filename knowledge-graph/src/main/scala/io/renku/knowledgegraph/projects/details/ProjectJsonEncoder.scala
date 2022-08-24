@@ -26,7 +26,7 @@ import io.circe.{Encoder, Json}
 import io.renku.config.renku
 import io.renku.http.rest.Links.{Link, Rel, _links}
 import io.renku.json.JsonOps._
-import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsEndpoint
+import io.renku.knowledgegraph
 import io.renku.tinytypes.json.TinyTypeEncoders._
 import model.Permissions._
 import model._
@@ -59,7 +59,7 @@ private class ProjectJsonEncoderImpl(renkuApiUrl: renku.ApiUrl) extends ProjectJ
       "statistics": ${project.statistics}
     }""" deepMerge _links(
       Link(Rel.Self        -> Endpoint.href(renkuApiUrl, project.path)),
-      Link(Rel("datasets") -> ProjectDatasetsEndpoint.href(renkuApiUrl, project.path))
+      Link(Rel("datasets") -> knowledgegraph.projects.datasets.Endpoint.href(renkuApiUrl, project.path))
     ).addIfDefined("description" -> project.maybeDescription)
       .addIfDefined("version" -> project.maybeVersion)
   }

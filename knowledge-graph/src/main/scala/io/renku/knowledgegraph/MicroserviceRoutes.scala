@@ -41,7 +41,6 @@ import io.renku.http.server.version
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
 import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
-import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.http4s.dsl.Http4sDsl
@@ -59,7 +58,7 @@ private class MicroserviceRoutes[F[_]: Async](
     lineageEndpoint:            projects.files.lineage.Endpoint[F],
     ontologyEndpoint:           ontology.Endpoint[F],
     projectDetailsEndpoint:     projects.details.Endpoint[F],
-    projectDatasetsEndpoint:    ProjectDatasetsEndpoint[F],
+    projectDatasetsEndpoint:    projects.datasets.Endpoint[F],
     projectDatasetTagsEndpoint: projects.datasets.tags.Endpoint[F],
     docsEndpoint:               docs.Endpoint[F],
     usersProjectsEndpoint:      users.projects.Endpoint[F],
@@ -304,7 +303,7 @@ private object MicroserviceRoutes {
         lineageEndpoint            <- projects.files.lineage.Endpoint[IO]
         ontologyEndpoint           <- ontology.Endpoint[IO]
         projectDetailsEndpoint     <- projects.details.Endpoint[IO]
-        projectDatasetsEndpoint    <- ProjectDatasetsEndpoint[IO]
+        projectDatasetsEndpoint    <- projects.datasets.Endpoint[IO]
         projectDatasetTagsEndpoint <- projects.datasets.tags.Endpoint[IO]
         docsEndpoint               <- docs.Endpoint[IO]
         usersProjectsEndpoint      <- users.projects.Endpoint[IO]

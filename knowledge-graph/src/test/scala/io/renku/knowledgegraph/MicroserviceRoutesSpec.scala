@@ -50,7 +50,6 @@ import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
 import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
 import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
-import io.renku.knowledgegraph.projects.datasets.ProjectDatasetsEndpoint
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
 import org.http4s.Method.GET
@@ -833,7 +832,7 @@ class MicroserviceRoutesSpec
     val lineageEndpoint            = mock[projects.files.lineage.Endpoint[IO]]
     val ontologyEndpoint           = mock[ontology.Endpoint[IO]]
     val projectDetailsEndpoint     = mock[projects.details.Endpoint[IO]]
-    val projectDatasetsEndpoint    = mock[ProjectDatasetsEndpoint[IO]]
+    val projectDatasetsEndpoint    = mock[projects.datasets.Endpoint[IO]]
     val projectDatasetTagsEndpoint = mock[projects.datasets.tags.Endpoint[IO]]
     val docsEndpoint               = mock[docs.Endpoint[IO]]
     val usersProjectsEndpoint      = mock[users.projects.Endpoint[IO]]

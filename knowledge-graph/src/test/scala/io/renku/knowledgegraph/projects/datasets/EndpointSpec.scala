@@ -46,7 +46,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectDatasetsEndpointSpec
+class EndpointSpec
     extends AnyWordSpec
     with MockFactory
     with ScalaCheckPropertyChecks
@@ -125,8 +125,7 @@ class ProjectDatasetsEndpointSpec
     val gitLabUrl             = gitLabUrls.generateOne
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint =
-      new ProjectDatasetsEndpointImpl[IO](projectDatasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
+    val endpoint = new EndpointImpl[IO](projectDatasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
 
     lazy val toJson: ((Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])) => Json = {
       case (id, originalId, title, name, Left(sameAs), images) =>
@@ -140,10 +139,10 @@ class ProjectDatasetsEndpointSpec
           "sameAs": $sameAs,
           "images": $images,
           "_links": [{
-            "rel": "details",
+            "rel":  "details",
             "href": ${renkuApiUrl / "datasets" / id}
           }, {
-            "rel": "initial-version",
+            "rel":  "initial-version",
             "href": ${renkuApiUrl / "datasets" / originalId}
           }]
         }"""
@@ -158,10 +157,10 @@ class ProjectDatasetsEndpointSpec
           "derivedFrom": $derivedFrom,
           "images": $images,
           "_links": [{
-            "rel": "details",
+            "rel":  "details",
             "href": ${renkuApiUrl / "datasets" / id}
           }, {
-            "rel": "initial-version",
+            "rel":  "initial-version",
             "href": ${renkuApiUrl / "datasets" / originalId}
           }]
         }"""
@@ -172,14 +171,14 @@ class ProjectDatasetsEndpointSpec
         case uri: ImageUri.Relative => json"""{
             "location": $uri,
             "_links": [{
-              "rel": "view",
+              "rel":  "view",
               "href": ${s"$gitLabUrl/$projectPath/raw/master/$uri"}
             }]
           }"""
         case uri: ImageUri.Absolute => json"""{
             "location": $uri,
             "_links": [{
-              "rel": "view",
+              "rel":  "view",
               "href": $uri
             }]
           }"""
