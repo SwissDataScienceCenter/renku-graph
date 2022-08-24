@@ -34,26 +34,25 @@ private object model {
 
     import io.circe.Encoder
 
-    implicit def modelEncoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[model.Tag] = Encoder.instance {
-      tag =>
-        import io.circe.literal._
-        import io.renku.http.rest.Links._
-        import io.renku.json.JsonOps._
-        import io.renku.tinytypes.json.TinyTypeEncoders._
+    implicit def modelEncoder(implicit renkuApiUrl: renku.ApiUrl): Encoder[model.Tag] = Encoder.instance { tag =>
+      import io.circe.literal._
+      import io.renku.http.rest.Links._
+      import io.renku.json.JsonOps._
+      import io.renku.tinytypes.json.TinyTypeEncoders._
 
-        json"""{
+      json"""{
         "name": ${tag.name},
         "date": ${tag.startDate}
       }"""
-          .addIfDefined("description" -> tag.maybeDesc)
-          .deepMerge(
-            _links(
-              Link(
-                Rel("dataset-details") ->
-                  knowledgegraph.datasets.details.DatasetEndpoint.href(renkuApiUrl, tag.datasetId)
-              )
+        .addIfDefined("description" -> tag.maybeDesc)
+        .deepMerge(
+          _links(
+            Link(
+              Rel("dataset-details") ->
+                knowledgegraph.datasets.details.DatasetEndpoint.href(renkuApiUrl, tag.datasetId)
             )
           )
+        )
     }
   }
 }
