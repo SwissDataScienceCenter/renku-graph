@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph.datasets
 package details
 
-import Dataset.{DatasetProject, DatasetVersions, ModifiedDataset, NonModifiedDataset}
+import Dataset.{DatasetProject, DatasetVersions, ModifiedDataset, NonModifiedDataset, Tag}
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
@@ -35,7 +35,7 @@ import io.renku.graph.model.datasets._
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities.{Dataset => _, _}
-import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.graph.model.{RenkuUrl, projects, publicationEvents}
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links
 import io.renku.http.rest.Links.Rel.Self
@@ -202,6 +202,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
       versions         <- cursor.downField("versions").as[DatasetVersions]
+      maybeInitialTag  <- cursor.downField("tags").downField("initial").as[Option[Tag]]
       images           <- cursor.downField("images").as[List[ImageUri]](decodeList(imageUriDecoder))
       date <-
         maybeDateCreated
@@ -217,6 +218,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                            name,
                            sameAs,
                            versions,
+                           maybeInitialTag,
                            maybeDescription,
                            published._1.toList,
                            date,
@@ -233,6 +235,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                         name,
                         derivedFrom,
                         versions,
+                        maybeInitialTag,
                         maybeDescription,
                         published._1.toList,
                         dateCreated,
@@ -280,6 +283,12 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     for {
       initial <- cursor.downField("initial").as[OriginalIdentifier]
     } yield DatasetVersions(initial)
+
+  private implicit lazy val tagDecoder: Decoder[Tag] = cursor =>
+    for {
+      name      <- cursor.downField("name").as[publicationEvents.Name]
+      maybeDesc <- cursor.downField("description").as[Option[publicationEvents.Description]]
+    } yield Tag(name, maybeDesc)
 
   private lazy val imageUriDecoder: Decoder[ImageUri] = _.downField("location").as[ImageUri]
 }

@@ -201,6 +201,11 @@ trait RenkuProjectEntitiesGenerators {
     )(implicit newProvenance: ProvenanceImportFactory[PIN, POUT]): Gen[(Dataset[POUT], RenkuProject)] =
       projectGen.map(_.importDataset(dataset))
 
+    def importDataset(
+        publicationEvent: PublicationEvent
+    ): Gen[(Dataset[Dataset.Provenance.ImportedInternal], RenkuProject)] =
+      projectGen.map(_.importDataset(publicationEvent))
+
     def modify(f: RenkuProject => RenkuProject): Gen[RenkuProject] = projectGen.map {
       case project: RenkuProject.WithoutParent => f(project)
       case project: RenkuProject.WithParent    => f(project)

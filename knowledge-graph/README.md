@@ -321,6 +321,12 @@ Response body example:
   "versions": {
     "initial": "11111111-1111-1111-1111-111111111111"
   },
+  "tags": {                                      // optional
+    "initial": {
+      "name":        "1.0.1",
+      "description": "some tag"                  //optional
+    }
+  },
   "title":       "dataset title",
   "name":        "dataset-name",
   "url":         "http://host/url1",             // optional property

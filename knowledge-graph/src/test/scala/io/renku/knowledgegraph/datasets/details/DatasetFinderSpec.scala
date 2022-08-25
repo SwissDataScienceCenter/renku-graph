@@ -646,6 +646,94 @@ class DatasetFinderSpec
       }
   }
 
+  "findDataset in the case the DS was imported from a tag" should {
+
+    "return info about the initial tag if it was imported from a tag on another Renku DS " +
+      "which means there are PublicationEvents on both original and imported DS with the same name and desc, " +
+      "there's sameAs on the imported DS to the original DS " +
+      "and imported DS has schema:version the same as the PublicationEvent name" in new TestCase {
+
+        val (originalDS, originalDSProject) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(
+            datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
+          )
+          .generateOne
+
+        val originalDSTag = originalDS.publicationEvents.head
+
+        val (importedDS, importedDSProject) =
+          anyRenkuProjectEntities(visibilityPublic).importDataset(originalDSTag).generateOne
+
+        upload(to = renkuDataset, originalDSProject, importedDSProject)
+
+        datasetFinder
+          .findDataset(importedDS.identifier,
+                       AuthContext(None, importedDS.identifier, Set(originalDSProject.path, importedDSProject.path))
+          )
+          .unsafeRunSync() shouldBe importedInternalToNonModified(importedDS, importedDSProject)
+          .copy(
+            maybeInitialTag = Tag(originalDSTag.name, originalDSTag.maybeDescription).some,
+            usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+          )
+          .some
+      }
+
+    "not return info about the initial tag even if it was imported from a tag on another Renku DS " +
+      "but the user has no access to the project of the original DS anymore" in new TestCase {
+
+        val (originalDS, originalDSProject) = anyRenkuProjectEntities(visibilityPrivate)
+          .addDataset(
+            datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
+          )
+          .generateOne
+
+        val originalDSTag = originalDS.publicationEvents.head
+
+        val (importedDS, importedDSProject) =
+          anyRenkuProjectEntities(visibilityPublic).importDataset(originalDSTag).generateOne
+
+        upload(to = renkuDataset, originalDSProject, importedDSProject)
+
+        datasetFinder
+          .findDataset(importedDS.identifier, AuthContext(None, importedDS.identifier, Set(importedDSProject.path)))
+          .unsafeRunSync() shouldBe importedInternalToNonModified(importedDS, importedDSProject).some
+      }
+
+    "not return info about the initial tag if " +
+      "there are PublicationEvents with the same name and desc on both original and imported DS " +
+      "but the version on the imported DS is different that the event name" in new TestCase {
+
+        val (originalDS, originalDSProject) = anyRenkuProjectEntities(visibilityPublic)
+          .addDataset(
+            datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
+          )
+          .generateOne
+
+        val originalDSTag = originalDS.publicationEvents.head
+
+        val (importedDS, importedDSProject) = {
+          val (ds, proj)    = anyRenkuProjectEntities(visibilityPublic).importDataset(originalDS).generateOne
+          val dsWithSameTag = ds.copy(publicationEventFactories = List(originalDSTag.toFactory))
+          dsWithSameTag -> proj.replaceDatasets(dsWithSameTag)
+        }
+
+        upload(to = renkuDataset, originalDSProject, importedDSProject)
+
+        originalDSTag.name             shouldBe importedDS.publicationEvents.head.name
+        originalDSTag.maybeDescription shouldBe importedDS.publicationEvents.head.maybeDescription
+
+        datasetFinder
+          .findDataset(importedDS.identifier,
+                       AuthContext(None, importedDS.identifier, Set(originalDSProject.path, importedDSProject.path))
+          )
+          .unsafeRunSync() shouldBe importedInternalToNonModified(importedDS, importedDSProject)
+          .copy(maybeInitialTag = None,
+                usedIn = List(originalDSProject, importedDSProject).map(_.to[DatasetProject]).sorted
+          )
+          .some
+      }
+  }
+
   private trait TestCase {
     implicit val renkuUrl:             RenkuUrl                    = renkuUrls.generateOne
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()

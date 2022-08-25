@@ -49,19 +49,24 @@ private class DatasetFinderImpl[F[_]: Spawn](
     findBaseDetails(identifier, authContext) >>= {
       case None => Option.empty[Dataset].pure[F]
       case Some(dataset) =>
+        def cancelledExceptionFor(process: String) = new Exception(s"$process finding process cancelled")
+
         for {
-          usedInFiber   <- Spawn[F].start(findUsedIn(identifier, authContext))
-          keywordsFiber <- Spawn[F].start(findKeywords(identifier))
-          imagesFiber   <- Spawn[F].start(findImages(identifier))
-          creatorsFiber <- Spawn[F].start(findCreators(identifier))
-          partsFiber    <- Spawn[F].start(findParts(identifier))
-          usedIn   <- usedInFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset usedIn fiber canceled")))
-          keywords <- keywordsFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset keywords fiber canceled")))
-          imageUrls <- imagesFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset imageUrls fiber canceled")))
-          creators <- creatorsFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset creators fiber canceled")))
-          parts    <- partsFiber.joinWith(MonadThrow[F].raiseError(new Exception("Dataset parts fiber canceled")))
+          initialTagFiber <- Spawn[F].start(findInitialTag(identifier, authContext))
+          usedInFiber     <- Spawn[F].start(findUsedIn(identifier, authContext))
+          keywordsFiber   <- Spawn[F].start(findKeywords(identifier))
+          imagesFiber     <- Spawn[F].start(findImages(identifier))
+          creatorsFiber   <- Spawn[F].start(findCreators(identifier))
+          partsFiber      <- Spawn[F].start(findParts(identifier))
+          maybeInitialTag <- initialTagFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("initial tag")))
+          usedIn          <- usedInFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("usedIn")))
+          keywords        <- keywordsFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("keywords")))
+          imageUrls       <- imagesFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("imageUrls")))
+          creators        <- creatorsFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("creators")))
+          parts           <- partsFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("parts")))
         } yield dataset
           .copy(
+            maybeInitialTag = maybeInitialTag,
             creators = creators,
             parts = parts,
             usedIn = usedIn,
@@ -72,16 +77,29 @@ private class DatasetFinderImpl[F[_]: Spawn](
     }
 
   private implicit class DatasetOps(dataset: Dataset) {
-    def copy(creators: NonEmptyList[DatasetCreator],
-             parts:    List[DatasetPart],
-             usedIn:   List[DatasetProject],
-             keywords: List[Keyword],
-             images:   List[ImageUri]
+    def copy(maybeInitialTag: Option[Tag],
+             creators:        NonEmptyList[DatasetCreator],
+             parts:           List[DatasetPart],
+             usedIn:          List[DatasetProject],
+             keywords:        List[Keyword],
+             images:          List[ImageUri]
     ): Dataset = dataset match {
       case ds: NonModifiedDataset =>
-        ds.copy(creators = creators.toList, parts = parts, usedIn = usedIn, keywords = keywords, images = images)
+        ds.copy(maybeInitialTag = maybeInitialTag,
+                creators = creators.toList,
+                parts = parts,
+                usedIn = usedIn,
+                keywords = keywords,
+                images = images
+        )
       case ds: ModifiedDataset =>
-        ds.copy(creators = creators.toList, parts = parts, usedIn = usedIn, keywords = keywords, images = images)
+        ds.copy(maybeInitialTag = maybeInitialTag,
+                creators = creators.toList,
+                parts = parts,
+                usedIn = usedIn,
+                keywords = keywords,
+                images = images
+        )
     }
   }
 }

@@ -73,6 +73,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       datasets.Name("name"),
       datasets.SameAs("http://datasets-repo/abcd"),
       DatasetVersions(datasets.OriginalIdentifier("12333")),
+      Tag(publicationEvents.Name("2.0"), publicationEvents.Description("Tag Dataset was imported from").some).some,
       datasets.Description("Dataset description").some,
       List(
         DatasetCreator(persons.Email("jan@mail.com").some,
