@@ -61,6 +61,7 @@ object Endpoint {
                              entityTypes:  Set[Filters.EntityType] = Set.empty,
                              creators:     Set[persons.Name] = Set.empty,
                              visibilities: Set[projects.Visibility] = Set.empty,
+                             namespaces:   Set[projects.Namespace] = Set.empty,
                              maybeSince:   Option[Filters.Since] = None,
                              maybeUntil:   Option[Filters.Until] = None
     )
@@ -121,6 +122,19 @@ object Endpoint {
 
         object visibilities extends OptionalMultiQueryParamDecoderMatcher[projects.Visibility]("visibility") {
           val parameterName: String = "visibility"
+        }
+      }
+
+      object Namespace {
+        private implicit val namespaceParameterDecoder: QueryParamDecoder[projects.Namespace] =
+          (value: QueryParameterValue) =>
+            projects.Namespace
+              .from(value.value)
+              .leftMap(_ => parsingFailure(namespaces.parameterName))
+              .toValidatedNel
+
+        object namespaces extends OptionalMultiQueryParamDecoderMatcher[projects.Namespace]("namespace") {
+          val parameterName: String = "namespace"
         }
       }
 
