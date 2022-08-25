@@ -55,9 +55,11 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |              schema:name ?name;
         |              schema:dateCreated ?date;
         |              ^renku:hasPlan ?projectId.
-        |        ?projectId renku:projectVisibility ?visibility
+        |        ?projectId renku:projectVisibility ?visibility;
+        |                   renku:projectNamespace ?namespace.
         |        ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
         |        ${filters.maybeOnVisibility("?visibility")}
+        |        ${filters.maybeOnNamespace("?namespace")}
         |        ${filters.maybeOnDateCreated("?date")}
         |      }
         |      GROUP BY ?wkId ?matchingScore ?date

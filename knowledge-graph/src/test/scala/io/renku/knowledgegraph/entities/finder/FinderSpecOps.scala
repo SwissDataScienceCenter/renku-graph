@@ -95,6 +95,11 @@ trait FinderSpecOps {
         .addPersons(project.activities.map(_.author))
         .distinct
 
+    def removeAllPersons(): List[model.Entity] = entities.filterNot {
+      case _: model.Entity.Person => true
+      case _ => false
+    }
+
     def addPersons(persons: List[Person]): List[model.Entity] = {
       persons.map(_.to[model.Entity.Person]) ::: entities
     }.distinct

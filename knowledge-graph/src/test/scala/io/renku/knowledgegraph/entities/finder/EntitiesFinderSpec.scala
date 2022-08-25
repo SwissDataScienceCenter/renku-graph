@@ -483,6 +483,50 @@ class EntitiesFinderSpec
     }
   }
 
+  "findEntities - with namespace filter" should {
+
+    "return entities with matching namespace only" in new TestCase {
+
+      val matchingProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
+        .withDatasets(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      val nonMatchingProject = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
+        .withDatasets(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      upload(to = renkuDataset, matchingProject, nonMatchingProject)
+
+      finder
+        .findEntities(
+          Criteria(
+            Filters(namespaces = Set(matchingProject.path.toNamespace)),
+            paging = PagingRequest(Page.first, PerPage(50))
+          )
+        )
+        .unsafeRunSync()
+        .results shouldBe allEntitiesFrom(matchingProject)
+        .removeAllPersons()
+        .sortBy(_.name.value)
+    }
+
+    "return no namespace aware entities when no match on namespace" in new TestCase {
+      val _ ::~ project = renkuProjectEntities(visibilityPublic)
+        .withActivities(activityEntities(planEntities()))
+        .addDataset(datasetEntities(provenanceNonModified))
+        .generateOne
+
+      upload(to = renkuDataset, project)
+
+      finder
+        .findEntities(Criteria(Filters(namespaces = projectNamespaces.generateFixedSizeSet(1))))
+        .unsafeRunSync()
+        .results shouldBe Nil
+    }
+  }
+
   "findEntities - with 'since' filter" should {
 
     "return entities with date >= 'since'" in new TestCase {

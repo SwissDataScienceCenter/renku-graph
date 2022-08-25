@@ -69,9 +69,11 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
         |               schema:name ?name;
         |               renku:projectPath ?path;
         |               renku:projectVisibility ?visibility;
+        |               renku:projectNamespace ?namespace;
         |               schema:dateCreated ?date.
         |    ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
         |    ${filters.maybeOnVisibility("?visibility")}
+        |    ${filters.maybeOnNamespace("?namespace")}
         |    ${filters.maybeOnDateCreated("?date")}
         |    OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
         |    ${filters.maybeOnCreatorName("?maybeCreatorName")}
