@@ -138,8 +138,8 @@ Response body example:
       ],
       "_links":[  
          {  
-            "rel":"details",
-            "href":"http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+            "rel":  "details",
+            "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
          }
       ]
    }
@@ -303,82 +303,82 @@ Response body example:
 
 ```json
 {
-  "_links" : [
+  "_links": [
     {
-      "rel" :  "self",
-      "href" : "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
+      "rel":  "self",
+      "href": "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
     },
     {
-      "rel" :  "initial-version",
-      "href" : "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
+      "rel":  "initial-version",
+      "href": "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
     },
     {
-      "rel" :  "tags",
-      "href" : "https://zemdgsw:9540/knowledge-graph/projects/namespace1/project1-name/datasets/dataset-name/tags"
+      "rel":  "tags",
+      "href": "https://zemdgsw:9540/knowledge-graph/projects/namespace1/project1-name/datasets/dataset-name/tags"
     }
   ],
-  "identifier" : "22222222-2222-2222-2222-222222222222",
-  "versions" : {
+  "identifier": "22222222-2222-2222-2222-222222222222",
+  "versions": {
     "initial": "11111111-1111-1111-1111-111111111111"
   },
-  "title" :       "dataset title",
-  "name" :        "dataset-name",
-  "url" :         "http://host/url1",                     // optional property
-  "sameAs" :      "http://host/url2",                  // optional property when no "derivedFrom" exists
-  "derivedFrom" : "http://host/url1",             // optional property when no "sameAs" exists
-  "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
-  "published" : {
-    "datePublished" : "2012-10-14",               // optional property
-    "creator" : [
+  "title":       "dataset title",
+  "name":        "dataset-name",
+  "url":         "http://host/url1",             // optional property
+  "sameAs":      "http://host/url2",             // optional property when no "derivedFrom" exists
+  "derivedFrom": "http://host/url1",             // optional property when no "sameAs" exists
+  "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
+  "published": {
+    "datePublished": "2012-10-14",               // optional property
+    "creator": [
       {
-        "name" :        "e wmtnxmcguz"
-        "affiliation" : "SDSC"                    // optional property
+        "name":        "e wmtnxmcguz",
+        "affiliation": "SDSC"                    // optional property
       },
       {
-        "name" :  "iilmadw vcxabmh",
-        "email" : "ticUnrW@cBmrdomoa"             // optional property
+        "name":  "iilmadw vcxabmh",
+        "email": "ticUnrW@cBmrdomoa"             // optional property
       }
     ]
   },
-  "created" : "2012-10-15T03:02:25.639Z",         // optional property
-  "hasPart" : [
+  "created": "2012-10-15T03:02:25.639Z",         // optional property
+  "hasPart": [
     {
-      "atLocation" : "data/dataset-name/file1"
+      "atLocation": "data/dataset-name/file1"
     },
     {
-      "atLocation" : "data/dataset-name/file2"
+      "atLocation": "data/dataset-name/file2"
     }
   ],
   "project":  {
-    "_links" : [
+    "_links": [
       {
-        "rel" :  "project-details",
-        "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
+        "rel":  "project-details",
+        "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
       }
     ],
-    "path" : "namespace1/project1-name",
-    "name" : "project1 name"
+    "path": "namespace1/project1-name",
+    "name": "project1 name"
   },
-  "usedIn" : [
+  "usedIn": [
     {
-      "_links" : [
+      "_links": [
         {
-          "rel" :  "project-details",
-          "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
+          "rel":  "project-details",
+          "href": "https://zemdgsw:9540/projects/namespace1/project1-name"
         }
       ],
-      "path" : "namespace1/project1-name",
-      "name" : "project1 name"
+      "path": "namespace1/project1-name",
+      "name": "project1 name"
     },
     {
-      "_links" : [
+      "_links": [
         {
-          "rel" :  "project-details",
-          "href" : "https://zemdgsw:9540/projects/namespace2/project2-name"
+          "rel":  "project-details",
+          "href": "https://zemdgsw:9540/projects/namespace2/project2-name"
         }
       ],
-      "path" : "namespace2/project2-name",
-      "name" : "project2 name"
+      "path": "namespace2/project2-name",
+      "name": "project2 name"
     }
   ],
   "keywords": [ "rldzpwo", "gfioui" ],
@@ -470,22 +470,22 @@ Response body example:
       ],
       "nodes": [
         {
-          "id": "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
+          "id":       "/blob/bbdc4293b79535ecce7c143b29538f7ff01db297/data/zhbikes",
           "location": "data/zhbikes",
-          "label": "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297",
-          "type": "Directory"
+          "label":    "data/zhbikes@bbdc4293b79535ecce7c143b29538f7ff01db297",
+          "type":     "Directory"
         },
         {
-          "id": "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "id":       "/commit/1aaf360c2267bedbedb81900a214e6f36be04e87",
           "location": ".renku/workflow/3144e9aa470441cf905f94105e1d27ca_python.cwl",
-          "label": "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet",
-          "type": "ProcessRun"
+          "label":    "renku run python src/clean_data.py data/zhbikes data/preprocessed/zhbikes.parquet",
+          "type":     "ProcessRun"
         },
         {
-          "id": "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
+          "id":       "/blob/1aaf360c2267bedbedb81900a214e6f36be04e87/data/preprocessed/zhbikes.parquet",
           "location": "data/preprocessed/zhbikes.parquet",
-          "label": "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87",
-          "type": "File"
+          "label":    "data/preprocessed/zhbikes.parquet@1aaf360c2267bedbedb81900a214e6f36be04e87",
+          "type":     "File"
         }
       ]
     }
@@ -511,43 +511,43 @@ Response body example for `Accept: application/ld+json`:
 ```json
 [
   {
-    "@id" : "https://swissdatasciencecenter.github.io/renku-ontology",
-    "@type" : "http://www.w3.org/2002/07/owl#Ontology",
-    "http://www.w3.org/2002/07/owl#imports" : [
+    "@id":   "https://swissdatasciencecenter.github.io/renku-ontology",
+    "@type": "http://www.w3.org/2002/07/owl#Ontology",
+    "http://www.w3.org/2002/07/owl#imports": [
       {
-        "@id" : "http://www.w3.org/ns/oa#"
+        "@id": "http://www.w3.org/ns/oa#"
       }
     ]
   },
   {
-    "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf",
-    "@type" : "http://www.w3.org/2002/07/owl#Class"
+    "@id":   "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf",
+    "@type": "http://www.w3.org/2002/07/owl#Class"
   },
   {
-    "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/name",
-    "@type" : "http://www.w3.org/2002/07/owl#DatatypeProperty",
-    "http://www.w3.org/2000/01/rdf-schema#domain" : [
+    "@id":   "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/name",
+    "@type": "http://www.w3.org/2002/07/owl#DatatypeProperty",
+    "http://www.w3.org/2000/01/rdf-schema#domain": [
       {
-        "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf"
+        "@id": "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf"
       }
     ],
-    "http://www.w3.org/2000/01/rdf-schema#range" : [
+    "http://www.w3.org/2000/01/rdf-schema#range": [
       {
-        "@id" : "http://www.w3.org/2001/XMLSchema#string"
+        "@id": "http://www.w3.org/2001/XMLSchema#string"
       }
     ]
   },
   {
-    "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/number",
-    "@type" : "http://www.w3.org/2002/07/owl#DatatypeProperty",
-    "http://www.w3.org/2000/01/rdf-schema#domain" : [
+    "@id":   "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/number",
+    "@type": "http://www.w3.org/2002/07/owl#DatatypeProperty",
+    "http://www.w3.org/2000/01/rdf-schema#domain": [
       {
-        "@id" : "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf"
+        "@id": "http://ksuefnmujl:3230/ypwx/kMs_-Prju/ev/xp/Leaf"
       }
     ],
-    "http://www.w3.org/2000/01/rdf-schema#range" : [
+    "http://www.w3.org/2000/01/rdf-schema#range": [
       {
-        "@id" : "http://www.w3.org/2001/XMLSchema#number"
+        "@id": "http://www.w3.org/2001/XMLSchema#number"
       }
     ]
   }
@@ -648,62 +648,62 @@ Response body example for `Accept: application/ld+json`:
 
 ```json
 {
-  "@id" : "http://wwywiir:3577/yobqsDoboi/projects/d_llli5Zo/2nTaozqw/llosas_/__-6h3a",
-  "@type" : [
+  "@id": "http://wwywiir:3577/yobqsDoboi/projects/d_llli5Zo/2nTaozqw/llosas_/__-6h3a",
+  "@type": [
     "http://www.w3.org/ns/prov#Location",
     "http://schema.org/Project"
   ],
-  "https://swissdatasciencecenter.github.io/renku-ontology#projectPath" : {
-    "@value" : "d_llli5Zo/2nTaozqw/llosas_/__-6h3a"
+  "https://swissdatasciencecenter.github.io/renku-ontology#projectPath": {
+    "@value": "d_llli5Zo/2nTaozqw/llosas_/__-6h3a"
   },
-  "http://schema.org/description" : {
-    "@value" : "Zs oJtagvqvIn diw cywpaj ordCPacr vnnkjj cgtzizxkb clfPe xuhrqT vK"
+  "http://schema.org/description": {
+    "@value": "Zs oJtagvqvIn diw cywpaj ordCPacr vnnkjj cgtzizxkb clfPe xuhrqT vK"
   },
-  "http://schema.org/dateModified" : {
-    "@type" :  "http://www.w3.org/2001/XMLSchema#dateTime",
-    "@value" : "1990-07-16T21:51:12.949Z"
+  "http://schema.org/dateModified": {
+    "@type":  "http://www.w3.org/2001/XMLSchema#dateTime",
+    "@value": "1990-07-16T21:51:12.949Z"
   },
-  "http://schema.org/identifier" : {
-    "@value" : 402288
+  "http://schema.org/identifier": {
+    "@value": 402288
   },
-  "http://schema.org/creator" : {
-    "@id" : "http://wwywiir:3577/yobqsDoboi/persons/69212174",
-    "@type" : [
+  "http://schema.org/creator": {
+    "@id": "http://wwywiir:3577/yobqsDoboi/persons/69212174",
+    "@type": [
       "http://www.w3.org/ns/prov#Person",
       "http://schema.org/Person"
     ],
-    "http://schema.org/email" : {
-      "@value" : "kpgj2u65iv@nezifs"
+    "http://schema.org/email": {
+      "@value": "kpgj2u65iv@nezifs"
     },
-    "http://schema.org/name" : {
-      "@value" : "flawal dolBA`ql"
+    "http://schema.org/name": {
+      "@value": "flawal dolBA`ql"
     }
   },
-  "http://schema.org/schemaVersion" : {
-    "@value" : "42.31.9"
+  "http://schema.org/schemaVersion": {
+    "@value": "42.31.9"
   },
-  "https://swissdatasciencecenter.github.io/renku-ontology#projectVisibility" : {
-    "@value" : "internal"
+  "https://swissdatasciencecenter.github.io/renku-ontology#projectVisibility": {
+    "@value": "internal"
   },
-  "http://schema.org/name" : {
-    "@value" : "__-6h3a"
+  "http://schema.org/name": {
+    "@value": "__-6h3a"
   },
-  "http://schema.org/dateCreated" : {
-    "@type" : "http://www.w3.org/2001/XMLSchema#dateTime",
-    "@value" : "2007-01-27T17:58:52.739Z"
+  "http://schema.org/dateCreated": {
+    "@type":  "http://www.w3.org/2001/XMLSchema#dateTime",
+    "@value": "2007-01-27T17:58:52.739Z"
   },
-  "http://schema.org/keywords" : [
+  "http://schema.org/keywords": [
     {
-      "@value" : "bNalprNSye"
+      "@value": "bNalprNSye"
     },
     {
-      "@value" : "jffkdfe"
+      "@value": "jffkdfe"
     },
     {
-      "@value" : "qscrvP"
+      "@value": "qscrvP"
     },
     {
-      "@value" : "ywnzgRbu"
+      "@value": "ywnzgRbu"
     }
   ]
 }
@@ -728,13 +728,13 @@ Response body example:
 [  
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
-      "versions" : {
+      "versions": {
         "initial": "11111111-1111-1111-1111-111111111111"
       },
-      "title":        "rmDaYfpehl",
-      "name":         "mniouUnmal",
-      "sameAs":       "http://host/url1",
-      "derivedFrom" : "http://host/url1",
+      "title":       "rmDaYfpehl",
+      "name":        "mniouUnmal",
+      "sameAs":      "http://host/url1",
+      "derivedFrom": "http://host/url1",
       "images": [],
       "_links": [  
         {  
@@ -742,23 +742,23 @@ Response body example:
            "href": "http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
         },
         {
-          "rel" :  "initial-version",
-          "href" : "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
+          "rel":  "initial-version",
+          "href": "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
         },
         {
-          "rel" :  "tags",
-          "href" : "https://zemdgsw:9540/knowledge-graph/projects/namespace/name/datasets/mniouUnmal/tags"
+          "rel":  "tags",
+          "href": "https://zemdgsw:9540/knowledge-graph/projects/namespace/name/datasets/mniouUnmal/tags"
         }
       ]
    },
    {  
       "identifier": "a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
-      "versions" : {
+      "versions": {
         "initial": "22222222-2222-2222-2222-222222222222"
       },
-      "name":         "a",
-      "sameAs" :      "http://host/url2",        // optional property when no "derivedFrom" exists
-      "derivedFrom" : "http://host/url2",   // optional property when no "sameAs" exists
+      "name":        "a",
+      "sameAs":      "http://host/url2",        // optional property when no "derivedFrom" exists
+      "derivedFrom": "http://host/url2",   // optional property when no "sameAs" exists
       "images": [
         {
           "location": "image.png",
@@ -785,12 +785,12 @@ Response body example:
            "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
         },
         {
-          "rel" :  "initial-version",
-          "href" : "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
+          "rel":  "initial-version",
+          "href": "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
         },
         {
-          "rel" :  "tags",
-          "href" : "https://zemdgsw:9540/knowledge-graph/projects/namespace/name/datasets/a/tags"
+          "rel":  "tags",
+          "href": "https://zemdgsw:9540/knowledge-graph/projects/namespace/name/datasets/a/tags"
         }
       ]
    }
