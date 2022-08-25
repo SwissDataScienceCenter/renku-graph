@@ -47,6 +47,7 @@ object projects {
       private lazy val nameString :: namespacesStringReversed = path.show.split('/').toList.reverse
       lazy val toName:       Name            = Name(nameString)
       lazy val toNamespaces: List[Namespace] = namespacesStringReversed.reverseIterator.map(Namespace(_)).toList
+      lazy val toNamespace:  Namespace       = toNamespaces.mkString("/")
     }
   }
 
