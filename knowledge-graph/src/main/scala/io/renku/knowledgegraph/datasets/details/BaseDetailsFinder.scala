@@ -29,6 +29,7 @@ import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.{projects, publicationEvents}
+import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -111,7 +112,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |             schema:sameAs/schema:url ?originalDsId.
         |  ?originalDsProjId renku:hasDataset ?originalDsId;
         |                    renku:projectPath ?projectPath.
-        |  FILTER (?projectPath IN (${authContext.allowedProjects.map(p => s"'$p'").mkString(", ")}))
+        |  ${allowedProjectFilterQuery(authContext.maybeAuthUser)}
         |  ?originalDsTagId schema:about/schema:url ?originalDsId;
         |                   schema:name ?version.
         |  ?datasetTagId schema:about/schema:url ?datasetId;
@@ -122,6 +123,22 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |LIMIT 1
         |""".stripMargin
   )
+
+  private lazy val allowedProjectFilterQuery: Option[AuthUser] => String = {
+    case Some(user) =>
+      s"""|?originalDsProjId renku:projectVisibility ?visibility .
+          |OPTIONAL {
+          |  ?originalDsProjId schema:member/schema:sameAs ?memberId.
+          |  ?memberId schema:additionalType 'GitLab';
+          |            schema:identifier ?userGitlabId .
+          |}
+          |FILTER ( ?visibility = '${projects.Visibility.Public.value}' || ?userGitlabId = ${user.id.value} )
+          |""".stripMargin
+    case _ =>
+      s"""|?originalDsProjId renku:projectVisibility ?visibility .
+          |FILTER(?visibility = '${projects.Visibility.Public.value}')
+          |""".stripMargin
+  }
 
   def findKeywords(identifier: Identifier): F[List[Keyword]] =
     queryExpecting[List[Keyword]](using = queryKeywords(identifier))
