@@ -34,9 +34,9 @@ import io.renku.http.rest.paging.model.{Page, PerPage, Total}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.DatasetSearchResult._
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
+import io.renku.knowledgegraph.datasets.Endpoint.Query.Phrase
+import io.renku.knowledgegraph.datasets.Endpoint.Sort
+import io.renku.knowledgegraph.datasets.Endpoint.Sort._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore._

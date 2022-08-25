@@ -19,8 +19,8 @@
 package io.renku.knowledgegraph.datasets
 
 import DatasetSearchResult._
-import DatasetsSearchEndpoint.Query.{Phrase, query}
-import DatasetsSearchEndpoint.Sort
+import Endpoint.Query.{Phrase, query}
+import Endpoint.Sort
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
@@ -54,12 +54,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetsSearchEndpointSpec
-    extends AnyWordSpec
-    with MockFactory
-    with ScalaCheckPropertyChecks
-    with should.Matchers
-    with IOSpec {
+class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers with IOSpec {
 
   "searchForDatasets" should {
 
@@ -123,14 +118,10 @@ class DatasetsSearchEndpointSpec
 
   "Sort.properties" should {
 
-    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
+    import io.renku.knowledgegraph.datasets.Endpoint.Sort._
 
     "list only name, datePublished and projectsCount" in {
-      DatasetsSearchEndpoint.Sort.properties shouldBe Set(TitleProperty,
-                                                          DateProperty,
-                                                          DatePublishedProperty,
-                                                          ProjectsCountProperty
-      )
+      Endpoint.Sort.properties shouldBe Set(TitleProperty, DateProperty, DatePublishedProperty, ProjectsCountProperty)
     }
   }
 
@@ -153,8 +144,7 @@ class DatasetsSearchEndpointSpec
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val datasetsFinder        = mock[DatasetsFinder[IO]]
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    val endpoint =
-      new DatasetsSearchEndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
+    val endpoint              = new EndpointImpl[IO](datasetsFinder, renkuApiUrl, gitLabUrl, executionTimeRecorder)
 
     lazy val toJson: DatasetSearchResult => Json = {
       case DatasetSearchResult(id,
