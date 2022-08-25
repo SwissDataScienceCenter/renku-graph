@@ -70,6 +70,44 @@ class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaF
         .reverse
       response.pagingInfo.total shouldBe Total(2)
     }
+
+    "return PublicationEvent objects linked to the Dataset family sharing the name from a the given project" in new TestCase {
+
+      val (ds, project) = renkuProjectEntities(visibilityPublic)
+        .addDataset(
+          datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(List(publicationEventFactory)))
+        )
+        .generateOne
+
+      val dsPublicationEvent = ds.publicationEvents.head
+
+      val (importedDs, projectWithImportedDs) = renkuProjectEntities(visibilityPublic)
+        .importDataset(dsPublicationEvent)
+        .generateOne
+
+      upload(to = renkuDataset, project, projectWithImportedDs)
+
+      project.datasets.flatMap(_.publicationEvents).size               shouldBe 1
+      projectWithImportedDs.datasets.flatMap(_.publicationEvents).size shouldBe 1
+
+      val response = finder.findTags(Criteria(project.path, ds.identification.name)).unsafeRunSync()
+
+      response.results shouldBe List(ds)
+        .flatMap(_.publicationEvents)
+        .map(_.to[model.Tag])
+        .sortBy(_.startDate)
+        .reverse
+      response.pagingInfo.total shouldBe Total(1)
+
+      finder
+        .findTags(Criteria(projectWithImportedDs.path, ds.identification.name))
+        .unsafeRunSync()
+        .results shouldBe List(importedDs)
+        .flatMap(_.publicationEvents)
+        .map(_.to[model.Tag])
+        .sortBy(_.startDate)
+        .reverse
+    }
   }
 
   "return no PublicationEvent if any on the Dataset" in new TestCase {

@@ -60,6 +60,7 @@ private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryT
     s"""|SELECT DISTINCT ?name ?startDate ?maybeDesc ?dsIdentifier
         |WHERE {
         |  ?projId a schema:Project;
+        |          renku:projectPath '${criteria.projectPath}';
         |          renku:hasDataset ?dsId.
         |  ?dsId renku:slug '${criteria.datasetName}';
         |        schema:identifier ?dsIdentifier.

@@ -119,7 +119,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |  BIND (?version AS ?tagName)
         |  OPTIONAL { ?datasetTagId schema:description ?maybeTagDesc }
         |}
-        |ORDER BY ASC(?keyword)
+        |LIMIT 1
         |""".stripMargin
   )
 
