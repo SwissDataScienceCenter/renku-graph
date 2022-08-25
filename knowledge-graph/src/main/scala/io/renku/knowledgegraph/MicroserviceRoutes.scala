@@ -38,8 +38,6 @@ import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
-import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
@@ -51,7 +49,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private class MicroserviceRoutes[F[_]: Async](
-    datasetsSearchEndpoint:     DatasetsSearchEndpoint[F],
+    datasetsSearchEndpoint:     datasets.Endpoint[F],
     datasetDetailsEndpoint:     datasets.details.Endpoint[F],
     entitiesEndpoint:           entities.Endpoint[F],
     queryEndpoint:              QueryEndpoint[F],
@@ -90,8 +88,9 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private lazy val `GET /datasets/*` : AuthedRoutes[Option[AuthUser], F] = {
-    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.query
-    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort.sort
+    import datasets.Endpoint.Query.query
+    import datasets.Endpoint.Sort.sort
+    import datasets._
 
     AuthedRoutes.of {
       case GET -> Root / "knowledge-graph" / "datasets"
@@ -103,7 +102,7 @@ private class MicroserviceRoutes[F[_]: Async](
 
   // format: off
   private lazy val `GET /entities/*`: AuthedRoutes[Option[AuthUser], F] = {
-    import io.renku.knowledgegraph.entities.Endpoint.Criteria._
+    import entities.Endpoint.Criteria._
     import Filters.CreatorName.creatorNames
     import Filters.EntityType.entityTypes
     import Filters.Query.query
@@ -159,14 +158,15 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private def searchForDatasets(
-      maybePhrase:   Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
-      maybeSort:     Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
+      maybePhrase:   Option[ValidatedNel[ParseFailure, datasets.Endpoint.Query.Phrase]],
+      maybeSort:     Option[ValidatedNel[ParseFailure, datasets.Endpoint.Sort.By]],
       maybePage:     Option[ValidatedNel[ParseFailure, Page]],
       maybePerPage:  Option[ValidatedNel[ParseFailure, PerPage]],
       maybeAuthUser: Option[AuthUser]
   ): F[Response[F]] = {
-    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
-    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
+    import datasets.Endpoint.Query._
+    import datasets.Endpoint.Sort
+    import datasets.Endpoint.Sort._
 
     (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
      maybeSort getOrElse Validated.validNel(Sort.By(TitleProperty, Direction.Asc)),
@@ -296,7 +296,7 @@ private object MicroserviceRoutes {
   ): IO[MicroserviceRoutes[IO]] = GitLabClient[IO]() >>= { implicit gitLabClient =>
     AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
       for {
-        datasetsSearchEndpoint     <- DatasetsSearchEndpoint[IO]
+        datasetsSearchEndpoint     <- datasets.Endpoint[IO]
         datasetDetailsEndpoint     <- datasets.details.Endpoint[IO]
         entitiesEndpoint           <- entities.Endpoint[IO]
         queryEndpoint              <- QueryEndpoint()

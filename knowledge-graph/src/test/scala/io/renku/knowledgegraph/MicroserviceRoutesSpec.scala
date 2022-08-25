@@ -45,10 +45,6 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
 import io.renku.http.{ErrorMessage, InfoMessage}
 import io.renku.interpreters.TestRoutesMetrics
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.{Phrase, query}
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
-import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
@@ -76,6 +72,11 @@ class MicroserviceRoutesSpec
     with IOSpec {
 
   "GET /knowledge-graph/datasets?query=<phrase>" should {
+
+    import datasets.Endpoint.Query._
+    import datasets.Endpoint.Sort
+    import datasets.Endpoint.Sort._
+    import datasets._
 
     s"return $Ok when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
 
@@ -551,9 +552,9 @@ class MicroserviceRoutesSpec
 
     val projectPath = projectPaths.generateOne
     val datasetName = datasetNames.generateOne
-    val projectDsTagsUri = projectPath.toNamespaces.foldLeft(uri"/knowledge-graph/projects")(
-      _ / _.show.value
-    ) / projectPath.toName.show / "datasets" / datasetName.show / "tags"
+    val projectDsTagsUri = projectPath.toNamespaces
+      .foldLeft(uri"/knowledge-graph/projects")(_ / _.show) /
+      projectPath.toName.show / "datasets" / datasetName.show / "tags"
 
     forAll {
       Table(
@@ -825,7 +826,7 @@ class MicroserviceRoutesSpec
 
   private trait TestCase {
 
-    val datasetsSearchEndpoint     = mock[DatasetsSearchEndpoint[IO]]
+    val datasetsSearchEndpoint     = mock[datasets.Endpoint[IO]]
     val datasetDetailsEndpoint     = mock[datasets.details.Endpoint[IO]]
     val entitiesEndpoint           = mock[entities.Endpoint[IO]]
     val queryEndpoint              = mock[QueryEndpoint[IO]]

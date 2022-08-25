@@ -18,8 +18,8 @@
 
 package io.renku.knowledgegraph.datasets
 
-import DatasetsSearchEndpoint.Query._
-import DatasetsSearchEndpoint.Sort
+import Endpoint.Query._
+import Endpoint.Sort
 import cats.effect._
 import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
@@ -42,7 +42,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait DatasetsSearchEndpoint[F[_]] {
+trait Endpoint[F[_]] {
   def searchForDatasets(maybePhrase: Option[Phrase],
                         sort:        Sort.By,
                         paging:      PagingRequest,
@@ -50,13 +50,13 @@ trait DatasetsSearchEndpoint[F[_]] {
   ): F[Response[F]]
 }
 
-class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
+class EndpointImpl[F[_]: Parallel: MonadThrow: Logger](
     datasetsFinder:        DatasetsFinder[F],
     renkuApiUrl:           renku.ApiUrl,
     gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
-    with DatasetsSearchEndpoint[F] {
+    with Endpoint[F] {
 
   import DatasetSearchResult._
   import PagingRequest.Decoders._
@@ -100,16 +100,16 @@ class DatasetsSearchEndpointImpl[F[_]: Parallel: MonadThrow: Logger](
   }
 }
 
-object DatasetsSearchEndpoint {
+object Endpoint {
 
-  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetsSearchEndpoint[F]] = for {
+  def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
     renkuConnectionConfig <- RenkuConnectionConfig[F]()
     renkuResourceUrl      <- renku.ApiUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
     creatorsFinder        <- CreatorsFinder(renkuConnectionConfig)
     datasetsFinder        <- DatasetsFinder(renkuConnectionConfig, creatorsFinder)
-  } yield new DatasetsSearchEndpointImpl[F](datasetsFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder)
+  } yield new EndpointImpl[F](datasetsFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder)
 
   object Query {
     final class Phrase private (val value: String) extends AnyVal with StringTinyType
