@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.datasets
 package details
 
+import Dataset.Tag
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
@@ -26,14 +27,15 @@ import eu.timepit.refined.auto._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
-import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
+import io.renku.graph.model.{projects, publicationEvents}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait BaseDetailsFinder[F[_]] {
   def findBaseDetails(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]]
+  def findInitialTag(identifier:  Identifier, authContext: AuthContext[Identifier]): F[Option[Tag]]
   def findKeywords(identifier:    Identifier): F[List[Keyword]]
   def findImages(identifier:      Identifier): F[List[ImageUri]]
 }
@@ -83,7 +85,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |  ?datasetId schema:identifier '$identifier';
         |             schema:identifier ?identifier;
         |             a schema:Dataset;
-        |             ^renku:hasDataset  ?projectId;   
+        |             ^renku:hasDataset ?projectId;   
         |             schema:name ?name;
         |             renku:slug ?slug;
         |             renku:topmostSameAs ?topmostSameAs;
@@ -96,12 +98,37 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
         |""".stripMargin
   )
 
+  def findInitialTag(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Tag]] =
+    queryExpecting[Option[Tag]](using = queryInitialTag(identifier, authContext))
+
+  private def queryInitialTag(identifier: Identifier, authContext: AuthContext[Identifier]) = SparqlQuery.of(
+    name = "ds by id - initial tag",
+    Prefixes of (renku -> "renku", schema -> "schema"),
+    s"""|SELECT DISTINCT ?tagName ?maybeTagDesc
+        |WHERE {
+        |  ?datasetId schema:identifier '$identifier';
+        |             schema:version ?version;
+        |             schema:sameAs/schema:url ?originalDsId.
+        |  ?originalDsProjId renku:hasDataset ?originalDsId;
+        |                    renku:projectPath ?projectPath.
+        |  FILTER (?projectPath IN (${authContext.allowedProjects.map(p => s"'$p'").mkString(", ")}))
+        |  ?originalDsTagId schema:about/schema:url ?originalDsId;
+        |                   schema:name ?version.
+        |  ?datasetTagId schema:about/schema:url ?datasetId;
+        |                schema:name ?version.
+        |  BIND (?version AS ?tagName)
+        |  OPTIONAL { ?datasetTagId schema:description ?maybeTagDesc }
+        |}
+        |ORDER BY ASC(?keyword)
+        |""".stripMargin
+  )
+
   def findKeywords(identifier: Identifier): F[List[Keyword]] =
     queryExpecting[List[Keyword]](using = queryKeywords(identifier))
 
   private def queryKeywords(identifier: Identifier) = SparqlQuery.of(
-    name = "ds by id - keyword details",
-    Prefixes.of(schema -> "schema"),
+    name = "ds by id - keywords",
+    Prefixes of schema -> "schema",
     s"""|SELECT DISTINCT ?keyword
         |WHERE {
         |  ?datasetId schema:identifier '$identifier' ;
@@ -116,7 +143,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
   private def queryImages(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - image urls",
-    Prefixes.of(schema -> "schema"),
+    Prefixes of schema -> "schema",
     s"""|SELECT DISTINCT ?contentUrl
         |WHERE {
         |    ?datasetId schema:identifier '$identifier' ;
@@ -134,8 +161,7 @@ private object BaseDetailsFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       renkuConnectionConfig: RenkuConnectionConfig
-  ): F[BaseDetailsFinder[F]] =
-    MonadThrow[F].catchNonFatal(new BaseDetailsFinderImpl[F](renkuConnectionConfig))
+  ): F[BaseDetailsFinder[F]] = MonadThrow[F].catchNonFatal(new BaseDetailsFinderImpl[F](renkuConnectionConfig))
 }
 
 private object BaseDetailsFinderImpl {
@@ -166,6 +192,7 @@ private object BaseDetailsFinderImpl {
         name,
         derived,
         DatasetVersions(initialVersion),
+        maybeInitialTag = None,
         maybeDesc,
         creators = List.empty,
         date = dates,
@@ -183,6 +210,7 @@ private object BaseDetailsFinderImpl {
         name,
         sameAs,
         DatasetVersions(initialVersion),
+        maybeInitialTag = None,
         maybeDescription,
         creators = List.empty,
         date = date,
@@ -236,11 +264,14 @@ private object BaseDetailsFinderImpl {
       } yield dataset
     }(toOption(show"More than one dataset with $dsId id"))
 
-  private implicit lazy val keywordsDecoder: Decoder[List[Keyword]] = ResultsDecoder[List, Keyword] { implicit cur =>
-    extract("keyword")
+  private implicit lazy val maybeInitialTagDecoder: Decoder[Option[Tag]] = ResultsDecoder[Option, Tag] { implicit cur =>
+    (extract[publicationEvents.Name]("tagName") -> extract[Option[publicationEvents.Description]]("maybeTagDesc"))
+      .mapN((name, maybeDesc) => Tag(name, maybeDesc))
   }
 
-  private implicit lazy val imagesDecoder: Decoder[List[ImageUri]] = ResultsDecoder[List, ImageUri] { implicit cur =>
-    extract("contentUrl")
-  }
+  private implicit lazy val keywordsDecoder: Decoder[List[Keyword]] =
+    ResultsDecoder[List, Keyword](implicit cur => extract("keyword"))
+
+  private implicit lazy val imagesDecoder: Decoder[List[ImageUri]] =
+    ResultsDecoder[List, ImageUri](implicit cur => extract("contentUrl"))
 }

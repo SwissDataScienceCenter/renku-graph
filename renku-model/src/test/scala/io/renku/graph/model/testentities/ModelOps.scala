@@ -131,6 +131,48 @@ trait ModelOps extends Dataset.ProvenanceOps {
       )
       importedDS -> (project addDatasets importedDS)
     }
+
+    def importDataset(
+        publicationEvent: PublicationEvent
+    ): (Dataset[Provenance.ImportedInternal], RenkuProject) = {
+      val newIdentifier = datasetIdentifiers.generateOne
+
+      val importedDS = publicationEvent.dataset.provenance match {
+        case provenance: Provenance.Internal =>
+          val provFactory =
+            implicitly[ProvenanceImportFactory[Provenance.Internal, Provenance.ImportedInternalAncestorInternal]]
+          publicationEvent.dataset.copy(
+            identification = publicationEvent.dataset.identification.copy(identifier = newIdentifier),
+            provenance = provFactory(
+              Dataset.entityId(newIdentifier),
+              SameAs(publicationEvent.dataset.entityId),
+              provenance,
+              OriginalIdentifier(newIdentifier)
+            )
+          )
+        case provenance: Provenance.Modified =>
+          val provFactory =
+            implicitly[ProvenanceImportFactory[Provenance.Modified, Provenance.ImportedInternalAncestorInternal]]
+          publicationEvent.dataset.copy(
+            identification = publicationEvent.dataset.identification.copy(identifier = newIdentifier),
+            provenance = provFactory(
+              Dataset.entityId(newIdentifier),
+              SameAs(publicationEvent.dataset.entityId),
+              provenance,
+              OriginalIdentifier(newIdentifier)
+            )
+          )
+        case other => throw new IllegalArgumentException(s"Cannot import from DS with $other")
+      }
+
+      val importedDSWithTag = importedDS.copy(
+        publicationEventFactories = List(publicationEvent.toFactory),
+        additionalInfo =
+          importedDS.additionalInfo.copy(maybeVersion = datasets.Version(publicationEvent.name.show).some)
+      )
+
+      importedDSWithTag -> (project addDatasets importedDSWithTag)
+    }
   }
 
   implicit class NonRenkuProjectWithParentOps(project: NonRenkuProject.WithParent)(implicit
@@ -486,7 +528,15 @@ trait ModelOps extends Dataset.ProvenanceOps {
   }
 
   implicit class PublicationEventOps(publicationEvent: PublicationEvent) {
+
     def to[T](implicit convert: PublicationEvent => T): T = convert(publicationEvent)
+
+    lazy val toFactory: Dataset[Provenance] => PublicationEvent = PublicationEvent(
+      _,
+      publicationEvent.maybeDescription,
+      publicationEvent.name,
+      timestampsNotInTheFuture(publicationEvent.startDate.value).generateAs(publicationEvents.StartDate)
+    )
   }
 
   implicit class ProvenanceOps[P <: Dataset.Provenance](provenance: P) {

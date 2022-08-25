@@ -30,13 +30,16 @@ import io.renku.graph.model
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, OriginalIdentifier, PartLocation, ResourceId, SameAs, Title}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
+import io.renku.json.JsonOps._
 import io.renku.tinytypes.json.TinyTypeEncoders._
 
-sealed trait Dataset extends Product with Serializable {
+private sealed trait Dataset extends Product with Serializable {
   val resourceId:       ResourceId
   val id:               Identifier
   val title:            Title
   val name:             Name
+  val versions:         DatasetVersions
+  val maybeInitialTag:  Option[Tag]
   val maybeDescription: Option[Description]
   val creators:         List[DatasetCreator]
   val date:             Date
@@ -44,11 +47,10 @@ sealed trait Dataset extends Product with Serializable {
   val project:          DatasetProject
   val usedIn:           List[DatasetProject]
   val keywords:         List[Keyword]
-  val versions:         DatasetVersions
   val images:           List[ImageUri]
 }
 
-object Dataset {
+private object Dataset {
 
   final case class NonModifiedDataset(resourceId:       ResourceId,
                                       id:               Identifier,
@@ -56,6 +58,7 @@ object Dataset {
                                       name:             Name,
                                       sameAs:           SameAs,
                                       versions:         DatasetVersions,
+                                      maybeInitialTag:  Option[Tag],
                                       maybeDescription: Option[Description],
                                       creators:         List[DatasetCreator],
                                       date:             Date,
@@ -72,6 +75,7 @@ object Dataset {
                                    name:             Name,
                                    derivedFrom:      DerivedFrom,
                                    versions:         DatasetVersions,
+                                   maybeInitialTag:  Option[Tag],
                                    maybeDescription: Option[Description],
                                    creators:         List[DatasetCreator],
                                    date:             DateCreated,
@@ -84,6 +88,7 @@ object Dataset {
 
   final case class DatasetPart(location: PartLocation)
   final case class DatasetVersions(initial: OriginalIdentifier)
+  final case class Tag(name: model.publicationEvents.Name, maybeDesc: Option[model.publicationEvents.Description])
 
   final case class DatasetProject(path: model.projects.Path, name: model.projects.Name)
 
@@ -100,6 +105,7 @@ object Dataset {
           case ds: ModifiedDataset    => ("derivedFrom" -> ds.derivedFrom.asJson).some
         },
         ("versions" -> dataset.versions.asJson).some,
+        dataset.maybeInitialTag.map(tag => "tags" -> json"""{"initial": ${tag.asJson}}"""),
         dataset.maybeDescription.map(description => "description" -> description.asJson),
         ("published" -> (dataset.creators -> dataset.date).asJson).some,
         dataset.date match {
@@ -160,21 +166,23 @@ object Dataset {
     }"""
   }
 
+  private implicit lazy val tagEncoder: Encoder[Tag] = Encoder.instance[Tag] { tag =>
+    json"""{
+      "name": ${tag.name}
+    }""" addIfDefined ("description" -> tag.maybeDesc)
+  }
+
   private implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], DatasetProject)] =
     Encoder.instance[(List[ImageUri], DatasetProject)] { case (imageUris, project) =>
       Json.arr(imageUris.map {
         case uri: ImageUri.Relative =>
           json"""{
             "location": $uri
-          }""" deepMerge _links(
-            Link(Rel("view") -> Href(gitLabUrl / project.path / "raw" / "master" / uri))
-          )
+          }""" deepMerge _links(Link(Rel("view") -> Href(gitLabUrl / project.path / "raw" / "master" / uri)))
         case uri: ImageUri.Absolute =>
           json"""{
             "location": $uri
-          }""" deepMerge _links(
-            Link(Rel("view") -> Href(uri.show))
-          )
+          }""" deepMerge _links(Link(Rel("view") -> Href(uri.show)))
       }: _*)
     }
 }

@@ -23,22 +23,23 @@ import io.renku.graph.model.datasets.{PartLocation, ResourceId, SameAs}
 import io.renku.graph.model.testentities.{Dataset => ModelDataset, HavingInvalidationTime, RenkuProject}
 import io.renku.graph.model.{RenkuUrl, testentities}
 import io.renku.jsonld.syntax._
-import io.renku.knowledgegraph.datasets.details.Dataset.{DatasetPart, DatasetProject, DatasetVersions, ModifiedDataset, NonModifiedDataset}
 
 package object details {
+  import Dataset._
 
-  implicit lazy val projectToDatasetProject: RenkuProject => DatasetProject =
+  private[details] implicit lazy val projectToDatasetProject: RenkuProject => DatasetProject =
     project => DatasetProject(project.path, project.name)
 
-  def internalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.Internal], project: RenkuProject)(implicit
-      renkuUrl:                      RenkuUrl
-  ): NonModifiedDataset = NonModifiedDataset(
+  private[details] def internalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.Internal],
+                                             project: RenkuProject
+  )(implicit renkuUrl:                                RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
     dataset.identification.title,
     dataset.identification.name,
     SameAs(dataset.entityId),
     DatasetVersions(dataset.provenance.originalIdentifier),
+    maybeInitialTag = None,
     dataset.additionalInfo.maybeDescription,
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
@@ -49,15 +50,16 @@ package object details {
     dataset.additionalInfo.images
   )
 
-  def importedExternalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.ImportedExternal],
-                                    project: RenkuProject
-  )(implicit renkuUrl:                       RenkuUrl): NonModifiedDataset = NonModifiedDataset(
+  private[details] def importedExternalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.ImportedExternal],
+                                                     project: RenkuProject
+  )(implicit renkuUrl:                                        RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
     dataset.identification.title,
     dataset.identification.name,
     dataset.provenance.sameAs,
     DatasetVersions(dataset.provenance.originalIdentifier),
+    maybeInitialTag = None,
     dataset.additionalInfo.maybeDescription,
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
@@ -68,15 +70,16 @@ package object details {
     dataset.additionalInfo.images
   )
 
-  def importedInternalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.ImportedInternal],
-                                    project: RenkuProject
-  )(implicit renkuUrl:                       RenkuUrl): NonModifiedDataset = NonModifiedDataset(
+  private[details] def importedInternalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.ImportedInternal],
+                                                     project: RenkuProject
+  )(implicit renkuUrl:                                        RenkuUrl): NonModifiedDataset = NonModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identification.identifier,
     dataset.identification.title,
     dataset.identification.name,
     dataset.provenance.sameAs,
     DatasetVersions(dataset.provenance.originalIdentifier),
+    maybeInitialTag = None,
     dataset.additionalInfo.maybeDescription,
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
@@ -87,15 +90,16 @@ package object details {
     dataset.additionalInfo.images
   )
 
-  def modifiedToModified(dataset: ModelDataset[ModelDataset.Provenance.Modified], project: RenkuProject)(implicit
-      renkuUrl:                   RenkuUrl
-  ): ModifiedDataset = ModifiedDataset(
+  private[details] def modifiedToModified(dataset: ModelDataset[ModelDataset.Provenance.Modified],
+                                          project: RenkuProject
+  )(implicit renkuUrl:                             RenkuUrl): ModifiedDataset = ModifiedDataset(
     ResourceId(dataset.asEntityId.show),
     dataset.identifier,
     dataset.identification.title,
     dataset.identification.name,
     dataset.provenance.derivedFrom,
     DatasetVersions(dataset.provenance.originalIdentifier),
+    maybeInitialTag = None,
     dataset.additionalInfo.maybeDescription,
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
