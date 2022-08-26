@@ -155,6 +155,7 @@ Allows finding `projects`, `datasets`, `workflows`, and `persons`.
 * `type`       - to filter by entity type(s); allowed values: `project`, `dataset`, `workflow`, and `person`; multiple `type` parameters allowed
 * `creator`    - to filter by creator(s); the filter would require creator's name; multiple `creator` parameters allowed
 * `visibility` - to filter by visibility(ies) (restricted vs. public); allowed values: `public`, `internal`, `private`; multiple `visibility` parameters allowed
+* `namespace`  - to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has be used, e.g. `group/subgroup` 
 * `since`      - to filter by entity's creation date to >= the given date
 * `until`      - to filter by entity's creation date to <= the given date
 
