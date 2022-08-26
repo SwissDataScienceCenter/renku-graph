@@ -48,6 +48,7 @@ private[tsmigrationrequest] object Migrations {
     multipleDSDescriptions            <- MultipleDSDescriptions[F]
     multipleTopmostDerivedFroms       <- MultipleTopmostDerivedFroms[F]
     multipleProjectAgents             <- MultipleProjectAgents[F]
+    addProjectNamespaceField          <- AddProjectNamespaceField[F]
     migrations <- validateNames(
                     datasetsCreator,
                     reProvisioning,
@@ -63,7 +64,8 @@ private[tsmigrationrequest] object Migrations {
                     removeNotLinkedPersons,
                     multipleDSDescriptions,
                     multipleTopmostDerivedFroms,
-                    multipleProjectAgents
+                    multipleProjectAgents,
+                    addProjectNamespaceField
                   )
   } yield migrations
 

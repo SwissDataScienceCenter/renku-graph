@@ -31,7 +31,7 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
   override val selectVariables = Set("?entityType", "?matchingScore", "?name")
 
   override def query(criteria: Endpoint.Criteria) =
-    (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
+    (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.namespaces.isEmpty, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
       import criteria._
       // format: off
       s"""|{

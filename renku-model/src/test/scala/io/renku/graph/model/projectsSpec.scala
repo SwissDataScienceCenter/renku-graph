@@ -105,6 +105,15 @@ class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
     }
   }
 
+  "toNamespace" should {
+    "extract the namespace from the path" in {
+      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
+        val namespaceAsString = namespaces.map(_.show).nonEmptyIntercalate("/")
+        Path(s"$namespaceAsString/$name").toNamespace shouldBe Namespace(namespaceAsString)
+      }
+    }
+  }
+
   private lazy val partsGenerator = {
     val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> const('_'))
     val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> Gen.oneOf('_', '.', '-'))

@@ -93,6 +93,12 @@ package object finder {
         case set                => s"FILTER ($variableName IN ${set.map(_.asLiteral).mkString("(", ", ", ")")})"
       }
 
+    def maybeOnNamespace(variableName: String): String =
+      filters.namespaces match {
+        case set if set.isEmpty => ""
+        case set                => s"FILTER ($variableName IN ${set.map(_.asLiteral).mkString("(", ", ", ")")})"
+      }
+
     def maybeOnDateCreated(variableName: String): String =
       List(
         filters.maybeSince map { since =>

@@ -100,12 +100,14 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |        FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
         |        FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
         |        ?projectId renku:projectVisibility ?visibility;
+        |                   renku:projectNamespace ?namespace;
         |                   renku:projectPath ?projectPath.
         |        ?dsId schema:identifier ?identifier;
         |              renku:slug ?name.
         |        BIND (CONCAT(STR(?identifier), STR(':'), STR(?projectPath), STR(':'), STR(?visibility)) AS ?idPathVisibility)
         |        ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
         |        ${filters.maybeOnVisibility("?visibility")}
+        |        ${filters.maybeOnNamespace("?namespace")}
         |        OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
         |        OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
         |        OPTIONAL { ?dsId schema:datePublished ?maybeDatePublished }.

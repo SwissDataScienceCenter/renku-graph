@@ -294,6 +294,18 @@ class MicroserviceRoutesSpec
             uri -> Criteria(Filters(visibilities = list.toSet))
           }
           .generateOne,
+        projectNamespaces
+          .map(v =>
+            uri"/knowledge-graph/entities" +? ("namespace" -> v.value) -> Criteria(Filters(namespaces = Set(v)))
+          )
+          .generateOne,
+        projectNamespaces
+          .toGeneratorOfList(minElements = 2)
+          .map { list =>
+            val uri = uri"/knowledge-graph/entities" ++? ("namespace" -> list.map(_.show))
+            uri -> Criteria(Filters(namespaces = list.toSet))
+          }
+          .generateOne,
         sinceParams
           .map(d =>
             uri"/knowledge-graph/entities" +? ("since" -> d.value.toString) -> Criteria(Filters(maybeSince = d.some))

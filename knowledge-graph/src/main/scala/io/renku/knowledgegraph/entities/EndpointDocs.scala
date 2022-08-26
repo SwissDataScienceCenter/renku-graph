@@ -48,7 +48,7 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     "Cross-Entity search",
     "Finds entities by the given criteria".some,
     GET(
-      Uri / "entities" :? query & `type` & creator & visibility & since & until & sort & page & perPage,
+      Uri / "entities" :? query & `type` & creator & visibility & namespace & since & until & sort & page & perPage,
       Status.Ok -> Response("Found entities",
                             Contents(MediaType.`application/json`("Sample response", example)),
                             responseHeaders
@@ -88,7 +88,13 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
   private lazy val visibility = Parameter.Query(
     "visibility",
     Schema.String,
-    "to filter by visibility(ies) (restricted vs. public); allowed values: public, internal, private; multiple visibility parameters allowed".some,
+    "to filter by visibility(ies) (restricted vs. public); allowed values: 'public', 'internal', 'private'; multiple visibility parameters allowed".some,
+    required = false
+  )
+  private lazy val namespace = Parameter.Query(
+    "namespace",
+    Schema.String,
+    "to filter by namespace(s); there might be multiple values given; for nested namespaces the whole path has be used, e.g. 'group/subgroup'".some,
     required = false
   )
   private lazy val since = Parameter.Query(

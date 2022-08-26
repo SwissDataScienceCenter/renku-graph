@@ -109,14 +109,16 @@ private class MicroserviceRoutes[F[_]: Async](
     import Filters.Since.since
     import Filters.Until.until
     import Filters.Visibility.visibilities
+    import Filters.Namespace.namespaces
     import Sorting.sort
 
     AuthedRoutes.of {
       case req@GET -> Root / "knowledge-graph" / "entities"
         :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators)
-        +& visibilities(maybeVisibilities) +& since(maybeSince) +& until(maybeUntil) 
+        +& visibilities(maybeVisibilities) +& namespaces(maybeNamespaces) 
+        +& since(maybeSince) +& until(maybeUntil) 
         +& sort(maybeSort) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
-        searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeVisibilities,
+        searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeVisibilities, maybeNamespaces,
           maybeSince, maybeUntil, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
     }
   }
@@ -181,6 +183,7 @@ private class MicroserviceRoutes[F[_]: Async](
       types:        ValidatedNel[ParseFailure, List[entities.Endpoint.Criteria.Filters.EntityType]],
       creators:     ValidatedNel[ParseFailure, List[persons.Name]],
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
+      namespaces:   ValidatedNel[ParseFailure, List[model.projects.Namespace]],
       maybeSince:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Since]],
       maybeUntil:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Until]],
       maybeSort:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Sorting.By]],
@@ -198,6 +201,7 @@ private class MicroserviceRoutes[F[_]: Async](
       types.map(_.toSet),
       creators.map(_.toSet),
       visibilities.map(_.toSet),
+      namespaces.map(_.toSet),
       maybeSince.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Since])),
       maybeUntil.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Until])),
       maybeSort getOrElse Validated.validNel(Sorting.By(ByName, Direction.Asc)),
@@ -210,9 +214,9 @@ private class MicroserviceRoutes[F[_]: Async](
           case _ => ().validNel[ParseFailure]
         }
         .getOrElse(().validNel[ParseFailure])
-    ).mapN { case (maybeQuery, types, creators, visibilities, maybeSince, maybeUntil, sorting, paging, _) =>
+    ).mapN { case (maybeQuery, types, creators, visibilities, namespaces, maybeSince, maybeUntil, sorting, paging, _) =>
       `GET /entities`(
-        Criteria(Filters(maybeQuery, types, creators, visibilities, maybeSince, maybeUntil),
+        Criteria(Filters(maybeQuery, types, creators, visibilities, namespaces, maybeSince, maybeUntil),
                  sorting,
                  paging,
                  maybeUser
