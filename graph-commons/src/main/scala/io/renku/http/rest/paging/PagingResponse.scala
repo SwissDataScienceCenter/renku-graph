@@ -63,20 +63,18 @@ object PagingResponse {
       total:         Total
   ): F[PagingResponse[Result]] = {
 
-    val pagingInfo = new PagingInfo(pagingRequest, total)
-
     import pagingRequest._
 
-    if (results.isEmpty && (page.value - 1) * perPage.value >= total.value) {
-      new PagingResponse[Result](results, pagingInfo).pure[F]
-    } else if (results.nonEmpty && ((page.value - 1) * perPage.value + results.size) == total.value) {
-      new PagingResponse[Result](results, pagingInfo).pure[F]
-    } else if (results.nonEmpty && (results.size == perPage.value) && (page.value * perPage.value) <= total.value) {
-      new PagingResponse[Result](results, pagingInfo).pure[F]
-    } else
+    if (results.size > perPage.value)
       new IllegalArgumentException(
         s"PagingResponse cannot be instantiated for ${results.size} results, total: $total, page: ${pagingRequest.page} and perPage: ${pagingRequest.perPage}"
       ).raiseError[F, PagingResponse[Result]]
+    else if (results.nonEmpty && ((page.value - 1) * perPage.value + results.size > total.value))
+      new PagingResponse[Result](results,
+                                 new PagingInfo(pagingRequest, Total((page.value - 1) * perPage.value + results.size))
+      ).pure[F]
+    else
+      new PagingResponse[Result](results, new PagingInfo(pagingRequest, total)).pure[F]
   }
 
   final class PagingInfo private[PagingResponse] (val pagingRequest: PagingRequest, val total: Total) {
