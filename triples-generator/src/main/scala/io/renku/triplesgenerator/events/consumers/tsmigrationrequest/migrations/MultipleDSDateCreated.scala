@@ -22,11 +22,10 @@ package migrations
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.Schemas.{schema, xsd}
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
 import tooling.UpdateQueryMigration
 
@@ -38,20 +37,19 @@ private object MultipleDSDateCreated {
   private lazy val name = Migration.Name("Multiple DateCreated on DS")
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,
-    Prefixes of schema -> "schema",
+    Prefixes of (schema -> "schema", xsd -> "xsd"),
     s"""|DELETE { ?dsId schema:dateCreated ?date }
         |WHERE {
         |  SELECT ?dsId ?date
         |  WHERE {
         |    {
-        |      SELECT ?dsId (MIN(?date) as ?minDate)
+        |      SELECT ?dsId (MIN(xsd:dateTime(?date)) as ?minDate)
         |      WHERE {
         |        ?dsId a schema:Dataset;
         |              schema:dateCreated ?date.
         |      }
         |      GROUP BY ?dsId
         |      HAVING (COUNT(?date) > 1)
-        |      ORDER BY ?dsId
         |    }
         |    ?dsId schema:dateCreated ?date.
         |    FILTER ( ?date != ?minDate )
