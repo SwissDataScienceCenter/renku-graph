@@ -24,8 +24,8 @@ val pureConfigVersion = "0.17.1"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
-libraryDependencies += "eu.timepit"   %% "refined-pureconfig" % "0.9.29"
-libraryDependencies += "io.sentry"     % "sentry-logback"     % "6.1.2"
+libraryDependencies += "eu.timepit"   %% "refined-pureconfig" % "0.10.1"
+libraryDependencies += "io.sentry"     % "sentry-logback"     % "6.4.0"
 libraryDependencies += "org.tpolecat" %% "skunk-core"         % "0.3.1"
 
 val http4sVersion = "0.23.12"
@@ -36,11 +36,11 @@ libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersi
 libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
 
-libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.3.5"
-libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.3.2"
+libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.3.14"
+libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.4.0"
 
 // Test dependencies
-val testContainersScalaVersion = "0.40.8"
+val testContainersScalaVersion = "0.40.10"
 libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
 libraryDependencies += "com.github.tomakehurst" % "wiremock-jre8"                   % "2.33.2"                   % Test
