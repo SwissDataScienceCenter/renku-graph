@@ -36,13 +36,13 @@ private object HtmlGenerator {
   private[ontology] val ontologyJsonLDFile: Path = Path.of("ontology.jsonld")
   private[ontology] val ontologyConfFile:   Path = Path.of("ontology.properties")
   private[ontology] val ontologyConfig = Seq(
-    "abstract"               -> "Renku Ontology",
-    "ontologyTitle"          -> "Renku Ontology",
-    "ontologyName"           -> "Renku Ontology",
+    "abstract"               -> "Renku Graph Ontology",
+    "ontologyTitle"          -> "Renku Graph Ontology",
+    "ontologyName"           -> "Renku Graph Ontology",
     "ontologyPrefix"         -> "renku",
     "ontologyNamespaceURI"   -> "https://swissdatasciencecenter.github.io/renku-ontology#",
     "ontologyRevisionNumber" -> "9",
-    "authors"                -> "Renku Team",
+    "authors"                -> "Renku Graph Team",
     "authorsInstitution"     -> "Swiss Data Science Center",
     "authorsInstitutionURI"  -> "https://datascience.ch",
     "licenseName"            -> "Licensed under the Apache License, Version 2.0",
@@ -62,7 +62,8 @@ private object HtmlGenerator {
         ontologyConfFile.toString,
         "-rewriteAll",
         "-webVowl",
-        "-uniteSections"
+        "-uniteSections",
+        "-excludeIntroduction"
       ).toArray
     )
   }
