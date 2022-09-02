@@ -20,7 +20,6 @@ package io.renku.knowledgegraph.ontology
 
 import cats.effect.{Async, Deferred, Sync}
 import cats.syntax.all._
-import io.renku.jsonld.JsonLD
 import widoco.gui.GuiController
 
 import java.nio.file.{Files, Path}
@@ -63,7 +62,7 @@ private object HtmlGenerator {
         "-rewriteAll",
         "-webVowl",
         "-uniteSections",
-        "-excludeIntroduction"
+        "-noPlaceHolderText"
       ).toArray
     )
   }
@@ -83,21 +82,23 @@ private class HtmlGeneratorImpl[F[_]: Async](
 
   private lazy val readinessFlag: Deferred[F, Unit] = Deferred.unsafe[F, Unit]
   private lazy val generationProcess: F[Unit] =
-    Sync[F].delay[Unit](createDirectory()) >>
-      Sync[F].delay[Unit](writeToFile(ontologyGenerator.getOntology)) >>
+    Sync[F].delay[Unit](createDirectory(generationPath)) >>
+      Sync[F].delay[Unit](
+        writeToFile(generationPath resolve ontologyJsonLDFile, ontologyGenerator.getOntology.toJson.spaces2)
+      ) >>
       Sync[F].delay[Unit](writeOntologyProperties()) >>
       Sync[F].delay[Unit](
         generateHtml(generationPath resolve ontologyJsonLDFile, generationPath resolve ontologyConfFile, generationPath)
       ) >>
       readinessFlag.complete(()).void
 
-  private def createDirectory(): Unit = {
-    if (!Files.isDirectory(generationPath)) Files.createDirectory(generationPath)
+  private def createDirectory(path: Path): Unit = {
+    if (!Files.isDirectory(path)) Files.createDirectory(path)
     ()
   }
 
-  private def writeToFile(ontology: JsonLD): Unit = {
-    Files.writeString(generationPath resolve ontologyJsonLDFile, ontology.toJson.spaces2)
+  private def writeToFile(file: Path, content: String): Unit = {
+    Files.writeString(file, content)
     ()
   }
 
