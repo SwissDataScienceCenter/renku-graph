@@ -32,7 +32,7 @@ object DatasetName extends TinyTypeFactory[DatasetName](new DatasetName(_)) with
   implicit val configReader: ConfigReader[DatasetName] = stringTinyTypeReader(DatasetName)
 }
 
-trait DatasetConfigFile extends StringTinyType
+trait DatasetConfigFile extends Any with StringTinyType
 object DatasetConfigFile {
   implicit lazy val show: Show[DatasetConfigFile] = Show.show(_.toString)
 }

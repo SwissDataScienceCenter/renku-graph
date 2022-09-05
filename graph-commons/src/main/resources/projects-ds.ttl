@@ -1,0 +1,43 @@
+@prefix :       <http://base/#> .
+@prefix tdb2:   <http://jena.apache.org/2016/tdb#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix fuseki: <http://jena.apache.org/fuseki#> .
+@prefix text:   <http://jena.apache.org/text#> .
+@prefix schema: <http://schema.org/> .
+@prefix renku:  <https://swissdatasciencecenter.github.io/renku-ontology#> .
+
+:service_tdb_all a                  fuseki:Service ;
+  rdfs:label                        "TDB2 projects" ;
+  fuseki:dataset                    :text_dataset ;
+  fuseki:name                       "projects" ;
+  fuseki:serviceQuery               "query" , "" , "sparql" ;
+  fuseki:serviceReadGraphStore      "get" ;
+  fuseki:serviceReadQuads           "" ;
+  fuseki:serviceReadWriteGraphStore "data" ;
+  fuseki:serviceReadWriteQuads      "" ;
+  fuseki:serviceUpdate              "" , "update" ;
+  fuseki:serviceUpload              "upload" .
+
+:text_dataset a  text:TextDataset ;
+  text:dataset   :tdb_projects ;
+  text:index     <#indexLucene> ;
+.
+
+:tdb_projects a  tdb2:DatasetTDB2 ;
+  tdb2:location  "/fuseki/databases/projects" .
+
+<#indexLucene> a text:TextIndexLucene ;
+  text:directory <file:///fuseki/databases/projects/lucene_index> ;
+  text:entityMap <#entMap> ;
+.
+
+<#entMap> a         text:EntityMap ;
+  text:defaultField "name" ;
+  text:entityField  "uri" ;
+  text:map (
+    [ text:field "name" ;              text:predicate schema:name ]
+    [ text:field "description" ;       text:predicate schema:description ]
+    [ text:field "slug" ;              text:predicate renku:slug ]
+    [ text:field "projectNamespaces" ; text:predicate renku:projectNamespaces ]
+    [ text:field "keywords" ;          text:predicate schema:keywords ]
+  ) .

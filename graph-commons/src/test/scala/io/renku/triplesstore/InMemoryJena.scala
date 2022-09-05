@@ -211,6 +211,21 @@ trait RenkuDataset extends JenaDataset {
   registerDataset(connectionInfoFactory, configFile)
 }
 
+trait ProjectsDataset extends JenaDataset {
+  self: InMemoryJena =>
+
+  private lazy val configFile: Either[Exception, DatasetConfigFile] = ProjectsTTL.fromTtlFile()
+  private lazy val connectionInfoFactory: FusekiUrl => ProjectsConnectionConfig = ProjectsConnectionConfig(
+    _,
+    BasicAuthCredentials(BasicAuthUsername("renku"), BasicAuthPassword("renku"))
+  )
+
+  def projectsDSConnectionInfo: ProjectsConnectionConfig = connectionInfoFactory(fusekiUrl)
+  def projectsDataset:          DatasetName              = projectsDSConnectionInfo.datasetName
+
+  registerDataset(connectionInfoFactory, configFile)
+}
+
 trait MigrationsDataset extends JenaDataset {
   self: InMemoryJena =>
 
@@ -220,8 +235,8 @@ trait MigrationsDataset extends JenaDataset {
     BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
   )
 
-  def migrationsDataset:          DatasetName                = migrationsDSConnectionInfo.datasetName
   def migrationsDSConnectionInfo: MigrationsConnectionConfig = connectionInfoFactory(fusekiUrl)
+  def migrationsDataset:          DatasetName                = migrationsDSConnectionInfo.datasetName
 
   registerDataset(connectionInfoFactory, configFile)
 }
