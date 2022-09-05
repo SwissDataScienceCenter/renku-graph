@@ -39,6 +39,7 @@ trait RenkuProjectEntitiesGenerators {
   self: EntitiesGenerators =>
 
   lazy val visibilityPublic:    Gen[Visibility] = fixed(Visibility.Public)
+  lazy val visibilityPrivate:   Gen[Visibility] = fixed(Visibility.Private)
   lazy val visibilityNonPublic: Gen[Visibility] = Gen.oneOf(Visibility.Internal, Visibility.Private)
   lazy val anyVisibility:       Gen[Visibility] = projectVisibilities
 
@@ -199,6 +200,11 @@ trait RenkuProjectEntitiesGenerators {
         dataset:              Dataset[PIN]
     )(implicit newProvenance: ProvenanceImportFactory[PIN, POUT]): Gen[(Dataset[POUT], RenkuProject)] =
       projectGen.map(_.importDataset(dataset))
+
+    def importDataset(
+        publicationEvent: PublicationEvent
+    ): Gen[(Dataset[Dataset.Provenance.ImportedInternal], RenkuProject)] =
+      projectGen.map(_.importDataset(publicationEvent))
 
     def modify(f: RenkuProject => RenkuProject): Gen[RenkuProject] = projectGen.map {
       case project: RenkuProject.WithoutParent => f(project)

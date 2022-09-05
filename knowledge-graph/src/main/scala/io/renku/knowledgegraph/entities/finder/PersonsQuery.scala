@@ -31,15 +31,18 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
   override val selectVariables = Set("?entityType", "?matchingScore", "?name")
 
   override def query(criteria: Endpoint.Criteria) =
-    (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
+    (criteria.filters whenRequesting (entityType, criteria.filters.withNoOrPublicVisibility, criteria.filters.namespaces.isEmpty, criteria.filters.maybeSince.isEmpty, criteria.filters.maybeUntil.isEmpty)) {
       import criteria._
+      // format: off
       s"""|{
           |  SELECT DISTINCT ?entityType ?matchingScore ?name
           |  WHERE {
           |    {
           |      SELECT (SAMPLE(?id) AS ?personId) ?name (MAX(?score) AS ?matchingScore)
           |      WHERE {
-          |        (?id ?score) text:query (schema:name '${filters.query}').
+          |        ${filters.onQuery(
+                   s"""(?id ?score) text:query (schema:name '${filters.query}').""",
+                   matchingScoreVariableName = "?score")}
           |        ?id a schema:Person;
           |            schema:name ?name.
           |        ${filters.maybeOnCreatorName("?name")}
@@ -50,14 +53,15 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
           |  }
           |}
           |""".stripMargin
+    // format: on
     }
 
-  override def decoder[EE >: Entity.Person]: Decoder[EE] = { cursor =>
+  override def decoder[EE >: Entity.Person]: Decoder[EE] = { implicit cursor =>
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     for {
-      matchingScore <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-      name          <- cursor.downField("name").downField("value").as[persons.Name]
+      matchingScore <- extract[MatchingScore]("matchingScore")
+      name          <- extract[persons.Name]("name")
     } yield Entity.Person(matchingScore, name)
   }
 }

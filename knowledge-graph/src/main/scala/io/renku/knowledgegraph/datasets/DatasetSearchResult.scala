@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.datasets
+package io.renku.knowledgegraph
+package datasets
 
-import Dataset.DatasetCreator
 import DatasetSearchResult.ProjectsCount
 import cats.syntax.all._
 import io.circe.literal._
@@ -63,22 +63,22 @@ object DatasetSearchResult {
                              images
         ) =>
       json"""{
-        "identifier": $id,
-        "title": $title,
-        "name": $name,
-        "published": ${creators -> date},
-        "date": ${date.instant},
+        "identifier":    $id,
+        "title":         $title,
+        "name":          $name,
+        "published":     ${creators -> date},
+        "date":          ${date.instant},
         "projectsCount": $projectsCount,
-        "keywords": $keywords,
-        "images": ${images -> exemplarProjectPath}
+        "keywords":      $keywords,
+        "images":        ${images -> exemplarProjectPath}
       }"""
         .addIfDefined("description" -> maybeDescription)
-        .deepMerge(_links(Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, id))))
+        .deepMerge(_links(Link(Rel("details") -> datasets.details.Endpoint.href(renkuApiUrl, id))))
   }
 
   private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] = Encoder.instance {
     case (creators, DatePublished(date)) => json"""{
-    "creator": $creators,
+    "creator":       $creators,
     "datePublished": $date
   }"""
     case (creators, _) => json"""{

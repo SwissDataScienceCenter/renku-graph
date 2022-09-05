@@ -10,7 +10,8 @@ COPY . .
 RUN export PATH="/usr/local/sbt/bin:$PATH" && \
     apk update && apk add --no-cache --virtual .build-dependencies bash wget tar git && \
     mkdir -p "/usr/local/sbt" && \
-    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.7.0/sbt-1.7.0.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    wget -qO - "https://github.com/sbt/sbt/releases/download/v1.7.1/sbt-1.7.1.tgz" | tar xz -C /usr/local/sbt --strip-components=1 && \
+    sbt writeVersionToVersionSbt && \
     sbt writeVersionToVersionConf && \
     sbt "project triples-generator" stage && \
     apk del .build-dependencies
@@ -30,7 +31,7 @@ RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py
     python3 -m pip install --ignore-installed packaging && \
     python3 -m pip install --upgrade 'pip==22.0.4' && \
     python3 -m pip install jinja2 && \
-    python3 -m pip install 'renku==1.6.0' 'sentry-sdk==1.5.5'  && \
+    python3 -m pip install 'renku==1.7.0' 'sentry-sdk==1.5.5'  && \
     chown -R daemon:daemon .
 
 COPY triples-generator/entrypoint.sh /entrypoint.sh

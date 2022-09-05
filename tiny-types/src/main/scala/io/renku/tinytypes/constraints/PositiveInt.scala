@@ -18,9 +18,12 @@
 
 package io.renku.tinytypes.constraints
 
-import io.renku.tinytypes.{Constraints, IntTinyType}
+import eu.timepit.refined.numeric.Positive
+import io.renku.tinytypes._
 
-trait PositiveInt[TT <: IntTinyType] extends Constraints[TT] {
+trait PositiveInt[TT <: TinyType { type V = Int }] extends Constraints[TT] with RefinedValue[TT, Positive] {
+  self: TinyTypeFactory[TT] =>
+
   addConstraint(
     check = _ > 0,
     message = _ => s"$typeName cannot be <= 0"

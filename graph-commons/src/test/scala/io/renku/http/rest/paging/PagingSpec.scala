@@ -97,9 +97,7 @@ class PagingSpec extends AnyWordSpec with should.Matchers with IOSpec {
       }
   }
 
-  private class ResultsFinder(
-      returning: IO[List[Int]]
-  )(total:       IO[Total] = returning.map(_.size).map(Total(_)))
+  private class ResultsFinder(returning: IO[List[Int]])(total: IO[Total] = returning.map(_.size).map(Total(_)))
       extends Paging[Int] {
 
     private implicit val resultsFinder: PagedResultsFinder[IO, Int] = new PagedResultsFinder[IO, Int] {

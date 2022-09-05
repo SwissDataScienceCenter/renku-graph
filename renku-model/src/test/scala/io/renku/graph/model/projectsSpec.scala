@@ -98,9 +98,18 @@ class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
   }
 
   "toNamespaces" should {
-    "extract all the path segment except the last" in {
+    "extract all the path segments except the last one" in {
       forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
         Path(s"${namespaces.map(_.show).nonEmptyIntercalate("/")}/$name").toNamespaces shouldBe namespaces.toList
+      }
+    }
+  }
+
+  "toNamespace" should {
+    "extract the namespace from the path" in {
+      forAll(projectNamespaces.toGeneratorOfNonEmptyList(), projectNames) { (namespaces, name) =>
+        val namespaceAsString = namespaces.map(_.show).nonEmptyIntercalate("/")
+        Path(s"$namespaceAsString/$name").toNamespace shouldBe Namespace(namespaceAsString)
       }
     }
   }

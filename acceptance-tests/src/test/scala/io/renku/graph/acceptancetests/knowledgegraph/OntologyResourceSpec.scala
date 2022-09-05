@@ -38,7 +38,7 @@ class OntologyResourceSpec extends AnyFeatureSpec with GivenWhenThen with GraphS
       Then("he should get OK response with ontology HTML page")
       status                      shouldBe Ok
       headers.get[`Content-Type`] shouldBe Some(`Content-Type`(text.html))
-      pageBody                      should include("Renku Ontology")
+      pageBody                      should include("Renku Graph Ontology")
     }
   }
 }

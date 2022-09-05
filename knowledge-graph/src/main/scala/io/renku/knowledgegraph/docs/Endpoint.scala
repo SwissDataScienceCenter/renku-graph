@@ -22,9 +22,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.config.ServiceVersion
-import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
-import io.renku.knowledgegraph.docs.model._
 import io.renku.knowledgegraph._
+import io.renku.knowledgegraph.docs.model._
 import org.http4s
 import org.http4s.circe.jsonEncoder
 import org.http4s.dsl.Http4sDsl
@@ -33,38 +32,32 @@ trait Endpoint[F[_]] {
   def `get /spec.json`: F[http4s.Response[F]]
 }
 
-private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEndpointDocs,
-                                        datasetEndpoint:         DatasetEndpointDocs,
-                                        entitiesEndpoint:        entities.EndpointDocs,
-                                        ontologyEndpoint:        ontology.EndpointDocs,
-                                        projectEndpoint:         projectdetails.EndpointDocs,
-                                        projectDatasetsEndpoint: ProjectDatasetsEndpointDocs,
-                                        docsEndpoint:            EndpointDocs,
-                                        serviceVersion:          ServiceVersion
+private class EndpointImpl[F[_]: Async](serviceVersion: ServiceVersion,
+                                        endpoint:  EndpointDocs,
+                                        endpoints: EndpointDocs*
 ) extends Http4sDsl[F]
     with Endpoint[F] {
   import Encoders._
 
   override def `get /spec.json`: F[http4s.Response[F]] = Ok(doc.asJson)
 
-  lazy val doc: OpenApiDocument = OpenApiDocument(
-    openApiVersion = "3.0.3",
-    Info("Knowledge Graph API",
-         "Get info about datasets, users, activities, and other entities".some,
-         serviceVersion.value
-    )
-  ).addServer(server)
-    .addPath(datasetsSearchEndpoint.path)
-    .addPath(datasetEndpoint.path)
-    .addPath(entitiesEndpoint.path)
-    .addPath(ontologyEndpoint.path)
-    .addPath(projectEndpoint.path)
-    .addPath(projectDatasetsEndpoint.path)
-    .addPath(lineage.EndpointDocs.path)
-    .addPath(docsEndpoint.path)
-    .addSecurity(privateToken)
-    .addSecurity(openIdConnect)
-    .addNoAuthSecurity()
+  lazy val doc: OpenApiDocument = {
+    val document = OpenApiDocument(
+      openApiVersion = "3.0.3",
+      Info("Knowledge Graph API",
+           "Get info about datasets, users, activities, and other entities".some,
+           serviceVersion.value
+      )
+    ).addServer(server)
+
+    endpoints
+      .foldLeft(document addPath endpoint.path) { (d, endpoint) =>
+        d.addPath(endpoint.path)
+      }
+      .addSecurity(privateToken)
+      .addSecurity(openIdConnect)
+      .addNoAuthSecurity()
+  }
 
   private lazy val server = Server(
     url = "/knowledge-graph",
@@ -86,21 +79,26 @@ private class EndpointImpl[F[_]: Async](datasetsSearchEndpoint: DatasetSearchEnd
 
 object Endpoint {
   def apply[F[_]: Async]: F[Endpoint[F]] = for {
-    datasetsSearchEndpoint  <- DatasetSearchEndpointDocs[F]
-    datasetEndpoint         <- DatasetEndpointDocs[F]
-    entitiesEndpoint        <- entities.EndpointDocs[F]
-    ontologyEndpoint        <- ontology.EndpointDocs[F]
-    projectEndpoint         <- projectdetails.EndpointDocs[F]
-    projectDatasetsEndpoint <- ProjectDatasetsEndpointDocs[F]
-    docsEndpointEndpoint    <- EndpointDocs[F]
-    serviceVersion          <- ServiceVersion.readFromConfig[F]()
-  } yield new EndpointImpl[F](datasetsSearchEndpoint,
-                              datasetEndpoint,
+    datasetsEndpoint           <- datasets.EndpointDocs[F]
+    datasetDetailsEndpoint     <- datasets.details.EndpointDocs[F]
+    entitiesEndpoint           <- entities.EndpointDocs[F]
+    ontologyEndpoint           <- ontology.EndpointDocs[F]
+    projectDetailsEndpoint     <- projects.details.EndpointDocs[F]
+    projectDatasetsEndpoint    <- projects.datasets.EndpointDocs[F]
+    projectDatasetTagsEndpoint <- projects.datasets.tags.EndpointDocs[F]
+    userProjectsEndpoint       <- users.projects.EndpointDocs[F]
+    docsEndpointEndpoint       <- EndpointDocs[F]
+    serviceVersion             <- ServiceVersion.readFromConfig[F]()
+  } yield new EndpointImpl[F](serviceVersion,
+                              datasetsEndpoint,
+                              datasetDetailsEndpoint,
                               entitiesEndpoint,
                               ontologyEndpoint,
-                              projectEndpoint,
+                              projectDetailsEndpoint,
+                              projects.files.lineage.EndpointDocs,
                               projectDatasetsEndpoint,
+                              projectDatasetTagsEndpoint,
                               docsEndpointEndpoint,
-                              serviceVersion
+                              userProjectsEndpoint
   )
 }

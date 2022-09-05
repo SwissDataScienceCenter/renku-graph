@@ -53,6 +53,9 @@ Hence, we are trying to find and then follow good patterns in naming, code organ
 * great attention should be paid to the scopes on all levels and as a rule it's preferable that the visibility is kept as low as possible;
 * variables should rather be defined the closest possible the usage; we don't follow the old way of top-variables-definition-block as it's hard to see the aim of a variable;
 * ADTs (Abstract Data Types) are used everywhere to make compiler preventing accidental mixing up different domain values; only in very exceptional cases that can be lifted;
+* technical names are rather discouraged in naming as domain and business language; an obvious exception here is more abstract utility defs/classes/objects etc.;
+* packages' names if possible should also carry business info rather than technicalities;
+* it's preferred to use simple names of classes/objects/traits and introduce namespacing through packages over putting context info into compilation unit names; e.g. it's fine to repeat _'Endpoint'_ as a class name of all the endpoints as each endpoint should live in its own package;
 * `implicit`s and Context Bound should/may be used extensively but wisely;
 * `show` String Interpolator should be the first choice over the `s` and `toString`; 
 * obviously the rules above can be always lifted if favour of readability;

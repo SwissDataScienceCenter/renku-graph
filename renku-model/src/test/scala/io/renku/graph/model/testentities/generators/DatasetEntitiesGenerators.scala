@@ -23,7 +23,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{fixed, nonBlankStrings, positiveInts, sentences, timestamps}
+import io.renku.generators.Generators.{fixed, nonBlankStrings, positiveInts, sentences, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetDescriptions, datasetExternalSameAs, datasetIdentifiers, datasetImageUris, datasetInternalSameAs, datasetKeywords, datasetLicenses, datasetNames, datasetOriginalIdentifiers, datasetPartExternals, datasetPartIds, datasetPartSources, datasetPublishedDates, datasetTitles, datasetVersions, projectCreatedDates}
 import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DerivedFrom, ExternalSameAs, Identifier, InternalSameAs, OriginalIdentifier, TopmostSameAs}
@@ -229,11 +229,18 @@ trait DatasetEntitiesGenerators {
     maybeSource <- datasetPartSources.toGeneratorOfOptions
   } yield DatasetPart(datasetPartIds.generateOne, external, entity, dateCreated, maybeSource)
 
-  def publicationEventFactories(minDateCreated: Instant): Gen[Dataset[Provenance] => PublicationEvent] = for {
-    maybeDescription <- sentences().map(_.value).map(publicationEvents.Description.apply).toGeneratorOfOptions
-    name             <- nonBlankStrings(minLength = 5).map(_.value).map(publicationEvents.Name.apply)
-    startDate        <- timestamps(minDateCreated, max = Instant.now()) map publicationEvents.StartDate.apply
-  } yield PublicationEvent(_, maybeDescription, name, startDate)
+  lazy val publicationEventFactories: Instant => Gen[Dataset[Provenance] => PublicationEvent] = minDateCreated =>
+    for {
+      maybeDescription <- sentences().map(_.value).map(publicationEvents.Description.apply).toGeneratorOfOptions
+      name             <- nonBlankStrings(minLength = 5).map(_.value).map(publicationEvents.Name.apply)
+      startDate        <- timestampsNotInTheFuture(minDateCreated) map publicationEvents.StartDate.apply
+    } yield ds => PublicationEvent(ds, maybeDescription, name, startDate)
+
+  lazy val publicationEventEntities: Dataset[Provenance] => Gen[PublicationEvent] = ds =>
+    publicationEventFactories(ds.provenance.date.instant).map(_.apply(ds))
+
+  lazy val publicationEventFactory: Dataset[Provenance] => PublicationEvent = ds =>
+    publicationEventFactories(ds.provenance.date.instant).map(_.apply(ds)).generateOne
 
   implicit class DatasetGenFactoryOps[P <: Dataset.Provenance](factory: DatasetGenFactory[P])(implicit
       renkuUrl:                                                         RenkuUrl

@@ -18,6 +18,7 @@
 
 package io.renku.knowledgegraph.entities
 
+import Endpoint.Criteria
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
@@ -26,9 +27,7 @@ import io.renku.config.renku
 import io.renku.graph.model._
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
-import io.renku.knowledgegraph.datasets.DatasetEndpoint
-import io.renku.knowledgegraph.entities.Endpoint.Criteria
-import io.renku.knowledgegraph.projectdetails
+import io.renku.knowledgegraph
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
 import io.renku.tinytypes.json.TinyTypeEncoders._
@@ -36,7 +35,7 @@ import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
 
 import java.time.Instant
 
-object model {
+private object model {
 
   sealed trait Entity extends Product with Serializable {
     type Name <: StringTinyType
@@ -73,6 +72,7 @@ object model {
             "name":          ${project.name},
             "path":          ${project.path},
             "namespace":     ${project.path.toNamespaces.mkString("/")},
+            "namespaces":    ${toDetailedInfo(project.path.toNamespaces)},
             "visibility":    ${project.visibility},
             "date":          ${project.date},
             "keywords":      ${project.keywords}
@@ -81,10 +81,25 @@ object model {
             .addIfDefined("description" -> project.maybeDescription)
             .deepMerge(
               _links(
-                Link(Rel("details") -> projectdetails.Endpoint.href(renkuApiUrl, project.path))
+                Link(Rel("details") -> knowledgegraph.projects.details.Endpoint.href(renkuApiUrl, project.path))
               )
             )
         }
+
+      private type NamespaceInfo = (Rel, List[projects.Namespace])
+
+      private lazy val toDetailedInfo: List[projects.Namespace] => Json = _.foldLeft(List.empty[NamespaceInfo]) {
+        case (Nil, namespace) => List(Rel(namespace.show) -> List(namespace))
+        case (all @ (_, lastNamespaces) :: _, namespace) =>
+          all ::: (Rel(namespace.show) -> (lastNamespaces ::: namespace :: Nil)) :: Nil
+      }.asJson
+
+      private implicit lazy val namespaceEncoder: Encoder[NamespaceInfo] = Encoder.instance { case (rel, namespaces) =>
+        json"""{
+          "rel":       $rel,
+          "namespace": ${namespaces.map(_.show).mkString("/")}
+        }"""
+      }
     }
 
     final case class Dataset(
@@ -139,7 +154,7 @@ object model {
             .addIfDefined("description" -> ds.maybeDescription)
             .deepMerge(
               _links(
-                Link(Rel("details") -> DatasetEndpoint.href(renkuApiUrl, ds.identifier))
+                Link(Rel("details") -> knowledgegraph.datasets.details.Endpoint.href(renkuApiUrl, ds.identifier))
               )
             )
         }

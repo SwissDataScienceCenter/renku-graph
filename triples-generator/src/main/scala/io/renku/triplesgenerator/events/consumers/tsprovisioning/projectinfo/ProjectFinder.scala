@@ -29,7 +29,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
 import org.http4s.dsl.io.{NotFound, Ok}
-import org.http4s.implicits.http4sLiteralsSyntax
+import org.http4s.implicits._
 import org.http4s.{EntityDecoder, Request, Response, Status}
 import org.typelevel.log4cats.Logger
 
@@ -88,7 +88,7 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
         maybeVisibility  <- cursor.downField("visibility").as[Option[projects.Visibility]]
         dateCreated      <- cursor.downField("created_at").as[projects.DateCreated]
         maybeDescription <- cursor.downField("description").as[Option[projects.Description]]
-        keywords         <- cursor.downField("tag_list").as[Set[Option[projects.Keyword]]].map(_.flatten)
+        keywords         <- cursor.downField("topics").as[Set[Option[projects.Keyword]]].map(_.flatten)
         maybeCreatorId   <- cursor.downField("creator_id").as[Option[persons.GitLabId]]
         maybeParentPath <- cursor
                              .downField("forked_from_project")

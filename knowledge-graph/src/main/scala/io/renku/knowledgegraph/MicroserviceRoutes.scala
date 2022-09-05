@@ -38,8 +38,6 @@ import io.renku.http.server.QueryParameterTools._
 import io.renku.http.server.security.Authentication
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.version
-import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.Phrase
-import io.renku.knowledgegraph.datasets._
 import io.renku.knowledgegraph.graphql.QueryEndpoint
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesstore.SparqlQueryTimeRecorder
@@ -51,30 +49,33 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private class MicroserviceRoutes[F[_]: Async](
-    datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
-    datasetEndpoint:         DatasetEndpoint[F],
-    entitiesEndpoint:        entities.Endpoint[F],
-    queryEndpoint:           QueryEndpoint[F],
-    lineageEndpoint:         lineage.Endpoint[F],
-    ontologyEndpoint:        ontology.Endpoint[F],
-    projectEndpoint:         projectdetails.Endpoint[F],
-    projectDatasetsEndpoint: ProjectDatasetsEndpoint[F],
-    docsEndpoint:            docs.Endpoint[F],
-    authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
-    projectPathAuthorizer:   Authorizer[F, model.projects.Path],
-    datasetIdAuthorizer:     Authorizer[F, model.datasets.Identifier],
-    routesMetrics:           RoutesMetrics[F],
-    versionRoutes:           version.Routes[F]
+    datasetsSearchEndpoint:     datasets.Endpoint[F],
+    datasetDetailsEndpoint:     datasets.details.Endpoint[F],
+    entitiesEndpoint:           entities.Endpoint[F],
+    queryEndpoint:              QueryEndpoint[F],
+    lineageEndpoint:            projects.files.lineage.Endpoint[F],
+    ontologyEndpoint:           ontology.Endpoint[F],
+    projectDetailsEndpoint:     projects.details.Endpoint[F],
+    projectDatasetsEndpoint:    projects.datasets.Endpoint[F],
+    projectDatasetTagsEndpoint: projects.datasets.tags.Endpoint[F],
+    docsEndpoint:               docs.Endpoint[F],
+    usersProjectsEndpoint:      users.projects.Endpoint[F],
+    authMiddleware:             AuthMiddleware[F, Option[AuthUser]],
+    projectPathAuthorizer:      Authorizer[F, model.projects.Path],
+    datasetIdAuthorizer:        Authorizer[F, model.datasets.Identifier],
+    routesMetrics:              RoutesMetrics[F],
+    versionRoutes:              version.Routes[F]
 ) extends Http4sDsl[F] {
 
-  import datasetEndpoint._
+  import datasetDetailsEndpoint._
   import datasetIdAuthorizer.{authorize => authorizeDatasetId}
   import entitiesEndpoint._
   import lineageEndpoint._
   import ontologyEndpoint._
   import org.http4s.HttpRoutes
+  import projectDatasetTagsEndpoint._
   import projectDatasetsEndpoint._
-  import projectEndpoint._
+  import projectDetailsEndpoint._
   import projectPathAuthorizer.{authorize => authorizePath}
   import queryEndpoint._
   import routesMetrics._
@@ -83,12 +84,13 @@ private class MicroserviceRoutes[F[_]: Async](
     (versionRoutes() <+> nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 
   private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
-    `GET /dataset routes` <+> `GET /entities routes` <+> otherAuthRoutes
+    `GET /datasets/*` <+> `GET /entities/*` <+> `GET /projects/*` <+> `GET /users/*` <+> otherAuthRoutes
   }
 
-  private lazy val `GET /dataset routes`: AuthedRoutes[Option[AuthUser], F] = {
-    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Query.query
-    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort.sort
+  private lazy val `GET /datasets/*` : AuthedRoutes[Option[AuthUser], F] = {
+    import datasets.Endpoint.Query.query
+    import datasets.Endpoint.Sort.sort
+    import datasets._
 
     AuthedRoutes.of {
       case GET -> Root / "knowledge-graph" / "datasets"
@@ -99,29 +101,53 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   // format: off
-  private lazy val `GET /entities routes`: AuthedRoutes[Option[AuthUser], F] = {
-    import io.renku.knowledgegraph.entities.Endpoint.Criteria._
+  private lazy val `GET /entities/*`: AuthedRoutes[Option[AuthUser], F] = {
+    import entities.Endpoint.Criteria._
     import Filters.CreatorName.creatorNames
     import Filters.EntityType.entityTypes
     import Filters.Query.query
     import Filters.Since.since
     import Filters.Until.until
     import Filters.Visibility.visibilities
+    import Filters.Namespace.namespaces
     import Sorting.sort
 
     AuthedRoutes.of {
       case req@GET -> Root / "knowledge-graph" / "entities"
         :? query(maybeQuery) +& entityTypes(maybeTypes) +& creatorNames(maybeCreators)
-        +& visibilities(maybeVisibilities) +& since(maybeSince) +& until(maybeUntil) 
+        +& visibilities(maybeVisibilities) +& namespaces(maybeNamespaces) 
+        +& since(maybeSince) +& until(maybeUntil) 
         +& sort(maybeSort) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
-        searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeVisibilities,
+        searchForEntities(maybeQuery, maybeTypes, maybeCreators, maybeVisibilities, maybeNamespaces,
           maybeSince, maybeUntil, maybeSort, maybePage, maybePerPage, maybeUser, req.req)
     }
   }
   // format: on
 
+  private lazy val `GET /users/*` : AuthedRoutes[Option[AuthUser], F] = {
+    import users.binders._
+    import users.projects.Endpoint._
+    import Criteria.Filters
+    import Criteria.Filters.ActivationState._
+    import Criteria.Filters._
+    import usersProjectsEndpoint._
+
+    AuthedRoutes.of {
+      case req @ GET -> Root / "knowledge-graph" / "users" / GitLabId(id) / "projects"
+          :? activationState(maybeState) +& page(maybePage) +& perPage(maybePerPage) as maybeUser =>
+        (maybeState getOrElse ActivationState.All.validNel, PagingRequest(maybePage, maybePerPage))
+          .mapN { (activationState, paging) =>
+            `GET /users/:id/projects`(Criteria(userId = id, Filters(activationState), paging, maybeUser), req.req)
+          }
+          .fold(toBadRequest, identity)
+    }
+  }
+
   private lazy val otherAuthRoutes: AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
     case authReq @ POST -> Root / "knowledge-graph" / "graphql" as maybeUser => handleQuery(authReq.req, maybeUser)
+  }
+
+  private lazy val `GET /projects/*` : AuthedRoutes[Option[AuthUser], F] = AuthedRoutes.of {
     case authReq @ GET -> "knowledge-graph" /: "projects" /: path as maybeUser =>
       routeToProjectsEndpoints(path, maybeUser)(authReq.req)
   }
@@ -134,14 +160,15 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private def searchForDatasets(
-      maybePhrase:   Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
-      maybeSort:     Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Sort.By]],
+      maybePhrase:   Option[ValidatedNel[ParseFailure, datasets.Endpoint.Query.Phrase]],
+      maybeSort:     Option[ValidatedNel[ParseFailure, datasets.Endpoint.Sort.By]],
       maybePage:     Option[ValidatedNel[ParseFailure, Page]],
       maybePerPage:  Option[ValidatedNel[ParseFailure, PerPage]],
       maybeAuthUser: Option[AuthUser]
   ): F[Response[F]] = {
-    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort
-    import io.renku.knowledgegraph.datasets.DatasetsSearchEndpoint.Sort._
+    import datasets.Endpoint.Query._
+    import datasets.Endpoint.Sort
+    import datasets.Endpoint.Sort._
 
     (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
      maybeSort getOrElse Validated.validNel(Sort.By(TitleProperty, Direction.Asc)),
@@ -156,6 +183,7 @@ private class MicroserviceRoutes[F[_]: Async](
       types:        ValidatedNel[ParseFailure, List[entities.Endpoint.Criteria.Filters.EntityType]],
       creators:     ValidatedNel[ParseFailure, List[persons.Name]],
       visibilities: ValidatedNel[ParseFailure, List[model.projects.Visibility]],
+      namespaces:   ValidatedNel[ParseFailure, List[model.projects.Namespace]],
       maybeSince:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Since]],
       maybeUntil:   Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Filters.Until]],
       maybeSort:    Option[ValidatedNel[ParseFailure, entities.Endpoint.Criteria.Sorting.By]],
@@ -173,6 +201,7 @@ private class MicroserviceRoutes[F[_]: Async](
       types.map(_.toSet),
       creators.map(_.toSet),
       visibilities.map(_.toSet),
+      namespaces.map(_.toSet),
       maybeSince.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Since])),
       maybeUntil.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Until])),
       maybeSort getOrElse Validated.validNel(Sorting.By(ByName, Direction.Asc)),
@@ -185,9 +214,9 @@ private class MicroserviceRoutes[F[_]: Async](
           case _ => ().validNel[ParseFailure]
         }
         .getOrElse(().validNel[ParseFailure])
-    ).mapN { case (maybeQuery, types, creators, visibilities, maybeSince, maybeUntil, sorting, paging, _) =>
+    ).mapN { case (maybeQuery, types, creators, visibilities, namespaces, maybeSince, maybeUntil, sorting, paging, _) =>
       `GET /entities`(
-        Criteria(Filters(maybeQuery, types, creators, visibilities, maybeSince, maybeUntil),
+        Criteria(Filters(maybeQuery, types, creators, visibilities, namespaces, maybeSince, maybeUntil),
                  sorting,
                  paging,
                  maybeUser
@@ -207,6 +236,20 @@ private class MicroserviceRoutes[F[_]: Async](
       path:           Path,
       maybeAuthUser:  Option[AuthUser]
   )(implicit request: Request[F]): F[Response[F]] = path.segments.toList.map(_.toString) match {
+    case projectPathParts :+ "datasets" :+ datasets.DatasetName(dsName) :+ "tags" =>
+      import projects.datasets.tags.Endpoint._
+
+      PagingRequest(page.find(request.uri.query), perPage.find(request.uri.query))
+        .map(paging =>
+          projectPathParts.toProjectPath
+            .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
+            .semiflatMap(path =>
+              `GET /projects/:path/datasets/:name/tags`(Criteria(path, dsName, paging, maybeAuthUser))
+            )
+            .merge
+        )
+        .fold(toBadRequest, identity)
+
     case projectPathParts :+ "datasets" =>
       projectPathParts.toProjectPath
         .flatTap(authorizePath(_, maybeAuthUser).leftMap(_.toHttpResponse))
@@ -222,7 +265,7 @@ private class MicroserviceRoutes[F[_]: Async](
   }
 
   private def getLineage(projectPathParts: List[String], location: String, maybeAuthUser: Option[AuthUser]) = {
-    import io.renku.knowledgegraph.lineage.model.Node.Location
+    import projects.files.lineage.model.Node.Location
 
     def toLocation(location: String): EitherT[F, Response[F], Location] = EitherT.fromEither[F] {
       Location
@@ -257,29 +300,33 @@ private object MicroserviceRoutes {
   ): IO[MicroserviceRoutes[IO]] = GitLabClient[IO]() >>= { implicit gitLabClient =>
     AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
       for {
-        datasetsSearchEndpoint  <- DatasetsSearchEndpoint[IO]
-        datasetEndpoint         <- DatasetEndpoint[IO]
-        entitiesEndpoint        <- entities.Endpoint[IO]
-        queryEndpoint           <- QueryEndpoint()
-        lineageEndpoint         <- lineage.Endpoint[IO]
-        ontologyEndpoint        <- ontology.Endpoint[IO]
-        projectEndpoint         <- projectdetails.Endpoint[IO]
-        projectDatasetsEndpoint <- ProjectDatasetsEndpoint[IO]
-        docsEndpoint            <- docs.Endpoint[IO]
-        authenticator           <- GitLabAuthenticator[IO]
-        authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-        projectPathAuthorizer   <- Authorizer.using(ProjectPathRecordsFinder[IO])
-        datasetIdAuthorizer     <- Authorizer.using(DatasetIdRecordsFinder[IO])
-        versionRoutes           <- version.Routes[IO]
+        datasetsSearchEndpoint     <- datasets.Endpoint[IO]
+        datasetDetailsEndpoint     <- datasets.details.Endpoint[IO]
+        entitiesEndpoint           <- entities.Endpoint[IO]
+        queryEndpoint              <- QueryEndpoint()
+        lineageEndpoint            <- projects.files.lineage.Endpoint[IO]
+        ontologyEndpoint           <- ontology.Endpoint[IO]
+        projectDetailsEndpoint     <- projects.details.Endpoint[IO]
+        projectDatasetsEndpoint    <- projects.datasets.Endpoint[IO]
+        projectDatasetTagsEndpoint <- projects.datasets.tags.Endpoint[IO]
+        docsEndpoint               <- docs.Endpoint[IO]
+        usersProjectsEndpoint      <- users.projects.Endpoint[IO]
+        authenticator              <- GitLabAuthenticator[IO]
+        authMiddleware             <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
+        projectPathAuthorizer      <- Authorizer.using(ProjectPathRecordsFinder[IO])
+        datasetIdAuthorizer        <- Authorizer.using(DatasetIdRecordsFinder[IO])
+        versionRoutes              <- version.Routes[IO]
       } yield new MicroserviceRoutes(datasetsSearchEndpoint,
-                                     datasetEndpoint,
+                                     datasetDetailsEndpoint,
                                      entitiesEndpoint,
                                      queryEndpoint,
                                      lineageEndpoint,
                                      ontologyEndpoint,
-                                     projectEndpoint,
+                                     projectDetailsEndpoint,
                                      projectDatasetsEndpoint,
+                                     projectDatasetTagsEndpoint,
                                      docsEndpoint,
+                                     usersProjectsEndpoint,
                                      authMiddleware,
                                      projectPathAuthorizer,
                                      datasetIdAuthorizer,

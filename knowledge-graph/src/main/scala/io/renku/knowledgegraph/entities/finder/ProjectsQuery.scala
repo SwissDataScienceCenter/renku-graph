@@ -42,13 +42,15 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
 
   override def query(criteria: Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
+    // format: off
     s"""|{
         |  SELECT ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName
         |    ?maybeDescription (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
-        |  WHERE { 
-        |    {
+        |  WHERE {
+        |    ${filters.onQuery(
+    s"""|    {
         |      SELECT ?projectId (MAX(?score) AS ?matchingScore)
-        |      WHERE { 
+        |      WHERE {
         |        {
         |          (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query}')
         |        } {
@@ -61,13 +63,17 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
         |      }
         |      GROUP BY ?projectId
         |    }
+        |""")}
         |    BIND ('project' AS ?entityType)
-        |    ?projectId schema:name ?name;
+        |    ?projectId a schema:Project;
+        |               schema:name ?name;
         |               renku:projectPath ?path;
         |               renku:projectVisibility ?visibility;
+        |               renku:projectNamespace ?namespace;
         |               schema:dateCreated ?date.
         |    ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
         |    ${filters.maybeOnVisibility("?visibility")}
+        |    ${filters.maybeOnNamespace("?namespace")}
         |    ${filters.maybeOnDateCreated("?date")}
         |    OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
         |    ${filters.maybeOnCreatorName("?maybeCreatorName")}
@@ -77,25 +83,24 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
         |  GROUP BY ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName ?maybeDescription
         |}
         |""".stripMargin
+    // format: on
   }
 
-  override def decoder[EE >: Entity.Project]: Decoder[EE] = { cursor =>
+  override def decoder[EE >: Entity.Project]: Decoder[EE] = { implicit cursor =>
     import DecodingTools._
+    import cats.syntax.all._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
     for {
-      matchingScore    <- cursor.downField("matchingScore").downField("value").as[MatchingScore]
-      path             <- cursor.downField("path").downField("value").as[projects.Path]
-      name             <- cursor.downField("name").downField("value").as[projects.Name]
-      visibility       <- cursor.downField("visibility").downField("value").as[projects.Visibility]
-      dateCreated      <- cursor.downField("date").downField("value").as[projects.DateCreated]
-      maybeCreatorName <- cursor.downField("maybeCreatorName").downField("value").as[Option[persons.Name]]
-      keywords <- cursor
-                    .downField("keywords")
-                    .downField("value")
-                    .as[Option[String]]
-                    .flatMap(toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword))
-      maybeDescription <- cursor.downField("maybeDescription").downField("value").as[Option[projects.Description]]
+      matchingScore    <- extract[MatchingScore]("matchingScore")
+      path             <- extract[projects.Path]("path")
+      name             <- extract[projects.Name]("name")
+      visibility       <- extract[projects.Visibility]("visibility")
+      dateCreated      <- extract[projects.DateCreated]("date")
+      maybeCreatorName <- extract[Option[persons.Name]]("maybeCreatorName")
+      keywords <-
+        extract[Option[String]]("keywords") >>= toListOf[projects.Keyword, projects.Keyword.type](projects.Keyword)
+      maybeDescription <- extract[Option[projects.Description]]("maybeDescription")
     } yield Entity.Project(matchingScore,
                            path,
                            name,

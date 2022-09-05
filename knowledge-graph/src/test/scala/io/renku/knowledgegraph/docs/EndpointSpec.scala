@@ -24,12 +24,9 @@ import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.EndpointTester._
-import io.renku.knowledgegraph.datasets.{DatasetEndpointDocs, DatasetSearchEndpointDocs, ProjectDatasetsEndpointDocs}
-import io.renku.knowledgegraph.{ontology, projectdetails}
 import io.renku.knowledgegraph.docs.OpenApiTester._
 import io.renku.knowledgegraph.docs.model.Operation.GET
 import io.renku.knowledgegraph.docs.model.{Path, Uri}
-import io.renku.knowledgegraph.entities
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -48,43 +45,21 @@ class EndpointSpec extends AnyWordSpec with should.Matchers with IOSpec with Moc
 
   private trait TestCase {
 
-    private val datasetsSearchEndpoint = mock[DatasetSearchEndpointDocs]
-    (() => datasetsSearchEndpoint.path)
+    private val endpointDocs1 = mock[EndpointDocs]
+    (() => endpointDocs1.path)
       .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "datasets")))
-    private val datasetEndpoint = mock[DatasetEndpointDocs]
-    (() => datasetEndpoint.path)
-      .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "datasets" / "1234")))
-    private val entitiesEndpoint = mock[entities.EndpointDocs]
-    (() => entitiesEndpoint.path)
-      .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "entities")))
-    private val ontologyEndpoint = mock[ontology.EndpointDocs]
-    (() => ontologyEndpoint.path)
-      .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "ontology")))
-    private val projectEndpoint = mock[projectdetails.EndpointDocs]
-    (() => projectEndpoint.path)
-      .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "namespace" / "name")))
-    private val projectDatasetsEndpoint = mock[ProjectDatasetsEndpointDocs]
-    (() => projectDatasetsEndpoint.path)
-      .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "projects" / "datasets")))
-    private val docsEndpoint = mock[EndpointDocs]
-    (() => docsEndpoint.path)
-      .expects()
-      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / "spec.json")))
+      .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / nonEmptyStrings().generateOne)))
 
-    val endpoint = new EndpointImpl[IO](datasetsSearchEndpoint,
-                                        datasetEndpoint,
-                                        entitiesEndpoint,
-                                        ontologyEndpoint,
-                                        projectEndpoint,
-                                        projectDatasetsEndpoint,
-                                        docsEndpoint,
-                                        serviceVersions.generateOne
-    )
+    val otherEndpointDocs = 1 to ints(min = 1, max = 10).generateOne map { _ =>
+      val docs = mock[EndpointDocs]
+
+      (() => docs.path)
+        .expects()
+        .returns(Path(nonEmptyStrings().generateOne, description = None, GET(Uri / nonEmptyStrings().generateOne)))
+
+      docs
+    }
+
+    val endpoint = new EndpointImpl[IO](serviceVersions.generateOne, endpointDocs1, otherEndpointDocs: _*)
   }
 }

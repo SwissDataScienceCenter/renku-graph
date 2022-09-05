@@ -19,8 +19,8 @@
 organization := "io.renku"
 name := "generators"
 
-libraryDependencies += "eu.timepit"     %% "refined"    % "0.9.29"
+libraryDependencies += "eu.timepit"     %% "refined"    % "0.10.1"
 libraryDependencies += "io.circe"       %% "circe-core" % "0.14.2"
 libraryDependencies += "io.renku"       %% "jsonld4s"   % "0.2.0"
 libraryDependencies += "org.typelevel"  %% "cats-core"  % "2.8.0"
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.3" // version 1.15.1 is broken
+libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.16.0"

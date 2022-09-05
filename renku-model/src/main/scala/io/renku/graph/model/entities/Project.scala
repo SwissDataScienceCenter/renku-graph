@@ -349,6 +349,7 @@ object Project {
           entityTypes,
           schema / "name"             -> project.name.asJsonLD,
           renku / "projectPath"       -> project.path.asJsonLD,
+          renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
           renku / "projectNamespaces" -> project.namespaces.asJsonLD,
           schema / "description"      -> project.maybeDescription.asJsonLD,
           schema / "agent"            -> project.agent.asJsonLD,
@@ -376,6 +377,7 @@ object Project {
           entityTypes,
           schema / "name"             -> project.name.asJsonLD,
           renku / "projectPath"       -> project.path.asJsonLD,
+          renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
           renku / "projectNamespaces" -> project.namespaces.asJsonLD,
           schema / "description"      -> project.maybeDescription.asJsonLD,
           schema / "dateCreated"      -> project.dateCreated.asJsonLD,
@@ -407,6 +409,7 @@ object Project {
       DataProperties(
         DataProperty(schema / "name", xsd / "string"),
         DataProperty(renku / "projectPath", xsd / "string"),
+        DataProperty(renku / "projectNamespace", xsd / "string"),
         DataProperty(renku / "projectNamespaces", xsd / "string"),
         DataProperty(schema / "description", xsd / "string"),
         DataProperty(schema / "dateCreated", xsd / "dateTime"),

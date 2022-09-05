@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.datasets
 
-import Dataset.DatasetCreator
 import cats.MonadThrow
 import cats.data.NonEmptyList
 import cats.effect.Async
