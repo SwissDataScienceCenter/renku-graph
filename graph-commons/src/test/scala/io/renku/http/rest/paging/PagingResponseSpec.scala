@@ -53,7 +53,7 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
     }
 
     "fix the total if results is not empty and (page.value - 1) * perPage.value + results.size > total.value" in {
-      forAll(perPages.retryUntil(_.value > 1), pages) { (perPage, page) =>
+      forAll(perPages.retryUntil(_.value > 1), pages.retryUntil(_.value > 1)) { (perPage, page) =>
         val results = nonEmptyStrings().generateNonEmptyList(maxElements = perPage.asRefined).toList
         val total   = positiveInts((page.value - 1) * perPage.value + results.size - 1).map(_.value).generateAs(Total)
         val request = PagingRequest(page, perPage)
@@ -67,7 +67,7 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
     }
 
     "instantiate successfully if results list is empty and (page.value - 1) * perPage.value > total.value" in {
-      forAll(perPages.retryUntil(_.value > 1), pages) { (perPage, page) =>
+      forAll(perPages.retryUntil(_.value > 1), pages.retryUntil(_.value > 1)) { (perPage, page) =>
         val results = List.empty[String]
         val total   = positiveInts((page.value - 1) * perPage.value + results.size - 1).map(_.value).generateAs(Total)
         val request = PagingRequest(page, perPage)
