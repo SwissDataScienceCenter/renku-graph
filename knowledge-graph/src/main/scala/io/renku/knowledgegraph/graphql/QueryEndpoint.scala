@@ -53,17 +53,15 @@ class QueryEndpointImpl[F[_]: Concurrent](
   import QueryEndpointImpl._
   import org.http4s.circe._
 
-  def schema(): F[Response[F]] =
-    for {
-      schema <- MonadThrow[F].fromTry(Try(renderSchema(queryRunner.schema)))
-      result <- Ok(schema)
-    } yield result
+  def schema(): F[Response[F]] = for {
+    schema <- MonadThrow[F].fromTry(Try(renderSchema(queryRunner.schema)))
+    result <- Ok(schema)
+  } yield result
 
   def handleQuery(request: Request[F], maybeUser: Option[AuthUser]): F[Response[F]] = {
     for {
-      query <- request.as[UserQuery] recoverWith badRequest
-      result <-
-        queryRunner run (query, maybeUser) recoverWith badRequestForInvalidQuery
+      query    <- request.as[UserQuery] recoverWith badRequest
+      result   <- queryRunner run (query, maybeUser) recoverWith badRequestForInvalidQuery
       response <- Ok(result)
     } yield response
   } recoverWith httpResponse

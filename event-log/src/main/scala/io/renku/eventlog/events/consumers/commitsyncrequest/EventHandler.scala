@@ -43,11 +43,11 @@ private class EventHandler[F[_]: Concurrent: Logger](
     EventHandlingProcess[F](startForceCommitSync(request))
 
   private def startForceCommitSync(request: EventRequestContent) = for {
-    event <-
+    event @ (projectId, projectPath) <-
       fromEither[F](
         request.event.as[(projects.Id, projects.Path)].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
       )
-    result <- forceCommitSync(event._1, event._2).toRightT
+    result <- forceCommitSync(projectId, projectPath).toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(event))
                 .leftSemiflatTap(Logger[F].log(event))
@@ -67,7 +67,5 @@ private class EventHandler[F[_]: Concurrent: Logger](
 
 private object EventHandler {
   def apply[F[_]: Concurrent: SessionResource: Logger](queriesExecTimes: LabeledHistogram[F]): F[EventHandler[F]] =
-    for {
-      commitSyncForcer <- CommitSyncForcer(queriesExecTimes)
-    } yield new EventHandler[F](categoryName, commitSyncForcer)
+    CommitSyncForcer(queriesExecTimes).map(new EventHandler[F](categoryName, _))
 }

@@ -68,33 +68,32 @@ object EventProducersRegistry {
       awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
       deletingGauge:               LabeledGauge[F, projects.Path],
       queriesExecTimes:            LabeledHistogram[F]
-  ): F[EventProducersRegistry[F]] = UrlAndIdSubscriberTracker(queriesExecTimes).flatMap { implicit subscriberTracker =>
-    for {
-      awaitingGenerationCategory <-
-        awaitinggeneration.SubscriptionCategory(awaitingGenerationGauge, underGenerationGauge, queriesExecTimes)
-      memberSyncCategory       <- membersync.SubscriptionCategory(queriesExecTimes)
-      commitSyncCategory       <- commitsync.SubscriptionCategory(queriesExecTimes)
-      globalCommitSyncCategory <- globalcommitsync.SubscriptionCategory(queriesExecTimes)
-      projectSyncCategory      <- projectsync.SubscriptionCategory(queriesExecTimes)
-      triplesGeneratedCategory <-
-        triplesgenerated.SubscriptionCategory(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
-      cleanUpEventCategory   <- cleanup.SubscriptionCategory(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
-      zombieEventsCategory   <- zombieevents.SubscriptionCategory(queriesExecTimes)
-      tsMigrationCategory    <- tsmigrationrequest.SubscriptionCategory(queriesExecTimes)
-      minProjectInfoCategory <- minprojectinfo.SubscriptionCategory(queriesExecTimes)
-    } yield new EventProducersRegistryImpl(
-      Set(
-        awaitingGenerationCategory,
-        memberSyncCategory,
-        commitSyncCategory,
-        globalCommitSyncCategory,
-        projectSyncCategory,
-        triplesGeneratedCategory,
-        cleanUpEventCategory,
-        zombieEventsCategory,
-        tsMigrationCategory,
-        minProjectInfoCategory
-      )
+  ): F[EventProducersRegistry[F]] = for {
+    implicit0(subscriberTracker: UrlAndIdSubscriberTracker[F]) <- UrlAndIdSubscriberTracker[F](queriesExecTimes)
+    awaitingGenerationCategory <-
+      awaitinggeneration.SubscriptionCategory(awaitingGenerationGauge, underGenerationGauge, queriesExecTimes)
+    memberSyncCategory       <- membersync.SubscriptionCategory(queriesExecTimes)
+    commitSyncCategory       <- commitsync.SubscriptionCategory(queriesExecTimes)
+    globalCommitSyncCategory <- globalcommitsync.SubscriptionCategory(queriesExecTimes)
+    projectSyncCategory      <- projectsync.SubscriptionCategory(queriesExecTimes)
+    triplesGeneratedCategory <-
+      triplesgenerated.SubscriptionCategory(awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
+    cleanUpEventCategory   <- cleanup.SubscriptionCategory(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
+    zombieEventsCategory   <- zombieevents.SubscriptionCategory(queriesExecTimes)
+    tsMigrationCategory    <- tsmigrationrequest.SubscriptionCategory(queriesExecTimes)
+    minProjectInfoCategory <- minprojectinfo.SubscriptionCategory(queriesExecTimes)
+  } yield new EventProducersRegistryImpl(
+    Set(
+      awaitingGenerationCategory,
+      memberSyncCategory,
+      commitSyncCategory,
+      globalCommitSyncCategory,
+      projectSyncCategory,
+      triplesGeneratedCategory,
+      cleanUpEventCategory,
+      zombieEventsCategory,
+      tsMigrationCategory,
+      minProjectInfoCategory
     )
-  }
+  )
 }

@@ -134,16 +134,15 @@ object commandParameters {
         )
       }
 
-    implicit lazy val stdInDecoder: JsonLDDecoder[IOStream.In] =
-      JsonLDDecoder.entity(entityTypes) { cursor =>
-        for {
-          resourceId <- cursor.downEntityId.as[ResourceId]
-          _ <- cursor.downField(renku / "streamType").as[String] >>= {
-                 case StdIn.name.value => ().asRight
-                 case name             => DecodingFailure(s"$name is cannot be decoded to ${StdIn.name}", Nil).asLeft
-               }
-        } yield StdIn(resourceId): IOStream.In
-      }
+    implicit lazy val stdInDecoder: JsonLDDecoder[IOStream.In] = JsonLDDecoder.entity(entityTypes) { cursor =>
+      for {
+        resourceId <- cursor.downEntityId.as[ResourceId]
+        _ <- cursor.downField(renku / "streamType").as[String] >>= {
+               case StdIn.name.value => ().asRight
+               case name             => DecodingFailure(s"$name is cannot be decoded to ${StdIn.name}", Nil).asLeft
+             }
+      } yield StdIn(resourceId): IOStream.In
+    }
 
     implicit lazy val stdOutDecoder: JsonLDDecoder[IOStream.Out] =
       JsonLDDecoder.entity(entityTypes) { cursor =>

@@ -101,7 +101,5 @@ private object EventHandler {
   def apply[F[_]: Concurrent: Logger: SessionResource](
       waitingEventsGauge: LabeledGauge[F, projects.Path],
       queriesExecTimes:   LabeledHistogram[F]
-  ): F[EventHandler[F]] = for {
-    eventPersister <- EventPersister(waitingEventsGauge, queriesExecTimes)
-  } yield new EventHandler[F](categoryName, eventPersister)
+  ): F[EventHandler[F]] = EventPersister(waitingEventsGauge, queriesExecTimes).map(new EventHandler[F](categoryName, _))
 }

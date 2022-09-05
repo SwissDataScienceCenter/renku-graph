@@ -28,12 +28,11 @@ object MetricsTools {
 
   implicit class CollectorOps(collector: Collector) {
 
-    def collectAllSamples: Seq[(String, String, Double)] =
-      for {
-        familySamples <- collector.collect().asScala.toList
-        sample        <- familySamples.samples.asScala.toList
-        resultTuple   <- toResultTuple(sample)
-      } yield resultTuple
+    def collectAllSamples: Seq[(String, String, Double)] = for {
+      familySamples <- collector.collect().asScala.toList
+      sample        <- familySamples.samples.asScala.toList
+      resultTuple   <- toResultTuple(sample)
+    } yield resultTuple
 
     private val toResultTuple: Sample => List[(String, String, Double)] = sample =>
       (sample.labelNames.asScala.toList, sample.labelValues.asScala.toList) mapN { case (labelName, labelValue) =>

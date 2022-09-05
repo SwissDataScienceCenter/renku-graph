@@ -124,7 +124,6 @@ private[consumers] class CommitToEventLogImpl[F[_]: MonadThrow](
 }
 
 private[consumers] object CommitToEventLog {
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[CommitToEventLog[F]] = for {
-    eventSender <- EventSender[F]
-  } yield new CommitToEventLogImpl[F](eventSender, CommitEventSerializer)
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[CommitToEventLog[F]] =
+    EventSender[F].map(new CommitToEventLogImpl[F](_, CommitEventSerializer))
 }

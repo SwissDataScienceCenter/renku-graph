@@ -44,23 +44,22 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(
       sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]
   ) = sessionPoolResource.use { implicit sessionResource =>
-    MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
-      for {
-        certificateLoader  <- CertificateLoader[IO]
-        sentryInitializer  <- SentryInitializer[IO]
-        queriesExecTimes   <- QueriesExecutionTimes[IO]
-        dbInitializer      <- DbInitializer(sessionResource, queriesExecTimes)
-        microserviceRoutes <- MicroserviceRoutes[IO](sessionResource, queriesExecTimes).map(_.routes)
-        exitcode <- microserviceRoutes.use { routes =>
-                      new MicroserviceRunner(
-                        certificateLoader,
-                        sentryInitializer,
-                        dbInitializer,
-                        HttpServer[IO](serverPort = 9003, routes)
-                      ).run()
-                    }
-      } yield exitcode
-    }
+    for {
+      implicit0(mr: MetricsRegistry[IO]) <- MetricsRegistry[IO]()
+      certificateLoader                  <- CertificateLoader[IO]
+      sentryInitializer                  <- SentryInitializer[IO]
+      queriesExecTimes                   <- QueriesExecutionTimes[IO]
+      dbInitializer                      <- DbInitializer(sessionResource, queriesExecTimes)
+      microserviceRoutes                 <- MicroserviceRoutes[IO](sessionResource, queriesExecTimes).map(_.routes)
+      exitCode <- microserviceRoutes.use { routes =>
+                    new MicroserviceRunner(
+                      certificateLoader,
+                      sentryInitializer,
+                      dbInitializer,
+                      HttpServer[IO](serverPort = 9003, routes)
+                    ).run()
+                  }
+    } yield exitCode
   }
 }
 

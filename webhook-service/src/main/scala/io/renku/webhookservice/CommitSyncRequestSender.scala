@@ -63,7 +63,6 @@ private class CommitSyncRequestSenderImpl[F[_]: MonadThrow: Logger](eventSender:
 }
 
 private object CommitSyncRequestSender {
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[CommitSyncRequestSender[F]] = for {
-    eventSender <- EventSender[F]
-  } yield new CommitSyncRequestSenderImpl(eventSender)
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[CommitSyncRequestSender[F]] =
+    EventSender[F].map(new CommitSyncRequestSenderImpl(_))
 }

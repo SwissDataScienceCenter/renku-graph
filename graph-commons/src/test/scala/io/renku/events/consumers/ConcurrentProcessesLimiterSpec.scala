@@ -201,7 +201,6 @@ class ConcurrentProcessesLimiterSpec
       handlerProcess <- EventHandlingProcess.withWaitingForCompletion[IO](process, releaseProcess)
       result         <- limiter.tryExecuting(handlerProcess)
     } yield result
-
   }
 
   private trait TestSemaphore extends Semaphore[IO]

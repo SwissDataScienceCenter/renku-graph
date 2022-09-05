@@ -223,26 +223,23 @@ trait RenkuProjectEntitiesGenerators {
     def addDataset[P <: Dataset.Provenance](
         factory: DatasetGenFactory[P]
     ): Gen[((T, Dataset[P]), RenkuProject)] = for {
-      tuple <- tupleGen
-      (entities, project) = tuple
-      ds <- factory(project.dateCreated)
+      (entities, project) <- tupleGen
+      ds                  <- factory(project.dateCreated)
     } yield (entities -> ds) -> (project addDatasets ds)
 
     def addDatasetAndModification[P <: Dataset.Provenance](
         factory: DatasetGenFactory[P]
     ): Gen[(((T, Dataset[P]), Dataset[Dataset.Provenance.Modified]), RenkuProject)] = for {
-      tuple <- tupleGen
-      (entities, project) = tuple
-      originalDs <- factory(project.dateCreated)
-      modifiedDs <- originalDs.createModification()(project.dateCreated)
+      (entities, project) <- tupleGen
+      originalDs          <- factory(project.dateCreated)
+      modifiedDs          <- originalDs.createModification()(project.dateCreated)
     } yield ((entities -> originalDs) -> modifiedDs) -> project.addDatasets(originalDs, modifiedDs)
 
     def addDatasetAndInvalidation[P <: Dataset.Provenance](
         factory: DatasetGenFactory[P]
     ): Gen[(((T, Dataset[P]), Dataset[Dataset.Provenance.Modified]), RenkuProject)] = for {
-      tuple <- tupleGen
-      (entities, project) = tuple
-      originalDs <- factory(project.dateCreated)
+      (entities, project) <- tupleGen
+      originalDs          <- factory(project.dateCreated)
       invalidated = originalDs.invalidateNow
     } yield ((entities -> originalDs) -> invalidated) -> project.addDatasets(originalDs, invalidated)
 

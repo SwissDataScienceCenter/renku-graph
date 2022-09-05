@@ -179,11 +179,10 @@ object CommonGraphGenerators {
 
   implicit lazy val sortingDirections: Gen[SortBy.Direction] = Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
 
-  def sortBys[T <: SortBy](sortBy: T): Gen[T#By] =
-    for {
-      property  <- Gen.oneOf(sortBy.properties.toList)
-      direction <- sortingDirections
-    } yield sortBy.By(property, direction)
+  def sortBys[T <: SortBy](sortBy: T): Gen[T#By] = for {
+    property  <- Gen.oneOf(sortBy.properties.toList)
+    direction <- sortingDirections
+  } yield sortBy.By(property, direction)
 
   object TestSort extends SortBy {
     type PropertyType = TestProperty

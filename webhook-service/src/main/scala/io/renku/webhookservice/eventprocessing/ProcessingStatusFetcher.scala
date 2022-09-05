@@ -42,9 +42,7 @@ private object ProcessingStatusFetcher {
   import io.circe.DecodingFailure
 
   def apply[F[_]: Async: Logger]: F[ProcessingStatusFetcher[F]] =
-    for {
-      eventLogUrl <- EventLogUrl[F]()
-    } yield new ProcessingStatusFetcherImpl(eventLogUrl)
+    EventLogUrl[F]().map(new ProcessingStatusFetcherImpl(_))
 
   implicit lazy val processingStatusDecoder: Decoder[ProcessingStatus] = cursor =>
     for {

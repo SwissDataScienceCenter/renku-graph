@@ -23,7 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.triplesstore._
@@ -36,12 +36,12 @@ private trait MembersSynchronizer[F[_]] {
 }
 
 private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
-    gitLabProjectMembersFinder: GitLabProjectMembersFinder[F],
-    kGProjectMembersFinder:     KGProjectMembersFinder[F],
-    kGPersonFinder:             KGPersonFinder[F],
-    updatesCreator:             UpdatesCreator,
-    querySender:                QuerySender[F],
-    executionTimeRecorder:      ExecutionTimeRecorder[F]
+    glMembersFinder:       GitLabProjectMembersFinder[F],
+    kgMembersFinder:       KGProjectMembersFinder[F],
+    kgPersonFinder:        KGPersonFinder[F],
+    updatesCreator:        UpdatesCreator,
+    querySender:           QuerySender[F],
+    executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends MembersSynchronizer[F] {
 
   private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
@@ -49,18 +49,17 @@ private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logge
   import executionTimeRecorder._
 
   override def synchronizeMembers(projectPath: projects.Path): F[Unit] = measureExecutionTime {
-    findAccessToken(projectPath) >>= { implicit maybeAccessToken =>
-      for {
-        membersInGitLab <- gitLabProjectMembersFinder.findProjectMembers(projectPath)
-        membersInKG     <- kGProjectMembersFinder.findProjectMembers(projectPath)
-        membersToAdd = findMembersToAdd(membersInGitLab, membersInKG)
-        membersToAddWithIds <- kGPersonFinder.findPersonIds(membersToAdd)
-        insertionUpdates = updatesCreator.insertion(projectPath, membersToAddWithIds)
-        membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
-        removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
-        _ <- (insertionUpdates ::: removalUpdates).map(querySender.send).sequence
-      } yield SyncSummary(projectPath, membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
-    }
+    for {
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(projectPath)
+      membersInGitLab                     <- glMembersFinder.findProjectMembers(projectPath)
+      membersInKG                         <- kgMembersFinder.findProjectMembers(projectPath)
+      membersToAdd = findMembersToAdd(membersInGitLab, membersInKG)
+      membersToAddWithIds <- kgPersonFinder.findPersonIds(membersToAdd)
+      insertionUpdates = updatesCreator.insertion(projectPath, membersToAddWithIds)
+      membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
+      removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
+      _ <- (insertionUpdates ::: removalUpdates).map(querySender.send).sequence
+    } yield SyncSummary(projectPath, membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
   } flatMap logSummary recoverWith { case NonFatal(exception) =>
     Logger[F].error(exception)(s"$categoryName: Members synchronized for project $projectPath FAILED")
   }

@@ -101,9 +101,7 @@ private object AccessTokenCrypto {
 
   import io.renku.config.ConfigLoader._
 
-  def apply[F[_]: MonadThrow](
-      config: Config = ConfigFactory.load()
-  ): F[AccessTokenCrypto[F]] = for {
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[AccessTokenCrypto[F]] = for {
     secret <- find[F, Secret]("projects-tokens.secret", config)
   } yield new AccessTokenCryptoImpl[F](secret)
 

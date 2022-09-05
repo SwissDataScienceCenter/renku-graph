@@ -90,15 +90,15 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
     _ <- eventSender.sendEvent(
            eventContent = events.EventRequestContent.WithPayload(
              event = json"""{
-                              "categoryName": "EVENTS_STATUS_CHANGE",
-                              "id": ${eventId.id},
-                              "project": {
-                                "id":   ${eventId.projectId},
-                                "path": $projectPath
-                              },
-                              "newStatus": $TriplesGenerated,
-                              "processingTime": $processingTime
-                            }""",
+                       "categoryName": "EVENTS_STATUS_CHANGE",
+                       "id": ${eventId.id},
+                       "project": {
+                         "id":   ${eventId.projectId},
+                         "path": $projectPath
+                       },
+                       "newStatus": $TriplesGenerated,
+                       "processingTime": $processingTime
+                     }""",
              payload = zippedContent
            ),
            EventSender.EventContext(CategoryName("EVENTS_STATUS_CHANGE"),

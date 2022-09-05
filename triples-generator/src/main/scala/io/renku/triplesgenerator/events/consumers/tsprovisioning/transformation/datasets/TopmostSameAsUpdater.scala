@@ -22,9 +22,9 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.entities.Project
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.ProjectFunctions
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private trait TopmostSameAsUpdater[F[_]] {
@@ -51,13 +51,13 @@ private class TopmostSameAsUpdaterImpl[F[_]: MonadThrow](
     findInternallyImportedDatasets(project)
       .foldLeft((project -> queries).pure[F]) { (projectAndQueriesF, dataset) =>
         for {
-          projectAndQueries        <- projectAndQueriesF
+          (project, queries)       <- projectAndQueriesF
           maybeParentTopmostSameAs <- findParentTopmostSameAs(dataset.provenance.sameAs)
           maybeKGTopmostSameAses   <- findTopmostSameAs(dataset.identification.resourceId)
           updatedDataset = maybeParentTopmostSameAs.map(dataset.update) getOrElse dataset
         } yield (
-          update(dataset, updatedDataset)(projectAndQueries._1),
-          projectAndQueries._2 |+| Queries.postDataQueriesOnly(
+          update(dataset, updatedDataset)(project),
+          queries |+| Queries.postDataQueriesOnly(
             prepareUpdates(dataset, maybeKGTopmostSameAses) :::
               prepareTopmostSameAsCleanup(updatedDataset, maybeParentTopmostSameAs)
           )

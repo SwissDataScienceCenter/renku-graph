@@ -40,7 +40,7 @@ private class EventBodyDeserializerImpl[F[_]: MonadThrow] extends EventBodyDeser
       projectPath <- cursor.downField("project").downField("path").as[Path]
     } yield CleanUpEvent(Project(projectId, projectPath))
 
-  private def toMeaningfulError(event: Json): DecodingFailure => Error = { case failure =>
+  private def toMeaningfulError(event: Json): DecodingFailure => Error = { failure =>
     failure.withMessage(s"CleanUpEvent cannot be deserialised: '$event'")
   }
 }

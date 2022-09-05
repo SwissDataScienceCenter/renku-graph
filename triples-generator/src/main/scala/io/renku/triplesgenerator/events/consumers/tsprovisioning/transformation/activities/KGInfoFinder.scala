@@ -35,9 +35,8 @@ private trait KGInfoFinder[F[_]] {
 }
 
 private object KGInfoFinder {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGInfoFinder[F]] = for {
-    config <- RenkuConnectionConfig[F]()
-  } yield new KGInfoFinderImpl(config)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGInfoFinder[F]] =
+    RenkuConnectionConfig[F]().map(new KGInfoFinderImpl(_))
 }
 
 private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](

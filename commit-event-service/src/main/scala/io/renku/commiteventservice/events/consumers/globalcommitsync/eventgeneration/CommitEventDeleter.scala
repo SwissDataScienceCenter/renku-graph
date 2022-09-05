@@ -53,7 +53,6 @@ private[eventgeneration] class CommitEventDeleterImpl[F[_]: MonadThrow](
   }
 }
 private[eventgeneration] object CommitEventDeleter {
-  def apply[F[_]: Async: Logger: MetricsRegistry]: F[CommitEventDeleter[F]] = for {
-    commitEventsRemover <- CommitEventsRemover[F]
-  } yield new CommitEventDeleterImpl[F](commitEventsRemover)
+  def apply[F[_]: Async: Logger: MetricsRegistry]: F[CommitEventDeleter[F]] =
+    CommitEventsRemover[F].map(new CommitEventDeleterImpl[F](_))
 }

@@ -32,10 +32,9 @@ trait AccessTokenRemover[F[_]] {
 }
 
 object AccessTokenRemover {
-  def apply[F[_]: Async: Logger]: F[AccessTokenRemover[F]] =
-    for {
-      tokenRepositoryUrl <- TokenRepositoryUrl[F]()
-    } yield new AccessTokenRemoverImpl[F](tokenRepositoryUrl)
+  def apply[F[_]: Async: Logger]: F[AccessTokenRemover[F]] = for {
+    tokenRepositoryUrl <- TokenRepositoryUrl[F]()
+  } yield new AccessTokenRemoverImpl[F](tokenRepositoryUrl)
 }
 
 class AccessTokenRemoverImpl[F[_]: Async: Logger](
@@ -47,11 +46,10 @@ class AccessTokenRemoverImpl[F[_]: Async: Logger](
   import org.http4s.Status.NoContent
   import org.http4s.{Request, Response}
 
-  override def removeAccessToken(projectId: Id): F[Unit] =
-    for {
-      uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
-      _   <- send(request(DELETE, uri))(mapResponse)
-    } yield ()
+  override def removeAccessToken(projectId: Id): F[Unit] = for {
+    uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
+    _   <- send(request(DELETE, uri))(mapResponse)
+  } yield ()
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
     case (NoContent, _, _) => ().pure[F]

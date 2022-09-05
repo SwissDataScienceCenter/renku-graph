@@ -39,11 +39,10 @@ class AccessTokenFinderImpl[F[_]: Async: Logger](
   import org.http4s.circe._
   import org.http4s.dsl.io._
 
-  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): F[Option[AccessToken]] =
-    for {
-      uri         <- validateUri(s"$tokenRepositoryUrl/projects/${toPathSegment(projectId)}/tokens")
-      accessToken <- send(request(GET, uri))(mapResponse)
-    } yield accessToken
+  def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): F[Option[AccessToken]] = for {
+    uri         <- validateUri(s"$tokenRepositoryUrl/projects/${toPathSegment(projectId)}/tokens")
+    accessToken <- send(request(GET, uri))(mapResponse)
+  } yield accessToken
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[AccessToken]]] = {
     case (Ok, _, response) => response.as[Option[AccessToken]]

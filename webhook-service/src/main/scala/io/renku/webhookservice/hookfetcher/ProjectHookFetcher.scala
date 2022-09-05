@@ -70,5 +70,4 @@ private[webhookservice] class ProjectHookFetcherImpl[F[_]: Async: GitLabClient: 
 
     jsonOf[F, List[HookIdAndUrl]]
   }
-
 }
