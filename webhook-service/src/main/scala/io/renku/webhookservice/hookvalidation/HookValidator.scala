@@ -130,11 +130,10 @@ object HookValidator {
     projectHookVerifier   <- ProjectHookVerifier[F]
     accessTokenAssociator <- AccessTokenAssociator[F]
     accessTokenRemover    <- AccessTokenRemover[F]
-  } yield new HookValidatorImpl[F](
-    projectHookUrl,
-    projectHookVerifier,
-    new AccessTokenFinderImpl(tokenRepositoryUrl),
-    accessTokenAssociator,
-    accessTokenRemover
+  } yield new HookValidatorImpl[F](projectHookUrl,
+                                   projectHookVerifier,
+                                   new AccessTokenFinderImpl(tokenRepositoryUrl),
+                                   accessTokenAssociator,
+                                   accessTokenRemover
   )
 }

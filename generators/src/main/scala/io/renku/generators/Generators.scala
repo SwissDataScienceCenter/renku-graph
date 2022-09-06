@@ -96,11 +96,10 @@ object Generators {
     suffix <- nonEmptyStrings()
   } yield s"$prefix $phrase $suffix"
 
-  def blankStrings(maxLength: Int Refined NonNegative = 10): Gen[String] =
-    for {
-      length <- choose(0, maxLength.value)
-      chars  <- listOfN(length, const(" "))
-    } yield chars.mkString("")
+  def blankStrings(maxLength: Int Refined NonNegative = 10): Gen[String] = for {
+    length <- choose(0, maxLength.value)
+    chars  <- listOfN(length, const(" "))
+  } yield chars.mkString("")
 
   def nonEmptyStringsList(minElements:    Int Refined Positive = 1,
                           maxElements:    Int Refined Positive = 5,
@@ -113,30 +112,27 @@ object Generators {
   def nonEmptyList[T](generator:   Gen[T],
                       minElements: Int Refined Positive = 1,
                       maxElements: Int Refined Positive = 5
-  ): Gen[NonEmptyList[T]] =
-    for {
-      size <- choose(minElements.value, maxElements.value)
-      list <- Gen.listOfN(size, generator)
-    } yield NonEmptyList.fromListUnsafe(list)
+  ): Gen[NonEmptyList[T]] = for {
+    size <- choose(minElements.value, maxElements.value)
+    list <- Gen.listOfN(size, generator)
+  } yield NonEmptyList.fromListUnsafe(list)
 
   def nonEmptySet[T](
       generator:   Gen[T],
       minElements: Int Refined Positive = 1,
       maxElements: Int Refined Positive = 5
-  ): Gen[Set[T]] =
-    for {
-      size <- choose(minElements.value, maxElements.value)
-      set  <- Gen.containerOfN[Set, T](size, generator)
-    } yield set
+  ): Gen[Set[T]] = for {
+    size <- choose(minElements.value, maxElements.value)
+    set  <- Gen.containerOfN[Set, T](size, generator)
+  } yield set
 
   def listOf[T](generator:   Gen[T],
                 minElements: Int Refined NonNegative = 0,
                 maxElements: Int Refined Positive = 5
-  ): Gen[List[T]] =
-    for {
-      size <- choose(minElements.value, maxElements.value)
-      list <- Gen.listOfN(size, generator)
-    } yield list
+  ): Gen[List[T]] = for {
+    size <- choose(minElements.value, maxElements.value)
+    list <- Gen.listOfN(size, generator)
+  } yield list
 
   def setOf[T](generator:   Gen[T],
                minElements: Int Refined NonNegative = 0,
@@ -198,14 +194,13 @@ object Generators {
 
   def httpUrls(hostGenerator: Gen[String] = nonEmptyStrings(),
                pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)
-  ): Gen[String] =
-    for {
-      protocol <- Gen.oneOf("http", "https")
-      port     <- httpPorts
-      host     <- hostGenerator
-      path     <- pathGenerator
-      pathValidated = if (path.isEmpty) "" else s"/$path"
-    } yield s"$protocol://$host:$port$pathValidated"
+  ): Gen[String] = for {
+    protocol <- Gen.oneOf("http", "https")
+    port     <- httpPorts
+    host     <- hostGenerator
+    path     <- pathGenerator
+    pathValidated = if (path.isEmpty) "" else s"/$path"
+  } yield s"$protocol://$host:$port$pathValidated"
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Gen.oneOf("http", "https")

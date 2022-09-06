@@ -52,7 +52,6 @@ private class SubscriptionSenderImpl[F[_]: Async: Temporal: Logger](
 }
 
 private object SubscriptionSender {
-  def apply[F[_]: Async: Temporal: Logger]: F[SubscriptionSender[F]] = for {
-    eventLogUrl <- EventLogUrl[F]()
-  } yield new SubscriptionSenderImpl(eventLogUrl)
+  def apply[F[_]: Async: Temporal: Logger]: F[SubscriptionSender[F]] =
+    EventLogUrl[F]().map(new SubscriptionSenderImpl(_))
 }

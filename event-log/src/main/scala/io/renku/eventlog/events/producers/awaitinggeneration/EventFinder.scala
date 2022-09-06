@@ -64,9 +64,8 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource](
 
   override def popEvent(): F[Option[AwaitingGenerationEvent]] = SessionResource[F].useK {
     for {
-      maybeProjectAwaitingGenerationEvent <- findEventAndUpdateForProcessing
-      (maybeProject, maybeAwaitingGenerationEvent) = maybeProjectAwaitingGenerationEvent
-      _ <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
+      (maybeProject, maybeAwaitingGenerationEvent) <- findEventAndUpdateForProcessing
+      _                                            <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
     } yield maybeAwaitingGenerationEvent
   }
 

@@ -56,13 +56,13 @@ class HookEventEndpointImpl[F[_]: Concurrent: Logger](
 
   def processPushEvent(request: Request[F]): F[Response[F]] = {
     for {
-      pushEvent <- request.as[(CommitId, CommitSyncRequest)] recoverWith badRequest
-      authToken <- findHookToken(request)
-      hookToken <- decrypt(authToken) recoverWith unauthorizedException
-      _         <- validate(hookToken, pushEvent._2)
-      _         <- Spawn[F].start(sendCommitSyncRequest(pushEvent._2, "HookEvent"))
-      _         <- logInfo(pushEvent)
-      response  <- Accepted(InfoMessage("Event accepted"))
+      pushEvent @ (_, commitSyncRequest) <- request.as[(CommitId, CommitSyncRequest)] recoverWith badRequest
+      authToken                          <- findHookToken(request)
+      hookToken                          <- decrypt(authToken) recoverWith unauthorizedException
+      _                                  <- validate(hookToken, commitSyncRequest)
+      _                                  <- Spawn[F].start(sendCommitSyncRequest(commitSyncRequest, "HookEvent"))
+      _                                  <- logInfo(pushEvent)
+      response                           <- Accepted(InfoMessage("Event accepted"))
     } yield response
   } recoverWith httpResponse
 

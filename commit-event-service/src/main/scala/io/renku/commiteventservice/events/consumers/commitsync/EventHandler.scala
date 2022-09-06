@@ -73,9 +73,7 @@ private[events] class EventHandler[F[_]: MonadThrow: Spawn: Concurrent: Logger](
           lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
         } yield FullCommitSyncEvent(id, project, lastSynced)
       case None =>
-        for {
-          project <- cursor.downField("project").as[Project]
-        } yield MinimalCommitSyncEvent(project)
+        cursor.downField("project").as[Project].map(MinimalCommitSyncEvent)
     }
 
   private implicit lazy val projectDecoder: Decoder[Project] = cursor =>

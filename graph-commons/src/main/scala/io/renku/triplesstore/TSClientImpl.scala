@@ -149,11 +149,10 @@ abstract class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       import io.renku.http.rest.paging.model.Total
       import io.renku.tinytypes.json.TinyTypeDecoders._
 
-      override def findResults(pagingRequest: PagingRequest): F[List[ResultType]] =
-        for {
-          queryWithPaging <- query.include[F](pagingRequest)
-          results         <- queryExpecting[List[ResultType]](using = queryWithPaging)
-        } yield results
+      override def findResults(pagingRequest: PagingRequest): F[List[ResultType]] = for {
+        queryWithPaging <- query.include[F](pagingRequest)
+        results         <- queryExpecting[List[ResultType]](using = queryWithPaging)
+      } yield results
 
       override def findTotal() =
         queryExpecting[Option[Total]](using = (maybeCountQuery getOrElse query).toCountQuery).flatMap {

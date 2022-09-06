@@ -97,16 +97,13 @@ class ConcurrentProcessesLimiterImpl[F[_]: Concurrent](
     semaphore.release.map(_ => SchedulingError(error))
   }
 
-  private def releaseAndNotify(scheduledProcess: EventHandlingProcess[F]): F[Unit] =
-    for {
-      _ <- semaphore.release
-      _ <- scheduledProcess.maybeReleaseProcess
-             .map(Spawn[F].start(_).void)
-             .getOrElse(().pure[F])
-             .recover { case NonFatal(_) =>
-               ()
-             }
-    } yield ()
+  private def releaseAndNotify(scheduledProcess: EventHandlingProcess[F]): F[Unit] = for {
+    _ <- semaphore.release
+    _ <- scheduledProcess.maybeReleaseProcess
+           .map(Spawn[F].start(_).void)
+           .getOrElse(().pure[F])
+           .recover { case NonFatal(_) => () }
+  } yield ()
 
   private def releasingSemaphore[O]: PartialFunction[Throwable, F[O]] = { case NonFatal(exception) =>
     semaphore.available flatMap {

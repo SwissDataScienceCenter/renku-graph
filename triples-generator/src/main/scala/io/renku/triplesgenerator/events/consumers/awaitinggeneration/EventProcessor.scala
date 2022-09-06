@@ -58,8 +58,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   def process(event: CommitEvent): F[Unit] = allEventsTimeRecorder.measureExecutionTime {
     for {
-      maybeAccessToken <- findAccessToken(event.project.path) recoverWith rollbackEvent(event)
-      uploadingResult  <- generateAndUpdateStatus(event)(maybeAccessToken)
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path) recoverWith rollbackEvent(event)
+      uploadingResult                     <- generateAndUpdateStatus(event)
     } yield uploadingResult
   } flatMap logSummary recoverWith logError(event)
 

@@ -48,11 +48,10 @@ private class ProjectPathFinderImpl[F[_]: Async: Temporal: Logger](
   import org.http4s._
   import org.http4s.dsl.io._
 
-  def findProjectPath(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[Option[projects.Path]] =
-    for {
-      uri     <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
-      project <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-    } yield project
+  def findProjectPath(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[Option[projects.Path]] = for {
+    uri     <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
+    project <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+  } yield project
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[projects.Path]]] = {
     case (Ok, _, response)    => response.as[projects.Path].map(Option.apply)
