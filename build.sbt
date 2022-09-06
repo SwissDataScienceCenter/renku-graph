@@ -175,7 +175,7 @@ lazy val commonSettings = Seq(
   Compile / packageDoc / publishArtifact := false,
   Compile / packageSrc / publishArtifact := false,
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
-  addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.2" cross CrossVersion.full),
+  addCompilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.2"),
   // format: off
   scalacOptions ++= Seq(
     "-language:postfixOps", // enabling postfixes
