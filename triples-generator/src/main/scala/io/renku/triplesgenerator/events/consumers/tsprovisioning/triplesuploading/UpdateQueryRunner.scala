@@ -33,11 +33,11 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-private trait UpdatesUploader[F[_]] {
-  def send(updateQuery: SparqlQuery): EitherT[F, ProcessingRecoverableError, Unit]
+private trait UpdateQueryRunner[F[_]] {
+  def run(updateQuery: SparqlQuery): EitherT[F, ProcessingRecoverableError, Unit]
 }
 
-private class UpdatesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig,
     recoveryStrategy:      RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:         FiniteDuration = SleepAfterConnectionIssue,
@@ -50,18 +50,18 @@ private class UpdatesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
                           idleTimeoutOverride = idleTimeout.some,
                           requestTimeoutOverride = requestTimeout.some
     )
-    with UpdatesUploader[F] {
+    with UpdateQueryRunner[F] {
 
   import org.http4s.Status.Ok
   import org.http4s.{Request, Response, Status}
   import recoveryStrategy._
 
-  override def send(updateQuery: SparqlQuery): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    updateWitMapping(updateQuery, responseMapper).recoverWith(
-      maybeRecoverableError[F, Unit](
-        s"Triples transformation update '${updateQuery.name}' failed"
-      ) orElse toNonRecoverableFailure(updateQuery)
-    )
+  override def run(updateQuery: SparqlQuery): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
+    updateWitMapping(updateQuery, responseMapper)
+      .recoverWith(
+        maybeRecoverableError[F, Unit](s"Triples transformation update '${updateQuery.name}' failed")
+          .orElse(nonRecoverableFailure(updateQuery))
+      )
   }
 
   private lazy val responseMapper
@@ -69,7 +69,7 @@ private class UpdatesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     case (Ok, _, _) => ().asRight[ProcessingRecoverableError].pure[F]
   }
 
-  private def toNonRecoverableFailure(
+  private def nonRecoverableFailure(
       updateQuery: SparqlQuery
   ): PartialFunction[Throwable, F[Either[ProcessingRecoverableError, Unit]]] = { case error: BadRequestException =>
     NonRecoverableFailure(s"Triples transformation update '${updateQuery.name}' failed", error)

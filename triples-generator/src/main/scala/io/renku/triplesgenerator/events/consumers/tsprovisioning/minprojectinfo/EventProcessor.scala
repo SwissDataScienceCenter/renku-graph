@@ -72,7 +72,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   )(implicit maybeAccessToken: Option[AccessToken]): F[UploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      result  <- right[UploadingResult](run(createSteps, project) >>= (toUploadingResult(event, _)))
+      result  <- right[UploadingResult](run(createSteps, project) >>= toUploadingResult(event))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
 
@@ -85,19 +85,14 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
       RecoverableError(event, error).pure[F].widen[UploadingResult]
   }
 
-  private def toUploadingResult(event:               MinProjectInfoEvent,
-                                triplesUploadResult: TriplesUploadResult
-  ): F[UploadingResult] = triplesUploadResult match {
-    case DeliverySuccess => (Uploaded(event): UploadingResult).pure[F]
-    case RecoverableFailure(error) =>
-      error match {
-        case error @ LogWorthyRecoverableError(message, _) =>
-          Logger[F]
-            .error(error)(s"${logMessageCommon(event)} $message")
-            .map(_ => RecoverableError(event, error))
-        case error @ SilentRecoverableError(_, _) =>
-          RecoverableError(event, error).pure[F].widen[UploadingResult]
-      }
+  private def toUploadingResult(event: MinProjectInfoEvent): TriplesUploadResult => F[UploadingResult] = {
+    case DeliverySuccess => Uploaded(event).pure[F].widen
+    case RecoverableFailure(error @ LogWorthyRecoverableError(message, _)) =>
+      Logger[F]
+        .error(error)(s"${logMessageCommon(event)} $message")
+        .map(_ => RecoverableError(event, error))
+    case RecoverableFailure(error @ SilentRecoverableError(_, _)) =>
+      RecoverableError(event, error).pure[F].widen[UploadingResult]
     case error: NonRecoverableFailure =>
       Logger[F]
         .error(error)(s"${logMessageCommon(event)} ${error.message}")

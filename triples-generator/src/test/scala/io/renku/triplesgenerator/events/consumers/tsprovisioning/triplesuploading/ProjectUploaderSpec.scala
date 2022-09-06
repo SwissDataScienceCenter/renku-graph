@@ -31,11 +31,11 @@ import io.renku.generators.jsonld.JsonLDGenerators._
 import io.renku.http.client.RestClientError.BadRequestException
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{FusekiUrl, SparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult._
+import io.renku.triplesstore.{FusekiUrl, SparqlQueryTimeRecorder}
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -43,20 +43,20 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
 
-class TriplesUploaderSpec
+class ProjectUploaderSpec
     extends AnyWordSpec
     with IOSpec
     with MockFactory
     with ExternalServiceStubbing
     with should.Matchers {
 
-  "upload" should {
+  "uploadProject" should {
 
     s"succeeds if uploading triples to the Store was successful" in new TestCase {
 
       givenUploader(returning = ok())
 
-      triplesUploader.uploadTriples(triples).value.unsafeRunSync() shouldBe ().asRight
+      uploader.uploadProject(triples).value.unsafeRunSync() shouldBe ().asRight
     }
 
     s"fail if remote client responds with a $BadRequest" in new TestCase {
@@ -65,7 +65,7 @@ class TriplesUploaderSpec
       givenUploader(returning = aResponse().withStatus(BadRequest.code).withBody(errorMessage))
 
       intercept[BadRequestException] {
-        triplesUploader.uploadTriples(triples).value.unsafeRunSync()
+        uploader.uploadProject(triples).value.unsafeRunSync()
       }
     }
 
@@ -75,7 +75,7 @@ class TriplesUploaderSpec
         val errorMessage = nonEmptyStrings().generateOne
         givenUploader(returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
-        val Left(error) = triplesUploader.uploadTriples(triples).value.unsafeRunSync()
+        val Left(error) = uploader.uploadProject(triples).value.unsafeRunSync()
         error shouldBe a[SilentRecoverableError]
       }
     }
@@ -86,7 +86,7 @@ class TriplesUploaderSpec
         val errorMessage = nonEmptyStrings().generateOne
         givenUploader(returning = serviceUnavailable().withBody(errorMessage))
 
-        val Left(error) = triplesUploader.uploadTriples(triples).value.unsafeRunSync()
+        val Left(error) = uploader.uploadProject(triples).value.unsafeRunSync()
         error shouldBe a[LogWorthyRecoverableError]
       }
 
@@ -94,7 +94,7 @@ class TriplesUploaderSpec
 
       givenUploader(returning = aResponse.withFault(CONNECTION_RESET_BY_PEER))
 
-      val Left(failure) = triplesUploader.uploadTriples(triples).value.unsafeRunSync()
+      val Left(failure) = uploader.uploadProject(triples).value.unsafeRunSync()
 
       failure shouldBe a[LogWorthyRecoverableError]
       failure.getMessage should startWith(
@@ -111,8 +111,8 @@ class TriplesUploaderSpec
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     lazy val renkuConnectionConfig =
       renkuConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
-    lazy val triplesUploader =
-      new TriplesUploaderImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
+    lazy val uploader =
+      new ProjectUploaderImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenUploader(returning: ResponseDefinitionBuilder) = stubFor {
       post(s"/${renkuConnectionConfig.datasetName}/data")

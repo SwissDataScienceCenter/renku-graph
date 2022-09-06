@@ -32,9 +32,9 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.{Histogram, MetricsRegistry}
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 import transformation.TransformationStepsCreator
 import triplesuploading.TriplesUploadResult._
@@ -65,7 +65,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   def process(event: TriplesGeneratedEvent): F[Unit] = {
     for {
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path).recoverWith(rollback(event))
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path) recoverWith rollback(event)
       results                             <- measureExecutionTime(transformAndUpload(event))
       _                                   <- updateEventLog(results)
       _                                   <- logSummary(event)(results)
@@ -78,33 +78,27 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   }
 
   private def transformAndUpload(
-      event:                   TriplesGeneratedEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): F[UploadingResult] = {
+      event:              TriplesGeneratedEvent
+  )(implicit accessToken: Option[AccessToken]): F[UploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      result  <- right[UploadingResult](run(createSteps, project) >>= (toUploadingResult(event, _)))
+      result  <- right[UploadingResult](run(createSteps, project) >>= toUploadingResult(event))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
 
-  private def toUploadingResult(triplesGeneratedEvent: TriplesGeneratedEvent,
-                                triplesUploadResult:   TriplesUploadResult
-  ): F[UploadingResult] = triplesUploadResult match {
+  private def toUploadingResult(event: TriplesGeneratedEvent): TriplesUploadResult => F[UploadingResult] = {
     case DeliverySuccess =>
-      (Uploaded(triplesGeneratedEvent): UploadingResult)
-        .pure[F]
-    case RecoverableFailure(error) =>
-      error match {
-        case error @ LogWorthyRecoverableError(message, _) =>
-          Logger[F]
-            .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} $message")
-            .map(_ => RecoverableError(triplesGeneratedEvent, error))
-        case error @ SilentRecoverableError(_, _) =>
-          RecoverableError(triplesGeneratedEvent, error).pure[F].widen[UploadingResult]
-      }
+      Uploaded(event).pure[F].widen
+    case RecoverableFailure(error @ LogWorthyRecoverableError(message, _)) =>
+      Logger[F]
+        .error(error)(s"${logMessageCommon(event)} $message")
+        .map(_ => RecoverableError(event, error))
+    case RecoverableFailure(error @ SilentRecoverableError(_, _)) =>
+      RecoverableError(event, error).pure[F].widen[UploadingResult]
     case error: NonRecoverableFailure =>
       Logger[F]
-        .error(error)(s"${logMessageCommon(triplesGeneratedEvent)} ${error.message}")
-        .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
+        .error(error)(s"${logMessageCommon(event)} ${error.message}")
+        .map(_ => NonRecoverableError(event, error: Throwable))
   }
 
   private def nonRecoverableFailure(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[UploadingResult]] = {
@@ -174,10 +168,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   ): PartialFunction[Throwable, F[Option[AccessToken]]] = { case NonFatal(exception) =>
     statusUpdater.rollback[TriplesGenerated](triplesGeneratedEvent.compoundEventId,
                                              triplesGeneratedEvent.project.path
-    ) >> new Exception(
-      "transformation failure -> Event rolled back",
-      exception
-    ).raiseError[F, Option[AccessToken]]
+    ) >> new Exception("transformation failure -> Event rolled back", exception).raiseError[F, Option[AccessToken]]
   }
 
   private sealed trait UploadingResult extends Product with Serializable {

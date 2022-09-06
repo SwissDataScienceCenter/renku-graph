@@ -41,21 +41,21 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
 
-class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
+class UpdateQueryRunnerSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
 
-  "send" should {
+  "run" should {
 
     s"return $DeliverySuccess if all the given updates pass" in new TestCase {
       givenStore(forUpdate = query, returning = ok())
 
-      updater.send(query).value.unsafeRunSync() shouldBe ().asRight
+      queryRunner.run(query).value.unsafeRunSync() shouldBe ().asRight
     }
 
     s"return $NonRecoverableFailure if the given updates is invalid (TS responds with a BAD_REQUEST 400)" in new TestCase {
 
       givenStore(forUpdate = query, returning = badRequest())
 
-      intercept[NonRecoverableFailure](updater.send(query).value.unsafeRunSync()).getMessage should startWith(
+      intercept[NonRecoverableFailure](queryRunner.run(query).value.unsafeRunSync()).getMessage should startWith(
         "Triples transformation update 'curation update' failed"
       )
     }
@@ -66,7 +66,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
         val errorMessage = nonEmptyStrings().generateOne
         givenStore(forUpdate = query, returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
-        val Left(error) = updater.send(query).value.unsafeRunSync()
+        val Left(error) = queryRunner.run(query).value.unsafeRunSync()
         error          shouldBe a[SilentRecoverableError]
         error.getMessage should startWith("Triples transformation update 'curation update' failed:")
       }
@@ -78,7 +78,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
         val errorMessage = nonEmptyStrings().generateOne
         givenStore(forUpdate = query, returning = serviceUnavailable().withBody(errorMessage))
 
-        val Left(error) = updater.send(query).value.unsafeRunSync()
+        val Left(error) = queryRunner.run(query).value.unsafeRunSync()
 
         error          shouldBe a[LogWorthyRecoverableError]
         error.getMessage should startWith("Triples transformation update 'curation update' failed:")
@@ -88,7 +88,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
 
       givenStore(forUpdate = query, returning = aResponse.withFault(CONNECTION_RESET_BY_PEER))
 
-      val Left(failure) = updater.send(query).value.unsafeRunSync()
+      val Left(failure) = queryRunner.run(query).value.unsafeRunSync()
 
       failure shouldBe a[LogWorthyRecoverableError]
       failure.getMessage should startWith(
@@ -104,7 +104,8 @@ class UpdatesUploaderSpec extends AnyWordSpec with IOSpec with ExternalServiceSt
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     lazy val renkuConnectionConfig =
       renkuConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
-    lazy val updater = new UpdatesUploaderImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
+    lazy val queryRunner =
+      new UpdateQueryRunnerImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) = stubFor {
       post(s"/${renkuConnectionConfig.datasetName}/update")

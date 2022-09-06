@@ -17,7 +17,7 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
-package persondetails
+package persons
 
 import cats.MonadThrow
 import cats.data.EitherT

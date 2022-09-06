@@ -25,10 +25,10 @@ import cats.syntax.all._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.entities.Project
 import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuUrl}
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{ProjectWithQueries, Queries}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -38,10 +38,10 @@ private[consumers] trait TransformationStepsRunner[F[_]] {
 }
 
 private[tsprovisioning] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
-    triplesUploader: TriplesUploader[F],
-    updatesUploader: UpdatesUploader[F],
-    renkuUrl:        RenkuUrl,
-    gitLabUrl:       GitLabUrl
+    projectUploader:   ProjectUploader[F],
+    updateQueryRunner: UpdateQueryRunner[F],
+    renkuUrl:          RenkuUrl,
+    gitLabUrl:         GitLabUrl
 ) extends TransformationStepsRunner[F] {
 
   private implicit val gitLabApiUrl:     GitLabApiUrl = gitLabUrl.apiV4
@@ -49,6 +49,7 @@ private[tsprovisioning] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
 
   import TriplesUploadResult._
   import io.renku.jsonld.syntax._
+  import projectUploader._
 
   override def run(steps: List[TransformationStep[F]], project: Project): F[TriplesUploadResult] = {
     runAll(steps)(project) >>=
@@ -72,21 +73,21 @@ private[tsprovisioning] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
     )
 
   private lazy val executeAllPreDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
-    case projectAndQueries @ (_, Queries(preQueries, _)) => execute(preQueries).map(_ => projectAndQueries)
+    case projectAndQueries @ (_, Queries(preQueries, _)) =>
+      execute(preQueries).map(_ => projectAndQueries)
   }
 
   private lazy val encodeAndSendProject: ((Project, Queries)) => ProjectWithQueries[F] = {
     case projectAndQueries @ (project, _) =>
-      for {
-        jsonLD <- EitherT
-                    .fromEither[F](project.asJsonLD.flatten)
-                    .leftSemiflatMap(error =>
-                      NonRecoverableFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}", error)
-                        .raiseError[F, ProcessingRecoverableError]
-                    )
-        _ <- triplesUploader.uploadTriples(jsonLD)
-      } yield projectAndQueries
+      (jsonise(project) >>= uploadProject).map(_ => projectAndQueries)
   }
+
+  private def jsonise(project: Project) = EitherT
+    .fromEither[F](project.asJsonLD.flatten)
+    .leftSemiflatMap(error =>
+      NonRecoverableFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}", error)
+        .raiseError[F, ProcessingRecoverableError]
+    )
 
   private lazy val executeAllPostDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
     case projectAndQueries @ (_, Queries(_, postQueries)) => execute(postQueries).map(_ => projectAndQueries)
@@ -94,15 +95,14 @@ private[tsprovisioning] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
 
   private def execute(queries: List[SparqlQuery]): EitherT[F, ProcessingRecoverableError, Unit] =
     queries.foldLeft(EitherT.rightT[F, ProcessingRecoverableError](())) { (previousResult, query) =>
-      previousResult >> updatesUploader.send(query)
+      previousResult >> (updateQueryRunner run query)
     }
 
-  private def transformationFailure(
-      project: Project
-  ): PartialFunction[Throwable, F[TriplesUploadResult]] = { case NonFatal(exception) =>
-    NonRecoverableFailure(s"Transformation of ${project.path} failed: $exception", exception)
-      .pure[F]
-      .widen[TriplesUploadResult]
+  private def transformationFailure(project: Project): PartialFunction[Throwable, F[TriplesUploadResult]] = {
+    case NonFatal(exception) =>
+      NonRecoverableFailure(s"Transformation of ${project.path} failed: $exception", exception)
+        .pure[F]
+        .widen[TriplesUploadResult]
   }
 }
 
@@ -112,8 +112,8 @@ private[consumers] object TransformationStepsRunner {
     renkuConnectionConfig <- RenkuConnectionConfig[F]()
     renkuUrl              <- RenkuUrlLoader[F]()
     gitlabUrl             <- GitLabUrlLoader[F]()
-  } yield new TransformationStepsRunnerImpl[F](new TriplesUploaderImpl[F](renkuConnectionConfig),
-                                               new UpdatesUploaderImpl(renkuConnectionConfig),
+  } yield new TransformationStepsRunnerImpl[F](new ProjectUploaderImpl[F](renkuConnectionConfig),
+                                               new UpdateQueryRunnerImpl(renkuConnectionConfig),
                                                renkuUrl,
                                                gitlabUrl
   )

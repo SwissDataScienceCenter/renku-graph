@@ -16,18 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
+package io.renku.triplesgenerator.events.consumers.tsprovisioning
+package transformation
 
+import activities.ActivityTransformer
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import datasets.DatasetTransformer
 import io.renku.triplesstore.SparqlQueryTimeRecorder
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.activities.ActivityTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.datasets.DatasetTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persondetails.PersonTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.projects.ProjectTransformer
 import org.typelevel.log4cats.Logger
+import persons.PersonTransformer
+import projects.ProjectTransformer
 
 private[consumers] trait TransformationStepsCreator[F[_]] {
   def createSteps: List[TransformationStep[F]]

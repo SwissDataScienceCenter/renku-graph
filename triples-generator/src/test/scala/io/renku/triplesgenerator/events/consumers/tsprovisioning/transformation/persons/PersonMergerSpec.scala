@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persondetails
+package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persons
 
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._

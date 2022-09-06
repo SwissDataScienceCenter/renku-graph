@@ -61,21 +61,21 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       inSequence {
         step1Queries.preDataUploadQueries.foreach { query =>
-          (updatesUploader.send _).expects(query).returning(EitherT.rightT(()))
+          (queryRunner.run _).expects(query).returning(EitherT.rightT(()))
         }
         step2Queries.preDataUploadQueries.foreach { query =>
-          (updatesUploader.send _).expects(query).returning(EitherT.rightT(()))
+          (queryRunner.run _).expects(query).returning(EitherT.rightT(()))
         }
 
-        (triplesUploader.uploadTriples _)
+        (projectUploader.uploadProject _)
           .expects(step2Project.asJsonLD.flatten.fold(fail(_), identity))
           .returning(EitherT.rightT(()))
 
         step1Queries.postDataUploadQueries.foreach { query =>
-          (updatesUploader.send _).expects(query).returning(EitherT.rightT(()))
+          (queryRunner.run _).expects(query).returning(EitherT.rightT(()))
         }
         step2Queries.postDataUploadQueries.foreach { query =>
-          (updatesUploader.send _).expects(query).returning(EitherT.rightT(()))
+          (queryRunner.run _).expects(query).returning(EitherT.rightT(()))
         }
       }
 
@@ -130,7 +130,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .returning(EitherT.rightT[Try, ProcessingRecoverableError]((step1Project, step1Queries)))
 
       val recoverableError = logWorthyRecoverableErrors.generateOne
-      (updatesUploader.send _)
+      (queryRunner.run _)
         .expects(step1Queries.preDataUploadQueries.head)
         .returning(EitherT.leftT(recoverableError))
 
@@ -152,7 +152,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .returning(EitherT.rightT[Try, ProcessingRecoverableError]((step1Project, step1Queries)))
 
       val nonRecoverableError = exceptions.generateOne
-      (updatesUploader.send _)
+      (queryRunner.run _)
         .expects(step1Queries.preDataUploadQueries.head)
         .returning(EitherT(nonRecoverableError.raiseError[Try, Either[ProcessingRecoverableError, Unit]]))
 
@@ -200,7 +200,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       val failure = processingRecoverableErrors.generateOne
 
-      (triplesUploader.uploadTriples _)
+      (projectUploader.uploadProject _)
         .expects(*)
         .returning(EitherT.leftT(failure))
 
@@ -221,7 +221,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
 
       val failure = exceptions.generateOne
 
-      (triplesUploader.uploadTriples _)
+      (projectUploader.uploadProject _)
         .expects(*)
         .returning(EitherT(failure.raiseError[Try, Either[ProcessingRecoverableError, Unit]]))
 
@@ -241,12 +241,12 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(originalProject)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError]((originalProject, step1Queries)))
 
-      (triplesUploader.uploadTriples _)
+      (projectUploader.uploadProject _)
         .expects(*)
         .returning(EitherT.rightT(()))
 
       val recoverableError = processingRecoverableErrors.generateOne
-      (updatesUploader.send _)
+      (queryRunner.run _)
         .expects(step1Queries.postDataUploadQueries.head)
         .returning(EitherT.leftT(recoverableError))
 
@@ -266,12 +266,12 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(originalProject)
         .returning(EitherT.rightT[Try, ProcessingRecoverableError]((originalProject, step1Queries)))
 
-      (triplesUploader.uploadTriples _)
+      (projectUploader.uploadProject _)
         .expects(*)
         .returning(EitherT.rightT(()))
 
       val nonRecoverableError = exceptions.generateOne
-      (updatesUploader.send _)
+      (queryRunner.run _)
         .expects(step1Queries.postDataUploadQueries.head)
         .returning(EitherT(nonRecoverableError.raiseError[Try, Either[ProcessingRecoverableError, Unit]]))
 
@@ -285,8 +285,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
   }
 
   private trait TestCase {
-    val triplesUploader = mock[TriplesUploader[Try]]
-    val updatesUploader = mock[UpdatesUploader[Try]]
-    val uploader        = new TransformationStepsRunnerImpl[Try](triplesUploader, updatesUploader, renkuUrl, gitLabUrl)
+    val projectUploader = mock[ProjectUploader[Try]]
+    val queryRunner     = mock[UpdateQueryRunner[Try]]
+    val uploader        = new TransformationStepsRunnerImpl[Try](projectUploader, queryRunner, renkuUrl, gitLabUrl)
   }
 }

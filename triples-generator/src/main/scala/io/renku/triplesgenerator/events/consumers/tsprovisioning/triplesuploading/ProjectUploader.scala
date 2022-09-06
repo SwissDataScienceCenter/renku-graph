@@ -26,18 +26,18 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.jsonld.JsonLD
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-private trait TriplesUploader[F[_]] {
-  def uploadTriples(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit]
+private trait ProjectUploader[F[_]] {
+  def uploadProject(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit]
 }
 
-private class TriplesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+private class ProjectUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig,
     recoveryStrategy:      RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:         FiniteDuration = SleepAfterConnectionIssue,
@@ -50,32 +50,32 @@ private class TriplesUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
                        idleTimeoutOverride = idleTimeout.some,
                        requestTimeoutOverride = requestTimeout.some
     )
-    with TriplesUploader[F] {
+    with ProjectUploader[F] {
 
   import org.http4s.Status._
   import org.http4s.{Request, Response, Status}
+  import recoveryStrategy.maybeRecoverableError
 
-  override def uploadTriples(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    uploadAndMap[Either[ProcessingRecoverableError, Unit]](triples)(
-      mapResponse
-    ) recoverWith recoveryStrategy.maybeRecoverableError
+  override def uploadProject(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
+    uploadAndMap[Either[ProcessingRecoverableError, Unit]](triples)(responseMapping)
+      .recoverWith(maybeRecoverableError)
   }
 
-  private lazy val mapResponse
+  private lazy val responseMapping
       : PartialFunction[(Status, Request[F], Response[F]), F[Either[ProcessingRecoverableError, Unit]]] = {
     case (Ok, _, _) => ().asRight[ProcessingRecoverableError].pure[F]
   }
 }
 
-private object TriplesUploader {
+private object ProjectUploader {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](renkuConnectionConfig: RenkuConnectionConfig,
                                                           retryInterval: FiniteDuration = SleepAfterConnectionIssue,
                                                           maxRetries: Int Refined NonNegative =
                                                             MaxRetriesAfterConnectionTimeout,
                                                           idleTimeout:    Duration = 6 minutes,
                                                           requestTimeout: Duration = 5 minutes
-  ): F[TriplesUploaderImpl[F]] = MonadThrow[F].catchNonFatal(
-    new TriplesUploaderImpl[F](renkuConnectionConfig,
+  ): F[ProjectUploaderImpl[F]] = MonadThrow[F].catchNonFatal(
+    new ProjectUploaderImpl[F](renkuConnectionConfig,
                                RecoverableErrorsRecovery,
                                retryInterval,
                                maxRetries,

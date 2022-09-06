@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persondetails
+package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persons
 
 import eu.timepit.refined.auto._
 import cats.syntax.all._

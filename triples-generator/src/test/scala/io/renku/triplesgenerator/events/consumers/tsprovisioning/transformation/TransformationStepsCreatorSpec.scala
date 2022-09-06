@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.Generators._
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.activities.ActivityTransformer
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.datasets.DatasetTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persondetails.PersonTransformer
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persons.PersonTransformer
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.projects.ProjectTransformer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
