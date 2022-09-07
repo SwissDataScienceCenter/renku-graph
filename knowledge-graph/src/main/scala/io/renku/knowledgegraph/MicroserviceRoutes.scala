@@ -105,11 +105,11 @@ private class MicroserviceRoutes[F[_]: Async](
     import entities.Endpoint.Criteria._
     import Filters.CreatorName.creatorNames
     import Filters.EntityType.entityTypes
+    import Filters.Namespace.namespaces
     import Filters.Query.query
     import Filters.Since.since
     import Filters.Until.until
     import Filters.Visibility.visibilities
-    import Filters.Namespace.namespaces
     import Sorting.sort
 
     AuthedRoutes.of {
@@ -297,42 +297,40 @@ private object MicroserviceRoutes {
       logger:             Logger[IO],
       metricsRegistry:    MetricsRegistry[IO],
       sparqlTimeRecorder: SparqlQueryTimeRecorder[IO]
-  ): IO[MicroserviceRoutes[IO]] = GitLabClient[IO]() >>= { implicit gitLabClient =>
-    AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
-      for {
-        datasetsSearchEndpoint     <- datasets.Endpoint[IO]
-        datasetDetailsEndpoint     <- datasets.details.Endpoint[IO]
-        entitiesEndpoint           <- entities.Endpoint[IO]
-        queryEndpoint              <- QueryEndpoint()
-        lineageEndpoint            <- projects.files.lineage.Endpoint[IO]
-        ontologyEndpoint           <- ontology.Endpoint[IO]
-        projectDetailsEndpoint     <- projects.details.Endpoint[IO]
-        projectDatasetsEndpoint    <- projects.datasets.Endpoint[IO]
-        projectDatasetTagsEndpoint <- projects.datasets.tags.Endpoint[IO]
-        docsEndpoint               <- docs.Endpoint[IO]
-        usersProjectsEndpoint      <- users.projects.Endpoint[IO]
-        authenticator              <- GitLabAuthenticator[IO]
-        authMiddleware             <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
-        projectPathAuthorizer      <- Authorizer.using(ProjectPathRecordsFinder[IO])
-        datasetIdAuthorizer        <- Authorizer.using(DatasetIdRecordsFinder[IO])
-        versionRoutes              <- version.Routes[IO]
-      } yield new MicroserviceRoutes(datasetsSearchEndpoint,
-                                     datasetDetailsEndpoint,
-                                     entitiesEndpoint,
-                                     queryEndpoint,
-                                     lineageEndpoint,
-                                     ontologyEndpoint,
-                                     projectDetailsEndpoint,
-                                     projectDatasetsEndpoint,
-                                     projectDatasetTagsEndpoint,
-                                     docsEndpoint,
-                                     usersProjectsEndpoint,
-                                     authMiddleware,
-                                     projectPathAuthorizer,
-                                     datasetIdAuthorizer,
-                                     new RoutesMetrics[IO],
-                                     versionRoutes
-      )
-    }
-  }
+  ): IO[MicroserviceRoutes[IO]] = for {
+    implicit0(gv: GitLabClient[IO])       <- GitLabClient[IO]()
+    implicit0(atf: AccessTokenFinder[IO]) <- AccessTokenFinder[IO]()
+    datasetsSearchEndpoint                <- datasets.Endpoint[IO]
+    datasetDetailsEndpoint                <- datasets.details.Endpoint[IO]
+    entitiesEndpoint                      <- entities.Endpoint[IO]
+    queryEndpoint                         <- QueryEndpoint()
+    lineageEndpoint                       <- projects.files.lineage.Endpoint[IO]
+    ontologyEndpoint                      <- ontology.Endpoint[IO]
+    projectDetailsEndpoint                <- projects.details.Endpoint[IO]
+    projectDatasetsEndpoint               <- projects.datasets.Endpoint[IO]
+    projectDatasetTagsEndpoint            <- projects.datasets.tags.Endpoint[IO]
+    docsEndpoint                          <- docs.Endpoint[IO]
+    usersProjectsEndpoint                 <- users.projects.Endpoint[IO]
+    authenticator                         <- GitLabAuthenticator[IO]
+    authMiddleware                        <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
+    projectPathAuthorizer                 <- Authorizer.using(ProjectPathRecordsFinder[IO])
+    datasetIdAuthorizer                   <- Authorizer.using(DatasetIdRecordsFinder[IO])
+    versionRoutes                         <- version.Routes[IO]
+  } yield new MicroserviceRoutes(datasetsSearchEndpoint,
+                                 datasetDetailsEndpoint,
+                                 entitiesEndpoint,
+                                 queryEndpoint,
+                                 lineageEndpoint,
+                                 ontologyEndpoint,
+                                 projectDetailsEndpoint,
+                                 projectDatasetsEndpoint,
+                                 projectDatasetTagsEndpoint,
+                                 docsEndpoint,
+                                 usersProjectsEndpoint,
+                                 authMiddleware,
+                                 projectPathAuthorizer,
+                                 datasetIdAuthorizer,
+                                 new RoutesMetrics[IO],
+                                 versionRoutes
+  )
 }

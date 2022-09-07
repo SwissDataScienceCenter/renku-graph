@@ -63,7 +63,6 @@ private class EndpointImpl[F[_]: Async: Logger](lineageFinder: LineageFinder[F])
 }
 
 object Endpoint {
-  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    lineageFinder <- LineageFinder[F]
-  } yield new EndpointImpl[F](lineageFinder)
+  def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] =
+    LineageFinder[F].map(new EndpointImpl[F](_))
 }

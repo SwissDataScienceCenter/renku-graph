@@ -68,7 +68,6 @@ private class CommitEventsRemoverImpl[F[_]: MonadThrow](eventSender: EventSender
 }
 
 private[consumers] object CommitEventsRemover {
-  def apply[F[_]: Async: Temporal: Logger: MetricsRegistry]: F[CommitEventsRemover[F]] = for {
-    sender <- EventSender[F]
-  } yield new CommitEventsRemoverImpl[F](sender)
+  def apply[F[_]: Async: Temporal: Logger: MetricsRegistry]: F[CommitEventsRemover[F]] =
+    EventSender[F].map(new CommitEventsRemoverImpl[F](_))
 }

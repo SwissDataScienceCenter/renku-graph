@@ -71,9 +71,9 @@ private class MemberEmailFinderImpl[F[_]: Async: Logger](
       case None => rightT[F, ProcessingRecoverableError](member)
       case Some(nextPage) =>
         for {
-          eventsAndNextPage <- projectEventsFinder.find(project, nextPage).map(filterEventsFor(member))
-          maybeEmail        <- matchEmailFromCommits(eventsAndNextPage._1, project)
-          updatedMember     <- addEmailOrCheckNextPage(member, maybeEmail, project, eventsAndNextPage._2)
+          (pushEvents, pagingInfo) <- projectEventsFinder.find(project, nextPage).map(filterEventsFor(member))
+          maybeEmail               <- matchEmailFromCommits(pushEvents, project)
+          updatedMember            <- addEmailOrCheckNextPage(member, maybeEmail, project, pagingInfo)
         } yield updatedMember
     }
 

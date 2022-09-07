@@ -59,9 +59,9 @@ private class ProjectFinderImpl[F[_]: Async: GitLabClient: Logger](
   ): EitherT[F, ProcessingRecoverableError, Option[GitLabProjectInfo]] = EitherT {
     {
       for {
-        projectAndCreator <- fetchProject(path)
-        maybeCreator      <- fetchCreator(projectAndCreator._2)
-      } yield projectAndCreator._1.copy(maybeCreator = maybeCreator)
+        (project, maybeCreatorId) <- fetchProject(path)
+        maybeCreator              <- fetchCreator(maybeCreatorId)
+      } yield project.copy(maybeCreator = maybeCreator)
     }.value.map(_.asRight[ProcessingRecoverableError]).recoverWith(recoveryStrategy.maybeRecoverableError)
   }
 

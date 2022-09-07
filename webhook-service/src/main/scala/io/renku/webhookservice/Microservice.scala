@@ -31,25 +31,18 @@ object Microservice extends IOMicroservice {
 
   private implicit val logger: ApplicationLogger.type = ApplicationLogger
 
-  override def run(args: List[String]): IO[ExitCode] = MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
-    GitLabClient[IO]() flatMap { implicit gitLabClient =>
-      ExecutionTimeRecorder[IO]() flatMap { implicit executionTimeRecorder =>
-        for {
-          certificateLoader  <- CertificateLoader[IO]
-          sentryInitializer  <- SentryInitializer[IO]
-          microserviceRoutes <- MicroserviceRoutes[IO]
-          exitcode <- microserviceRoutes.routes.use { routes =>
-                        val httpServer = HttpServer[IO](serverPort = 9001, routes)
-                        new MicroserviceRunner(
-                          certificateLoader,
-                          sentryInitializer,
-                          httpServer
-                        ).run()
-                      }
-        } yield exitcode
-      }
-    }
-  }
+  override def run(args: List[String]): IO[ExitCode] = for {
+    implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistry[IO]()
+    implicit0(gc: GitLabClient[IO])           <- GitLabClient[IO]()
+    implicit0(etr: ExecutionTimeRecorder[IO]) <- ExecutionTimeRecorder[IO]()
+    certificateLoader                         <- CertificateLoader[IO]
+    sentryInitializer                         <- SentryInitializer[IO]
+    microserviceRoutes                        <- MicroserviceRoutes[IO]
+    exitCode <- microserviceRoutes.routes.use { routes =>
+                  val httpServer = HttpServer[IO](serverPort = 9001, routes)
+                  new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer).run()
+                }
+  } yield exitCode
 }
 
 class MicroserviceRunner(certificateLoader: CertificateLoader[IO],

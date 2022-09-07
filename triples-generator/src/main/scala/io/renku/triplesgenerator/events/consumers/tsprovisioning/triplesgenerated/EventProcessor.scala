@@ -64,13 +64,12 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   import uploader._
 
   def process(event: TriplesGeneratedEvent): F[Unit] = {
-    findAccessToken(event.project.path).recoverWith(rollback(event)) >>= { implicit accessToken =>
-      for {
-        results <- measureExecutionTime(transformAndUpload(event))
-        _       <- updateEventLog(results)
-        _       <- logSummary(event)(results)
-      } yield ()
-    }
+    for {
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(event.project.path).recoverWith(rollback(event))
+      results                             <- measureExecutionTime(transformAndUpload(event))
+      _                                   <- updateEventLog(results)
+      _                                   <- logSummary(event)(results)
+    } yield ()
   } recoverWith logError(event)
 
   private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[Unit]] = {

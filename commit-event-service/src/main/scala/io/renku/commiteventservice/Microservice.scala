@@ -40,32 +40,27 @@ object Microservice extends IOMicroservice {
   val ServicePort:             Int Refined Positive = 9006
   private implicit val logger: Logger[IO]           = ApplicationLogger
 
-  override def run(args: List[String]): IO[ExitCode] =
-    MetricsRegistry[IO]() flatMap { implicit metricsRegistry =>
-      ExecutionTimeRecorder[IO]() flatMap { implicit executionTimeRecorder =>
-        GitLabClient[IO]() flatMap { implicit gitLabClient =>
-          AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
-            for {
-              certificateLoader        <- CertificateLoader[IO]
-              sentryInitializer        <- SentryInitializer[IO]
-              commitSyncCategory       <- events.consumers.commitsync.SubscriptionFactory[IO]
-              globalCommitSyncCategory <- events.consumers.globalcommitsync.SubscriptionFactory[IO]
-              eventConsumersRegistry   <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
-              serviceReadinessChecker  <- ServiceReadinessChecker[IO](ServicePort)
-              microserviceRoutes       <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
-              exitcode <- microserviceRoutes.routes.use { routes =>
-                            new MicroserviceRunner[IO](serviceReadinessChecker,
-                                                       certificateLoader,
-                                                       sentryInitializer,
-                                                       eventConsumersRegistry,
-                                                       HttpServer[IO](serverPort = ServicePort.value, routes)
-                            ).run()
-                          }
-            } yield exitcode
-          }
-        }
-      }
-    }
+  override def run(args: List[String]): IO[ExitCode] = for {
+    implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistry[IO]()
+    implicit0(etr: ExecutionTimeRecorder[IO]) <- ExecutionTimeRecorder[IO]()
+    implicit0(gc: GitLabClient[IO])           <- GitLabClient[IO]()
+    implicit0(acf: AccessTokenFinder[IO])     <- AccessTokenFinder[IO]()
+    certificateLoader                         <- CertificateLoader[IO]
+    sentryInitializer                         <- SentryInitializer[IO]
+    commitSyncCategory                        <- events.consumers.commitsync.SubscriptionFactory[IO]
+    globalCommitSyncCategory                  <- events.consumers.globalcommitsync.SubscriptionFactory[IO]
+    eventConsumersRegistry  <- consumers.EventConsumersRegistry(commitSyncCategory, globalCommitSyncCategory)
+    serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
+    microserviceRoutes      <- MicroserviceRoutes(eventConsumersRegistry, new RoutesMetrics[IO])
+    exitcode <- microserviceRoutes.routes.use { routes =>
+                  new MicroserviceRunner[IO](serviceReadinessChecker,
+                                             certificateLoader,
+                                             sentryInitializer,
+                                             eventConsumersRegistry,
+                                             HttpServer[IO](serverPort = ServicePort.value, routes)
+                  ).run()
+                }
+  } yield exitcode
 }
 
 class MicroserviceRunner[F[_]: Spawn: Logger](serviceReadinessChecker: ServiceReadinessChecker[F],

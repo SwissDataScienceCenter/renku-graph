@@ -42,12 +42,11 @@ class AccessTokenAssociatorImpl[F[_]: Async: Logger](
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  override def associate(projectId: Id, accessToken: AccessToken): F[Unit] =
-    for {
-      uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
-      requestWithPayload = request(PUT, uri).withEntity(accessToken.asJson)
-      _ <- send(requestWithPayload)(mapResponse)
-    } yield ()
+  override def associate(projectId: Id, accessToken: AccessToken): F[Unit] = for {
+    uri <- validateUri(s"$tokenRepositoryUrl/projects/$projectId/tokens")
+    requestWithPayload = request(PUT, uri).withEntity(accessToken.asJson)
+    _ <- send(requestWithPayload)(mapResponse)
+  } yield ()
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Unit]] = {
     case (NoContent, _, _) => ().pure[F]

@@ -34,12 +34,12 @@ import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.{IOMicroservice, ServiceReadinessChecker}
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.config.certificates.GitCertificateInstaller
 import io.renku.triplesgenerator.events.consumers._
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{minprojectinfo, triplesgenerated}
 import io.renku.triplesgenerator.init.{CliVersionCompatibilityChecker, CliVersionCompatibilityVerifier}
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -56,51 +56,45 @@ object Microservice extends IOMicroservice {
     }
   }
 
-  override def run(args: List[String]): IO[ExitCode] =
-    MetricsRegistry[IO]() >>= { implicit metricsRegistry =>
-      SparqlQueryTimeRecorder[IO](metricsRegistry) >>= { implicit sparqlTimeRecorder =>
-        GitLabClient[IO]() >>= { implicit gitLabClient =>
-          AccessTokenFinder[IO]() >>= { implicit accessTokenFinder =>
-            ReProvisioningStatus[IO]() >>= { implicit reProvisioningStatus =>
-              for {
-                config                         <- parseConfigArgs(args)
-                certificateLoader              <- CertificateLoader[IO]
-                gitCertificateInstaller        <- GitCertificateInstaller[IO]
-                sentryInitializer              <- SentryInitializer[IO]
-                cliVersionCompatChecker        <- CliVersionCompatibilityChecker[IO](config)
-                awaitingGenerationSubscription <- awaitinggeneration.SubscriptionFactory[IO]
-                membersSyncSubscription        <- membersync.SubscriptionFactory[IO]
-                triplesGeneratedSubscription   <- triplesgenerated.SubscriptionFactory[IO]
-                cleanUpSubscription            <- cleanup.SubscriptionFactory[IO]
-                minProjectInfoSubscription     <- minprojectinfo.SubscriptionFactory[IO]
-                migrationRequestSubscription   <- tsmigrationrequest.SubscriptionFactory[IO](config)
-                eventConsumersRegistry <- consumers.EventConsumersRegistry(
-                                            awaitingGenerationSubscription,
-                                            membersSyncSubscription,
-                                            triplesGeneratedSubscription,
-                                            minProjectInfoSubscription,
-                                            cleanUpSubscription,
-                                            migrationRequestSubscription
-                                          )
-                serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
-                microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config.some).map(_.routes)
-                exitCode <- microserviceRoutes.use { routes =>
-                              new MicroserviceRunner[IO](
-                                serviceReadinessChecker,
-                                certificateLoader,
-                                gitCertificateInstaller,
-                                sentryInitializer,
-                                cliVersionCompatChecker,
-                                eventConsumersRegistry,
-                                HttpServer[IO](serverPort = ServicePort.value, routes)
-                              ).run()
-                            }
-              } yield exitCode
-            }
-          }
-        }
-      }
-    }
+  override def run(args: List[String]): IO[ExitCode] = for {
+    implicit0(mr: MetricsRegistry[IO])           <- MetricsRegistry[IO]()
+    implicit0(sqtr: SparqlQueryTimeRecorder[IO]) <- SparqlQueryTimeRecorder[IO](mr)
+    implicit0(gc: GitLabClient[IO])              <- GitLabClient[IO]()
+    implicit0(acf: AccessTokenFinder[IO])        <- AccessTokenFinder[IO]()
+    implicit0(rp: ReProvisioningStatus[IO])      <- ReProvisioningStatus[IO]()
+    config                                       <- parseConfigArgs(args)
+    certificateLoader                            <- CertificateLoader[IO]
+    gitCertificateInstaller                      <- GitCertificateInstaller[IO]
+    sentryInitializer                            <- SentryInitializer[IO]
+    cliVersionCompatChecker                      <- CliVersionCompatibilityChecker[IO](config)
+    awaitingGenerationSubscription               <- awaitinggeneration.SubscriptionFactory[IO]
+    membersSyncSubscription                      <- membersync.SubscriptionFactory[IO]
+    triplesGeneratedSubscription                 <- triplesgenerated.SubscriptionFactory[IO]
+    cleanUpSubscription                          <- cleanup.SubscriptionFactory[IO]
+    minProjectInfoSubscription                   <- minprojectinfo.SubscriptionFactory[IO]
+    migrationRequestSubscription                 <- tsmigrationrequest.SubscriptionFactory[IO](config)
+    eventConsumersRegistry <- consumers.EventConsumersRegistry(
+                                awaitingGenerationSubscription,
+                                membersSyncSubscription,
+                                triplesGeneratedSubscription,
+                                minProjectInfoSubscription,
+                                cleanUpSubscription,
+                                migrationRequestSubscription
+                              )
+    serviceReadinessChecker <- ServiceReadinessChecker[IO](ServicePort)
+    microserviceRoutes      <- MicroserviceRoutes[IO](eventConsumersRegistry, config.some).map(_.routes)
+    exitCode <- microserviceRoutes.use { routes =>
+                  new MicroserviceRunner[IO](
+                    serviceReadinessChecker,
+                    certificateLoader,
+                    gitCertificateInstaller,
+                    sentryInitializer,
+                    cliVersionCompatChecker,
+                    eventConsumersRegistry,
+                    HttpServer[IO](serverPort = ServicePort.value, routes)
+                  ).run()
+                }
+  } yield exitCode
 }
 
 private class MicroserviceRunner[F[_]: Spawn: Logger](

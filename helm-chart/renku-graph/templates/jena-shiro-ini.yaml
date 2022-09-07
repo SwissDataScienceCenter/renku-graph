@@ -31,4 +31,5 @@ data:
     ## and the rest are restricted
     /$/** = authcBasic,user[admin]
     /renku/** = authcBasic,user[renku]
+    /projects/** = authcBasic,user[renku]
     /migrations/** = authcBasic,user[admin]

@@ -61,11 +61,9 @@ private class EventFinderImpl[F[_]: Async: SessionResource](
 
   override def popEvent(): F[Option[TriplesGeneratedEvent]] = SessionResource[F].useK {
     for {
-      maybeProjectAndEvent <- findEventAndUpdateForProcessing()
-      (maybeProject, maybeTriplesGeneratedEvent) = maybeProjectAndEvent
+      (maybeProject, maybeTriplesGeneratedEvent) <- findEventAndUpdateForProcessing()
       _ <- Kleisli.liftF(maybeUpdateMetrics(maybeProject, maybeTriplesGeneratedEvent))
     } yield maybeTriplesGeneratedEvent
-
   }
 
   private def findEventAndUpdateForProcessing() = for {

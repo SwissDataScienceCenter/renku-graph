@@ -24,10 +24,10 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.entities.Project
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{Queries, Transformation}
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{RecoverableErrorsRecovery, TransformationStep}
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[transformation] trait ActivityTransformer[F[_]] {
@@ -35,9 +35,8 @@ private[transformation] trait ActivityTransformer[F[_]] {
 }
 
 private[transformation] object ActivityTransformer {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ActivityTransformer[F]] = for {
-    kgInfoFinder <- KGInfoFinder[F]
-  } yield new ActivityTransformerImpl[F](kgInfoFinder, UpdatesCreator)
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[ActivityTransformer[F]] =
+    KGInfoFinder[F].map(new ActivityTransformerImpl[F](_, UpdatesCreator))
 }
 
 private[transformation] class ActivityTransformerImpl[F[_]: MonadThrow](

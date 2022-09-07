@@ -31,22 +31,20 @@ private[producers] object SubscriptionCategory {
 
   def apply[F[_]: Async: SessionResource: Logger: MetricsRegistry](
       queriesExecTimes: LabeledHistogram[F]
-  ): F[producers.SubscriptionCategory[F]] =
-    SubscriberTracker[F](queriesExecTimes) flatMap { implicit subscriberTracker =>
-      for {
-        subscribers      <- Subscribers[F, MigratorSubscriptionInfo, SubscriberTracker.Type[F]](categoryName)
-        eventFinder      <- EventFinder[F](queriesExecTimes)
-        dispatchRecovery <- DispatchRecovery[F](queriesExecTimes)
-        eventDelivery    <- EventDelivery.noOp[F, MigrationRequestEvent]
-        distributor <- EventsDistributor[F, MigrationRequestEvent](
-                         categoryName,
-                         subscribers,
-                         eventFinder,
-                         eventDelivery,
-                         EventEncoder(MigrationRequestEvent.encodeEvent),
-                         dispatchRecovery
-                       )
-        deserializer <- SubscriptionPayloadDeserializer[F]
-      } yield new SubscriptionCategoryImpl(categoryName, subscribers, distributor, deserializer)
-    }
+  ): F[producers.SubscriptionCategory[F]] = for {
+    implicit0(st: SubscriberTracker[F]) <- SubscriberTracker[F](queriesExecTimes)
+    subscribers      <- Subscribers[F, MigratorSubscriptionInfo, SubscriberTracker.Type[F]](categoryName)
+    eventFinder      <- EventFinder[F](queriesExecTimes)
+    dispatchRecovery <- DispatchRecovery[F](queriesExecTimes)
+    eventDelivery    <- EventDelivery.noOp[F, MigrationRequestEvent]
+    distributor <- EventsDistributor[F, MigrationRequestEvent](
+                     categoryName,
+                     subscribers,
+                     eventFinder,
+                     eventDelivery,
+                     EventEncoder(MigrationRequestEvent.encodeEvent),
+                     dispatchRecovery
+                   )
+    deserializer <- SubscriptionPayloadDeserializer[F]
+  } yield new SubscriptionCategoryImpl(categoryName, subscribers, distributor, deserializer)
 }

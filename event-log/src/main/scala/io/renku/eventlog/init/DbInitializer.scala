@@ -152,10 +152,10 @@ object DbInitializer {
             discardingStatuses = TriplesStore :: Nil
           ),
           FailedEventsRestorer[F](
-            "%Cannot decode JsonLDNull to Int, List())%",
-            currentStatus = TransformationNonRecoverableFailure,
-            destinationStatus = TriplesGenerated,
-            discardingStatuses = TriplesStore :: Nil
+            "%You are using renku version % but this project requires at least version%",
+            currentStatus = GenerationNonRecoverableFailure,
+            destinationStatus = New,
+            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
           )
         ),
         isMigrating

@@ -28,9 +28,9 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.Schemas.renku
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
+import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.Migration
 import org.typelevel.log4cats.Logger
 
 private[migrations] trait MigrationExecutionRegister[F[_]] {
@@ -73,13 +73,11 @@ private class MigrationExecutionRegisterImpl[F[_]: Async: Logger: SparqlQueryTim
 
 private[migrations] object MigrationExecutionRegister {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationExecutionRegister[F]] =
-    RenkuUrlLoader[F]() flatMap { implicit renkuUrl =>
-      for {
-        serviceVersion <- ServiceVersion.readFromConfig[F]()
-        storeConfig    <- MigrationsConnectionConfig[F]()
-      } yield new MigrationExecutionRegisterImpl[F](serviceVersion, storeConfig)
-    }
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[MigrationExecutionRegister[F]] = for {
+    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
+    serviceVersion                <- ServiceVersion.readFromConfig[F]()
+    storeConfig                   <- MigrationsConnectionConfig[F]()
+  } yield new MigrationExecutionRegisterImpl[F](serviceVersion, storeConfig)
 
   private[migrations] final case class MigrationExecution(migrationName: Migration.Name, serviceVersion: ServiceVersion)
 

@@ -58,11 +58,10 @@ private class ToTriplesGeneratedUpdater[F[_]: Async](
     }
 
   private def updateDependentData(event: ToTriplesGenerated) = for {
-    _                  <- updatePayload(event)
-    _                  <- updateProcessingTime(event)
-    idsAndUpdateResult <- updateAncestorsStatus(event)
-    (idsAndStatuses, ancestorsUpdateResults) = idsAndUpdateResult
-    _ <- cleanUp(idsAndStatuses, event)
+    _                                        <- updatePayload(event)
+    _                                        <- updateProcessingTime(event)
+    (idsAndStatuses, ancestorsUpdateResults) <- updateAncestorsStatus(event)
+    _                                        <- cleanUp(idsAndStatuses, event)
   } yield ancestorsUpdateResults
 
   private def updateStatus(event: ToTriplesGenerated) = measureExecutionTime {
