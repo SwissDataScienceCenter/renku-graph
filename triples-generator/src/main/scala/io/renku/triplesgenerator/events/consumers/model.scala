@@ -20,9 +20,6 @@ package io.renku.triplesgenerator.events.consumers
 
 import io.renku.graph.model.events.CompoundEventId
 
-object models {
-
-  trait CategoryEvent {
-    def compoundEventId: CompoundEventId
-  }
+private trait CategoryEvent {
+  def compoundEventId: CompoundEventId
 }

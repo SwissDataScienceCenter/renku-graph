@@ -18,17 +18,12 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning
 
-import cats.data.EitherT
 import cats.syntax.all._
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
-import io.renku.graph.model.entities.Project
 import io.renku.jsonld.EntityId
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 
 package object transformation {
-
-  private[tsprovisioning] type TransformationResults[F[_]] = EitherT[F, ProcessingRecoverableError, Project]
 
   implicit val entityIdDecoder: Decoder[EntityId] =
     decodeString.emap { value =>
