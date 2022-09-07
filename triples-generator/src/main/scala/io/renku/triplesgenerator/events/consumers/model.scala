@@ -23,3 +23,11 @@ import io.renku.graph.model.events.CompoundEventId
 private trait CategoryEvent {
   def compoundEventId: CompoundEventId
 }
+
+private sealed trait TSVersion
+private object TSVersion {
+  implicit case object DefaultGraph extends TSVersion
+  type DefaultGraph = DefaultGraph.type
+  implicit case object NamedGraphs extends TSVersion
+  type NamedGraphs = NamedGraphs.type
+}

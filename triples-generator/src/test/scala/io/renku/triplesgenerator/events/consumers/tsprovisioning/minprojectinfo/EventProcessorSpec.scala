@@ -141,8 +141,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       givenEntityBuilding(event, returning = rightT(project))
 
       val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
+      (stepsCreator
+        .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        .expects(TSVersion.DefaultGraph)
         .returning(steps)
 
       val processingRecoverableError = logWorthyRecoverableErrors.generateOne
@@ -166,8 +167,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       givenEntityBuilding(event, returning = rightT(project))
 
       val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
+      (stepsCreator
+        .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        .expects(TSVersion.DefaultGraph)
         .returning(steps)
 
       val processingRecoverableError = silentRecoverableErrors.generateOne
@@ -190,8 +192,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       givenEntityBuilding(event, returning = rightT(project))
 
       val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
+      (stepsCreator
+        .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        .expects(TSVersion.DefaultGraph)
         .returning(steps)
 
       val failure =
@@ -216,8 +219,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       val steps = transformationSteps[Try].generateList()
 
-      (() => stepsCreator.createSteps)
-        .expects()
+      (stepsCreator
+        .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        .expects(TSVersion.DefaultGraph)
         .returning(steps)
 
       val exception = exceptions.generateOne
@@ -240,8 +244,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       givenEntityBuilding(event, returning = rightT(project))
 
       val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
+      (stepsCreator
+        .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        .expects(TSVersion.DefaultGraph)
         .returning(steps)
 
       val uploadingError =
@@ -265,8 +270,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       givenEntityBuilding(event, returning = rightT(project))
 
       val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
+      (stepsCreator
+        .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        .expects(TSVersion.DefaultGraph)
         .returning(steps)
 
       (triplesUploader.run _)
@@ -313,8 +319,9 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     def successfulTriplesTransformationAndUpload(project: Project) = {
       val steps = transformationSteps[Try].generateList()
-      (() => stepsCreator.createSteps)
-        .expects()
+      (stepsCreator
+        .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        .expects(TSVersion.DefaultGraph)
         .returning(steps)
 
       (triplesUploader.run _)

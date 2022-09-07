@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning
+package io.renku.triplesgenerator.events.consumers
+package tsprovisioning
 package transformation
 
 import cats.MonadThrow
@@ -26,34 +27,38 @@ import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[consumers] trait TransformationStepsCreator[F[_]] {
-  def createSteps: List[TransformationStep[F]]
+  def createSteps[TS <: TSVersion](implicit ev: TS): List[TransformationStep[F]]
 }
 
 private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
-    personTransformer:   defaultgraph.persons.PersonTransformer[F],
-    projectTransformer:  defaultgraph.projects.ProjectTransformer[F],
-    datasetTransformer:  defaultgraph.datasets.DatasetTransformer[F],
-    activityTransformer: defaultgraph.activities.ActivityTransformer[F]
+    defaultGraphPersonTransformer:   defaultgraph.persons.PersonTransformer[F],
+    defaultGraphProjectTransformer:  defaultgraph.projects.ProjectTransformer[F],
+    defaultGraphDatasetTransformer:  defaultgraph.datasets.DatasetTransformer[F],
+    defaultGraphActivityTransformer: defaultgraph.activities.ActivityTransformer[F]
 ) extends TransformationStepsCreator[F] {
 
-  override def createSteps: List[TransformationStep[F]] = List(
-    personTransformer.createTransformationStep,
-    projectTransformer.createTransformationStep,
-    datasetTransformer.createTransformationStep,
-    activityTransformer.createTransformationStep
-  )
+  override def createSteps[TS <: TSVersion](implicit ev: TS): List[TransformationStep[F]] = ev match {
+    case TSVersion.DefaultGraph =>
+      List(
+        defaultGraphPersonTransformer.createTransformationStep,
+        defaultGraphProjectTransformer.createTransformationStep,
+        defaultGraphDatasetTransformer.createTransformationStep,
+        defaultGraphActivityTransformer.createTransformationStep
+      )
+    case TSVersion.NamedGraphs => Nil
+  }
 }
 
 private[consumers] object TransformationStepsCreator {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsCreator[F]] = for {
-    personTransformer   <- defaultgraph.persons.PersonTransformer[F]
-    projectTransformer  <- defaultgraph.projects.ProjectTransformer[F]
-    datasetTransformer  <- defaultgraph.datasets.DatasetTransformer[F]
-    activityTransformer <- defaultgraph.activities.ActivityTransformer[F]
-  } yield new TransformationStepsCreatorImpl[F](personTransformer,
-                                                projectTransformer,
-                                                datasetTransformer,
-                                                activityTransformer
+    defaultGraphPersonTransformer   <- defaultgraph.persons.PersonTransformer[F]
+    defaultGraphProjectTransformer  <- defaultgraph.projects.ProjectTransformer[F]
+    defaultGraphDatasetTransformer  <- defaultgraph.datasets.DatasetTransformer[F]
+    defaultGraphActivityTransformer <- defaultgraph.activities.ActivityTransformer[F]
+  } yield new TransformationStepsCreatorImpl[F](defaultGraphPersonTransformer,
+                                                defaultGraphProjectTransformer,
+                                                defaultGraphDatasetTransformer,
+                                                defaultGraphActivityTransformer
   )
 }

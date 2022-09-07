@@ -16,15 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
+package io.renku.triplesgenerator.events.consumers
+package tsprovisioning.transformation
 
+import Generators._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.Generators._
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.activities.ActivityTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.datasets.DatasetTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.persons.PersonTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.projects.ProjectTransformer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -33,27 +30,34 @@ import scala.util.Try
 
 class TransformationStepsCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  "createSteps" should {
-    "combine steps from person/project/dataset/activity transformers" in {
+  "createSteps[DefaultGraph]" should {
+    "combine steps from person/project/dataset/activity transformers for the DefaultGraph" in new TestCase {
       val steps @ step1 :: step2 :: step3 :: step4 :: Nil = transformationSteps[Try].generateFixedSizeList(4)
 
-      val personTransformer = mock[PersonTransformer[Try]]
       (() => personTransformer.createTransformationStep).expects().returning(step1)
-
-      val projectTransformer = mock[ProjectTransformer[Try]]
       (() => projectTransformer.createTransformationStep).expects().returning(step2)
-
-      val datasetTransformer = mock[DatasetTransformer[Try]]
       (() => datasetTransformer.createTransformationStep).expects().returning(step3)
-
-      val activityTransformer = mock[ActivityTransformer[Try]]
       (() => activityTransformer.createTransformationStep).expects().returning(step4)
 
-      new TransformationStepsCreatorImpl[Try](personTransformer,
-                                              projectTransformer,
-                                              datasetTransformer,
-                                              activityTransformer
-      ).createSteps shouldBe steps
+      stepsCreator.createSteps[TSVersion.DefaultGraph] shouldBe steps
     }
+  }
+
+  "createSteps[NamedGraphs]" should {
+    "combine steps from person/project/dataset/activity transformers for the NamedGraph" in new TestCase {
+      stepsCreator.createSteps[TSVersion.NamedGraphs] shouldBe List.empty
+    }
+  }
+
+  private trait TestCase {
+    val personTransformer   = mock[defaultgraph.persons.PersonTransformer[Try]]
+    val projectTransformer  = mock[defaultgraph.projects.ProjectTransformer[Try]]
+    val datasetTransformer  = mock[defaultgraph.datasets.DatasetTransformer[Try]]
+    val activityTransformer = mock[defaultgraph.activities.ActivityTransformer[Try]]
+    val stepsCreator = new TransformationStepsCreatorImpl[Try](personTransformer,
+                                                               projectTransformer,
+                                                               datasetTransformer,
+                                                               activityTransformer
+    )
   }
 }
