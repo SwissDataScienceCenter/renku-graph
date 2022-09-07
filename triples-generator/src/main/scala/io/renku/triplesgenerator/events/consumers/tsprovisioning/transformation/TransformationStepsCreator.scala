@@ -19,25 +19,21 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning
 package transformation
 
-import activities.ActivityTransformer
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import datasets.DatasetTransformer
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
-import persons.PersonTransformer
-import projects.ProjectTransformer
 
 private[consumers] trait TransformationStepsCreator[F[_]] {
   def createSteps: List[TransformationStep[F]]
 }
 
 private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
-    personTransformer:   PersonTransformer[F],
-    projectTransformer:  ProjectTransformer[F],
-    datasetTransformer:  DatasetTransformer[F],
-    activityTransformer: ActivityTransformer[F]
+    personTransformer:   defaultgraph.persons.PersonTransformer[F],
+    projectTransformer:  defaultgraph.projects.ProjectTransformer[F],
+    datasetTransformer:  defaultgraph.datasets.DatasetTransformer[F],
+    activityTransformer: defaultgraph.activities.ActivityTransformer[F]
 ) extends TransformationStepsCreator[F] {
 
   override def createSteps: List[TransformationStep[F]] = List(
@@ -51,10 +47,10 @@ private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
 private[consumers] object TransformationStepsCreator {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsCreator[F]] = for {
-    personTransformer   <- PersonTransformer[F]
-    projectTransformer  <- ProjectTransformer[F]
-    datasetTransformer  <- DatasetTransformer[F]
-    activityTransformer <- ActivityTransformer[F]
+    personTransformer   <- defaultgraph.persons.PersonTransformer[F]
+    projectTransformer  <- defaultgraph.projects.ProjectTransformer[F]
+    datasetTransformer  <- defaultgraph.datasets.DatasetTransformer[F]
+    activityTransformer <- defaultgraph.activities.ActivityTransformer[F]
   } yield new TransformationStepsCreatorImpl[F](personTransformer,
                                                 projectTransformer,
                                                 datasetTransformer,

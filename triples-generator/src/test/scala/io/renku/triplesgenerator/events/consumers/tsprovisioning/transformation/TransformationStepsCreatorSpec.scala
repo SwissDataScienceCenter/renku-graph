@@ -21,10 +21,10 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.Generators._
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.activities.ActivityTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.datasets.DatasetTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persons.PersonTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.projects.ProjectTransformer
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.activities.ActivityTransformer
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.datasets.DatasetTransformer
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.persons.PersonTransformer
+import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.projects.ProjectTransformer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -34,7 +34,7 @@ import scala.util.Try
 class TransformationStepsCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "createSteps" should {
-    "combine steps from person/dataset/project transformers" in {
+    "combine steps from person/project/dataset/activity transformers" in {
       val steps @ step1 :: step2 :: step3 :: step4 :: Nil = transformationSteps[Try].generateFixedSizeList(4)
 
       val personTransformer = mock[PersonTransformer[Try]]
