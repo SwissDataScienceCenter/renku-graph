@@ -24,7 +24,7 @@ private trait CategoryEvent {
   def compoundEventId: CompoundEventId
 }
 
-private sealed trait TSVersion
+private sealed trait TSVersion extends Product with Serializable
 private object TSVersion {
   implicit case object DefaultGraph extends TSVersion
   type DefaultGraph = DefaultGraph.type

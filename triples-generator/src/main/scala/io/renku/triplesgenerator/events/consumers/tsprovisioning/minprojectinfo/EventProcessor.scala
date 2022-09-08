@@ -72,7 +72,9 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   )(implicit maybeAccessToken: Option[AccessToken]): F[UploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      result  <- right[UploadingResult](run(createSteps[TSVersion.DefaultGraph], project) >>= toUploadingResult(event))
+      result <- right[UploadingResult](
+                  run[TSVersion.DefaultGraph](createSteps[TSVersion.DefaultGraph], project) >>= toUploadingResult(event)
+                )
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
 

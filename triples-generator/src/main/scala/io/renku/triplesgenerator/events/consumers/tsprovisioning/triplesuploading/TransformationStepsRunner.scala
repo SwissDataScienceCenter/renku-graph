@@ -16,42 +16,37 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading
+package io.renku.triplesgenerator.events.consumers
+package tsprovisioning
+package triplesuploading
 
 import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.entities.Project
-import io.renku.graph.model.{GitLabApiUrl, GitLabUrl, RenkuUrl}
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{ProjectWithQueries, Queries}
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private[consumers] trait TransformationStepsRunner[F[_]] {
-  def run(steps: List[TransformationStep[F]], project: Project): F[TriplesUploadResult]
+private[tsprovisioning] trait TransformationStepsRunner[F[_]] {
+  def run[TS <: TSVersion](steps: List[TransformationStep[F]], project: Project)(implicit
+      ev:                         TS
+  ): F[TriplesUploadResult]
 }
 
-private[tsprovisioning] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
-    projectUploader:   ProjectUploader[F],
-    updateQueryRunner: UpdateQueryRunner[F],
-    renkuUrl:          RenkuUrl,
-    gitLabUrl:         GitLabUrl
+private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
+    resultsUploader: TransformationResultsUploader.Locator[F]
 ) extends TransformationStepsRunner[F] {
 
-  private implicit val gitLabApiUrl:     GitLabApiUrl = gitLabUrl.apiV4
-  private implicit val renkuUrlImplicit: RenkuUrl     = renkuUrl
-
   import TriplesUploadResult._
-  import io.renku.jsonld.syntax._
-  import projectUploader._
 
-  override def run(steps: List[TransformationStep[F]], project: Project): F[TriplesUploadResult] = {
+  override def run[TS <: TSVersion](steps: List[TransformationStep[F]], project: Project)(implicit
+      ev:                                  TS
+  ): F[TriplesUploadResult] = {
     runAll(steps)(project) >>=
       executeAllPreDataUploadQueries >>=
       encodeAndSendProject >>=
@@ -72,30 +67,28 @@ private[tsprovisioning] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
         }
     )
 
-  private lazy val executeAllPreDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
-    case projectAndQueries @ (_, Queries(preQueries, _)) =>
-      execute(preQueries).map(_ => projectAndQueries)
+  private def executeAllPreDataUploadQueries[TS <: TSVersion](implicit
+      ev: TS
+  ): ((Project, Queries)) => ProjectWithQueries[F] = { case projectAndQueries @ (_, Queries(preQueries, _)) =>
+    execute(preQueries) map (_ => projectAndQueries)
   }
 
-  private lazy val encodeAndSendProject: ((Project, Queries)) => ProjectWithQueries[F] = {
+  private def encodeAndSendProject[TS <: TSVersion](implicit ev: TS): ((Project, Queries)) => ProjectWithQueries[F] = {
     case projectAndQueries @ (project, _) =>
-      (jsonise(project) >>= uploadProject).map(_ => projectAndQueries)
+      resultsUploader[TS].upload(project) map (_ => projectAndQueries)
   }
 
-  private def jsonise(project: Project) = EitherT
-    .fromEither[F](project.asJsonLD.flatten)
-    .leftSemiflatMap(error =>
-      NonRecoverableFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}", error)
-        .raiseError[F, ProcessingRecoverableError]
-    )
-
-  private lazy val executeAllPostDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
-    case projectAndQueries @ (_, Queries(_, postQueries)) => execute(postQueries).map(_ => projectAndQueries)
+  private def executeAllPostDataUploadQueries[TS <: TSVersion](implicit
+      ev: TS
+  ): ((Project, Queries)) => ProjectWithQueries[F] = { case projectAndQueries @ (_, Queries(_, postQueries)) =>
+    execute(postQueries) map (_ => projectAndQueries)
   }
 
-  private def execute(queries: List[SparqlQuery]): EitherT[F, ProcessingRecoverableError, Unit] =
+  private def execute[TS <: TSVersion](
+      queries:   List[SparqlQuery]
+  )(implicit ev: TS): EitherT[F, ProcessingRecoverableError, Unit] =
     queries.foldLeft(EitherT.rightT[F, ProcessingRecoverableError](())) { (previousResult, query) =>
-      previousResult >> (updateQueryRunner run query)
+      previousResult >> resultsUploader[TS].execute(query)
     }
 
   private def transformationFailure(project: Project): PartialFunction[Throwable, F[TriplesUploadResult]] = {
@@ -106,24 +99,18 @@ private[tsprovisioning] class TransformationStepsRunnerImpl[F[_]: MonadThrow](
   }
 }
 
-private[consumers] object TransformationStepsRunner {
+private[tsprovisioning] object TransformationStepsRunner {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsRunnerImpl[F]] = for {
-    renkuConnectionConfig <- RenkuConnectionConfig[F]()
-    renkuUrl              <- RenkuUrlLoader[F]()
-    gitlabUrl             <- GitLabUrlLoader[F]()
-  } yield new TransformationStepsRunnerImpl[F](new ProjectUploaderImpl[F](renkuConnectionConfig),
-                                               new UpdateQueryRunnerImpl(renkuConnectionConfig),
-                                               renkuUrl,
-                                               gitlabUrl
-  )
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsRunner[F]] = for {
+    resultsUploader <- TransformationResultsUploader[F]
+  } yield new TransformationStepsRunnerImpl[F](resultsUploader)
 }
 
-private[consumers] sealed trait TriplesUploadResult extends Product with Serializable {
+private[tsprovisioning] sealed trait TriplesUploadResult extends Product with Serializable {
   val message: String
 }
 
-private[consumers] object TriplesUploadResult {
+private[tsprovisioning] object TriplesUploadResult {
 
   type DeliverySuccess = DeliverySuccess.type
   final case object DeliverySuccess extends TriplesUploadResult {
