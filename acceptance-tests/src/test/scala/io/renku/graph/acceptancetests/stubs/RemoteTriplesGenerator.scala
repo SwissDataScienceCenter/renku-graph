@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests.stubs
 
+import cats.data.NonEmptyList
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -59,6 +60,33 @@ trait RemoteTriplesGenerator {
           ok(triples.flatten.fold(throw _, _.toJson.spaces2))
         )
     }
+    ()
+  }
+
+  def mockCommitDataOnTripleGenerator(
+      project:   data.Project,
+      triples:   JsonLD,
+      commitId:  CommitId,
+      commitIds: CommitId*
+  ): Unit =
+    mockCommitDataOnTripleGenerator(project, triples, NonEmptyList(commitId, commitIds.toList))
+
+  def mockCommitDataOnTripleGenerator(
+      project:   data.Project,
+      triples:   JsonLD,
+      commitIds: NonEmptyList[CommitId]
+  ): Unit = {
+    commitIds
+      .foldLeft(List.empty[CommitId]) {
+        case (Nil, commitId) =>
+          `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+
+          commitId :: Nil
+        case (parentIds, commitId) =>
+          `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+
+          parentIds ::: commitId :: Nil
+      }
     ()
   }
 
