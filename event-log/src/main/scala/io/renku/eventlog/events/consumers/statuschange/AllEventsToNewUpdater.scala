@@ -35,7 +35,6 @@ import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.implicits._
@@ -45,8 +44,7 @@ private class AllEventsToNewUpdater[F[_]: Async](
     queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient(Some(queriesExecTimes))
     with DBUpdater[F, AllEventsToNew]
-    with TypeSerializers
-    with TinyTypeEncoders {
+    with TypeSerializers {
 
   private val applicative: Applicative[F] = Applicative[F]
 

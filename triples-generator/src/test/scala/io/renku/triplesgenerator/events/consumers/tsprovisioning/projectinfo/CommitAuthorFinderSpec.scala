@@ -38,7 +38,6 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import org.http4s.Status.{BadGateway, GatewayTimeout, NotImplemented, ServiceUnavailable}
 import org.http4s.implicits._
@@ -55,7 +54,6 @@ class CommitAuthorFinderSpec
     with should.Matchers
     with MockFactory
     with ScalaCheckPropertyChecks
-    with TinyTypeEncoders
     with GitLabClientTools[IO] {
 
   "findCommitAuthor" should {

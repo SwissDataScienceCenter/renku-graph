@@ -41,7 +41,6 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import org.http4s.implicits.http4sLiteralsSyntax
 import org.http4s.{Header, Headers, Request, Response, Status, Uri}
@@ -61,7 +60,6 @@ class ProjectEventsFinderSpec
     with should.Matchers
     with ScalaCheckPropertyChecks
     with MockFactory
-    with TinyTypeEncoders
     with GitLabClientTools[IO] {
 
   "find" should {

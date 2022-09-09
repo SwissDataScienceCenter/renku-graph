@@ -37,7 +37,6 @@ import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import io.renku.tinytypes.json.TinyTypeEncoders._
 import model.Permissions
 import model.Permissions._
 import org.http4s.implicits.http4sLiteralsSyntax

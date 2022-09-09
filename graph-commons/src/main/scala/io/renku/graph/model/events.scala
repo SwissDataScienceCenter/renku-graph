@@ -23,12 +23,11 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.circe.Decoder.decodeString
-import io.circe.{Decoder, Encoder}
+import io.circe.Decoder
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 import io.renku.tinytypes.contenttypes.ZippedContent
 import io.renku.tinytypes.json.TinyTypeDecoders.{durationDecoder, instantDecoder}
-import io.renku.tinytypes.json.TinyTypeEncoders.durationEncoder
 
 import java.time.{Clock, Duration, Instant}
 
@@ -227,7 +226,6 @@ object events {
       with DurationNotNegative[EventProcessingTime] {
 
     implicit val decoder: Decoder[EventProcessingTime] = durationDecoder(EventProcessingTime)
-    implicit val encoder: Encoder[EventProcessingTime] = durationEncoder
 
     implicit class EventProcessingTimeOps(processingTime: EventProcessingTime) {
 

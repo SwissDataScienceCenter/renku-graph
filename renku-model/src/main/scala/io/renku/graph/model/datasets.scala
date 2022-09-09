@@ -33,7 +33,6 @@ import io.renku.jsonld.ontology.{Class, ObjectProperty, Type}
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, LocalDateNotInTheFuture, NonBlank, NonNegativeInt, UUID, Url => UrlConstraint}
-import io.renku.tinytypes.json.TinyTypeEncoders
 
 import java.time.{Instant, LocalDate, ZoneOffset}
 
@@ -120,18 +119,12 @@ object datasets {
     final class Relative private (val value: String) extends AnyVal with ImageUri with RelativePathTinyType {
       override type V = String
     }
-    object Relative extends TinyTypeFactory[Relative](new Relative(_)) with constraints.RelativePath[Relative] {
-      implicit lazy val encoder: Encoder[Relative] = TinyTypeEncoders.relativePathEncoder
-    }
+    object Relative extends TinyTypeFactory[Relative](new Relative(_)) with constraints.RelativePath[Relative]
 
     final class Absolute private (val value: String) extends AnyVal with ImageUri with UrlTinyType {
       override type V = String
     }
-    object Absolute extends TinyTypeFactory[Absolute](new Absolute(_)) with constraints.Url[Absolute] {
-      implicit lazy val encoder: Encoder[Absolute] = TinyTypeEncoders.urlEncoder
-    }
-
-    import io.renku.tinytypes.json.TinyTypeEncoders._
+    object Absolute extends TinyTypeFactory[Absolute](new Absolute(_)) with constraints.Url[Absolute]
 
     implicit lazy val encoder: Encoder[ImageUri] = Encoder.instance {
       case uri: Relative => Json.fromString(uri.value)
@@ -299,7 +292,6 @@ object datasets {
   }
 
   object Date {
-    import io.renku.tinytypes.json.TinyTypeEncoders._
     implicit val encoder: Encoder[Date] = Encoder.instance {
       case d: DateCreated   => d.asJson
       case d: DatePublished => d.asJson

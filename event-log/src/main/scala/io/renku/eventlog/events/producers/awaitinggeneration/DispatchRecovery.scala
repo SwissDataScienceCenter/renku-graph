@@ -31,15 +31,13 @@ import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, New}
 import io.renku.metrics.MetricsRegistry
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
     eventSender: EventSender[F]
-) extends producers.DispatchRecovery[F, AwaitingGenerationEvent]
-    with TinyTypeEncoders {
+) extends producers.DispatchRecovery[F, AwaitingGenerationEvent] {
 
   override def returnToQueue(event: AwaitingGenerationEvent, reason: SendingResult): F[Unit] =
     eventSender.sendEvent(

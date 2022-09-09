@@ -27,16 +27,11 @@ import io.renku.graph.model.datasets.ResourceId
 import io.renku.graph.model.testentities.{Dataset => _, _}
 import io.renku.graph.model.{RenkuUrl, datasets, testentities}
 import io.renku.jsonld.syntax._
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class BaseDetailsFinderSpec
-    extends AnyWordSpec
-    with ScalaCheckPropertyChecks
-    with should.Matchers
-    with TinyTypeEncoders {
+class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import io.renku.knowledgegraph.datasets.details.BaseDetailsFinderImpl._
 

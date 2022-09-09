@@ -32,15 +32,13 @@ import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.EventStatus.{TransformationNonRecoverableFailure, TriplesGenerated}
 import io.renku.metrics.MetricsRegistry
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](
     eventSender: EventSender[F]
-) extends producers.DispatchRecovery[F, TriplesGeneratedEvent]
-    with TinyTypeEncoders {
+) extends producers.DispatchRecovery[F, TriplesGeneratedEvent] {
 
   override def returnToQueue(event: TriplesGeneratedEvent, reason: SendingResult): F[Unit] = eventSender.sendEvent(
     EventRequestContent.NoPayload(json"""{
