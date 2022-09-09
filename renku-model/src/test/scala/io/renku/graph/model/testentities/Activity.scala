@@ -99,8 +99,8 @@ object Activity {
       activity.parameters.map(_.to[entities.ParameterValue])
     )
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
-    JsonLDEncoder.instance(activity => activity.to[entities.Activity].asJsonLD)
+  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl, graph: Graph): JsonLDEncoder[Activity] =
+    JsonLDEncoder.instance(_.to[entities.Activity].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Activity] =
     EntityIdEncoder.instance(entity => EntityId of renkuUrl / "activities" / entity.id)

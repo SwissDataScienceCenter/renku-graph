@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.associations.ResourceId
-import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
+import io.renku.graph.model.{GitLabApiUrl, Graph, RenkuUrl}
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
@@ -45,22 +45,23 @@ object Association {
 
   val entityTypes: EntityTypes = EntityTypes of (prov / "Association")
 
-  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Association] = JsonLDEncoder.instance {
-    case WithRenkuAgent(resourceId, agent, plan) =>
-      JsonLD.entity(
-        resourceId.asEntityId,
-        entityTypes,
-        prov / "agent"   -> agent.asJsonLD,
-        prov / "hadPlan" -> plan.resourceId.asEntityId.asJsonLD
-      )
-    case WithPersonAgent(resourceId, agent, plan) =>
-      JsonLD.entity(
-        resourceId.asEntityId,
-        entityTypes,
-        prov / "agent"   -> agent.asJsonLD,
-        prov / "hadPlan" -> plan.resourceId.asEntityId.asJsonLD
-      )
-  }
+  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl, graph: Graph): JsonLDEncoder[Association] =
+    JsonLDEncoder.instance {
+      case WithRenkuAgent(resourceId, agent, plan) =>
+        JsonLD.entity(
+          resourceId.asEntityId,
+          entityTypes,
+          prov / "agent"   -> agent.asJsonLD,
+          prov / "hadPlan" -> plan.resourceId.asEntityId.asJsonLD
+        )
+      case WithPersonAgent(resourceId, agent, plan) =>
+        JsonLD.entity(
+          resourceId.asEntityId,
+          entityTypes,
+          prov / "agent"   -> agent.asJsonLD,
+          prov / "hadPlan" -> plan.resourceId.asEntityId.asJsonLD
+        )
+    }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Association] =
     JsonLDDecoder.entity(entityTypes) { implicit cursor =>

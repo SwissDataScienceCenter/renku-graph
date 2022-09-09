@@ -147,9 +147,7 @@ trait RenkuProjectEntitiesGenerators {
     def modify(f: ProjectMember => ProjectMember): Gen[ProjectMember] = membersGen.map(f)
   }
 
-  implicit class RenkuProjectGenFactoryOps[FC <: ForksCount](projectGen: Gen[RenkuProject])(implicit
-      renkuUrl:                                                          RenkuUrl
-  ) {
+  implicit class RenkuProjectGenFactoryOps(projectGen: Gen[RenkuProject])(implicit renkuUrl: RenkuUrl) {
 
     def withDatasets[P <: Dataset.Provenance](factories: DatasetGenFactory[P]*): Gen[RenkuProject] = for {
       project  <- projectGen

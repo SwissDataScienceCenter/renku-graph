@@ -24,7 +24,7 @@ import io.circe.DecodingFailure
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.entities.Dataset.Provenance._
 import io.renku.graph.model.entities.Dataset._
-import io.renku.graph.model.{GitLabApiUrl, InvalidationTime, RenkuUrl}
+import io.renku.graph.model.{GitLabApiUrl, Graph, InvalidationTime, RenkuUrl}
 
 import java.time.Instant
 
@@ -219,7 +219,8 @@ object Dataset {
 
     private[Dataset] implicit def encoder(implicit
         renkuUrl:     RenkuUrl,
-        gitLabApiUrl: GitLabApiUrl
+        gitLabApiUrl: GitLabApiUrl,
+        graph:        Graph
     ): Provenance => Map[Property, JsonLD] = {
       case provenance @ Internal(_, _, date, creators) =>
         Map(
@@ -463,7 +464,8 @@ object Dataset {
 
   implicit def encoder[P <: Provenance](implicit
       renkuUrl:     RenkuUrl,
-      gitLabApiUrl: GitLabApiUrl
+      gitLabApiUrl: GitLabApiUrl,
+      graph:        Graph
   ): JsonLDEncoder[Dataset[P]] = {
     implicit class SerializationOps[T](obj: T) {
       def asJsonLDProperties(implicit encoder: T => Map[Property, JsonLD]): Map[Property, JsonLD] = encoder(obj)
@@ -516,7 +518,7 @@ object Dataset {
       } yield dataset
     }
 
-  val ontologyClass = Class(schema / "Dataset", ParentClass(prov / "Entity"))
+  val ontologyClass: Class = Class(schema / "Dataset", ParentClass(prov / "Entity"))
   lazy val ontology: Type =
     Type.Def(
       ontologyClass,

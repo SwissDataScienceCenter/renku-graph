@@ -21,7 +21,7 @@ package io.renku.graph.model.entities
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
-import io.renku.graph.model.entities
+import io.renku.graph.model.{Graph, entities}
 import io.renku.graph.model.testentities.CommandParameterBase.CommandInput
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.syntax._
@@ -32,6 +32,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class UsageSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
+    implicit val graph: Graph = Graph.Default
 
     "turn JsonLD Usage entity into the Usage object" in {
       forAll(entityLocations, entityChecksums) { (location, checksum) =>

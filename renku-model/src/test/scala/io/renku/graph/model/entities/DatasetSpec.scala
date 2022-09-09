@@ -25,12 +25,13 @@ import io.circe.{DecodingFailure, Json}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
-import io.renku.jsonld.JsonLD
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
@@ -40,6 +41,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
+    implicit val graph: Graph = Graph.Default
 
     "turn JsonLD Dataset entity into the Dataset object" in {
       forAll(datasetEntities(provenanceNonModified).decoupledFromProject) { dataset =>
@@ -330,6 +332,75 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           s"that points to ${otherDatasetPublicationEvent.datasetResourceId} but should be pointing to ${dataset.resourceId}"
       }
     }
+  }
+
+  "encode" should {
+
+    implicit val jsonLDEncoder: JsonLDEncoder[entities.Dataset.Image] = JsonLDEncoder.instance {
+      case entities.Dataset.Image(resourceId, uri, position) =>
+        JsonLD.entity(
+          resourceId.asEntityId,
+          EntityTypes of schema / "ImageObject",
+          schema / "contentUrl" -> uri.asJsonLD,
+          schema / "position"   -> position.asJsonLD
+        )
+    }
+
+    "produce JsonLD with all the relevant properties and only links to Person entities " +
+      "if encoding requested for the Project Graph" in {
+        implicit val graph: Graph = Graph.Project
+
+        val ds = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+
+        ds.asJsonLD shouldBe JsonLD
+          .entity(
+            ds.resourceId.asEntityId,
+            entities.Dataset.entityTypes,
+            schema / "identifier"   -> ds.identification.identifier.asJsonLD,
+            schema / "name"         -> ds.identification.title.asJsonLD,
+            renku / "slug"          -> ds.identification.name.asJsonLD,
+            schema / "dateCreated"  -> ds.provenance.date.asJsonLD,
+            schema / "creator"      -> ds.provenance.creators.map(_.resourceId.asEntityId.asJsonLD).toList.asJsonLD,
+            renku / "topmostSameAs" -> ds.provenance.topmostSameAs.asJsonLD,
+            renku / "topmostDerivedFrom" -> ds.provenance.topmostDerivedFrom.asJsonLD,
+            renku / "originalIdentifier" -> ds.provenance.originalIdentifier.asJsonLD,
+            schema / "description"       -> ds.additionalInfo.maybeDescription.asJsonLD,
+            schema / "keywords"          -> ds.additionalInfo.keywords.asJsonLD,
+            schema / "image"             -> ds.additionalInfo.images.asJsonLD,
+            schema / "license"           -> ds.additionalInfo.maybeLicense.asJsonLD,
+            schema / "version"           -> ds.additionalInfo.maybeVersion.asJsonLD,
+            schema / "hasPart"           -> ds.parts.asJsonLD
+          )
+      }
+
+    "produce JsonLD with all the relevant properties entities " +
+      "if encoding requested for the Default Graph" in {
+        implicit val graph: Graph = Graph.Default
+
+        val ds = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
+          .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
+
+        ds.asJsonLD shouldBe JsonLD
+          .entity(
+            ds.resourceId.asEntityId,
+            entities.Dataset.entityTypes,
+            schema / "identifier"        -> ds.identification.identifier.asJsonLD,
+            schema / "name"              -> ds.identification.title.asJsonLD,
+            renku / "slug"               -> ds.identification.name.asJsonLD,
+            schema / "dateCreated"       -> ds.provenance.date.asJsonLD,
+            schema / "creator"           -> ds.provenance.creators.toList.asJsonLD,
+            renku / "topmostSameAs"      -> ds.provenance.topmostSameAs.asJsonLD,
+            renku / "topmostDerivedFrom" -> ds.provenance.topmostDerivedFrom.asJsonLD,
+            renku / "originalIdentifier" -> ds.provenance.originalIdentifier.asJsonLD,
+            schema / "description"       -> ds.additionalInfo.maybeDescription.asJsonLD,
+            schema / "keywords"          -> ds.additionalInfo.keywords.asJsonLD,
+            schema / "image"             -> ds.additionalInfo.images.asJsonLD,
+            schema / "license"           -> ds.additionalInfo.maybeLicense.asJsonLD,
+            schema / "version"           -> ds.additionalInfo.maybeVersion.asJsonLD,
+            schema / "hasPart"           -> ds.parts.asJsonLD
+          )
+      }
   }
 
   "update" should {

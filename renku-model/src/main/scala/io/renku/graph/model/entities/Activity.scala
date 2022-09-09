@@ -21,7 +21,7 @@ package io.renku.graph.model.entities
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{Graph, RenkuUrl}
 import io.renku.graph.model.activities.{EndTime, ResourceId, StartTime}
 import io.renku.graph.model.entities.ParameterValue.{CommandInputValue, CommandOutputValue}
 
@@ -98,7 +98,7 @@ object Activity {
     case (result, _) => result
   }
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Activity] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl, graph: Graph): JsonLDEncoder[Activity] =
     JsonLDEncoder.instance { activity =>
       JsonLD.entity(
         activity.resourceId.asEntityId,

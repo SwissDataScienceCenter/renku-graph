@@ -59,6 +59,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   }
 
   "decode" should {
+    implicit val graph: Graph = Graph.Default
 
     "turn JsonLD Project entity without parent into the Project object" in {
       forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
@@ -681,9 +682,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
   }
 
-  "encode" should {
+  "encode for the Default Graph" should {
 
-    "produce JsonLD with all the relevant properties or a Renku Project" in {
+    implicit val graph: Graph = Graph.Default
+
+    "produce JsonLD with all the relevant properties of a Renku Project" in {
       forAll(renkuProjectEntitiesWithDatasetsAndActivities.map(_.to[entities.RenkuProject])) { project =>
         val maybeParentId = project match {
           case p: entities.RenkuProject.WithParent => p.parentResourceId.some
@@ -747,6 +750,83 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
   }
 
+  "encode for the Project Graph" should {
+
+    import persons.ResourceId.entityIdEncoder
+    implicit val graph: Graph = Graph.Project
+
+    "produce JsonLD with all the relevant properties and only links to Person entities" in {
+      forAll(
+        renkuProjectEntitiesWithDatasetsAndActivities
+          .modify(replaceMembers(personEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
+          .map(_.to[entities.RenkuProject])
+      ) { project =>
+        val maybeParentId = project match {
+          case p: entities.RenkuProject.WithParent => p.parentResourceId.some
+          case _ => Option.empty[projects.ResourceId]
+        }
+
+        project.asJsonLD.toJson shouldBe JsonLD
+          .arr(
+            JsonLD.entity(
+              EntityId.of(project.resourceId.show),
+              entities.Project.entityTypes,
+              schema / "name"             -> project.name.asJsonLD,
+              renku / "projectPath"       -> project.path.asJsonLD,
+              renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+              renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+              schema / "description"      -> project.maybeDescription.asJsonLD,
+              schema / "agent"            -> project.agent.asJsonLD,
+              schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
+              renku / "projectVisibility" -> project.visibility.asJsonLD,
+              schema / "keywords"         -> project.keywords.asJsonLD,
+              schema / "member"           -> project.members.map(_.resourceId.asEntityId).toList.asJsonLD,
+              schema / "schemaVersion"    -> project.version.asJsonLD,
+              renku / "hasActivity"       -> project.activities.asJsonLD,
+              renku / "hasPlan"           -> project.plans.toList.asJsonLD,
+              renku / "hasDataset"        -> project.datasets.asJsonLD,
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+            ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*
+          )
+          .toJson
+      }
+    }
+
+    "produce JsonLD with all the relevant properties or a non-Renku Project" in {
+      forAll(
+        anyNonRenkuProjectEntities
+          .modify(replaceMembers(personEntities(withoutGitLabId).generateFixedSizeSet(ofSize = 1)))
+          .map(_.to[entities.NonRenkuProject])
+      ) { project =>
+        val maybeParentId = project match {
+          case p: entities.NonRenkuProject.WithParent => p.parentResourceId.some
+          case _ => Option.empty[projects.ResourceId]
+        }
+
+        project.asJsonLD.toJson shouldBe JsonLD
+          .arr(
+            JsonLD.entity(
+              EntityId.of(project.resourceId.show),
+              entities.Project.entityTypes,
+              schema / "name"             -> project.name.asJsonLD,
+              renku / "projectPath"       -> project.path.asJsonLD,
+              renku / "projectNamespace"  -> project.path.toNamespace.asJsonLD,
+              renku / "projectNamespaces" -> project.namespaces.asJsonLD,
+              schema / "description"      -> project.maybeDescription.asJsonLD,
+              schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+              schema / "creator"          -> project.maybeCreator.map(_.resourceId.asEntityId).asJsonLD,
+              renku / "projectVisibility" -> project.visibility.asJsonLD,
+              schema / "keywords"         -> project.keywords.asJsonLD,
+              schema / "member"           -> project.members.map(_.resourceId.asEntityId).toList.asJsonLD,
+              prov / "wasDerivedFrom"     -> maybeParentId.map(_.asEntityId).asJsonLD
+            )
+          )
+          .toJson
+      }
+    }
+  }
+
   private def cliLikeJsonLD(resourceId:       projects.ResourceId,
                             cliVersion:       CliVersion,
                             schemaVersion:    SchemaVersion,
@@ -755,7 +835,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                             dateCreated:      DateCreated,
                             activities:       List[entities.Activity],
                             datasets:         List[entities.Dataset[entities.Dataset.Provenance]]
-  ) = {
+  )(implicit graph:                           Graph) = {
+
     val descriptionJsonLD = maybeDescription match {
       case Some(desc) => desc.asJsonLD
       case None =>

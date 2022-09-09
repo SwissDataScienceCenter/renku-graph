@@ -336,7 +336,8 @@ object Project {
 
   implicit def encoder[P <: Project](implicit
       renkuUrl:     RenkuUrl,
-      gitLabApiUrl: GitLabApiUrl
+      gitLabApiUrl: GitLabApiUrl,
+      graph:        Graph
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
     case project: RenkuProject =>
       val maybeDerivedFrom = project match {

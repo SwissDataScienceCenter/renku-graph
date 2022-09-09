@@ -85,7 +85,7 @@ object Person {
     case _ => None
   }
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl, graph: Graph): JsonLDEncoder[Person] =
     JsonLDEncoder.instance(_.to[entities.Person].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Person] =

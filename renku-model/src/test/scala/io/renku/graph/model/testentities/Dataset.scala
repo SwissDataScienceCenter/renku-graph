@@ -361,7 +361,8 @@ object Dataset {
 
   implicit def encoder[P <: Provenance](implicit
       renkuUrl:     RenkuUrl,
-      gitLabApiUrl: GitLabApiUrl
+      gitLabApiUrl: GitLabApiUrl,
+      graph:        Graph
   ): JsonLDEncoder[Dataset[P]] = JsonLDEncoder.instance(_.to[entities.Dataset[entities.Dataset.Provenance]].asJsonLD)
 
   implicit def entityIdEncoder[P <: Provenance](implicit renkuUrl: RenkuUrl): EntityIdEncoder[Dataset[P]] =
