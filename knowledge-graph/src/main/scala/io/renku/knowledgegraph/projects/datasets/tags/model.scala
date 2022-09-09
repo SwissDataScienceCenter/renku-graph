@@ -38,7 +38,6 @@ private object model {
       import io.circe.literal._
       import io.renku.http.rest.Links._
       import io.renku.json.JsonOps._
-      import io.renku.tinytypes.json.TinyTypeEncoders._
 
       json"""{
         "name": ${tag.name},

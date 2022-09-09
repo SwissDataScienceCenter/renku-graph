@@ -30,14 +30,13 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with MockFactory with TinyTypeEncoders {
+class CommitEventsRemoverSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "removeDeletedEvent" should {
 

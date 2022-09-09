@@ -30,14 +30,12 @@ import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
 import io.renku.metrics.MetricsRegistry
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 private class DispatchRecoveryImpl[F[_]: MonadThrow: Logger](eventSender: EventSender[F])
-    extends DispatchRecovery[F, CleanUpEvent]
-    with TinyTypeEncoders {
+    extends DispatchRecovery[F, CleanUpEvent] {
 
   override def returnToQueue(event: CleanUpEvent, reason: SendingResult): F[Unit] =
     sendStatusChangeEvent(newStatus = AwaitingDeletion, event)

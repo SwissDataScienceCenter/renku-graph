@@ -478,7 +478,6 @@ trait DatasetsResources {
   self: GraphServices with should.Matchers =>
 
   import io.renku.json.JsonOps._
-  import io.renku.tinytypes.json.TinyTypeEncoders._
 
   def briefJson(dataset: Dataset[Dataset.Provenance], projectPath: projects.Path)(implicit
       encoder:           Encoder[(Dataset[Dataset.Provenance], projects.Path)]

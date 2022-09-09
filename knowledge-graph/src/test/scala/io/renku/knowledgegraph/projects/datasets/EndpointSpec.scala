@@ -36,7 +36,6 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Warn}
 import io.renku.logging.TestExecutionTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
@@ -46,13 +45,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EndpointSpec
-    extends AnyWordSpec
-    with MockFactory
-    with ScalaCheckPropertyChecks
-    with should.Matchers
-    with TinyTypeEncoders
-    with IOSpec {
+class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers with IOSpec {
 
   import ProjectDatasetsFinder._
 

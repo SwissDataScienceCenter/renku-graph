@@ -129,7 +129,6 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
   private trait TestCase {
     import io.renku.json.JsonOps._
-    import io.renku.tinytypes.json.TinyTypeEncoders._
 
     val maybePhrase   = phrases.generateOption
     val sort          = searchEndpointSorts.generateOne

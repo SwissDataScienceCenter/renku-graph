@@ -92,7 +92,6 @@ object Links {
 
   implicit val linksEncoder: Encoder[Links] = Encoder.instance[Links] { links =>
     import io.circe.Json
-    import io.renku.tinytypes.json.TinyTypeEncoders._
 
     def toJson(link: Link) = Json.obj(
       List(

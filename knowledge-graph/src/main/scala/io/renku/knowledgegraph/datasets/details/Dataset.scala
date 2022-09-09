@@ -31,7 +31,6 @@ import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.datasets.{Date, DateCreated, DatePublished, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, OriginalIdentifier, PartLocation, ResourceId, SameAs, Title}
 import io.renku.http.rest.Links.{Href, Link, Rel, _links}
 import io.renku.json.JsonOps._
-import io.renku.tinytypes.json.TinyTypeEncoders._
 
 private sealed trait Dataset extends Product with Serializable {
   val resourceId:       ResourceId
