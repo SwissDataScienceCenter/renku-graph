@@ -30,7 +30,6 @@ import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links._
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
@@ -48,7 +47,6 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
     gitLabUrl:             GitLabUrl,
     executionTimeRecorder: ExecutionTimeRecorder[F]
 ) extends Http4sDsl[F]
-    with TinyTypeEncoders
     with Endpoint[F] {
 
   import executionTimeRecorder._

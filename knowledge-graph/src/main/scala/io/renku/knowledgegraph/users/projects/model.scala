@@ -27,7 +27,6 @@ import io.renku.graph.model.{RenkuUrl, persons, projects}
 import io.renku.http.rest.Links.{Href, Link, Method, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph.projects.details.Endpoint
-import io.renku.tinytypes.json.TinyTypeEncoders._
 
 private object model {
 

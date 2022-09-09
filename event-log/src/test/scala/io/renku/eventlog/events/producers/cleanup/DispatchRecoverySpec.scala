@@ -31,14 +31,13 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.events.EventStatus._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory with TinyTypeEncoders {
+class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "returnToQueue" should {
 

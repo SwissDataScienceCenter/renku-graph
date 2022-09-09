@@ -30,7 +30,6 @@ package object knowledgegraph {
   import io.renku.graph.model.testentities._
   import io.renku.http.rest.Links.{Href, Link, Rel, _links}
   import io.renku.json.JsonOps._
-  import io.renku.tinytypes.json.TinyTypeEncoders._
 
   def fullJson(project: Project): Json = json"""{
     "identifier":  ${project.id.value}, 

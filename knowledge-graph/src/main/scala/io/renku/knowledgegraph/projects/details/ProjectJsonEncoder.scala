@@ -27,7 +27,6 @@ import io.renku.config.renku
 import io.renku.http.rest.Links.{Link, Rel, _links}
 import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
-import io.renku.tinytypes.json.TinyTypeEncoders._
 import model.Permissions._
 import model._
 

@@ -41,7 +41,6 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.interpreters.TestLogger
 import io.renku.json.JsonOps._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
-import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError._
 import org.http4s.Status.{BadGateway, Forbidden, ServiceUnavailable, Unauthorized}
@@ -59,7 +58,6 @@ class ProjectFinderSpec
     with should.Matchers
     with MockFactory
     with ScalaCheckPropertyChecks
-    with TinyTypeEncoders
     with GitLabClientTools[IO] {
 
   "findProject" should {

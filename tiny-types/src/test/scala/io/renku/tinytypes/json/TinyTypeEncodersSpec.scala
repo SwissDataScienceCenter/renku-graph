@@ -31,8 +31,6 @@ import java.time.format.DateTimeFormatter.{ISO_DATE, ISO_INSTANT}
 
 class TinyTypeEncodersSpec extends AnyWordSpec with should.Matchers {
 
-  import TinyTypeEncoders._
-
   "stringEncoder" should {
 
     "encode StringTinyType to Json" in {

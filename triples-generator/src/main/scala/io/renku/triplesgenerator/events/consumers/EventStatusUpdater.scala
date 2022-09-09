@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.consumers
 
 import cats.effect.{Async, Sync}
 import cats.syntax.all._
-import io.circe.Encoder
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
 import io.renku.events
@@ -34,8 +33,6 @@ import io.renku.json.JsonOps._
 import io.renku.jsonld.JsonLD
 import io.renku.metrics.MetricsRegistry
 import io.renku.tinytypes.constraints.DurationNotNegative
-import io.renku.tinytypes.json.TinyTypeEncoders
-import io.renku.tinytypes.json.TinyTypeEncoders.durationEncoder
 import io.renku.tinytypes.{DurationTinyType, TinyTypeFactory}
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater.ExecutionDelay
 import org.typelevel.log4cats.Logger
@@ -75,8 +72,7 @@ private class EventStatusUpdaterImpl[F[_]: Sync](
     eventSender:  EventSender[F],
     categoryName: CategoryName,
     zipper:       Zip
-) extends EventStatusUpdater[F]
-    with TinyTypeEncoders {
+) extends EventStatusUpdater[F] {
 
   import io.circe.literal._
   import zipper._
@@ -205,9 +201,5 @@ private object EventStatusUpdater {
   final class ExecutionDelay private (val value: Duration) extends AnyVal with DurationTinyType
   object ExecutionDelay
       extends TinyTypeFactory[ExecutionDelay](new ExecutionDelay(_))
-      with DurationNotNegative[ExecutionDelay] {
-
-    implicit val encoder: Encoder[ExecutionDelay] = durationEncoder
-
-  }
+      with DurationNotNegative[ExecutionDelay]
 }
