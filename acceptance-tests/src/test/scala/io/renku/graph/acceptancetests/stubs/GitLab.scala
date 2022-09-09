@@ -525,7 +525,7 @@ trait GitLab {
 private object GitLabWiremockInstance {
   private val logger = TestLogger()
 
-  val port: Int Refined Positive = 2048
+  val port: Int Refined Positive = 2049
 
   val instance = WireMock.create().http().host("localhost").port(port.value).build()
 

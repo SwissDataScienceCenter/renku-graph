@@ -20,8 +20,10 @@ package io.renku.graph.acceptancetests.tooling
 
 import cats.effect._
 import cats.effect.std.Semaphore
+import com.typesafe.config.ConfigFactory
 import io.renku._
 import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository, TriplesStore}
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub
 import io.renku.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
 import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
@@ -29,6 +31,7 @@ import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
 import io.renku.triplesstore.FusekiUrl
 import io.renku.testtools.IOSpec
+import org.http4s.Uri
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import org.typelevel.log4cats.Logger
 
@@ -49,12 +52,18 @@ trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with 
   val knowledgeGraphClient:     KnowledgeGraphClient          = KnowledgeGraphClient()
   val eventLogClient:           EventLogClient.EventLogClient = EventLogClient()
 
+  val webhookUri: Uri = Uri.unsafeFromString(s"${webhookServiceClient.baseUrl}/webhooks/events")
+
   def run(service: ServiceRun): Unit = servicesRunner.run(service).unsafeRunSync()
 
   def stop(service: ServiceRun): Unit = servicesRunner.stop(service)
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
+
+    val testConfig = ConfigFactory.load()
+    val gitlabUri  = Uri.unsafeFromString(testConfig.getString("services.gitlab.url"))
+    gitLabStub.run("localhost", gitlabUri.port.getOrElse(0)).compile.drain.foreverM.start.unsafeRunSync()
 
     servicesRunner
       .run(
@@ -96,6 +105,8 @@ trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with 
     serviceClient = triplesGeneratorClient,
     preServiceStart = List(TriplesStore.start())
   )
+  protected lazy val gitLabStub: GitLabApiStub[IO] =
+    GitLabApiStub.empty[IO].unsafeRunSync()
 
   private lazy val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
 }
