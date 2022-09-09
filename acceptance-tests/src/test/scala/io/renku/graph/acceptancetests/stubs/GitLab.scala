@@ -525,12 +525,12 @@ trait GitLab {
 private object GitLabWiremockInstance {
   private val logger = TestLogger()
 
-  val port: Int Refined Positive = 2049
+  val port: Int Refined Positive = 2048
 
-  val instance = WireMock.create().http().host("localhost").port(port.value).build()
+  val instance = WireMock.create().http().host("localhost").port(2049).build()
 
   val server = {
-    val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port.value))
+    val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(2049))
     newServer.start()
     WireMock.configureFor(newServer.port())
     logger.info(s"GitLab stub started")

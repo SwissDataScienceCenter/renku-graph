@@ -74,7 +74,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
             OkOrNotFound(state.findPersonById(id))
 
           case GET -> Root / GitLabIdVar(userId) / "projects" =>
-            if (userId == authenticatedUser.id) Ok(state.projectsFor(userId))
+            if (userId == authenticatedUser.id) Ok(state.projectsFor(userId.some))
             else Ok(List.empty[Project])
         }
       }
@@ -82,27 +82,27 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
   def projectRoutes: HttpRoutes[F] =
     withState { state =>
-      GitLabAuth.auth(state) { authenticatedUser =>
+      GitLabAuth.authOpt(state) { authenticatedUser =>
         HttpRoutes.of {
           case GET -> Root / ProjectId(id) =>
-            OkOrNotFound(state.findProject(id, authenticatedUser.id))
+            OkOrNotFound(state.findProject(id, authenticatedUser.map(_.id)))
 
           case GET -> Root / ProjectPath(path) =>
-            OkOrNotFound(state.findProject(path, authenticatedUser.id))
+            OkOrNotFound(state.findProject(path, authenticatedUser.map(_.id)))
 
           case GET -> Root / ProjectPath(path) / ("users" | "members") =>
             Ok(
               state
-                .findProject(path, authenticatedUser.id)
+                .findProject(path, authenticatedUser.map(_.id))
                 .toList
                 .flatMap(_.entitiesProject.members.toList)
             )
 
           case GET -> Root / ProjectId(id) / "repository" / "commits" =>
-            Ok(state.commitsFor(id, authenticatedUser.id))
+            Ok(state.commitsFor(id, authenticatedUser.map(_.id)))
 
           case GET -> Root / ProjectId(id) / "repository" / "commits" / CommitIdVar(sha) =>
-            OkOrNotFound(state.findCommit(id, authenticatedUser.id, sha))
+            OkOrNotFound(state.findCommit(id, authenticatedUser.map(_.id), sha))
 
           case GET -> Root / ProjectId(id) / "hooks" =>
             Ok(state.findWebhooks(id))
@@ -111,7 +111,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
             // action is always "pushed", page is always 1
             if (action != "pushed".some || page != 1.some)
               BadRequest(s"(action=$action, page=$page) vs. expected (action=pushed,page=1)")
-            else Ok(state.findPushEvents(id, authenticatedUser.id))
+            else Ok(state.findPushEvents(id, authenticatedUser.map(_.id)))
 
           case DELETE -> Root / ProjectId(id) / "hooks" / IntVar(hookId) =>
             stateRef.modify(_.removeWebhook(id, hookId)).flatMap {

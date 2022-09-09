@@ -33,10 +33,6 @@ trait JsonCodec {
   implicit val uriEncoder: Encoder[Uri] =
     Encoder.encodeString.contramap(_.renderString)
 
-  // I think we can put it into TinyType companion object, as there is probably only one canonical encoding for a TinyType?
-//  implicit def tinyTypeEncoder[A <: TinyType](implicit venc: Encoder[A#V]): Encoder[A] =
-//    venc.contramap(_.value)
-
   implicit val personEncoder: Encoder[Person] = Encoder.instance { person =>
     Map("id" -> person.maybeGitLabId.asJson, "username" -> person.name.asJson, "name" -> person.name.asJson).asJson
   }
@@ -99,7 +95,7 @@ trait JsonCodec {
         "commit_count"       -> stats.commitsCount.value.asJson,
         "storage_size"       -> stats.storageSize.value.asJson,
         "repository_size"    -> stats.repositorySize.value.asJson,
-        "lfs_object_size"    -> stats.lsfObjectsSize.value.asJson,
+        "lfs_objects_size"   -> stats.lsfObjectsSize.value.asJson,
         "job_artifacts_size" -> stats.jobArtifactsSize.value.asJson
       )
     )
@@ -122,8 +118,8 @@ trait JsonCodec {
           "path_with_namespace" -> project.path.value.asJson,
           "created_at"          -> project.entitiesProject.dateCreated.value.asJson,
           "creator_id" -> project.entitiesProject.maybeCreator
-            .flatMap(_.maybeGitLabId.map(_.value.asJson))
-            .getOrElse(Json.Null),
+            .flatMap(_.maybeGitLabId)
+            .asJson,
           "last_activity_at" -> project.updatedAt.value.asJson,
           "permissions"      -> project.permissions.asJson,
           "statistics"       -> project.statistics.asJson,

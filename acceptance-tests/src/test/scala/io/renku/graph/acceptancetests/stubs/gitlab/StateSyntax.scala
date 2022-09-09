@@ -28,7 +28,7 @@ import io.renku.graph.model.GraphModelGenerators
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Id, Path, Visibility}
-import io.renku.graph.model.testentities.Person
+import io.renku.graph.model.testentities.{Person, RenkuProject}
 import io.renku.http.client.AccessToken
 import io.renku.http.server.security.model.AuthUser
 import org.http4s.Uri
@@ -58,6 +58,9 @@ trait StateSyntax {
     def addAuthenticated(id: GitLabId, token: AccessToken): State =
       self.copy(users = self.users.updated(id, token))
 
+    def addAuthenticated(user: AuthUser): State =
+      addAuthenticated(user.id, user.accessToken)
+
     def addProject(project: Project): State =
       self.copy(projects = project :: self.projects.filter(_.id != project.id))
 
@@ -65,10 +68,17 @@ trait StateSyntax {
       addProject(project).addWebhook(project.id, webhook)
 
     def setupProject(project: Project, webhook: Uri, commits: CommitId*): State =
-      addProject(project, webhook).recordCommits(project.id, commits)
+      addProject(project, webhook)
+        .recordCommits(project.id, commits)
+        .addPersons(StateSyntax.findAllPersons(project.entitiesProject))
 
-    def addPerson(person: Person): State =
-      self.copy(persons = person :: self.persons.filter(_.maybeGitLabId != person.maybeGitLabId))
+    def addPerson(person: Person*): State =
+      addPersons(person.toSet)
+
+    def addPersons(persons: Iterable[Person]): State = {
+      val ids = persons.flatMap(_.maybeGitLabId).toSet
+      self.copy(persons = persons.toList ::: self.persons.filterNot(p => p.maybeGitLabId.exists(ids.contains)))
+    }
 
     def addWebhook(projectId: Id, url: Uri): State = {
       val nextId = self.webhooks.size
@@ -93,17 +103,16 @@ trait StateSyntax {
     def recordCommits(projectId: Id, commits: Seq[CommitId]): State =
       recordCommitData(projectId, commits.map(id => commitData(id).generateOne))
 
-    def commitsFor(projectId: Id, user: GitLabId): List[CommitData] =
+    def commitsFor(projectId: Id, user: Option[GitLabId]): List[CommitData] =
       findProject(projectId, user).toList
         .flatMap(_ => self.commits.get(projectId).map(_.toList))
         .flatten
 
-    def findCommit(projectId: Id, user: GitLabId, sha: CommitId): Option[CommitData] =
+    def findCommit(projectId: Id, user: Option[GitLabId], sha: CommitId): Option[CommitData] =
       commitsFor(projectId, user).find(_.commitId == sha)
 
-    def findPushEvents(projectId: Id, user: GitLabId): List[PushEvent] =
-      commitsFor(projectId, user)
-        .map(_.toPushEvent(projectId))
+    def findPushEvents(projectId: Id, user: Option[GitLabId]): List[PushEvent] =
+      commitsFor(projectId, user).map(_.toPushEvent(projectId))
 
     def findUserByToken(token: AccessToken): Option[AuthUser] =
       self.users.find(_._2 == token).map(AuthUser.tupled)
@@ -111,17 +120,17 @@ trait StateSyntax {
     def findPersonById(id: GitLabId): Option[Person] =
       self.persons.find(_.maybeGitLabId == id.some)
 
-    def projectsFor(user: GitLabId): List[Project] =
+    def projectsFor(user: Option[GitLabId]): List[Project] =
       self.projects.filter { p =>
         p.entitiesProject.visibility == Visibility.Public ||
-        p.entitiesProject.members.flatMap(_.maybeGitLabId).contains(user) ||
-        p.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId) == user.some
+        user.exists(p.entitiesProject.members.flatMap(_.maybeGitLabId).contains) ||
+        p.entitiesProject.maybeCreator.flatMap(_.maybeGitLabId) == user
       }
 
-    def findProject(id: Id, user: GitLabId): Option[Project] =
+    def findProject(id: Id, user: Option[GitLabId]): Option[Project] =
       projectsFor(user).find(p => p.id == id)
 
-    def findProject(path: Path, user: GitLabId): Option[Project] =
+    def findProject(path: Path, user: Option[GitLabId]): Option[Project] =
       projectsFor(user).find(p => p.path == path)
 
     def findWebhooks(projectId: Id): List[Webhook] =
@@ -129,11 +138,20 @@ trait StateSyntax {
   }
 
   final implicit class CommitDataOps(self: CommitData) {
-
     def toPushEvent(projectId: Id): PushEvent =
       PushEvent(projectId, self.commitId, GraphModelGenerators.personGitLabIds.generateOne, self.author.name)
-
   }
 }
 
-object StateSyntax extends StateSyntax
+object StateSyntax extends StateSyntax {
+  // TODO: this is a copy from ProjectFunctions which is not in scope
+  private lazy val findAllPersons: RenkuProject => Set[Person] = project =>
+    project.members ++
+      project.maybeCreator ++
+      project.activities.map(_.author) ++
+      project.datasets.flatMap(_.provenance.creators.toList.toSet) ++
+      project.activities.flatMap(_.association.agent match {
+        case p: Person => Option(p)
+        case _ => Option.empty[Person]
+      })
+}

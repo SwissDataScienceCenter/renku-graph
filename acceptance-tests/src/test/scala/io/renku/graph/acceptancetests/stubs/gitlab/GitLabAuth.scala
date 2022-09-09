@@ -30,12 +30,16 @@ import org.http4s.headers.Authorization
 import org.http4s.server.AuthMiddleware
 import org.typelevel.ci._
 import StateSyntax._
+import cats.Applicative
 
 object GitLabAuth {
-  def auth[F[_]: Async](state: State)(cont: AuthUser => HttpRoutes[F]): HttpRoutes[F] = {
-    val dsl = new Http4sDsl[F] {}
+  private def authFail[F[_]: Applicative]: AuthedRoutes[String, F] = {
+    val dsl = Http4sDsl[F]
     import dsl._
+    Kleisli(req => OptionT.liftF(Forbidden(req.context)))
+  }
 
+  def auth[F[_]: Async](state: State)(cont: AuthUser => HttpRoutes[F]): HttpRoutes[F] = {
     val authUser: Kleisli[F, Request[F], Either[String, AuthUser]] = Kleisli { req =>
       req.headers.get[PersonalAccessToken].orElse(req.headers.get[OAuthAccessToken]) match {
         case None => "No token provided in request".asLeft[AuthUser].pure[F]
@@ -43,8 +47,22 @@ object GitLabAuth {
           state.findUserByToken(token).toRight("User not found").pure[F]
       }
     }
-    val authFail: AuthedRoutes[String, F] = Kleisli(req => OptionT.liftF(Forbidden(req.context)))
+    val middleware = AuthMiddleware(authUser, authFail)
+    middleware(AuthedRoutes(authReq => cont(authReq.context).run(authReq.req)))
+  }
 
+  def authOpt[F[_]: Async](state: State)(cont: Option[AuthUser] => HttpRoutes[F]): HttpRoutes[F] = {
+    val authUser: Kleisli[F, Request[F], Either[String, Option[AuthUser]]] = Kleisli { req =>
+      req.headers.get[PersonalAccessToken].orElse(req.headers.get[OAuthAccessToken]) match {
+        case None => Option.empty[AuthUser].asRight[String].pure[F]
+        case Some(token) =>
+          state
+            .findUserByToken(token)
+            .map(_.some)
+            .toRight("User not found")
+            .pure[F]
+      }
+    }
     val middleware = AuthMiddleware(authUser, authFail)
     middleware(AuthedRoutes(authReq => cont(authReq.context).run(authReq.req)))
   }
