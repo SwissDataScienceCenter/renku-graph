@@ -35,20 +35,28 @@ import JsonCodec._
 import com.comcast.ip4s.{Host, Port}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
-import StateSyntax._
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStateQueries._
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStateUpdates._
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.Id
 import org.http4s.server.Router
 
 import java.time.Instant
 
+/** GitLab Api subset that operates off a in-memory state. The data can be manipulated using `update` and can be
+ *  inspected using `query`. 
+ */
 final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, State])
     extends Http4sDsl[F]
     with Http4sDslUtils {
   private[this] val apiPrefix = "api/v4"
+  private[this] val logger    = Logger[F]
 
   def update(f: State => State): F[Unit] =
     stateRef.update(f)
+
+  def query[A](q: State => A): F[A] =
+    stateRef.get.map(q)
 
   def allRoutes: HttpRoutes[F] =
     Router(
@@ -57,76 +65,71 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
       s"$apiPrefix/projects" -> projectRoutes
     ) <+> stubIncomplete
 
-  def userRoutes: HttpRoutes[F] =
-    withState { state =>
-      GitLabAuth.auth(state) { authenticatedUser =>
-        HttpRoutes.of { case GET -> Root =>
-          Ok(authenticatedUser)
-        }
+  private def userRoutes: HttpRoutes[F] =
+    GitLabAuth.authF(stateRef) { authenticatedUser =>
+      HttpRoutes.of { case GET -> Root =>
+        Ok(authenticatedUser)
       }
     }
 
-  def usersRoutes: HttpRoutes[F] =
-    withState { state =>
-      GitLabAuth.auth(state) { authenticatedUser =>
-        HttpRoutes.of {
-          case GET -> Root / GitLabIdVar(id) =>
-            OkOrNotFound(state.findPersonById(id))
+  private def usersRoutes: HttpRoutes[F] =
+    GitLabAuth.authOptF(stateRef) { authenticatedUser =>
+      HttpRoutes.of {
+        case GET -> Root / GitLabIdVar(id) =>
+          query(findPersonById(id)).flatMap(OkOrNotFound(_))
 
-          case GET -> Root / GitLabIdVar(userId) / "projects" =>
-            if (userId == authenticatedUser.id) Ok(state.projectsFor(userId.some))
-            else Ok(List.empty[Project])
-        }
+        case GET -> Root / GitLabIdVar(userId) / "projects" =>
+          if (userId.some == authenticatedUser.map(_.id)) query(projectsFor(userId.some)).flatMap(Ok(_))
+          else Ok(List.empty[Project])
       }
     }
 
-  def projectRoutes: HttpRoutes[F] =
-    withState { state =>
-      GitLabAuth.authOpt(state) { authenticatedUser =>
-        HttpRoutes.of {
-          case GET -> Root / ProjectId(id) =>
-            OkOrNotFound(state.findProject(id, authenticatedUser.map(_.id)))
+  private def projectRoutes: HttpRoutes[F] =
+    GitLabAuth.authOptF(stateRef) { authenticatedUser =>
+      HttpRoutes.of {
+        case GET -> Root / ProjectId(id) =>
+          query(findProject(id, authenticatedUser.map(_.id))).flatMap(OkOrNotFound(_))
 
-          case GET -> Root / ProjectPath(path) =>
-            OkOrNotFound(state.findProject(path, authenticatedUser.map(_.id)))
+        case GET -> Root / ProjectPath(path) =>
+          query(findProject(path, authenticatedUser.map(_.id))).flatMap(OkOrNotFound(_))
 
-          case GET -> Root / ProjectPath(path) / ("users" | "members") =>
-            Ok(
-              state
-                .findProject(path, authenticatedUser.map(_.id))
-                .toList
-                .flatMap(_.entitiesProject.members.toList)
-            )
+        case GET -> Root / ProjectPath(path) / ("users" | "members") =>
+          for {
+            project <- query(findProject(path, authenticatedUser.map(_.id)))
+            members = project.toList.flatMap(_.entitiesProject.members.toList)
+            resp <- Ok(members)
+          } yield resp
 
-          case GET -> Root / ProjectId(id) / "repository" / "commits" =>
-            Ok(state.commitsFor(id, authenticatedUser.map(_.id)))
+        case GET -> Root / ProjectId(id) / "repository" / "commits" =>
+          query(commitsFor(id, authenticatedUser.map(_.id))).flatMap(Ok(_))
 
-          case GET -> Root / ProjectId(id) / "repository" / "commits" / CommitIdVar(sha) =>
-            OkOrNotFound(state.findCommit(id, authenticatedUser.map(_.id), sha))
+        case GET -> Root / ProjectId(id) / "repository" / "commits" / CommitIdVar(sha) =>
+          query(findCommit(id, authenticatedUser.map(_.id), sha)).flatMap(OkOrNotFound(_))
 
-          case GET -> Root / ProjectId(id) / "hooks" =>
-            Ok(state.findWebhooks(id))
+        case GET -> Root / ProjectId(id) / "hooks" =>
+          query(findWebhooks(id)).flatMap(Ok(_))
 
-          case GET -> Root / ProjectId(id) / "events" :? PageParam(page) :? ActionParam(action) =>
-            // action is always "pushed", page is always 1
-            if (action != "pushed".some || page != 1.some)
-              BadRequest(s"(action=$action, page=$page) vs. expected (action=pushed,page=1)")
-            else Ok(state.findPushEvents(id, authenticatedUser.map(_.id)))
+        case GET -> Root / ProjectId(id) / "events" :? PageParam(page) :? ActionParam(action) =>
+          // action is always "pushed", page is always 1
+          if (action != "pushed".some || page != 1.some) {
+            val msg =
+              s"Unexpected request parameters: got action=$action, page=$page, expected action=pushed, page=1"
+            logger.error(msg) *> BadRequest(msg)
+          } else query(findPushEvents(id, authenticatedUser.map(_.id))).flatMap(Ok(_))
 
-          case DELETE -> Root / ProjectId(id) / "hooks" / IntVar(hookId) =>
-            stateRef.modify(_.removeWebhook(id, hookId)).flatMap {
-              case true  => Ok()
-              case false => NotFound()
-            }
-        }
+        case DELETE -> Root / ProjectId(id) / "hooks" / IntVar(hookId) =>
+          stateRef.modify(removeWebhook(id, hookId)).flatMap {
+            case true  => Ok()
+            case false => NotFound()
+          }
       }
     }
 
-  def stubIncomplete: HttpRoutes[F] =
+  private def stubIncomplete: HttpRoutes[F] =
     HttpRoutes { req =>
       val message = s"GitLabApiStub doesn't have this route implemented: ${req.pathInfo.renderString}"
       OptionT
-        .liftF(Logger[F].error(message))
+        .liftF(logger.error(message))
         .semiflatMap(_ => InternalServerError(message))
     }
 
@@ -134,7 +137,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
     Client.fromHttpApp(allRoutes.orNotFound)
 
   def run(bindAddress: Host, port: Port): Stream[F, Nothing] =
-    Stream.eval(Logger[F].info(s"Starting GitLab stub on $bindAddress:$port")).drain ++
+    Stream.eval(logger.info(s"Starting GitLab stub on $bindAddress:$port")).drain ++
       BlazeServerBuilder[F]
         .bindHttp(port.value, bindAddress.show)
         .withoutBanner
@@ -146,9 +149,6 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
     (Host.fromString(bindAddress), Port.fromInt(port))
       .mapN(run)
       .getOrElse(sys.error("Invalid host or port"))
-
-  private def withState(cont: State => HttpRoutes[F]): HttpRoutes[F] =
-    HttpRoutes(req => OptionT.liftF(stateRef.get).flatMap(s => cont(s).run(req)))
 }
 
 object GitLabApiStub {

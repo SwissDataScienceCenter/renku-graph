@@ -24,7 +24,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.stubs.gitlab.StateSyntax
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.projects.Visibility
@@ -44,7 +44,7 @@ class ProjectsResourcesSpec
     with GraphServices
     with TSProvisioning
     with DatasetsResources
-    with StateSyntax {
+    with GitLabStubIOSyntax {
 
   private val user = authUsers.generateOne
   private implicit val accessToken: AccessToken = user.accessToken
@@ -71,18 +71,18 @@ class ProjectsResourcesSpec
     Scenario("As a user I would like to find project's details by calling a REST endpoint") {
 
       Given("the user is authenticated")
-      gitLabStub.update(_.addAuthenticated(user)).unsafeRunSync()
+      gitLabStub.addAuthenticated(user)
 
       And("there are some data in the Triples Store")
       val parentCommitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(parentProject, parentProject.entitiesProject.asJsonLD, parentCommitId)
-      gitLabStub.update(_.setupProject(parentProject, webhookUri, parentCommitId)).unsafeRunSync()
+      gitLabStub.setupProject(parentProject, parentCommitId)
 
       `data in the Triples Store`(parentProject, parentCommitId)
 
       val commitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
-      gitLabStub.update(_.setupProject(project, webhookUri, commitId)).unsafeRunSync()
+      gitLabStub.setupProject(project, commitId)
       `data in the Triples Store`(project, commitId)
 
       When("the user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
@@ -109,7 +109,7 @@ class ProjectsResourcesSpec
 
       When("there's an authenticated user who is not project member")
       val nonMemberUser = authUsers.generateOne
-      gitLabStub.update(_.addAuthenticated(nonMemberUser)).unsafeRunSync()
+      gitLabStub.addAuthenticated(nonMemberUser)
 
       And("he fetches project's details")
       val projectDetailsResponseForNonMember =

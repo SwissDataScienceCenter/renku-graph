@@ -29,10 +29,9 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
 import org.http4s.server.AuthMiddleware
 import org.typelevel.ci._
-import StateSyntax._
 import cats.Applicative
 
-object GitLabAuth {
+private[gitlab] object GitLabAuth {
   private def authFail[F[_]: Applicative]: AuthedRoutes[String, F] = {
     val dsl = Http4sDsl[F]
     import dsl._
@@ -44,20 +43,23 @@ object GitLabAuth {
       req.headers.get[PersonalAccessToken].orElse(req.headers.get[OAuthAccessToken]) match {
         case None => "No token provided in request".asLeft[AuthUser].pure[F]
         case Some(token) =>
-          state.findUserByToken(token).toRight("User not found").pure[F]
+          GitLabStateQueries.findUserByToken(token)(state).toRight("User not found").pure[F]
       }
     }
     val middleware = AuthMiddleware(authUser, authFail)
     middleware(AuthedRoutes(authReq => cont(authReq.context).run(authReq.req)))
   }
 
+  def authF[F[_]: Async](stateRef: Ref[F, State])(cont: AuthUser => HttpRoutes[F]): HttpRoutes[F] =
+    Kleisli(req => OptionT.liftF(stateRef.get).flatMap(auth(_)(cont).run(req)))
+
   def authOpt[F[_]: Async](state: State)(cont: Option[AuthUser] => HttpRoutes[F]): HttpRoutes[F] = {
     val authUser: Kleisli[F, Request[F], Either[String, Option[AuthUser]]] = Kleisli { req =>
       req.headers.get[PersonalAccessToken].orElse(req.headers.get[OAuthAccessToken]) match {
         case None => Option.empty[AuthUser].asRight[String].pure[F]
         case Some(token) =>
-          state
-            .findUserByToken(token)
+          GitLabStateQueries
+            .findUserByToken(token)(state)
             .map(_.some)
             .toRight("User not found")
             .pure[F]
@@ -66,6 +68,9 @@ object GitLabAuth {
     val middleware = AuthMiddleware(authUser, authFail)
     middleware(AuthedRoutes(authReq => cont(authReq.context).run(authReq.req)))
   }
+
+  def authOptF[F[_]: Async](stateRef: Ref[F, State])(cont: Option[AuthUser] => HttpRoutes[F]): HttpRoutes[F] =
+    Kleisli(req => OptionT.liftF(stateRef.get).flatMap(authOpt(_)(cont).run(req)))
 
   def apply(user: AuthUser): Header.ToRaw =
     user.accessToken match {

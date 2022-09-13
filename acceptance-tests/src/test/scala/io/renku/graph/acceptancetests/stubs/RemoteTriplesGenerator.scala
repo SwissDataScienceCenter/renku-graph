@@ -75,20 +75,10 @@ trait RemoteTriplesGenerator {
       project:   data.Project,
       triples:   JsonLD,
       commitIds: NonEmptyList[CommitId]
-  ): Unit = {
-    commitIds
-      .foldLeft(List.empty[CommitId]) {
-        case (Nil, commitId) =>
-          `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
-
-          commitId :: Nil
-        case (parentIds, commitId) =>
-          `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
-
-          parentIds ::: commitId :: Nil
-      }
-    ()
-  }
+  ): Unit =
+    commitIds.toList.foreach { commitId =>
+      `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+    }
 
   def `GET <triples-generator>/projects/:id/commits/:id fails non recoverably`(
       project:  data.Project,

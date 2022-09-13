@@ -19,18 +19,20 @@
 package io.renku.graph.acceptancetests.stubs.gitlab
 
 import cats.Applicative
-import cats.effect.Async
+import cats.data.OptionT
+import cats.effect._
 import cats.syntax.all._
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Id, Path}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalQueryParamDecoderMatcher
-import org.http4s.{EntityEncoder, HttpApp, Response}
+import org.http4s.{EntityEncoder, HttpApp, HttpRoutes, Response}
 import org.http4s.server.middleware.{Logger => LoggerMiddleware}
 import org.typelevel.log4cats.Logger
 
-protected[gitlab] trait Http4sDslUtils {
+private[gitlab] trait Http4sDslUtils {
 
   object GitLabIdVar {
     def unapply(str: String): Option[GitLabId] =
@@ -69,6 +71,9 @@ protected[gitlab] trait Http4sDslUtils {
     val logAction: String => F[Unit] = Logger[F].debug(_)
     LoggerMiddleware.httpApp(logHeaders = true, logBody = true, logAction = Some(logAction))(app)
   }
+
+  def withState[F[_]: Sync](stateRef: Ref[F, State])(cont: State => HttpRoutes[F]): HttpRoutes[F] =
+    HttpRoutes(req => OptionT.liftF(stateRef.get).flatMap(s => cont(s).run(req)))
 
   object PageParam extends OptionalQueryParamDecoderMatcher[Int]("page")
 

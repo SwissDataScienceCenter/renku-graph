@@ -27,7 +27,7 @@ import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
-import io.renku.graph.acceptancetests.stubs.gitlab.StateSyntax._
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.graph.model.projects
@@ -46,6 +46,7 @@ class UserProjectsResourceSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
+    with GitLabStubIOSyntax
     with should.Matchers {
 
   Feature("GET knowledge-graph/users/:id/projects to return user's projects") {
@@ -57,7 +58,7 @@ class UserProjectsResourceSpec
       val userId = personGitLabIds.generateOne
       val user   = personEntities(fixed(userId.some)).generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
-      gitLabStub.update(_.addAuthenticated(userId, accessToken)).unsafeRunSync()
+      gitLabStub.addAuthenticated(userId, accessToken)
 
       val activatedProject = dataProjects(
         renkuProjectEntities(anyVisibility).modify(replaceMembers(Set(user))).generateOne
@@ -65,7 +66,7 @@ class UserProjectsResourceSpec
 
       val commitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(activatedProject, activatedProject.entitiesProject.asJsonLD, commitId)
-      gitLabStub.update(_.setupProject(activatedProject, webhookUri, commitId)).unsafeRunSync()
+      gitLabStub.setupProject(activatedProject, commitId)
       `data in the Triples Store`(activatedProject, commitId)
 
       And("he has a not activated project")
@@ -74,7 +75,7 @@ class UserProjectsResourceSpec
         renkuProjectEntities(visibilityPublic).generateOne
       ).generateOne
 
-      gitLabStub.update(_.addProject(notActivatedProject)).unsafeRunSync()
+      gitLabStub.addProject(notActivatedProject)
 
       When("user navigates to GET knowledge-graph/users/:id/projects")
 
