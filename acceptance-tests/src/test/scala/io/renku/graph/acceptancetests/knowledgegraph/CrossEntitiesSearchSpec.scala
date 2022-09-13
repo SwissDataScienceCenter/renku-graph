@@ -26,12 +26,12 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, sentenceContaining}
 import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{datasetEntities, renkuProjectEntities, visibilityPublic}
-import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder._
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
@@ -44,12 +44,12 @@ class CrossEntitiesSearchSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
-    with TSData {
+    with TSData
+    with GitLabStubIOSyntax {
 
   Feature("GET knowledge-graph/entities") {
 
     val user = authUsers.generateOne
-    implicit val accessToken: AccessToken = user.accessToken
 
     val commonPhrase = nonBlankStrings(minLength = 5).generateOne
     val testEntitiesProject =
@@ -78,8 +78,10 @@ class CrossEntitiesSearchSpec
 
       Given("there's relevant data in the Triples Store")
       val commitId = commitIds.generateOne
-      mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
+      gitLabStub.setupProject(project, commitId)
+      gitLabStub.addAuthenticated(user)
+      mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
+      `data in the Triples Store`(project, commitId)(user.accessToken, ioRuntime)
 
       When("the user calls the GET knowledge-graph/entities")
       val response = knowledgeGraphClient GET s"knowledge-graph/entities?query=${urlEncode(commonPhrase.value)}"
