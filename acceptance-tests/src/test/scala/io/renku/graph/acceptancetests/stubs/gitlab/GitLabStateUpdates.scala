@@ -1,7 +1,6 @@
 package io.renku.graph.acceptancetests.stubs.gitlab
 
 import cats.data.NonEmptyList
-import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.{CommitData, State, Webhook}
@@ -44,16 +43,30 @@ trait GitLabStateUpdates {
     (state.copy(webhooks = filtered), filtered != state.webhooks)
   }
 
-  def recordCommitData(projectId: Id, commits: Seq[CommitData]): StateUpdate = state => {
+  def removeWebhooks(projectId: Id): StateUpdate =
+    state => state.copy(webhooks = state.webhooks.filterNot(_.projectId == projectId))
+
+  def addCommitData(projectId: Id, commits: Seq[CommitData]): StateUpdate = state => {
+    def connectParents(list: Seq[CommitData]): List[CommitData] =
+      list.foldRight(List.empty[CommitData]) { (el, res) =>
+        el.copy(parents = res.headOption.map(_.commitId).toList) :: res
+      }
+
     val next = state.commits.updatedWith(projectId) {
-      case Some(existing) => existing.concat(commits.toList).some
-      case None           => NonEmptyList.fromList(commits.toList)
+      case Some(existing) => NonEmptyList.fromList(connectParents(commits ++ existing.toList))
+      case None           => NonEmptyList.fromList(connectParents(commits))
     }
     state.copy(commits = next)
   }
 
-  def recordCommits(projectId: Id, commits: Seq[CommitId]): StateUpdate =
-    recordCommitData(projectId, commits.map(id => commitData(id).generateOne))
+  def addCommits(projectId: Id, commits: Seq[CommitId]): StateUpdate =
+    addCommitData(projectId, commits.map(id => commitData(id).generateOne))
+
+  def removeCommits(projectId: Id): StateUpdate =
+    state => state.copy(commits = state.commits.removed(projectId))
+
+  def replaceCommits(projectId: Id, commits: Seq[CommitId]): StateUpdate =
+    removeCommits(projectId) >> addCommits(projectId, commits)
 
   def addPerson(person: Person*): StateUpdate =
     addPersons(person.toSet)
@@ -71,8 +84,22 @@ trait GitLabStateUpdates {
 
   def setupProject(project: Project, webhook: Uri, commits: CommitId*): StateUpdate =
     addProject(project, webhook) >>
-      recordCommits(project.id, commits) >>
+      addCommits(project.id, commits) >>
       addPersons(GitLabStateUpdates.findAllPersons(project.entitiesProject))
+
+  def replaceRenkuProject(projectId: Id, renkuProject: RenkuProject): StateUpdate =
+    state =>
+      state.projects.find(_.id == projectId) match {
+        case Some(p) =>
+          val np = p.copy(entitiesProject = renkuProject)
+          state.copy(projects = np :: state.projects.filterNot(_.id == np.id))
+        case None => state
+      }
+
+  def removeProject(projectId: Id): StateUpdate =
+    removeCommits(projectId) >>
+      removeWebhooks(projectId) >>
+      (state => state.copy(projects = state.projects.filterNot(_.id == projectId)))
 }
 
 object GitLabStateUpdates extends GitLabStateUpdates {

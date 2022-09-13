@@ -27,6 +27,7 @@ import io.renku.graph.acceptancetests.data.{Project, _}
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsResources, fullJson}
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
@@ -49,10 +50,10 @@ class CommitHistoryChangesSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
-    with DatasetsResources {
+    with DatasetsResources
+    with GitLabStubIOSyntax {
 
   private val user = authUsers.generateOne
-  private implicit val accessToken: AccessToken = user.accessToken
 
   Feature("Changes in the commit history to trigger re-provisioning") {
 
@@ -65,26 +66,28 @@ class CommitHistoryChangesSpec
 
       Given("there is data in the TS")
 
-      `GET <gitlabApi>/user returning OK`(user)
+      gitLabStub.addAuthenticated(user)
+      gitLabStub.setupProject(project, commits.toList: _*)
+      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commits)
 
-      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commits)
-      `data in the Triples Store`(project, commits.last)
+      `data in the Triples Store`(project, commits)(user.accessToken, ioRuntime)
 
       eventually {
         EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
       }
 
-      assertProjectDataIsCorrect(project, project.entitiesProject)
+      assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
 
       When("the commit history changes")
 
       val newCommits  = commitIds.generateNonEmptyList(minElements = 3)
       val newEntities = generateNewActivitiesAndDataset(project.entitiesProject)
 
-      mockDataOnGitLabAPIs(project, newEntities.asJsonLD, newCommits)
+      gitLabStub.replaceCommits(project.id, newCommits.toList: _*)
+      mockCommitDataOnTripleGenerator(project, newEntities.asJsonLD, newCommits)
 
       commits.toList.foreach { commitId =>
-        `GET <gitlabApi>/projects/:id/repository/commits/:sha returning NOT_FOUND`(project, commitId)
+        `GET <gitlabApi>/projects/:id/repository/commits/:sha returning NOT_FOUND`(project, commitId)(user.accessToken)
       }
 
       webhookServiceClient
@@ -100,7 +103,7 @@ class CommitHistoryChangesSpec
       }
 
       Then("the project should contain the new data")
-      assertProjectDataIsCorrect(project, newEntities)
+      assertProjectDataIsCorrect(project, newEntities, user.accessToken)
     }
 
     Scenario("Removing a project from GitLab should remove it from the knowledge-graph") {
@@ -110,26 +113,18 @@ class CommitHistoryChangesSpec
 
       Given("There is data in the triple store")
 
-      `GET <gitlabApi>/user returning OK`(user)
+      // `GET <gitlabApi>/user returning OK`(user)
+      gitLabStub.addAuthenticated(user)
+      gitLabStub.setupProject(project, commits.toList: _*)
 
-      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commits)
-      `data in the Triples Store`(project, commits)
+      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commits)
+      // mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commits)
+      `data in the Triples Store`(project, commits)(user.accessToken, ioRuntime)
 
-      assertProjectDataIsCorrect(project, project.entitiesProject)
+      assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
 
       When("the project is removed from GitLab")
-
-      commits.toList.foreach { commitId =>
-        `GET <gitlabApi>/projects/:id/repository/commits/:sha returning NOT_FOUND`(project, commitId)
-      }
-
-      `GET <gitlabApi>/projects/:path AND :id returning NOT_FOUND`(project)
-
-      `GET <gitlabApi>/projects/:id/repository/commits per page returning NOT_FOUND`(project.id)
-
-      `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning NOT_FOUND`(
-        project
-      )
+      gitLabStub.removeProject(project.id)
 
       And("the global commit sync is triggered")
       EventLog.removeGlobalCommitSyncRow(project.id)
@@ -140,19 +135,17 @@ class CommitHistoryChangesSpec
 
       Then("the project and its datasets should be removed from the knowledge-graph")
 
-      knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken).status shouldBe NotFound
+      knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", user.accessToken).status shouldBe NotFound
 
       project.entitiesProject.datasets.foreach { dataset =>
         knowledgeGraphClient
-          .GET(s"knowledge-graph/datasets/${dataset.identification.identifier}", accessToken)
+          .GET(s"knowledge-graph/datasets/${dataset.identification.identifier}", user.accessToken)
           .status shouldBe NotFound
       }
     }
   }
 
-  private def assertProjectDataIsCorrect(project: Project, projectEntities: RenkuProject)(implicit
-      accessToken:                                AccessToken
-  ) = {
+  private def assertProjectDataIsCorrect(project: Project, projectEntities: RenkuProject, accessToken: AccessToken) = {
 
     val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 

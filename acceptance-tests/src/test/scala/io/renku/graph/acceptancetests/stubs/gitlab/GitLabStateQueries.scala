@@ -44,9 +44,9 @@ trait GitLabStateQueries {
 
   def commitsFor(projectId: Id, user: Option[GitLabId]): StateQuery[List[CommitData]] =
     for {
-      project <- findProject(projectId, user).andThen(_.toList)
+      project <- findProject(projectId, user)
       commits <- project.traverse(p => projectCommits(p.id))
-    } yield commits.flatten
+    } yield commits.getOrElse(Nil)
 
   def findCommit(projectId: Id, user: Option[GitLabId], sha: CommitId): StateQuery[Option[CommitData]] =
     commitsFor(projectId, user).andThen(_.find(_.commitId == sha))
