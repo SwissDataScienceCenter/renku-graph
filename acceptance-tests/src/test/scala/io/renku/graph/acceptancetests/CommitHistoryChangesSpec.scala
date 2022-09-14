@@ -113,12 +113,10 @@ class CommitHistoryChangesSpec
 
       Given("There is data in the triple store")
 
-      // `GET <gitlabApi>/user returning OK`(user)
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commits.toList: _*)
 
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commits)
-      // mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commits)
       `data in the Triples Store`(project, commits)(user.accessToken, ioRuntime)
 
       assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
