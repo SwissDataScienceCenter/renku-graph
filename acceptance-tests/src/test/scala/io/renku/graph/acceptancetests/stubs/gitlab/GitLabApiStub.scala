@@ -62,7 +62,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
     Router(
       s"$apiPrefix/user"     -> userRoutes,
       s"$apiPrefix/users"    -> usersRoutes,
-      s"$apiPrefix/projects" -> projectRoutes
+      s"$apiPrefix/projects" -> (brokenProjects <+> projectRoutes)
     ) <+> stubIncomplete
 
   private def userRoutes: HttpRoutes[F] =
@@ -125,6 +125,22 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
       }
     }
 
+  private def brokenProjects: HttpRoutes[F] =
+    HttpRoutes {
+      case GET -> Root / ProjectId(id) =>
+        OptionT.liftF(query(isProjectBroken(id))).flatMap {
+          case true  => OptionT.liftF(InternalServerError())
+          case false => OptionT.none
+        }
+      case GET -> Root / ProjectPath(path) =>
+        OptionT.liftF(query(isProjectBroken(path))).flatMap {
+          case true  => OptionT.liftF(InternalServerError())
+          case false => OptionT.none
+        }
+
+      case _ => OptionT.none[F, Response[F]]
+    }
+
   private def stubIncomplete: HttpRoutes[F] =
     HttpRoutes { req =>
       val message = s"GitLabApiStub doesn't have this route implemented: ${req.pathInfo.renderString}"
@@ -159,14 +175,15 @@ object GitLabApiStub {
     apply(State.empty)
 
   final case class State(
-      users:    Map[GitLabId, AccessToken],
-      persons:  List[Person],
-      projects: List[Project],
-      webhooks: List[Webhook],
-      commits:  Map[Id, NonEmptyList[CommitData]]
+      users:          Map[GitLabId, AccessToken],
+      persons:        List[Person],
+      projects:       List[Project],
+      webhooks:       List[Webhook],
+      commits:        Map[Id, NonEmptyList[CommitData]],
+      brokenProjects: Set[Id]
   )
   object State {
-    val empty: State = State(Map.empty, Nil, Nil, Nil, Map.empty)
+    val empty: State = State(Map.empty, Nil, Nil, Nil, Map.empty, Set.empty)
   }
 
   final case class Webhook(webhookId: Int, projectId: Id, url: Uri)

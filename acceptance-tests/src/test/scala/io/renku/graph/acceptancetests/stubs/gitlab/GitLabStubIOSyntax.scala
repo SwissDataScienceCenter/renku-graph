@@ -43,5 +43,11 @@ trait GitLabStubIOSyntax { self: IOSpec =>
 
     def removeProject(id: Id): Unit =
       self.update(GitLabStateUpdates.removeProject(id)).unsafeRunSync()
+
+    def markProjectBroken(id: Id): Unit =
+      self.update(GitLabStateUpdates.markProjectBroken(id)).unsafeRunSync()
+
+    def unmarkProjectBroken(id: Id): Unit =
+      self.update(GitLabStateUpdates.unmarkProjectBroken(id)).unsafeRunSync()
   }
 }

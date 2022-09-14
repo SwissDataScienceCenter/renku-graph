@@ -85,6 +85,15 @@ trait GitLabStateQueries {
   def findWebhooks(projectId: Id): StateQuery[List[Webhook]] =
     _.webhooks.filter(_.projectId == projectId)
 
+  def isProjectBroken(id: Id): StateQuery[Boolean] =
+    _.brokenProjects.contains(id)
+
+  def isProjectBroken(path: Path): StateQuery[Boolean] =
+    for {
+      project <- findProjectByPath(path)
+      broken  <- project.traverse(p => isProjectBroken(p.id))
+    } yield broken.getOrElse(false)
+
   final implicit class CommitDataOps(self: CommitData) {
     def toPushEvent(projectId: Id): PushEvent =
       PushEvent(projectId, self.commitId, GraphModelGenerators.personGitLabIds.generateOne, self.author.name)

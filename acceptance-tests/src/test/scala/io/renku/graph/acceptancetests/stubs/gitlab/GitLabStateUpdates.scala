@@ -100,6 +100,12 @@ trait GitLabStateUpdates {
     removeCommits(projectId) >>
       removeWebhooks(projectId) >>
       (state => state.copy(projects = state.projects.filterNot(_.id == projectId)))
+
+  def markProjectBroken(id: Id): StateUpdate =
+    state => state.copy(brokenProjects = state.brokenProjects + id)
+
+  def unmarkProjectBroken(id: Id): StateUpdate =
+    state => state.copy(brokenProjects = state.brokenProjects - id)
 }
 
 object GitLabStateUpdates extends GitLabStateUpdates {
