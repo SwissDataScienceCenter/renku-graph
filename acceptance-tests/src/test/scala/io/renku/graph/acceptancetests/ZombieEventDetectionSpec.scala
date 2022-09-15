@@ -28,7 +28,6 @@ import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.AccessTokenPresence
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -61,7 +60,6 @@ class ZombieEventDetectionSpec
     with GivenWhenThen
     with TypeSerializers
     with AcceptanceTestPatience
-    with GitLabStubIOSyntax
     with should.Matchers {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(

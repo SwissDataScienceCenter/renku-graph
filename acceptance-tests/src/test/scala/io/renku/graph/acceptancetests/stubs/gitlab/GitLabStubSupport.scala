@@ -24,7 +24,7 @@ import io.renku.graph.model.{GitLabApiUrl, GitLabUrl}
 import org.scalatest._
 
 /** Mixin for tests that starts a [[GitLabApiStub]] for the whole suite and clears its state before each test. */
-trait GitLabStubSupport extends BeforeAndAfterAll with BeforeAndAfter { self: BaseSpec =>
+trait GitLabStubSupport extends BeforeAndAfterAll with BeforeAndAfter with GitLabStubIOSyntax { self: BaseSpec =>
 
   implicit val gitLabUrl:    GitLabUrl    = GitLabUrl(testConfig.getString(GitLabStubSupport.gitLabUrlKey))
   implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
@@ -49,7 +49,7 @@ trait GitLabStubSupport extends BeforeAndAfterAll with BeforeAndAfter { self: Ba
   }
 
   before {
-    gitLabStub.update(GitLabStateUpdates.clearState).unsafeRunSync()
+    gitLabStub.clearState()
   }
 }
 

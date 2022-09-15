@@ -26,7 +26,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.{AccessTokenPresence, TSProvisioning}
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -48,7 +47,6 @@ class EventsProcessingStatusSpec
     with AccessTokenPresence
     with Eventually
     with AcceptanceTestPatience
-    with GitLabStubIOSyntax
     with should.Matchers {
 
   private val numberOfEvents: Int Refined Positive = 5

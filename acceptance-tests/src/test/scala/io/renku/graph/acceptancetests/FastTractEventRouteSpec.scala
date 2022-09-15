@@ -23,7 +23,6 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -41,8 +40,7 @@ class FastTractEventRouteSpec
     with GraphServices
     with TSProvisioning
     with Eventually
-    with AcceptanceTestPatience
-    with GitLabStubIOSyntax {
+    with AcceptanceTestPatience {
 
   Feature("Fast track route for events not in the TS") {
 

@@ -25,7 +25,6 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
@@ -47,8 +46,7 @@ class ProjectReProvisioningSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
-    with TSData
-    with GitLabStubIOSyntax {
+    with TSData {
 
   Feature("Project re-provisioning") {
 

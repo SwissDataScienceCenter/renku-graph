@@ -37,17 +37,10 @@ import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import cats.data.NonEmptyList
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.model.testentities.personEntities
 import io.renku.http.server.security.model.AuthUser
 
-class EventsResourceSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSData
-    with TSProvisioning
-    with GitLabStubIOSyntax {
+class EventsResourceSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSData with TSProvisioning {
 
   Feature("GET /events?project-path=<path> to return info about all the project events") {
 

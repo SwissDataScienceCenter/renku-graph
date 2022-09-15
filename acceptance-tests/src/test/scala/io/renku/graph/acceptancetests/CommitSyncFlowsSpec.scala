@@ -26,7 +26,6 @@ import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventId
@@ -42,8 +41,7 @@ class CommitSyncFlowsSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
-    with TypeSerializers
-    with GitLabStubIOSyntax {
+    with TypeSerializers {
 
   Feature("Missed GitLab events should be synchronised") {
 

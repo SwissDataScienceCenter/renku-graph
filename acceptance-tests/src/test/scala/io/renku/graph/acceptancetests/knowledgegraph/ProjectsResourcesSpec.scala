@@ -24,7 +24,6 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.projects.Visibility
@@ -43,8 +42,7 @@ class ProjectsResourcesSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
-    with DatasetsResources
-    with GitLabStubIOSyntax {
+    with DatasetsResources {
 
   private val user = authUsers.generateOne
   private implicit val accessToken: AccessToken = user.accessToken

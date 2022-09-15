@@ -26,7 +26,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ServiceClient}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -42,13 +41,7 @@ import org.scalatest.time.{Minutes, Seconds, Span}
 
 import java.nio.file.{Files, Paths}
 
-class ReProvisioningSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with TSData
-    with GitLabStubIOSyntax {
+class ReProvisioningSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSProvisioning with TSData {
 
   Feature("ReProvisioning") {
 

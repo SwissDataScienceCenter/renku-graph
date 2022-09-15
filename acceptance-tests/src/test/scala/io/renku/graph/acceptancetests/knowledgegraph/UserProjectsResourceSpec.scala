@@ -27,7 +27,6 @@ import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.graph.model.projects
@@ -46,7 +45,6 @@ class UserProjectsResourceSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
-    with GitLabStubIOSyntax
     with should.Matchers {
 
   Feature("GET knowledge-graph/users/:id/projects to return user's projects") {

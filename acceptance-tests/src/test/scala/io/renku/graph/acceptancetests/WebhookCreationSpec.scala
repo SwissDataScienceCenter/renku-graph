@@ -24,7 +24,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.flows.AccessTokenPresence
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -40,7 +39,6 @@ class WebhookCreationSpec
     with GivenWhenThen
     with GraphServices
     with AccessTokenPresence
-    with GitLabStubIOSyntax
     with should.Matchers {
 
   Feature("A Graph Services hook can be created for a project") {

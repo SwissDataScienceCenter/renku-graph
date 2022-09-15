@@ -26,7 +26,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, sentenceContaining}
 import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
@@ -44,8 +43,7 @@ class CrossEntitiesSearchSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
-    with TSData
-    with GitLabStubIOSyntax {
+    with TSData {
 
   Feature("GET knowledge-graph/entities") {
 

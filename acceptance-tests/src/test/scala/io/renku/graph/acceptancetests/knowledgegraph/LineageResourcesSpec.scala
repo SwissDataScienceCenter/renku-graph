@@ -26,7 +26,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.acceptancetests.data.{TSData, cliVersion, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
@@ -47,7 +46,6 @@ class LineageResourcesSpec
     extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
-    with GitLabStubIOSyntax
     with TSProvisioning
     with TSData {
 

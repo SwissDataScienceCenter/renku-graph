@@ -27,7 +27,6 @@ import io.renku.graph.acceptancetests.data.{Project, _}
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsResources, fullJson}
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
@@ -50,8 +49,7 @@ class CommitHistoryChangesSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
-    with DatasetsResources
-    with GitLabStubIOSyntax {
+    with DatasetsResources {
 
   private val user = authUsers.generateOne
 
