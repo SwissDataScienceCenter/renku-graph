@@ -60,10 +60,10 @@ trait GitLab {
   implicit lazy val gitLabUrl:    GitLabUrl            = GitLabUrl(s"http://localhost:$port")
   implicit lazy val gitLabApiUrl: GitLabApiUrl         = gitLabUrl.apiV4
 
-  def `GET <gitlabApi>/user returning OK`(user: AuthUser): Unit =
+  private def `GET <gitlabApi>/user returning OK`(user: AuthUser): Unit =
     `GET <gitlabApi>/user returning OK`(user.id)(user.accessToken)
 
-  def `GET <gitlabApi>/user returning NOT_FOUND`(user: AuthUser): Unit = {
+  private def `GET <gitlabApi>/user returning NOT_FOUND`(user: AuthUser): Unit = {
     stubFor {
       get("/api/v4/user")
         .withAccessTokenInHeader(user.accessToken)
@@ -72,7 +72,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/user returning OK`(
+  private def `GET <gitlabApi>/user returning OK`(
       userGitLabId:       persons.GitLabId = personGitLabIds.generateOne
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -84,8 +84,8 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/users/:id returning OK`(id: persons.GitLabId, person: Person)(implicit
-      accessToken:                                 AccessToken
+  private def `GET <gitlabApi>/users/:id returning OK`(id: persons.GitLabId, person: Person)(implicit
+      accessToken:                                         AccessToken
   ): Unit = {
     stubFor {
       get(s"/api/v4/users/$id").withAccessTokenInHeader
@@ -100,7 +100,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/users/:id/projects returning OK`(
+  private def `GET <gitlabApi>/users/:id/projects returning OK`(
       userId:             persons.GitLabId,
       project:            data.Project
   )(implicit accessToken: AccessToken): Unit = {
@@ -130,7 +130,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(
+  private def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(
       maybeAuthor:        Option[Person],
       project:            data.Project,
       commitId:           CommitId
@@ -140,7 +140,7 @@ trait GitLab {
                                                                             NonEmptyList(commitId, Nil)
     )
 
-  def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(
+  private def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(
       maybeAuthor:        Option[Person],
       project:            data.Project,
       commitIds:          NonEmptyList[CommitId]
@@ -168,7 +168,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning NOT_FOUND`(
+  private def `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning NOT_FOUND`(
       project:            data.Project
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -178,7 +178,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(
+  private def `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     val webhookId  = "1"
@@ -190,7 +190,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(
+  private def `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -200,7 +200,7 @@ trait GitLab {
     ()
   }
 
-  def `POST <gitlabApi>/projects/:id/hooks returning CREATED`(
+  private def `POST <gitlabApi>/projects/:id/hooks returning CREATED`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -209,7 +209,7 @@ trait GitLab {
     }
     ()
   }
-  def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(
+  private def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(
       projectId:          Id,
       commitId:           CommitId
   )(implicit accessToken: AccessToken): Unit =
@@ -217,7 +217,7 @@ trait GitLab {
                                                                                          NonEmptyList(commitId, Nil)
     )
 
-  def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(
+  private def `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(
       projectId:          Id,
       commitIds:          NonEmptyList[CommitId]
   )(implicit accessToken: AccessToken): Unit = {
@@ -243,7 +243,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id/repository/commits per page returning NOT_FOUND`(
+  private def `GET <gitlabApi>/projects/:id/repository/commits per page returning NOT_FOUND`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -292,7 +292,7 @@ trait GitLab {
       }  
       """
 
-  def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
+  private def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
       project:                data.Project,
       commitId:               CommitId,
       parentIds:              Set[CommitId] = Set.empty,
@@ -326,7 +326,7 @@ trait GitLab {
     }
   }
 
-  def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning NOT_FOUND`(
+  private def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning NOT_FOUND`(
       project:            data.Project,
       commitId:           CommitId
   )(implicit accessToken: AccessToken): StubMapping = {
@@ -340,7 +340,7 @@ trait GitLab {
     }
   }
 
-  def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
+  private def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
       project:            data.Project
   )(implicit accessToken: AccessToken): Unit = {
     implicit val personEncoder: Encoder[Person] = Encoder.instance { person =>
@@ -362,7 +362,7 @@ trait GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:path AND :id returning OK with`(
+  private def `GET <gitlabApi>/projects/:path AND :id returning OK with`(
       project:            data.Project
   )(implicit accessToken: AccessToken): Unit = {
 
@@ -443,14 +443,14 @@ trait GitLab {
     `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project)
   }
 
-  def `GET <gitlabApi>/projects/:path returning BadRequest`(
+  private def `GET <gitlabApi>/projects/:path returning BadRequest`(
       project:            data.Project
   )(implicit accessToken: AccessToken): StubMapping = stubFor {
     get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
       .willReturn(badRequest())
   }
 
-  def `GET <gitlabApi>/projects/:path AND :id returning NOT_FOUND`(
+  private def `GET <gitlabApi>/projects/:path AND :id returning NOT_FOUND`(
       project:            data.Project
   )(implicit accessToken: AccessToken): StubMapping = {
     stubFor {
@@ -464,20 +464,20 @@ trait GitLab {
     }
   }
 
-  def `GET <gitlabApi>/projects/:path having connectivity issues`(
+  private def `GET <gitlabApi>/projects/:path having connectivity issues`(
       project:            data.Project
   )(implicit accessToken: AccessToken): StubMapping = stubFor {
     get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
       .willReturn(aResponse() withFault CONNECTION_RESET_BY_PEER)
   }
 
-  def mockDataOnGitLabAPIs(
+  private def mockDataOnGitLabAPIs(
       project:            data.Project,
       triples:            JsonLD,
       commitId:           CommitId
   )(implicit accessToken: AccessToken): Unit = mockDataOnGitLabAPIs(project, triples, NonEmptyList(commitId, Nil))
 
-  def mockDataOnGitLabAPIs(
+  private def mockDataOnGitLabAPIs(
       project:            data.Project,
       triples:            JsonLD,
       commitIds:          NonEmptyList[CommitId]
@@ -531,7 +531,7 @@ private object GitLabWiremockInstance {
 
   val server = {
     val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(2049))
-    newServer.start()
+    // newServer.start()
     WireMock.configureFor(newServer.port())
     logger.info(s"GitLab stub started")
     newServer
