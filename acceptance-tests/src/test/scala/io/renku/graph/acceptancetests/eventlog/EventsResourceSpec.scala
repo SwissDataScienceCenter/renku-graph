@@ -38,6 +38,7 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import cats.data.NonEmptyList
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
+import io.renku.graph.model.testentities.personEntities
 import io.renku.http.server.security.model.AuthUser
 
 class EventsResourceSpec
@@ -53,7 +54,11 @@ class EventsResourceSpec
     Scenario("As a user I would like to see all events from the project with the given path") {
       val commits: NonEmptyList[events.CommitId] = commitIds.generateNonEmptyList(maxElements = 6)
       val user:    AuthUser                      = authUsers.generateOne
-      val project = dataProjects(renkuProjectEntities(anyVisibility), CommitsCount(commits.size)).generateOne
+      val project = dataProjects(
+        renkuProjectEntities(anyVisibility)
+          .map(_.copy(maybeCreator = personEntities(user.id.some).generateOne.some)),
+        CommitsCount(commits.size)
+      ).generateOne
 
       Given("there are no events for the given project in EL")
       val noEventsResponse = eventLogClient.GET(s"events?project-path=${urlEncode(project.path.show)}")
