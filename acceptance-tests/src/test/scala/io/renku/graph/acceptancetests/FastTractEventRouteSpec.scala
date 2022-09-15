@@ -24,20 +24,17 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.{Accepted, Ok}
-import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
-import org.scalatest.featurespec.AnyFeatureSpec
 
 class FastTractEventRouteSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
+    extends AcceptanceSpec
+    with ApplicationServices
     with TSProvisioning
     with Eventually
     with AcceptanceTestPatience {

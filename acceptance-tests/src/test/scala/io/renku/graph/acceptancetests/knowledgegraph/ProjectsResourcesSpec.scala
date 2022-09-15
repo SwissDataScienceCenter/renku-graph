@@ -24,7 +24,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.RenkuProject._
@@ -34,15 +34,12 @@ import io.renku.http.rest.Links
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
 class ProjectsResourcesSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
+    extends AcceptanceSpec
+    with ApplicationServices
     with TSProvisioning
-    with DatasetsResources {
+    with DatasetsApiEncoders {
 
   private val user = authUsers.generateOne
   private val accessToken: AccessToken = user.accessToken

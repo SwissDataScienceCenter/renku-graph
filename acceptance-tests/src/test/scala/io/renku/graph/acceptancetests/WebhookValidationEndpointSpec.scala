@@ -24,15 +24,12 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.server.security.model.AuthUser
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 
-class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with should.Matchers {
+class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServices {
 
   Feature("Existence of a Graph Services hook can be validated") {
 

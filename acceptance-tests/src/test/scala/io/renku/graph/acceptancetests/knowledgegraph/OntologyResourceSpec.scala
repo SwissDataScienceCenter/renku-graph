@@ -18,15 +18,12 @@
 
 package io.renku.graph.acceptancetests.knowledgegraph
 
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import org.http4s.MediaType.text
 import org.http4s.Status.Ok
 import org.http4s.headers.`Content-Type`
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 
-class OntologyResourceSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with should.Matchers {
+class OntologyResourceSpec extends AcceptanceSpec with ApplicationServices {
 
   Feature("GET knowledge-graph/ontology to return Renku ontology specification") {
 

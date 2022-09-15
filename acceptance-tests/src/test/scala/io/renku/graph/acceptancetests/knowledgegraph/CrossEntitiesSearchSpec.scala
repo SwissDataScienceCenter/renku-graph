@@ -26,7 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{nonBlankStrings, sentenceContaining}
 import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model._
 import io.renku.graph.model.testentities._
@@ -35,15 +35,8 @@ import io.renku.http.client.UrlEncoder._
 import io.renku.jsonld.syntax._
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import org.http4s.Status.Ok
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
-class CrossEntitiesSearchSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with TSData {
+class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
 
   Feature("GET knowledge-graph/entities") {
 

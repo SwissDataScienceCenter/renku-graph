@@ -26,25 +26,18 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.http4s.Status.{NotFound, Ok}
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 
-class ProjectSyncFlowSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with TypeSerializers {
+class ProjectSyncFlowSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TypeSerializers {
 
   Feature("Project info should be kept in sync with GitLab") {
 

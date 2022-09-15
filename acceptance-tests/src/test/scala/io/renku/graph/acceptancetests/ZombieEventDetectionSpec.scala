@@ -29,7 +29,7 @@ import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.AccessTokenPresence
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
@@ -38,10 +38,7 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.microservices.MicroserviceIdentifier
 import org.scalacheck.Gen
-import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
-import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 import org.scalatest.time.{Minutes, Seconds, Span}
 import skunk.data.Completion
 import skunk.implicits._
@@ -52,15 +49,13 @@ import java.time.Instant
 import scala.concurrent.duration._
 
 class ZombieEventDetectionSpec
-    extends AnyFeatureSpec
-    with GraphServices
+    extends AcceptanceSpec
+    with ApplicationServices
     with Eventually
     with ModelImplicits
     with AccessTokenPresence
-    with GivenWhenThen
     with TypeSerializers
-    with AcceptanceTestPatience
-    with should.Matchers {
+    with AcceptanceTestPatience {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(3, Minutes)),

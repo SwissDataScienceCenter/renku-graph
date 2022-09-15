@@ -35,17 +35,9 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
-import tooling.GraphServices
+import tooling.{AcceptanceSpec, ApplicationServices}
 
-class UserProjectsResourceSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with should.Matchers {
+class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("GET knowledge-graph/users/:id/projects to return user's projects") {
 

@@ -30,10 +30,8 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
-class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSProvisioning {
+class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("Push events from GitLab should be translated into triples in the Triples Store") {
 

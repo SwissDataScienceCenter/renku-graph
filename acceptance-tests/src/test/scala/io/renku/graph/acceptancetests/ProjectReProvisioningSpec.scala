@@ -25,7 +25,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
 import io.renku.graph.model.testentities.RenkuProject
@@ -36,19 +36,13 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.scalactic.source.Position
 import org.scalatest.enablers.Retrying
-import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.time.{Minutes, Seconds, Span}
-import org.scalatest.{Assertion, GivenWhenThen}
+import org.scalatest.Assertion
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 
-class ProjectReProvisioningSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with TSData {
+class ProjectReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
 
   Feature("Project re-provisioning") {
 

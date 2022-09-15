@@ -29,7 +29,7 @@ import io.renku.graph.model.testentities.{Parent, Person}
 import io.renku.http.server.security.model.AuthUser
 import org.http4s.Uri
 
-trait JsonCodec {
+trait JsonEncoders {
   implicit val uriEncoder: Encoder[Uri] =
     Encoder.encodeString.contramap(_.renderString)
 
@@ -133,4 +133,4 @@ trait JsonCodec {
     }
 }
 
-object JsonCodec extends JsonCodec
+object JsonEncoders extends JsonEncoders

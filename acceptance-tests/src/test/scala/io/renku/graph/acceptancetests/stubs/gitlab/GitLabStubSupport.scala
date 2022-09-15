@@ -19,14 +19,18 @@
 package io.renku.graph.acceptancetests.stubs.gitlab
 
 import cats.effect.IO
-import io.renku.graph.acceptancetests.tooling.BaseSpec
+import io.renku.graph.acceptancetests.tooling.AcceptanceSpec
+import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model.{GitLabApiUrl, GitLabUrl}
+import org.http4s.Uri
 import org.scalatest._
 
-/** Mixin for tests that starts a [[GitLabApiStub]] for the whole suite and clears its state before each test. */
-trait GitLabStubSupport extends BeforeAndAfterAll with BeforeAndAfter with GitLabStubIOSyntax { self: BaseSpec =>
+import scala.util.Try
 
-  implicit val gitLabUrl:    GitLabUrl    = GitLabUrl(testConfig.getString(GitLabStubSupport.gitLabUrlKey))
+/** Mixin for tests that starts a [[GitLabApiStub]] for the whole suite and clears its state before each test. */
+trait GitLabStubSupport extends BeforeAndAfterAll with BeforeAndAfter with GitLabStubIOSyntax { self: AcceptanceSpec =>
+
+  implicit val gitLabUrl:    GitLabUrl    = GitLabUrlLoader[Try]().fold(throw _, identity)
   implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrl.apiV4
 
   lazy val gitLabStub: GitLabApiStub[IO] = GitLabApiStub.empty[IO].unsafeRunSync()
@@ -35,7 +39,7 @@ trait GitLabStubSupport extends BeforeAndAfterAll with BeforeAndAfter with GitLa
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    val uri           = configUri(GitLabStubSupport.gitLabUrlKey)
+    val uri           = Uri.unsafeFromString(gitLabUrl.value)
     val host          = uri.host.getOrElse(sys.error("No gitlab host found"))
     val port          = uri.port.getOrElse(sys.error("No gitlab port found"))
     val (_, shutdown) = gitLabStub.resource(host.value, port).allocated.unsafeRunSync()
@@ -51,8 +55,4 @@ trait GitLabStubSupport extends BeforeAndAfterAll with BeforeAndAfter with GitLa
   before {
     gitLabStub.clearState()
   }
-}
-
-object GitLabStubSupport {
-  private val gitLabUrlKey = "services.gitlab.url"
 }

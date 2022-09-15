@@ -27,27 +27,22 @@ import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.{AccessTokenPresence, TSProvisioning}
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
-import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 
 class EventsProcessingStatusSpec
-    extends AnyFeatureSpec
+    extends AcceptanceSpec
     with ModelImplicits
-    with GivenWhenThen
-    with GraphServices
+    with ApplicationServices
     with TSProvisioning
     with AccessTokenPresence
     with Eventually
-    with AcceptanceTestPatience
-    with should.Matchers {
+    with AcceptanceTestPatience {
 
   private val numberOfEvents: Int Refined Positive = 5
 

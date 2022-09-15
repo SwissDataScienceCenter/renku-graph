@@ -23,19 +23,17 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.RenkuUrl
 import io.renku.testtools.IOSpec
-import org.http4s.Uri
-import org.scalatest.Suite
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
 import org.typelevel.log4cats.Logger
 
 import scala.util.Try
 
-trait BaseSpec extends Suite with IOSpec {
+trait AcceptanceSpec extends AnyFeatureSpec with IOSpec with GivenWhenThen with should.Matchers {
   val testConfig: Config = ConfigFactory.load()
 
   implicit val testLogger: Logger[IO] = TestLogger()
 
   implicit val renkuUrl: RenkuUrl = RenkuUrlLoader[Try]().fold(throw _, identity)
-
-  protected def configUri(path: String): Uri =
-    Uri.unsafeFromString(testConfig.getString(path))
 }

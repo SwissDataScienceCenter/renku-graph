@@ -26,7 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
@@ -34,13 +34,11 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisib
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 import cats.data.NonEmptyList
 import io.renku.graph.model.testentities.personEntities
 import io.renku.http.server.security.model.AuthUser
 
-class EventsResourceSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSData with TSProvisioning {
+class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TSData with TSProvisioning {
 
   Feature("GET /events?project-path=<path> to return info about all the project events") {
 

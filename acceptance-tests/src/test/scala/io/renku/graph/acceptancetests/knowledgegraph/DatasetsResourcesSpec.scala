@@ -18,45 +18,39 @@
 
 package io.renku.graph.acceptancetests.knowledgegraph
 
-import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.literal._
-import io.circe.{Encoder, Json}
+import io.circe.Json
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.datasets.{DatePublished, Identifier, ImageUri, Title}
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.testentities.{::~, Dataset, Person}
-import io.renku.graph.model.{projects, publicationEvents, testentities}
+import io.renku.graph.model.testentities.::~
+import io.renku.graph.model.{publicationEvents, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
-import io.renku.http.rest.Links.{Href, Rel, _links}
+import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 
 import scala.util.Random
 
 class DatasetsResourcesSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
+    extends AcceptanceSpec
+    with ApplicationServices
     with TSProvisioning
     with TSData
-    with DatasetsResources {
+    with DatasetsApiEncoders {
 
   val creator: AuthUser = authUsers.generateOne
   val user:    AuthUser = authUsers.generateOne
@@ -482,124 +476,4 @@ class DatasetsResourcesSpec
       unauthorisedResponse.status shouldBe NotFound
     }
   }
-}
-
-trait DatasetsResources {
-  self: GraphServices with should.Matchers =>
-
-  import io.renku.json.JsonOps._
-
-  def briefJson(dataset: Dataset[Dataset.Provenance], projectPath: projects.Path)(implicit
-      encoder:           Encoder[(Dataset[Dataset.Provenance], projects.Path)]
-  ): Json = encoder(dataset -> projectPath)
-
-  implicit def datasetEncoder[P <: Dataset.Provenance](implicit
-      provenanceEncoder: Encoder[P]
-  ): Encoder[(Dataset[P], projects.Path)] = Encoder.instance { case (dataset, projectPath) =>
-    json"""{
-      "identifier": ${dataset.identification.identifier.value},
-      "versions": {
-        "initial": ${dataset.provenance.originalIdentifier.value}
-      },
-      "title":  ${dataset.identification.title.value},
-      "name":   ${dataset.identification.name.value},
-      "images": ${dataset.additionalInfo.images -> projectPath}
-    }"""
-      .deepMerge(
-        _links(
-          Rel("details")         -> Href(renkuApiUrl / "datasets" / dataset.identification.identifier),
-          Rel("initial-version") -> Href(renkuApiUrl / "datasets" / dataset.provenance.originalIdentifier),
-          Rel("tags") -> Href(
-            renkuApiUrl / "projects" / projectPath / "datasets" / dataset.identification.name / "tags"
-          )
-        )
-      )
-      .deepMerge(provenanceEncoder(dataset.provenance))
-  }
-
-  implicit def provenanceEncoder: Encoder[Dataset.Provenance] = Encoder.instance {
-    case provenance: Dataset.Provenance.Modified => json"""{
-        "derivedFrom": ${provenance.derivedFrom.value}
-      }"""
-    case provenance => json"""{
-        "sameAs": ${provenance.topmostSameAs.value}
-      }"""
-  }
-
-  def searchResultJson[P <: Dataset.Provenance](dataset:       Dataset[P],
-                                                projectsCount: Int,
-                                                projectPath:   projects.Path,
-                                                actualResults: List[Json]
-  ): Json = {
-    val actualIdentifier = actualResults
-      .findId(dataset.identification.title)
-      .getOrElse(fail(s"No ${dataset.identification.title} dataset found among the results"))
-
-    dataset.identification.identifier shouldBe actualIdentifier
-
-    json"""{
-      "identifier":    ${actualIdentifier.value},
-      "title":         ${dataset.identification.title.value},
-      "name":          ${dataset.identification.name.value},
-      "published":     ${dataset.provenance.creators -> dataset.provenance.date},
-      "date":          ${dataset.provenance.date.instant},
-      "projectsCount": $projectsCount,
-      "keywords":      ${dataset.additionalInfo.keywords.sorted.map(_.value)},
-      "images":        ${dataset.additionalInfo.images -> projectPath}
-    }"""
-      .addIfDefined("description" -> dataset.additionalInfo.maybeDescription)
-      .deepMerge {
-        _links(
-          Rel("details") -> Href(renkuApiUrl / "datasets" / actualIdentifier)
-        )
-      }
-  }
-
-  private implicit def publishedEncoder[P <: Dataset.Provenance]: Encoder[(NonEmptyList[Person], P#D)] =
-    Encoder.instance {
-      case (creators, DatePublished(date)) => json"""{
-          "creator": ${creators.toList},
-          "datePublished": $date
-        }"""
-      case (creators, _) => json"""{
-          "creator": ${creators.toList}
-        }"""
-    }
-
-  private implicit lazy val personEncoder: Encoder[Person] = Encoder.instance[Person] {
-    case Person(name, maybeEmail, _, _, _) => json"""{
-      "name": $name
-    }""" addIfDefined ("email" -> maybeEmail)
-  }
-
-  private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
-    Encoder.instance[(List[ImageUri], projects.Path)] { case (images, exemplarProjectPath) =>
-      Json.arr(images.map {
-        case uri: ImageUri.Relative => json"""{
-            "_links": [{
-              "rel": "view",
-              "href": ${s"$gitLabUrl/$exemplarProjectPath/raw/master/$uri"}
-            }],
-            "location": $uri
-          }"""
-        case uri: ImageUri.Absolute => json"""{
-            "_links": [{
-              "rel": "view",
-              "href": $uri
-            }],
-            "location": $uri
-          }"""
-      }: _*)
-    }
-
-  implicit class JsonsOps(jsons: List[Json]) {
-
-    def findId(title: Title): Option[Identifier] =
-      jsons
-        .find(_.hcursor.downField("title").as[String].fold(throw _, _ == title.toString))
-        .map(_.hcursor.downField("identifier").as[Identifier].fold(throw _, identity))
-  }
-
-  def findIdentifier(json: Json): Identifier =
-    json.hcursor.downField("identifier").as[Identifier].fold(throw _, identity)
 }

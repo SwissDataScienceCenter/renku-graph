@@ -26,7 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.acceptancetests.data.{TSData, cliVersion, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas.prov
@@ -39,15 +39,8 @@ import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.jsonld.syntax._
 import org.http4s.Status.{NotFound, Ok}
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
-class LineageResourcesSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with TSData {
+class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/files/<location>/lineage to find a file's lineage") {
     val (exemplarData, project) = {

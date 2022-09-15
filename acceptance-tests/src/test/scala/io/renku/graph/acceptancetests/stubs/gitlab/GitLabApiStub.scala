@@ -30,7 +30,7 @@ import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.circe.CirceEntityCodec._
 import org.typelevel.log4cats.Logger
-import JsonCodec._
+import JsonEncoders._
 import com.comcast.ip4s.{Host, Port}
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.client.Client
@@ -148,7 +148,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
       val message = s"GitLabApiStub doesn't have this route implemented: ${req.method} ${req.pathInfo.renderString}"
       OptionT
         .liftF(logger.error(message))
-        .semiflatMap(_ => InternalServerError(message))
+        .semiflatMap(_ => ServiceUnavailable(message))
     }
 
   def client: Client[F] =

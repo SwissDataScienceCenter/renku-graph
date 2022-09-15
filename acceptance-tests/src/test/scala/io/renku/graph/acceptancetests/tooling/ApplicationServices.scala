@@ -29,7 +29,8 @@ import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServic
 import io.renku.triplesstore.FusekiUrl
 import org.scalatest.BeforeAndAfterAll
 
-trait GraphServices extends BaseSpec with GitLabStubSupport with RemoteTriplesGenerator with BeforeAndAfterAll {
+trait ApplicationServices extends GitLabStubSupport with RemoteTriplesGenerator with BeforeAndAfterAll {
+  self: AcceptanceSpec =>
 
   protected implicit lazy val fusekiUrl: FusekiUrl = TriplesStore.fusekiUrl
 

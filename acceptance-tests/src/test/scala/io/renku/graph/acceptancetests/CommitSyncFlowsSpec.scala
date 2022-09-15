@@ -26,22 +26,15 @@ import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.events.EventStatus.TriplesStore
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
-class CommitSyncFlowsSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with TypeSerializers {
+class CommitSyncFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TypeSerializers {
 
   Feature("Missed GitLab events should be synchronised") {
 

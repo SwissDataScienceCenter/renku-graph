@@ -26,8 +26,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.{Project, _}
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsResources, fullJson}
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsApiEncoders, fullJson}
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events
 import io.renku.graph.model.testentities.RenkuProject._
@@ -38,18 +38,15 @@ import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
 import io.renku.jsonld.syntax._
 import io.renku.webhookservice.model
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._
 
 class CommitHistoryChangesSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
+    extends AcceptanceSpec
+    with ApplicationServices
     with TSProvisioning
-    with DatasetsResources {
+    with DatasetsApiEncoders {
 
   private val user = authUsers.generateOne
 

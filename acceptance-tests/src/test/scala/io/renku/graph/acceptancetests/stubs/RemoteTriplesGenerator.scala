@@ -28,14 +28,14 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.graph.acceptancetests.data
-import io.renku.graph.acceptancetests.tooling.{GraphServices, TestLogger}
+import io.renku.graph.acceptancetests.tooling.{ApplicationServices, TestLogger}
 import io.renku.graph.model._
 import io.renku.graph.model.events.CommitId
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 
 trait RemoteTriplesGenerator {
-  self: GraphServices =>
+  self: ApplicationServices =>
 
   import RemoteTriplesGeneratorWiremockInstance._
 

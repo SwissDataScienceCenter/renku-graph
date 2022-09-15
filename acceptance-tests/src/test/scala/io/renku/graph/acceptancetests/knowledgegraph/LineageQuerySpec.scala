@@ -26,7 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas._
@@ -38,12 +38,10 @@ import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 import sangria.ast.Document
 import sangria.macros._
 
-class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSProvisioning {
+class LineageQuerySpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("GraphQL query to find lineage") {
     val user = authUsers.generateOne

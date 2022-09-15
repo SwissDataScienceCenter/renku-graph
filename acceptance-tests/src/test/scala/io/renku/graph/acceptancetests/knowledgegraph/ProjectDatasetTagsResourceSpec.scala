@@ -24,7 +24,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.publicationEvents
 import io.renku.graph.model.testentities._
@@ -32,10 +32,8 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
-class ProjectDatasetTagsResourceSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSProvisioning {
+class ProjectDatasetTagsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets/:dsName/tags to find project dataset's tags") {
 

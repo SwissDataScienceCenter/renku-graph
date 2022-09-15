@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
+import io.renku.graph.acceptancetests.tooling.{ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
@@ -39,6 +39,7 @@ import scala.concurrent.duration._
 import cats.data.NonEmptyList
 import io.renku.events.CategoryName
 import io.renku.graph.acceptancetests.db.EventLog
+import io.renku.testtools.IOSpec
 
 import scala.annotation.tailrec
 
@@ -48,7 +49,7 @@ trait TSProvisioning
     with Eventually
     with AcceptanceTestPatience
     with should.Matchers {
-  self: GraphServices =>
+  self: ApplicationServices with IOSpec =>
 
   def `data in the Triples Store`(
       project:          data.Project,

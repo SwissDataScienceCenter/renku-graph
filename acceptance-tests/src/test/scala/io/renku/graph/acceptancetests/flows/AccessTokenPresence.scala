@@ -20,14 +20,15 @@ package io.renku.graph.acceptancetests.flows
 
 import io.circe.syntax._
 import io.renku.graph.acceptancetests.data.Project
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.ApplicationServices
 import io.renku.http.client.AccessToken
+import io.renku.testtools.IOSpec
 import org.http4s.Status._
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
 
 trait AccessTokenPresence extends should.Matchers {
-  self: GraphServices =>
+  self: ApplicationServices with IOSpec =>
 
   def givenAccessTokenPresentFor(project: Project, accessToken: AccessToken): Assertion =
     tokenRepositoryClient
