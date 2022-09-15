@@ -105,15 +105,6 @@ trait GitLabStateUpdates {
       addCommits(project.id, commits) >>
       addPersons(GitLabStateUpdates.findAllPersons(project.entitiesProject))
 
-  def replaceRenkuProject(projectId: Id, renkuProject: RenkuProject): StateUpdate =
-    state =>
-      state.projects.find(_.id == projectId) match {
-        case Some(p) =>
-          val np = p.copy(entitiesProject = renkuProject)
-          state.copy(projects = np :: state.projects.filterNot(_.id == np.id))
-        case None => state
-      }
-
   def removeProject(projectId: Id): StateUpdate =
     removeCommits(projectId) >>
       removeWebhooks(projectId) >>

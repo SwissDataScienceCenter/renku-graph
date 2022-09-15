@@ -21,16 +21,17 @@ package io.renku.graph.acceptancetests
 import cats.syntax.all._
 import io.renku.eventlog.TypeSerializers
 import io.renku.events.CategoryName
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.TSProvisioning
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
-import io.renku.http.client.AccessToken
+import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.http4s.Status.{NotFound, Ok}
 import org.scalatest.GivenWhenThen
@@ -44,20 +45,23 @@ class ProjectSyncFlowSpec
     with GivenWhenThen
     with GraphServices
     with TSProvisioning
-    with TypeSerializers {
+    with TypeSerializers
+    with GitLabStubIOSyntax {
 
   Feature("Project info should be kept in sync with GitLab") {
 
     Scenario("There's a project_path change in GitLab for a repo that is already in KG") {
 
-      implicit val accessToken: AccessToken = accessTokens.generateOne
+      val user: AuthUser = authUsers.generateOne
       val testEntitiesProject = renkuProjectEntities(visibilityPublic).generateOne
       val project             = dataProjects(testEntitiesProject).generateOne
 
       Given("repository data in the Triples Store")
       val commitId = commitIds.generateOne
-      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
+      gitLabStub.addAuthenticated(user)
+      gitLabStub.setupProject(project, commitId)
+      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
+      `data in the Triples Store`(project, commitId)(user.accessToken, ioRuntime)
 
       Then("the project data should exist in the KG")
       eventually {
@@ -67,11 +71,11 @@ class ProjectSyncFlowSpec
       }
 
       When("project_path changes in GitLab")
-      resetGitLab()
-      resetTriplesGenerator()
       val updatedProject = project.copy(entitiesProject = testEntitiesProject.copy(path = projectPaths.generateOne))
-      mockDataOnGitLabAPIs(updatedProject, updatedProject.entitiesProject.asJsonLD, commitId)
-      givenAccessTokenPresentFor(updatedProject)
+      gitLabStub.replaceProject(updatedProject)
+      mockCommitDataOnTripleGenerator(updatedProject, updatedProject.entitiesProject.asJsonLD, commitId)
+      resetTriplesGenerator()
+      givenAccessTokenPresentFor(updatedProject)(user.accessToken)
 
       And("PROJECT_SYNC event is sent and handled")
       EventLog.forceCategoryEventTriggering(CategoryName("PROJECT_SYNC"), updatedProject.id)

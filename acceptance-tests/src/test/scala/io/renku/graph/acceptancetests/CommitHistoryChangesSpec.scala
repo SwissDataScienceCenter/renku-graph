@@ -86,10 +86,6 @@ class CommitHistoryChangesSpec
       gitLabStub.replaceCommits(project.id, newCommits.toList: _*)
       mockCommitDataOnTripleGenerator(project, newEntities.asJsonLD, newCommits)
 
-      commits.toList.foreach { commitId =>
-        `GET <gitlabApi>/projects/:id/repository/commits/:sha returning NOT_FOUND`(project, commitId)(user.accessToken)
-      }
-
       webhookServiceClient
         .POST("webhooks/events", model.HookToken(project.id), GitLab.pushEvent(project, newCommits.last))
         .status shouldBe Accepted

@@ -29,7 +29,6 @@ import io.renku.testtools.IOSpec
 import org.http4s.Uri
 import GitLabStateUpdates.stateUpdateMonoid
 import io.renku.graph.model.projects.Id
-import io.renku.graph.model.testentities.RenkuProject
 
 /** Convenience syntax for test cases to update the [[GitLabApiStub]] state in an unsafe way. */
 trait GitLabStubIOSyntax { self: IOSpec =>
@@ -53,8 +52,8 @@ trait GitLabStubIOSyntax { self: IOSpec =>
     def setupProject(project: Project, commits: CommitId*): Unit =
       self.update(GitLabStateUpdates.setupProject(project, webhookUri, commits: _*)).unsafeRunSync()
 
-    def replaceRenkuProject(id: Id, project: RenkuProject): Unit =
-      self.update(GitLabStateUpdates.replaceRenkuProject(id, project)).unsafeRunSync()
+    def replaceProject(project: Project): Unit =
+      addProject(project)
 
     def replaceCommits(id: Id, commits: CommitId*): Unit =
       self.update(GitLabStateUpdates.replaceCommits(id, commits)).unsafeRunSync()
@@ -67,5 +66,8 @@ trait GitLabStubIOSyntax { self: IOSpec =>
 
     def unmarkProjectBroken(id: Id): Unit =
       self.update(GitLabStateUpdates.unmarkProjectBroken(id)).unsafeRunSync()
+
+    def removeWebhook(project: Id): Unit =
+      self.update(GitLabStateUpdates.removeWebhooks(project)).unsafeRunSync()
   }
 }

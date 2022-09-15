@@ -26,6 +26,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubIOSyntax
 import io.renku.graph.acceptancetests.tooling.{GraphServices, ServiceClient}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -41,7 +42,13 @@ import org.scalatest.time.{Minutes, Seconds, Span}
 
 import java.nio.file.{Files, Paths}
 
-class ReProvisioningSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSProvisioning with TSData {
+class ReProvisioningSpec
+    extends AnyFeatureSpec
+    with GivenWhenThen
+    with GraphServices
+    with TSProvisioning
+    with TSData
+    with GitLabStubIOSyntax {
 
   Feature("ReProvisioning") {
 
@@ -55,8 +62,9 @@ class ReProvisioningSpec extends AnyFeatureSpec with GivenWhenThen with GraphSer
       val project  = dataProjects(testEntitiesProject).generateOne
       val commitId = commitIds.generateOne
 
-      `GET <gitlabApi>/user returning OK`(user)
-      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
+      gitLabStub.addAuthenticated(user)
+      gitLabStub.setupProject(project, commitId)
+      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
 
       `data in the Triples Store`(project, commitId)
 

@@ -55,16 +55,9 @@ class FastTractEventRouteSpec
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commitId)
-      /// `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
-      // `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id, commitId)
-
-      // `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator, project, commitId )
 
       And("Triples are failing on generation")
       `GET <triples-generator>/projects/:id/commits/:id fails non recoverably`(project, commitId)
-
-      And("project exists in GitLab")
-      // `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
 
       And("access token is present")
       givenAccessTokenPresentFor(project)(user.accessToken)

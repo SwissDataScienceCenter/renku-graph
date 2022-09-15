@@ -109,6 +109,9 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
         case GET -> Root / ProjectId(id) / "hooks" =>
           query(findWebhooks(id)).flatMap(Ok(_))
 
+        case POST -> Root / ProjectId(_) / "hooks" =>
+          Created()
+
         case GET -> Root / ProjectId(id) / "events" :? PageParam(page) :? ActionParam(action) =>
           // action is always "pushed", page is always 1
           if (action != "pushed".some || page != 1.some) {
@@ -143,7 +146,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
 
   private def stubIncomplete: HttpRoutes[F] =
     HttpRoutes { req =>
-      val message = s"GitLabApiStub doesn't have this route implemented: ${req.pathInfo.renderString}"
+      val message = s"GitLabApiStub doesn't have this route implemented: ${req.method} ${req.pathInfo.renderString}"
       OptionT
         .liftF(logger.error(message))
         .semiflatMap(_ => InternalServerError(message))
