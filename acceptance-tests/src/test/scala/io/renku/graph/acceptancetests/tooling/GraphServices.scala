@@ -20,31 +20,18 @@ package io.renku.graph.acceptancetests.tooling
 
 import cats.effect._
 import cats.effect.std.Semaphore
-import com.typesafe.config.{Config, ConfigFactory}
 import io.renku._
 import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository, TriplesStore}
-import io.renku.graph.acceptancetests.stubs.gitlab.{GitLabApiStub, GitLabStateUpdates}
-import io.renku.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubSupport
+import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator
 import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
-import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.RenkuUrl
 import io.renku.triplesstore.FusekiUrl
-import io.renku.testtools.IOSpec
-import org.http4s.Uri
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
-import org.typelevel.log4cats.Logger
+import org.scalatest.BeforeAndAfterAll
 
-import scala.util.Try
+trait GraphServices extends BaseSpec with GitLabStubSupport with RemoteTriplesGenerator with BeforeAndAfterAll {
 
-trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with BeforeAndAfterAll with BeforeAndAfter {
-  self: Suite =>
-
-  protected implicit lazy val fusekiUrl: FusekiUrl  = TriplesStore.fusekiUrl
-  implicit val renkuUrl:                 RenkuUrl   = RenkuUrlLoader[Try]().fold(throw _, identity)
-  implicit lazy val logger:              Logger[IO] = TestLogger()
-
-  val testConfig: Config = ConfigFactory.load()
+  protected implicit lazy val fusekiUrl: FusekiUrl = TriplesStore.fusekiUrl
 
   val restClient:               RestClientImpl                = new RestClientImpl()
   val webhookServiceClient:     WebhookServiceClient          = WebhookServiceClient()
@@ -58,15 +45,8 @@ trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with 
 
   def stop(service: ServiceRun): Unit = servicesRunner.stop(service)
 
-  before {
-    gitLabStub.update(GitLabStateUpdates.clearState).unsafeRunSync()
-  }
-
-  protected override def beforeAll(): Unit = {
+  override def beforeAll(): Unit = {
     super.beforeAll()
-
-    val gitlabUri = Uri.unsafeFromString(testConfig.getString("services.gitlab.url"))
-    gitLabStub.run("localhost", gitlabUri.port.getOrElse(0)).compile.drain.foreverM.start.unsafeRunSync()
 
     servicesRunner
       .run(
@@ -108,8 +88,6 @@ trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with 
     serviceClient = triplesGeneratorClient,
     preServiceStart = List(TriplesStore.start())
   )
-  protected lazy val gitLabStub: GitLabApiStub[IO] =
-    GitLabApiStub.empty[IO].unsafeRunSync()
 
   private lazy val servicesRunner = (Semaphore[IO](1) map (new ServicesRunner(_))).unsafeRunSync()
 }

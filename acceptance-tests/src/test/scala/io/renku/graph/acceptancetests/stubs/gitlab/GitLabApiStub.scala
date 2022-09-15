@@ -21,7 +21,6 @@ package io.renku.graph.acceptancetests.stubs.gitlab
 import cats.effect._
 import cats.data.{NonEmptyList, OptionT}
 import cats.syntax.all._
-import fs2.Stream
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
 import io.renku.graph.model.persons.{GitLabId, Name}
@@ -39,7 +38,7 @@ import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStateQueries._
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStateUpdates._
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects.Id
-import org.http4s.server.Router
+import org.http4s.server.{Router, Server}
 
 import java.time.Instant
 
@@ -155,18 +154,17 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
   def client: Client[F] =
     Client.fromHttpApp(allRoutes.orNotFound)
 
-  def run(bindAddress: Host, port: Port): Stream[F, Nothing] =
-    Stream.eval(logger.info(s"Starting GitLab stub on $bindAddress:$port")).drain ++
+  def resource(bindAddress: Host, port: Port): Resource[F, Server] =
+    Resource.eval(logger.info(s"Starting GitLab stub on $bindAddress:$port")) *>
       BlazeServerBuilder[F]
         .bindHttp(port.value, bindAddress.show)
         .withoutBanner
         .withHttpApp(enableLogging[F](allRoutes.orNotFound))
-        .serve
-        .drain
+        .resource
 
-  def run(bindAddress: String, port: Int): Stream[F, ExitCode] =
+  def resource(bindAddress: String, port: Int): Resource[F, Server] =
     (Host.fromString(bindAddress), Port.fromInt(port))
-      .mapN(run)
+      .mapN(resource)
       .getOrElse(sys.error("Invalid host or port"))
 }
 
