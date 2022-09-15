@@ -59,7 +59,7 @@ class ReProvisioningSpec extends AnyFeatureSpec with GivenWhenThen with GraphSer
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
 
-      `data in the Triples Store`(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 
@@ -97,7 +97,7 @@ class ReProvisioningSpec extends AnyFeatureSpec with GivenWhenThen with GraphSer
   private object TestData {
 
     val user = authUsers.generateOne
-    implicit val accessToken: AccessToken = user.accessToken
+    val accessToken: AccessToken = user.accessToken
     val initialProjectSchemaVersion = SchemaVersion("8")
 
     val testEntitiesProject = renkuProjectEntities(visibilityPublic)

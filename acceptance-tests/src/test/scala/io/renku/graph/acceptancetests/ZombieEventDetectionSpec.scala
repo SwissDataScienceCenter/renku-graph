@@ -84,7 +84,7 @@ class ZombieEventDetectionSpec
     gitLabStub.setupProject(project, commitId)
 
     And("an access token is present")
-    givenAccessTokenPresentFor(project)(user.accessToken)
+    givenAccessTokenPresentFor(project, user.accessToken)
 
     And("an event that should be classified as zombie is in the EventLog DB")
     insertProjectToDB(project, eventDate) shouldBe 1

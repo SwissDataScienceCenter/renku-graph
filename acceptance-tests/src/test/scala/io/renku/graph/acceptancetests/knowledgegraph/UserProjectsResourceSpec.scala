@@ -55,7 +55,7 @@ class UserProjectsResourceSpec
 
       val userId = personGitLabIds.generateOne
       val user   = personEntities(fixed(userId.some)).generateOne
-      implicit val accessToken: AccessToken = accessTokens.generateOne
+      val accessToken: AccessToken = accessTokens.generateOne
       gitLabStub.addAuthenticated(userId, accessToken)
 
       val activatedProject = dataProjects(
@@ -65,7 +65,7 @@ class UserProjectsResourceSpec
       val commitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(activatedProject, activatedProject.entitiesProject.asJsonLD, commitId)
       gitLabStub.setupProject(activatedProject, commitId)
-      `data in the Triples Store`(activatedProject, commitId)
+      `data in the Triples Store`(activatedProject, commitId, accessToken)
 
       And("he has a not activated project")
 

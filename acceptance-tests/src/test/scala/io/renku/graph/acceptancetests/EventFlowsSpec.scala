@@ -51,7 +51,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
       And("access token is present")
-      givenAccessTokenPresentFor(project)(user.accessToken)
+      givenAccessTokenPresentFor(project, user.accessToken)
 
       When("a Push Event arrives")
       webhookServiceClient
@@ -79,7 +79,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
       `GET <triples-generator>/projects/:id/commits/:id fails non recoverably`(project, commitId)
 
       And("access token is present")
-      givenAccessTokenPresentFor(project)(user.accessToken)
+      givenAccessTokenPresentFor(project, user.accessToken)
 
       When("a Push Event arrives")
       webhookServiceClient
@@ -109,7 +109,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
       `GET <triples-generator>/projects/:id/commits/:id fails recoverably`(project, commitId)
 
       And("access token is present")
-      givenAccessTokenPresentFor(project)(user.accessToken)
+      givenAccessTokenPresentFor(project, user.accessToken)
 
       When("a Push Event arrives")
       webhookServiceClient
@@ -139,7 +139,7 @@ class EventFlowsSpec extends AnyFeatureSpec with GivenWhenThen with GraphService
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
       And("access token is present")
-      givenAccessTokenPresentFor(project)(user.accessToken)
+      givenAccessTokenPresentFor(project, user.accessToken)
 
       And("the transformation fails non recoverable, because gitlab responds with error")
       gitLabStub.markProjectBroken(project.id)

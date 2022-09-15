@@ -78,14 +78,14 @@ class LineageResourcesSpec
      */
     Scenario("As a user I would like to find a public project's lineage") {
       val user = authUsers.generateOne
-      implicit val token: AccessToken = user.accessToken
+      val token: AccessToken = user.accessToken
 
       Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(project, exemplarData.project.asJsonLD, commitId)
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commitId)
-      `data in the Triples Store`(project, commitId)
+      `data in the Triples Store`(project, commitId, token)
 
       When("user calls the lineage endpoint")
       val response =
@@ -118,7 +118,7 @@ class LineageResourcesSpec
       mockCommitDataOnTripleGenerator(project, accessibleExemplarData.project.asJsonLD, commitId)
       gitLabStub.setupProject(project, commitId)
       gitLabStub.addAuthenticated(user)
-      `data in the Triples Store`(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       When("user fetches the lineage of the project he is a member of")
 
@@ -150,7 +150,7 @@ class LineageResourcesSpec
       gitLabStub.addAuthenticated(creator)
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, privateExemplarData.project.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)(creator.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user posts a graphql query to fetch lineage of the project he is not a member of")
       val response =

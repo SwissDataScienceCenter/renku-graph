@@ -79,7 +79,7 @@ class CrossEntitiesSearchSpec
       gitLabStub.setupProject(project, commitId)
       gitLabStub.addAuthenticated(user)
       mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)(user.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commitId, user.accessToken)
 
       When("the user calls the GET knowledge-graph/entities")
       val response = knowledgeGraphClient GET s"knowledge-graph/entities?query=${urlEncode(commonPhrase.value)}"

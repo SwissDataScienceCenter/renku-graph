@@ -45,7 +45,7 @@ class ProjectsResourcesSpec
     with DatasetsResources {
 
   private val user = authUsers.generateOne
-  private implicit val accessToken: AccessToken = user.accessToken
+  private val accessToken: AccessToken = user.accessToken
 
   private val (parentProject, project) = {
     val creator = personEntities(withGitLabId, withEmail).generateOne
@@ -76,12 +76,12 @@ class ProjectsResourcesSpec
       mockCommitDataOnTripleGenerator(parentProject, parentProject.entitiesProject.asJsonLD, parentCommitId)
       gitLabStub.setupProject(parentProject, parentCommitId)
 
-      `data in the Triples Store`(parentProject, parentCommitId)
+      `data in the Triples Store`(parentProject, parentCommitId, accessToken)
 
       val commitId = commitIds.generateOne
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
       gitLabStub.setupProject(project, commitId)
-      `data in the Triples Store`(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       When("the user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)

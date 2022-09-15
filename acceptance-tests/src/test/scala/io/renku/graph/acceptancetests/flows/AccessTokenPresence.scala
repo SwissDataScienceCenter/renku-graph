@@ -29,7 +29,7 @@ import org.scalatest.matchers.should
 trait AccessTokenPresence extends should.Matchers {
   self: GraphServices =>
 
-  def givenAccessTokenPresentFor(project: Project)(implicit accessToken: AccessToken): Assertion =
+  def givenAccessTokenPresentFor(project: Project, accessToken: AccessToken): Assertion =
     tokenRepositoryClient
       .PUT(s"projects/${project.id}/tokens", accessToken.asJson, None) shouldBe NoContent
 }

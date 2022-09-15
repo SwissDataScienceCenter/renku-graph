@@ -28,9 +28,11 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.GraphServices
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.projectSchemaVersions
+import io.renku.graph.model.testentities.RenkuProject
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{personEntities, renkuProjectEntities, visibilityPublic}
 import io.renku.graph.model.{SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
+import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.scalactic.source.Position
 import org.scalatest.enablers.Retrying
@@ -63,7 +65,7 @@ class ProjectReProvisioningSpec
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
 
-      `data in the Triples Store`(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       eventually {
         knowledgeGraphClient
@@ -109,10 +111,10 @@ class ProjectReProvisioningSpec
 
   private object TestData {
 
-    val user = authUsers.generateOne
-    implicit val accessToken: AccessToken = user.accessToken
+    val user:        AuthUser    = authUsers.generateOne
+    val accessToken: AccessToken = user.accessToken
 
-    val testEntitiesProject = renkuProjectEntities(visibilityPublic).generateOne
+    val testEntitiesProject: RenkuProject = renkuProjectEntities(visibilityPublic).generateOne
       .copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
   }
 

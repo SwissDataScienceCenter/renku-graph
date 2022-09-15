@@ -68,7 +68,7 @@ class CommitHistoryChangesSpec
       gitLabStub.setupProject(project, commits.toList: _*)
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commits)
 
-      `data in the Triples Store`(project, commits)(user.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commits, user.accessToken)
 
       eventually {
         EventLog.findEvents(project.id, events.EventStatus.TriplesStore).toSet shouldBe commits.toList.toSet
@@ -111,7 +111,7 @@ class CommitHistoryChangesSpec
       gitLabStub.setupProject(project, commits.toList: _*)
 
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commits)
-      `data in the Triples Store`(project, commits)(user.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commits, user.accessToken)
 
       assertProjectDataIsCorrect(project, project.entitiesProject, user.accessToken)
 

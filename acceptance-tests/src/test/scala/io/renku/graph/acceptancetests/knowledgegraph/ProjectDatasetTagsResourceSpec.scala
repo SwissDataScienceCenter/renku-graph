@@ -41,7 +41,7 @@ class ProjectDatasetTagsResourceSpec extends AnyFeatureSpec with GivenWhenThen w
 
     Scenario("As a user I would like to find project dataset's tags by calling a REST endpoint") {
       val user = authUsers.generateOne
-      implicit val accessToken: AccessToken = user.accessToken
+      val accessToken: AccessToken = user.accessToken
 
       Given("the user is authenticated")
       gitLabStub.addAuthenticated(user)
@@ -64,7 +64,7 @@ class ProjectDatasetTagsResourceSpec extends AnyFeatureSpec with GivenWhenThen w
       // mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
       gitLabStub.setupProject(project, commitId)
-      `data in the Triples Store`(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       When("the user fetches the tags with GET knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags")
       val response = knowledgeGraphClient.GET(

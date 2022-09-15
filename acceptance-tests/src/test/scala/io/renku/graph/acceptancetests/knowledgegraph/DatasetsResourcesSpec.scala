@@ -77,7 +77,7 @@ class DatasetsResourcesSpec
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
       // mockDataOnGitLabAPIs(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)(creator.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
@@ -189,7 +189,7 @@ class DatasetsResourcesSpec
       gitLabStub.addAuthenticated(creator, user)
       gitLabStub.setupProject(privateProject, commitId)
       mockCommitDataOnTripleGenerator(privateProject, testEntitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(privateProject, commitId)(creator.accessToken, ioRuntime)
+      `data in the Triples Store`(privateProject, commitId, creator.accessToken)
 
       When("there's an authenticated user who is not a member of the project")
       And("he fetches project's details")
@@ -400,7 +400,7 @@ class DatasetsResourcesSpec
       val commitId    = commitIds.generateOne
       gitLabStub.setupProject(dataProject, commitId)
       mockCommitDataOnTripleGenerator(dataProject, project.asJsonLD, commitId)
-      `data in the Triples Store`(dataProject, commitId)(accessToken, ioRuntime)
+      `data in the Triples Store`(dataProject, commitId, accessToken)
       dataProject
     }
   }
@@ -421,7 +421,7 @@ class DatasetsResourcesSpec
       gitLabStub.addAuthenticated(creator)
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)(creator.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user fetches dataset details with GET knowledge-graph/datasets/:id")
       val detailsResponse = knowledgeGraphClient GET s"knowledge-graph/datasets/${dataset.identifier}"
@@ -453,7 +453,7 @@ class DatasetsResourcesSpec
       val commitId = commitIds.generateOne
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, testEntitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)(creator.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commitId, creator.accessToken)
       `wait for events to be processed`(project.id)
 
       When("an authenticated and authorised user fetches dataset details through GET knowledge-graph/datasets/:id")

@@ -64,7 +64,7 @@ class EventsResourceSpec extends AnyFeatureSpec with GivenWhenThen with GraphSer
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commits)
 
       When("new events are added to the store")
-      `data in the Triples Store`(project, commits)(user.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commits, user.accessToken)
 
       eventually {
         Then("the user can see the events on the endpoint")

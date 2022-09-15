@@ -58,7 +58,7 @@ class FastTractEventRouteSpec
       `GET <triples-generator>/projects/:id/commits/:id fails non recoverably`(project, commitId)
 
       And("access token is present")
-      givenAccessTokenPresentFor(project)(user.accessToken)
+      givenAccessTokenPresentFor(project, user.accessToken)
 
       When("a Push Event arrives")
       webhookServiceClient

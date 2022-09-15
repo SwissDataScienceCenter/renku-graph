@@ -51,17 +51,19 @@ trait TSProvisioning
   self: GraphServices =>
 
   def `data in the Triples Store`(
-      project:            data.Project,
-      commitId:           CommitId = commitIds.generateOne
-  )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion =
-    `data in the Triples Store`(project, NonEmptyList(commitId, Nil))
+      project:          data.Project,
+      commitId:         CommitId = commitIds.generateOne,
+      accessToken:      AccessToken
+  )(implicit ioRuntime: IORuntime): Assertion =
+    `data in the Triples Store`(project, NonEmptyList(commitId, Nil), accessToken)
 
   def `data in the Triples Store`(
-      project:            data.Project,
-      commitIds:          NonEmptyList[CommitId]
-  )(implicit accessToken: AccessToken, ioRuntime: IORuntime): Assertion = {
+      project:          data.Project,
+      commitIds:        NonEmptyList[CommitId],
+      accessToken:      AccessToken
+  )(implicit ioRuntime: IORuntime): Assertion = {
 
-    givenAccessTokenPresentFor(project)
+    givenAccessTokenPresentFor(project, accessToken)
 
     commitIds.toList.foreach { commitId =>
       webhookServiceClient

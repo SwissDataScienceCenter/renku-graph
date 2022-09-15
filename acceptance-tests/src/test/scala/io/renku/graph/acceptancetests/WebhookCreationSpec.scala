@@ -73,7 +73,7 @@ class WebhookCreationSpec
       gitLabStub.addProject(project)
 
       Given("some Commit exists for the project in GitLab")
-      givenAccessTokenPresentFor(project)(user.accessToken)
+      givenAccessTokenPresentFor(project, user.accessToken)
       val commitId = commitIds.generateOne
       gitLabStub.replaceCommits(project.id, commitId)
 

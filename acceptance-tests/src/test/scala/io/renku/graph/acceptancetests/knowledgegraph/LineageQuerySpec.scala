@@ -47,7 +47,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
 
   Feature("GraphQL query to find lineage") {
     val user = authUsers.generateOne
-    implicit val accessToken: AccessToken = user.accessToken
+    val accessToken: AccessToken = user.accessToken
 
     val (exemplarData, project) = {
       val lineageData = LineageExemplarData(
@@ -82,8 +82,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       gitLabStub.setupProject(project, commitId)
       gitLabStub.addAuthenticated(user)
       mockCommitDataOnTripleGenerator(project, exemplarData.project.asJsonLD, commitId)
-      // mockDataOnGitLabAPIs(project, exemplarData.project.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery
@@ -137,11 +136,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, accessibleExemplarData.project.asJsonLD, commitId)
-      // mockDataOnGitLabAPIs(project, accessibleExemplarData.project.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
-
-      And("I am authenticated")
-      // `GET <gitlabApi>/user returning OK`(user)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       When("user posts a graphql query to fetch lineage of the project he is a member of")
       val response = knowledgeGraphClient.POST(
@@ -178,7 +173,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, privateExemplarData.project.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)(creator.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user posts a graphql query to fetch lineage of the project he is not a member of")
       val privateProjectResponse = knowledgeGraphClient.POST(
@@ -212,7 +207,7 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       val project  = dataProjects(exemplarData.project).generateOne
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, exemplarData.project.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)(creator.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient.POST(namedLineageQuery,

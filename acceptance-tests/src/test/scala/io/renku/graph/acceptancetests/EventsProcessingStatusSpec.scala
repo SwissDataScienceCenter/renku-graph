@@ -68,7 +68,7 @@ class EventsProcessingStatusSpec
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, allCommitIds.toList: _*)
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, allCommitIds)
-      `data in the Triples Store`(project, allCommitIds)(user.accessToken, ioRuntime)
+      `data in the Triples Store`(project, allCommitIds, user.accessToken)
 
       Then("the status endpoint should return OK with some progress info")
       eventually {

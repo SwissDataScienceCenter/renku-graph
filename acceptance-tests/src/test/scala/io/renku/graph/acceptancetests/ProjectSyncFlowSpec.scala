@@ -59,7 +59,7 @@ class ProjectSyncFlowSpec
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, commitId)
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)(user.accessToken, ioRuntime)
+      `data in the Triples Store`(project, commitId, user.accessToken)
 
       Then("the project data should exist in the KG")
       eventually {
@@ -73,7 +73,7 @@ class ProjectSyncFlowSpec
       gitLabStub.replaceProject(updatedProject)
       mockCommitDataOnTripleGenerator(updatedProject, updatedProject.entitiesProject.asJsonLD, commitId)
       resetTriplesGenerator()
-      givenAccessTokenPresentFor(updatedProject)(user.accessToken)
+      givenAccessTokenPresentFor(updatedProject, user.accessToken)
 
       And("PROJECT_SYNC event is sent and handled")
       EventLog.forceCategoryEventTriggering(CategoryName("PROJECT_SYNC"), updatedProject.id)
