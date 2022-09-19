@@ -35,34 +35,6 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
   import ProjectFunctions._
 
-  "findAllPersons" should {
-    "collect renku project members, project creator, activities' authors, associations' agents and datasets' creators" in {
-      forAll(
-        anyRenkuProjectEntities
-          .withActivities(activityEntities(planEntities()),
-                          activityEntities(planEntities()).modify(toAssociationPersonAgent)
-          )
-          .withDatasets(datasetEntities(provenanceNonModified))
-          .map(_.to[entities.Project])
-      ) { project =>
-        findAllPersons(project) shouldBe project.members ++
-          project.maybeCreator ++
-          project.datasets.flatMap(_.provenance.creators.toList) ++
-          project.activities.map(_.author) ++
-          project.activities.flatMap(_.association.agent match {
-            case p: entities.Person => List(p)
-            case _ => List.empty[entities.Person]
-          })
-      }
-    }
-
-    "collect non-renku project members and creator" in {
-      forAll(anyNonRenkuProjectEntities.map(_.to[entities.Project])) { project =>
-        findAllPersons(project) shouldBe project.members ++ project.maybeCreator
-      }
-    }
-  }
-
   "update - person" should {
     val oldPerson = personEntities().generateOne
 

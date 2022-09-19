@@ -23,11 +23,13 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.graph.model.entities.{Person, Project}
-import io.renku.triplesstore.SparqlQueryTimeRecorder
+import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
+import io.renku.graph.model.entities.{EntityFunctions, Person, Project}
+import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{Queries, Transformation}
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{ProjectFunctions, RecoverableErrorsRecovery, TransformationStep}
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[transformation] trait PersonTransformer[F[_]] {
@@ -40,19 +42,21 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
     updatesCreator:            UpdatesCreator,
     projectFunctions:          ProjectFunctions,
     recoverableErrorsRecovery: RecoverableErrorsRecovery = RecoverableErrorsRecovery
-) extends PersonTransformer[F] {
+)(implicit renkuUrl:           RenkuUrl, glApiUrl: GitLabApiUrl)
+    extends PersonTransformer[F] {
 
   import personMerger._
   import projectFunctions._
-  import updatesCreator._
   import recoverableErrorsRecovery._
+  import updatesCreator._
 
   override def createTransformationStep: TransformationStep[F] =
     TransformationStep("Person Details Updates", createTransformation)
 
   private def createTransformation: Transformation[F] = project =>
     EitherT {
-      findAllPersons(project)
+      EntityFunctions[Project]
+        .findAllPersons(project)
         .foldLeft((project -> Queries.empty).pure[F]) { (previousResultsF, person) =>
           updateProjectAndPreDataQueries(previousResultsF, person)
         }
@@ -80,6 +84,8 @@ private class PersonTransformerImpl[F[_]: MonadThrow](
 private[transformation] object PersonTransformer {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[PersonTransformer[F]] = for {
-    kgPersonFinder <- KGPersonFinder[F]
+    kgPersonFinder                    <- KGPersonFinder[F]
+    implicit0(renkuUrl: RenkuUrl)     <- RenkuUrlLoader[F]()
+    implicit0(glApiUrl: GitLabApiUrl) <- GitLabUrlLoader[F]().map(_.apiV4)
   } yield new PersonTransformerImpl[F](kgPersonFinder, PersonMerger, UpdatesCreator, ProjectFunctions)
 }
