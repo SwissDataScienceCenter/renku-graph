@@ -25,6 +25,8 @@ import cats.data.EitherT.right
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
+import io.renku.graph.model.TSVersion
+import io.renku.graph.model.entities.Project
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
@@ -72,11 +74,12 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   )(implicit maybeAccessToken: Option[AccessToken]): F[UploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      result <- right[UploadingResult](
-                  run[TSVersion.DefaultGraph](createSteps[TSVersion.DefaultGraph], project) >>= toUploadingResult(event)
-                )
+      result  <- right[UploadingResult](createAndRunSteps(TSVersion.DefaultGraph, project) >>= toUploadingResult(event))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
+
+  private def createAndRunSteps(tsVersion: TSVersion, project: Project) =
+    run(createSteps(tsVersion), project)(tsVersion)
 
   private def toUploadingError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[UploadingResult]] = {
     case error: LogWorthyRecoverableError =>

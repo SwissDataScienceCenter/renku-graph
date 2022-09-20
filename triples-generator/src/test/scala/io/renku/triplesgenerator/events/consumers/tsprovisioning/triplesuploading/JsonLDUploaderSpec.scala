@@ -43,20 +43,20 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
 
-class ProjectUploaderSpec
+class JsonLDUploaderSpec
     extends AnyWordSpec
     with IOSpec
     with MockFactory
     with ExternalServiceStubbing
     with should.Matchers {
 
-  "uploadProject" should {
+  "uploadJsonLD" should {
 
     s"succeeds if uploading triples to the Store was successful" in new TestCase {
 
       givenUploader(returning = ok())
 
-      uploader.uploadProject(triples).value.unsafeRunSync() shouldBe ().asRight
+      uploader.uploadJsonLD(triples).value.unsafeRunSync() shouldBe ().asRight
     }
 
     s"fail if remote client responds with a $BadRequest" in new TestCase {
@@ -65,7 +65,7 @@ class ProjectUploaderSpec
       givenUploader(returning = aResponse().withStatus(BadRequest.code).withBody(errorMessage))
 
       intercept[BadRequestException] {
-        uploader.uploadProject(triples).value.unsafeRunSync()
+        uploader.uploadJsonLD(triples).value.unsafeRunSync()
       }
     }
 
@@ -75,7 +75,7 @@ class ProjectUploaderSpec
         val errorMessage = nonEmptyStrings().generateOne
         givenUploader(returning = aResponse().withStatus(status.code).withBody(errorMessage))
 
-        val Left(error) = uploader.uploadProject(triples).value.unsafeRunSync()
+        val Left(error) = uploader.uploadJsonLD(triples).value.unsafeRunSync()
         error shouldBe a[SilentRecoverableError]
       }
     }
@@ -86,7 +86,7 @@ class ProjectUploaderSpec
         val errorMessage = nonEmptyStrings().generateOne
         givenUploader(returning = serviceUnavailable().withBody(errorMessage))
 
-        val Left(error) = uploader.uploadProject(triples).value.unsafeRunSync()
+        val Left(error) = uploader.uploadJsonLD(triples).value.unsafeRunSync()
         error shouldBe a[LogWorthyRecoverableError]
       }
 
@@ -94,7 +94,7 @@ class ProjectUploaderSpec
 
       givenUploader(returning = aResponse.withFault(CONNECTION_RESET_BY_PEER))
 
-      val Left(failure) = uploader.uploadProject(triples).value.unsafeRunSync()
+      val Left(failure) = uploader.uploadJsonLD(triples).value.unsafeRunSync()
 
       failure shouldBe a[LogWorthyRecoverableError]
       failure.getMessage should startWith(
@@ -112,7 +112,7 @@ class ProjectUploaderSpec
     lazy val renkuConnectionConfig =
       renkuConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
     lazy val uploader =
-      new ProjectUploaderImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
+      new JsonLDUploaderImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenUploader(returning: ResponseDefinitionBuilder) = stubFor {
       post(s"/${renkuConnectionConfig.datasetName}/data")

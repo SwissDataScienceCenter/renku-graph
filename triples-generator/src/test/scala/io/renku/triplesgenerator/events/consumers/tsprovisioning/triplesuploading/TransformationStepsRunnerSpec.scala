@@ -29,7 +29,7 @@ import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.personNames
-import io.renku.graph.model.entities
+import io.renku.graph.model.{TSVersion, entities}
 import io.renku.graph.model.testentities._
 import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, processingRecoverableErrors}
 import org.scalacheck.Gen
@@ -85,7 +85,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
              TransformationStep(nonBlankStrings().generateOne, step2Transformation)
         ),
         originalProject
-      ) shouldBe DeliverySuccess.pure[Try]
+      )(tsVersion) shouldBe DeliverySuccess.pure[Try]
     }
 
     s"return $RecoverableFailure if running transformation step fails with a LogWorthyRecoverableError" in new TestCase {
@@ -97,8 +97,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(originalProject)
         .returning(EitherT.leftT[Try, (entities.Project, Queries)](recoverableError))
 
-      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
-                      originalProject
+      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)), originalProject)(
+        tsVersion
       ) shouldBe RecoverableFailure(recoverableError).pure[Try]
     }
 
@@ -113,8 +113,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(originalProject)
         .returning(EitherT(exception.raiseError[Try, Either[ProcessingRecoverableError, (entities.Project, Queries)]]))
 
-      stepsRunner.run(List(TransformationStep(step1Name, step1Transformation)),
-                      originalProject
+      stepsRunner.run(List(TransformationStep(step1Name, step1Transformation)), originalProject)(
+        tsVersion
       ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.path} failed: $exception", exception)
         .pure[Try]
     }
@@ -138,7 +138,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
       stepsRunner.run(
         List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
         originalProject
-      ) shouldBe RecoverableFailure(recoverableError).pure[Try]
+      )(tsVersion) shouldBe RecoverableFailure(recoverableError).pure[Try]
     }
 
     s"return $NonRecoverableFailure if executing transformation step preDataUploadQueries fails with a NonRecoverableFailure" in new TestCase {
@@ -157,8 +157,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(step1Queries.preDataUploadQueries.head)
         .returning(EitherT(nonRecoverableError.raiseError[Try, Either[ProcessingRecoverableError, Unit]]))
 
-      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
-                      originalProject
+      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)), originalProject)(
+        tsVersion
       ) shouldBe NonRecoverableFailure(s"Transformation of ${originalProject.path} failed: $nonRecoverableError",
                                        nonRecoverableError
       ).pure[Try]
@@ -184,7 +184,7 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
       val Success(result) = stepsRunner.run(
         List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
         originalProject
-      )
+      )(tsVersion)
 
       result shouldBe a[NonRecoverableFailure]
     }
@@ -204,8 +204,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(project)
         .returning(EitherT.leftT(failure))
 
-      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
-                      project
+      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)), project)(
+        tsVersion
       ) shouldBe RecoverableFailure(failure).pure[Try]
     }
 
@@ -224,8 +224,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(project)
         .returning(EitherT(failure.raiseError[Try, Either[ProcessingRecoverableError, Unit]]))
 
-      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
-                      project
+      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)), project)(
+        tsVersion
       ) shouldBe NonRecoverableFailure(s"Transformation of ${project.path} failed: $failure", failure).pure[Try]
     }
 
@@ -249,8 +249,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(step1Queries.postDataUploadQueries.head)
         .returning(EitherT.leftT(recoverableError))
 
-      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
-                      project
+      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)), project)(
+        tsVersion
       ) shouldBe RecoverableFailure(recoverableError).pure[Try]
     }
 
@@ -274,8 +274,8 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
         .expects(step1Queries.postDataUploadQueries.head)
         .returning(EitherT(nonRecoverableError.raiseError[Try, Either[ProcessingRecoverableError, Unit]]))
 
-      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)),
-                      project
+      stepsRunner.run(List(TransformationStep(nonBlankStrings().generateOne, step1Transformation)), project)(
+        tsVersion
       ) shouldBe NonRecoverableFailure(s"Transformation of ${project.path} failed: $nonRecoverableError",
                                        nonRecoverableError
       ).pure[Try]
@@ -283,12 +283,10 @@ class TransformationStepsRunnerSpec extends AnyWordSpec with MockFactory with sh
   }
 
   private trait TestCase {
-    implicit val tsVersion: TSVersion = Gen.oneOf(TSVersion.DefaultGraph, TSVersion.NamedGraphs).generateOne
-    val resultsUploader = mock[TransformationResultsUploader[Try, TSVersion]]
-    val resultsUploaderLocator = new TransformationResultsUploader.Locator[Try] {
-      override def apply[TS <: TSVersion](implicit ev: TS) =
-        resultsUploader.asInstanceOf[TransformationResultsUploader[Try, TS]]
-    }
+    val tsVersion              = Gen.oneOf(TSVersion.DefaultGraph, TSVersion.NamedGraphs).generateOne
+    val resultsUploader        = mock[TransformationResultsUploader[Try]]
+    val resultsUploaderLocator = mock[TransformationResultsUploader.Locator[Try]]
+    (resultsUploaderLocator.apply _).expects(tsVersion).returning(resultsUploader)
     val stepsRunner = new TransformationStepsRunnerImpl[Try](resultsUploaderLocator)
   }
 }

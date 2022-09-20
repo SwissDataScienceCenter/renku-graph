@@ -16,8 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading
+package io.renku.triplesgenerator.events.consumers
+package tsprovisioning
+package triplesuploading
 
+import TriplesUploadResult.NonRecoverableFailure
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
@@ -26,9 +29,6 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.client.RestClientError.BadRequestException
 import io.renku.triplesstore._
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading.TriplesUploadResult.NonRecoverableFailure
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -38,13 +38,13 @@ private trait UpdateQueryRunner[F[_]] {
 }
 
 private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig,
-    recoveryStrategy:      RecoverableErrorsRecovery = RecoverableErrorsRecovery,
-    retryInterval:         FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:            Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:           Duration = 11 minutes,
-    requestTimeout:        Duration = 10 minutes
-) extends TSClientImpl[F](renkuConnectionConfig,
+    dsConnectionConfig: DatasetConnectionConfig,
+    recoveryStrategy:   RecoverableErrorsRecovery = RecoverableErrorsRecovery,
+    retryInterval:      FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:        Duration = 11 minutes,
+    requestTimeout:     Duration = 10 minutes
+) extends TSClientImpl[F](dsConnectionConfig,
                           retryInterval,
                           maxRetries,
                           idleTimeoutOverride = idleTimeout.some,

@@ -22,6 +22,7 @@ package tsprovisioning.transformation
 import Generators._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.TSVersion
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -39,13 +40,13 @@ class TransformationStepsCreatorSpec extends AnyWordSpec with MockFactory with s
       (() => datasetTransformer.createTransformationStep).expects().returning(step3)
       (() => activityTransformer.createTransformationStep).expects().returning(step4)
 
-      stepsCreator.createSteps[TSVersion.DefaultGraph] shouldBe steps
+      stepsCreator.createSteps(TSVersion.DefaultGraph) shouldBe steps
     }
   }
 
   "createSteps[NamedGraphs]" should {
     "combine steps from person/project/dataset/activity transformers for the NamedGraph" in new TestCase {
-      stepsCreator.createSteps[TSVersion.NamedGraphs] shouldBe List.empty
+      stepsCreator.createSteps(TSVersion.NamedGraphs) shouldBe List.empty
     }
   }
 

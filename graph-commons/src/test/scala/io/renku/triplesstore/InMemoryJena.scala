@@ -26,10 +26,12 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
+import io.renku.graph.model.entities.{EntityFunctions, Person}
+import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl}
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.{JsonLD, JsonLDEncoder}
+import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import org.testcontainers.containers.wait.strategy.Wait
 
@@ -93,18 +95,20 @@ trait InMemoryJena {
       )
       .unsafeRunSync()
 
-  def upload(to: DatasetName, jsonLDs: JsonLD*)(implicit ioRuntime: IORuntime): Unit = {
-    val jsonLD = JsonLD.arr(jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD])): _*)
-    upload(to, jsonLD)
-  }
-
-  private def upload(to: DatasetName, jsonLD: JsonLD)(implicit ioRuntime: IORuntime): Unit =
-    queryRunnerFor(to)
-      .uploadPayload(jsonLD)
+  def upload(to: DatasetName, graphs: Graph*)(implicit ioRuntime: IORuntime): Unit =
+    graphs
+      .map(_.flatten.fold(throw _, identity))
+      .toList
+      .map(queryRunnerFor(to).uploadPayload(_))
+      .sequence
+      .void
       .unsafeRunSync()
 
-  def upload[T](to: DatasetName, objects: T*)(implicit encoder: JsonLDEncoder[T], ioRuntime: IORuntime): Unit =
-    upload(to, objects.map(encoder.apply): _*)
+  def upload[T](to:    DatasetName, objects: T*)(implicit
+      entityFunctions: EntityFunctions[T],
+      graphsProducer:  GraphsProducer[T],
+      ioRuntime:       IORuntime
+  ): Unit = upload(to, objects >>= graphsProducer.apply: _*)
 
   def insert(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
     .runUpdate {
@@ -192,9 +196,11 @@ trait InMemoryJena {
   }
 }
 
-trait JenaDataset {
-  self: InMemoryJena =>
+trait GraphsProducer[T] {
+  def apply(obj: T)(implicit entityFunctions: EntityFunctions[T]): List[Graph]
 }
+
+trait JenaDataset { self: InMemoryJena => }
 
 trait RenkuDataset extends JenaDataset {
   self: InMemoryJena =>
@@ -209,6 +215,19 @@ trait RenkuDataset extends JenaDataset {
   def renkuDSConnectionInfo: RenkuConnectionConfig = connectionInfoFactory(fusekiUrl)
 
   registerDataset(connectionInfoFactory, configFile)
+
+  protected implicit val graph: GraphClass = GraphClass.Default
+
+  protected implicit def graphsProducer[A](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): GraphsProducer[A] =
+    new GraphsProducer[A] {
+      import io.renku.jsonld.DefaultGraph
+      import io.renku.jsonld.syntax._
+
+      override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] = {
+        implicit val enc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Default)
+        List(DefaultGraph.fromJsonLDsUnsafe(entity.asJsonLD))
+      }
+    }
 }
 
 trait ProjectsDataset extends JenaDataset {
@@ -224,6 +243,44 @@ trait ProjectsDataset extends JenaDataset {
   def projectsDataset:          DatasetName              = projectsDSConnectionInfo.datasetName
 
   registerDataset(connectionInfoFactory, configFile)
+
+  import io.renku.generators.Generators.Implicits._
+  import io.renku.graph.model.GraphModelGenerators.projectPaths
+  import io.renku.graph.model.projects.Path
+
+  lazy val defaultProjectForGraph: Path = projectPaths.generateOne
+
+  def defaultProjectGraphId(implicit renkuUrl: RenkuUrl): EntityId =
+    io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)
+
+  protected implicit def graphsProducer[A](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): GraphsProducer[A] =
+    new GraphsProducer[A] {
+      import io.renku.graph.model.Schemas.schema
+      import io.renku.graph.model.entities
+      import io.renku.jsonld.NamedGraph
+      import io.renku.jsonld.syntax._
+
+      override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] =
+        buildProjectGraph(entity) :: maybeBuildPersonsGraph(entity).toList
+
+      private def buildProjectGraph(entity: A)(implicit entityFunctions: EntityFunctions[A], renkuUrl: RenkuUrl) = {
+        implicit val projectEnc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Project)
+        NamedGraph.fromJsonLDsUnsafe(projectGraphId(entity), entity.asJsonLD)
+      }
+
+      private def maybeBuildPersonsGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
+        implicit val graph: GraphClass = GraphClass.Persons
+        entityFunctions.findAllPersons(entity).toList.map(_.asJsonLD) match {
+          case Nil    => None
+          case h :: t => NamedGraph.fromJsonLDsUnsafe(schema / "Person", h, t: _*).some
+        }
+      }
+
+      private def projectGraphId(entity: A): EntityId = entity match {
+        case p: entities.Project => p.resourceId.asEntityId
+        case _ => defaultProjectGraphId
+      }
+    }
 }
 
 trait MigrationsDataset extends JenaDataset {
@@ -239,4 +296,21 @@ trait MigrationsDataset extends JenaDataset {
   def migrationsDataset:          DatasetName                = migrationsDSConnectionInfo.datasetName
 
   registerDataset(connectionInfoFactory, configFile)
+
+  implicit def entityFunctions[A](implicit entityEncoder: JsonLDEncoder[A]): EntityFunctions[A] =
+    new EntityFunctions[A] {
+      override val findAllPersons: A => Set[Person]               = _ => Set.empty
+      override val encoder:        GraphClass => JsonLDEncoder[A] = _ => entityEncoder
+    }
+
+  protected implicit def graphsProducer[A]: GraphsProducer[A] = new GraphsProducer[A] {
+
+    import io.renku.jsonld.DefaultGraph
+    import io.renku.jsonld.syntax._
+
+    override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] = {
+      implicit val enc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Default)
+      List(DefaultGraph.fromJsonLDsUnsafe(entity.asJsonLD))
+    }
+  }
 }

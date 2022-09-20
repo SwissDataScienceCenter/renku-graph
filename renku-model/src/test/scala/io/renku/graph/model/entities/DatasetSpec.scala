@@ -31,9 +31,9 @@ import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.entities.Dataset.Provenance.{ImportedInternalAncestorExternal, ImportedInternalAncestorInternal}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -41,7 +41,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
-    implicit val graph: Graph = Graph.Default
+    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Dataset entity into the Dataset object" in {
       forAll(datasetEntities(provenanceNonModified).decoupledFromProject) { dataset =>
@@ -348,7 +348,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     "produce JsonLD with all the relevant properties and only links to Person entities " +
       "if encoding requested for the Project Graph" in {
-        implicit val graph: Graph = Graph.Project
+        implicit val graph: GraphClass = GraphClass.Project
 
         val ds = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
           .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
@@ -376,7 +376,7 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     "produce JsonLD with all the relevant properties entities " +
       "if encoding requested for the Default Graph" in {
-        implicit val graph: Graph = Graph.Default
+        implicit val graph: GraphClass = GraphClass.Default
 
         val ds = datasetEntities(provenanceInternal).decoupledFromProject.generateOne
           .to[entities.Dataset[entities.Dataset.Provenance.Internal]]
@@ -401,6 +401,32 @@ class DatasetSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             schema / "hasPart"           -> ds.parts.asJsonLD
           )
       }
+  }
+
+  "entityFunctions.findAllPersons" should {
+
+    "return all Dataset's authors" in {
+
+      val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      EntityFunctions[entities.Dataset[entities.Dataset.Provenance]].findAllPersons(ds) shouldBe
+        ds.provenance.creators.toList.toSet
+    }
+  }
+
+  "entityFunctions.encoder" should {
+
+    "return encoder that honors the given GraphClass" in {
+
+      val ds = datasetEntities(provenanceNonModified).decoupledFromProject.generateOne
+        .to[entities.Dataset[entities.Dataset.Provenance]]
+
+      implicit val graph: GraphClass = graphClasses.generateOne
+      val functionsEncoder = EntityFunctions[entities.Dataset[entities.Dataset.Provenance]].encoder(graph)
+
+      ds.asJsonLD(functionsEncoder) shouldBe ds.asJsonLD
+    }
   }
 
   "update" should {

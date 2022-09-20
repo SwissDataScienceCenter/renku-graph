@@ -28,8 +28,8 @@ import io.renku.graph.model.datasets.{SameAs, TopmostSameAs}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{datasets, entities, persons}
-import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
+import io.renku.jsonld.{DefaultGraph, EntityId}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -594,7 +594,8 @@ class UpdatesCreatorSpec
       ).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
 
-      upload(to = renkuDataset, originalDS.asJsonLD, importedDS.asJsonLD)
+      upload(to = renkuDataset, originalDS)
+      upload(to = renkuDataset, importedDS)
 
       val otherSameAs = datasetSameAs.generateOne.entityId
       insert(to = renkuDataset, Triple.edge(importedDS.resourceId, schema / "sameAs", otherSameAs))
@@ -618,7 +619,7 @@ class UpdatesCreatorSpec
       val importedExternalDS = datasetEntities(provenanceImportedExternal).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedExternal]]
 
-      upload(to = renkuDataset, importedExternalDS.asJsonLD)
+      upload(to = renkuDataset, importedExternalDS)
 
       val otherSameAs = datasetSameAs.generateOne.entityId
       insert(to = renkuDataset, Triple.edge(importedExternalDS.resourceId, schema / "sameAs", otherSameAs))
@@ -668,7 +669,7 @@ class UpdatesCreatorSpec
 
       val otherDerivedFrom       = datasetDerivedFroms.generateOne
       val otherDerivedFromJsonLD = otherDerivedFrom.asJsonLD
-      upload(to = renkuDataset, otherDerivedFromJsonLD)
+      upload(to = renkuDataset, DefaultGraph.fromJsonLDsUnsafe(otherDerivedFromJsonLD))
       val derivedFromId = otherDerivedFromJsonLD.entityId.getOrElse(fail(" Cannot obtain EntityId for DerivedFrom"))
       insert(to = renkuDataset, Triple.edge(ds.resourceId, prov / "wasDerivedFrom", derivedFromId))
 

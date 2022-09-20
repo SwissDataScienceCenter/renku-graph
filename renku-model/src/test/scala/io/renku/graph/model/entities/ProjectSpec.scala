@@ -59,7 +59,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   }
 
   "decode" should {
-    implicit val graph: Graph = Graph.Default
+    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Project entity without parent into the Project object" in {
       forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
@@ -684,7 +684,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
   "encode for the Default Graph" should {
 
-    implicit val graph: Graph = Graph.Default
+    implicit val graph: GraphClass = GraphClass.Default
 
     "produce JsonLD with all the relevant properties of a Renku Project" in {
       forAll(renkuProjectEntitiesWithDatasetsAndActivities.map(_.to[entities.RenkuProject])) { project =>
@@ -753,7 +753,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   "encode for the Project Graph" should {
 
     import persons.ResourceId.entityIdEncoder
-    implicit val graph: Graph = Graph.Project
+    implicit val graph: GraphClass = GraphClass.Project
 
     "produce JsonLD with all the relevant properties and only links to Person entities" in {
       forAll(
@@ -827,6 +827,33 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
   }
 
+  "entityFunctions.findAllPersons" should {
+
+    "return Project's creator, members, activities' authors and datasets' creators" in {
+
+      val project = renkuProjectEntitiesWithDatasetsAndActivities.generateOne.to[entities.RenkuProject]
+
+      EntityFunctions[entities.Project].findAllPersons(project) shouldBe
+        project.maybeCreator.toSet ++
+        project.members ++
+        project.activities.flatMap(EntityFunctions[entities.Activity].findAllPersons).toSet ++
+        project.datasets.flatMap(EntityFunctions[entities.Dataset[entities.Dataset.Provenance]].findAllPersons).toSet
+    }
+  }
+
+  "entityFunctions.encoder" should {
+
+    "return encoder that honors the given GraphClass" in {
+
+      val project = anyRenkuProjectEntities.generateOne.to[entities.Project]
+
+      implicit val graph: GraphClass = graphClasses.generateOne
+      val functionsEncoder = EntityFunctions[entities.Project].encoder(graph)
+
+      project.asJsonLD(functionsEncoder) shouldBe project.asJsonLD
+    }
+  }
+
   private def cliLikeJsonLD(resourceId:       projects.ResourceId,
                             cliVersion:       CliVersion,
                             schemaVersion:    SchemaVersion,
@@ -835,7 +862,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                             dateCreated:      DateCreated,
                             activities:       List[entities.Activity],
                             datasets:         List[entities.Dataset[entities.Dataset.Provenance]]
-  )(implicit graph:                           Graph) = {
+  )(implicit graph:                           GraphClass) = {
 
     val descriptionJsonLD = maybeDescription match {
       case Some(desc) => desc.asJsonLD

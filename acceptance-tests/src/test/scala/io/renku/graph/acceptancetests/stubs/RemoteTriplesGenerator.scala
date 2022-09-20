@@ -37,6 +37,8 @@ import io.renku.jsonld.syntax._
 trait RemoteTriplesGenerator {
   self: ApplicationServices =>
 
+  private implicit val graph: GraphClass = GraphClass.Default
+
   import RemoteTriplesGeneratorWiremockInstance._
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(

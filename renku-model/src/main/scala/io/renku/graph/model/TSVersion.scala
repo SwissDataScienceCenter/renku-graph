@@ -18,20 +18,10 @@
 
 package io.renku.graph.model
 
-import cats.Show
-
-sealed trait Graph extends Product with Serializable
-
-object Graph {
-
-  lazy val all: Set[Graph] = Set(Default, Project, Persons)
-
-  case object Default extends Graph
-  type Default = Default.type
-  case object Project extends Graph
-  type Project = Project.type
-  case object Persons extends Graph
-  type Persons = Persons.type
-
-  implicit val show: Show[Graph] = Show.show(_.productPrefix)
+sealed trait TSVersion extends Product with Serializable
+object TSVersion {
+  case object DefaultGraph extends TSVersion
+  type DefaultGraph = DefaultGraph.type
+  case object NamedGraphs extends TSVersion
+  type NamedGraphs = NamedGraphs.type
 }

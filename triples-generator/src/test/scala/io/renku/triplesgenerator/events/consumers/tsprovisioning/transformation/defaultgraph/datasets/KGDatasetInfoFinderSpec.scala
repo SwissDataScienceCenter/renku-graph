@@ -229,7 +229,8 @@ class KGDatasetInfoFinderSpec
       ).decoupledFromProject.generateOne
         .to[entities.Dataset[entities.Dataset.Provenance.ImportedInternalAncestorInternal]]
 
-      upload(to = renkuDataset, originalDS.asJsonLD, importedDS.asJsonLD)
+      upload(to = renkuDataset, originalDS)
+      upload(to = renkuDataset, importedDS)
 
       val otherSameAs = datasetSameAs.generateOne.entityId
       insert(to = renkuDataset, Triple.edge(importedDS.resourceId, schema / "sameAs", otherSameAs))

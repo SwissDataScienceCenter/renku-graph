@@ -26,7 +26,7 @@ import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.publicationEvents
+import io.renku.graph.model.{GraphClass, publicationEvents}
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
@@ -34,6 +34,8 @@ import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
 
 class ProjectDatasetTagsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets/:dsName/tags to find project dataset's tags") {
 

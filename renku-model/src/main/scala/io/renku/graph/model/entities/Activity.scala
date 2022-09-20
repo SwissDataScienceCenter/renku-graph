@@ -21,9 +21,10 @@ package io.renku.graph.model.entities
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.{Graph, RenkuUrl}
 import io.renku.graph.model.activities.{EndTime, ResourceId, StartTime}
 import io.renku.graph.model.entities.ParameterValue.{CommandInputValue, CommandOutputValue}
+import io.renku.graph.model.{GraphClass, RenkuUrl}
+import io.renku.jsonld.JsonLDEncoder
 
 final case class Activity(resourceId:  ResourceId,
                           startTime:   StartTime,
@@ -38,10 +39,21 @@ final case class Activity(resourceId:  ResourceId,
 
 object Activity {
   import io.renku.graph.model.GitLabApiUrl
+
+  implicit def functions(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): EntityFunctions[Activity] =
+    new EntityFunctions[Activity] {
+
+      override val findAllPersons: Activity => Set[Person] = { a =>
+        Set(a.author) ++ EntityFunctions[Association].findAllPersons(a.association)
+      }
+
+      override val encoder: GraphClass => JsonLDEncoder[Activity] = Activity.encoder(renkuUrl, gitLabApiUrl, _)
+    }
+
   import io.renku.graph.model.Schemas.{prov, renku}
-  import io.renku.jsonld._
   import io.renku.jsonld.ontology._
   import io.renku.jsonld.syntax._
+  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder, Reverse}
 
   val entityTypes: EntityTypes = EntityTypes of (prov / "Activity")
 
@@ -98,7 +110,11 @@ object Activity {
     case (result, _) => result
   }
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl, graph: Graph): JsonLDEncoder[Activity] =
+  implicit def encoder(implicit
+      renkuUrl: RenkuUrl,
+      glApiUrl: GitLabApiUrl,
+      graph:    GraphClass
+  ): JsonLDEncoder[Activity] =
     JsonLDEncoder.instance { activity =>
       JsonLD.entity(
         activity.resourceId.asEntityId,

@@ -23,13 +23,15 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.entities
+import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphClass, TSVersion, entities}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
+import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.TSVersion
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -47,12 +49,15 @@ class TransformationResultsUploaderSpec extends AnyWordSpec with MockFactory wit
 
       val uploader = TransformationResultsUploader[IO].unsafeRunSync()
 
-      uploader[TSVersion.DefaultGraph].getClass shouldBe classOf[DefaultGraphResultsUploader[IO]]
+      uploader(TSVersion.DefaultGraph).getClass shouldBe classOf[DefaultGraphResultsUploader[IO]]
+      uploader(TSVersion.NamedGraphs).getClass  shouldBe classOf[NamedGraphsResultsUploader[IO]]
     }
   }
 }
 
 class DefaultGraphResultsUploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   "execute" should {
 
@@ -72,15 +77,71 @@ class DefaultGraphResultsUploaderSpec extends AnyWordSpec with MockFactory with 
 
       val projectJsonLD = project.asJsonLD.flatten.fold(throw _, identity)
 
-      (projectUploader.uploadProject _).expects(projectJsonLD).returning(rightT(()))
+      (jsonLDUploader.uploadJsonLD _).expects(projectJsonLD).returning(rightT(()))
 
       uploader.upload(project).value shouldBe ().asRight.pure[Try]
     }
   }
 
   private trait TestCase {
-    val projectUploader = mock[ProjectUploader[Try]]
-    val queryRunner     = mock[UpdateQueryRunner[Try]]
-    val uploader        = new DefaultGraphResultsUploader(projectUploader, queryRunner)
+    val jsonLDUploader = mock[JsonLDUploader[Try]]
+    val queryRunner    = mock[UpdateQueryRunner[Try]]
+    val uploader       = new DefaultGraphResultsUploader(jsonLDUploader, queryRunner)
+  }
+}
+
+class NamedGraphsResultsUploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+
+  "execute" should {
+
+    "call the queryRunner's run with the given query" in new TestCase {
+      val query = sparqlQueries.generateOne
+
+      (queryRunner.run _).expects(query).returning(rightT(()))
+
+      (uploader execute query).value shouldBe ().asRight.pure[Try]
+    }
+  }
+
+  "upload" should {
+
+    "encode the given project to JsonLD, flatten it, " +
+      "separate Person and non-Person entities to their own NamedGraphs " +
+      "and pass them both to the projectUploader" in new TestCase {
+
+        val project = anyProjectEntities.generateOne.to[entities.Project]
+
+        implicit val projectEncoder: JsonLDEncoder[entities.Project] =
+          EntityFunctions[entities.Project].encoder(GraphClass.Project)
+        val projectGraph = NamedGraph
+          .fromJsonLDsUnsafe(project.resourceId.asEntityId, project.asJsonLD)
+          .flatten
+          .fold(fail(_), identity)
+        (jsonLDUploader.uploadJsonLD _)
+          .expects(projectGraph)
+          .returning(rightT(()))
+
+        EntityFunctions[entities.Project].findAllPersons(project).toList match {
+          case Nil => ()
+          case h :: t =>
+            implicit val encoder: JsonLDEncoder[entities.Person] =
+              EntityFunctions[entities.Person].encoder(GraphClass.Persons)
+            val personsGraph = NamedGraph
+              .fromJsonLDsUnsafe(schema / "Person", h.asJsonLD, t.map(_.asJsonLD): _*)
+              .flatten
+              .fold(fail(_), identity)
+            (jsonLDUploader.uploadJsonLD _)
+              .expects(personsGraph)
+              .returning(rightT(()))
+        }
+
+        (uploader upload project).value shouldBe ().asRight.pure[Try]
+      }
+  }
+
+  private trait TestCase {
+    val jsonLDUploader = mock[JsonLDUploader[Try]]
+    val queryRunner    = mock[UpdateQueryRunner[Try]]
+    val uploader       = new NamedGraphsResultsUploader(jsonLDUploader, queryRunner)
   }
 }

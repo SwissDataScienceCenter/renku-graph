@@ -34,7 +34,7 @@ import io.renku.graph.model.events.EventStatus.{FailureStatus, TransformationNon
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, projects}
+import io.renku.graph.model.{TSVersion, entities, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
@@ -160,16 +160,16 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         givenEntityBuilding(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
         val steps = transformationSteps[Try].generateList()
-        (stepsCreator
-          .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        (stepsCreator.createSteps _)
           .expects(TSVersion.DefaultGraph)
           .returning(steps)
 
         val processingRecoverableError = logWorthyRecoverableErrors.generateOne
         val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-        givenStepsRunnerFor[TSVersion.DefaultGraph](steps,
-                                                    project,
-                                                    returning = failure.pure[Try].widen[TriplesUploadResult]
+        givenStepsRunnerFor(TSVersion.DefaultGraph,
+                            steps,
+                            project,
+                            returning = failure.pure[Try].widen[TriplesUploadResult]
         )
 
         expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, failure.error)
@@ -190,16 +190,16 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         givenEntityBuilding(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
         val steps = transformationSteps[Try].generateList()
-        (stepsCreator
-          .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        (stepsCreator.createSteps _)
           .expects(TSVersion.DefaultGraph)
           .returning(steps)
 
         val processingRecoverableError = silentRecoverableErrors.generateOne
         val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-        givenStepsRunnerFor[TSVersion.DefaultGraph](steps,
-                                                    project,
-                                                    returning = failure.pure[Try].widen[TriplesUploadResult]
+        givenStepsRunnerFor(TSVersion.DefaultGraph,
+                            steps,
+                            project,
+                            returning = failure.pure[Try].widen[TriplesUploadResult]
         )
 
         expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, failure.error)
@@ -219,16 +219,16 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         givenEntityBuilding(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
         val steps = transformationSteps[Try].generateList()
-        (stepsCreator
-          .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        (stepsCreator.createSteps _)
           .expects(TSVersion.DefaultGraph)
           .returning(steps)
 
         val failure =
           TriplesUploadResult.RecoverableFailure(SilentRecoverableError(exceptions.generateOne.getMessage))
-        givenStepsRunnerFor[TSVersion.DefaultGraph](steps,
-                                                    project,
-                                                    returning = failure.pure[Try].widen[TriplesUploadResult]
+        givenStepsRunnerFor(TSVersion.DefaultGraph,
+                            steps,
+                            project,
+                            returning = failure.pure[Try].widen[TriplesUploadResult]
         )
 
         expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, failure.error)
@@ -249,15 +249,15 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       val steps = transformationSteps[Try].generateList()
 
-      (stepsCreator
-        .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+      (stepsCreator.createSteps _)
         .expects(TSVersion.DefaultGraph)
         .returning(steps)
 
       val exception = exceptions.generateOne
-      givenStepsRunnerFor[TSVersion.DefaultGraph](steps,
-                                                  project,
-                                                  returning = exception.raiseError[Try, TriplesUploadResult]
+      givenStepsRunnerFor(TSVersion.DefaultGraph,
+                          steps,
+                          project,
+                          returning = exception.raiseError[Try, TriplesUploadResult]
       )
 
       expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, exception)
@@ -278,14 +278,13 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         givenEntityBuilding(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
         val steps = transformationSteps[Try].generateList()
-        (stepsCreator
-          .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        (stepsCreator.createSteps _)
           .expects(TSVersion.DefaultGraph)
           .returning(steps)
 
         val uploadingError =
           nonEmptyStrings().map(message => RecoverableFailure(LogWorthyRecoverableError(message))).generateOne
-        givenStepsRunnerFor[TSVersion.DefaultGraph](steps, project, returning = uploadingError.pure[Try])
+        givenStepsRunnerFor(TSVersion.DefaultGraph, steps, project, returning = uploadingError.pure[Try])
 
         expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, uploadingError.error)
 
@@ -305,12 +304,11 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         givenEntityBuilding(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
         val steps = transformationSteps[Try].generateList()
-        (stepsCreator
-          .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+        (stepsCreator.createSteps _)
           .expects(TSVersion.DefaultGraph)
           .returning(steps)
 
-        givenStepsRunnerFor[TSVersion.DefaultGraph](steps, project, returning = failure.pure[Try])
+        givenStepsRunnerFor(TSVersion.DefaultGraph, steps, project, returning = failure.pure[Try])
 
         expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent, failure)
 
@@ -388,22 +386,21 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     def successfulTriplesTransformationAndUpload(project: Project) = {
       val steps = transformationSteps[Try].generateList()
-      (stepsCreator
-        .createSteps[TSVersion.DefaultGraph](_: TSVersion.DefaultGraph))
+      (stepsCreator.createSteps _)
         .expects(TSVersion.DefaultGraph)
         .returning(steps)
 
-      givenStepsRunnerFor[TSVersion.DefaultGraph](steps, project, returning = DeliverySuccess.pure[Try])
+      givenStepsRunnerFor(TSVersion.DefaultGraph, steps, project, returning = DeliverySuccess.pure[Try])
     }
 
-    def givenStepsRunnerFor[TS <: TSVersion](steps:     List[TransformationStep[Try]],
-                                             project:   Project,
-                                             returning: Try[TriplesUploadResult]
-    )(implicit ev:                                      TS) =
-      (stepsRunner
-        .run[TS](_: List[TransformationStep[Try]], _: Project)(_: TS))
-        .expects(steps, project, ev)
-        .returning(returning)
+    def givenStepsRunnerFor(tsVersion: TSVersion,
+                            steps:     List[TransformationStep[Try]],
+                            project:   Project,
+                            returning: Try[TriplesUploadResult]
+    ) = (stepsRunner
+      .run(_: List[TransformationStep[Try]], _: Project)(_: TSVersion))
+      .expects(steps, project, tsVersion)
+      .returning(returning)
 
     def givenEntityBuilding(event:     TriplesGeneratedEvent,
                             returning: EitherT[Try, ProcessingRecoverableError, Project]

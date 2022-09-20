@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-organization := "io.renku"
-name := "generators"
+package io.renku.triplesgenerator.events.consumers
 
-libraryDependencies += "eu.timepit"     %% "refined"    % "0.10.1"
-libraryDependencies += "io.circe"       %% "circe-core" % "0.14.2"
-libraryDependencies += "io.renku"       %% "jsonld4s"   % "0.4.0"
-libraryDependencies += "org.typelevel"  %% "cats-core"  % "2.8.0"
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.16.0"
+import io.renku.graph.model.events.CompoundEventId
+
+private trait CategoryEvent {
+  def compoundEventId: CompoundEventId
+}

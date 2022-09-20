@@ -16,18 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers
+package io.renku.graph.model
 
-import io.renku.graph.model.events.CompoundEventId
+import cats.Show
 
-private trait CategoryEvent {
-  def compoundEventId: CompoundEventId
-}
+sealed trait GraphClass extends Product with Serializable
 
-private sealed trait TSVersion extends Product with Serializable
-private object TSVersion {
-  implicit case object DefaultGraph extends TSVersion
-  type DefaultGraph = DefaultGraph.type
-  implicit case object NamedGraphs extends TSVersion
-  type NamedGraphs = NamedGraphs.type
+object GraphClass {
+
+  lazy val all: Set[GraphClass] = Set(Default, Project, Persons)
+
+  case object Default extends GraphClass
+  type Default = Default.type
+  case object Project extends GraphClass
+  type Project = Project.type
+  case object Persons extends GraphClass
+  type Persons = Persons.type
+
+  implicit val show: Show[GraphClass] = Show.show(_.productPrefix)
 }

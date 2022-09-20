@@ -23,11 +23,12 @@ package transformation
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.TSVersion
 import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[consumers] trait TransformationStepsCreator[F[_]] {
-  def createSteps[TS <: TSVersion](implicit ev: TS): List[TransformationStep[F]]
+  def createSteps(tsVersion: TSVersion): List[TransformationStep[F]]
 }
 
 private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
@@ -37,7 +38,7 @@ private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
     defaultGraphActivityTransformer: defaultgraph.activities.ActivityTransformer[F]
 ) extends TransformationStepsCreator[F] {
 
-  override def createSteps[TS <: TSVersion](implicit ev: TS): List[TransformationStep[F]] = ev match {
+  override def createSteps(tsVersion: TSVersion): List[TransformationStep[F]] = tsVersion match {
     case TSVersion.DefaultGraph =>
       List(
         defaultGraphPersonTransformer.createTransformationStep,

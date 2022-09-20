@@ -26,6 +26,7 @@ import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.GraphClass
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.RenkuProject._
 import io.renku.graph.model.testentities._
@@ -41,6 +42,7 @@ class ProjectsResourcesSpec
     with TSProvisioning
     with DatasetsApiEncoders {
 
+  private implicit val graph: GraphClass = GraphClass.Default
   private val user = authUsers.generateOne
   private val accessToken: AccessToken = user.accessToken
 

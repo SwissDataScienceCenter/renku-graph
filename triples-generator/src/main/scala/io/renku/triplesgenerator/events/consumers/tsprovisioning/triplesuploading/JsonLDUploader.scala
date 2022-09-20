@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading
+package io.renku.triplesgenerator.events.consumers
+package tsprovisioning
+package triplesuploading
 
 import cats.MonadThrow
 import cats.data.EitherT
@@ -26,37 +28,35 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.jsonld.JsonLD
-import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.RecoverableErrorsRecovery
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-private trait ProjectUploader[F[_]] {
-  def uploadProject(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit]
+private trait JsonLDUploader[F[_]] {
+  def uploadJsonLD(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit]
 }
 
-private class ProjectUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig,
-    recoveryStrategy:      RecoverableErrorsRecovery = RecoverableErrorsRecovery,
-    retryInterval:         FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:            Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:           Duration = 11 minutes,
-    requestTimeout:        Duration = 10 minutes
-) extends TSClientImpl(renkuConnectionConfig,
+private class JsonLDUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+    dsConnectionConfig: DatasetConnectionConfig,
+    recoveryStrategy:   RecoverableErrorsRecovery = RecoverableErrorsRecovery,
+    retryInterval:      FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:        Duration = 11 minutes,
+    requestTimeout:     Duration = 10 minutes
+) extends TSClientImpl(dsConnectionConfig,
                        retryInterval = retryInterval,
                        maxRetries = maxRetries,
                        idleTimeoutOverride = idleTimeout.some,
                        requestTimeoutOverride = requestTimeout.some
     )
-    with ProjectUploader[F] {
+    with JsonLDUploader[F] {
 
   import org.http4s.Status._
   import org.http4s.{Request, Response, Status}
   import recoveryStrategy.maybeRecoverableError
 
-  override def uploadProject(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
+  override def uploadJsonLD(triples: JsonLD): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
     uploadAndMap[Either[ProcessingRecoverableError, Unit]](triples)(responseMapping)
       .recoverWith(maybeRecoverableError)
   }
@@ -67,20 +67,20 @@ private class ProjectUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   }
 }
 
-private object ProjectUploader {
+private object JsonLDUploader {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](renkuConnectionConfig: RenkuConnectionConfig,
                                                           retryInterval: FiniteDuration = SleepAfterConnectionIssue,
                                                           maxRetries: Int Refined NonNegative =
                                                             MaxRetriesAfterConnectionTimeout,
                                                           idleTimeout:    Duration = 6 minutes,
                                                           requestTimeout: Duration = 5 minutes
-  ): F[ProjectUploaderImpl[F]] = MonadThrow[F].catchNonFatal(
-    new ProjectUploaderImpl[F](renkuConnectionConfig,
-                               RecoverableErrorsRecovery,
-                               retryInterval,
-                               maxRetries,
-                               idleTimeout,
-                               requestTimeout
+  ): F[JsonLDUploaderImpl[F]] = MonadThrow[F].catchNonFatal(
+    new JsonLDUploaderImpl[F](renkuConnectionConfig,
+                              RecoverableErrorsRecovery,
+                              retryInterval,
+                              maxRetries,
+                              idleTimeout,
+                              requestTimeout
     )
   )
 }

@@ -28,11 +28,10 @@ import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import io.renku.graph.model.{datasets, projects}
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
-import io.renku.jsonld.syntax.JsonEncoderOps
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -50,7 +49,7 @@ class ProjectTriplesRemoverSpec
 
     "remove all activities, datasets and their dependant entities of a project and the project itself" in new TestCase {
       forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
-        upload(to = renkuDataset, project.asJsonLD)
+        upload(to = renkuDataset, project)
 
         projectTriplesRemover.removeTriples(project.path).unsafeRunSync()
 
@@ -63,7 +62,7 @@ class ProjectTriplesRemoverSpec
         forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
           val (projectData, child) = project.forkOnce()
 
-          upload(to = renkuDataset, projectData.asJsonLD, child.asJsonLD)
+          upload(to = renkuDataset, projectData, child)
 
           projectTriplesRemover.removeTriples(projectData.path).unsafeRunSync()
 
@@ -304,7 +303,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(topProjectDS).generateOne
 
-        upload(to = renkuDataset, bottomProject.asJsonLD, topProject.asJsonLD, topProjectFork.asJsonLD)
+        upload(to = renkuDataset, bottomProject, topProject, topProjectFork)
 
         projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
 
@@ -335,12 +334,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        upload(to = renkuDataset,
-               topProject.asJsonLD,
-               middleProject.asJsonLD,
-               middleProjectFork.asJsonLD,
-               bottomProject.asJsonLD
-        )
+        upload(to = renkuDataset, topProject, middleProject, middleProjectFork, bottomProject)
 
         projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
 
@@ -375,12 +369,7 @@ class ProjectTriplesRemoverSpec
         val (bottomProjectDS, bottomProject) =
           renkuProjectEntities(anyVisibility).importDataset(middleProjectDS).generateOne
 
-        upload(to = renkuDataset,
-               topProject.asJsonLD,
-               middleProject.asJsonLD,
-               middleProjectFork.asJsonLD,
-               bottomProject.asJsonLD
-        )
+        upload(to = renkuDataset, topProject, middleProject, middleProjectFork, bottomProject)
 
         projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
         projectTriplesRemover.removeTriples(middleProjectFork.path).unsafeRunSync()

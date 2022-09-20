@@ -21,7 +21,7 @@ package io.renku.graph.model.entities
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
-import io.renku.graph.model.{Graph, entities}
+import io.renku.graph.model.{GraphClass, entities}
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.JsonLD
@@ -34,7 +34,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class GenerationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
-    implicit val graph: Graph = Graph.Default
+    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Generation entity into the Generation object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>

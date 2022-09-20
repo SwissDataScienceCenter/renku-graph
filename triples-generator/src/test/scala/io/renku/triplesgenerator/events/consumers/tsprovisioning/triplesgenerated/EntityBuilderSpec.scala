@@ -48,6 +48,8 @@ import scala.util.{Failure, Success, Try}
 
 class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
+  private implicit val graph: GraphClass = GraphClass.Default
+
   "buildEntity" should {
 
     "successfully deserialize JsonLD to the model - case of a Renku Project" in new TestCase {

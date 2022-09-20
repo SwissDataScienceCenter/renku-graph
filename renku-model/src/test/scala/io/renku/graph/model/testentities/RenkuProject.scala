@@ -48,19 +48,6 @@ sealed trait RenkuProject extends Project with RenkuProject.ProjectOps with Prod
 
 object RenkuProject {
 
-  /** Finds all persons in the given project. This function works with the test-entity 
-   * `RenkuProject`. The original function is in `ProjectFunctions`. 
-   */
-  def findAllPersons(project: RenkuProject): Set[Person] =
-    project.members ++
-      project.maybeCreator ++
-      project.activities.map(_.author) ++
-      project.datasets.flatMap(_.provenance.creators.toList.toSet) ++
-      project.activities.flatMap(_.association.agent match {
-        case p: Person => Option(p)
-        case _ => Option.empty[Person]
-      })
-
   final case class WithoutParent(path:             Path,
                                  name:             Name,
                                  maybeDescription: Option[Description],
@@ -232,7 +219,7 @@ object RenkuProject {
   implicit def encoder[P <: RenkuProject](implicit
       renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl,
-      graph:        Graph
+      graph:        GraphClass
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
     case project: RenkuProject.WithParent    => project.to[entities.RenkuProject.WithParent].asJsonLD
     case project: RenkuProject.WithoutParent => project.to[entities.RenkuProject.WithoutParent].asJsonLD

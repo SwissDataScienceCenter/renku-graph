@@ -25,7 +25,6 @@ import io.renku.graph.model.GraphModelGenerators.{datasetNames, projectPaths}
 import io.renku.graph.model.testentities._
 import io.renku.http.rest.paging.model.Total
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
@@ -55,7 +54,7 @@ class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaF
         (original, modified, projStage4)
       }
 
-      upload(to = renkuDataset, project.asJsonLD)
+      upload(to = renkuDataset, project)
 
       original.identification.name shouldBe modified.identification.name
 
@@ -116,7 +115,7 @@ class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaF
       .addDataset(datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(Nil)))
       .generateOne
 
-    upload(to = renkuDataset, project.asJsonLD)
+    upload(to = renkuDataset, project)
 
     val response = finder.findTags(Criteria(project.path, original.identification.name)).unsafeRunSync()
 
@@ -138,7 +137,7 @@ class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaF
       .addDataset(datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(Nil)))
       .generateOne
 
-    upload(to = renkuDataset, project.asJsonLD)
+    upload(to = renkuDataset, project)
 
     val response = finder.findTags(Criteria(projectPaths.generateOne, original.identification.name)).unsafeRunSync()
 

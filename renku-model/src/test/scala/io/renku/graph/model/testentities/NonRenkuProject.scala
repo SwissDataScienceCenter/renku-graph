@@ -96,7 +96,7 @@ object NonRenkuProject {
   implicit def encoder[P <: NonRenkuProject](implicit
       renkuUrl:     RenkuUrl,
       gitLabApiUrl: GitLabApiUrl,
-      graph:        Graph
+      graph:        GraphClass
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
     case project: NonRenkuProject.WithParent    => project.to[entities.NonRenkuProject.WithParent].asJsonLD
     case project: NonRenkuProject.WithoutParent => project.to[entities.NonRenkuProject.WithoutParent].asJsonLD

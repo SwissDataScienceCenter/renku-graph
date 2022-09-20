@@ -29,7 +29,10 @@ import io.renku.http.client.AccessToken
 import org.http4s.Uri
 import GitLabStateGenerators._
 import cats.Monoid
-import io.renku.graph.model.testentities.{Person, RenkuProject}
+import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.entities
+import io.renku.graph.model.entities.EntityFunctions
+import io.renku.graph.model.testentities.{Person, Project => RenkuProject}
 
 /** Collection of functions to update the state in [[GitLabApiStub]]. */
 trait GitLabStateUpdates {
@@ -100,10 +103,19 @@ trait GitLabStateUpdates {
   def addProject(project: Project, webhook: Uri): StateUpdate =
     addProject(project) >> addWebhook(project.id, webhook)
 
-  def setupProject(project: Project, webhook: Uri, commits: CommitId*): StateUpdate =
+  def setupProject(project: Project, webhook: Uri, commits: CommitId*)(implicit renkuUrl: RenkuUrl): StateUpdate =
     addProject(project, webhook) >>
       addCommits(project.id, commits) >>
-      addPersons(RenkuProject.findAllPersons(project.entitiesProject))
+      addPersons(EntityFunctions[RenkuProject].findAllPersons(project.entitiesProject).map(toPerson))
+
+  private lazy val toPerson: entities.Person => Person = person =>
+    Person(
+      person.name,
+      person.maybeEmail,
+      person.maybeGitLabId,
+      person.maybeOrcidId,
+      person.maybeAffiliation
+    )
 
   def removeProject(projectId: Id): StateUpdate =
     removeCommits(projectId) >>

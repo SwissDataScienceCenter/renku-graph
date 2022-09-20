@@ -24,15 +24,15 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
-import io.renku.graph.model.entities.Project
-import io.renku.graph.model.{GitLabApiUrl, RenkuUrl}
+import io.renku.graph.model._
+import io.renku.graph.model.entities.{EntityFunctions, Person, Project}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import io.renku.triplesgenerator.events.consumers.{ProcessingRecoverableError, TSVersion}
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
-private trait TransformationResultsUploader[F[_], TS <: TSVersion] {
+private trait TransformationResultsUploader[F[_]] {
   def execute(query:  SparqlQuery): EitherT[F, ProcessingRecoverableError, Unit]
   def upload(project: Project):     EitherT[F, ProcessingRecoverableError, Unit]
 }
@@ -40,15 +40,16 @@ private trait TransformationResultsUploader[F[_], TS <: TSVersion] {
 private object TransformationResultsUploader {
 
   trait Locator[F[_]] {
-    def apply[TS <: TSVersion](implicit ev: TS): TransformationResultsUploader[F, TS]
+    def apply(tsVersion: TSVersion): TransformationResultsUploader[F]
   }
 
-  private class LocatorImpl[F[_]](defaultGraphResultsUploader: TransformationResultsUploader[F, TSVersion.DefaultGraph])
-      extends Locator[F] {
+  private class LocatorImpl[F[_]](defaultGraphResultsUploader: TransformationResultsUploader[F],
+                                  namedGraphsResultsUploader:  TransformationResultsUploader[F]
+  ) extends Locator[F] {
 
-    override def apply[TS <: TSVersion](implicit ev: TS) = ev match {
-      case TSVersion.DefaultGraph => defaultGraphResultsUploader.asInstanceOf[TransformationResultsUploader[F, TS]]
-      case TSVersion.NamedGraphs  => ???
+    override def apply(tsVersion: TSVersion): TransformationResultsUploader[F] = tsVersion match {
+      case TSVersion.DefaultGraph => defaultGraphResultsUploader
+      case TSVersion.NamedGraphs  => namedGraphsResultsUploader
     }
   }
 
@@ -56,26 +57,70 @@ private object TransformationResultsUploader {
     implicit0(renkuUrl: RenkuUrl)     <- RenkuUrlLoader[F]()
     implicit0(glApiUrl: GitLabApiUrl) <- GitLabUrlLoader[F]().map(_.apiV4)
     renkuConnectionConfig             <- RenkuConnectionConfig[F]()
+    projectsConnectionConfig          <- ProjectsConnectionConfig[F]()
   } yield new LocatorImpl(
-    new DefaultGraphResultsUploader[F](new ProjectUploaderImpl[F](renkuConnectionConfig),
+    new DefaultGraphResultsUploader[F](new JsonLDUploaderImpl[F](renkuConnectionConfig),
                                        new UpdateQueryRunnerImpl(renkuConnectionConfig)
+    ),
+    new NamedGraphsResultsUploader[F](new JsonLDUploaderImpl[F](projectsConnectionConfig),
+                                      new UpdateQueryRunnerImpl(projectsConnectionConfig)
     )
   )
 }
 
-private class DefaultGraphResultsUploader[F[_]: MonadThrow](projectUploader: ProjectUploader[F],
+private class DefaultGraphResultsUploader[F[_]: MonadThrow](jsonLDUploader: JsonLDUploader[F],
                                                             updateQueryRunner: UpdateQueryRunner[F]
 )(implicit renkuUrl:                                                           RenkuUrl, gitLabUrl: GitLabApiUrl)
-    extends TransformationResultsUploader[F, TSVersion.DefaultGraph] {
+    extends TransformationResultsUploader[F] {
+
+  private implicit val graph: GraphClass = GraphClass.Default
+  import jsonLDUploader._
 
   override def execute(query: SparqlQuery) = updateQueryRunner run query
 
-  override def upload(project: Project) = encode(project) >>= projectUploader.uploadProject
+  override def upload(project: Project) = encode(project) >>= uploadJsonLD
 
   private def encode(project: Project): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT
     .fromEither[F](project.asJsonLD.flatten)
     .leftSemiflatMap(error =>
-      NonRecoverableFailure(s"Metadata for project ${project.path} failed: ${error.getMessage}", error)
-        .raiseError[F, ProcessingRecoverableError]
+      NonRecoverableFailure(s"Encoding '${project.path}' failed", error).raiseError[F, ProcessingRecoverableError]
     )
+}
+
+private class NamedGraphsResultsUploader[F[_]: MonadThrow](jsonLDUploader: JsonLDUploader[F],
+                                                           updateQueryRunner: UpdateQueryRunner[F]
+)(implicit renkuUrl:                                                          RenkuUrl, gitLabUrl: GitLabApiUrl)
+    extends TransformationResultsUploader[F] {
+
+  import Schemas.schema
+  import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
+  import jsonLDUploader._
+
+  override def execute(query: SparqlQuery) = updateQueryRunner run query
+
+  override def upload(project: Project): EitherT[F, ProcessingRecoverableError, Unit] =
+    encode(project).flatMap(_.map(uploadJsonLD).sequence.void)
+
+  private def encode(project: Project): EitherT[F, ProcessingRecoverableError, List[NamedGraph]] = EitherT.right {
+    (projectGraph(project) -> maybePersonsGraph(project))
+      .mapN(_ :: _.toList)
+      .flatMap(_.map(_.flatten).sequence)
+      .fold(
+        error => NonRecoverableFailure(s"Encoding '${project.path}' failed", error).raiseError[F, List[NamedGraph]],
+        _.pure[F]
+      )
+  }
+
+  private def projectGraph(project: Project) = {
+    implicit val encoder: JsonLDEncoder[Project] = EntityFunctions[Project].encoder(GraphClass.Project)
+    NamedGraph.from(project.resourceId.asEntityId, project.asJsonLD)
+  }
+
+  private def maybePersonsGraph(project: Project) =
+    EntityFunctions[Project].findAllPersons(project).toList match {
+      case Nil => Option.empty[NamedGraph].asRight
+      case h :: t =>
+        implicit val encoder: JsonLDEncoder[Person] = EntityFunctions[Person].encoder(GraphClass.Persons)
+        NamedGraph.from(schema / "Person", h.asJsonLD, t.map(_.asJsonLD): _*).map(Option.apply)
+    }
 }

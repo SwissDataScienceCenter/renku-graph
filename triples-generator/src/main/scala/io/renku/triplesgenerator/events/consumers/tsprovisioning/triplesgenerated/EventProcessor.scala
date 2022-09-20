@@ -25,6 +25,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import eu.timepit.refined.auto._
+import io.renku.graph.model.TSVersion
+import io.renku.graph.model.entities.Project
 import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -82,11 +84,12 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   )(implicit accessToken: Option[AccessToken]): F[UploadingResult] = {
     for {
       project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      result <- right[UploadingResult](
-                  run[TSVersion.DefaultGraph](createSteps[TSVersion.DefaultGraph], project) >>= toUploadingResult(event)
-                )
+      result  <- right[UploadingResult](createAndRunSteps(TSVersion.DefaultGraph, project) >>= toUploadingResult(event))
     } yield result
   }.merge recoverWith nonRecoverableFailure(event)
+
+  private def createAndRunSteps(tsVersion: TSVersion, project: Project) =
+    run(createSteps(tsVersion), project)(tsVersion)
 
   private def toUploadingResult(event: TriplesGeneratedEvent): TriplesUploadResult => F[UploadingResult] = {
     case DeliverySuccess =>

@@ -25,11 +25,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{entities, projects}
-import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
+import io.renku.triplesstore._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -97,9 +96,7 @@ class UpdatesCreatorSpec
         upload(to = renkuDataset, project)
 
         val parentId = projectResourceIds.generateOne
-        upload(to = renkuDataset,
-               JsonLD.edge(project.resourceId.asEntityId, prov / "wasDerivedFrom", parentId.asEntityId)
-        )
+        insert(to = renkuDataset, Triple.edge(project.resourceId, prov / "wasDerivedFrom", parentId.asEntityId))
 
         findProjects shouldBe Set(CurrentProjectState.from(project).copy(maybeParentId = parentId.show.some))
 
