@@ -103,7 +103,7 @@ trait GitLabStateUpdates {
   def setupProject(project: Project, webhook: Uri, commits: CommitId*): StateUpdate =
     addProject(project, webhook) >>
       addCommits(project.id, commits) >>
-      addPersons(GitLabStateUpdates.findAllPersons(project.entitiesProject))
+      addPersons(RenkuProject.findAllPersons(project.entitiesProject))
 
   def removeProject(projectId: Id): StateUpdate =
     removeCommits(projectId) >>
@@ -117,15 +117,4 @@ trait GitLabStateUpdates {
     state => state.copy(brokenProjects = state.brokenProjects - id)
 }
 
-object GitLabStateUpdates extends GitLabStateUpdates {
-  // TODO: this is a copy from ProjectFunctions which is not in scope
-  private lazy val findAllPersons: RenkuProject => Set[Person] = project =>
-    project.members ++
-      project.maybeCreator ++
-      project.activities.map(_.author) ++
-      project.datasets.flatMap(_.provenance.creators.toList.toSet) ++
-      project.activities.flatMap(_.association.agent match {
-        case p: Person => Option(p)
-        case _ => Option.empty[Person]
-      })
-}
+object GitLabStateUpdates extends GitLabStateUpdates
