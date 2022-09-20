@@ -31,6 +31,7 @@ import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl}
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
+import io.renku.jsonld.JsonLD.JsonLDEntityLike
 import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import org.testcontainers.containers.wait.strategy.Wait
@@ -110,18 +111,6 @@ trait InMemoryJena {
       ioRuntime:       IORuntime
   ): Unit = upload(to, objects >>= graphsProducer.apply: _*)
 
-  def insert(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
-    .runUpdate {
-      SparqlQuery.of("insert triple", show"INSERT DATA { $triple }")
-    }
-    .unsafeRunSync()
-
-  def delete(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
-    .runUpdate {
-      SparqlQuery.of("delete triple", show"DELETE DATA { $triple }")
-    }
-    .unsafeRunSync()
-
   def runSelect(on: DatasetName, query: SparqlQuery): IO[List[Map[String, String]]] =
     queryRunnerFor(on).runQuery(query)
 
@@ -153,7 +142,7 @@ trait InMemoryJena {
 
   private lazy val datasetsCreator = TSAdminClient[IO](AdminConnectionConfig(fusekiUrl, adminCredentials))
 
-  private def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
+  protected def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
 
   private def queryRunner(connectionInfo: DatasetConnectionConfig) = new TSClientImpl[IO](connectionInfo) {
 
@@ -196,13 +185,45 @@ trait InMemoryJena {
   }
 }
 
+sealed trait DefaultGraphDataset {
+  self: InMemoryJena =>
+
+  def insert(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
+    .runUpdate {
+      SparqlQuery.of("insert triple", show"INSERT DATA { $triple }")
+    }
+    .unsafeRunSync()
+
+  def delete(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
+    .runUpdate {
+      SparqlQuery.of("delete triple", show"DELETE DATA { $triple }")
+    }
+    .unsafeRunSync()
+}
+
+sealed trait NamedGraphDataset {
+  self: InMemoryJena =>
+
+  def delete(from: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
+    .runUpdate {
+      SparqlQuery.of("delete quad", show"DELETE DATA { $quad }")
+    }
+    .unsafeRunSync()
+
+  def insert(to: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
+    .runUpdate {
+      SparqlQuery.of("insert quad", show"INSERT DATA { $quad }")
+    }
+    .unsafeRunSync()
+}
+
 trait GraphsProducer[T] {
   def apply(obj: T)(implicit entityFunctions: EntityFunctions[T]): List[Graph]
 }
 
 trait JenaDataset { self: InMemoryJena => }
 
-trait RenkuDataset extends JenaDataset {
+trait RenkuDataset extends JenaDataset with DefaultGraphDataset {
   self: InMemoryJena =>
 
   private lazy val configFile: Either[Exception, DatasetConfigFile] = RenkuTTL.fromTtlFile()
@@ -230,7 +251,7 @@ trait RenkuDataset extends JenaDataset {
     }
 }
 
-trait ProjectsDataset extends JenaDataset {
+trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
   self: InMemoryJena =>
 
   private lazy val configFile: Either[Exception, DatasetConfigFile] = ProjectsTTL.fromTtlFile()
@@ -261,11 +282,14 @@ trait ProjectsDataset extends JenaDataset {
       import io.renku.jsonld.syntax._
 
       override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] =
-        buildProjectGraph(entity) :: maybeBuildPersonsGraph(entity).toList
+        List(maybeBuildProjectGraph(entity), maybeBuildPersonsGraph(entity)).flatten
 
-      private def buildProjectGraph(entity: A)(implicit entityFunctions: EntityFunctions[A], renkuUrl: RenkuUrl) = {
+      private def maybeBuildProjectGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
         implicit val projectEnc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Project)
-        NamedGraph.fromJsonLDsUnsafe(projectGraphId(entity), entity.asJsonLD)
+        entity.asJsonLD match {
+          case jsonLD: JsonLDEntityLike => NamedGraph.fromJsonLDsUnsafe(projectGraphId(entity), jsonLD).some
+          case _ => None
+        }
       }
 
       private def maybeBuildPersonsGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
@@ -283,7 +307,7 @@ trait ProjectsDataset extends JenaDataset {
     }
 }
 
-trait MigrationsDataset extends JenaDataset {
+trait MigrationsDataset extends JenaDataset with DefaultGraphDataset {
   self: InMemoryJena =>
 
   private lazy val configFile: Either[Exception, MigrationsTTL] = MigrationsTTL.fromTtlFile()

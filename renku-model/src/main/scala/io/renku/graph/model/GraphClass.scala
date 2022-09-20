@@ -18,7 +18,9 @@
 
 package io.renku.graph.model
 
+import Schemas.schema
 import cats.Show
+import io.renku.jsonld.EntityId
 
 sealed trait GraphClass extends Product with Serializable
 
@@ -28,9 +30,13 @@ object GraphClass {
 
   case object Default extends GraphClass
   type Default = Default.type
+
   case object Project extends GraphClass
   type Project = Project.type
-  case object Persons extends GraphClass
+
+  case object Persons extends GraphClass {
+    lazy val id: EntityId = EntityId of schema / "Person"
+  }
   type Persons = Persons.type
 
   implicit val show: Show[GraphClass] = Show.show(_.productPrefix)
