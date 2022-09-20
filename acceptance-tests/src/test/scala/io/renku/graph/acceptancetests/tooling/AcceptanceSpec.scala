@@ -16,21 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.graph.acceptancetests.flows
+package io.renku.graph.acceptancetests.tooling
 
-import io.circe.syntax._
-import io.renku.graph.acceptancetests.data.Project
-import io.renku.graph.acceptancetests.tooling.ApplicationServices
-import io.renku.http.client.AccessToken
+import cats.effect.IO
+import com.typesafe.config.{Config, ConfigFactory}
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.RenkuUrl
 import io.renku.testtools.IOSpec
-import org.http4s.Status._
-import org.scalatest.Assertion
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import org.typelevel.log4cats.Logger
 
-trait AccessTokenPresence extends should.Matchers {
-  self: ApplicationServices with IOSpec =>
+import scala.util.Try
 
-  def givenAccessTokenPresentFor(project: Project, accessToken: AccessToken): Assertion =
-    tokenRepositoryClient
-      .PUT(s"projects/${project.id}/tokens", accessToken.asJson, None) shouldBe NoContent
+trait AcceptanceSpec extends AnyFeatureSpec with IOSpec with GivenWhenThen with should.Matchers {
+  val testConfig: Config = ConfigFactory.load()
+
+  implicit val testLogger: Logger[IO] = TestLogger()
+
+  implicit val renkuUrl: RenkuUrl = RenkuUrlLoader[Try]().fold(throw _, identity)
 }

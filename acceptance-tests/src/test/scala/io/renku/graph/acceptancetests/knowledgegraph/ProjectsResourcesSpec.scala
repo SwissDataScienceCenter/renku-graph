@@ -24,7 +24,7 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.RenkuProject._
@@ -34,18 +34,15 @@ import io.renku.http.rest.Links
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
 class ProjectsResourcesSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
+    extends AcceptanceSpec
+    with ApplicationServices
     with TSProvisioning
-    with DatasetsResources {
+    with DatasetsApiEncoders {
 
   private val user = authUsers.generateOne
-  private implicit val accessToken: AccessToken = user.accessToken
+  private val accessToken: AccessToken = user.accessToken
 
   private val (parentProject, project) = {
     val creator = personEntities(withGitLabId, withEmail).generateOne
@@ -69,16 +66,19 @@ class ProjectsResourcesSpec
     Scenario("As a user I would like to find project's details by calling a REST endpoint") {
 
       Given("the user is authenticated")
-      `GET <gitlabApi>/user returning OK`(user)
+      gitLabStub.addAuthenticated(user)
 
       And("there are some data in the Triples Store")
       val parentCommitId = commitIds.generateOne
-      mockDataOnGitLabAPIs(parentProject, parentProject.entitiesProject.asJsonLD, parentCommitId)
-      `data in the Triples Store`(parentProject, parentCommitId)
+      mockCommitDataOnTripleGenerator(parentProject, parentProject.entitiesProject.asJsonLD, parentCommitId)
+      gitLabStub.setupProject(parentProject, parentCommitId)
+
+      `data in the Triples Store`(parentProject, parentCommitId, accessToken)
 
       val commitId = commitIds.generateOne
-      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
+      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
+      gitLabStub.setupProject(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       When("the user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
@@ -103,12 +103,12 @@ class ProjectsResourcesSpec
       foundDatasets should contain theSameElementsAs project.entitiesProject.datasets.map(briefJson(_, project.path))
 
       When("there's an authenticated user who is not project member")
-      val nonMemberAccessToken = accessTokens.generateOne
-      `GET <gitlabApi>/user returning OK`()(nonMemberAccessToken)
+      val nonMemberUser = authUsers.generateOne
+      gitLabStub.addAuthenticated(nonMemberUser)
 
       And("he fetches project's details")
       val projectDetailsResponseForNonMember =
-        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", nonMemberAccessToken)
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", nonMemberUser.accessToken)
 
       Then("he should get NOT_FOUND response")
       projectDetailsResponseForNonMember.status shouldBe NotFound

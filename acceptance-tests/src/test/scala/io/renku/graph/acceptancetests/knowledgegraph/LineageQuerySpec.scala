@@ -21,12 +21,12 @@ package io.renku.graph.acceptancetests.knowledgegraph
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
-import io.renku.generators.CommonGraphGenerators.{accessTokens, authUsers}
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas._
@@ -38,16 +38,14 @@ import io.renku.graph.model.testentities.{LineageExemplarData, NodeDef}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 import sangria.ast.Document
 import sangria.macros._
 
-class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSProvisioning {
+class LineageQuerySpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("GraphQL query to find lineage") {
-
-    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val user = authUsers.generateOne
+    val accessToken: AccessToken = user.accessToken
 
     val (exemplarData, project) = {
       val lineageData = LineageExemplarData(
@@ -79,8 +77,10 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
 
       Given("some data in the Triples Store")
       val commitId = commitIds.generateOne
-      mockDataOnGitLabAPIs(project, exemplarData.project.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
+      gitLabStub.setupProject(project, commitId)
+      gitLabStub.addAuthenticated(user)
+      mockCommitDataOnTripleGenerator(project, exemplarData.project.asJsonLD, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery
@@ -131,11 +131,10 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
       Given("some data in the Triples Store with a project I am a member of")
       val commitId = commitIds.generateOne
       val project  = dataProjects(accessibleExemplarData.project).generateOne
-      mockDataOnGitLabAPIs(project, accessibleExemplarData.project.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
-
-      And("I am authenticated")
-      `GET <gitlabApi>/user returning OK`(user)
+      gitLabStub.addAuthenticated(user)
+      gitLabStub.setupProject(project, commitId)
+      mockCommitDataOnTripleGenerator(project, accessibleExemplarData.project.asJsonLD, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       When("user posts a graphql query to fetch lineage of the project he is a member of")
       val response = knowledgeGraphClient.POST(
@@ -156,20 +155,23 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
     }
 
     Scenario("As an authenticated user I should not be able to find lineage of project I am not a member of") {
-
+      val creator = authUsers.generateOne
+      gitLabStub.addAuthenticated(creator)
       val privateExemplarData = LineageExemplarData(
         renkuProjectEntities(fixed(Visibility.Private)).generateOne.copy(
           path = model.projects.Path("private/secret-project"),
-          members = Set.empty
+          members = Set.empty,
+          maybeCreator = personEntities(creator.id.some).generateOne.some
         )
       )
       val commitId = commitIds.generateOne
       val project  = dataProjects(privateExemplarData.project).generateOne
-      mockDataOnGitLabAPIs(project, privateExemplarData.project.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
 
       Given("I am authenticated")
-      `GET <gitlabApi>/user returning OK`(user)
+      gitLabStub.addAuthenticated(user)
+      gitLabStub.setupProject(project, commitId)
+      mockCommitDataOnTripleGenerator(project, privateExemplarData.project.asJsonLD, commitId)
+      `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user posts a graphql query to fetch lineage of the project he is not a member of")
       val privateProjectResponse = knowledgeGraphClient.POST(
@@ -191,15 +193,19 @@ class LineageQuerySpec extends AnyFeatureSpec with GivenWhenThen with GraphServi
 
     Scenario("As an unauthenticated user I should not be able to find a lineage from a private project") {
       Given("some data in the Triples Store with a project I am a member of")
+      val creator = authUsers.generateOne
+      gitLabStub.addAuthenticated(creator)
       val exemplarData = LineageExemplarData(
         renkuProjectEntities(fixed(Visibility.Private)).generateOne.copy(
-          path = model.projects.Path("unauthenticated/private-project")
+          path = model.projects.Path("unauthenticated/private-project"),
+          maybeCreator = personEntities(creator.id.some).generateOne.some
         )
       )
       val commitId = commitIds.generateOne
       val project  = dataProjects(exemplarData.project).generateOne
-      mockDataOnGitLabAPIs(project, exemplarData.project.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
+      gitLabStub.setupProject(project, commitId)
+      mockCommitDataOnTripleGenerator(project, exemplarData.project.asJsonLD, commitId)
+      `data in the Triples Store`(project, commitId, creator.accessToken)
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient.POST(namedLineageQuery,

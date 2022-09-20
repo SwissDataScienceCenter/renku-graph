@@ -22,26 +22,23 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog._
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.flows.AccessTokenPresence
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
-import io.renku.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.http.client.AccessToken
+import io.renku.http.server.security.model.AuthUser
 import io.renku.microservices.MicroserviceIdentifier
 import org.scalacheck.Gen
-import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
-import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
 import org.scalatest.time.{Minutes, Seconds, Span}
 import skunk.data.Completion
 import skunk.implicits._
@@ -52,15 +49,13 @@ import java.time.Instant
 import scala.concurrent.duration._
 
 class ZombieEventDetectionSpec
-    extends AnyFeatureSpec
-    with GraphServices
+    extends AcceptanceSpec
+    with ApplicationServices
     with Eventually
     with ModelImplicits
     with AccessTokenPresence
-    with GivenWhenThen
     with TypeSerializers
-    with AcceptanceTestPatience
-    with should.Matchers {
+    with AcceptanceTestPatience {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(3, Minutes)),
@@ -71,7 +66,7 @@ class ZombieEventDetectionSpec
     s"An event which got stuck in either $GeneratingTriples or $TransformingTriples status " +
       s"should be detected and re-processes"
   ) {
-    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val user: AuthUser = authUsers.generateOne
     val project   = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
     val commitId  = commitIds.generateOne
     val eventDate = eventDates.generateOne
@@ -79,22 +74,12 @@ class ZombieEventDetectionSpec
     Given("Triples generation is successful")
     `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
-    And("project exists in GitLab")
-    `GET <gitlabApi>/projects/:path AND :id returning OK with`(project)
+    And("a project with a commit exists in GitLab")
+    gitLabStub.addAuthenticated(user)
+    gitLabStub.setupProject(project, commitId)
 
-    `GET <gitlabApi>/projects/:id/events?action=pushed&page=1 returning OK`(project.entitiesProject.maybeCreator,
-                                                                            project,
-                                                                            commitId
-    )
-
-    And("the event commit in GitLab")
-    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project, commitId)
-
-    And("the event classified as zombie is the latest commit in GitLab")
-    `GET <gitlabApi>/projects/:id/repository/commits per page returning OK with commits`(project.id, commitId)
-
-    And("access token is present")
-    givenAccessTokenPresentFor(project)
+    And("an access token is present")
+    givenAccessTokenPresentFor(project, user.accessToken)
 
     And("an event that should be classified as zombie is in the EventLog DB")
     insertProjectToDB(project, eventDate) shouldBe 1
