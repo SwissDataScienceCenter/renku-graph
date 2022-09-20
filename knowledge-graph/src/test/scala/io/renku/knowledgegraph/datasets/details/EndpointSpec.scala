@@ -275,9 +275,10 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
   private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {
-      path <- cursor.downField("path").as[Path]
-      name <- cursor.downField("name").as[projects.Name]
-    } yield DatasetProject(path, name)
+      path       <- cursor.downField("path").as[Path]
+      name       <- cursor.downField("name").as[projects.Name]
+      visibility <- cursor.downField("visibility").as[projects.Visibility]
+    } yield DatasetProject(path, name, visibility)
 
   private implicit lazy val versionsDecoder: Decoder[DatasetVersions] = cursor =>
     for {

@@ -28,7 +28,7 @@ package object details {
   import Dataset._
 
   private[details] implicit lazy val projectToDatasetProject: RenkuProject => DatasetProject =
-    project => DatasetProject(project.path, project.name)
+    project => DatasetProject(project.path, project.name, project.visibility)
 
   private[details] def internalToNonModified(dataset: ModelDataset[ModelDataset.Provenance.Internal],
                                              project: RenkuProject
@@ -44,8 +44,8 @@ package object details {
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
     dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-    DatasetProject(project.path, project.name),
-    usedIn = List(DatasetProject(project.path, project.name)),
+    projectToDatasetProject(project),
+    usedIn = List(projectToDatasetProject(project)),
     dataset.additionalInfo.keywords.sorted,
     dataset.additionalInfo.images
   )
@@ -64,8 +64,8 @@ package object details {
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
     dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-    DatasetProject(project.path, project.name),
-    usedIn = List(DatasetProject(project.path, project.name)),
+    projectToDatasetProject(project),
+    usedIn = List(projectToDatasetProject(project)),
     dataset.additionalInfo.keywords.sorted,
     dataset.additionalInfo.images
   )
@@ -84,8 +84,8 @@ package object details {
     dataset.provenance.creators.map(personToCreator).sortBy(_.name).toList,
     dataset.provenance.date,
     dataset.parts.map(part => DatasetPart(PartLocation(part.entity.location.value))).sortBy(_.location),
-    DatasetProject(project.path, project.name),
-    usedIn = List(DatasetProject(project.path, project.name)),
+    projectToDatasetProject(project),
+    usedIn = List(projectToDatasetProject(project)),
     dataset.additionalInfo.keywords.sorted,
     dataset.additionalInfo.images
   )
@@ -107,8 +107,8 @@ package object details {
       .filterNot { case _: testentities.DatasetPart with HavingInvalidationTime => true; case _ => false }
       .map(part => DatasetPart(PartLocation(part.entity.location.value)))
       .sortBy(_.location),
-    DatasetProject(project.path, project.name),
-    usedIn = List(DatasetProject(project.path, project.name)),
+    projectToDatasetProject(project),
+    usedIn = List(projectToDatasetProject(project)),
     dataset.additionalInfo.keywords.sorted,
     dataset.additionalInfo.images
   )
