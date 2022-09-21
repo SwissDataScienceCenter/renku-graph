@@ -31,7 +31,7 @@ import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl}
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.JsonLD.JsonLDEntityLike
+import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntityLike}
 import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import org.testcontainers.containers.wait.strategy.Wait
@@ -269,14 +269,10 @@ trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
   import io.renku.graph.model.GraphModelGenerators.projectPaths
   import io.renku.graph.model.projects.Path
 
-  lazy val defaultProjectForGraph: Path = projectPaths.generateOne
-
-  def defaultProjectGraphId(implicit renkuUrl: RenkuUrl): EntityId =
-    io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)
+  private lazy val defaultProjectForGraph: Path = projectPaths.generateOne
 
   protected implicit def graphsProducer[A](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): GraphsProducer[A] =
     new GraphsProducer[A] {
-      import io.renku.graph.model.Schemas.schema
       import io.renku.graph.model.entities
       import io.renku.jsonld.NamedGraph
       import io.renku.jsonld.syntax._
@@ -287,7 +283,8 @@ trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
       private def maybeBuildProjectGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
         implicit val projectEnc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Project)
         entity.asJsonLD match {
-          case jsonLD: JsonLDEntityLike => NamedGraph.fromJsonLDsUnsafe(projectGraphId(entity), jsonLD).some
+          case jsonLD: JsonLDEntityLike => NamedGraph(projectGraphId(entity), jsonLD).some
+          case jsonLD: JsonLDArray      => NamedGraph.fromJsonLDsUnsafe(projectGraphId(entity), jsonLD).some
           case _ => None
         }
       }
@@ -296,13 +293,13 @@ trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
         implicit val graph: GraphClass = GraphClass.Persons
         entityFunctions.findAllPersons(entity).toList.map(_.asJsonLD) match {
           case Nil    => None
-          case h :: t => NamedGraph.fromJsonLDsUnsafe(schema / "Person", h, t: _*).some
+          case h :: t => NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, h, t: _*).some
         }
       }
 
       private def projectGraphId(entity: A): EntityId = entity match {
-        case p: entities.Project => p.resourceId.asEntityId
-        case _ => defaultProjectGraphId
+        case p: entities.Project => GraphClass.Project.id(p.resourceId)
+        case _ => io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)
       }
     }
 }

@@ -26,12 +26,16 @@ sealed trait GraphClass extends Product with Serializable
 
 object GraphClass {
 
+  import io.renku.jsonld.syntax._
+
   lazy val all: Set[GraphClass] = Set(Default, Project, Persons)
 
   case object Default extends GraphClass
   type Default = Default.type
 
-  case object Project extends GraphClass
+  case object Project extends GraphClass {
+    def id(resourceId: projects.ResourceId): EntityId = resourceId.asEntityId
+  }
   type Project = Project.type
 
   case object Persons extends GraphClass {
