@@ -364,7 +364,8 @@ Response body example:
       }
     ],
     "path": "namespace1/project1-name",
-    "name": "project1 name"
+    "name": "project1 name",
+    "visibility": "public"
   },
   "usedIn": [
     {
@@ -375,7 +376,8 @@ Response body example:
         }
       ],
       "path": "namespace1/project1-name",
-      "name": "project1 name"
+      "name": "project1 name",
+      "visibility": "public"
     },
     {
       "_links": [
@@ -385,15 +387,16 @@ Response body example:
         }
       ],
       "path": "namespace2/project2-name",
-      "name": "project2 name"
+      "name": "project2 name",
+      "visibility": "public"
     }
   ],
   "keywords": [ "rldzpwo", "gfioui" ],
   "images": [
     {
       "location": "image.png",
-      "_links":[  
-         {  
+      "_links":[
+         {
             "rel":  "view",
             "href": "https://renkulab.io/gitlab/project_path/raw/master/data/mniouUnmal/image.png"
          }
@@ -401,8 +404,8 @@ Response body example:
     },
     {
       "location": "http://host/external-image.png",
-      "_links":[  
-         {  
+      "_links":[
+         {
             "rel":  "view",
             "href": "http://host/external-image.png"
          }
