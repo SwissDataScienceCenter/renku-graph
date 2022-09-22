@@ -20,9 +20,7 @@ package io.renku.graph.acceptancetests.db
 
 import cats.effect.{IO, Temporal}
 import cats.{Applicative, Monad}
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
@@ -30,7 +28,7 @@ import scala.concurrent.duration._
 
 object TriplesStore extends InMemoryJena with RenkuDataset with MigrationsDataset {
 
-  protected override val maybeJenaFixedPort: Option[Int Refined Positive] = Some(3030)
+  protected override val jenaRunMode: JenaRunMode = JenaRunMode.FixedPortContainer(3030)
 
   def start()(implicit logger: Logger[IO]): IO[Unit] = for {
     _ <- Applicative[IO].unlessA(isRunning)(IO(container.start()))
