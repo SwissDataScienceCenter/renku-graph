@@ -16,15 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.events
+package io.renku.graph.acceptancetests.tooling
 
-import io.renku.tinytypes.constraints.NonBlank
-import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
+import cats.effect.IO
+import com.typesafe.config.{Config, ConfigFactory}
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model.RenkuUrl
+import io.renku.testtools.IOSpec
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
+import org.typelevel.log4cats.Logger
 
-final class CategoryName private (val value: String) extends AnyVal with StringTinyType
-object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank[CategoryName] {
-  import io.circe.Decoder
-  import io.renku.tinytypes.json.TinyTypeDecoders.stringDecoder
+import scala.util.Try
 
-  implicit val decoder: Decoder[CategoryName] = stringDecoder(CategoryName)
+trait AcceptanceSpec extends AnyFeatureSpec with IOSpec with GivenWhenThen with should.Matchers {
+  val testConfig: Config = ConfigFactory.load()
+
+  implicit val testLogger: Logger[IO] = TestLogger()
+
+  implicit val renkuUrl: RenkuUrl = RenkuUrlLoader[Try]().fold(throw _, identity)
 }

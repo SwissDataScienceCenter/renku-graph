@@ -22,24 +22,17 @@ import cats.effect._
 import cats.effect.std.Semaphore
 import io.renku._
 import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository, TriplesStore}
-import io.renku.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubSupport
+import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator
 import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
-import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.RenkuUrl
 import io.renku.triplesstore.FusekiUrl
-import io.renku.testtools.IOSpec
-import org.scalatest.{BeforeAndAfterAll, Suite}
-import org.typelevel.log4cats.Logger
+import org.scalatest.BeforeAndAfterAll
 
-import scala.util.Try
+trait ApplicationServices extends GitLabStubSupport with RemoteTriplesGenerator with BeforeAndAfterAll {
+  self: AcceptanceSpec =>
 
-trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with BeforeAndAfterAll {
-  self: Suite =>
-
-  protected implicit lazy val fusekiUrl: FusekiUrl  = TriplesStore.fusekiUrl
-  implicit val renkuUrl:                 RenkuUrl   = RenkuUrlLoader[Try]().fold(throw _, identity)
-  implicit lazy val logger:              Logger[IO] = TestLogger()
+  protected implicit lazy val fusekiUrl: FusekiUrl = TriplesStore.fusekiUrl
 
   val restClient:               RestClientImpl                = new RestClientImpl()
   val webhookServiceClient:     WebhookServiceClient          = WebhookServiceClient()
@@ -53,7 +46,7 @@ trait GraphServices extends GitLab with RemoteTriplesGenerator with IOSpec with 
 
   def stop(service: ServiceRun): Unit = servicesRunner.stop(service)
 
-  protected override def beforeAll(): Unit = {
+  override def beforeAll(): Unit = {
     super.beforeAll()
 
     servicesRunner

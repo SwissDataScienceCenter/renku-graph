@@ -24,7 +24,7 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.GraphServices
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.publicationEvents
 import io.renku.graph.model.testentities._
@@ -32,19 +32,17 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 
-class ProjectDatasetTagsResourceSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with TSProvisioning {
+class ProjectDatasetTagsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets/:dsName/tags to find project dataset's tags") {
 
     Scenario("As a user I would like to find project dataset's tags by calling a REST endpoint") {
       val user = authUsers.generateOne
-      implicit val accessToken: AccessToken = user.accessToken
+      val accessToken: AccessToken = user.accessToken
 
       Given("the user is authenticated")
-      `GET <gitlabApi>/user returning OK`(user)
+      gitLabStub.addAuthenticated(user)
 
       And("there's a project with datasets and tags")
       val (dataset, project) = {
@@ -61,8 +59,10 @@ class ProjectDatasetTagsResourceSpec extends AnyFeatureSpec with GivenWhenThen w
       }
 
       val commitId = commitIds.generateOne
-      mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(project, commitId)
+      // mockDataOnGitLabAPIs(project, project.entitiesProject.asJsonLD, commitId)
+      mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, commitId)
+      gitLabStub.setupProject(project, commitId)
+      `data in the Triples Store`(project, commitId, accessToken)
 
       When("the user fetches the tags with GET knowledge-graph/projects/:namespace/:name/datasets/:dsName/tags")
       val response = knowledgeGraphClient.GET(
@@ -77,7 +77,6 @@ class ProjectDatasetTagsResourceSpec extends AnyFeatureSpec with GivenWhenThen w
         .map(_.hcursor.downField("name").as[publicationEvents.Name])
         .sequence
         .fold(fail(_), identity) shouldBe dataset.publicationEvents.sortBy(_.startDate).reverse.map(_.name)
-
     }
   }
 }

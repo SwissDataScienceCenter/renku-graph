@@ -27,6 +27,7 @@ import io.circe.syntax._
 import io.renku.config.renku
 import io.renku.graph.config.GitLabUrlLoader
 import io.renku.graph.model._
+import io.renku.graph.model.projects.Visibility
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
 import io.renku.knowledgegraph.docs.model.Operation.GET
@@ -83,8 +84,8 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       ),
       datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
       List(DatasetPart(datasets.PartLocation("data"))),
-      DatasetProject(projects.Path("group/subgroup/name"), projects.Name("name")),
-      List(DatasetProject(projects.Path("group/subgroup/name"), projects.Name("name"))),
+      DatasetProject(projects.Path("group/subgroup/name"), projects.Name("name"), Visibility.Public),
+      List(DatasetProject(projects.Path("group/subgroup/name"), projects.Name("name"), Visibility.Public)),
       List(datasets.Keyword("key")),
       List(datasets.ImageUri("image.png"))
     ): Dataset).asJson

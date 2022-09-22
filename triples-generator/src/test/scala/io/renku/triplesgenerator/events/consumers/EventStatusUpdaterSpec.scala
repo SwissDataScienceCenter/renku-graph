@@ -37,18 +37,12 @@ import io.renku.http.client.RestClient._
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
-import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventStatusUpdaterSpec
-    extends AnyWordSpec
-    with IOSpec
-    with MockFactory
-    with should.Matchers
-    with TinyTypeEncoders {
+class EventStatusUpdaterSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "toTriplesGenerated" should {
 

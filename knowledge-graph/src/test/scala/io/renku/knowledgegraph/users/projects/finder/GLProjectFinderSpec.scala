@@ -135,8 +135,7 @@ class GLProjectFinderSpec
 
   private def uri(criteria: Criteria) = uri"users" / criteria.userId.show / "projects"
 
-  private implicit lazy val projectEncoder: Encoder[(model.Project.NotActivated, Option[persons.GitLabId])] = {
-    import io.renku.tinytypes.json.TinyTypeEncoders._
+  private implicit lazy val projectEncoder: Encoder[(model.Project.NotActivated, Option[persons.GitLabId])] =
     Encoder.instance { case (project, maybeCreatorId) =>
       json"""{
         "id":                  ${project.id},
@@ -149,5 +148,4 @@ class GLProjectFinderSpec
       }"""
         .addIfDefined("visibility" -> Option.when(project.visibility != projects.Visibility.Public)(project.visibility))
     }
-  }
 }

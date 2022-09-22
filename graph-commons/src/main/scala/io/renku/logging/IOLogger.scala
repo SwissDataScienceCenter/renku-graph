@@ -24,43 +24,43 @@ import org.typelevel.log4cats.Logger
 
 class IOLogger(logger: Slf4jLogger) extends Logger[IO] {
 
-  override def error(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+  override def error(t: Throwable)(message: => String): IO[Unit] = IO.delay {
     logger.error(message, t)
   }
 
-  override def warn(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+  override def warn(t: Throwable)(message: => String): IO[Unit] = IO.delay {
     logger.warn(message, t)
   }
 
-  override def info(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+  override def info(t: Throwable)(message: => String): IO[Unit] = IO.delay {
     logger.info(message, t)
   }
 
-  override def debug(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+  override def debug(t: Throwable)(message: => String): IO[Unit] = IO.delay {
     logger.debug(message, t)
   }
 
-  override def trace(t: Throwable)(message: => String): IO[Unit] = IO.pure {
+  override def trace(t: Throwable)(message: => String): IO[Unit] = IO.delay {
     logger.trace(message, t)
   }
 
-  override def error(message: => String): IO[Unit] = IO.pure {
+  override def error(message: => String): IO[Unit] = IO.delay {
     logger.error(message)
   }
 
-  override def warn(message: => String): IO[Unit] = IO.pure {
+  override def warn(message: => String): IO[Unit] = IO.delay {
     logger.warn(message)
   }
 
-  override def info(message: => String): IO[Unit] = IO.pure {
+  override def info(message: => String): IO[Unit] = IO.delay {
     logger.info(message)
   }
 
-  override def debug(message: => String): IO[Unit] = IO.pure {
+  override def debug(message: => String): IO[Unit] = IO.delay {
     logger.debug(message)
   }
 
-  override def trace(message: => String): IO[Unit] = IO.pure {
+  override def trace(message: => String): IO[Unit] = IO.delay {
     logger.trace(message)
   }
 }

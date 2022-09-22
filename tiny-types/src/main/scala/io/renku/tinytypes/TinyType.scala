@@ -20,7 +20,7 @@ package io.renku.tinytypes
 
 import cats.syntax.all._
 import cats.{MonadThrow, Order, Show}
-import io.circe.Json
+import io.circe.{Encoder, Json}
 import io.renku.tinytypes.constraints.PathSegment
 
 import java.time.{Duration, Instant, LocalDate}
@@ -32,6 +32,11 @@ trait TinyType extends Any {
   def value: V
 
   override def toString: String = value.toString
+}
+
+object TinyType {
+  implicit def jsonEncoder[A <: TinyType](implicit venc: Encoder[A#V]): Encoder[A] =
+    venc.contramap(_.value)
 }
 
 trait StringTinyType       extends Any with TinyType { type V = String }

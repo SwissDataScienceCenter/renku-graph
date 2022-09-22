@@ -30,7 +30,6 @@ import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
 import io.renku.metrics.MetricsRegistry
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -39,9 +38,7 @@ private[consumers] trait CommitEventsRemover[F[_]] {
   def removeDeletedEvent(project: Project, commitId: CommitId): F[UpdateResult]
 }
 
-private class CommitEventsRemoverImpl[F[_]: MonadThrow](eventSender: EventSender[F])
-    extends CommitEventsRemover[F]
-    with TinyTypeEncoders {
+private class CommitEventsRemoverImpl[F[_]: MonadThrow](eventSender: EventSender[F]) extends CommitEventsRemover[F] {
 
   override def removeDeletedEvent(project: Project, commitId: CommitId): F[UpdateResult] =
     eventSender

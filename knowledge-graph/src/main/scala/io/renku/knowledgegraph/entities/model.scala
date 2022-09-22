@@ -30,8 +30,7 @@ import io.renku.json.JsonOps._
 import io.renku.knowledgegraph
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.FiniteFloat
-import io.renku.tinytypes.json.TinyTypeEncoders._
-import io.renku.tinytypes.json.{TinyTypeDecoders, TinyTypeEncoders}
+import io.renku.tinytypes.json.TinyTypeDecoders
 
 import java.time.Instant
 
@@ -217,7 +216,6 @@ private object model {
   final class MatchingScore private (val value: Float) extends AnyVal with FloatTinyType
   object MatchingScore extends TinyTypeFactory[MatchingScore](new MatchingScore(_)) with FiniteFloat[MatchingScore] {
     val min:                  MatchingScore          = MatchingScore(1.0f)
-    implicit val jsonEncoder: Encoder[MatchingScore] = TinyTypeEncoders.floatEncoder
     implicit val jsonDecoder: Decoder[MatchingScore] = TinyTypeDecoders.floatDecoder(MatchingScore)
   }
 }

@@ -35,17 +35,9 @@ import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers.should
-import tooling.GraphServices
+import tooling.{AcceptanceSpec, ApplicationServices}
 
-class UserProjectsResourceSpec
-    extends AnyFeatureSpec
-    with GivenWhenThen
-    with GraphServices
-    with TSProvisioning
-    with should.Matchers {
+class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
 
   Feature("GET knowledge-graph/users/:id/projects to return user's projects") {
 
@@ -55,16 +47,17 @@ class UserProjectsResourceSpec
 
       val userId = personGitLabIds.generateOne
       val user   = personEntities(fixed(userId.some)).generateOne
-      implicit val accessToken: AccessToken = accessTokens.generateOne
-      `GET <gitlabApi>/user returning OK`(userId)
+      val accessToken: AccessToken = accessTokens.generateOne
+      gitLabStub.addAuthenticated(userId, accessToken)
 
       val activatedProject = dataProjects(
         renkuProjectEntities(anyVisibility).modify(replaceMembers(Set(user))).generateOne
       ).generateOne
 
       val commitId = commitIds.generateOne
-      mockDataOnGitLabAPIs(activatedProject, activatedProject.entitiesProject.asJsonLD, commitId)
-      `data in the Triples Store`(activatedProject, commitId)
+      mockCommitDataOnTripleGenerator(activatedProject, activatedProject.entitiesProject.asJsonLD, commitId)
+      gitLabStub.setupProject(activatedProject, commitId)
+      `data in the Triples Store`(activatedProject, commitId, accessToken)
 
       And("he has a not activated project")
 
@@ -72,7 +65,7 @@ class UserProjectsResourceSpec
         renkuProjectEntities(visibilityPublic).generateOne
       ).generateOne
 
-      `GET <gitlabApi>/users/:id/projects returning OK`(userId, notActivatedProject)
+      gitLabStub.addProject(notActivatedProject)
 
       When("user navigates to GET knowledge-graph/users/:id/projects")
 

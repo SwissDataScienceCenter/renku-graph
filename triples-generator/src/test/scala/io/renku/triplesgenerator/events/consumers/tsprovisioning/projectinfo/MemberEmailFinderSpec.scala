@@ -36,7 +36,6 @@ import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import io.renku.tinytypes.json.TinyTypeEncoders
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
 import org.scalacheck.Gen
@@ -53,8 +52,7 @@ class MemberEmailFinderSpec
     with ExternalServiceStubbing
     with should.Matchers
     with ScalaCheckPropertyChecks
-    with MockFactory
-    with TinyTypeEncoders {
+    with MockFactory {
 
   "findEmail" should {
 

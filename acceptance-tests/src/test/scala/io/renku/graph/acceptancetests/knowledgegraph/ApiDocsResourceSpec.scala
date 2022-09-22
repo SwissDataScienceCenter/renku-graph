@@ -23,12 +23,10 @@ import io.circe.Json
 import org.http4s.MediaType.application
 import org.http4s.Status.Ok
 import org.http4s.headers.`Content-Type`
-import org.scalatest.GivenWhenThen
-import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
-import tooling.GraphServices
+import tooling.{AcceptanceSpec, ApplicationServices}
 
-class ApiDocsResourceSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with should.Matchers {
+class ApiDocsResourceSpec extends AcceptanceSpec with ApplicationServices with should.Matchers {
 
   Feature("GET knowledge-graph/spec.json to return KG API specs") {
 

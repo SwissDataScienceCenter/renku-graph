@@ -54,7 +54,7 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def query(identifier: Identifier, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "ds by id - projects",
     Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
-    s"""|SELECT DISTINCT ?projectId ?projectName
+    s"""|SELECT DISTINCT ?projectId ?projectName ?projectVisibility
         |WHERE {
         |  ?dsId a schema:Dataset;
         |        schema:identifier '$identifier';
@@ -71,7 +71,8 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |  FILTER NOT EXISTS {
         |    ?allDsId prov:invalidatedAtTime ?invalidationTime .
         |  }  
-        |  ?projectId schema:name ?projectName .
+        |  ?projectId schema:name ?projectName;
+        |             renku:projectVisibility ?projectVisibility.
         |}
         |ORDER BY ASC(?projectName)
         |""".stripMargin
@@ -109,9 +110,10 @@ private object ProjectsFinderImpl {
 
     implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
       for {
-        path <- cursor.downField("projectId").downField("value").as[ResourceId].flatMap(toProjectPath)
-        name <- cursor.downField("projectName").downField("value").as[projects.Name]
-      } yield DatasetProject(path, name)
+        path       <- cursor.downField("projectId").downField("value").as[ResourceId].flatMap(toProjectPath)
+        name       <- cursor.downField("projectName").downField("value").as[projects.Name]
+        visibility <- cursor.downField("projectVisibility").downField("value").as[Visibility]
+      } yield DatasetProject(path, name, visibility)
     }
 
     _.downField("results").downField("bindings").as(decodeList[DatasetProject])

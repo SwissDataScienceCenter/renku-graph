@@ -27,16 +27,11 @@ import io.renku.graph.model.datasets.ResourceId
 import io.renku.graph.model.testentities.{Dataset => _, _}
 import io.renku.graph.model.{RenkuUrl, datasets, testentities}
 import io.renku.jsonld.syntax._
-import io.renku.tinytypes.json.TinyTypeEncoders
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class BaseDetailsFinderSpec
-    extends AnyWordSpec
-    with ScalaCheckPropertyChecks
-    with should.Matchers
-    with TinyTypeEncoders {
+class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import io.renku.knowledgegraph.datasets.details.BaseDetailsFinderImpl._
 
@@ -111,7 +106,8 @@ class BaseDetailsFinderSpec
       "topmostSameAs":  {"value": ${dataset.provenance.topmostSameAs}},
       "initialVersion": {"value": ${dataset.provenance.originalIdentifier}},
       "projectPath":    {"value": ${project.path}},
-      "projectName":    {"value": ${project.name}}
+      "projectName":    {"value": ${project.name}},
+      "projectVisibility": {"value": ${project.visibility}}
     }""" deepMerge {
       dataset.provenance.date match {
         case date: datasets.DatePublished => json"""{
@@ -141,7 +137,8 @@ class BaseDetailsFinderSpec
       "maybeDateCreated": {"value": ${dataset.provenance.date}},
       "initialVersion":   {"value": ${dataset.provenance.originalIdentifier}},
       "projectPath":      {"value": ${project.path}},
-      "projectName":      {"value": ${project.name}}
+      "projectName":      {"value": ${project.name}},
+      "projectVisibility": {"value": ${project.visibility}}
     }"""
 
     json"""{"results": {"bindings": [$binding]}}"""
