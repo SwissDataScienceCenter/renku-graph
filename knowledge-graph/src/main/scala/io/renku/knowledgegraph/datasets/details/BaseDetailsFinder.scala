@@ -58,16 +58,17 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     name = "ds by id - details",
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?maybeDateCreated ?slug 
-        |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName
+        |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName ?projectVisibility
         |WHERE {        
         |  {
-        |    SELECT ?projectId ?projectPath ?projectName
+        |    SELECT ?projectId ?projectPath ?projectName ?projectVisibility
         |    WHERE {
         |      ?datasetId a schema:Dataset;
         |                 schema:identifier '$identifier';
         |                 ^renku:hasDataset  ?projectId.
         |      ?projectId schema:dateCreated ?dateCreated ;
         |                 schema:name ?projectName;
+        |                 renku:projectVisibility ?projectVisibility;
         |                 renku:projectPath ?projectPath.
         |      FILTER (?projectPath IN (${authContext.allowedProjects.map(p => s"'$p'").mkString(", ")})) 
         |      FILTER NOT EXISTS {
@@ -265,18 +266,23 @@ private object BaseDetailsFinderImpl {
                       .widen[Date]
                 }
         maybeDescription <- extract[Option[Description]]("description")
-        projectPath      <- extract[projects.Path]("projectPath")
-        projectName      <- extract[projects.Name]("projectName")
-        dataset <- createDataset(resourceId,
-                                 identifier,
-                                 title,
-                                 name,
-                                 maybeDerivedFrom,
-                                 sameAs,
-                                 initialVersion,
-                                 date,
-                                 maybeDescription,
-                                 DatasetProject(projectPath, projectName)
+
+        project <- (extract[projects.Path]("projectPath"),
+                    extract[projects.Name]("projectName"),
+                    extract[projects.Visibility]("projectVisibility")
+                   ).mapN(DatasetProject)
+
+        dataset <- createDataset(
+                     resourceId,
+                     identifier,
+                     title,
+                     name,
+                     maybeDerivedFrom,
+                     sameAs,
+                     initialVersion,
+                     date,
+                     maybeDescription,
+                     project
                    )
       } yield dataset
     }(toOption(show"More than one dataset with $dsId id"))

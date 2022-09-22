@@ -106,7 +106,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "topmostSameAs":  {"value": ${dataset.provenance.topmostSameAs}},
       "initialVersion": {"value": ${dataset.provenance.originalIdentifier}},
       "projectPath":    {"value": ${project.path}},
-      "projectName":    {"value": ${project.name}}
+      "projectName":    {"value": ${project.name}},
+      "projectVisibility": {"value": ${project.visibility}}
     }""" deepMerge {
       dataset.provenance.date match {
         case date: datasets.DatePublished => json"""{
@@ -136,7 +137,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "maybeDateCreated": {"value": ${dataset.provenance.date}},
       "initialVersion":   {"value": ${dataset.provenance.originalIdentifier}},
       "projectPath":      {"value": ${project.path}},
-      "projectName":      {"value": ${project.name}}
+      "projectName":      {"value": ${project.name}},
+      "projectVisibility": {"value": ${project.visibility}}
     }"""
 
     json"""{"results": {"bindings": [$binding]}}"""
