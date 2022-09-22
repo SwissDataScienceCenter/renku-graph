@@ -249,8 +249,9 @@ private object Commands {
   }
 
   class RenkuImpl[F[_]: Async](
-      renkuMigrate: Path => CommandResult = %%("renku", "migrate", "--preserve-identifiers", "--skip-template-update", "--skip-docker-update")(_),
-      renkuExport:  Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict", "--no-indent")(_)
+      renkuMigrate: Path => CommandResult =
+        %%("renku", "migrate", "--preserve-identifiers", "--skip-template-update", "--skip-docker-update")(_),
+      renkuExport: Path => CommandResult = %%("renku", "graph", "export", "--full", "--strict", "--no-indent")(_)
   ) extends Renku[F] {
 
     import cats.syntax.all._
