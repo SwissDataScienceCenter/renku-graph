@@ -35,7 +35,11 @@ private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
     defaultGraphPersonTransformer:   defaultgraph.persons.PersonTransformer[F],
     defaultGraphProjectTransformer:  defaultgraph.projects.ProjectTransformer[F],
     defaultGraphDatasetTransformer:  defaultgraph.datasets.DatasetTransformer[F],
-    defaultGraphActivityTransformer: defaultgraph.activities.ActivityTransformer[F]
+    defaultGraphActivityTransformer: defaultgraph.activities.ActivityTransformer[F],
+    namedGraphsPersonTransformer:    namedgraphs.persons.PersonTransformer[F],
+    namedGraphsProjectTransformer:   namedgraphs.projects.ProjectTransformer[F],
+    namedGraphsDatasetTransformer:   namedgraphs.datasets.DatasetTransformer[F],
+    namedGraphsActivityTransformer:  namedgraphs.activities.ActivityTransformer[F]
 ) extends TransformationStepsCreator[F] {
 
   override def createSteps(tsVersion: TSVersion): List[TransformationStep[F]] = tsVersion match {
@@ -46,7 +50,13 @@ private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
         defaultGraphDatasetTransformer.createTransformationStep,
         defaultGraphActivityTransformer.createTransformationStep
       )
-    case TSVersion.NamedGraphs => Nil
+    case TSVersion.NamedGraphs =>
+      List(
+        namedGraphsPersonTransformer.createTransformationStep,
+        namedGraphsProjectTransformer.createTransformationStep,
+        namedGraphsDatasetTransformer.createTransformationStep,
+        namedGraphsActivityTransformer.createTransformationStep
+      )
   }
 }
 
@@ -57,9 +67,17 @@ private[consumers] object TransformationStepsCreator {
     defaultGraphProjectTransformer  <- defaultgraph.projects.ProjectTransformer[F]
     defaultGraphDatasetTransformer  <- defaultgraph.datasets.DatasetTransformer[F]
     defaultGraphActivityTransformer <- defaultgraph.activities.ActivityTransformer[F]
+    namedGraphsPersonTransformer    <- namedgraphs.persons.PersonTransformer[F]
+    namedGraphsProjectTransformer   <- namedgraphs.projects.ProjectTransformer[F]
+    namedGraphsDatasetTransformer   <- namedgraphs.datasets.DatasetTransformer[F]
+    namedGraphsActivityTransformer  <- namedgraphs.activities.ActivityTransformer[F]
   } yield new TransformationStepsCreatorImpl[F](defaultGraphPersonTransformer,
                                                 defaultGraphProjectTransformer,
                                                 defaultGraphDatasetTransformer,
-                                                defaultGraphActivityTransformer
+                                                defaultGraphActivityTransformer,
+                                                namedGraphsPersonTransformer,
+                                                namedGraphsProjectTransformer,
+                                                namedGraphsDatasetTransformer,
+                                                namedGraphsActivityTransformer
   )
 }

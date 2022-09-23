@@ -35,30 +35,45 @@ class TransformationStepsCreatorSpec extends AnyWordSpec with MockFactory with s
     "combine steps from person/project/dataset/activity transformers for the DefaultGraph" in new TestCase {
       val steps @ step1 :: step2 :: step3 :: step4 :: Nil = transformationSteps[Try].generateFixedSizeList(4)
 
-      (() => personTransformer.createTransformationStep).expects().returning(step1)
-      (() => projectTransformer.createTransformationStep).expects().returning(step2)
-      (() => datasetTransformer.createTransformationStep).expects().returning(step3)
-      (() => activityTransformer.createTransformationStep).expects().returning(step4)
+      (() => dgPersonTransformer.createTransformationStep).expects().returning(step1)
+      (() => dgProjectTransformer.createTransformationStep).expects().returning(step2)
+      (() => dgDatasetTransformer.createTransformationStep).expects().returning(step3)
+      (() => dgActivityTransformer.createTransformationStep).expects().returning(step4)
 
       stepsCreator.createSteps(TSVersion.DefaultGraph) shouldBe steps
     }
   }
 
   "createSteps[NamedGraphs]" should {
-    "combine steps from person/project/dataset/activity transformers for the NamedGraph" in new TestCase {
-      stepsCreator.createSteps(TSVersion.NamedGraphs) shouldBe List.empty
+    "combine steps from person/project/dataset/activity transformers for the NamedGraphs" in new TestCase {
+      val steps @ step1 :: step2 :: step3 :: step4 :: Nil = transformationSteps[Try].generateFixedSizeList(4)
+
+      (() => ngPersonTransformer.createTransformationStep).expects().returning(step1)
+      (() => ngProjectTransformer.createTransformationStep).expects().returning(step2)
+      (() => ngDatasetTransformer.createTransformationStep).expects().returning(step3)
+      (() => ngActivityTransformer.createTransformationStep).expects().returning(step4)
+
+      stepsCreator.createSteps(TSVersion.NamedGraphs) shouldBe steps
     }
   }
 
   private trait TestCase {
-    val personTransformer   = mock[defaultgraph.persons.PersonTransformer[Try]]
-    val projectTransformer  = mock[defaultgraph.projects.ProjectTransformer[Try]]
-    val datasetTransformer  = mock[defaultgraph.datasets.DatasetTransformer[Try]]
-    val activityTransformer = mock[defaultgraph.activities.ActivityTransformer[Try]]
-    val stepsCreator = new TransformationStepsCreatorImpl[Try](personTransformer,
-                                                               projectTransformer,
-                                                               datasetTransformer,
-                                                               activityTransformer
+    val dgPersonTransformer   = mock[defaultgraph.persons.PersonTransformer[Try]]
+    val dgProjectTransformer  = mock[defaultgraph.projects.ProjectTransformer[Try]]
+    val dgDatasetTransformer  = mock[defaultgraph.datasets.DatasetTransformer[Try]]
+    val dgActivityTransformer = mock[defaultgraph.activities.ActivityTransformer[Try]]
+    val ngPersonTransformer   = mock[namedgraphs.persons.PersonTransformer[Try]]
+    val ngProjectTransformer  = mock[namedgraphs.projects.ProjectTransformer[Try]]
+    val ngDatasetTransformer  = mock[namedgraphs.datasets.DatasetTransformer[Try]]
+    val ngActivityTransformer = mock[namedgraphs.activities.ActivityTransformer[Try]]
+    val stepsCreator = new TransformationStepsCreatorImpl[Try](dgPersonTransformer,
+                                                               dgProjectTransformer,
+                                                               dgDatasetTransformer,
+                                                               dgActivityTransformer,
+                                                               ngPersonTransformer,
+                                                               ngProjectTransformer,
+                                                               ngDatasetTransformer,
+                                                               ngActivityTransformer
     )
   }
 }
