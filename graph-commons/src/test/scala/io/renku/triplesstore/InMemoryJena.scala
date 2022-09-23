@@ -34,6 +34,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntityLike}
 import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import org.testcontainers.containers
 import org.testcontainers.containers.wait.strategy.Wait
 
 import scala.collection.mutable
@@ -41,30 +42,36 @@ import scala.language.reflectiveCalls
 
 trait InMemoryJena {
 
-  protected val maybeJenaFixedPort: Option[Int Refined Positive] = None
+  protected val jenaRunMode: JenaRunMode = JenaRunMode.GenericContainer
 
   private val adminCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
 
-  lazy val container: SingleContainer[_] = maybeJenaFixedPort match {
-    case None =>
+  lazy val container: SingleContainer[_] = jenaRunMode match {
+    case JenaRunMode.GenericContainer =>
       GenericContainer(
         dockerImage = "renku/renku-jena:0.0.17",
         exposedPorts = Seq(3030),
         waitStrategy = Wait forHttp "/$/ping"
       )
-    case Some(fixedPort) =>
+    case JenaRunMode.FixedPortContainer(fixedPort) =>
       FixedHostPortGenericContainer(
         imageName = "renku/renku-jena:0.0.17",
         exposedPorts = Seq(3030),
-        exposedHostPort = fixedPort.value,
-        exposedContainerPort = fixedPort.value,
+        exposedHostPort = fixedPort,
+        exposedContainerPort = fixedPort,
         waitStrategy = Wait forHttp "/$/ping"
       )
+    case JenaRunMode.Local(_) =>
+      new GenericContainer(new containers.GenericContainer("") {
+        override def start(): Unit = ()
+        override def stop():  Unit = ()
+      })
   }
 
-  private lazy val fusekiServerPort: Int Refined Positive = maybeJenaFixedPort match {
-    case None       => Refined.unsafeApply(container.mappedPort(container.exposedPorts.head))
-    case Some(port) => port
+  private lazy val fusekiServerPort: Int Refined Positive = jenaRunMode match {
+    case JenaRunMode.GenericContainer         => Refined.unsafeApply(container.mappedPort(container.exposedPorts.head))
+    case JenaRunMode.FixedPortContainer(port) => port
+    case JenaRunMode.Local(port)              => port
   }
 
   lazy val fusekiUrl: FusekiUrl = FusekiUrl(s"http://localhost:$fusekiServerPort")
