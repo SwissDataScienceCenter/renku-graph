@@ -94,13 +94,18 @@ project contains deployment descriptions for all environments.
       ([example](https://github.com/SwissDataScienceCenter/renku/pull/2704))
 
 **renku project:**
-- create a new entry in `CHANGELOG.rst` and amend it to the PR opened
-  by the bot
+- amend the PR created by the bot with the following:
+  - create a new entry in `CHANGELOG.rst` 
+  - change the version in
+  [`helm-chart/renku/CHart.yaml`](https://github.com/SwissDataScienceCenter/renku/blob/master/helm-chart/renku/Chart.yaml)
+  - if there already exists a release PR from another project, apply
+    the changes directly to the existing PR (including changelog
+    entries) and close the obsolete PR from `renku-graph` afterwards.
 - Merge the PR when satisfiled
 - create a new release in the renku project.
   ([example](https://github.com/SwissDataScienceCenter/renku/releases/tag/0.17.2))
-- only then it will publish new renku helm chart and create all
-  relevant PRs in the
+- then it will publish new renku helm chart and create all relevant
+  PRs in the
   [terraform-renku](https://github.com/SwissDataScienceCenter/terraform-renku)
   repo which will contain changes to the deployment
   - Examples:
