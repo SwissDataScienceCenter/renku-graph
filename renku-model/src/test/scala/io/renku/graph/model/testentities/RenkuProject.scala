@@ -111,6 +111,7 @@ object RenkuProject {
       .sequence
       .void
   }
+
   final case class WithParent(path:             Path,
                               name:             Name,
                               maybeDescription: Option[Description],

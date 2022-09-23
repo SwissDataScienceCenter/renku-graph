@@ -27,7 +27,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.graph.model.entities.{EntityFunctions, Person}
-import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl}
+import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, testentities}
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
@@ -271,6 +271,9 @@ trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
 
   private lazy val defaultProjectForGraph: Path = projectPaths.generateOne
 
+  def defaultProjectGraphId(implicit renkuUrl: RenkuUrl): EntityId =
+    io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)
+
   protected implicit def graphsProducer[A](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): GraphsProducer[A] =
     new GraphsProducer[A] {
       import io.renku.graph.model.entities
@@ -298,8 +301,9 @@ trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
       }
 
       private def projectGraphId(entity: A): EntityId = entity match {
-        case p: entities.Project => GraphClass.Project.id(p.resourceId)
-        case _ => io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)
+        case p: entities.Project     => GraphClass.Project.id(p.resourceId)
+        case p: testentities.Project => GraphClass.Project.id(p.asEntityId)
+        case _ => defaultProjectGraphId
       }
     }
 }

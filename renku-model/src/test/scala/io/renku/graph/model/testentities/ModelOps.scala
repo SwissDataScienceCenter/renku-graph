@@ -27,11 +27,11 @@ import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetPartIds}
-import io.renku.graph.model._
-import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title}
+import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title, TopmostSameAs}
 import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.Dataset.Provenance
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
+import io.renku.graph.model._
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 
@@ -313,6 +313,8 @@ trait ModelOps extends Dataset.ProvenanceOps {
     ): DatasetGenFactory[Provenance.Modified] =
       ((projectDate: projects.DateCreated) => modifiedDatasetEntities(dataset, projectDate)).modify(modifier)
 
+    def modifyProvenance(f: P => P): Dataset[P] = provenanceLens[P].modify(f)(dataset)
+
     def makeNameContaining(phrase: String): Dataset[P] = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase)
       replaceDSName(to = sentenceContaining(nonEmptyPhrase).map(Name.apply).generateOne)(dataset)
@@ -345,6 +347,11 @@ trait ModelOps extends Dataset.ProvenanceOps {
     def replacePublicationEvents(eventFactories: List[Dataset[Provenance] => PublicationEvent])(implicit
         ev:                                      P <:< Provenance.NonImported
     ): Dataset[P] = dataset.copy(publicationEventFactories = eventFactories)
+  }
+
+  def replaceTopmostSameAs[P <: Dataset.Provenance.ImportedInternal](newValue: TopmostSameAs): P => P = {
+    case p: Dataset.Provenance.ImportedInternalAncestorInternal => p.copy(topmostSameAs = newValue).asInstanceOf[P]
+    case p: Dataset.Provenance.ImportedInternalAncestorExternal => p.copy(topmostSameAs = newValue).asInstanceOf[P]
   }
 
   type ProvenanceImportFactory[OldProvenance <: Dataset.Provenance, NewProvenance <: Dataset.Provenance] =

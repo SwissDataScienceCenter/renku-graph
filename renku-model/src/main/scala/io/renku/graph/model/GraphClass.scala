@@ -35,6 +35,7 @@ object GraphClass {
 
   case object Project extends GraphClass {
     def id(resourceId: projects.ResourceId): EntityId = resourceId.asEntityId
+    def id(resourceId: EntityId):            EntityId = resourceId
   }
   type Project = Project.type
 
