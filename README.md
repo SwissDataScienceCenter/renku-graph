@@ -65,7 +65,55 @@ Hence, we are trying to find and then follow good patterns in naming, code organ
 
 #### Releasing
 
-The standard release process is done manually.
+The standard release process is done manually. There are multiple
+repositories taking part in the process. The
+[renku](https://github.com/SwissDataScienceCenter/renku) project
+contains helm charts for deploying to kubernetes and the acceptance
+tests. The
+[terraform-renku](https://github.com/SwissDataScienceCenter/terraform-renku)
+project contains deployment descriptions for all environments.
+
+**renku-graph project:**
+- create a branch off the `origin/release` branch, name it
+  `prep-<version>`
+- either cherry-pick from development to here or do a `git rebase
+  origin/development`
+- make a PR for this branch to be merged into origin/release
+  ([example](https://github.com/SwissDataScienceCenter/renku-graph/pull/1095))
+- list some points in the description for what has been changed
+- merge the PR and create a release on github
+  - release description: list the points again but organized in
+    Features, Bugfixes etc
+    ([example](https://github.com/SwissDataScienceCenter/renku-graph/releases/tag/2.19.0))
+  - The release notes are public, so don't list refactorings.
+  - this will trigger actions that:
+    - Runs acceptance tests
+    - creates a PR on the
+      [renku](https://github.com/SwissDataScienceCenter/renku) project
+      to change the version in the `requirements.yml`
+      ([example](https://github.com/SwissDataScienceCenter/renku/pull/2704))
+
+**renku project:**
+- create a new entry in `CHANGELOG.rst` and amend it to the PR opened
+  by the bot
+- Merge the PR when satisfiled
+- create a new release in the renku project.
+  ([example](https://github.com/SwissDataScienceCenter/renku/releases/tag/0.17.2))
+- only then it will publish new renku helm chart and create all
+  relevant PRs in the
+  [terraform-renku](https://github.com/SwissDataScienceCenter/terraform-renku)
+  repo which will contain changes to the deployment
+  - Examples:
+    - https://github.com/SwissDataScienceCenter/terraform-renku/pull/858
+    - https://github.com/SwissDataScienceCenter/terraform-renku/pull/857
+
+**terraform-renku:**
+- These PRs are merged by the YAT team which will release to prod
+
+**Cleanup (renku-graph):**
+- merge the `release` branch back into `development`
+- push directly to the `development` branch
+
 
 #### Hotfixes
 
