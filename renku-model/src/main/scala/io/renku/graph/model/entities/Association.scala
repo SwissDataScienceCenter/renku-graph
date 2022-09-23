@@ -36,13 +36,16 @@ sealed trait Association {
 
 object Association {
 
-  implicit def functions(implicit glUrl: GitLabApiUrl): EntityFunctions[Association] =
+  implicit def functions(implicit glUrl: GitLabApiUrl, efp: EntityFunctions[Plan]): EntityFunctions[Association] =
     new EntityFunctions[Association] {
 
-      override val findAllPersons: Association => Set[Person] = _.agent match {
-        case p: Person => Set(p)
-        case _ => Set.empty[Person]
-      }
+      override val findAllPersons: Association => Set[Person] =
+        a =>
+          efp.findAllPersons(a.plan) ++
+            (a.agent match {
+              case p: Person => Set(p)
+              case _ => Set.empty[Person]
+            })
 
       override val encoder: GraphClass => JsonLDEncoder[Association] = Association.encoder(glUrl, _)
     }

@@ -492,6 +492,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
                plan.name,
                plan.maybeDescription,
                plan.maybeCommand,
+               plan.creators,
                plan.dateCreated,
                plan.maybeProgrammingLanguage,
                plan.keywords,
