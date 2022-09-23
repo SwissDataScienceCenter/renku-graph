@@ -85,7 +85,7 @@ project contains deployment descriptions for all environments.
   - release description: list the points again but organized in
     Features, Bugfixes etc
     ([example](https://github.com/SwissDataScienceCenter/renku-graph/releases/tag/2.19.0))
-  - The release notes are public, so don't list refactorings.
+  - the release notes are public, so don't list refactorings.
   - this will trigger actions that:
     - Runs acceptance tests
     - creates a PR on the
@@ -101,7 +101,7 @@ project contains deployment descriptions for all environments.
   - if there already exists a release PR from another project, apply
     the changes directly to the existing PR (including changelog
     entries) and close the obsolete PR from `renku-graph` afterwards.
-- Merge the PR when satisfiled
+- merge the PR when satisfiled
 - create a new release in the renku project.
   ([example](https://github.com/SwissDataScienceCenter/renku/releases/tag/0.17.2))
 - then it will publish new renku helm chart and create all relevant
@@ -113,7 +113,7 @@ project contains deployment descriptions for all environments.
     - https://github.com/SwissDataScienceCenter/terraform-renku/pull/857
 
 **terraform-renku:**
-- These PRs are merged by the YAT team which will release to prod
+- these PRs are merged by the YAT team which will release to prod
 
 **Cleanup (renku-graph):**
 - merge the `release` branch back into `development`
