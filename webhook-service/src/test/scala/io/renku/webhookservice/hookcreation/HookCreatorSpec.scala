@@ -89,6 +89,15 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(projectId, Some(accessToken))
         .returning(HookExists.pure[IO])
 
+      (projectInfoFinder
+        .findProjectInfo(_: Id)(_: Option[AccessToken]))
+        .expects(projectId, Some(accessToken))
+        .returning(projectInfo.pure[IO])
+
+      (commitSyncRequestSender.sendCommitSyncRequest _)
+        .expects(CommitSyncRequest(Project(projectInfo.id, projectInfo.path)), "HookCreation")
+        .returning(().pure[IO])
+
       hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookExisted
 
       logger.expectNoLogs()
