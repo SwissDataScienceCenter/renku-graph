@@ -155,7 +155,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
     Client.fromHttpApp(allRoutes.orNotFound)
 
   def resource(bindAddress: Host, port: Port): Resource[F, Server] =
-    Resource.eval(logger.info(s"Starting GitLab stub on $bindAddress:$port")) *>
+    Resource.eval(logger.trace(s"Starting GitLab stub on $bindAddress:$port")) *>
       BlazeServerBuilder[F]
         .bindHttp(port.value, bindAddress.show)
         .withoutBanner
