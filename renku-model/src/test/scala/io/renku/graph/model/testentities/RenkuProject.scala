@@ -84,6 +84,9 @@ object RenkuProject {
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithoutParent =
       copy(datasets = newDatasets.toList)
 
+    override def replaceActivities(newActivities: Activity*): RenkuProject.WithoutParent =
+      copy(activities = newActivities.toList)
+
     private def validateDates(projectDateCreated: projects.DateCreated,
                               activities:         List[Activity],
                               datasets:           List[Dataset[Dataset.Provenance]]
@@ -145,6 +148,9 @@ object RenkuProject {
 
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithParent =
       copy(datasets = newDatasets.toList)
+
+    override def replaceActivities(newActivities: Activity*): RenkuProject.WithParent =
+      copy(activities = newActivities.toList)
   }
 
   import io.renku.jsonld._
@@ -165,6 +171,8 @@ object RenkuProject {
     def addDataset[P <: Dataset.Provenance](toAdd: DatasetGenFactory[P]): (Dataset[P], ProjectType)
 
     def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): ProjectType
+
+    def replaceActivities(newActivities: Activity*): ProjectType
   }
 
   implicit def toEntitiesRenkuProject(implicit renkuUrl: RenkuUrl): RenkuProject => entities.RenkuProject = {

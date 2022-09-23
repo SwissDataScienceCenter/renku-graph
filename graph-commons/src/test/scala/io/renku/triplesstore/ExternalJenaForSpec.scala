@@ -18,9 +18,9 @@
 
 package io.renku.triplesstore
 
+import eu.timepit.refined.auto._
 import io.renku.testtools.IOSpec
 import org.scalatest.Suite
-import eu.timepit.refined.auto._
 
 /** Use this trait as a replacement for [[InMemoryJenaForSpec]] to connect to a locally/externally running Jena without 
  * starting a container.  
