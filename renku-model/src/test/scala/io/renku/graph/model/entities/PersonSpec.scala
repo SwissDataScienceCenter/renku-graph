@@ -74,7 +74,6 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
     "turn JsonLD Person entity into the Person object" in {
       implicit val graph: GraphClass = GraphClass.Default
       forAll { person: Person =>
-        println(person.asJsonLD.cursor.as[entities.Person])
         person.asJsonLD.cursor.as[entities.Person] shouldBe person.to[entities.Person].asRight
       }
     }

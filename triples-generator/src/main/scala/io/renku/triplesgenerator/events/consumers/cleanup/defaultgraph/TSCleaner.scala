@@ -17,6 +17,7 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.cleanup
+package defaultgraph
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -33,29 +34,23 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-private trait ProjectTriplesRemover[F[_]] {
-  def removeTriples(of: projects.Path): F[Unit]
+private[cleanup] trait TSCleaner[F[_]] {
+  def removeTriples(path: projects.Path): F[Unit]
 }
 
-private object ProjectTriplesRemover {
+private[cleanup] object TSCleaner {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
       maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
       idleTimeout:    Duration = 16 minutes,
       requestTimeout: Duration = 15 minutes
-  ): F[ProjectTriplesRemover[F]] = for {
+  ): F[TSCleaner[F]] = for {
     renkuConnectionConfig <- RenkuConnectionConfig[F]()
     renkuUrl              <- RenkuUrlLoader[F]()
-  } yield new ProjectTriplesRemoverImpl[F](renkuConnectionConfig,
-                                           renkuUrl,
-                                           retryInterval,
-                                           maxRetries,
-                                           idleTimeout,
-                                           requestTimeout
-  )
+  } yield new TSCleanerImpl[F](renkuConnectionConfig, renkuUrl, retryInterval, maxRetries, idleTimeout, requestTimeout)
 }
 
-private class ProjectTriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig,
     renkuUrl:              RenkuUrl,
     retryInterval:         FiniteDuration = SleepAfterConnectionIssue,
@@ -68,18 +63,17 @@ private class ProjectTriplesRemoverImpl[F[_]: Async: Logger: SparqlQueryTimeReco
                        idleTimeoutOverride = idleTimeout.some,
                        requestTimeoutOverride = requestTimeout.some
     )
-    with ProjectTriplesRemover[F] {
+    with TSCleaner[F] {
   import SameAsHierarchyFixer._
   import io.renku.graph.model.Schemas._
 
   private implicit val baseUrl:     RenkuUrl              = renkuUrl
   private implicit val storeConfig: RenkuConnectionConfig = renkuConnectionConfig
 
-  override def removeTriples(projectPath: projects.Path): F[Unit] = for {
-    _ <- relinkSameAsHierarchy(projectPath)
-    _ <- relinkProjectHierarchy(projectPath)
-    _ <- removeProjectInternalEntities(projectPath)
-  } yield ()
+  override def removeTriples(path: projects.Path): F[Unit] =
+    relinkSameAsHierarchy(path) >>
+      relinkProjectHierarchy(path) >>
+      removeProjectInternalEntities(path)
 
   private def relinkProjectHierarchy(projectPath: projects.Path) = updateWithNoResult {
     SparqlQuery.of(

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.cleanup
+package io.renku.triplesgenerator.events.consumers.cleanup.defaultgraph
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -30,13 +30,14 @@ import io.renku.interpreters.TestLogger
 import io.renku.jsonld.EntityId
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.consumers.cleanup.defaultgraph
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectTriplesRemoverSpec
+class TSCleanerSpec
     extends AnyWordSpec
     with IOSpec
     with should.Matchers
@@ -51,7 +52,7 @@ class ProjectTriplesRemoverSpec
       forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
         upload(to = renkuDataset, project)
 
-        projectTriplesRemover.removeTriples(project.path).unsafeRunSync()
+        cleaner.removeTriples(project.path).unsafeRunSync()
 
         findAllData.unsafeRunSync() shouldBe List.empty
       }
@@ -59,16 +60,14 @@ class ProjectTriplesRemoverSpec
 
     "remove all entities which are linked only to the current project " +
       "and the project itself" in new TestCase {
-        forAll(renkuProjectEntitiesWithDatasetsAndActivities) { project =>
-          val (projectData, child) = project.forkOnce()
+        val (projectData, child) = renkuProjectEntitiesWithDatasetsAndActivities.forkOnce().generateOne
 
-          upload(to = renkuDataset, projectData, child)
+        upload(to = renkuDataset, projectData, child)
 
-          projectTriplesRemover.removeTriples(projectData.path).unsafeRunSync()
+        cleaner.removeTriples(projectData.path).unsafeRunSync()
 
-          findProject(projectData.path).unsafeRunSync()   shouldBe List.empty
-          findProject(child.path).unsafeRunSync().isEmpty shouldBe false
-        }
+        findProject(projectData.path).unsafeRunSync()   shouldBe List.empty
+        findProject(child.path).unsafeRunSync().isEmpty shouldBe false
       }
 
     "remove the project and all entities which are linked to it " +
@@ -87,7 +86,7 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, middleProject, bottomProject, topProject)
 
-        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
+        cleaner.removeTriples(topProject.path).unsafeRunSync()
 
         findProject(topProject.path).unsafeRunSync()       shouldBe List.empty
         findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
@@ -116,7 +115,7 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, middleProject, bottomProject, topProject)
 
-        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
+        cleaner.removeTriples(topProject.path).unsafeRunSync()
 
         findProject(topProject.path).unsafeRunSync()       shouldBe List.empty
         findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
@@ -145,7 +144,7 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, middleProject, bottomProject, topProject)
 
-        projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
+        cleaner.removeTriples(middleProject.path).unsafeRunSync()
 
         findProject(middleProject.path).unsafeRunSync() shouldBe List.empty
 
@@ -175,7 +174,7 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, middleProject, bottomProject, topProject)
 
-        projectTriplesRemover.removeTriples(bottomProject.path).unsafeRunSync()
+        cleaner.removeTriples(bottomProject.path).unsafeRunSync()
 
         findProject(bottomProject.path).unsafeRunSync() shouldBe List.empty
 
@@ -208,7 +207,7 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, middleProject1, middleProject2, bottomProject, topProject)
 
-        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
+        cleaner.removeTriples(topProject.path).unsafeRunSync()
 
         findProject(topProject.path).unsafeRunSync()       shouldBe List.empty
         findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
@@ -265,7 +264,7 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, topProject, middleProject1, middleProject2, bottomProject)
 
-        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
+        cleaner.removeTriples(topProject.path).unsafeRunSync()
 
         findProject(topProject.path).unsafeRunSync()       shouldBe List.empty
         findDataset(topProjectDS.entityId).unsafeRunSync() shouldBe Nil
@@ -305,7 +304,7 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, bottomProject, topProject, topProjectFork)
 
-        projectTriplesRemover.removeTriples(topProject.path).unsafeRunSync()
+        cleaner.removeTriples(topProject.path).unsafeRunSync()
 
         findProject(topProject.path).unsafeRunSync()        shouldBe List.empty
         findProject(topProjectFork.path).unsafeRunSync().size should be > 0
@@ -336,7 +335,7 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, topProject, middleProject, middleProjectFork, bottomProject)
 
-        projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
+        cleaner.removeTriples(middleProject.path).unsafeRunSync()
 
         val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
         topSameAs              shouldBe None
@@ -371,8 +370,8 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, topProject, middleProject, middleProjectFork, bottomProject)
 
-        projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
-        projectTriplesRemover.removeTriples(middleProjectFork.path).unsafeRunSync()
+        cleaner.removeTriples(middleProject.path).unsafeRunSync()
+        cleaner.removeTriples(middleProjectFork.path).unsafeRunSync()
 
         val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
         topSameAs              shouldBe None
@@ -407,7 +406,7 @@ class ProjectTriplesRemoverSpec
 
         upload(to = renkuDataset, topProject, middleProject, middleProjectFork, bottomProject1, bottomProject2)
 
-        projectTriplesRemover.removeTriples(middleProject.path).unsafeRunSync()
+        cleaner.removeTriples(middleProject.path).unsafeRunSync()
 
         val Some((topSameAs, topTopmostSameAs)) = findSameAs(topProjectDS.entityId).unsafeRunSync()
         topSameAs              shouldBe None
@@ -477,7 +476,7 @@ class ProjectTriplesRemoverSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val projectTriplesRemover = new ProjectTriplesRemoverImpl[IO](renkuDSConnectionInfo, renkuUrl)
+    val cleaner = new defaultgraph.TSCleanerImpl[IO](renkuDSConnectionInfo, renkuUrl)
   }
 
   private def findOutNewlyNominatedTopDS(ds1: Dataset[Dataset.Provenance], ds2: Dataset[Dataset.Provenance]): EntityId =

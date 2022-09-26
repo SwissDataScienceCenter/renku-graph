@@ -77,19 +77,19 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     def to[T](implicit convert: P => T): T = convert(project)
 
-    def forkOnce(): (RenkuProject, RenkuProject.WithParent) = {
+    def forkOnce(): (P, RenkuProject.WithParent) = {
       val (parent, childGen) = fork(times = 1)
       parent -> childGen.head
     }
 
-    def fork(
-        times: Int Refined Positive
-    ): (RenkuProject, NonEmptyList[RenkuProject.WithParent]) = {
+    def fork(times: Int Refined Positive): (P, NonEmptyList[RenkuProject.WithParent]) = {
       val parent = project match {
         case proj: RenkuProject.WithParent =>
-          proj.copy(forksCount = ForksCount(Refined.unsafeApply(proj.forksCount.value + times.value)))
+          proj.copy(forksCount = ForksCount(Refined.unsafeApply(proj.forksCount.value + times.value))).asInstanceOf[P]
         case proj: RenkuProject.WithoutParent =>
-          proj.copy(forksCount = ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
+          proj
+            .copy(forksCount = ForksCount(Refined.unsafeApply(project.forksCount.value + times.value)))
+            .asInstanceOf[P]
       }
       parent -> (1 until times.value).foldLeft(NonEmptyList.one(newChildGen(parent).generateOne))((childrenGens, _) =>
         newChildGen(parent).generateOne :: childrenGens

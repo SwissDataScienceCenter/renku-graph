@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.cleanup
+package io.renku.triplesgenerator.events.consumers.cleanup.defaultgraph
 
 import cats.MonadThrow
 import cats.data.Nested
@@ -93,11 +93,8 @@ private class SameAsHierarchyFixer[F[_]: Async: Logger: SparqlQueryTimeRecorder]
 
   private def collectDSInfos: Nested[F, List, DSInfo] = Nested {
     implicit val decoder: Decoder[List[DSInfo]] = ResultsDecoder[List, DSInfo] { implicit cursor =>
-      for {
-        id            <- extract[ResourceId]("datasetId")
-        topmostSameAs <- extract[TopmostSameAs]("topmostSameAs")
-        maybeSameAs   <- extract[Option[SameAs]]("sameAs")
-      } yield (id, topmostSameAs, maybeSameAs)
+      (extract[ResourceId]("datasetId"), extract[TopmostSameAs]("topmostSameAs"), extract[Option[SameAs]]("sameAs"))
+        .mapN((_, _, _))
     }
 
     queryExpecting[List[DSInfo]] {
