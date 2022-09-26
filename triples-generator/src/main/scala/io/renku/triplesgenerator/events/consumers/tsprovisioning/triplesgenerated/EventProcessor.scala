@@ -26,6 +26,7 @@ import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import eu.timepit.refined.auto._
 import io.renku.graph.model.TSVersion
+import io.renku.graph.model.TSVersion._
 import io.renku.graph.model.entities.Project
 import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
@@ -58,7 +59,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 ) extends EventProcessor[F] {
 
   private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
-  import UploadingResult._
+  import EventUploadingResult._
   import accessTokenFinder._
   import entityBuilder._
   import executionTimeRecorder._
@@ -81,17 +82,18 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def transformAndUpload(
       event:              TriplesGeneratedEvent
-  )(implicit accessToken: Option[AccessToken]): F[UploadingResult] = {
+  )(implicit accessToken: Option[AccessToken]): F[EventUploadingResult] = {
     for {
-      project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      result  <- right[UploadingResult](createAndRunSteps(TSVersion.DefaultGraph, project) >>= toUploadingResult(event))
-    } yield result
+      project  <- buildEntity(event) leftSemiflatMap toUploadingError(event)
+      dgResult <- right[EventUploadingResult](createAndRunSteps(DefaultGraph, project) >>= toUploadingResult(event))
+      ngResult <- right[EventUploadingResult](createAndRunSteps(NamedGraphs, project) >>= toUploadingResult(event))
+    } yield dgResult merge ngResult
   }.merge recoverWith nonRecoverableFailure(event)
 
   private def createAndRunSteps(tsVersion: TSVersion, project: Project) =
     run(createSteps(tsVersion), project)(tsVersion)
 
-  private def toUploadingResult(event: TriplesGeneratedEvent): TriplesUploadResult => F[UploadingResult] = {
+  private def toUploadingResult(event: TriplesGeneratedEvent): TriplesUploadResult => F[EventUploadingResult] = {
     case DeliverySuccess =>
       Uploaded(event).pure[F].widen
     case RecoverableFailure(error @ LogWorthyRecoverableError(message, _)) =>
@@ -99,32 +101,34 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
         .error(error)(s"${logMessageCommon(event)} $message")
         .map(_ => RecoverableError(event, error))
     case RecoverableFailure(error @ SilentRecoverableError(_, _)) =>
-      RecoverableError(event, error).pure[F].widen[UploadingResult]
+      RecoverableError(event, error).pure[F].widen[EventUploadingResult]
     case error: NonRecoverableFailure =>
       Logger[F]
         .error(error)(s"${logMessageCommon(event)} ${error.message}")
         .map(_ => NonRecoverableError(event, error: Throwable))
   }
 
-  private def nonRecoverableFailure(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[UploadingResult]] = {
+  private def nonRecoverableFailure(
+      event: TriplesGeneratedEvent
+  ): PartialFunction[Throwable, F[EventUploadingResult]] = {
     case exception: ProcessingNonRecoverableError.MalformedRepository =>
-      NonRecoverableError(event, exception).pure[F].widen[UploadingResult]
+      NonRecoverableError(event, exception).pure[F].widen[EventUploadingResult]
     case NonFatal(exception) =>
       Logger[F]
         .error(exception)(s"${logMessageCommon(event)} ${exception.getMessage}")
         .map(_ => NonRecoverableError(event, exception))
   }
 
-  private def toUploadingError(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[UploadingResult]] = {
+  private def toUploadingError(event: TriplesGeneratedEvent): PartialFunction[Throwable, F[EventUploadingResult]] = {
     case error: LogWorthyRecoverableError =>
       Logger[F]
         .error(error)(s"${logMessageCommon(event)} ${error.getMessage}")
         .map(_ => RecoverableError(event, error))
     case error: SilentRecoverableError =>
-      RecoverableError(event, error).pure[F].widen[UploadingResult]
+      RecoverableError(event, error).pure[F].widen[EventUploadingResult]
   }
 
-  private lazy val updateEventLog: ((ElapsedTime, UploadingResult)) => F[Unit] = {
+  private lazy val updateEventLog: ((ElapsedTime, EventUploadingResult)) => F[Unit] = {
     case (elapsedTime, Uploaded(event)) =>
       statusUpdater
         .toTriplesStore(event.compoundEventId,
@@ -157,7 +161,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     Logger[F].error(exception)(s"${logMessageCommon(event)} failed to mark $message in the Event Log")
   }
 
-  private def logSummary(event: TriplesGeneratedEvent): ((ElapsedTime, UploadingResult)) => F[Unit] = {
+  private def logSummary(event: TriplesGeneratedEvent): ((ElapsedTime, EventUploadingResult)) => F[Unit] = {
     case (elapsedTime, uploadingResult) =>
       val message = uploadingResult match {
         case Uploaded(_) => "success"
@@ -176,20 +180,26 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     ) >> new Exception("transformation failure -> Event rolled back", exception).raiseError[F, Option[AccessToken]]
   }
 
-  private sealed trait UploadingResult extends Product with Serializable {
+  private sealed trait EventUploadingResult extends UploadingResult[EventUploadingResult] {
     val event: TriplesGeneratedEvent
   }
 
-  private sealed trait UploadingError extends UploadingResult {
+  private sealed trait EventUploadingError extends EventUploadingResult {
     val cause: Throwable
   }
 
-  private object UploadingResult {
-    case class Uploaded(event: TriplesGeneratedEvent) extends UploadingResult
+  private object EventUploadingResult {
+    case class Uploaded(event: TriplesGeneratedEvent)
+        extends EventUploadingResult
+        with UploadingResult.Uploaded[EventUploadingResult]
 
-    case class RecoverableError(event: TriplesGeneratedEvent, cause: ProcessingRecoverableError) extends UploadingError
+    case class RecoverableError(event: TriplesGeneratedEvent, cause: ProcessingRecoverableError)
+        extends EventUploadingError
+        with UploadingResult.RecoverableError[EventUploadingResult]
 
-    case class NonRecoverableError(event: TriplesGeneratedEvent, cause: Throwable) extends UploadingError
+    case class NonRecoverableError(event: TriplesGeneratedEvent, cause: Throwable)
+        extends EventUploadingError
+        with UploadingResult.NonRecoverableError[EventUploadingResult]
   }
 }
 
