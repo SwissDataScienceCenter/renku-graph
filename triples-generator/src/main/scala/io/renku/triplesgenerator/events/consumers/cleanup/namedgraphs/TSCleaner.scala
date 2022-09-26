@@ -22,8 +22,10 @@ import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.renku.graph.model.projects
+import io.circe.Decoder
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import io.renku.jsonld.EntityId
 import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
 import org.typelevel.log4cats.Logger
 
@@ -67,7 +69,8 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private implicit val tsConnection: ProjectsConnectionConfig = connectionConfig
 
   override def removeTriples(path: projects.Path): F[Unit] =
-    relinkSameAsHierarchy(path) >> relinkProjectHierarchy(path) >> removeProjectGraph(path)
+    relinkSameAsHierarchy(path) >> relinkProjectHierarchy(path) >>
+      findGraphId(path) >>= removeProjectGraph
 
   private def relinkProjectHierarchy(projectPath: projects.Path) = updateWithNoResult {
     SparqlQuery.of(
@@ -89,18 +92,33 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     )
   }
 
-  private def removeProjectGraph(projectPath: projects.Path): F[Unit] = updateWithNoResult {
-    SparqlQuery.of(
-      name = "project removal",
-      Prefixes of renku -> "renku",
-      s"""
-      DELETE { GRAPH ?projectId { ?s ?p ?o } }
-      WHERE {
-        GRAPH ?g {
-          ?projectId renku:projectPath '${sparqlEncode(projectPath.show)}'
-        }
-        GRAPH ?projectId { ?s ?p ?o }
-      }"""
-    )
+  private def findGraphId(projectPath: projects.Path): F[Option[EntityId]] = {
+    implicit val enc: Decoder[Option[EntityId]] = ResultsDecoder[Option, EntityId] { implicit cur =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+      extract[projects.ResourceId]("graphId").map(GraphClass.Project.id)
+    }
+
+    queryExpecting[Option[EntityId]] {
+      SparqlQuery.of(
+        name = "find project graphId",
+        Prefixes of (renku -> "renku", prov -> "prov"),
+        s"""
+        SELECT ?graphId
+        WHERE {
+          GRAPH ?graphId {
+            ?projectId renku:projectPath '${sparqlEncode(projectPath.show)}'
+          }
+        } 
+       """
+      )
+    }
+  }
+
+  private def removeProjectGraph: Option[EntityId] => F[Unit] = {
+    case None => ().pure[F]
+    case Some(graphId) =>
+      updateWithNoResult {
+        SparqlQuery.of(name = "project graph removal", s"""DROP GRAPH <$graphId>""")
+      }
   }
 }
