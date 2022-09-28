@@ -25,7 +25,7 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.Person.{entityTypes, gitLabIdEncoder, orcidIdEncoder}
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, persons}
+import io.renku.graph.model.{GraphClass, entities, persons}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, JsonLDEncoder}
 import org.scalacheck.Gen
@@ -35,32 +35,44 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "encode" should {
+  GraphClass.all - GraphClass.Project foreach { implicit graph =>
+    show"encode as an Entity for the $graph Graph" should {
 
-    "use the Person resourceId if there's no GitLabId" in {
-      val person = personEntities(withoutGitLabId).generateOne.to[entities.Person]
-      person.asJsonLD.cursor.downEntityId.as[persons.ResourceId] shouldBe person.resourceId.asRight
-    }
+      "use the Person resourceId if there's no GitLabId" in {
+        val person = personEntities(withoutGitLabId).generateOne.to[entities.Person]
+        person.asJsonLD.cursor.downEntityId.as[persons.ResourceId] shouldBe person.resourceId.asRight
+      }
 
-    "use the resourceId based on person's GitLabId if it exists" in {
-      val gitLabId = personGitLabIds.generateOne
-      forAll(personEntities().map(_.copy(maybeGitLabId = gitLabId.some))) { person =>
+      "use the resourceId based on person's GitLabId if it exists" in {
+        val gitLabId = personGitLabIds.generateOne
+        forAll(personEntities().map(_.copy(maybeGitLabId = gitLabId.some))) { person =>
+          person.asJsonLD.cursor.downEntityId.as[persons.ResourceId] shouldBe persons.ResourceId(gitLabId).asRight
+        }
+      }
+
+      "use the resourceId based on person's GitLabId if it exists even if there's an orcidId" in {
+        val gitLabId = personGitLabIds.generateOne
+        val person = personEntities()
+          .map(_.copy(maybeGitLabId = gitLabId.some, maybeOrcidId = personOrcidIds.generateSome))
+          .generateOne
         person.asJsonLD.cursor.downEntityId.as[persons.ResourceId] shouldBe persons.ResourceId(gitLabId).asRight
       }
     }
+  }
 
-    "use the resourceId based on person's GitLabId if it exists even if there's an orcidId" in {
-      val gitLabId = personGitLabIds.generateOne
-      val person = personEntities()
-        .map(_.copy(maybeGitLabId = gitLabId.some, maybeOrcidId = personOrcidIds.generateSome))
-        .generateOne
-      person.asJsonLD.cursor.downEntityId.as[persons.ResourceId] shouldBe persons.ResourceId(gitLabId).asRight
+  "encode as entityId only for the Project Graph" should {
+    implicit val graph: GraphClass = GraphClass.Project
+
+    "use the Person resourceId if there's no GitLabId" in {
+      val person = personEntities().generateOne.to[entities.Person]
+      person.asJsonLD shouldBe person.resourceId.asEntityId.asJsonLD
     }
   }
 
   "decode" should {
 
     "turn JsonLD Person entity into the Person object" in {
+      implicit val graph: GraphClass = GraphClass.Default
       forAll { person: Person =>
         person.asJsonLD.cursor.as[entities.Person] shouldBe person.to[entities.Person].asRight
       }
@@ -205,6 +217,29 @@ class PersonSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropert
           show"Invalid Person with ${invalidResourceId.asEntityId}, gitLabId = ${Option.empty[persons.GitLabId]}, " +
           show"orcidId = ${Option.empty[persons.OrcidId]}, email = ${Option.empty[persons.Email]}"
       }
+    }
+  }
+
+  "entityFunctions.findAllPersons" should {
+
+    "return itself" in {
+
+      val person = personEntities.generateOne.to[entities.Person]
+
+      EntityFunctions[entities.Person].findAllPersons(person) shouldBe Set(person)
+    }
+  }
+
+  "entityFunctions.encoder" should {
+
+    "return encoder that honors the given GraphClass" in {
+
+      val person = personEntities.generateOne.to[entities.Person]
+
+      implicit val graph: GraphClass = graphClasses.generateOne
+      val functionsEncoder = EntityFunctions[entities.Person].encoder(graph)
+
+      person.asJsonLD(functionsEncoder) shouldBe person.asJsonLD
     }
   }
 }

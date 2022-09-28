@@ -131,7 +131,8 @@ class DatasetsFinderSpec
           val (dataset2, project2) = publicProjectEntities.importDataset(dataset).generateOne
           val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
 
-          upload(to = renkuDataset, List(project1, project2Updated))
+          upload(to = renkuDataset, project1)
+          upload(to = renkuDataset, project2Updated)
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default, None)
@@ -653,15 +654,12 @@ class DatasetsFinderSpec
         .addDataset(datasetEntities(provenanceInternal).modify(_.makeKeywordsContaining(phrase.value)))
         .generateOne
 
-      upload(
-        to = renkuDataset,
-        project1 ::
-          project1Fork ::
-          project2 ::
-          project2Forks.toList :::
-          project3 ::
-          publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2 :: Nil
-      )
+      upload(to = renkuDataset, project1)
+      upload(to = renkuDataset, project1Fork)
+      upload(to = renkuDataset, project2)
+      upload(to = renkuDataset, project2Forks.toList: _*)
+      upload(to = renkuDataset, project3)
+      upload(to = renkuDataset, publicProjectEntities.addDataset(datasetEntities(provenanceInternal)).generateOne._2)
 
       val results = datasetsFinder
         .findDatasets(Some(phrase), Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default, None)

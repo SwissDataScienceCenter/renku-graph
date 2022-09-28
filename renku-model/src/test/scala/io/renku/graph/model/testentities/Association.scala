@@ -19,7 +19,7 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
-import io.renku.graph.model.{RenkuUrl, associations, entities}
+import io.renku.graph.model.{GraphClass, RenkuUrl, associations, entities}
 import io.renku.jsonld._
 
 sealed trait Association {
@@ -55,9 +55,9 @@ object Association {
       )
   }
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[Association] =
-    JsonLDEncoder.instance(association => association.to[entities.Association].asJsonLD)
+  implicit def encoder(implicit renkuUrl: RenkuUrl, graph: GraphClass): JsonLDEncoder[Association] =
+    JsonLDEncoder.instance(_.to[entities.Association].asJsonLD)
 
   implicit def entityIdEncoder[A <: Association](implicit renkuUrl: RenkuUrl): EntityIdEncoder[A] =
-    EntityIdEncoder.instance(entity => entity.activity.asEntityId.asUrlEntityId / "association")
+    EntityIdEncoder.instance(_.activity.asEntityId.asUrlEntityId / "association")
 }

@@ -24,11 +24,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -45,7 +44,7 @@ class ProjectsFinderSpec
 
       val projects = anyProjectEntities.generateNonEmptyList().toList
 
-      projects.foreach(p => upload(to = renkuDataset, p.asJsonLD))
+      projects foreach (upload(to = renkuDataset, _))
 
       projectsFinder.findProjects().unsafeRunSync() should contain theSameElementsAs projects.map(_.path)
     }

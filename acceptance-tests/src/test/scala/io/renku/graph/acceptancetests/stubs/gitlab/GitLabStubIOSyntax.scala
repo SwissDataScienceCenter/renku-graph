@@ -28,6 +28,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.testtools.IOSpec
 import org.http4s.Uri
 import GitLabStateUpdates.stateUpdateMonoid
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.projects.Id
 
 /** Convenience syntax for test cases to update the [[GitLabApiStub]] state. */
@@ -59,7 +60,7 @@ trait GitLabStubIOSyntax { self: IOSpec =>
     /** Adds the given project and associates the given commits. It also installs the `webhook/events` webhook to
      *  integrate with the triples generator. 
      */
-    def setupProject(project: Project, commits: CommitId*): Unit =
+    def setupProject(project: Project, commits: CommitId*)(implicit renkuUrl: RenkuUrl): Unit =
       self.update(GitLabStateUpdates.setupProject(project, webhookUri, commits: _*)).unsafeRunSync()
 
     /** Adds the given project and removes any existing project with the same id. */

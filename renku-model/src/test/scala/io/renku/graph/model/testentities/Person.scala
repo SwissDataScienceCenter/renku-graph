@@ -20,6 +20,7 @@ package io.renku.graph.model.testentities
 
 import cats.syntax.all._
 import io.renku.graph.model._
+import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.persons.{Affiliation, Email, GitLabId, Name, OrcidId}
 
 final case class Person(
@@ -33,6 +34,9 @@ final case class Person(
 object Person {
 
   def apply(name: Name, email: Email): Person = Person(name, Some(email))
+
+  implicit def function[P <: Person]: EntityFunctions[P] =
+    EntityFunctions[entities.Person].contramap(implicitly[P => entities.Person])
 
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
@@ -85,8 +89,11 @@ object Person {
     case _ => None
   }
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
-    JsonLDEncoder.instance(_.to[entities.Person].asJsonLD)
+  implicit def encoder(implicit
+      renkuUrl:     RenkuUrl,
+      gitLabApiUrl: GitLabApiUrl,
+      graph:        GraphClass
+  ): JsonLDEncoder[Person] = JsonLDEncoder.instance(_.to[entities.Person].asJsonLD)
 
   implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Person] =
     EntityIdEncoder.instance(person => EntityId.of(person.to[entities.Person].resourceId.value))

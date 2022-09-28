@@ -28,7 +28,7 @@ import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.events
+import io.renku.graph.model.{GraphClass, events}
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisibility, renkuProjectEntities}
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -39,6 +39,8 @@ import io.renku.graph.model.testentities.personEntities
 import io.renku.http.server.security.model.AuthUser
 
 class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TSData with TSProvisioning {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GET /events?project-path=<path> to return info about all the project events") {
 

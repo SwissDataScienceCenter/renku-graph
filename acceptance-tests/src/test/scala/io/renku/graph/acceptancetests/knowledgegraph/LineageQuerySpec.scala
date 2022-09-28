@@ -30,7 +30,7 @@ import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServic
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas._
-import io.renku.graph.model.projects
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
@@ -42,6 +42,8 @@ import sangria.ast.Document
 import sangria.macros._
 
 class LineageQuerySpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GraphQL query to find lineage") {
     val user = authUsers.generateOne

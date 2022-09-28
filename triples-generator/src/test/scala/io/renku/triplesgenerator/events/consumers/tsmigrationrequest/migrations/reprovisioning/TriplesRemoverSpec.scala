@@ -23,11 +23,9 @@ import io.renku.generators.Generators.Implicits.GenOps
 import io.renku.generators.Generators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.syntax._
 import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -41,11 +39,8 @@ class TriplesRemoverSpec
   "removeAllTriples" should {
 
     "remove all the triples from the storage except for CLI version" in new TestCase {
-      upload(to = renkuDataset,
-             anyRenkuProjectEntities.generateOne.asJsonLD,
-             anyRenkuProjectEntities.generateOne.asJsonLD,
-             renkuVersionPairs.generateOne.asJsonLD
-      )
+
+      upload(to = renkuDataset, anyRenkuProjectEntities.generateOne, anyRenkuProjectEntities.generateOne)
 
       triplesCount(on = renkuDataset) should be > 0L
 

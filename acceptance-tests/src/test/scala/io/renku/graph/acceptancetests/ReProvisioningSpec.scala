@@ -29,7 +29,7 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ServiceClient}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.graph.model.{SchemaVersion, testentities}
+import io.renku.graph.model.{GraphClass, SchemaVersion, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import org.http4s.Status.Ok
@@ -40,6 +40,8 @@ import org.scalatest.time.{Minutes, Seconds, Span}
 import java.nio.file.{Files, Paths}
 
 class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("ReProvisioning") {
 

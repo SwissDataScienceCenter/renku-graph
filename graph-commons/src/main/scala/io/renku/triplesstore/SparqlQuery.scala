@@ -24,8 +24,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.jsonld.Schema
-import io.renku.triplesstore.SparqlQuery.Prefix
 import io.renku.tinytypes.StringTinyType
+import io.renku.triplesstore.SparqlQuery.Prefix
 
 final case class SparqlQuery(name:               String Refined NonEmpty,
                              prefixes:           Set[Prefix],

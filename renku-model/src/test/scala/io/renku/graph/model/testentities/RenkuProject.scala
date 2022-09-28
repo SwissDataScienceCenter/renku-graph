@@ -48,19 +48,6 @@ sealed trait RenkuProject extends Project with RenkuProject.ProjectOps with Prod
 
 object RenkuProject {
 
-  /** Finds all persons in the given project. This function works with the test-entity 
-   * `RenkuProject`. The original function is in `ProjectFunctions`. 
-   */
-  def findAllPersons(project: RenkuProject): Set[Person] =
-    project.members ++
-      project.maybeCreator ++
-      project.activities.map(_.author) ++
-      project.datasets.flatMap(_.provenance.creators.toList.toSet) ++
-      project.activities.flatMap(_.association.agent match {
-        case p: Person => Option(p)
-        case _ => Option.empty[Person]
-      })
-
   final case class WithoutParent(path:             Path,
                                  name:             Name,
                                  maybeDescription: Option[Description],
@@ -97,6 +84,9 @@ object RenkuProject {
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithoutParent =
       copy(datasets = newDatasets.toList)
 
+    override def replaceActivities(newActivities: Activity*): RenkuProject.WithoutParent =
+      copy(activities = newActivities.toList)
+
     private def validateDates(projectDateCreated: projects.DateCreated,
                               activities:         List[Activity],
                               datasets:           List[Dataset[Dataset.Provenance]]
@@ -124,6 +114,7 @@ object RenkuProject {
       .sequence
       .void
   }
+
   final case class WithParent(path:             Path,
                               name:             Name,
                               maybeDescription: Option[Description],
@@ -157,6 +148,9 @@ object RenkuProject {
 
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithParent =
       copy(datasets = newDatasets.toList)
+
+    override def replaceActivities(newActivities: Activity*): RenkuProject.WithParent =
+      copy(activities = newActivities.toList)
   }
 
   import io.renku.jsonld._
@@ -177,6 +171,8 @@ object RenkuProject {
     def addDataset[P <: Dataset.Provenance](toAdd: DatasetGenFactory[P]): (Dataset[P], ProjectType)
 
     def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): ProjectType
+
+    def replaceActivities(newActivities: Activity*): ProjectType
   }
 
   implicit def toEntitiesRenkuProject(implicit renkuUrl: RenkuUrl): RenkuProject => entities.RenkuProject = {
@@ -231,7 +227,8 @@ object RenkuProject {
 
   implicit def encoder[P <: RenkuProject](implicit
       renkuUrl:     RenkuUrl,
-      gitLabApiUrl: GitLabApiUrl
+      gitLabApiUrl: GitLabApiUrl,
+      graph:        GraphClass
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
     case project: RenkuProject.WithParent    => project.to[entities.RenkuProject.WithParent].asJsonLD
     case project: RenkuProject.WithoutParent => project.to[entities.RenkuProject.WithoutParent].asJsonLD

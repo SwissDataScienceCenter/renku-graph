@@ -228,16 +228,21 @@ object datasets {
 
     def apply(datasetEntityId: EntityId): InternalSameAs = new InternalSameAs(datasetEntityId.toString)
 
-    implicit lazy val jsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
+    implicit lazy val jsonLDEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
       case sameAs @ InternalSameAs(_) => internalSameAsEncoder(sameAs)
       case sameAs @ ExternalSameAs(_) => externalSameAsEncoder(sameAs)
+    }
+
+    implicit def jsonLDEntityEncoder[S <: SameAs]: EntityIdEncoder[S] = EntityIdEncoder.instance {
+      case sameAs @ InternalSameAs(_) => EntityId of s"$sameAs/${sameAs.value.hashCode}"
+      case sameAs @ ExternalSameAs(_) => EntityId of s"$sameAs/${sameAs.value.hashCode}"
     }
 
     private val urlEntityTypes = EntityTypes of (schema / "URL")
 
     implicit lazy val internalSameAsEncoder: JsonLDEncoder[InternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
-        EntityId of s"$sameAs/${sameAs.value.hashCode}",
+        sameAs.asEntityId,
         urlEntityTypes,
         schema / "url" -> EntityId.of(sameAs.value).asJsonLD
       )
@@ -249,7 +254,7 @@ object datasets {
 
     implicit lazy val externalSameAsEncoder: JsonLDEncoder[ExternalSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
-        EntityId of s"$sameAs/${sameAs.value.hashCode}",
+        sameAs.asEntityId,
         urlEntityTypes,
         schema / "url" -> sameAs.value.asJsonLD
       )

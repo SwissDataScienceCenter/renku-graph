@@ -30,7 +30,7 @@ import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServic
 import io.renku.graph.model
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.Schemas.prov
-import io.renku.graph.model.projects
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.LineageExemplarData.ExemplarData
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{personEntities, renkuProjectEntities, visibilityPublic}
@@ -41,6 +41,8 @@ import io.renku.jsonld.syntax._
 import org.http4s.Status.{NotFound, Ok}
 
 class LineageResourcesSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/files/<location>/lineage to find a file's lineage") {
     val (exemplarData, project) = {

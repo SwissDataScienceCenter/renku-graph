@@ -23,6 +23,7 @@ import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.graph.model._
 import io.renku.graph.model.datasets._
+import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.testentities.Dataset.Provenance._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
@@ -356,12 +357,17 @@ object Dataset {
     )
   }
 
+  implicit def functions[P <: Provenance]: EntityFunctions[Dataset[P]] =
+    EntityFunctions[entities.Dataset[entities.Dataset.Provenance]]
+      .contramap(implicitly[Dataset[P] => entities.Dataset[entities.Dataset.Provenance]])
+
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
   implicit def encoder[P <: Provenance](implicit
       renkuUrl:     RenkuUrl,
-      gitLabApiUrl: GitLabApiUrl
+      gitLabApiUrl: GitLabApiUrl,
+      graph:        GraphClass
   ): JsonLDEncoder[Dataset[P]] = JsonLDEncoder.instance(_.to[entities.Dataset[entities.Dataset.Provenance]].asJsonLD)
 
   implicit def entityIdEncoder[P <: Provenance](implicit renkuUrl: RenkuUrl): EntityIdEncoder[Dataset[P]] =

@@ -29,7 +29,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
-import io.renku.graph.model.projects
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
@@ -38,6 +38,8 @@ import org.http4s.Status.Ok
 import tooling.{AcceptanceSpec, ApplicationServices}
 
 class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning {
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GET knowledge-graph/users/:id/projects to return user's projects") {
 

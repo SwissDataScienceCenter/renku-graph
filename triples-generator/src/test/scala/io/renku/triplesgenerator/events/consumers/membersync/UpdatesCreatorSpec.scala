@@ -27,12 +27,11 @@ import io.renku.graph.model.persons.{Email, GitLabId}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{persons, projects}
-import io.renku.jsonld.syntax._
-import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.events.consumers.membersync.Generators._
 import io.renku.triplesgenerator.events.consumers.membersync.PersonOps._
+import io.renku.triplesstore.SparqlQuery.Prefixes
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -74,7 +73,8 @@ class UpdatesCreatorSpec
       val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
       val project    = anyRenkuProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
 
-      upload(to = renkuDataset, project.asJsonLD, personInKG.asJsonLD)
+      upload(to = renkuDataset, project)
+      upload(to = renkuDataset, personInKG)
 
       findMembers(project.path) shouldBe Set.empty
 

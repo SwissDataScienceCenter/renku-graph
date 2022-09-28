@@ -33,7 +33,7 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.testentities.::~
-import io.renku.graph.model.{publicationEvents, testentities}
+import io.renku.graph.model.{GraphClass, publicationEvents, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
@@ -54,6 +54,8 @@ class DatasetsResourcesSpec
 
   val creator: AuthUser = authUsers.generateOne
   val user:    AuthUser = authUsers.generateOne
+
+  private implicit val graph: GraphClass = GraphClass.Default
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
     val (dataset1 ::~ dataset2 ::~ dataset2Modified, testEntitiesProject) = renkuProjectEntities(visibilityPublic)

@@ -21,12 +21,12 @@ package io.renku.graph.model.entities
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
+import io.renku.graph.model.GraphModelGenerators.{graphClasses, projectCreatedDates}
 import io.renku.graph.model.Schemas.{prov, renku}
-import io.renku.graph.model.entities
 import io.renku.graph.model.entities.Activity.entityTypes
 import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput}
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphClass, entities}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLD, JsonLDEncoder, Reverse}
 import org.scalatest.matchers.should
@@ -36,6 +36,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
+    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Activity entity into the Activity object" in {
       forAll(activityEntities(planEntities())(projectCreatedDates().generateOne)) { activity =>
@@ -74,7 +75,6 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
       val Left(error) = JsonLD
         .arr(activity.asJsonLD, activity.association.plan.asJsonLD)
-        .asJsonLD
         .flatten
         .fold(throw _, _.asArray.fold(fail("JsonLD is not an array"))(replaceEntityLocation))
         .cursor
@@ -108,7 +108,6 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
       val Left(error) = JsonLD
         .arr(activity.asJsonLD, activity.association.plan.asJsonLD)
-        .asJsonLD
         .flatten
         .fold(throw _, _.asArray.fold(fail("JsonLD is not an array"))(replaceEntityLocation))
         .cursor
@@ -176,6 +175,83 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
 
       error       shouldBe a[DecodingFailure]
       error.message should endWith(s"Activity ${activity.resourceId} without or with multiple authors")
+    }
+  }
+
+  "encode for the Default Graph" should {
+    implicit val graph: GraphClass = GraphClass.Default
+
+    "produce JsonLD with all the relevant properties" in {
+      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+        .buildProvenanceUnsafe()
+        .to[entities.Activity]
+
+      activity.asJsonLD shouldBe JsonLD.entity(
+        activity.resourceId.asEntityId,
+        entityTypes,
+        Reverse.ofJsonLDsUnsafe((prov / "activity") -> activity.generations.asJsonLD),
+        prov / "startedAtTime"        -> activity.startTime.asJsonLD,
+        prov / "endedAtTime"          -> activity.endTime.asJsonLD,
+        prov / "wasAssociatedWith"    -> JsonLD.arr(activity.agent.asJsonLD, activity.author.asJsonLD),
+        prov / "qualifiedAssociation" -> activity.association.asJsonLD,
+        prov / "qualifiedUsage"       -> activity.usages.asJsonLD,
+        renku / "parameter"           -> activity.parameters.asJsonLD
+      )
+    }
+  }
+
+  "encode for the Project Graph" should {
+    implicit val graph: GraphClass = GraphClass.Project
+
+    "produce JsonLD with all the relevant properties and only links to Person entities" in {
+      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+        .buildProvenanceUnsafe()
+        .to[entities.Activity]
+
+      activity.asJsonLD shouldBe JsonLD.entity(
+        activity.resourceId.asEntityId,
+        entityTypes,
+        Reverse.ofJsonLDsUnsafe((prov / "activity") -> activity.generations.asJsonLD),
+        prov / "startedAtTime" -> activity.startTime.asJsonLD,
+        prov / "endedAtTime"   -> activity.endTime.asJsonLD,
+        prov / "wasAssociatedWith" -> JsonLD.arr(activity.agent.asJsonLD,
+                                                 activity.author.resourceId.asEntityId.asJsonLD
+        ),
+        prov / "qualifiedAssociation" -> activity.association.asJsonLD,
+        prov / "qualifiedUsage"       -> activity.usages.asJsonLD,
+        renku / "parameter"           -> activity.parameters.asJsonLD
+      )
+    }
+  }
+
+  "entityFunctions.findAllPersons" should {
+
+    "return Activity's author and Association's agent if exists" in {
+      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+        .buildProvenanceUnsafe()
+        .to[entities.Activity]
+
+      val maybeAssociationPersons: Set[entities.Person] = activity.association.agent match {
+        case p: entities.Person => Set(p)
+        case _ => Set.empty[entities.Person]
+      }
+
+      EntityFunctions[entities.Activity].findAllPersons(activity) shouldBe
+        Set(activity.author) ++ maybeAssociationPersons
+    }
+  }
+
+  "entityFunctions.encoder" should {
+
+    "return encoder that honors the given GraphClass" in {
+      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+        .buildProvenanceUnsafe()
+        .to[entities.Activity]
+
+      implicit val graph: GraphClass = graphClasses.generateOne
+      val functionsEncoder = EntityFunctions[entities.Activity].encoder(graph)
+
+      activity.asJsonLD(functionsEncoder) shouldBe activity.asJsonLD
     }
   }
 }

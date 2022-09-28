@@ -22,8 +22,8 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.events.consumers.Project
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.EventStatusUpdater
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -32,15 +32,16 @@ private trait EventProcessor[F[_]] {
   def process(project: Project): F[Unit]
 }
 
-private class EventProcessorImpl[F[_]: Async: Logger](triplesRemover: ProjectTriplesRemover[F],
-                                                      statusUpdater: EventStatusUpdater[F]
+private class EventProcessorImpl[F[_]: Async: Logger](defaultGraphCleaner: defaultgraph.TSCleaner[F],
+                                                      namedGraphsCleaner: namedgraphs.TSCleaner[F],
+                                                      statusUpdater:      EventStatusUpdater[F]
 ) extends EventProcessor[F] {
 
-  import triplesRemover._
-
-  override def process(project: Project): F[Unit] =
-    (removeTriples(of = project.path) >> statusUpdater.projectToNew(project))
-      .recoverWith(logError(project))
+  override def process(project: Project): F[Unit] = {
+    defaultGraphCleaner.removeTriples(project.path) >>
+      namedGraphsCleaner.removeTriples(project.path) >>
+      statusUpdater.projectToNew(project)
+  }.recoverWith(logError(project))
 
   private def logError(project: Project): PartialFunction[Throwable, F[Unit]] = { case NonFatal(error) =>
     Logger[F].error(error)(show"$categoryName: $project - triples removal failed ${error.getMessage}")
@@ -49,7 +50,8 @@ private class EventProcessorImpl[F[_]: Async: Logger](triplesRemover: ProjectTri
 
 private object EventProcessor {
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[EventProcessor[F]] = for {
-    eventStatusUpdater <- EventStatusUpdater(categoryName)
-    triplesRemover     <- ProjectTriplesRemover[F]()
-  } yield new EventProcessorImpl[F](triplesRemover, eventStatusUpdater)
+    eventStatusUpdater  <- EventStatusUpdater(categoryName)
+    defaultGraphCleaner <- defaultgraph.TSCleaner[F]()
+    namedGraphsCleaner  <- namedgraphs.TSCleaner[F]()
+  } yield new EventProcessorImpl[F](defaultGraphCleaner, namedGraphsCleaner, eventStatusUpdater)
 }
