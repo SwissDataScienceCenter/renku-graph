@@ -32,6 +32,8 @@ sealed trait Association {
   val resourceId: ResourceId
   val agent:      AgentType
   val plan:       Plan
+
+  def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A
 }
 
 object Association {
@@ -40,21 +42,21 @@ object Association {
     new EntityFunctions[Association] {
 
       override val findAllPersons: Association => Set[Person] =
-        a =>
-          efp.findAllPersons(a.plan) ++
-            (a.agent match {
-              case p: Person => Set(p)
-              case _ => Set.empty[Person]
-            })
+        a => efp.findAllPersons(a.plan) ++ AssociationLens.associationAgent.get(a).toOption.toSet
 
       override val encoder: GraphClass => JsonLDEncoder[Association] = Association.encoder(glUrl, _)
     }
 
   final case class WithRenkuAgent(resourceId: ResourceId, agent: Agent, plan: Plan) extends Association {
     type AgentType = Agent
+
+    def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A =
+      fb(this)
   }
   final case class WithPersonAgent(resourceId: ResourceId, agent: Person, plan: Plan) extends Association {
     type AgentType = Person
+    def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A =
+      fa(this)
   }
 
   val entityTypes: EntityTypes = EntityTypes of (prov / "Association")

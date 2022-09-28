@@ -179,12 +179,13 @@ object ProjectJsonLDDecoder {
   private def members(
       allJsonLdPersons: Set[Person]
   )(gitLabInfo:         GitLabProjectInfo)(implicit renkuUrl: RenkuUrl): Set[Person] =
-    gitLabInfo.members.map(member =>
-      allJsonLdPersons
+    gitLabInfo.members.map { member =>
+      val z = allJsonLdPersons
         .find(byEmailOrUsername(member))
         .map(merge(member))
         .getOrElse(toPerson(member))
-    )
+      z
+    }
 
   private lazy val byEmailOrUsername: ProjectMember => Person => Boolean = {
     case member: ProjectMemberWithEmail =>

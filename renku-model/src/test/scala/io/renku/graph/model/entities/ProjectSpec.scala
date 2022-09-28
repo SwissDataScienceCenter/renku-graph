@@ -29,6 +29,7 @@ import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
+import io.renku.graph.model.persons.{GitLabId, Name, Username}
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword}
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.JsonLDDecoder._
@@ -61,6 +62,61 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   "decode" should {
     implicit val graph: GraphClass = GraphClass.Default
 
+    "match persons in plan.creators" in {
+      forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
+        (projectInfo, cliVersion, schemaVersion) =>
+          val creator =
+            projectMembersWithEmail.generateOne.copy(name = Name("Harry"),
+                                                     username = Username("user-harry"),
+                                                     gitLabId = GitLabId(42)
+            )
+          val member2 = projectMembersWithEmail.generateOne.copy(name = Name("Member2"))
+
+          val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member2))
+          val resourceId         = projects.ResourceId(info.path)
+          val creatorAsCliPerson = creator.toCLIPayloadPerson
+          val activity1          = activityWith(member2.toCLIPayloadPerson)(info.dateCreated)
+
+          val activity1WithPlanCreator =
+            ActivityLens.activityPlanCreators.set(Set(creatorAsCliPerson))(activity1)
+
+          val jsonLD = cliLikeJsonLD(
+            resourceId,
+            cliVersion,
+            schemaVersion,
+            info.maybeDescription,
+            info.keywords,
+            creatorAsCliPerson.some,
+            info.dateCreated,
+            activity1WithPlanCreator :: Nil,
+            Nil
+          )
+          val mergedCreator = merge(creatorAsCliPerson, creator)
+          val mergedMember2 = merge(activity1WithPlanCreator.author, member2)
+          val activity1WithPlanCreatorExpect =
+            (ActivityLens.activityPlanCreators.set(Set(mergedCreator)) >>>
+              ActivityLens.activityAuthor.set(mergedMember2))(activity1)
+
+          jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
+            entities.RenkuProject.WithoutParent(
+              resourceId,
+              info.path,
+              info.name,
+              info.maybeDescription,
+              cliVersion,
+              info.dateCreated,
+              maybeCreator = mergedCreator.some,
+              info.visibility,
+              info.keywords,
+              members = Set(mergedMember2.some).flatten,
+              schemaVersion,
+              activity1WithPlanCreatorExpect :: Nil,
+              Nil
+            )
+          ).asRight
+      }
+    }
+
     "turn JsonLD Project entity without parent into the Project object" in {
       forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
         (projectInfo, cliVersion, schemaVersion) =>
@@ -80,14 +136,16 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             info.dateCreated
           )
 
-          val jsonLD = cliLikeJsonLD(resourceId,
-                                     cliVersion,
-                                     schemaVersion,
-                                     info.maybeDescription,
-                                     info.keywords,
-                                     info.dateCreated,
-                                     activity1 :: activity2 :: activity3 :: Nil,
-                                     dataset1 :: dataset2 :: Nil
+          val jsonLD = cliLikeJsonLD(
+            resourceId,
+            cliVersion,
+            schemaVersion,
+            info.maybeDescription,
+            info.keywords,
+            None,
+            info.dateCreated,
+            activity1 :: activity2 :: activity3 :: Nil,
+            dataset1 :: dataset2 :: Nil
           )
 
           val mergedCreator = merge(creatorAsCliPerson, creator)
@@ -139,14 +197,16 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
             info.dateCreated
           )
 
-        val jsonLD = cliLikeJsonLD(resourceId,
-                                   cliVersion,
-                                   schemaVersion,
-                                   info.maybeDescription,
-                                   info.keywords,
-                                   info.dateCreated,
-                                   activity1 :: activity2 :: activity3 :: Nil,
-                                   dataset1 :: dataset2 :: Nil
+        val jsonLD = cliLikeJsonLD(
+          resourceId,
+          cliVersion,
+          schemaVersion,
+          info.maybeDescription,
+          info.keywords,
+          None,
+          info.dateCreated,
+          activity1 :: activity2 :: activity3 :: Nil,
+          dataset1 :: dataset2 :: Nil
         )
 
         val mergedCreator = merge(creatorAsCliPerson, creator)
@@ -237,6 +297,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
+        None,
         projectInfo.dateCreated,
         activities = Nil,
         datasets = Nil
@@ -267,6 +328,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
+        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
         projectInfo.dateCreated,
         activities = activityEntities(planEntities())
           .withDateBefore(projectInfo.dateCreated)
@@ -293,6 +355,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
+        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
         projectInfo.dateCreated,
         activities = Nil,
         datasets = datasetEntities(provenanceInternal)
@@ -320,6 +383,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
+        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
         projectInfo.dateCreated,
         activities = List(activity.to[entities.Activity]),
         datasets = Nil
@@ -344,6 +408,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
+        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset.to[entities.Dataset[entities.Dataset.Provenance.Internal]])
@@ -382,6 +447,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         schemaVersion,
         projectInfo.maybeDescription,
         projectInfo.keywords,
+        None,
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset1, dataset2, dateset2Modified).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
@@ -429,6 +495,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
+        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset, datesetModified).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
@@ -461,6 +528,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         schemaVersion,
         projectInfo.maybeDescription,
         projectInfo.keywords,
+        None,
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset1, dataset2, dataset3).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
@@ -501,6 +569,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           projectSchemaVersions.generateOne,
           projectInfo.maybeDescription,
           projectInfo.keywords,
+          projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
           projectInfo.dateCreated,
           activities = Nil,
           datasets = List(original, modified, broken).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
@@ -524,14 +593,16 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val schemaVersion = projectSchemaVersions.generateOne
       val resourceId    = projects.ResourceId(projectInfo.path)
 
-      val jsonLD = cliLikeJsonLD(resourceId,
-                                 cliVersion,
-                                 schemaVersion,
-                                 projectInfo.maybeDescription,
-                                 projectInfo.keywords,
-                                 cliDate,
-                                 activities = Nil,
-                                 datasets = Nil
+      val jsonLD = cliLikeJsonLD(
+        resourceId,
+        cliVersion,
+        schemaVersion,
+        projectInfo.maybeDescription,
+        projectInfo.keywords,
+        None,
+        cliDate,
+        activities = Nil,
+        datasets = Nil
       )
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
@@ -573,6 +644,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                                  schemaVersion,
                                  description,
                                  keywords,
+                                 None,
                                  cliDate,
                                  activities = Nil,
                                  datasets = Nil
@@ -610,14 +682,16 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val schemaVersion = projectSchemaVersions.generateOne
       val resourceId    = projects.ResourceId(projectInfo.path)
 
-      val jsonLD = cliLikeJsonLD(resourceId,
-                                 cliVersion,
-                                 schemaVersion,
-                                 maybeDescription = None,
-                                 keywords = Set.empty,
-                                 cliDate,
-                                 activities = Nil,
-                                 datasets = Nil
+      val jsonLD = cliLikeJsonLD(
+        resourceId,
+        cliVersion,
+        schemaVersion,
+        maybeDescription = None,
+        keywords = Set.empty,
+        None,
+        cliDate,
+        activities = Nil,
+        datasets = Nil
       )
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
@@ -652,14 +726,16 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val schemaVersion = projectSchemaVersions.generateOne
       val resourceId    = projects.ResourceId(projectInfo.path)
 
-      val jsonLD = cliLikeJsonLD(resourceId,
-                                 cliVersion,
-                                 schemaVersion,
-                                 maybeDescription = None,
-                                 keywords = Set.empty,
-                                 cliDate,
-                                 activities = Nil,
-                                 datasets = Nil
+      val jsonLD = cliLikeJsonLD(
+        resourceId,
+        cliVersion,
+        schemaVersion,
+        maybeDescription = None,
+        keywords = Set.empty,
+        None,
+        cliDate,
+        activities = Nil,
+        datasets = Nil
       )
 
       jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo))) shouldBe List(
@@ -859,6 +935,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
                             schemaVersion:    SchemaVersion,
                             maybeDescription: Option[Description],
                             keywords:         Set[Keyword],
+                            maybeCreator:     Option[entities.Person],
                             dateCreated:      DateCreated,
                             activities:       List[entities.Activity],
                             datasets:         List[entities.Dataset[entities.Dataset.Provenance]]
@@ -879,6 +956,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schema / "schemaVersion" -> schemaVersion.asJsonLD,
           schema / "description"   -> descriptionJsonLD,
           schema / "keywords"      -> (keywords.map(_.value) + blankStrings().generateOne).asJsonLD,
+          schema / "creator"       -> maybeCreator.asJsonLD,
           schema / "dateCreated"   -> dateCreated.asJsonLD,
           renku / "hasActivity"    -> activities.asJsonLD,
           renku / "hasPlan"        -> activities.map(_.association.plan).distinct.asJsonLD,
@@ -900,6 +978,13 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       .fold(throw _, identity)
 
   private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
+    def toTestPerson: testentities.Person =
+      gitLabPerson match {
+        case ProjectMemberNoEmail(name, _, gitLabId) =>
+          testentities.Person(name, None, gitLabId.some)
+        case ProjectMemberWithEmail(name, _, gitLabId, email) =>
+          testentities.Person(name, email.some, gitLabId.some)
+      }
 
     lazy val toCLIPayloadPerson: entities.Person = gitLabPerson match {
       case member: ProjectMemberNoEmail =>

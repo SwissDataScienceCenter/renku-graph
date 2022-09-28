@@ -128,10 +128,10 @@ class UpdatesCreatorSpec
       findPersonAgents(activity.association.resourceId) shouldBe activity.association.maybePersonAgentResourceId.toSet
 
       val newAgent = personEntities.generateOne.to[entities.Person]
-      val modelActivity = activity.association match {
-        case assoc: entities.Association.WithPersonAgent => activity.copy(association = assoc.copy(agent = newAgent))
-        case _ => fail("Expected Association.WithPersonAgent")
-      }
+      val modelActivity = activity.association
+        .fold(assoc => activity.copy(association = assoc.copy(agent = newAgent)))(_ =>
+          fail("Expected Association.WithPersonAgent")
+        )
 
       UpdatesCreator
         .queriesUnlinkingAgents(modelActivity, activity.association.maybePersonAgentResourceId.toSet)
