@@ -46,21 +46,20 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       (eventStatusUpdater.projectToNew _).expects(project).returns(().pure[IO])
 
-      eventProcessor.process(project).unsafeRunSync() shouldBe ()
+      (eventProcessor process project).unsafeRunSync() shouldBe ()
     }
 
     "do not fail but log an error if the removal of the triples fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      if (Random.nextBoolean()) {
+      if (Random.nextBoolean())
         (defaultGraphCleaner.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
-        (namedGraphsCleaner.removeTriples _).expects(path).returns(().pure[IO])
-      } else {
+      else {
         (defaultGraphCleaner.removeTriples _).expects(path).returns(().pure[IO])
         (namedGraphsCleaner.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
       }
 
-      eventProcessor.process(project).unsafeRunSync() shouldBe ()
+      (eventProcessor process project).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Error(s"${commonLogMessage(project)} - triples removal failed ${exception.getMessage}", exception)
@@ -75,7 +74,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val exception = exceptions.generateOne
       (eventStatusUpdater.projectToNew _).expects(project).returns(exception.raiseError[IO, Unit])
 
-      eventProcessor.process(project).unsafeRunSync() shouldBe ()
+      (eventProcessor process project).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
         Error(s"${commonLogMessage(project)} - triples removal failed ${exception.getMessage}", exception)
