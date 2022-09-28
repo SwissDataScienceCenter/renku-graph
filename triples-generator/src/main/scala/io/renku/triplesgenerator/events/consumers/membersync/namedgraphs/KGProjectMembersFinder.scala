@@ -17,15 +17,17 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
+package namedgraphs
 
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model._
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{RenkuUrl, persons, projects}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -35,9 +37,9 @@ private trait KGProjectMembersFinder[F[_]] {
 }
 
 private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig,
-    renkuUrl:              RenkuUrl
-) extends TSClientImpl(renkuConnectionConfig)
+    connectionConfig: ProjectsConnectionConfig
+)(implicit renkuUrl:  RenkuUrl)
+    extends TSClientImpl(connectionConfig)
     with KGProjectMembersFinder[F] {
 
   import eu.timepit.refined.auto._
@@ -53,26 +55,27 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
         .mapN(KGProjectMember)
   }
 
-  private def query(path: Path) = SparqlQuery.of(
-    name = "members by project path",
-    Prefixes of schema -> "schema",
-    s"""|SELECT DISTINCT ?memberId ?gitLabId
-        |WHERE {
-        |  ${ResourceId(path)(renkuUrl).showAs[RdfResource]} a schema:Project;
-        |                                                        schema:member ?memberId.                                                     
-        |  ?sameAsId  schema:additionalType  'GitLab';
-        |             schema:identifier      ?gitLabId ;
-        |             ^schema:sameAs         ?memberId .
-        |}
-        |""".stripMargin
-  )
+  private def query(path: Path) = {
+    val projectId = ResourceId(path)
+    SparqlQuery.of(
+      name = "members by project path",
+      Prefixes of schema -> "schema",
+      s"""|SELECT DISTINCT ?memberId ?gitLabId
+          |FROM <${GraphClass.Persons.id}> 
+          |FROM <${GraphClass.Project.id(projectId)}> {
+          |  ${projectId.showAs[RdfResource]} schema:member ?memberId.
+          |  ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+          |            schema:identifier     ?gitLabId;
+          |            ^schema:sameAs        ?memberId.
+          |}
+          |""".stripMargin
+    )
+  }
 }
 
 private object KGProjectMembersFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectMembersFinder[F]] = for {
-    renkuConnectionConfig <- RenkuConnectionConfig[F]()
-    renkuUrl              <- RenkuUrlLoader[F]()
-  } yield new KGProjectMembersFinderImpl(renkuConnectionConfig, renkuUrl)
+    connectionConfig              <- ProjectsConnectionConfig[F]()
+    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
+  } yield new KGProjectMembersFinderImpl(connectionConfig)
 }
-
-private final case class KGProjectMember(resourceId: persons.ResourceId, gitLabId: persons.GitLabId)

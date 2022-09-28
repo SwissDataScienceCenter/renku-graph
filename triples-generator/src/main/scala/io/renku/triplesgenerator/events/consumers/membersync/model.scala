@@ -18,9 +18,8 @@
 
 package io.renku.triplesgenerator.events.consumers.membersync
 
-import io.renku.triplesstore.SparqlQuery
+import io.renku.graph.model.persons
 
-private trait QuerySender[F[_]] {
+private final case class SyncSummary(membersAdded: Int, membersRemoved: Int)
 
-  def send(update: SparqlQuery): F[Unit]
-}
+private final case class KGProjectMember(resourceId: persons.ResourceId, gitLabId: persons.GitLabId)
