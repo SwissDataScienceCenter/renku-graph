@@ -27,7 +27,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.graph.model.entities.{EntityFunctions, Person}
-import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, testentities}
+import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, projects, testentities}
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
@@ -309,7 +309,7 @@ trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
 
       private def projectGraphId(entity: A): EntityId = entity match {
         case p: entities.Project     => GraphClass.Project.id(p.resourceId)
-        case p: testentities.Project => GraphClass.Project.id(p.asEntityId)
+        case p: testentities.Project => GraphClass.Project.id(projects.ResourceId(p.asEntityId))
         case _ => defaultProjectGraphId
       }
     }
