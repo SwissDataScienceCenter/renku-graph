@@ -63,6 +63,7 @@ private class EventHandler[F[_]: Async: Logger: MetricsRegistry](
       requestAs[RollbackToTriplesGenerated],
       requestAs[ToAwaitingDeletion],
       requestAs[RollbackToAwaitingDeletion],
+      requestAs[RedoProjectTransformation],
       requestAs[ProjectEventsToNew],
       requestAs[AllEventsToNew]
     )(request)
@@ -280,7 +281,18 @@ private object EventHandler {
     } yield RollbackToAwaitingDeletion(Project(projectId, projectPath))
   }
 
-  private implicit lazy val eventToProjectEventToNewDecoder
+  private implicit lazy val eventToRedoProjectTransformationDecoder
+      : EventRequestContent => Either[DecodingFailure, RedoProjectTransformation] = { request =>
+    for {
+      projectPath <- request.event.hcursor.downField("project").downField("path").as[projects.Path]
+      _ <- request.event.hcursor.downField("newStatus").as[EventStatus] >>= {
+             case TriplesGenerated => Right(())
+             case status           => Left(DecodingFailure(s"Unrecognized event status $status", Nil))
+           }
+    } yield RedoProjectTransformation(projectPath)
+  }
+
+  private implicit lazy val eventToProjectEventsToNewDecoder
       : EventRequestContent => Either[DecodingFailure, ProjectEventsToNew] = { request =>
     for {
       projectId   <- request.event.hcursor.downField("project").downField("id").as[projects.Id]

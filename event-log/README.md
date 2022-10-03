@@ -216,6 +216,22 @@ the new status.
 }
 ```
 
+#### Changing status of the given project's latest event in `TRIPLES_STORE` to `TRIPLES_GENERATED` or triggering `ADD_MIN_PROJECT_INFO` event in case there's no event in `TRIPLES_STORE`
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "EVENTS_STATUS_CHANGE",
+  "project": {
+    "path": "namespace/project-name"
+  },
+  "newStatus": "TRIPLES_GENERATED"
+}
+```
+
 #### Changing status of the specified event to `AWAITING_DELETION`
 
 **Multipart Request**
@@ -870,8 +886,8 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | project_path      VARCHAR        NOT NULL |
 | latest_event_date TIMESTAMPTZ    NOT NULL |
 
-| event_payload                    |
-|----------------------------------|
+| event_payload                     |
+|-----------------------------------|
 | event_id   VARCHAR PK FK NOT NULL |
 | project_id INT4    PK FK NOT NULL |
 | payload    BYTEA         NOT NULL |

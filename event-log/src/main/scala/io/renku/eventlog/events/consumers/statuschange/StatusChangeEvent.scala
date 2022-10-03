@@ -130,10 +130,28 @@ private object StatusChangeEvent {
     }
   }
 
-  type AllEventsToNew = AllEventsToNew.type
-  final case object AllEventsToNew extends StatusChangeEvent {
-    override val silent:    Boolean              = false
-    implicit lazy val show: Show[AllEventsToNew] = Show.show(_ => s"status = $New")
+  final case class RedoProjectTransformation(projectPath: projects.Path) extends StatusChangeEvent {
+    override val silent: Boolean = false
+  }
+
+  object RedoProjectTransformation {
+    implicit lazy val show: Show[RedoProjectTransformation] = Show.show { case RedoProjectTransformation(projectPath) =>
+      s"projectPath = $projectPath, status = $TriplesGenerated - redo"
+    }
+
+    implicit lazy val encoder: Encoder[RedoProjectTransformation] = Encoder.instance {
+      case RedoProjectTransformation(path) => json"""{
+        "project": {
+          "path": ${path.value}
+        }
+      }"""
+    }
+
+    implicit lazy val decoder: Decoder[RedoProjectTransformation] =
+      _.downField("project").downField("path").as[projects.Path].map(RedoProjectTransformation(_))
+
+    implicit lazy val eventType: StatusChangeEventsQueue.EventType[RedoProjectTransformation] =
+      StatusChangeEventsQueue.EventType("REDO_PROJECT_TRANSFORMATION")
   }
 
   final case class ProjectEventsToNew(project: Project) extends StatusChangeEvent {
@@ -147,7 +165,7 @@ private object StatusChangeEvent {
     implicit lazy val encoder: Encoder[ProjectEventsToNew] = Encoder.instance {
       case ProjectEventsToNew(Project(id, path)) => json"""{
         "project": {
-          "id": ${id.value},
+          "id":   ${id.value},
           "path": ${path.value}
         }    
       }"""
@@ -160,6 +178,12 @@ private object StatusChangeEvent {
 
     implicit lazy val eventType: StatusChangeEventsQueue.EventType[ProjectEventsToNew] =
       StatusChangeEventsQueue.EventType("PROJECT_EVENTS_TO_NEW")
+  }
+
+  type AllEventsToNew = AllEventsToNew.type
+  final case object AllEventsToNew extends StatusChangeEvent {
+    override val silent:    Boolean              = false
+    implicit lazy val show: Show[AllEventsToNew] = Show.show(_ => s"status = $New")
   }
 
   implicit def show[E <: StatusChangeEvent](implicit concreteShow: Show[E]): Show[E] = concreteShow

@@ -41,9 +41,11 @@ trait StatusChangeEventsQueue[F[_]] {
       handler:        E => F[Unit]
   )(implicit decoder: Decoder[E], eventType: EventType[E]): F[Unit]
 
-  def offer[E <: StatusChangeEvent](
-      event:          E
-  )(implicit encoder: Encoder[E], eventType: EventType[E], show: Show[E]): Kleisli[F, Session[F], Unit]
+  def offer[E <: StatusChangeEvent](event: E)(implicit
+      encoder:                             Encoder[E],
+      eventType:                           EventType[E],
+      show:                                Show[E]
+  ): Kleisli[F, Session[F], Unit]
 
   def run(): F[Unit]
 }
@@ -84,23 +86,24 @@ private class StatusChangeEventsQueueImpl[F[_]: Async: Logger: SessionResource](
   )(implicit decoder: Decoder[E], eventType: EventType[E]): F[Unit] =
     handlers.update(HandlerDef(eventType, decoder, handler) :: _)
 
-  override def offer[E <: StatusChangeEvent](
-      event:          E
-  )(implicit encoder: Encoder[E], eventType: EventType[E], show: Show[E]): Kleisli[F, Session[F], Unit] =
-    measureExecutionTime {
-      SqlStatement[F](name = "status change event queue - offer")
-        .command[OffsetDateTime ~ String ~ String](
-          sql"""INSERT INTO status_change_events_queue (date, event_type, payload)
-                VALUES ($timestamptz, $varchar, $text)
-          """.command
-        )
-        .arguments(OffsetDateTime.now() ~ eventType.value ~ event.asJson(encoder).noSpaces)
-        .build
-    } flatMapF {
-      case Completion.Insert(1) => ().pure[F]
-      case Completion.Insert(0) => Logger[F].error(show"$categoryName $event wasn't enqueued")
-      case other                => Logger[F].error(s"$categoryName offering ${event.show} failed with $other")
-    }
+  override def offer[E <: StatusChangeEvent](event: E)(implicit
+      encoder:                                      Encoder[E],
+      eventType:                                    EventType[E],
+      show:                                         Show[E]
+  ): Kleisli[F, Session[F], Unit] = measureExecutionTime {
+    SqlStatement[F](name = "status change event queue - offer")
+      .command[OffsetDateTime ~ String ~ String](
+        sql"""INSERT INTO status_change_events_queue (date, event_type, payload)
+              VALUES ($timestamptz, $varchar, $text)
+           """.command
+      )
+      .arguments(OffsetDateTime.now() ~ eventType.value ~ event.asJson(encoder).noSpaces)
+      .build
+  } flatMapF {
+    case Completion.Insert(1) => ().pure[F]
+    case Completion.Insert(0) => Logger[F].error(show"$categoryName $event wasn't enqueued")
+    case other                => Logger[F].error(s"$categoryName offering ${event.show} failed with $other")
+  }
 
   override def run(): F[Unit] = dequeueAll().foreverM
 

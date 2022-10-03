@@ -18,12 +18,12 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import Generators.projectEventsToNewEvents
+import Generators.redoProjectTransformationEvents
 import cats.Show
 import cats.data.Kleisli
 import cats.syntax.all._
 import io.circe.Encoder
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
+import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEventsQueue.EventType
 import io.renku.generators.Generators.Implicits._
 import org.scalamock.scalatest.MockFactory
@@ -33,15 +33,15 @@ import skunk.Session
 
 import scala.util.Try
 
-class ProjectEventsToNewHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class RedoProjectTransformationHandlerSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "updateDB" should {
 
-    "offer the ProjectEventsToNew event to the queue" in new TestCase {
+    "offer the RedoProjectTransformation event to the queue" in new TestCase {
       (queue
-        .offer(_: ProjectEventsToNew)(_: Encoder[ProjectEventsToNew],
-                                      _: EventType[ProjectEventsToNew],
-                                      _: Show[ProjectEventsToNew]
+        .offer(_: RedoProjectTransformation)(_: Encoder[RedoProjectTransformation],
+                                             _: EventType[RedoProjectTransformation],
+                                             _: Show[RedoProjectTransformation]
         ))
         .expects(event, *, *, *)
         .returning(Kleisli.pure(()))
@@ -57,10 +57,10 @@ class ProjectEventsToNewHandlerSpec extends AnyWordSpec with should.Matchers wit
   }
 
   private trait TestCase {
-    val event   = projectEventsToNewEvents.generateOne
+    val event   = redoProjectTransformationEvents.generateOne
     val session = mock[Session[Try]]
 
     val queue   = mock[StatusChangeEventsQueue[Try]]
-    val handler = new ProjectEventsToNewHandler[Try](queue)
+    val handler = new RedoProjectTransformationHandler[Try](queue)
   }
 }
