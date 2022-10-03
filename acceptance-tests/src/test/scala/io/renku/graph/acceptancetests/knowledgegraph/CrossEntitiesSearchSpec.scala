@@ -38,6 +38,8 @@ import org.http4s.Status.Ok
 
 class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices with TSProvisioning with TSData {
 
+  private implicit val graph: GraphClass = GraphClass.Default
+
   Feature("GET knowledge-graph/entities") {
 
     val user = authUsers.generateOne

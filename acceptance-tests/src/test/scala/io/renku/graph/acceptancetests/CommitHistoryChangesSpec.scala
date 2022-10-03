@@ -29,7 +29,7 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsApiEncoders, fullJson}
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.events
+import io.renku.graph.model.{GraphClass, events}
 import io.renku.graph.model.testentities.RenkuProject._
 import io.renku.graph.model.testentities._
 import io.renku.http.client.AccessToken
@@ -48,6 +48,7 @@ class CommitHistoryChangesSpec
     with TSProvisioning
     with DatasetsApiEncoders {
 
+  private implicit val graph: GraphClass = GraphClass.Default
   private val user = authUsers.generateOne
 
   Feature("Changes in the commit history to trigger re-provisioning") {

@@ -34,16 +34,6 @@ private trait ProjectFunctions {
   import ProjectFunctions.Lenses._
   import ProjectFunctions._
 
-  lazy val findAllPersons: Project => Set[Person] = project =>
-    project.members ++
-      project.maybeCreator ++
-      project.activities.map(_.author) ++
-      project.datasets.flatMap(_.provenance.creators.toList.toSet) ++
-      project.activities.flatMap(_.association.agent match {
-        case p: Person => Option(p)
-        case _ => Option.empty[Person]
-      })
-
   def update(oldPerson: Person, newPerson: Person): Project => Project = project =>
     project
       .updateMember(oldPerson, newPerson)

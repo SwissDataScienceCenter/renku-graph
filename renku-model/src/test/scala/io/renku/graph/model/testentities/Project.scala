@@ -16,13 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.graph.model.testentities
+package io.renku.graph.model
+package testentities
 
+import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.projects.{DateCreated, Description, ForksCount, Keyword, Name, Path, Visibility}
 import io.renku.graph.model.testentities.NonRenkuProject._
 import io.renku.graph.model.testentities.RenkuProject._
-import io.renku.graph.model.{GitLabApiUrl, RenkuUrl, entities}
-import io.renku.jsonld.{EntityIdEncoder, JsonLDEncoder}
+import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, entities}
+import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDEncoder}
 
 trait Project extends Product with Serializable {
   val path:             Path
@@ -45,7 +47,11 @@ trait Parent {
 
 object Project {
 
+  import cats.syntax.all._
   import io.renku.jsonld.syntax._
+
+  implicit def functions[P <: Project](implicit renkuUrl: RenkuUrl): EntityFunctions[P] =
+    EntityFunctions[entities.Project].contramap(implicitly[P => entities.Project])
 
   implicit def toEntitiesProject(implicit renkuUrl: RenkuUrl): Project => entities.Project = {
     case p: RenkuProject.WithParent       => toEntitiesRenkuProject(renkuUrl)(p)
@@ -54,12 +60,18 @@ object Project {
     case p: NonRenkuProject.WithoutParent => toEntitiesNonRenkuProjectWithoutParent(renkuUrl)(p)
   }
 
-  implicit def encoder[P <: Project](implicit renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[P] =
-    JsonLDEncoder.instance {
-      case project: RenkuProject    => project.to[entities.RenkuProject].asJsonLD
-      case project: NonRenkuProject => project.to[entities.NonRenkuProject].asJsonLD
-    }
+  implicit def encoder[P <: Project](implicit
+      renkuUrl:     RenkuUrl,
+      gitLabApiUrl: GitLabApiUrl,
+      graph:        GraphClass
+  ): JsonLDEncoder[P] = JsonLDEncoder.instance {
+    case project: RenkuProject    => project.to[entities.RenkuProject].asJsonLD
+    case project: NonRenkuProject => project.to[entities.NonRenkuProject].asJsonLD
+  }
 
   implicit def entityIdEncoder[P <: Project](implicit renkuUrl: RenkuUrl): EntityIdEncoder[P] =
-    EntityIdEncoder.instance(project => renkuUrl / "projects" / project.path)
+    EntityIdEncoder.instance(project => toEntityId(project.path))
+
+  def toEntityId(projectPath: Path)(implicit renkuUrl: RenkuUrl): EntityId =
+    EntityId.of(renkuUrl / "projects" / projectPath)
 }

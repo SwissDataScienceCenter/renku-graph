@@ -26,11 +26,15 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
+import io.renku.graph.model.entities.{EntityFunctions, Person}
+import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, projects, testentities}
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
-import io.renku.jsonld.{JsonLD, JsonLDEncoder}
+import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntityLike}
+import io.renku.jsonld._
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import org.testcontainers.containers
 import org.testcontainers.containers.wait.strategy.Wait
 
 import scala.collection.mutable
@@ -38,30 +42,36 @@ import scala.language.reflectiveCalls
 
 trait InMemoryJena {
 
-  protected val maybeJenaFixedPort: Option[Int Refined Positive] = None
+  protected val jenaRunMode: JenaRunMode = JenaRunMode.GenericContainer
 
   private val adminCredentials = BasicAuthCredentials(BasicAuthUsername("admin"), BasicAuthPassword("admin"))
 
-  lazy val container: SingleContainer[_] = maybeJenaFixedPort match {
-    case None =>
+  lazy val container: SingleContainer[_] = jenaRunMode match {
+    case JenaRunMode.GenericContainer =>
       GenericContainer(
         dockerImage = "renku/renku-jena:0.0.17",
         exposedPorts = Seq(3030),
         waitStrategy = Wait forHttp "/$/ping"
       )
-    case Some(fixedPort) =>
+    case JenaRunMode.FixedPortContainer(fixedPort) =>
       FixedHostPortGenericContainer(
         imageName = "renku/renku-jena:0.0.17",
         exposedPorts = Seq(3030),
-        exposedHostPort = fixedPort.value,
-        exposedContainerPort = fixedPort.value,
+        exposedHostPort = fixedPort,
+        exposedContainerPort = fixedPort,
         waitStrategy = Wait forHttp "/$/ping"
       )
+    case JenaRunMode.Local(_) =>
+      new GenericContainer(new containers.GenericContainer("") {
+        override def start(): Unit = ()
+        override def stop():  Unit = ()
+      })
   }
 
-  private lazy val fusekiServerPort: Int Refined Positive = maybeJenaFixedPort match {
-    case None       => Refined.unsafeApply(container.mappedPort(container.exposedPorts.head))
-    case Some(port) => port
+  private lazy val fusekiServerPort: Int Refined Positive = jenaRunMode match {
+    case JenaRunMode.GenericContainer         => Refined.unsafeApply(container.mappedPort(container.exposedPorts.head))
+    case JenaRunMode.FixedPortContainer(port) => port
+    case JenaRunMode.Local(port)              => port
   }
 
   lazy val fusekiUrl: FusekiUrl = FusekiUrl(s"http://localhost:$fusekiServerPort")
@@ -93,30 +103,20 @@ trait InMemoryJena {
       )
       .unsafeRunSync()
 
-  def upload(to: DatasetName, jsonLDs: JsonLD*)(implicit ioRuntime: IORuntime): Unit = {
-    val jsonLD = JsonLD.arr(jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD])): _*)
-    upload(to, jsonLD)
-  }
-
-  private def upload(to: DatasetName, jsonLD: JsonLD)(implicit ioRuntime: IORuntime): Unit =
-    queryRunnerFor(to)
-      .uploadPayload(jsonLD)
+  def upload(to: DatasetName, graphs: Graph*)(implicit ioRuntime: IORuntime): Unit =
+    graphs
+      .map(_.flatten.fold(throw _, identity))
+      .toList
+      .map(queryRunnerFor(to).uploadPayload(_))
+      .sequence
+      .void
       .unsafeRunSync()
 
-  def upload[T](to: DatasetName, objects: T*)(implicit encoder: JsonLDEncoder[T], ioRuntime: IORuntime): Unit =
-    upload(to, objects.map(encoder.apply): _*)
-
-  def insert(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
-    .runUpdate {
-      SparqlQuery.of("insert triple", show"INSERT DATA { $triple }")
-    }
-    .unsafeRunSync()
-
-  def delete(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
-    .runUpdate {
-      SparqlQuery.of("delete triple", show"DELETE DATA { $triple }")
-    }
-    .unsafeRunSync()
+  def upload[T](to:    DatasetName, objects: T*)(implicit
+      entityFunctions: EntityFunctions[T],
+      graphsProducer:  GraphsProducer[T],
+      ioRuntime:       IORuntime
+  ): Unit = upload(to, objects >>= graphsProducer.apply: _*)
 
   def runSelect(on: DatasetName, query: SparqlQuery): IO[List[Map[String, String]]] =
     queryRunnerFor(on).runQuery(query)
@@ -149,7 +149,7 @@ trait InMemoryJena {
 
   private lazy val datasetsCreator = TSAdminClient[IO](AdminConnectionConfig(fusekiUrl, adminCredentials))
 
-  private def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
+  protected def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
 
   private def queryRunner(connectionInfo: DatasetConnectionConfig) = new TSClientImpl[IO](connectionInfo) {
 
@@ -192,11 +192,45 @@ trait InMemoryJena {
   }
 }
 
-trait JenaDataset {
+sealed trait DefaultGraphDataset {
   self: InMemoryJena =>
+
+  def insert(to: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
+    .runUpdate {
+      SparqlQuery.of("insert triple", show"INSERT DATA { $triple }")
+    }
+    .unsafeRunSync()
+
+  def delete(from: DatasetName, triple: Triple)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
+    .runUpdate {
+      SparqlQuery.of("delete triple", show"DELETE DATA { $triple }")
+    }
+    .unsafeRunSync()
 }
 
-trait RenkuDataset extends JenaDataset {
+sealed trait NamedGraphDataset {
+  self: InMemoryJena =>
+
+  def delete(from: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(from)
+    .runUpdate {
+      SparqlQuery.of("delete quad", show"DELETE DATA { $quad }")
+    }
+    .unsafeRunSync()
+
+  def insert(to: DatasetName, quad: Quad)(implicit ioRuntime: IORuntime): Unit = queryRunnerFor(to)
+    .runUpdate {
+      SparqlQuery.of("insert quad", show"INSERT DATA { $quad }")
+    }
+    .unsafeRunSync()
+}
+
+trait GraphsProducer[T] {
+  def apply(obj: T)(implicit entityFunctions: EntityFunctions[T]): List[Graph]
+}
+
+trait JenaDataset { self: InMemoryJena => }
+
+trait RenkuDataset extends JenaDataset with DefaultGraphDataset {
   self: InMemoryJena =>
 
   private lazy val configFile: Either[Exception, DatasetConfigFile] = RenkuTTL.fromTtlFile()
@@ -209,9 +243,22 @@ trait RenkuDataset extends JenaDataset {
   def renkuDSConnectionInfo: RenkuConnectionConfig = connectionInfoFactory(fusekiUrl)
 
   registerDataset(connectionInfoFactory, configFile)
+
+  protected implicit val graph: GraphClass = GraphClass.Default
+
+  protected implicit def graphsProducer[A](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): GraphsProducer[A] =
+    new GraphsProducer[A] {
+      import io.renku.jsonld.DefaultGraph
+      import io.renku.jsonld.syntax._
+
+      override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] = {
+        implicit val enc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Default)
+        List(DefaultGraph.fromJsonLDsUnsafe(entity.asJsonLD))
+      }
+    }
 }
 
-trait ProjectsDataset extends JenaDataset {
+trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
   self: InMemoryJena =>
 
   private lazy val configFile: Either[Exception, DatasetConfigFile] = ProjectsTTL.fromTtlFile()
@@ -224,9 +271,51 @@ trait ProjectsDataset extends JenaDataset {
   def projectsDataset:          DatasetName              = projectsDSConnectionInfo.datasetName
 
   registerDataset(connectionInfoFactory, configFile)
+
+  import io.renku.generators.Generators.Implicits._
+  import io.renku.graph.model.GraphModelGenerators.projectPaths
+  import io.renku.graph.model.projects.Path
+
+  private lazy val defaultProjectForGraph: Path = projectPaths.generateOne
+
+  def defaultProjectGraphId(implicit renkuUrl: RenkuUrl): EntityId =
+    io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)
+
+  protected implicit def graphsProducer[A](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): GraphsProducer[A] =
+    new GraphsProducer[A] {
+      import io.renku.graph.model.entities
+      import io.renku.jsonld.NamedGraph
+      import io.renku.jsonld.syntax._
+
+      override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] =
+        List(maybeBuildProjectGraph(entity), maybeBuildPersonsGraph(entity)).flatten
+
+      private def maybeBuildProjectGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
+        implicit val projectEnc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Project)
+        entity.asJsonLD match {
+          case jsonLD: JsonLDEntityLike => NamedGraph(projectGraphId(entity), jsonLD).some
+          case jsonLD: JsonLDArray      => NamedGraph.fromJsonLDsUnsafe(projectGraphId(entity), jsonLD).some
+          case _ => None
+        }
+      }
+
+      private def maybeBuildPersonsGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
+        implicit val graph: GraphClass = GraphClass.Persons
+        entityFunctions.findAllPersons(entity).toList.map(_.asJsonLD) match {
+          case Nil    => None
+          case h :: t => NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, h, t: _*).some
+        }
+      }
+
+      private def projectGraphId(entity: A): EntityId = entity match {
+        case p: entities.Project     => GraphClass.Project.id(p.resourceId)
+        case p: testentities.Project => GraphClass.Project.id(projects.ResourceId(p.asEntityId))
+        case _ => defaultProjectGraphId
+      }
+    }
 }
 
-trait MigrationsDataset extends JenaDataset {
+trait MigrationsDataset extends JenaDataset with DefaultGraphDataset {
   self: InMemoryJena =>
 
   private lazy val configFile: Either[Exception, MigrationsTTL] = MigrationsTTL.fromTtlFile()
@@ -239,4 +328,21 @@ trait MigrationsDataset extends JenaDataset {
   def migrationsDataset:          DatasetName                = migrationsDSConnectionInfo.datasetName
 
   registerDataset(connectionInfoFactory, configFile)
+
+  implicit def entityFunctions[A](implicit entityEncoder: JsonLDEncoder[A]): EntityFunctions[A] =
+    new EntityFunctions[A] {
+      override val findAllPersons: A => Set[Person]               = _ => Set.empty
+      override val encoder:        GraphClass => JsonLDEncoder[A] = _ => entityEncoder
+    }
+
+  protected implicit def graphsProducer[A]: GraphsProducer[A] = new GraphsProducer[A] {
+
+    import io.renku.jsonld.DefaultGraph
+    import io.renku.jsonld.syntax._
+
+    override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] = {
+      implicit val enc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Default)
+      List(DefaultGraph.fromJsonLDsUnsafe(entity.asJsonLD))
+    }
+  }
 }

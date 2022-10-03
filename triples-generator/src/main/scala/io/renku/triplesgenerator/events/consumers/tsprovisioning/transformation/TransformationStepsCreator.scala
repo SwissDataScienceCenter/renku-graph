@@ -16,48 +16,68 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
+package io.renku.triplesgenerator.events.consumers
+package tsprovisioning
+package transformation
 
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.TSVersion
 import io.renku.triplesstore.SparqlQueryTimeRecorder
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.activities.ActivityTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.datasets.DatasetTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.persondetails.PersonTransformer
-import io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.projects.ProjectTransformer
 import org.typelevel.log4cats.Logger
 
 private[consumers] trait TransformationStepsCreator[F[_]] {
-  def createSteps: List[TransformationStep[F]]
+  def createSteps(tsVersion: TSVersion): List[TransformationStep[F]]
 }
 
 private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
-    personTransformer:   PersonTransformer[F],
-    projectTransformer:  ProjectTransformer[F],
-    datasetTransformer:  DatasetTransformer[F],
-    activityTransformer: ActivityTransformer[F]
+    defaultGraphPersonTransformer:   defaultgraph.persons.PersonTransformer[F],
+    defaultGraphProjectTransformer:  defaultgraph.projects.ProjectTransformer[F],
+    defaultGraphDatasetTransformer:  defaultgraph.datasets.DatasetTransformer[F],
+    defaultGraphActivityTransformer: defaultgraph.activities.ActivityTransformer[F],
+    namedGraphsPersonTransformer:    namedgraphs.persons.PersonTransformer[F],
+    namedGraphsProjectTransformer:   namedgraphs.projects.ProjectTransformer[F],
+    namedGraphsDatasetTransformer:   namedgraphs.datasets.DatasetTransformer[F],
+    namedGraphsActivityTransformer:  namedgraphs.activities.ActivityTransformer[F]
 ) extends TransformationStepsCreator[F] {
 
-  override def createSteps: List[TransformationStep[F]] = List(
-    personTransformer.createTransformationStep,
-    projectTransformer.createTransformationStep,
-    datasetTransformer.createTransformationStep,
-    activityTransformer.createTransformationStep
-  )
+  override def createSteps(tsVersion: TSVersion): List[TransformationStep[F]] = tsVersion match {
+    case TSVersion.DefaultGraph =>
+      List(
+        defaultGraphPersonTransformer.createTransformationStep,
+        defaultGraphProjectTransformer.createTransformationStep,
+        defaultGraphDatasetTransformer.createTransformationStep,
+        defaultGraphActivityTransformer.createTransformationStep
+      )
+    case TSVersion.NamedGraphs =>
+      List(
+        namedGraphsPersonTransformer.createTransformationStep,
+        namedGraphsProjectTransformer.createTransformationStep,
+        namedGraphsDatasetTransformer.createTransformationStep,
+        namedGraphsActivityTransformer.createTransformationStep
+      )
+  }
 }
 
 private[consumers] object TransformationStepsCreator {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TransformationStepsCreator[F]] = for {
-    personTransformer   <- PersonTransformer[F]
-    projectTransformer  <- ProjectTransformer[F]
-    datasetTransformer  <- DatasetTransformer[F]
-    activityTransformer <- ActivityTransformer[F]
-  } yield new TransformationStepsCreatorImpl[F](personTransformer,
-                                                projectTransformer,
-                                                datasetTransformer,
-                                                activityTransformer
+    defaultGraphPersonTransformer   <- defaultgraph.persons.PersonTransformer[F]
+    defaultGraphProjectTransformer  <- defaultgraph.projects.ProjectTransformer[F]
+    defaultGraphDatasetTransformer  <- defaultgraph.datasets.DatasetTransformer[F]
+    defaultGraphActivityTransformer <- defaultgraph.activities.ActivityTransformer[F]
+    namedGraphsPersonTransformer    <- namedgraphs.persons.PersonTransformer[F]
+    namedGraphsProjectTransformer   <- namedgraphs.projects.ProjectTransformer[F]
+    namedGraphsDatasetTransformer   <- namedgraphs.datasets.DatasetTransformer[F]
+    namedGraphsActivityTransformer  <- namedgraphs.activities.ActivityTransformer[F]
+  } yield new TransformationStepsCreatorImpl[F](defaultGraphPersonTransformer,
+                                                defaultGraphProjectTransformer,
+                                                defaultGraphDatasetTransformer,
+                                                defaultGraphActivityTransformer,
+                                                namedGraphsPersonTransformer,
+                                                namedGraphsProjectTransformer,
+                                                namedGraphsDatasetTransformer,
+                                                namedGraphsActivityTransformer
   )
 }

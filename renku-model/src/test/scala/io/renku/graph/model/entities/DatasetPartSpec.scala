@@ -23,7 +23,7 @@ import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{InvalidationTime, entities}
+import io.renku.graph.model.{GraphClass, InvalidationTime, entities}
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -32,6 +32,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class DatasetPartSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
+    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD DatasetPart entity into the DatasetPart object" in {
       val startDate = timestampsNotInTheFuture.generateOne

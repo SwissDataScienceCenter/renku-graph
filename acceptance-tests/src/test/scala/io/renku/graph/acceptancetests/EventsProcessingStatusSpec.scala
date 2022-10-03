@@ -29,6 +29,7 @@ import io.renku.graph.acceptancetests.flows.{AccessTokenPresence, TSProvisioning
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
+import io.renku.graph.model.GraphClass
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
@@ -44,6 +45,7 @@ class EventsProcessingStatusSpec
     with Eventually
     with AcceptanceTestPatience {
 
+  private implicit val graph: GraphClass = GraphClass.Default
   private val numberOfEvents: Int Refined Positive = 5
 
   Feature("Status of events processing for a given project") {

@@ -22,7 +22,7 @@ import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
-import io.renku.graph.model.entities
+import io.renku.graph.model.{GraphClass, entities}
 import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities._
 import io.renku.jsonld.JsonLDDecoder._
@@ -34,6 +34,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "decode" should {
+    implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD VariableParameterValue entity into the VariableParameterValue object " in {
       forAll(nonEmptyStrings().toGeneratorOf(ParameterDefaultValue), parameterValueOverrides) {

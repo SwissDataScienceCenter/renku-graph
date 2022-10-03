@@ -18,7 +18,8 @@
 
 package io.renku.triplesgenerator.events.consumers
 
-abstract class ProcessingRecoverableError(val message: String, val cause: Throwable) extends Exception(message, cause)
+sealed abstract class ProcessingRecoverableError(val message: String, val cause: Throwable)
+    extends Exception(message, cause)
 object ProcessingRecoverableError {
 
   final case class LogWorthyRecoverableError(override val message: String, override val cause: Throwable)
@@ -34,7 +35,7 @@ object ProcessingRecoverableError {
   }
 }
 
-abstract class ProcessingNonRecoverableError(message: String, cause: Throwable) extends Exception(message, cause)
+sealed abstract class ProcessingNonRecoverableError(message: String, cause: Throwable) extends Exception(message, cause)
 object ProcessingNonRecoverableError {
 
   final case class MalformedRepository(message: String, cause: Throwable)

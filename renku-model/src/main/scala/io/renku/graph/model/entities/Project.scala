@@ -328,15 +328,30 @@ object RenkuProject {
 
 object Project {
 
+  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
+
+  implicit def functions[P <: Project](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): EntityFunctions[P] =
+    new EntityFunctions[P] {
+
+      override val findAllPersons: P => Set[Person] = { project =>
+        project.members ++
+          project.maybeCreator ++
+          project.activities.flatMap(EntityFunctions[Activity].findAllPersons) ++
+          project.datasets.flatMap(EntityFunctions[Dataset[Dataset.Provenance]].findAllPersons)
+      }
+
+      override val encoder: GraphClass => JsonLDEncoder[P] = Project.encoder(renkuUrl, glApiUrl, _)
+    }
+
   import io.renku.graph.model.Schemas._
   import io.renku.jsonld.syntax._
-  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
   val entityTypes: EntityTypes = EntityTypes.of(prov / "Location", schema / "Project")
 
   implicit def encoder[P <: Project](implicit
-      renkuUrl:     RenkuUrl,
-      gitLabApiUrl: GitLabApiUrl
+      renkuUrl: RenkuUrl,
+      glApiUrl: GitLabApiUrl,
+      graph:    GraphClass
   ): JsonLDEncoder[P] = JsonLDEncoder.instance {
     case project: RenkuProject =>
       val maybeDerivedFrom = project match {
