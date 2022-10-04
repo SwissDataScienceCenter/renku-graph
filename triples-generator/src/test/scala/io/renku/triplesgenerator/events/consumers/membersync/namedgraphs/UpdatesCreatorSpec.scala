@@ -17,7 +17,9 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
+package namedgraphs
 
+import Generators._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
@@ -26,12 +28,11 @@ import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.persons.{Email, GitLabId}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.testtools.IOSpec
-import io.renku.triplesgenerator.events.consumers.membersync.Generators._
 import io.renku.triplesgenerator.events.consumers.membersync.PersonOps._
 import io.renku.triplesstore.SparqlQuery.Prefixes
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQuery}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQuery}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -40,7 +41,7 @@ class UpdatesCreatorSpec
     with should.Matchers
     with IOSpec
     with InMemoryJenaForSpec
-    with RenkuDataset {
+    with ProjectsDataset {
 
   "removal" should {
 
@@ -51,7 +52,7 @@ class UpdatesCreatorSpec
       val allMembers      = Set(memberToRemove0, memberToRemove1, memberToStay)
       val project         = anyRenkuProjectEntities.modify(membersLens.modify(_ => allMembers)).generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       findMembers(project.path) shouldBe allMembers.flatMap(_.maybeGitLabId)
 
@@ -60,7 +61,7 @@ class UpdatesCreatorSpec
         Set(memberToRemove0, memberToRemove1).flatMap(_.toMaybe[KGProjectMember]) + kgProjectMembers.generateOne
       )
 
-      queries.runAll(on = renkuDataset).unsafeRunSync()
+      queries.runAll(on = projectsDataset).unsafeRunSync()
 
       findMembers(project.path) shouldBe Set(memberToStay.maybeGitLabId).flatten
     }
@@ -73,8 +74,8 @@ class UpdatesCreatorSpec
       val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
       val project    = anyRenkuProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
 
-      upload(to = renkuDataset, project)
-      upload(to = renkuDataset, personInKG)
+      upload(to = projectsDataset, project)
+      upload(to = projectsDataset, personInKG)
 
       findMembers(project.path) shouldBe Set.empty
 
@@ -83,7 +84,7 @@ class UpdatesCreatorSpec
         Set(member -> personInKG.resourceId.some)
       )
 
-      queries.runAll(on = renkuDataset).unsafeRunSync()
+      queries.runAll(on = projectsDataset).unsafeRunSync()
 
       findMembersEmails(project.path) shouldBe Set(member.gitLabId -> personInKG.maybeEmail)
     }
@@ -92,7 +93,7 @@ class UpdatesCreatorSpec
 
       val project = anyRenkuProjectEntities.modify(membersLens.modify(_ => Set.empty)).generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       findMembers(project.path) shouldBe Set.empty
 
@@ -102,7 +103,7 @@ class UpdatesCreatorSpec
         Set(member -> Option.empty[persons.ResourceId])
       )
 
-      queries.runAll(on = renkuDataset).unsafeRunSync()
+      queries.runAll(on = projectsDataset).unsafeRunSync()
 
       findMembersEmails(project.path) shouldBe Set(member.gitLabId -> Option.empty[persons.Email])
     }
@@ -119,7 +120,7 @@ class UpdatesCreatorSpec
         Set(member -> Option.empty[persons.ResourceId])
       )
 
-      queries.runAll(on = renkuDataset).unsafeRunSync()
+      queries.runAll(on = projectsDataset).unsafeRunSync()
 
       findMembersEmails(projectPath) shouldBe Set(
         member.gitLabId -> Option.empty[persons.Email]
@@ -131,7 +132,7 @@ class UpdatesCreatorSpec
       val member     = gitLabProjectMembers.generateOne
       val personInKG = personEntities(fixed(member.gitLabId.some), withEmail).generateOne
 
-      upload(to = renkuDataset, personInKG)
+      upload(to = projectsDataset, personInKG)
 
       val projectPath = projectPaths.generateOne
 
@@ -142,7 +143,7 @@ class UpdatesCreatorSpec
         Set(member -> personInKG.resourceId.some)
       )
 
-      queries.runAll(on = renkuDataset).unsafeRunSync()
+      queries.runAll(on = projectsDataset).unsafeRunSync()
 
       findMembersEmails(projectPath) shouldBe Set(
         member.gitLabId -> personInKG.maybeEmail
@@ -165,49 +166,54 @@ class UpdatesCreatorSpec
   for all existing members in KG who have been removed in gitlab,
     remove link in KG
    */
-  private lazy val updatesCreator = new UpdatesCreator(renkuUrl, gitLabApiUrl)
+  private lazy val updatesCreator = new UpdatesCreator
 
-  private def findMembers(path: projects.Path): Set[GitLabId] = runSelect(
-    on = renkuDataset,
-    SparqlQuery.of(
-      "find gitLabId",
-      Prefixes of schema -> "schema",
-      s"""|SELECT DISTINCT ?gitLabId
-          |WHERE {
-          |  ${projects.ResourceId(path).showAs[RdfResource]} schema:member ?memberId.
-          |  ?memberId  a             schema:Person;
-          |             schema:sameAs ?sameAsId. 
-          |             
-          |  ?sameAsId  schema:additionalType  'GitLab';
-          |             schema:identifier      ?gitLabId.
-          |}
-          |""".stripMargin
-    )
-  ).unsafeRunSync()
-    .flatMap(row => row.get("gitLabId").map(_.toInt).map(GitLabId.apply))
-    .toSet
+  private def findMembers(path: projects.Path): Set[GitLabId] = {
+    val projectId = projects.ResourceId(path)
+    runSelect(
+      on = projectsDataset,
+      SparqlQuery.of(
+        "find gitLabId",
+        Prefixes of schema -> "schema",
+        s"""|SELECT DISTINCT ?gitLabId
+            |FROM <${GraphClass.Persons.id}>
+            |FROM <${GraphClass.Project.id(projectId)}> {
+            |  ${projectId.showAs[RdfResource]} schema:member/schema:sameAs ?sameAsId.
+            |  ?sameAsId schema:additionalType 'GitLab';
+            |            schema:identifier     ?gitLabId.
+            |}
+            |""".stripMargin
+      )
+    ).unsafeRunSync()
+      .flatMap(row => row.get("gitLabId").map(_.toInt).map(GitLabId.apply))
+      .toSet
+  }
 
-  private def findMembersEmails(path: projects.Path): Set[(GitLabId, Option[Email])] = runSelect(
-    on = renkuDataset,
-    SparqlQuery.of(
-      "find gitLabId and email",
-      Prefixes of schema -> "schema",
-      s"""|SELECT DISTINCT ?gitLabId ?email
-          |WHERE {
-          |  ${projects.ResourceId(path).showAs[RdfResource]} schema:member ?memberId.
-          |  ?memberId  a             schema:Person;
-          |             schema:sameAs ?sameAsId. 
-          |             
-          |  ?sameAsId  schema:additionalType  'GitLab';
-          |             schema:identifier      ?gitLabId. 
-          |             
-          |  OPTIONAL {
-          |    ?memberId  schema:email ?email. 
-          |  }
-          |}
-          |""".stripMargin
-    )
-  ).unsafeRunSync()
-    .map(row => GitLabId(row("gitLabId").toInt) -> row.get("email").map(Email.apply))
-    .toSet
+  private def findMembersEmails(path: projects.Path): Set[(GitLabId, Option[Email])] = {
+    val projectId = projects.ResourceId(path)
+    runSelect(
+      on = projectsDataset,
+      SparqlQuery.of(
+        "find gitLabId and email",
+        Prefixes of schema -> "schema",
+        s"""|SELECT DISTINCT ?gitLabId ?email
+            |FROM <${GraphClass.Persons.id}>
+            |FROM <${GraphClass.Project.id(projectId)}> {
+            |  ${projectId.showAs[RdfResource]} schema:member ?memberId.
+            |  ?memberId a schema:Person;
+            |            schema:sameAs ?sameAsId. 
+            |             
+            |  ?sameAsId schema:additionalType 'GitLab';
+            |            schema:identifier     ?gitLabId. 
+            |             
+            |  OPTIONAL {
+            |    ?memberId schema:email ?email. 
+            |  }
+            |}
+            |""".stripMargin
+      )
+    ).unsafeRunSync()
+      .map(row => GitLabId(row("gitLabId").toInt) -> row.get("email").map(Email.apply))
+      .toSet
+  }
 }

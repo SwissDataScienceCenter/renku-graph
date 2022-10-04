@@ -17,6 +17,7 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
+package defaultgraph
 
 import cats.MonadThrow
 import cats.syntax.all._
@@ -24,8 +25,8 @@ import eu.timepit.refined.auto._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
-import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.views.SparqlValueEncoder.sparqlEncode
 import io.renku.triplesstore.SparqlQuery

@@ -17,49 +17,50 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
+package defaultgraph
 
-import Generators._
 import cats.effect.IO
-import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
+import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
+import io.renku.triplesgenerator.events.consumers.membersync.PersonOps._
+import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class KGPersonFinderSpec
+class KGProjectMembersFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with IOSpec
-    with ScalaCheckPropertyChecks
     with InMemoryJenaForSpec
-    with RenkuDataset {
+    with RenkuDataset
+    with ScalaCheckPropertyChecks {
 
-  "findPersonIds" should {
+  "findProjectMembers" should {
 
-    "return person resourceIds if found in the triples store" in new TestCase {
+    "return all members of a given project" in new TestCase {
+      val members = personEntities(withGitLabId).generateFixedSizeSet()
+      val project = anyRenkuProjectEntities.modify(membersLens.modify(_ => members)).generateOne
 
-      val memberNonExistingInKG = gitLabProjectMembers.generateOne
-      val memberExistingInKG    = gitLabProjectMembers.generateOne
-      val person                = personEntities(fixed(memberExistingInKG.gitLabId.some)).generateOne
+      upload(to = renkuDataset, project)
 
-      upload(to = renkuDataset, person)
+      val expectedMembers = members.flatMap(_.toMaybe[KGProjectMember])
 
-      finder.findPersonIds(Set(memberNonExistingInKG, memberExistingInKG)).unsafeRunSync() shouldBe Set(
-        memberNonExistingInKG -> None,
-        memberExistingInKG    -> person.resourceId.some
-      )
+      finder.findProjectMembers(project.path).unsafeRunSync() shouldBe expectedMembers
+    }
+
+    "return no members if there's no project with the given path" in new TestCase {
+      finder.findProjectMembers(projectPaths.generateOne).unsafeRunSync() shouldBe Set.empty
     }
   }
 
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new KGPersonFinderImpl[IO](renkuDSConnectionInfo)
+    val finder = new KGProjectMembersFinderImpl[IO](renkuDSConnectionInfo, renkuUrl)
   }
 }
