@@ -45,6 +45,7 @@ private class KGSynchronizerImpl[F[_]: MonadThrow](kgMembersFinder: KGProjectMem
                                                    updatesCreator: UpdatesCreator,
                                                    querySender:    QuerySender[F]
 ) extends KGSynchronizer[F] {
+  import KGSynchronizerFunctions._
 
   override def syncMembers(path: projects.Path, membersInGL: Set[GitLabProjectMember]): F[SyncSummary] = for {
     membersInKG <- kgMembersFinder.findProjectMembers(path)

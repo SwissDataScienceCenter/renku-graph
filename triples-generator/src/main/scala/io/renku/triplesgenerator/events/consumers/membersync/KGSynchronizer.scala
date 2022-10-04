@@ -23,15 +23,18 @@ import io.renku.triplesstore.SparqlQuery
 
 private trait KGSynchronizer[F[_]] {
   def syncMembers(path: projects.Path, membersInGL: Set[GitLabProjectMember]): F[SyncSummary]
+}
 
-  protected def findMembersToAdd(membersInGitLab: Set[GitLabProjectMember],
-                                 membersInKG:     Set[KGProjectMember]
+private object KGSynchronizerFunctions {
+
+  def findMembersToAdd(membersInGitLab: Set[GitLabProjectMember],
+                       membersInKG:     Set[KGProjectMember]
   ): Set[GitLabProjectMember] = membersInGitLab.collect {
     case member @ GitLabProjectMember(gitlabId, _) if !membersInKG.exists(_.gitLabId == gitlabId) => member
   }
 
-  protected def findMembersToRemove(membersInGitLab: Set[GitLabProjectMember],
-                                    membersInKG:     Set[KGProjectMember]
+  def findMembersToRemove(membersInGitLab: Set[GitLabProjectMember],
+                          membersInKG:     Set[KGProjectMember]
   ): Set[KGProjectMember] = membersInKG.collect {
     case member @ KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.gitLabId == gitlabId) => member
   }
