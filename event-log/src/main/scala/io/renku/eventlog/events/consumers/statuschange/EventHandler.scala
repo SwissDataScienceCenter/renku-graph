@@ -142,6 +142,8 @@ private object EventHandler {
   ) = for {
     projectsToNewUpdater <- ProjectEventsToNewUpdater(queriesExecTimes)
     _ <- eventsQueue.register[ProjectEventsToNew](statusChanger.updateStatuses(_)(projectsToNewUpdater))
+    redoProjectTransformation <- RedoProjectTransformationUpdater(queriesExecTimes)
+    _ <- eventsQueue.register[RedoProjectTransformation](statusChanger.updateStatuses(_)(redoProjectTransformation))
   } yield ()
 
   import io.renku.tinytypes.json.TinyTypeDecoders._
