@@ -19,7 +19,6 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
-import io.circe.syntax._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventMessages
 import io.renku.eventlog._
@@ -64,10 +63,8 @@ class RedoProjectTransformationUpdaterSpec
         findEventStatuses(project) shouldBe List(TriplesStore, GenerationNonRecoverableFailure, TriplesStore, New)
 
         val event = RedoProjectTransformation(project.path)
-        insertEventIntoEventsQueue(RedoProjectTransformation.eventType.value, event.asJson)
-
         sessionResource
-          .useK(updater updateDB RedoProjectTransformation(project.path))
+          .useK(updater updateDB event)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects(project.path,
                                                                 Map(TriplesStore -> -1, TriplesGenerated -> 1)
         )
@@ -75,7 +72,7 @@ class RedoProjectTransformationUpdaterSpec
         findEventStatuses(project) shouldBe List(TriplesStore, GenerationNonRecoverableFailure, TriplesGenerated, New)
 
         sessionResource
-          .useK(updater updateDB RedoProjectTransformation(project.path))
+          .useK(updater updateDB event)
           .unsafeRunSync() shouldBe DBUpdateResults.ForProjects.empty
       }
 
@@ -95,9 +92,6 @@ class RedoProjectTransformationUpdaterSpec
                                timestampsNotInTheFuture.generateAs(LastSyncedDate)
         )
         findSyncTime(project.id, producers.minprojectinfo.categoryName).isEmpty shouldBe false
-
-        val event = RedoProjectTransformation(project.path)
-        insertEventIntoEventsQueue(RedoProjectTransformation.eventType.value, event.asJson)
 
         sessionResource
           .useK(updater updateDB RedoProjectTransformation(project.path))
