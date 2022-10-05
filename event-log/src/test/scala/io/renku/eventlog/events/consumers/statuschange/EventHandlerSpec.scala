@@ -22,7 +22,6 @@ package statuschange
 import cats.Show
 import cats.effect.{Deferred, IO}
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
@@ -58,47 +57,53 @@ class EventHandlerSpec
 
     "decode a valid event and pass it to the events updater" in new TestCase {
       Seq(
-        Gen
-          .const(AllEventsToNew)
-          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
-          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
-        toTriplesGeneratedEvents
+        "ToTriplesGenerated" -> toTriplesGeneratedEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(toRequestContent(e => EventRequestContent.WithPayload[ZippedEventPayload](e.asJson, e.payload))),
-        toTripleStoreEvents
+        "ToTripleStore" -> toTripleStoreEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
-        toFailureEvents
+        "ToFailure" -> toFailureEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
-        rollbackToNewEvents
+        "RollbackToNew" -> rollbackToNewEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
-        rollbackToTriplesGeneratedEvents
+        "RollbackToTriplesGenerated" -> rollbackToTriplesGeneratedEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
-        toAwaitingDeletionEvents
+        "ToAwaitingDeletion" -> toAwaitingDeletionEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
-        rollbackToAwaitingDeletionEvents
+        "RollbackToAwaitingDeletion" -> rollbackToAwaitingDeletionEvents
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
-        projectEventToNewEvents
+        "RedoProjectTransformation" -> redoProjectTransformationEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
+        "ProjectEventToNew" -> projectEventsToNewEvents
+          .map(stubUpdateStatuses(updateResult = ().pure[IO]))
+          .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson))),
+        "AllEventsToNew" -> Gen
+          .const(AllEventsToNew)
           .map(stubUpdateStatuses(updateResult = ().pure[IO]))
           .map(toRequestContent(event => EventRequestContent.NoPayload(event.asJson)))
-      ).map(_.generateOne) foreach { case (event, eventRequestContent, waitForUpdate, eventAsString) =>
-        handler
-          .createHandlingProcess(eventRequestContent)
-          .unsafeRunSync()
-          .process
-          .value
-          .unsafeRunSync() shouldBe Right(Accepted)
+      ).map(_.bimap(identity, _.generateOne)) foreach {
+        case (subcategory, (event, eventRequestContent, waitForUpdate, eventAsString)) =>
+          withClue(s"$subcategory -> ") {
+            handler
+              .createHandlingProcess(eventRequestContent)
+              .unsafeRunSync()
+              .process
+              .value
+              .unsafeRunSync() shouldBe Right(Accepted)
 
-        waitForUpdate.get.unsafeRunSync()
+            waitForUpdate.get.unsafeRunSync()
 
-        if (event.silent) logger.expectNoLogs()
-        else logger.loggedOnly(Info(s"$categoryName: $eventAsString -> $Accepted"))
-        logger.reset()
+            if (event.silent) logger.expectNoLogs()
+            else logger.loggedOnly(Info(s"$categoryName: $eventAsString -> $Accepted"))
+            logger.reset()
+          }
       }
     }
 
@@ -143,12 +148,12 @@ class EventHandlerSpec
 
   private trait TestCase {
 
-    implicit val logger:          TestLogger[IO]      = TestLogger[IO]()
-    implicit val metricsRegistry: MetricsRegistry[IO] = TestMetricsRegistry[IO]
-    val statusChanger       = mock[StatusChanger[IO]]
-    val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
-    val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
-    val queryExec           = TestLabeledHistogram[SqlStatement.Name]("query_id")
+    implicit val logger:                  TestLogger[IO]      = TestLogger[IO]()
+    private implicit val metricsRegistry: MetricsRegistry[IO] = TestMetricsRegistry[IO]
+    private val statusChanger       = mock[StatusChanger[IO]]
+    private val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
+    private val eventsQueue         = mock[StatusChangeEventsQueue[IO]]
+    private val queryExec           = TestLabeledHistogram[SqlStatement.Name]("query_id")
     val handler = new EventHandler[IO](categoryName, eventsQueue, statusChanger, deliveryInfoRemover, queryExec)
 
     def stubUpdateStatuses[E <: StatusChangeEvent](
@@ -251,6 +256,13 @@ class EventHandlerSpec
         "path":       ${project.path.value}
       },
       "newStatus":    "NEW"
+    }"""
+    case StatusChangeEvent.RedoProjectTransformation(projectPath) => json"""{
+      "categoryName": "EVENTS_STATUS_CHANGE",
+      "project": {
+        "path": ${projectPath.value}
+      },
+      "newStatus": "TRIPLES_GENERATED"
     }"""
   }
 }

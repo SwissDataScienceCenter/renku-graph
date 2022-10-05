@@ -50,7 +50,8 @@ trait EventDataFetching {
       val query: Query[projects.Id, CompoundEventId] = sql"""
             SELECT event_id, project_id
             FROM event
-            WHERE project_id = $projectIdEncoder"""
+            WHERE project_id = $projectIdEncoder
+            ORDER BY event_date"""
         .query(eventIdDecoder ~ projectIdDecoder)
         .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
       session.prepare(query).use(_.stream(projectId, 32).compile.toList)
