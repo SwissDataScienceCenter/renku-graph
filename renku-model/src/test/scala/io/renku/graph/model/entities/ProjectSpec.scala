@@ -74,8 +74,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
           val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member2))
           val resourceId         = projects.ResourceId(info.path)
-          val creatorAsCliPerson = creator.toCLIPayloadPerson
-          val activity1          = activityWith(member2.toCLIPayloadPerson)(info.dateCreated)
+          val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
+          val activity1          = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(info.dateCreated)
 
           val activity1WithPlanCreator =
             ActivityLens.activityPlanCreators.set(Set(creatorAsCliPerson))(activity1)
@@ -126,12 +126,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           val member3    = projectMembersWithEmail.generateOne
           val info       = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
           val resourceId = projects.ResourceId(info.path)
-          val creatorAsCliPerson = creator.toCLIPayloadPerson
-          val activity1          = activityWith(member2.toCLIPayloadPerson)(info.dateCreated)
+          val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
+          val activity1          = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(info.dateCreated)
           val activity2 =
             activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
           val activity3 = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
-          val dataset1  = datasetWith(NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson))(info.dateCreated)
+          val dataset1 = datasetWith(
+            NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson(member3.chooseSomeName))
+          )(info.dateCreated)
           val dataset2 = datasetWith(NonEmptyList.of(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(
             info.dateCreated
           )
@@ -186,12 +188,14 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         val member3            = projectMembersWithEmail.generateOne
         val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member1, member2, member3))
         val resourceId         = projects.ResourceId(info.path)
-        val creatorAsCliPerson = creator.toCLIPayloadPerson
-        val activity1          = activityWith(member2.toCLIPayloadPerson)(info.dateCreated)
+        val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
+        val activity1          = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(info.dateCreated)
         val activity2 =
           activityWith(personEntities(withoutGitLabId).generateOne.to[entities.Person])(info.dateCreated)
         val activity3 = activityWithAssociationAgent(creatorAsCliPerson)(info.dateCreated)
-        val dataset1  = datasetWith(NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson))(info.dateCreated)
+        val dataset1 = datasetWith(
+          NonEmptyList.of(creatorAsCliPerson, member3.toCLIPayloadPerson(member3.chooseSomeName))
+        )(info.dateCreated)
         val dataset2 =
           datasetWith(NonEmptyList.of(personEntities(withoutGitLabId).generateOne.to[entities.Person]))(
             info.dateCreated
@@ -328,7 +332,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
+        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
         activities = activityEntities(planEntities())
           .withDateBefore(projectInfo.dateCreated)
@@ -355,7 +359,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
+        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
         activities = Nil,
         datasets = datasetEntities(provenanceInternal)
@@ -383,7 +387,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
+        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
         activities = List(activity.to[entities.Activity]),
         datasets = Nil
@@ -408,7 +412,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
+        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset.to[entities.Dataset[entities.Dataset.Provenance.Internal]])
@@ -495,7 +499,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectSchemaVersions.generateOne,
         projectInfo.maybeDescription,
         projectInfo.keywords,
-        projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
+        projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
         activities = Nil,
         datasets = List(dataset, datesetModified).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
@@ -569,7 +573,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           projectSchemaVersions.generateOne,
           projectInfo.maybeDescription,
           projectInfo.keywords,
-          projectInfo.maybeCreator.map(_.toCLIPayloadPerson),
+          projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
           projectInfo.dateCreated,
           activities = Nil,
           datasets = List(original, modified, broken).map(_.to[entities.Dataset[entities.Dataset.Provenance]])
@@ -979,11 +983,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
   private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
 
-    lazy val toCLIPayloadPerson: entities.Person = gitLabPerson match {
-      case member: ProjectMemberNoEmail =>
+    def toCLIPayloadPerson(name: Name): entities.Person = gitLabPerson match {
+      case _: ProjectMemberNoEmail =>
         personEntities.generateOne
           .copy(
-            name = nameFromUsernameOrName(member),
+            name = name,
             maybeEmail = None,
             maybeGitLabId = None
           )
@@ -991,7 +995,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       case member: ProjectMemberWithEmail =>
         personEntities.generateOne
           .copy(
-            name = nameFromUsernameOrName(member),
+            name = name,
             maybeEmail = member.email.some,
             maybeGitLabId = None
           )
@@ -1017,9 +1021,9 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         )
     }
 
-    private def nameFromUsernameOrName(member: ProjectMember) =
-      if (Random.nextBoolean()) member.name
-      else persons.Name(member.username.value)
+    def chooseSomeName =
+      if (Random.nextBoolean()) gitLabPerson.name
+      else persons.Name(gitLabPerson.username.value)
   }
 
   private def activityWith(author: entities.Person): projects.DateCreated => entities.Activity = dateCreated =>
