@@ -978,13 +978,6 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       .fold(throw _, identity)
 
   private implicit class ProjectMemberOps(gitLabPerson: ProjectMember) {
-    def toTestPerson: testentities.Person =
-      gitLabPerson match {
-        case ProjectMemberNoEmail(name, _, gitLabId) =>
-          testentities.Person(name, None, gitLabId.some)
-        case ProjectMemberWithEmail(name, _, gitLabId, email) =>
-          testentities.Person(name, email.some, gitLabId.some)
-      }
 
     lazy val toCLIPayloadPerson: entities.Person = gitLabPerson match {
       case member: ProjectMemberNoEmail =>
@@ -1067,10 +1060,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     })
 
   private def replaceAgent(activity: entities.Activity, newAgent: entities.Person): entities.Activity =
-    activity.association match {
-      case a: entities.Association.WithPersonAgent => activity.copy(association = a.copy(agent = newAgent))
-      case _ => activity
-    }
+    ActivityLens.activityAssociationAgent.modify(_.map(_ => newAgent))(activity)
 
   private def byEmail(member: ProjectMemberWithEmail): entities.Person => Boolean =
     _.maybeEmail.contains(member.email)

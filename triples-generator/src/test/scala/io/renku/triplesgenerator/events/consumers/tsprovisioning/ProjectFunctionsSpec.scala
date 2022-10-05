@@ -102,11 +102,8 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val entitiesOldPerson = oldPerson.to[entities.Person]
       val newPerson         = personEntities().generateOne.to[entities.Person]
 
-      update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map { activity =>
-        activity.association match {
-          case assoc: entities.Association.WithPersonAgent => activity.copy(association = assoc.copy(agent = newPerson))
-          case _ => activity
-        }
+      update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map {
+        ActivityLens.activityAssociationAgent.modify(_.as(newPerson))
       }
     }
 
