@@ -29,12 +29,17 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+object TinyTypeData {
+  val arbitraryValues: List[Any] =
+    "abc" +: 2 +: 2L +: true +: List.empty[Any]
+}
+
 class TinyTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "toString" should {
 
     "return a String value of the 'value' property" in {
-      ("abc" +: 2 +: 2L +: true +: Nil) foreach { someValue =>
+      TinyTypeData.arbitraryValues foreach { someValue =>
         val tinyType: TinyType = new TinyType {
           type V = Any
           override val value: Any = someValue
@@ -71,7 +76,7 @@ class SensitiveSpec extends AnyWordSpec with should.Matchers {
   "toString" should {
 
     "return a '<sensitive>' instead of the value" in {
-      ("abc" +: 2 +: 2L +: true +: Nil) foreach { someValue =>
+      TinyTypeData.arbitraryValues foreach { someValue =>
         val tinyType: TinyType = new TinyType with Sensitive {
           type V = Any
           override val value: Any = someValue
@@ -138,7 +143,7 @@ class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
   "implicit show" should {
 
     "return a String value of the 'value' property" in {
-      ("abc" +: 2 +: 2L +: true +: Nil) foreach { someValue =>
+      TinyTypeData.arbitraryValues foreach { someValue =>
         case class InnerTinyType(v: Any) extends TinyType {
           type V = Any
           override val value: Any = v
