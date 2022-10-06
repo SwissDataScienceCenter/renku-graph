@@ -246,16 +246,18 @@ trait RenkuDataset extends JenaDataset with DefaultGraphDataset {
 
   protected implicit val graph: GraphClass = GraphClass.Default
 
-  protected implicit def graphsProducer[A](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): GraphsProducer[A] =
-    new GraphsProducer[A] {
-      import io.renku.jsonld.DefaultGraph
-      import io.renku.jsonld.syntax._
+  protected implicit def renkuDSGraphsProducer[A](implicit
+      renkuUrl: RenkuUrl,
+      glApiUrl: GitLabApiUrl
+  ): GraphsProducer[A] = new GraphsProducer[A] {
+    import io.renku.jsonld.DefaultGraph
+    import io.renku.jsonld.syntax._
 
-      override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] = {
-        implicit val enc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Default)
-        List(DefaultGraph.fromJsonLDsUnsafe(entity.asJsonLD))
-      }
+    override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] = {
+      implicit val enc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Default)
+      List(DefaultGraph.fromJsonLDsUnsafe(entity.asJsonLD))
     }
+  }
 }
 
 trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
@@ -281,38 +283,40 @@ trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
   def defaultProjectGraphId(implicit renkuUrl: RenkuUrl): EntityId =
     io.renku.graph.model.testentities.Project.toEntityId(defaultProjectForGraph)
 
-  protected implicit def graphsProducer[A](implicit renkuUrl: RenkuUrl, glApiUrl: GitLabApiUrl): GraphsProducer[A] =
-    new GraphsProducer[A] {
-      import io.renku.graph.model.entities
-      import io.renku.jsonld.NamedGraph
-      import io.renku.jsonld.syntax._
+  protected implicit def projectsDSGraphsProducer[A](implicit
+      renkuUrl: RenkuUrl,
+      glApiUrl: GitLabApiUrl
+  ): GraphsProducer[A] = new GraphsProducer[A] {
+    import io.renku.graph.model.entities
+    import io.renku.jsonld.NamedGraph
+    import io.renku.jsonld.syntax._
 
-      override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] =
-        List(maybeBuildProjectGraph(entity), maybeBuildPersonsGraph(entity)).flatten
+    override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] =
+      List(maybeBuildProjectGraph(entity), maybeBuildPersonsGraph(entity)).flatten
 
-      private def maybeBuildProjectGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
-        implicit val projectEnc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Project)
-        entity.asJsonLD match {
-          case jsonLD: JsonLDEntityLike => NamedGraph(projectGraphId(entity), jsonLD).some
-          case jsonLD: JsonLDArray      => NamedGraph.fromJsonLDsUnsafe(projectGraphId(entity), jsonLD).some
-          case _ => None
-        }
-      }
-
-      private def maybeBuildPersonsGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
-        implicit val graph: GraphClass = GraphClass.Persons
-        entityFunctions.findAllPersons(entity).toList.map(_.asJsonLD) match {
-          case Nil    => None
-          case h :: t => NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, h, t: _*).some
-        }
-      }
-
-      private def projectGraphId(entity: A): EntityId = entity match {
-        case p: entities.Project     => GraphClass.Project.id(p.resourceId)
-        case p: testentities.Project => GraphClass.Project.id(projects.ResourceId(p.asEntityId))
-        case _ => defaultProjectGraphId
+    private def maybeBuildProjectGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
+      implicit val projectEnc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Project)
+      entity.asJsonLD match {
+        case jsonLD: JsonLDEntityLike => NamedGraph(projectGraphId(entity), jsonLD).some
+        case jsonLD: JsonLDArray      => NamedGraph.fromJsonLDsUnsafe(projectGraphId(entity), jsonLD).some
+        case _ => None
       }
     }
+
+    private def maybeBuildPersonsGraph(entity: A)(implicit entityFunctions: EntityFunctions[A]) = {
+      implicit val graph: GraphClass = GraphClass.Persons
+      entityFunctions.findAllPersons(entity).toList.map(_.asJsonLD) match {
+        case Nil    => None
+        case h :: t => NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, h, t: _*).some
+      }
+    }
+
+    private def projectGraphId(entity: A): EntityId = entity match {
+      case p: entities.Project     => GraphClass.Project.id(p.resourceId)
+      case p: testentities.Project => GraphClass.Project.id(projects.ResourceId(p.asEntityId))
+      case _ => defaultProjectGraphId
+    }
+  }
 }
 
 trait MigrationsDataset extends JenaDataset with DefaultGraphDataset {
