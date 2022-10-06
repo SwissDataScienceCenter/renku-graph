@@ -24,7 +24,7 @@ import io.renku.generators.Generators.{nonEmptyStrings, timestampsNotInTheFuture
 import io.renku.graph.model.commandParameters.Position
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{entities, plans}
+import io.renku.graph.model.{GraphClass, entities, plans}
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -33,14 +33,15 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
-  "decode" should {
-
-    "turn JsonLD Plan entity into the Plan object" in {
-      forAll(planObjects) { plan =>
-        plan.asJsonLD.flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[entities.Plan]] shouldBe List(plan.to[entities.Plan]).asRight
+  (GraphClass.Default :: GraphClass.Persons :: Nil).foreach { implicit graphClass =>
+    show"decode via graphClass=$graphClass" should {
+      "turn JsonLD Plan entity into the Plan object" in {
+        forAll(planObjects) { plan =>
+          plan.asJsonLD.flatten
+            .fold(throw _, identity)
+            .cursor
+            .as[List[entities.Plan]] shouldBe List(plan.to[entities.Plan]).asRight
+        }
       }
     }
   }
@@ -62,11 +63,13 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     keywords                 <- nonEmptyStrings().map(plans.Keyword).toGeneratorOfList()
     paramFactories           <- parameterFactoryLists
     successCodes             <- planSuccessCodes.toGeneratorOfList()
+    creators                 <- personEntities.toGeneratorOfList()
   } yield Plan(
     planIdentifiers.generateOne,
     name,
     maybeDescription,
     maybeCommand,
+    creators.toSet,
     dateCreated,
     maybeProgrammingLanguage,
     keywords,

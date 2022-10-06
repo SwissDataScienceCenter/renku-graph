@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, schema}
-import io.renku.graph.model.entities.{Activity, Association}
+import io.renku.graph.model.entities.{Activity, ActivityLens}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{GraphClass, entities, persons, projects}
 import io.renku.triplesstore.SparqlQuery
@@ -69,28 +69,31 @@ private object UpdatesCreator extends UpdatesCreator {
   override def queriesUnlinkingAgents(projectId: projects.ResourceId,
                                       activity:  Activity,
                                       kgAgents:  Set[persons.ResourceId]
-  ): List[SparqlQuery] = activity.association match {
-    case _:     Association.WithRenkuAgent => List.empty
-    case assoc: Association.WithPersonAgent =>
-      Option
-        .when((kgAgents.size > 1) || !(kgAgents forall (_ == assoc.agent.resourceId))) {
-          SparqlQuery.of(
-            name = "transformation - delete association agent link",
-            Prefixes of (schema -> "schema", prov -> "prov"),
-            s"""|DELETE { GRAPH <${GraphClass.Project.id(projectId)}> { ?assocId prov:agent ?agentId } }
-                |WHERE {
-                |  BIND (${assoc.resourceId.showAs[RdfResource]} AS ?assocId)
-                |  GRAPH <${GraphClass.Project.id(projectId)}> {
-                |    ?assocId a prov:Association;
-                |             prov:agent ?agentId
-                |  }
-                |  GRAPH <${GraphClass.Persons.id}> {
-                |    ?agentId a schema:Person
-                |  }
-                |}
-                |""".stripMargin
-          )
-        }
-        .toList
-  }
+  ): List[SparqlQuery] =
+    ActivityLens.activityAssociationAgent
+      .get(activity)
+      .map(agent =>
+        Option
+          .when((kgAgents.size > 1) || !(kgAgents forall (_ == agent.resourceId))) {
+            SparqlQuery.of(
+              name = "transformation - delete association agent link",
+              Prefixes of (schema -> "schema", prov -> "prov"),
+              s"""|DELETE { GRAPH <${GraphClass.Project.id(projectId)}> { ?assocId prov:agent ?agentId } }
+                  |WHERE {
+                  |  BIND (${activity.association.resourceId.showAs[RdfResource]} AS ?assocId)
+                  |  GRAPH <${GraphClass.Project.id(projectId)}> {
+                  |    ?assocId a prov:Association;
+                  |             prov:agent ?agentId
+                  |  }
+                  |  GRAPH <${GraphClass.Persons.id}> {
+                  |    ?agentId a schema:Person
+                  |  }
+                  |}
+                  |""".stripMargin
+            )
+          }
+          .toList
+      )
+      .getOrElse(List.empty)
+
 }

@@ -19,8 +19,10 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.activities
 
 import cats.effect.IO
+import cats.syntax.functor._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.httpUrls
+import io.renku.graph.model.entities.ActivityLens
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{activities, entities}
 import io.renku.interpreters.TestLogger
@@ -72,16 +74,14 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with should.Matchers with
       upload(to = renkuDataset, project)
 
       val person = personEntities.generateOne.to[entities.Person]
-      val updatedAgentActivity = activity.copy(association = activity.association match {
-        case assoc: entities.Association.WithPersonAgent => assoc.copy(agent = person)
-        case _ => fail("Association.WithPersonAgent expected")
-      })
+      val updatedAgentActivity = ActivityLens.activityAssociationAgent.modify(
+        _.requireRight("Association.WithPersonAgent expected").as(person)
+      )(activity)
+
       upload(to = renkuDataset, updatedAgentActivity)
 
-      val originalAgent = activity.association match {
-        case assoc: entities.Association.WithPersonAgent => assoc.agent
-        case _ => fail("expected Person agent")
-      }
+      val originalAgent =
+        ActivityLens.activityAssociationAgent.get(activity).toOption.getOrElse(fail("expected Person agent"))
 
       kgInfoFinder.findAssociationPersonAgents(activity.resourceId).unsafeRunSync() shouldBe
         Set(originalAgent.resourceId, person.resourceId)
@@ -113,5 +113,10 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with should.Matchers with
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val kgInfoFinder = new KGInfoFinderImpl[IO](renkuDSConnectionInfo)
+  }
+
+  private final implicit class EitherAssertions[A, B](eab: Either[A, B]) {
+    def requireRight(message: String): Either[A, B] =
+      eab.filterOrElse(_ => true, fail(message))
   }
 }

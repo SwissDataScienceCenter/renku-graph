@@ -269,39 +269,36 @@ object RenkuProject {
     private implicit class ActivitiesOps(activities: List[Activity]) {
 
       def updatePersons(from: Set[Person]): List[Activity] =
-        (updateAuthors(from) andThen updateAssociationAgents(from))(activities)
+        (updateAuthors(from) andThen updateAssociationAgents(from) andThen updatePlanCreators(from))(activities)
 
       private def updateAuthors(from: Set[Person]): List[Activity] => List[Activity] =
-        activitiesLens.modify { activity =>
+        activitiesLens.composeLens(ActivityLens.activityAuthor).modify { author =>
           from
-            .find(byEmail(activity.author))
-            .map(person => activityAuthorLens.modify(_ => person)(activity))
-            .getOrElse(activity)
+            .find(byEmail(author))
+            .getOrElse(author)
         }
 
       private def updateAssociationAgents(from: Set[Person]): List[Activity] => List[Activity] =
-        activitiesLens.modify { activity =>
-          activity.association match {
-            case _:     Association.WithRenkuAgent => activity
-            case assoc: Association.WithPersonAgent =>
-              from
-                .find(byEmail(assoc.agent))
-                .map(person => activity.copy(association = assoc.copy(agent = person)))
-                .getOrElse(activity)
-          }
+        activitiesLens.composeLens(ActivityLens.activityAssociationAgent).modify {
+          case Right(person) =>
+            Right(from.find(byEmail(person)).getOrElse(person))
+          case other => other
         }
+
+      private def updatePlanCreators(from: Set[Person]): List[Activity] => List[Activity] =
+        activitiesLens
+          .composeLens(ActivityLens.activityPlanCreators)
+          .modify(ps => ps.map(p => from.find(byEmail(p)).getOrElse(p)))
     }
 
     private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
 
-      def updateCreators(from: Set[Person]): List[Dataset[Provenance]] = {
-        val creatorsUpdate = creatorsLens.modify { creator =>
-          from.find(byEmail(creator)).getOrElse(creator)
-        }
-        datasetsLens.modify(
-          provenanceLens.modify(provCreatorsLens.modify(creatorsUpdate))
-        )(datasets)
-      }
+      def updateCreators(from: Set[Person]): List[Dataset[Provenance]] =
+        datasetsLens
+          .composeLens(provenanceLens)
+          .composeLens(provCreatorsLens)
+          .composeTraversal(creatorsLens)
+          .modify(creator => from.find(byEmail(creator)).getOrElse(creator))(datasets)
     }
 
     private lazy val byEmail: Person => Person => Boolean = { person1 => person2 =>
@@ -309,7 +306,6 @@ object RenkuProject {
     }
 
     private val activitiesLens: Traversal[List[Activity], Activity] = Traversal.fromTraverse[List, Activity]
-    private val activityAuthorLens = Lens[Activity, Person](_.author)(p => a => a.copy(author = p))
 
     private val datasetsLens   = Traversal.fromTraverse[List, Dataset[Provenance]]
     private val provenanceLens = Lens[Dataset[Provenance], Provenance](_.provenance)(p => d => d.copy(provenance = p))
