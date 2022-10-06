@@ -32,7 +32,7 @@ private[membersync] object KGSynchronizer {
     kgPersonFinder         <- KGPersonFinder[F]
     updatesCreator         <- UpdatesCreator[F]
     renkuConnectionConfig  <- RenkuConnectionConfig[F]()
-    querySender <- MonadThrow[F].catchNonFatal(new TSClientImpl(renkuConnectionConfig) with QuerySender[F] {
+    querySender <- MonadThrow[F].catchNonFatal(new TSClient(renkuConnectionConfig) with QuerySender[F] {
                      override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
                    })
   } yield new KGSynchronizerImpl[F](kgProjectMembersFinder, kgPersonFinder, updatesCreator, querySender)

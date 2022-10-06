@@ -26,7 +26,7 @@ import io.circe.Decoder
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.jsonld.EntityId
-import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
@@ -52,11 +52,11 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     maxRetries:       Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:      Duration = 16 minutes,
     requestTimeout:   Duration = 15 minutes
-) extends TSClientImpl(connectionConfig,
-                       retryInterval = retryInterval,
-                       maxRetries = maxRetries,
-                       idleTimeoutOverride = idleTimeout.some,
-                       requestTimeoutOverride = requestTimeout.some
+) extends TSClient(connectionConfig,
+                   retryInterval = retryInterval,
+                   maxRetries = maxRetries,
+                   idleTimeoutOverride = idleTimeout.some,
+                   requestTimeoutOverride = requestTimeout.some
     )
     with TSCleaner[F] {
 

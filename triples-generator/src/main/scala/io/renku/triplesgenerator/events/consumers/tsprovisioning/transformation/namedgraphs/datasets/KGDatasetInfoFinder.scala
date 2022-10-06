@@ -41,7 +41,7 @@ private trait KGDatasetInfoFinder[F[_]] {
 
 private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     connectionConfig: ProjectsConnectionConfig
-) extends TSClientImpl(connectionConfig)
+) extends TSClient(connectionConfig)
     with KGDatasetInfoFinder[F] {
 
   import cats.syntax.all._

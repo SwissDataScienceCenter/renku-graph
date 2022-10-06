@@ -38,7 +38,7 @@ private trait KGProjectMembersFinder[F[_]] {
 private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig,
     renkuUrl:              RenkuUrl
-) extends TSClientImpl(renkuConnectionConfig)
+) extends TSClient(renkuConnectionConfig)
     with KGProjectMembersFinder[F] {
 
   import eu.timepit.refined.auto._

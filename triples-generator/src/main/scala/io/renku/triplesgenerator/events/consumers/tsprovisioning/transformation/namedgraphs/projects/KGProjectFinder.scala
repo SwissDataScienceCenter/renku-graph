@@ -33,7 +33,7 @@ private trait KGProjectFinder[F[_]] {
 
 private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     connectionConfig: ProjectsConnectionConfig
-) extends TSClientImpl(connectionConfig)
+) extends TSClient(connectionConfig)
     with KGProjectFinder[F] {
 
   import eu.timepit.refined.auto._
