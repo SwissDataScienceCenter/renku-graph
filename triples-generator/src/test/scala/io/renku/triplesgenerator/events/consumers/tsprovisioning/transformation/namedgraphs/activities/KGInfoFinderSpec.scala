@@ -58,7 +58,7 @@ class KGInfoFinderSpec
       val person = personEntities.generateOne.to[entities.Person]
       upload(
         to = projectsDataset, {
-          implicit val encß: JsonLDEncoder[entities.Person] =
+          implicit val enc: JsonLDEncoder[entities.Person] =
             EntityFunctions[entities.Person].encoder(GraphClass.Persons)
           NamedGraph.fromJsonLDsUnsafe(GraphClass.Persons.id, person.asJsonLD)
         }

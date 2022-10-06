@@ -1,18 +1,14 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
-import io.renku.graph.model.RenkuUrl
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators
 import io.renku.graph.model.associations.ResourceId
-import io.renku.graph.model.projects.DateCreated
 import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.Instant
-
-class AssociationLensSpec extends AnyWordSpec with should.Matchers {
-  implicit val renkuUrl: RenkuUrl = EntitiesGenerators.renkuUrl
-  import io.renku.generators.Generators.Implicits._
+class AssociationLensSpec extends AnyWordSpec with should.Matchers with EntitiesGenerators {
 
   "associationPlan" should {
     "get and set" in {
@@ -49,23 +45,22 @@ class AssociationLensSpec extends AnyWordSpec with should.Matchers {
   }
 
   private def createPlan =
-    EntitiesGenerators
-      .planEntities()(EntitiesGenerators.planCommands)
-      .apply(DateCreated(Instant.EPOCH))
+    planEntities()
+      .apply(GraphModelGenerators.projectCreatedDates().generateOne)
       .generateOne
       .to[Plan]
 
   private def createAssociationAgent: Association.WithRenkuAgent =
     Association.WithRenkuAgent(
-      ResourceId(s"http://localhost/${EntitiesGenerators.activityIds.generateOne.value}"),
+      ResourceId(s"http://localhost/${activityIds.generateOne.value}"),
       EntitiesGenerators.agentEntities.generateOne,
       createPlan
     )
 
   private def createAssociationPerson: Association.WithPersonAgent =
     Association.WithPersonAgent(
-      ResourceId(s"http://localhost/${EntitiesGenerators.activityIds.generateOne.value}"),
-      EntitiesGenerators.personEntities.generateOne.to[Person],
+      ResourceId(s"http://localhost/${activityIds.generateOne.value}"),
+      personEntities.generateOne.to[Person],
       createPlan
     )
 }

@@ -1,16 +1,12 @@
 package io.renku.graph.model.entities
 
-import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.projects.DateCreated
-import io.renku.graph.model.testentities.generators.{ActivityGenerators, EntitiesGenerators}
+import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.GraphModelGenerators
+import io.renku.graph.model.testentities.generators.EntitiesGenerators
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.Instant
-
-class ActivityLensSpec extends AnyWordSpec with should.Matchers {
-  implicit val renkuUrl: RenkuUrl = EntitiesGenerators.renkuUrl
-  import io.renku.generators.Generators.Implicits._
+class ActivityLensSpec extends AnyWordSpec with should.Matchers with EntitiesGenerators {
 
   "activityAssociation" should {
     "get and set" in {
@@ -31,9 +27,8 @@ class ActivityLensSpec extends AnyWordSpec with should.Matchers {
   }
 
   private def createActivity =
-    ActivityGenerators
-      .activityEntities(ActivityGenerators.planEntities()(ActivityGenerators.planCommands))
-      .apply(DateCreated(Instant.EPOCH))
+    activityEntities(planEntities())
+      .apply(GraphModelGenerators.projectCreatedDates().generateOne)
       .generateOne
       .to[Activity]
 }
