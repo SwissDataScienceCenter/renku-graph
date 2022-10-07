@@ -17,6 +17,7 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
+package defaultgraph
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -28,14 +29,12 @@ import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait KGPersonFinder[F[_]] {
-  def findPersonIds(
-      membersToAdd: Set[GitLabProjectMember]
-  ): F[Set[(GitLabProjectMember, Option[ResourceId])]]
+  def findPersonIds(membersToAdd: Set[GitLabProjectMember]): F[Set[(GitLabProjectMember, Option[ResourceId])]]
 }
 
 private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClientImpl(renkuConnectionConfig)
+) extends TSClient(renkuConnectionConfig)
     with KGPersonFinder[F] {
 
   import eu.timepit.refined.auto._

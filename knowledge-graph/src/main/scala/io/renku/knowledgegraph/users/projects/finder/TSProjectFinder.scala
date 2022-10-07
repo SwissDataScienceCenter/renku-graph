@@ -26,7 +26,7 @@ import io.circe.Decoder
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects
 import io.renku.knowledgegraph.users.projects.model.Project
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 private trait TSProjectFinder[F[_]] {
@@ -40,7 +40,7 @@ private object TSProjectFinder {
 
 private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClientImpl(renkuConnectionConfig)
+) extends TSClient(renkuConnectionConfig)
     with TSProjectFinder[F] {
 
   import eu.timepit.refined.auto._

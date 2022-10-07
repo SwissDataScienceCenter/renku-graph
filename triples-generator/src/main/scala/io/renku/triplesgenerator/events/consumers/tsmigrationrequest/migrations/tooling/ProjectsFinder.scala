@@ -28,7 +28,7 @@ import org.typelevel.log4cats.Logger
 import scala.concurrent.duration._
 
 private trait ProjectsFinder[F[_]] {
-  def findProjects(): F[List[projects.Path]]
+  def findProjects: F[List[projects.Path]]
 }
 
 private object ProjectsFinder {
@@ -39,13 +39,13 @@ private object ProjectsFinder {
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     query:                 SparqlQuery,
     renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClientImpl[F](renkuConnectionConfig,
-                          idleTimeoutOverride = (16 minutes).some,
-                          requestTimeoutOverride = (15 minutes).some
+) extends TSClient[F](renkuConnectionConfig,
+                      idleTimeoutOverride = (16 minutes).some,
+                      requestTimeoutOverride = (15 minutes).some
     )
     with ProjectsFinder[F] {
 
-  override def findProjects(): F[List[projects.Path]] = queryExpecting[List[projects.Path]](query)
+  override def findProjects: F[List[projects.Path]] = queryExpecting[List[projects.Path]](query)
 
   private implicit lazy val pathsDecoder: Decoder[List[projects.Path]] = ResultsDecoder[List, projects.Path] {
     implicit cursor =>

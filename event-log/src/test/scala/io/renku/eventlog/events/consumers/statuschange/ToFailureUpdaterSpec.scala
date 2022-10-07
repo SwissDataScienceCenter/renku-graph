@@ -259,9 +259,7 @@ class ToFailureUpdaterSpec
     def createFailureEvent[C <: ProcessingStatus, N <: FailureStatus](currentStatus:  C,
                                                                       newStatus:      N,
                                                                       executionDelay: Option[Duration]
-    )(implicit
-        evidence: AllowedCombination[C, N]
-    ): ToFailure[C, N] =
+    )(implicit evidence: AllowedCombination[C, N]): ToFailure[C, N] =
       ToFailure(addEvent(currentStatus),
                 projectPath,
                 eventMessages.generateOne,

@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.triplesgenerator.events.consumers.membersync
+package io.renku.graph.model.entities
 
-import io.renku.triplesstore.SparqlQuery
+import monocle.Lens
 
-private trait QuerySender[F[_]] {
+object PlanLens {
 
-  def send(update: SparqlQuery): F[Unit]
+  val planCreators: Lens[Plan, Set[Person]] =
+    Lens[Plan, Set[Person]](_.creators)(persons => plan => plan.copy(creators = persons))
 }

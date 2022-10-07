@@ -115,3 +115,5 @@ helm-chart/renku-graph/charts/*tgz
 
 # MAc
 .DS_Store
+
+.direnv/

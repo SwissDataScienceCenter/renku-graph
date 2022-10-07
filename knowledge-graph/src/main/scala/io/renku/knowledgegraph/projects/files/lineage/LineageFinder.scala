@@ -49,7 +49,7 @@ class LineageFinderImpl[F[_]: MonadThrow: Logger](
     findEdges(projectPath, maybeUser) flatMap {
       case edges if edges.isEmpty => Option.empty[Lineage].pure[F]
       case edges =>
-        trim(edges, location) flatMap {
+        trim(edges, location) >>= {
           case trimmedEdges if trimmedEdges.isEmpty => Option.empty[Lineage].pure[F]
           case trimmedEdges                         => findDetailsAndLineage(trimmedEdges, projectPath)
         }

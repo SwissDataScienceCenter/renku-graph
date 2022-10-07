@@ -45,7 +45,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
 
       val config = ConfigFactory.parseMap(
         Map(
-          namespace -> Map(
+          namespace -> Map[String, Any](
             "db-host"         -> host.value,
             "db-port"         -> port.value,
             "db-user"         -> user,
@@ -74,7 +74,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
     "fail if there is no '<config-namespace>.db-host' in the config" in new TestCase {
       val config = ConfigFactory.parseMap(
         Map(
-          namespace -> Map(
+          namespace -> Map[String, Any](
             "db-host"         -> "",
             "db-port"         -> positiveInts().generateOne.value,
             "db-user"         -> nonEmptyStrings().generateOne,
@@ -92,7 +92,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
     "fail if there is no '<config-namespace>.db-port' in the config" in new TestCase {
       val config = ConfigFactory.parseMap(
         Map(
-          namespace -> Map(
+          namespace -> Map[String, Any](
             "db-host"         -> nonEmptyStrings().generateOne,
             "db-user"         -> nonEmptyStrings().generateOne,
             "db-pass"         -> nonEmptyStrings().generateOne,
@@ -109,7 +109,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
     "fail if there is no '<config-namespace>.db-user' in the config" in new TestCase {
       val config = ConfigFactory.parseMap(
         Map(
-          namespace -> Map(
+          namespace -> Map[String, Any](
             "db-host"         -> hosts.generateOne.value,
             "db-user"         -> "",
             "db-port"         -> positiveInts().generateOne.value,
@@ -127,7 +127,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
     "fail if there is no '<config-namespace>.db-pass' in the config" in new TestCase {
       val config = ConfigFactory.parseMap(
         Map(
-          namespace -> Map(
+          namespace -> Map[String, Any](
             "db-host"         -> hosts.generateOne.value,
             "db-user"         -> nonEmptyStrings().generateOne,
             "db-port"         -> positiveInts().generateOne.value,
@@ -144,7 +144,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
     "fail if there is no '<config-namespace>.connection-pool' in the config" in new TestCase {
       val config = ConfigFactory.parseMap(
         Map(
-          namespace -> Map(
+          namespace -> Map[String, Any](
             "db-host" -> hosts.generateOne.value,
             "db-port" -> positiveInts().generateOne.value,
             "db-user" -> nonEmptyStrings().generateOne,

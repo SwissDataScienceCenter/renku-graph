@@ -35,7 +35,7 @@ class TriplesGeneratorSpec extends AnyWordSpec with IOSpec with should.Matchers 
 
     s"return an instance of RenkuLogTriplesGenerator if TriplesGeneration is $RenkuLog" in {
       val config = ConfigFactory.parseMap(
-        Map(
+        Map[String, Any](
           "triples-generation" -> "renku-log",
           "services" -> Map(
             "triples-generator" -> Map("url" -> "http://host").asJava,
@@ -52,7 +52,7 @@ class TriplesGeneratorSpec extends AnyWordSpec with IOSpec with should.Matchers 
     s"return an instance of RemoteTriplesGenerator if TriplesGeneration is $RemoteTriplesGeneration" in {
 
       val config = ConfigFactory.parseMap(
-        Map(
+        Map[String, Any](
           "triples-generation" -> "remote-generator",
           "services"           -> Map("triples-generator" -> Map("url" -> "http://host").asJava).asJava
         ).asJava

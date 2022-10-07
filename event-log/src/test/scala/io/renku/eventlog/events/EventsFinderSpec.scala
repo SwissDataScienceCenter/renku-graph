@@ -48,7 +48,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project the given path" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(maxElements = 10)
+      val infos     = eventInfos(fixed(projectPath)).generateList(max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -83,7 +83,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and the given PagingRequest" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(minElements = 3, maxElements = 10)
+      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -115,7 +115,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and the given direction" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(minElements = 3, maxElements = 10)
+      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -163,7 +163,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and status filter" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(minElements = 3, maxElements = 10)
+      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -194,7 +194,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and since filters" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(minElements = 3, maxElements = 10)
+      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -229,7 +229,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and until filters" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(minElements = 3, maxElements = 10)
+      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -264,7 +264,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of all projects matching the given status filter" in new TestCase {
 
-      val infos = eventInfos().generateList(minElements = 3, maxElements = 10)
+      val infos = eventInfos().generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
@@ -366,7 +366,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of all projects matching the given since filter" in new TestCase {
 
-      val infos = eventInfos().generateList(minElements = 3, maxElements = 10)
+      val infos = eventInfos().generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
@@ -398,7 +398,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of all projects matching the given until filter" in new TestCase {
 
-      val infos = eventInfos().generateList(minElements = 3, maxElements = 10)
+      val infos = eventInfos().generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
@@ -430,7 +430,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of all projects matching the given since and until filters" in new TestCase {
 
-      val infos = eventInfos().generateList(minElements = 3, maxElements = 10)
+      val infos = eventInfos().generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectIds.generateOne)

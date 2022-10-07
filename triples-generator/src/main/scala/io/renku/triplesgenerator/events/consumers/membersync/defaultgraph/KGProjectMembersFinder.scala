@@ -17,6 +17,7 @@
  */
 
 package io.renku.triplesgenerator.events.consumers.membersync
+package defaultgraph
 
 import cats.effect.Async
 import cats.syntax.all._
@@ -37,7 +38,7 @@ private trait KGProjectMembersFinder[F[_]] {
 private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig,
     renkuUrl:              RenkuUrl
-) extends TSClientImpl(renkuConnectionConfig)
+) extends TSClient(renkuConnectionConfig)
     with KGProjectMembersFinder[F] {
 
   import eu.timepit.refined.auto._
@@ -74,5 +75,3 @@ private object KGProjectMembersFinder {
     renkuUrl              <- RenkuUrlLoader[F]()
   } yield new KGProjectMembersFinderImpl(renkuConnectionConfig, renkuUrl)
 }
-
-private final case class KGProjectMember(resourceId: persons.ResourceId, gitLabId: persons.GitLabId)

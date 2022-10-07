@@ -27,9 +27,9 @@ import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProce
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.GitLabClient
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.TSReadinessForEventsChecker
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[events] class EventHandler[F[_]: Concurrent: Logger](
@@ -45,15 +45,15 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
   override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
     EventHandlingProcess[F](verifyTSReady >> startSynchronizingMember(request))
 
-  private def startSynchronizingMember(request: EventRequestContent) = for {
-    projectPath <- fromEither[F](request.event.getProjectPath)
-    result <- Spawn[F]
-                .start(synchronizeMembers(projectPath))
-                .toRightT
-                .map(_ => Accepted)
-                .semiflatTap(Logger[F].log(projectPath))
-                .leftSemiflatTap(Logger[F].log(projectPath))
-  } yield result
+  private def startSynchronizingMember(request: EventRequestContent) =
+    fromEither[F](request.event.getProjectPath) >>= { projectPath =>
+      Spawn[F]
+        .start(synchronizeMembers(projectPath))
+        .toRightT
+        .map(_ => Accepted)
+        .semiflatTap(Logger[F] log projectPath)
+        .leftSemiflatTap(Logger[F] log projectPath)
+    }
 
   private implicit lazy val eventInfoToString: Show[projects.Path] = Show.show(path => s"projectPath = $path")
 }

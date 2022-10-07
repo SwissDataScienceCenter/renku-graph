@@ -88,8 +88,11 @@ object Generators {
   def sentences(minWords:       Int Refined Positive = 1,
                 maxWords:       Int Refined Positive = 10,
                 charsGenerator: Gen[Char] = alphaChar
-  ): Gen[NonBlank] =
+  ): Gen[NonBlank] = {
+    require(minWords.value <= maxWords.value, s"minWords = $minWords has to be > maxWords = $maxWords")
+
     nonEmptyStringsList(minWords, maxWords, charsGenerator) map (_.mkString(" ")) map Refined.unsafeApply
+  }
 
   def sentenceContaining(phrase: NonBlank): Gen[String] = for {
     prefix <- nonEmptyStrings()
@@ -104,35 +107,59 @@ object Generators {
   def nonEmptyStringsList(minElements:    Int Refined Positive = 1,
                           maxElements:    Int Refined Positive = 5,
                           charsGenerator: Gen[Char] = alphaChar
-  ): Gen[List[String]] = for {
-    size  <- choose(minElements.value, maxElements.value)
-    lines <- Gen.listOfN(size, nonEmptyStrings(charsGenerator = charsGenerator))
-  } yield lines
+  ): Gen[List[String]] = {
+    require(minElements.value <= maxElements.value,
+            s"minElements = $minElements has to be > maxElements = $maxElements"
+    )
+
+    for {
+      size  <- choose(minElements.value, maxElements.value)
+      lines <- Gen.listOfN(size, nonEmptyStrings(charsGenerator = charsGenerator))
+    } yield lines
+  }
 
   def nonEmptyList[T](generator:   Gen[T],
                       minElements: Int Refined Positive = 1,
                       maxElements: Int Refined Positive = 5
-  ): Gen[NonEmptyList[T]] = for {
-    size <- choose(minElements.value, maxElements.value)
-    list <- Gen.listOfN(size, generator)
-  } yield NonEmptyList.fromListUnsafe(list)
+  ): Gen[NonEmptyList[T]] = {
+    require(minElements.value <= maxElements.value,
+            s"minElements = $minElements has to be > maxElements = $maxElements"
+    )
+
+    for {
+      size <- choose(minElements.value, maxElements.value)
+      list <- Gen.listOfN(size, generator)
+    } yield NonEmptyList.fromListUnsafe(list)
+  }
 
   def nonEmptySet[T](
       generator:   Gen[T],
       minElements: Int Refined Positive = 1,
       maxElements: Int Refined Positive = 5
-  ): Gen[Set[T]] = for {
-    size <- choose(minElements.value, maxElements.value)
-    set  <- Gen.containerOfN[Set, T](size, generator)
-  } yield set
+  ): Gen[Set[T]] = {
+    require(minElements.value <= maxElements.value,
+            s"minElements = $minElements has to be > maxElements = $maxElements"
+    )
+
+    for {
+      size <- choose(minElements.value, maxElements.value)
+      set  <- Gen.containerOfN[Set, T](size, generator)
+    } yield set
+  }
 
   def listOf[T](generator:   Gen[T],
                 minElements: Int Refined NonNegative = 0,
                 maxElements: Int Refined Positive = 5
-  ): Gen[List[T]] = for {
-    size <- choose(minElements.value, maxElements.value)
-    list <- Gen.listOfN(size, generator)
-  } yield list
+  ): Gen[List[T]] = {
+    require(minElements.value <= maxElements.value,
+            s"minElements = $minElements has to be > maxElements = $maxElements"
+    )
+
+    for {
+      size <- choose(minElements.value, maxElements.value)
+      list <- Gen.listOfN(size, generator)
+    } yield list
+  }
 
   def setOf[T](generator:   Gen[T],
                minElements: Int Refined NonNegative = 0,
@@ -300,10 +327,10 @@ object Generators {
 
     val tuples = for {
       key <- nonEmptyStrings(maxLength = 5)
-      value <- oneOf(nonEmptyStrings(maxLength = 5),
-                     Arbitrary.arbNumber.arbitrary,
-                     Arbitrary.arbBool.arbitrary,
-                     Gen.nonEmptyListOf(nonEmptyStrings())
+      value <- oneOf[Any](nonEmptyStrings(maxLength = 5),
+                          Arbitrary.arbNumber.arbitrary,
+                          Arbitrary.arbBool.arbitrary,
+                          Gen.nonEmptyListOf(nonEmptyStrings())
                )
     } yield key -> value
 
@@ -342,8 +369,8 @@ object Generators {
       def generateFixedSizeList(ofSize: Int Refined Positive): List[T] =
         generateNonEmptyList(minElements = ofSize, maxElements = ofSize).toList
 
-      def generateList(minElements: Int Refined NonNegative = 0, maxElements: Int Refined Positive = 5): List[T] =
-        generateExample(listOf(generator, minElements, maxElements))
+      def generateList(min: Int Refined NonNegative = 0, max: Int Refined Positive = 5): List[T] =
+        generateExample(listOf(generator, min, max))
 
       def generateFixedSizeSet(ofSize: Int Refined Positive = 5): Set[T] =
         generateExample(setOf(generator, minElements = ofSize, maxElements = ofSize))

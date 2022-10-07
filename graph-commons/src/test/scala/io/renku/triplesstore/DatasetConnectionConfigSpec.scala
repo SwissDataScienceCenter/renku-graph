@@ -38,7 +38,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
-              "fuseki" -> Map(
+              "fuseki" -> Map[String, Any](
                 "url" -> storeConfig.fusekiUrl.toString,
                 "admin" -> Map(
                   "username" -> storeConfig.authCredentials.username.value,
@@ -61,7 +61,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "fuseki" -> Map(
+            "fuseki" -> Map[String, Any](
               "url" -> "invalid-url",
               "admin" -> Map(
                 "username" -> adminConnectionConfigs.generateOne.authCredentials.username.value,
@@ -81,7 +81,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "fuseki" -> Map(
+            "fuseki" -> Map[String, Any](
               "url" -> adminConnectionConfigs.generateOne.fusekiUrl.toString,
               "admin" -> Map(
                 "username" -> "  ",
@@ -101,7 +101,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "fuseki" -> Map(
+            "fuseki" -> Map[String, Any](
               "url" -> adminConnectionConfigs.generateOne.fusekiUrl.toString,
               "admin" -> Map(
                 "username" -> adminConnectionConfigs.generateOne.authCredentials.username.value,
@@ -125,7 +125,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
-              "fuseki" -> Map(
+              "fuseki" -> Map[String, Any](
                 "url" -> storeConfig.fusekiUrl.toString,
                 "renku" -> Map(
                   "username" -> storeConfig.authCredentials.username.value,
@@ -149,7 +149,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "fuseki" -> Map(
+            "fuseki" -> Map[String, Any](
               "url" -> "invalid-url",
               "renku" -> Map(
                 "username" -> renkuConnectionConfigs.generateOne.authCredentials.username.value,
@@ -169,7 +169,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "fuseki" -> Map(
+            "fuseki" -> Map[String, Any](
               "url" -> renkuConnectionConfigs.generateOne.fusekiUrl.toString,
               "renku" -> Map(
                 "username" -> "  ",
@@ -189,7 +189,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
-            "fuseki" -> Map(
+            "fuseki" -> Map[String, Any](
               "url" -> renkuConnectionConfigs.generateOne.fusekiUrl.toString,
               "renku" -> Map(
                 "username" -> renkuConnectionConfigs.generateOne.authCredentials.username.value,
@@ -213,7 +213,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
-              "fuseki" -> Map(
+              "fuseki" -> Map[String, Any](
                 "url" -> storeConfig.fusekiUrl.toString,
                 "admin" -> Map(
                   "username" -> storeConfig.authCredentials.username.value,

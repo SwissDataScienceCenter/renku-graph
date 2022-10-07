@@ -152,6 +152,24 @@ trait ActivityGenerators {
         }
     )
 
+  def toAssociationRenkuAgent(agent: Agent): Activity => Activity =
+    activity =>
+      activity.copy(associationFactory = activity.associationFactory.andThen {
+        case p: Association.WithPersonAgent =>
+          Association.WithRenkuAgent(p.activity, agent, p.plan)
+        case p: Association.WithRenkuAgent =>
+          p.copy(agent = agent)
+      })
+
+  def setPlanCreator(person: Person): Activity => Activity =
+    activity =>
+      activity.copy(associationFactory = activity.associationFactory.andThen {
+        case p: Association.WithPersonAgent =>
+          Association.WithPersonAgent(p.activity, p.agent, p.plan.copy(creators = Set(person)))
+        case p: Association.WithRenkuAgent =>
+          Association.WithRenkuAgent(p.activity, p.agent, p.plan.copy(creators = Set(person)))
+      })
+
   implicit class PlanGenFactoryOps(factory: PlanGenFactory) {
 
     def modify(f: Plan => Plan): PlanGenFactory =

@@ -21,7 +21,7 @@ package io.renku.triplesgenerator.events.consumers.membersync
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.projects
+import io.renku.graph.model.{TSVersion, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
@@ -32,56 +32,38 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 private trait MembersSynchronizer[F[_]] {
-  def synchronizeMembers(projectPath: projects.Path): F[Unit]
+  def synchronizeMembers(path: projects.Path): F[Unit]
 }
 
 private class MembersSynchronizerImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
-    glMembersFinder:       GitLabProjectMembersFinder[F],
-    kgMembersFinder:       KGProjectMembersFinder[F],
-    kgPersonFinder:        KGPersonFinder[F],
-    updatesCreator:        UpdatesCreator,
-    querySender:           QuerySender[F],
-    executionTimeRecorder: ExecutionTimeRecorder[F]
+    glMembersFinder:          GitLabProjectMembersFinder[F],
+    defaultGraphSynchronizer: KGSynchronizer[F],
+    namedGraphsSynchronizer:  KGSynchronizer[F],
+    executionTimeRecorder:    ExecutionTimeRecorder[F]
 ) extends MembersSynchronizer[F] {
 
   private val accessTokenFinder: AccessTokenFinder[F] = AccessTokenFinder[F]
   import accessTokenFinder._
   import executionTimeRecorder._
 
-  override def synchronizeMembers(projectPath: projects.Path): F[Unit] = measureExecutionTime {
+  override def synchronizeMembers(path: projects.Path): F[Unit] = {
     for {
-      implicit0(mat: Option[AccessToken]) <- findAccessToken(projectPath)
-      membersInGitLab                     <- glMembersFinder.findProjectMembers(projectPath)
-      membersInKG                         <- kgMembersFinder.findProjectMembers(projectPath)
-      membersToAdd = findMembersToAdd(membersInGitLab, membersInKG)
-      membersToAddWithIds <- kgPersonFinder.findPersonIds(membersToAdd)
-      insertionUpdates = updatesCreator.insertion(projectPath, membersToAddWithIds)
-      membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
-      removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
-      _ <- (insertionUpdates ::: removalUpdates).map(querySender.send).sequence
-    } yield SyncSummary(projectPath, membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
-  } flatMap logSummary recoverWith { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"$categoryName: Members synchronized for project $projectPath FAILED")
+      implicit0(mat: Option[AccessToken]) <- findAccessToken(path)
+      membersInGL                         <- glMembersFinder.findProjectMembers(path)
+      _ <- syncMembers(path, defaultGraphSynchronizer.syncMembers(_, membersInGL), TSVersion.DefaultGraph)
+      _ <- syncMembers(path, namedGraphsSynchronizer.syncMembers(_, membersInGL), TSVersion.NamedGraphs)
+    } yield ()
+  } recoverWith { case NonFatal(exception) =>
+    Logger[F].error(exception)(s"$categoryName: Members synchronized for project $path FAILED")
   }
 
-  def findMembersToAdd(membersInGitLab: Set[GitLabProjectMember],
-                       membersInKG:     Set[KGProjectMember]
-  ): Set[GitLabProjectMember] = membersInGitLab.collect {
-    case member @ GitLabProjectMember(gitlabId, _) if !membersInKG.exists(_.gitLabId == gitlabId) => member
-  }
+  private def syncMembers(path: projects.Path, sync: projects.Path => F[SyncSummary], tsVersion: TSVersion) =
+    measureExecutionTime(sync(path)) >>= logSummary(path, tsVersion)
 
-  def findMembersToRemove(membersInGitLab: Set[GitLabProjectMember],
-                          membersInKG:     Set[KGProjectMember]
-  ): Set[KGProjectMember] = membersInKG.collect {
-    case member @ KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.gitLabId == gitlabId) => member
-  }
-
-  private case class SyncSummary(projectPath: projects.Path, membersAdded: Int, membersRemoved: Int)
-
-  private def logSummary: ((ElapsedTime, SyncSummary)) => F[Unit] = {
-    case (elapsedTime, SyncSummary(projectPath, membersAdded, membersRemoved)) =>
+  private def logSummary(path: projects.Path, tsVersion: TSVersion): ((ElapsedTime, SyncSummary)) => F[Unit] = {
+    case (elapsedTime, SyncSummary(membersAdded, membersRemoved)) =>
       Logger[F].info(
-        s"$categoryName: Members for project: $projectPath synchronized in ${elapsedTime}ms: " +
+        s"$categoryName: Members for project: $path in $tsVersion synchronized in ${elapsedTime}ms: " +
           s"$membersAdded member(s) added, $membersRemoved member(s) removed"
       )
   }
@@ -91,20 +73,12 @@ private object MembersSynchronizer {
   def apply[F[_]: Async: GitLabClient: AccessTokenFinder: Logger: SparqlQueryTimeRecorder]: F[MembersSynchronizer[F]] =
     for {
       gitLabProjectMembersFinder <- GitLabProjectMembersFinder[F]
-      kGProjectMembersFinder     <- KGProjectMembersFinder[F]
-      kGPersonFinder             <- KGPersonFinder[F]
-      updatesCreator             <- UpdatesCreator[F]
-      renkuConnectionConfig      <- RenkuConnectionConfig[F]()
-      querySender <-
-        MonadThrow[F].catchNonFatal(new TSClientImpl(renkuConnectionConfig) with QuerySender[F] {
-          override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
-        })
-      executionTimeRecorder <- ExecutionTimeRecorder[F](maybeHistogram = None)
+      defaultGraphSynchronizer   <- defaultgraph.KGSynchronizer[F]
+      namedGraphsSynchronizer    <- namedgraphs.KGSynchronizer[F]
+      executionTimeRecorder      <- ExecutionTimeRecorder[F](maybeHistogram = None)
     } yield new MembersSynchronizerImpl[F](gitLabProjectMembersFinder,
-                                           kGProjectMembersFinder,
-                                           kGPersonFinder,
-                                           updatesCreator,
-                                           querySender,
+                                           defaultGraphSynchronizer,
+                                           namedGraphsSynchronizer,
                                            executionTimeRecorder
     )
 }

@@ -180,7 +180,7 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       lineageFinder.find(projectPath, location, maybeAuthUser) shouldBeFailure exception
     }
 
-    "return a Failure if instantiation of a Lineage object fails" in new TestCase {
+    "return a Failure when Lineage object instantiation fails" in new TestCase {
 
       val initialEdgesMap = lineages.generateOne.toEdgesMap
       (edgesFinder
@@ -192,15 +192,12 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
       val trimmedEdgesMap = lineage.toEdgesMap
       (edgesTrimmer.trim _)
         .expects(initialEdgesMap, location)
-        .returning(
-          trimmedEdgesMap
-            .pure[Try]
-        )
+        .returning(trimmedEdgesMap.pure[Try])
 
       (nodeDetailsFinder
         .findDetails(_: Set[ExecutionInfo], _: projects.Path)(_: (ExecutionInfo, ResourceId) => SparqlQuery))
         .expects(trimmedEdgesMap.keySet, projectPath, activityIdQuery)
-        .returning(lineage.processRunNodes.pure[Try])
+        .returning(Set.empty[Node].pure[Try])
 
       val nodesSet = trimmedEdgesMap.view
         .mapValues { case (s, t) => s ++ t }

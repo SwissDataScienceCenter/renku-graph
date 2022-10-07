@@ -23,7 +23,7 @@ import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.http.rest.paging.{Paging, PagingResponse}
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClientImpl}
+import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 private trait TagsFinder[F[_]] {
@@ -37,7 +37,7 @@ private object TagsFinder {
 
 private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClientImpl[F](renkuConnectionConfig)
+) extends TSClient[F](renkuConnectionConfig)
     with TagsFinder[F]
     with Paging[model.Tag] {
 

@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import Generators.projectEventToNewEvents
+import Generators.projectEventsToNewEvents
 import io.circe.syntax._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import org.scalatest.matchers.should
@@ -30,7 +30,7 @@ class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaC
   "ProjectEventsToNew" should {
 
     "be serializable and deserializable to and from Json" in {
-      forAll(projectEventToNewEvents) { event =>
+      forAll(projectEventsToNewEvents) { event =>
         event.asJson.as[ProjectEventsToNew] shouldBe Right(event)
       }
     }

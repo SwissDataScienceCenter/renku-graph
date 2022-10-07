@@ -29,6 +29,7 @@ case class Plan(id:                        Identifier,
                 name:                      Name,
                 maybeDescription:          Option[Description],
                 maybeCommand:              Option[Command],
+                creators:                  Set[Person],
                 dateCreated:               DateCreated,
                 maybeProgrammingLanguage:  Option[ProgrammingLanguage],
                 keywords:                  List[Keyword],
@@ -59,6 +60,7 @@ object Plan {
     name,
     maybeDescription = None,
     maybeCommand,
+    Set.empty,
     dateCreated,
     maybeProgrammingLanguage = None,
     keywords = Nil,
@@ -87,6 +89,7 @@ object Plan {
         plan.name,
         plan.maybeDescription,
         plan.maybeCommand,
+        plan.creators.map(_.to[entities.Person]),
         plan.dateCreated,
         plan.maybeProgrammingLanguage,
         plan.keywords,
@@ -98,7 +101,7 @@ object Plan {
       )
     }
 
-  implicit def encoder(implicit renkuUrl: RenkuUrl): JsonLDEncoder[Plan] =
+  implicit def encoder(implicit renkuUrl: RenkuUrl, graphClass: GraphClass): JsonLDEncoder[Plan] =
     JsonLDEncoder.instance(_.to[entities.Plan].asJsonLD)
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuUrl: RenkuUrl): EntityIdEncoder[R] =

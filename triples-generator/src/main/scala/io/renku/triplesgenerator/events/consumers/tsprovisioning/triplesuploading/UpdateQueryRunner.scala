@@ -44,11 +44,11 @@ private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:        Duration = 11 minutes,
     requestTimeout:     Duration = 10 minutes
-) extends TSClientImpl[F](dsConnectionConfig,
-                          retryInterval,
-                          maxRetries,
-                          idleTimeoutOverride = idleTimeout.some,
-                          requestTimeoutOverride = requestTimeout.some
+) extends TSClient[F](dsConnectionConfig,
+                      retryInterval,
+                      maxRetries,
+                      idleTimeoutOverride = idleTimeout.some,
+                      requestTimeoutOverride = requestTimeout.some
     )
     with UpdateQueryRunner[F] {
 

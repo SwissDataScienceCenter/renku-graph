@@ -23,6 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.personResourceIds
 import eu.timepit.refined.auto._
+import io.renku.graph.model.entities.{ActivityLens, AssociationLens}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
 import io.renku.testtools.IOSpec
@@ -128,10 +129,9 @@ class UpdatesCreatorSpec
       findPersonAgents(activity.association.resourceId) shouldBe activity.association.maybePersonAgentResourceId.toSet
 
       val newAgent = personEntities.generateOne.to[entities.Person]
-      val modelActivity = activity.association match {
-        case assoc: entities.Association.WithPersonAgent => activity.copy(association = assoc.copy(agent = newAgent))
-        case _ => fail("Expected Association.WithPersonAgent")
-      }
+      val modelActivity = ActivityLens.activityAssociationAgent.modify(
+        _.requireRight("Expected Association.WithPersonAgent").as(newAgent)
+      )(activity)
 
       UpdatesCreator
         .queriesUnlinkingAgents(modelActivity, activity.association.maybePersonAgentResourceId.toSet)
@@ -241,9 +241,12 @@ class UpdatesCreatorSpec
     .toSet
 
   private implicit class AssociationOps(association: entities.Association) {
-    lazy val maybePersonAgentResourceId: Option[persons.ResourceId] = association match {
-      case assoc: entities.Association.WithPersonAgent => assoc.agent.resourceId.some
-      case _ => None
-    }
+    lazy val maybePersonAgentResourceId: Option[persons.ResourceId] =
+      AssociationLens.associationAgent.get(association).toOption.map(_.resourceId)
+  }
+
+  private final implicit class EitherAssertions[A, B](eab: Either[A, B]) {
+    def requireRight(message: String): Either[A, B] =
+      eab.filterOrElse(_ => true, fail(message))
   }
 }

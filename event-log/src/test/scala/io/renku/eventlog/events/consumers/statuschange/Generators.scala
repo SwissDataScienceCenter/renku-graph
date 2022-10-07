@@ -103,7 +103,7 @@ private object Generators {
     projectPath <- projectPaths
   } yield RollbackToAwaitingDeletion(Project(projectId, projectPath))
 
-  lazy val projectEventToNewEvents = for {
-    project <- consumerProjects
-  } yield ProjectEventsToNew(project)
+  lazy val projectEventsToNewEvents = consumerProjects.map(ProjectEventsToNew(_))
+
+  lazy val redoProjectTransformationEvents = projectPaths.map(RedoProjectTransformation(_))
 }

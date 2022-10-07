@@ -20,7 +20,7 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 
 import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, schema}
-import io.renku.graph.model.entities.{Activity, Association}
+import io.renku.graph.model.entities.{Activity, ActivityLens}
 import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model.{entities, persons}
 import io.renku.triplesstore.SparqlQuery
@@ -54,17 +54,17 @@ private object UpdatesCreator extends UpdatesCreator {
   }
 
   override def queriesUnlinkingAgents(activity: Activity, kgAgents: Set[persons.ResourceId]): List[SparqlQuery] =
-    activity.association match {
-      case _:     Association.WithRenkuAgent => List.empty
-      case assoc: Association.WithPersonAgent =>
+    ActivityLens.activityAssociationAgent
+      .get(activity)
+      .map(agent =>
         Option
-          .when((kgAgents.size > 1) || !(kgAgents forall (_ == assoc.agent.resourceId))) {
+          .when((kgAgents.size > 1) || !(kgAgents forall (_ == agent.resourceId))) {
             SparqlQuery.of(
               name = "transformation - delete association agent link",
               Prefixes of (schema -> "schema", prov -> "prov"),
               s"""|DELETE { ?assocId prov:agent ?agentId }
                   |WHERE {
-                  |  BIND (${assoc.resourceId.showAs[RdfResource]} AS ?assocId)
+                  |  BIND (${activity.association.resourceId.showAs[RdfResource]} AS ?assocId)
                   |  ?assocId a prov:Association;
                   |           prov:agent ?agentId.
                   |  ?agentId a schema:Person.
@@ -73,5 +73,7 @@ private object UpdatesCreator extends UpdatesCreator {
             )
           }
           .toList
-    }
+      )
+      .getOrElse(List.empty)
+
 }

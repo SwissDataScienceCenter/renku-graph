@@ -40,9 +40,9 @@ object Generators {
 
   implicit val eventRequestContents: Gen[EventRequestContent] = for {
     event        <- jsons
-    maybePayload <- oneOf(nonEmptyStrings(), zippedContents).toGeneratorOfOptions
+    maybePayload <- oneOf[Any](nonEmptyStrings(), zippedContents).toGeneratorOfOptions
   } yield maybePayload match {
-    case Some(payload) => events.EventRequestContent.WithPayload(event, payload)
+    case Some(payload) => events.EventRequestContent.WithPayload[Any](event, payload)
     case None          => events.EventRequestContent.NoPayload(event)
   }
 

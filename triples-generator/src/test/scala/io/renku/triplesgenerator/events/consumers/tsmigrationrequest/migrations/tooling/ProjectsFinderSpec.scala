@@ -46,7 +46,7 @@ class ProjectsFinderSpec
 
       projects foreach (upload(to = renkuDataset, _))
 
-      projectsFinder.findProjects().unsafeRunSync() should contain theSameElementsAs projects.map(_.path)
+      projectsFinder.findProjects.unsafeRunSync() should contain theSameElementsAs projects.map(_.path)
     }
   }
 

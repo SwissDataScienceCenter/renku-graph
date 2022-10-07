@@ -48,7 +48,7 @@ class KGPersonFinderSpec
 
       upload(to = renkuDataset, person)
 
-      finder.find(person).unsafeRunSync() shouldBe Some(person)
+      (finder find person).unsafeRunSync() shouldBe Some(person)
     }
 
     "pick-up one of the Person names if there multiple" in new TestCase {
@@ -62,7 +62,7 @@ class KGPersonFinderSpec
       }
       findNames(person) shouldBe duplicateNames + person.name
 
-      val Some(found) = finder.find(person).unsafeRunSync()
+      val Some(found) = (finder find person).unsafeRunSync()
 
       found.resourceId       shouldBe person.resourceId
       Set(found.name)          should contain oneElementOf (duplicateNames + person.name)
