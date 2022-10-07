@@ -22,7 +22,7 @@ Test / fork := true
 
 // log4j-core is needed only by widoco
 libraryDependencies += "org.apache.logging.log4j" % "log4j-core"      % "2.18.0"
-libraryDependencies += "ch.qos.logback"           % "logback-classic" % "1.4.0"
+libraryDependencies += "ch.qos.logback"           % "logback-classic" % "1.4.3"
 
 libraryDependencies += "com.github.dgarijo" % "widoco" % "1.4.17"
 
