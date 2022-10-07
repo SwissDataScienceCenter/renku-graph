@@ -45,16 +45,11 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.Try
 
-class TSClientImplSpec
-    extends AnyWordSpec
-    with IOSpec
-    with ExternalServiceStubbing
-    with MockFactory
-    with should.Matchers {
+class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
 
   "TSClientImpl" should {
     "be a RestClient" in new QueryClientTestCase {
-      type IOTSClientImpl = TSClientImpl[IO]
+      type IOTSClientImpl = TSClient[IO]
       client shouldBe a[IOTSClientImpl]
       client shouldBe a[RestClient[IO, _]]
     }
@@ -427,7 +422,7 @@ class TSClientImplSpec
       val query:             SparqlQuery,
       renkuConnectionConfig: RenkuConnectionConfig
   )(implicit logger:         Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
-      extends TSClientImpl[IO](renkuConnectionConfig) {
+      extends TSClient[IO](renkuConnectionConfig) {
 
     def sendUpdate: IO[Unit] = updateWithNoResult(query)
 
@@ -441,7 +436,7 @@ class TSClientImplSpec
   private class TestTSQueryClientImpl(val query: SparqlQuery, renkuConnectionConfig: RenkuConnectionConfig)(implicit
       logger:                                    Logger[IO],
       timeRecorder:                              SparqlQueryTimeRecorder[IO]
-  ) extends TSClientImpl[IO](renkuConnectionConfig)
+  ) extends TSClient[IO](renkuConnectionConfig)
       with Paging[String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)
