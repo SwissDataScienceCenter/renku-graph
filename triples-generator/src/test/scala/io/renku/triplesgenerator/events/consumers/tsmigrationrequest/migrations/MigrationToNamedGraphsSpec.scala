@@ -22,7 +22,6 @@ package migrations
 import DefaultGraphProjectsFinder.ProjectInfo
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
@@ -30,7 +29,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.{projectPaths, projectResourceIds}
 import cats.MonadThrow
-import io.renku.generators.Generators.exceptions
+import eu.timepit.refined.api.Refined
+import io.renku.generators.Generators.{exceptions, positiveInts}
 import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
@@ -50,12 +50,12 @@ class MigrationToNamedGraphsSpec extends AnyWordSpec with should.Matchers with I
 
     "find all projects that exists in the Default Graph but not in the Named Graphs dataset" in new TestCase {
 
-      val defaultOnlyProjects = projectInfos.generateList(min = 20, max = 30)
+      val defaultOnlyProjects = projectInfos.generateList(max = chunkSize)
       val bothDSProjects      = projectInfos.generateNonEmptyList().toList
 
       val allDefaultDSProjectsChunks = (defaultOnlyProjects ::: bothDSProjects)
         .sortBy(_._2)
-        .sliding(chunkSize, chunkSize)
+        .sliding(chunkSize.value, chunkSize.value)
         .toList
       allDefaultDSProjectsChunks.zipWithIndex foreach givenProjectsChunkReturned
       givenProjectsChunkReturned(List.empty[ProjectInfo] -> allDefaultDSProjectsChunks.size)
@@ -82,7 +82,7 @@ class MigrationToNamedGraphsSpec extends AnyWordSpec with should.Matchers with I
   }
 
   private trait TestCase {
-    val chunkSize: Int = 30
+    val chunkSize = positiveInts(max = 100).generateOne
 
     val eventCategoryName          = CategoryName("EVENTS_STATUS_CHANGE")
     val defaultGraphProjectsFinder = mock[DefaultGraphProjectsFinder[IO]]
@@ -150,18 +150,22 @@ class DefaultGraphProjectsFinderSpec
     with InMemoryJenaForSpec
     with RenkuDataset {
 
+  private val chunkSize = 50
+
   "findDefaultGraphProjects" should {
 
     "find requested page of projects that exists in the Default Graph" in new TestCase {
 
       val projects = anyRenkuProjectEntities
-        .generateList(min = 31, max = 40)
+        .generateList(min = Refined.unsafeApply(chunkSize + 1),
+                      max = Refined.unsafeApply(Gen.choose(chunkSize + 1, (2 * chunkSize) - 1).generateOne)
+        )
         .map(_.to[entities.Project])
         .sortBy(_.path)
 
       upload(to = renkuDataset, projects: _*)
 
-      val (page1, page2) = projects splitAt 30
+      val (page1, page2) = projects splitAt chunkSize
       finder.findDefaultGraphProjects(page = 1).unsafeRunSync() shouldBe page1.map(p => p.resourceId -> p.path)
       finder.findDefaultGraphProjects(page = 2).unsafeRunSync() shouldBe page2.map(p => p.resourceId -> p.path)
       finder.findDefaultGraphProjects(page = 3).unsafeRunSync() shouldBe Nil

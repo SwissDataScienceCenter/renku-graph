@@ -112,7 +112,7 @@ private class DefaultGraphProjectsFinderImpl[F[_]](recordsFinder: RecordsFinder[
   import ResultsDecoder._
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
-  private val chunkSize: Int = 30
+  private val chunkSize: Int = 50
 
   override def findDefaultGraphProjects(page: Int): F[List[ProjectInfo]] =
     recordsFinder.findRecords(query(page))
