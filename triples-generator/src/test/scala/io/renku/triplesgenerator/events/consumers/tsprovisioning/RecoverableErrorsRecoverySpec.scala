@@ -61,7 +61,9 @@ class RecoverableErrorsRecoverySpec extends AnyWordSpec with should.Matchers wit
     ) { case (problemName, exception, failureTypeAssertion) =>
       s"return a Recoverable Failure for $problemName" in {
         val Success(Left(failure: ProcessingRecoverableError)) =
-          exception.raiseError[Try, Unit] recoverWith maybeRecoverableError[Try, Unit]
+          exception
+            .raiseError[Try, Either[ProcessingRecoverableError, Unit]]
+            .recoverWith(maybeRecoverableError[Try, Unit])
 
         failureTypeAssertion(failure)
       }
@@ -70,7 +72,9 @@ class RecoverableErrorsRecoverySpec extends AnyWordSpec with should.Matchers wit
     s"fail with MalformedRepository for ${Status.InternalServerError}" in {
       val exception = UnexpectedResponseException(Status.InternalServerError, nonEmptyStrings().generateOne)
 
-      val Failure(failure) = exception.raiseError[Try, Unit] recoverWith maybeRecoverableError[Try, Unit]
+      val Failure(failure) = exception
+        .raiseError[Try, Either[ProcessingRecoverableError, Unit]]
+        .recoverWith(maybeRecoverableError[Try, Unit])
 
       failure            shouldBe a[ProcessingNonRecoverableError.MalformedRepository]
       failure.getMessage shouldBe exception.message

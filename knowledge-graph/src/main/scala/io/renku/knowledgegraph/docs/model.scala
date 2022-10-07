@@ -96,7 +96,7 @@ object model {
           case StringPart(value)                        => value
         }
         .mkString("/")
-        .prepended("/")
+        .prepended('/')
         .mkString("")
 
   }
