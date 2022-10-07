@@ -70,6 +70,7 @@ object GitLabStubSupport {
     def shutdown(): Unit =
       close.unsafeRunSync()
   }
+
   object GitLabStubStarter {
     def apply(gitLabUrl: GitLabUrl)(implicit rt: IORuntime, logger: Logger[IO]): GitLabStubStarter = {
       val stub = GitLabApiStub.empty[IO].unsafeRunSync()

@@ -29,17 +29,14 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-object TinyTypeData {
+class TinyTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
   val arbitraryValues: List[Any] =
     "abc" +: 2 +: 2L +: true +: List.empty[Any]
-}
-
-class TinyTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "toString" should {
 
     "return a String value of the 'value' property" in {
-      TinyTypeData.arbitraryValues foreach { someValue =>
+      arbitraryValues foreach { someValue =>
         val tinyType: TinyType = new TinyType {
           type V = Any
           override val value: Any = someValue
@@ -72,11 +69,13 @@ class TinyTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 }
 
 class SensitiveSpec extends AnyWordSpec with should.Matchers {
+  val arbitraryValues: List[Any] =
+    "abc" +: 2 +: 2L +: true +: List.empty[Any]
 
   "toString" should {
 
     "return a '<sensitive>' instead of the value" in {
-      TinyTypeData.arbitraryValues foreach { someValue =>
+      arbitraryValues foreach { someValue =>
         val tinyType: TinyType = new TinyType with Sensitive {
           type V = Any
           override val value: Any = someValue
@@ -89,6 +88,8 @@ class SensitiveSpec extends AnyWordSpec with should.Matchers {
 }
 
 class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
+  val arbitraryValues: List[Any] =
+    "abc" +: 2 +: 2L +: true +: List.empty[Any]
 
   import TinyTypeTest._
 
@@ -143,7 +144,7 @@ class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
   "implicit show" should {
 
     "return a String value of the 'value' property" in {
-      TinyTypeData.arbitraryValues foreach { someValue =>
+      arbitraryValues foreach { someValue =>
         case class InnerTinyType(v: Any) extends TinyType {
           type V = Any
           override val value: Any = v
@@ -218,7 +219,7 @@ private object TinyTypeTest extends TinyTypeFactory[TinyTypeTest](new TinyTypeTe
 
   override val transform: String => Either[Throwable, String] = {
     case `invalidForTransformation` => Left(invalidTransformationException)
-    case other                      => Right(other.toString)
+    case other                      => Right(other)
   }
 
   addConstraint(
