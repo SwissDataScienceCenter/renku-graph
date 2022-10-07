@@ -45,7 +45,7 @@ private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](
   import recoveryStrategy._
 
   protected[tooling] override def migrate(): EitherT[F, ProcessingRecoverableError, Unit] = EitherT {
-    (findProjects().map(toEvents) >>= sendEvents)
+    ((findProjects map toEvents) >>= sendEvents)
       .map(_.asRight[ProcessingRecoverableError])
       .recoverWith(maybeRecoverableError[F, Unit])
   }

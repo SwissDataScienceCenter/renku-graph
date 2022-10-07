@@ -68,7 +68,7 @@ class ProjectEventsToNewUpdaterSpec
         val project = consumerProjects.generateOne
         val eventsStatuses = Gen
           .oneOf(EventStatus.all diff Set(Skipped, GeneratingTriples, AwaitingDeletion, Deleting))
-          .generateList(minElements = 2)
+          .generateList(min = 2)
 
         val eventsAndDates = eventsStatuses.map { status =>
           val eventDate = timestampsNotInTheFuture.generateAs(EventDate)

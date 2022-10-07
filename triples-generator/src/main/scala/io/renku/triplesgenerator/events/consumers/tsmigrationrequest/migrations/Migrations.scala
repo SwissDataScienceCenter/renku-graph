@@ -49,6 +49,7 @@ private[tsmigrationrequest] object Migrations {
     multipleTopmostDerivedFroms       <- MultipleTopmostDerivedFroms[F]
     multipleProjectAgents             <- MultipleProjectAgents[F]
     addProjectNamespaceField          <- AddProjectNamespaceField[F]
+    migrationToNamedGraphs            <- MigrationToNamedGraphs[F]
     migrations <- validateNames(
                     datasetsCreator,
                     reProvisioning,
@@ -65,7 +66,8 @@ private[tsmigrationrequest] object Migrations {
                     multipleDSDescriptions,
                     multipleTopmostDerivedFroms,
                     multipleProjectAgents,
-                    addProjectNamespaceField
+                    addProjectNamespaceField,
+                    migrationToNamedGraphs
                   )
   } yield migrations
 
