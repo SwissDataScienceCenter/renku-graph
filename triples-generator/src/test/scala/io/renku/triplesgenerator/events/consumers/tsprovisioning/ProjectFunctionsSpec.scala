@@ -24,6 +24,7 @@ import io.renku.graph.model._
 import GraphModelGenerators.datasetTopmostDerivedFroms
 import cats.data.NonEmptyList
 import io.renku.graph.model.datasets.TopmostDerivedFrom
+import io.renku.graph.model.entities.ActivityLens
 import io.renku.graph.model.testentities.{::~, activityEntities, anyRenkuProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, provenanceInternal, provenanceLens, provenanceNonModified, renkuProjectEntities, renkuProjectWithParentEntities, _}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -101,11 +102,30 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val entitiesOldPerson = oldPerson.to[entities.Person]
       val newPerson         = personEntities().generateOne.to[entities.Person]
 
-      update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map { activity =>
-        activity.association match {
-          case assoc: entities.Association.WithPersonAgent => activity.copy(association = assoc.copy(agent = newPerson))
-          case _ => activity
-        }
+      update(entitiesOldPerson, newPerson)(project).activities shouldBe project.activities.map {
+        ActivityLens.activityAssociationAgent.modify(_.as(newPerson))
+      }
+    }
+
+    "replace the old person with the new person in all plan creators" in {
+      val project = anyRenkuProjectEntities
+        .withActivities(
+          activityEntities(planEntities())
+            .modify(setPlanCreator(oldPerson))
+            .modify(toAssociationRenkuAgent(agentEntities.generateOne)),
+          activityEntities(planEntities())
+            .modify(setPlanCreator(oldPerson))
+            .modify(toAssociationRenkuAgent(agentEntities.generateOne))
+        )
+        .generateOne
+        .to[entities.Project]
+
+      val entitiesOldPerson = oldPerson.to[entities.Person]
+      val newPerson         = personEntities().generateOne.to[entities.Person]
+
+      val updated = update(entitiesOldPerson, newPerson)(project)
+      updated.activities shouldBe project.activities.map {
+        ActivityLens.activityPlanCreators.set(Set(newPerson))
       }
     }
 

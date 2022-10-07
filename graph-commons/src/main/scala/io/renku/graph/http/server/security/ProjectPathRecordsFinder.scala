@@ -37,7 +37,7 @@ object ProjectPathRecordsFinder {
 
 private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClientImpl(renkuConnectionConfig)
+) extends TSClient(renkuConnectionConfig)
     with SecurityRecordFinder[F, projects.Path] {
 
   override def apply(path: projects.Path): F[List[SecurityRecord]] =

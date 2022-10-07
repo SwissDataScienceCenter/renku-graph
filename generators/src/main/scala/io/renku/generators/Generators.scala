@@ -327,10 +327,10 @@ object Generators {
 
     val tuples = for {
       key <- nonEmptyStrings(maxLength = 5)
-      value <- oneOf(nonEmptyStrings(maxLength = 5),
-                     Arbitrary.arbNumber.arbitrary,
-                     Arbitrary.arbBool.arbitrary,
-                     Gen.nonEmptyListOf(nonEmptyStrings())
+      value <- oneOf[Any](nonEmptyStrings(maxLength = 5),
+                          Arbitrary.arbNumber.arbitrary,
+                          Arbitrary.arbBool.arbitrary,
+                          Gen.nonEmptyListOf(nonEmptyStrings())
                )
     } yield key -> value
 

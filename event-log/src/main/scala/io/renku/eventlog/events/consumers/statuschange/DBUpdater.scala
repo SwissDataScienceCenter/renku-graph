@@ -65,6 +65,11 @@ private object DBUpdater {
     (_, _, execTimes) =>
       new RollbackToAwaitingDeletionUpdater(execTimes).pure[F].widen[DBUpdater[F, RollbackToAwaitingDeletion]]
 
+  implicit def factoryRedoProjectTransformationHandler[F[_]: Async: Logger]
+      : EventUpdaterFactory[F, RedoProjectTransformation] =
+    (eventsQueue, _, _) =>
+      new RedoProjectTransformationHandler[F](eventsQueue).pure[F].widen[DBUpdater[F, RedoProjectTransformation]]
+
   implicit def factoryToProjectEventsNewHandler[F[_]: Async: Logger]: EventUpdaterFactory[F, ProjectEventsToNew] =
     (eventsQueue, _, _) => new ProjectEventsToNewHandler[F](eventsQueue).pure[F].widen[DBUpdater[F, ProjectEventsToNew]]
 

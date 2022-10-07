@@ -23,7 +23,7 @@ import cats.syntax.all._
 import io.circe.syntax._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.events.consumers.statuschange.Generators.projectEventToNewEvents
+import io.renku.eventlog.events.consumers.statuschange.Generators.projectEventsToNewEvents
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
 import io.renku.generators.Generators.Implicits._
@@ -48,9 +48,9 @@ class StatusChangeEventsQueueSpec
 
   "run" should {
 
-    "keep dequeueing items from the status_change_events_queue" in new TestCase {
+    "keep dequeuing items from the status_change_events_queue" in new TestCase {
 
-      val event = projectEventToNewEvents.generateOne
+      val event = projectEventsToNewEvents.generateOne
 
       sessionResource.useK(queue offer event).unsafeRunSync()
 
@@ -62,7 +62,7 @@ class StatusChangeEventsQueueSpec
         dequeuedEvents.get.unsafeRunSync() shouldBe List(event)
       }
 
-      val nextEvent = projectEventToNewEvents.generateOne
+      val nextEvent = projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer nextEvent).unsafeRunSync()
 
       eventually {
@@ -71,10 +71,10 @@ class StatusChangeEventsQueueSpec
     }
 
     "be dequeueing the oldest events first" in new TestCase {
-      val event = projectEventToNewEvents.generateOne
+      val event = projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer event).unsafeRunSync()
 
-      val nextEvent = projectEventToNewEvents.generateOne
+      val nextEvent = projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer nextEvent).unsafeRunSync()
 
       queue.register(eventHandler).unsafeRunSync()
@@ -87,9 +87,9 @@ class StatusChangeEventsQueueSpec
     }
 
     "log error and continue dequeueing next events if handler fails during processing event" in new TestCase {
-      val event = projectEventToNewEvents.generateOne
+      val event = projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer event).unsafeRunSync()
-      val nextEvent = projectEventToNewEvents.generateOne
+      val nextEvent = projectEventsToNewEvents.generateOne
       sessionResource.useK(queue offer nextEvent).unsafeRunSync()
 
       val exception = exceptions.generateOne

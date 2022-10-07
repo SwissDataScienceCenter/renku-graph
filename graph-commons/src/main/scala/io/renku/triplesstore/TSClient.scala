@@ -37,7 +37,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-abstract class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
+abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     triplesStoreConfig:     DatasetConnectionConfig,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
@@ -54,7 +54,7 @@ abstract class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     with ResultsDecoder
     with RdfMediaTypes {
 
-  import TSClientImpl._
+  import TSClient._
   import eu.timepit.refined.auto._
   import io.renku.http.client.UrlEncoder.urlEncode
   import org.http4s.MediaType.application._
@@ -170,7 +170,7 @@ abstract class TSClientImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     }
 }
 
-object TSClientImpl {
+object TSClient {
 
   private trait SparqlQueryType
   private final implicit case object SparqlSelect extends SparqlQueryType

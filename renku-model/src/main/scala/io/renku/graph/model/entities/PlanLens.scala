@@ -16,23 +16,12 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events.consumers.statuschange
+package io.renku.graph.model.entities
 
-import Generators.projectEventsToNewEvents
-import io.circe.syntax._
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import monocle.Lens
 
-class StatusChangeEventSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+object PlanLens {
 
-  "ProjectEventsToNew" should {
-
-    "be serializable and deserializable to and from Json" in {
-      forAll(projectEventsToNewEvents) { event =>
-        event.asJson.as[ProjectEventsToNew] shouldBe Right(event)
-      }
-    }
-  }
+  val planCreators: Lens[Plan, Set[Person]] =
+    Lens[Plan, Set[Person]](_.creators)(persons => plan => plan.copy(creators = persons))
 }

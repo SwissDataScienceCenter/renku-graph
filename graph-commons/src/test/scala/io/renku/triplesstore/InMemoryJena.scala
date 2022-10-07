@@ -151,7 +151,7 @@ trait InMemoryJena {
 
   protected def queryRunnerFor(datasetName: DatasetName) = queryRunner(findConnectionInfo(datasetName))
 
-  private def queryRunner(connectionInfo: DatasetConnectionConfig) = new TSClientImpl[IO](connectionInfo) {
+  private def queryRunner(connectionInfo: DatasetConnectionConfig) = new TSClient[IO](connectionInfo) {
 
     import io.circe.Decoder._
 

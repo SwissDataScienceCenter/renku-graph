@@ -41,9 +41,9 @@ private[migrations] object RecordsFinder {
 }
 
 private class RecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](connectionConfig: DatasetConnectionConfig)
-    extends TSClientImpl[F](connectionConfig,
-                            idleTimeoutOverride = (16 minutes).some,
-                            requestTimeoutOverride = (15 minutes).some
+    extends TSClient[F](connectionConfig,
+                        idleTimeoutOverride = (16 minutes).some,
+                        requestTimeoutOverride = (15 minutes).some
     )
     with RecordsFinder[F] {
 
