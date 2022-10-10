@@ -27,6 +27,7 @@ import io.renku.http.server.version
 import io.renku.metrics.{MetricsRegistry, RoutesMetrics}
 import io.renku.triplesgenerator.events.EventEndpoint
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.jdk.CollectionConverters._
 
@@ -60,8 +61,8 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: MetricsRegistry](consumersRegistry: EventConsumersRegistry[F],
-                                          config: Option[Config]
+  def apply[F[_]: Async: Logger: MetricsRegistry](consumersRegistry: EventConsumersRegistry[F],
+                                                  config: Option[Config]
   ): F[MicroserviceRoutes[F]] = for {
     eventEndpoint <- EventEndpoint(consumersRegistry)
     versionRoutes <- version.Routes[F]
