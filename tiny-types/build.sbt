@@ -21,7 +21,7 @@ name := "tiny-types"
 
 libraryDependencies += "eu.timepit" %% "refined" % "0.10.1"
 
-val circeVersion = "0.14.3"
+val circeVersion       = "0.14.3"
 val circeOpticsVersion = "0.14.1"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
@@ -29,7 +29,7 @@ libraryDependencies += "io.circe" %% "circe-generic" % circeVersion
 libraryDependencies += "io.circe" %% "circe-optics"  % circeOpticsVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
-libraryDependencies += "io.renku" %% "jsonld4s" % "0.4.0"
+libraryDependencies += "io.renku" %% "jsonld4s" % "0.5.0"
 
 val catsVersion = "2.8.0"
 libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
