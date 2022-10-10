@@ -61,11 +61,12 @@ final class GitLabClientImpl[F[_]: Async: Logger](
     retryInterval:          FiniteDuration = RestClient.SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = RestClient.MaxRetriesAfterConnectionTimeout,
     requestTimeoutOverride: Option[Duration] = None
-) extends RestClient(gitLabThrottler,
-                     maybeTimeRecorder = Some(apiCallRecorder.instance),
-                     retryInterval = retryInterval,
-                     maxRetries = maxRetries,
-                     requestTimeoutOverride = requestTimeoutOverride
+) extends RestClient(
+      gitLabThrottler,
+      maybeTimeRecorder = Some(apiCallRecorder.instance),
+      retryInterval = retryInterval,
+      maxRetries = maxRetries,
+      requestTimeoutOverride = requestTimeoutOverride
     )
     with GitLabClient[F] {
 

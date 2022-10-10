@@ -57,11 +57,12 @@ private class TSCleanerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     maxRetries:            Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeout:           Duration = 16 minutes,
     requestTimeout:        Duration = 15 minutes
-) extends TSClient(renkuConnectionConfig,
-                   retryInterval = retryInterval,
-                   maxRetries = maxRetries,
-                   idleTimeoutOverride = idleTimeout.some,
-                   requestTimeoutOverride = requestTimeout.some
+) extends TSClient(
+      renkuConnectionConfig,
+      retryInterval = retryInterval,
+      maxRetries = maxRetries,
+      idleTimeoutOverride = idleTimeout.some,
+      requestTimeoutOverride = requestTimeout.some
     )
     with TSCleaner[F] {
   import SameAsHierarchyFixer._

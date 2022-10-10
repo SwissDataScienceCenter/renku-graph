@@ -192,14 +192,15 @@ class DatasetTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     val descriptionUpdater             = mock[DescriptionUpdater[Try]]
     val personLinksUpdater             = mock[PersonLinksUpdater[Try]]
     val hierarchyOnInvalidationUpdater = mock[HierarchyOnInvalidationUpdater[Try]]
-    val transformer = new DatasetTransformerImpl[Try](derivationHierarchyUpdater,
-                                                      sameAsUpdater,
-                                                      topmostSameAsUpdater,
-                                                      originalIdentifierUpdater,
-                                                      dateCreatedUpdater,
-                                                      descriptionUpdater,
-                                                      personLinksUpdater,
-                                                      hierarchyOnInvalidationUpdater
+    val transformer = new DatasetTransformerImpl[Try](
+      derivationHierarchyUpdater,
+      sameAsUpdater,
+      topmostSameAsUpdater,
+      originalIdentifierUpdater,
+      dateCreatedUpdater,
+      descriptionUpdater,
+      personLinksUpdater,
+      hierarchyOnInvalidationUpdater
     )
 
     def generateProjAndQueries =

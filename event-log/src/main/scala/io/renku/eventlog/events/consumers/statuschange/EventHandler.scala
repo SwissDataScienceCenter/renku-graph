@@ -124,12 +124,13 @@ private object EventHandler {
   ): F[EventHandler[F]] = for {
     deliveryInfoRemover <- DeliveryInfoRemover(queriesExecTimes)
     gaugesUpdater <- MonadThrow[F].catchNonFatal(
-                       new GaugesUpdaterImpl[F](awaitingTriplesGenerationGauge,
-                                                awaitingTriplesTransformationGauge,
-                                                underTriplesTransformationGauge,
-                                                underTriplesGenerationGauge,
-                                                awaitingDeletionGauge,
-                                                deletingGauge
+                       new GaugesUpdaterImpl[F](
+                         awaitingTriplesGenerationGauge,
+                         awaitingTriplesTransformationGauge,
+                         underTriplesTransformationGauge,
+                         underTriplesGenerationGauge,
+                         awaitingDeletionGauge,
+                         deletingGauge
                        )
                      )
     statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](gaugesUpdater))
