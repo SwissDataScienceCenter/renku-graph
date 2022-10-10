@@ -32,6 +32,8 @@ import io.renku.http.InfoMessage._
 import io.renku.http.client.RestClient._
 import io.renku.http.server.EndpointTester._
 import io.renku.http.{ErrorMessage, InfoMessage}
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.testtools.IOSpec
 import io.renku.tinytypes.ByteArrayTinyType
 import io.renku.tinytypes.contenttypes.ZippedContent
@@ -154,15 +156,18 @@ class EventEndpointSpec
 
     s"return $InternalServerError if handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
 
+      val exception = exceptions.generateOne
       (subscriptionsRegistry.handle _)
         .expects(*)
-        .returning(EventSchedulingResult.SchedulingError(exceptions.generateOne).pure[IO])
+        .returning(EventSchedulingResult.SchedulingError(exception).pure[IO])
 
       val response = (request >>= endpoint.processEvent).unsafeRunSync()
 
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
+
+      logger.loggedOnly(Error("Event scheduling error", exception))
     }
 
     s"return $ServiceUnavailable if handler returns EventSchedulingResult.ServiceUnavailable" in new TestCase {
@@ -177,6 +182,8 @@ class EventEndpointSpec
       response.status                          shouldBe ServiceUnavailable
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
       response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage(handlingResult.reason)
+
+      logger.loggedOnly(Error(s"Service needed for event processing unavailable: ${handlingResult.reason}"))
     }
 
     s"return $InternalServerError if handler fails" in new TestCase {
@@ -214,6 +221,7 @@ class EventEndpointSpec
 
     lazy val request: IO[Request[IO]] = Request[IO](Method.POST, uri"events").addParts(multipartParts: _*)
 
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val subscriptionsRegistry = mock[EventConsumersRegistry[IO]]
     val endpoint              = new EventEndpointImpl[IO](subscriptionsRegistry)
   }

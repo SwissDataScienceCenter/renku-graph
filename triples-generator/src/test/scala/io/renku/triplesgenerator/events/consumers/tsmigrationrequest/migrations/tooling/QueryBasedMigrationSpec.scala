@@ -52,7 +52,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with MockFactory with should.M
     "run find records and send an event for each of the found projects" in new TestCase {
       val records = projectPaths.generateNonEmptyList().toList
 
-      (projectsFinder.findProjects _).expects().returning(records.pure[Try])
+      (() => projectsFinder.findProjects).expects().returning(records.pure[Try])
 
       records foreach { record =>
         val event = eventRequestContentNoPayloads.generateOne
@@ -76,7 +76,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with MockFactory with should.M
       "the given strategy returns one" in new TestCase {
         val exception = exceptions.generateOne
 
-        (projectsFinder.findProjects _).expects().returning(exception.raiseError[Try, List[projects.Path]])
+        (() => projectsFinder.findProjects).expects().returning(exception.raiseError[Try, List[projects.Path]])
 
         migration.migrate().value shouldBe recoverableError.asLeft.pure[Try]
       }
@@ -85,7 +85,7 @@ class QueryBasedMigrationSpec extends AnyWordSpec with MockFactory with should.M
       "the given strategy returns one" in new TestCase {
 
         val record = projectPaths.generateOne
-        (projectsFinder.findProjects _).expects().returning(List(record).pure[Try])
+        (() => projectsFinder.findProjects).expects().returning(List(record).pure[Try])
 
         val event = eventRequestContentNoPayloads.generateOne
         eventProducer.expects(record).returning((record, event, eventCategoryName))

@@ -41,10 +41,10 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
       val criteria      = criterias.generateOne.copy(filters = Filters(ActivationState.All))
       val commonProject = notActivatedProjects.generateOne
 
-      val tsProjects = commonProject.toActivated :: activatedProjects.generateList(maxElements = 4)
+      val tsProjects = commonProject.toActivated :: activatedProjects.generateList(max = 4)
       (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(tsProjects.pure[Try])
 
-      val glProjects = notActivatedProjects.generateList(maxElements = 4)
+      val glProjects = notActivatedProjects.generateList(max = 4)
       (glProjectsFinder.findProjectsInGL _)
         .expects(criteria)
         .returning((commonProject :: glProjects).pure[Try])
@@ -61,10 +61,10 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
       val criteria      = criterias.generateOne.copy(filters = Filters(ActivationState.NotActivated))
       val commonProject = notActivatedProjects.generateOne
 
-      val tsProjects = commonProject.toActivated :: activatedProjects.generateList(maxElements = 4)
+      val tsProjects = commonProject.toActivated :: activatedProjects.generateList(max = 4)
       (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(tsProjects.pure[Try])
 
-      val glProjects = notActivatedProjects.generateList(maxElements = 4)
+      val glProjects = notActivatedProjects.generateList(max = 4)
       (glProjectsFinder.findProjectsInGL _)
         .expects(criteria)
         .returning((commonProject :: glProjects).pure[Try])
@@ -81,10 +81,10 @@ class ProjectsFinderSpec extends AnyWordSpec with should.Matchers with MockFacto
       val criteria      = criterias.generateOne.copy(filters = Filters(ActivationState.Activated))
       val commonProject = notActivatedProjects.generateOne
 
-      val tsProjects = commonProject.toActivated :: activatedProjects.generateList(maxElements = 4)
+      val tsProjects = commonProject.toActivated :: activatedProjects.generateList(max = 4)
       (tsProjectsFinder.findProjectsInTS _).expects(criteria).returning(tsProjects.pure[Try])
 
-      val glProjects = notActivatedProjects.generateList(maxElements = 4)
+      val glProjects = notActivatedProjects.generateList(max = 4)
       (glProjectsFinder.findProjectsInGL _)
         .expects(criteria)
         .returning((commonProject :: glProjects).pure[Try])

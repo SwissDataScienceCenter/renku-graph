@@ -57,7 +57,7 @@ class ZipSpec extends AnyWordSpec with IOSpec with should.Matchers {
     "fail with a meaningful error if unzipping fails" in {
       val actual = intercept[Exception] {
         Zip
-          .unzip[IO](bytes = Arbitrary.arbByte.arbitrary.generateList(minElements = 10, maxElements = 100).toArray)
+          .unzip[IO](bytes = Arbitrary.arbByte.arbitrary.generateList(min = 10, max = 100).toArray)
           .unsafeRunSync()
       }
       actual.getMessage shouldBe "Unzipping content failed"
