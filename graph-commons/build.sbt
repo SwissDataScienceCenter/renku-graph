@@ -28,12 +28,14 @@ libraryDependencies += "eu.timepit"   %% "refined-pureconfig" % "0.10.1"
 libraryDependencies += "io.sentry"     % "sentry-logback"     % "6.4.0"
 libraryDependencies += "org.tpolecat" %% "skunk-core"         % "0.3.1"
 
-val http4sVersion = "0.23.12"
-libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
+val http4sVersion = "0.23.16"
+val http4sBlazeVersion = "0.23.12"
+val http4sPrometheusVersion = "0.23.12"
+libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sBlazeVersion
+libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sBlazeVersion
 libraryDependencies += "org.http4s" %% "http4s-circe"              % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sPrometheusVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
 
 libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.3.14"
