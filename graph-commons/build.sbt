@@ -26,7 +26,7 @@ libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfig
 
 libraryDependencies += "eu.timepit"   %% "refined-pureconfig" % "0.10.1"
 libraryDependencies += "io.sentry"     % "sentry-logback"     % "6.4.3"
-libraryDependencies += "org.tpolecat" %% "skunk-core"         % "0.3.1"
+libraryDependencies += "org.tpolecat" %% "skunk-core"         % "0.3.2"
 
 val http4sVersion           = "0.23.16"
 val http4sBlazeVersion      = "0.23.12"
