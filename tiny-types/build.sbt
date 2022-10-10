@@ -21,7 +21,7 @@ name := "tiny-types"
 
 libraryDependencies += "eu.timepit" %% "refined" % "0.10.1"
 
-val circeVersion = "0.14.3"
+val circeVersion       = "0.14.3"
 val circeOpticsVersion = "0.14.1"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
@@ -36,5 +36,5 @@ libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free" % catsVersion
 
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.16.0"  % Test
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.13"  % Test
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.14"  % Test
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
