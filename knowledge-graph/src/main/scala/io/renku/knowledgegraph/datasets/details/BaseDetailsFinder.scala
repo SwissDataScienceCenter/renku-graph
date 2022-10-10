@@ -51,7 +51,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
   def findBaseDetails(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] = {
     implicit val decoder: Decoder[Option[Dataset]] = maybeDatasetDecoder(identifier)
-    queryExpecting[Option[Dataset]](using = queryForDatasetDetails(identifier, authContext))
+    queryExpecting[Option[Dataset]](selectQuery = queryForDatasetDetails(identifier, authContext))
   }
 
   private def queryForDatasetDetails(identifier: Identifier, authContext: AuthContext[Identifier]) = SparqlQuery.of(
@@ -101,7 +101,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   )
 
   def findInitialTag(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Tag]] =
-    queryExpecting[Option[Tag]](using = queryInitialTag(identifier, authContext))
+    queryExpecting[Option[Tag]](selectQuery = queryInitialTag(identifier, authContext))
 
   private def queryInitialTag(identifier: Identifier, authContext: AuthContext[Identifier]) = SparqlQuery.of(
     name = "ds by id - initial tag",
@@ -142,7 +142,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   }
 
   def findKeywords(identifier: Identifier): F[List[Keyword]] =
-    queryExpecting[List[Keyword]](using = queryKeywords(identifier))
+    queryExpecting[List[Keyword]](selectQuery = queryKeywords(identifier))
 
   private def queryKeywords(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - keywords",
@@ -157,7 +157,7 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
   )
 
   def findImages(identifier: Identifier): F[List[ImageUri]] =
-    queryExpecting[List[ImageUri]](using = queryImages(identifier))
+    queryExpecting[List[ImageUri]](selectQuery = queryImages(identifier))
 
   private def queryImages(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - image urls",

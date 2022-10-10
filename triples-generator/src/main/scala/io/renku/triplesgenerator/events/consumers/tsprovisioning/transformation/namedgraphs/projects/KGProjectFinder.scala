@@ -43,7 +43,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.tinytypes.json.TinyTypeDecoders._
 
   override def find(resourceId: projects.ResourceId): F[Option[ProjectMutableData]] =
-    queryExpecting(using = query(resourceId))(decoder(resourceId))
+    queryExpecting(selectQuery = query(resourceId))(decoder(resourceId))
 
   private def query(resourceId: projects.ResourceId) = SparqlQuery.of(
     name = "transformation - find project",

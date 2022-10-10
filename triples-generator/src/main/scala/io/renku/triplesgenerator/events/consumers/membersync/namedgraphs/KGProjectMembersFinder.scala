@@ -46,7 +46,7 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
   import io.circe.Decoder
 
   def findProjectMembers(path: projects.Path): F[Set[KGProjectMember]] =
-    queryExpecting[Set[KGProjectMember]](using = query(path))
+    queryExpecting[Set[KGProjectMember]](selectQuery = query(path))
 
   private implicit lazy val recordsDecoder: Decoder[Set[KGProjectMember]] = ResultsDecoder[Set, KGProjectMember] {
     implicit cursor =>

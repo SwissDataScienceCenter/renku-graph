@@ -40,7 +40,7 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
     with SecurityRecordFinder[F, datasets.Identifier] {
 
   override def apply(id: datasets.Identifier): F[List[SecurityRecord]] =
-    queryExpecting[List[SecurityRecord]](using = query(id))(recordsDecoder)
+    queryExpecting[List[SecurityRecord]](selectQuery = query(id))(recordsDecoder)
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._

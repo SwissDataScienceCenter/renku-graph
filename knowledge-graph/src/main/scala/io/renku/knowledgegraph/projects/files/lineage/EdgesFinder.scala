@@ -47,13 +47,13 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private type EdgeData = (ExecutionInfo, Option[Location], Option[Node.Location])
 
   override def findEdges(projectPath: Path, maybeUser: Option[AuthUser]): F[EdgeMap] =
-    queryEdges(using = query(projectPath, maybeUser)) map toNodesLocations
+    queryEdges(query = query(projectPath, maybeUser)) map toNodesLocations
 
-  private def queryEdges(using: SparqlQuery): F[Set[EdgeData]] = {
+  private def queryEdges(query: SparqlQuery): F[Set[EdgeData]] = {
     val pageSize = 2000
 
-    def fetchPaginatedResult(into: Set[EdgeData], using: SparqlQuery, offset: Int): F[Set[EdgeData]] = {
-      val queryWithOffset = using.copy(body = using.body + s"\nLIMIT $pageSize \nOFFSET $offset")
+    def fetchPaginatedResult(into: Set[EdgeData], `using`: SparqlQuery, offset: Int): F[Set[EdgeData]] = {
+      val queryWithOffset = `using`.copy(body = `using`.body + s"\nLIMIT $pageSize \nOFFSET $offset")
       for {
         edges <- queryExpecting[Set[EdgeData]](queryWithOffset)
         results <- edges match {
@@ -63,7 +63,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       } yield results
     }
 
-    fetchPaginatedResult(Set.empty[EdgeData], using, offset = 0)
+    fetchPaginatedResult(Set.empty[EdgeData], query, offset = 0)
   }
 
   private def query(path: Path, maybeUser: Option[AuthUser]) = SparqlQuery.of(

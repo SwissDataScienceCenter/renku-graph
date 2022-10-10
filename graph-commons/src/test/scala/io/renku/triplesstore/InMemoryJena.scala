@@ -160,7 +160,7 @@ trait InMemoryJena {
     def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] =
       queryExpecting[List[Map[String, String]]](query)
 
-    def runUpdate(query: SparqlQuery): IO[Unit] = updateWithNoResult(using = query)
+    def runUpdate(query: SparqlQuery): IO[Unit] = updateWithNoResult(updateQuery = query)
 
     private implicit lazy val valuesDecoder: Decoder[List[Map[String, String]]] = { cursor =>
       for {

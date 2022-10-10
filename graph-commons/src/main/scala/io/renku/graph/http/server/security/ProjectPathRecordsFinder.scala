@@ -41,7 +41,7 @@ private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
     with SecurityRecordFinder[F, projects.Path] {
 
   override def apply(path: projects.Path): F[List[SecurityRecord]] =
-    queryExpecting[List[SecurityRecord]](using = query(path))(recordsDecoder(path))
+    queryExpecting[List[SecurityRecord]](selectQuery = query(path))(recordsDecoder(path))
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._

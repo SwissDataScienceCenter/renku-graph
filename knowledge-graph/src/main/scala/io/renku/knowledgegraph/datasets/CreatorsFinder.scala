@@ -43,7 +43,7 @@ private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   def findCreators(identifier: Identifier): F[NonEmptyList[DatasetCreator]] = {
     implicit val decoder: Decoder[NonEmptyList[DatasetCreator]] = creatorsDecoder(identifier)
-    queryExpecting[NonEmptyList[DatasetCreator]](using = query(identifier))
+    queryExpecting[NonEmptyList[DatasetCreator]](selectQuery = query(identifier))
   }
 
   private def query(identifier: Identifier) = SparqlQuery.of(
