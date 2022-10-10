@@ -30,7 +30,6 @@ jena:
   image:
     repository: renku/renku-jena
     pullPolicy: IfNotPresent
-    tag: '0.0.17'
   users:
     admin:
       ## Admin user password

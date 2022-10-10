@@ -45,11 +45,12 @@ object ConcurrentProcessesLimiter {
         scheduledProcess.process
           .widen[EventSchedulingResult]
           .merge
-          .flatTap(_ => releaseIfNecessary(scheduledProcess.maybeReleaseProcess)) recoverWith { case NonFatal(error) =>
-          releaseIfNecessary(scheduledProcess.maybeReleaseProcess).map(_ =>
-            EventSchedulingResult.SchedulingError(error)
-          )
-        }
+          .flatTap(_ => releaseIfNecessary(scheduledProcess.maybeReleaseProcess))
+          .recoverWith { case NonFatal(error) =>
+            releaseIfNecessary(scheduledProcess.maybeReleaseProcess).map(_ =>
+              EventSchedulingResult.SchedulingError(error)
+            )
+          }
 
       private def releaseIfNecessary(maybeReleaseProcess: Option[F[Unit]]): F[Unit] =
         maybeReleaseProcess
@@ -65,9 +66,7 @@ class ConcurrentProcessesLimiterImpl[F[_]: Concurrent](
     semaphore:      Semaphore[F]
 ) extends ConcurrentProcessesLimiter[F] {
 
-  def tryExecuting(
-      process: EventHandlingProcess[F]
-  ): F[EventSchedulingResult] = semaphore.available >>= {
+  def tryExecuting(process: EventHandlingProcess[F]): F[EventSchedulingResult] = semaphore.available >>= {
     case 0 => Busy.pure[F].widen[EventSchedulingResult]
     case _ =>
       {
@@ -106,7 +105,7 @@ class ConcurrentProcessesLimiterImpl[F[_]: Concurrent](
   } yield ()
 
   private def releasingSemaphore[O]: PartialFunction[Throwable, F[O]] = { case NonFatal(exception) =>
-    semaphore.available flatMap {
+    semaphore.available >>= {
       case available if available == processesCount.value => exception.raiseError[F, O]
       case _ => semaphore.release flatMap { _ => exception.raiseError[F, O] }
     }
