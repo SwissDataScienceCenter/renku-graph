@@ -33,40 +33,14 @@ private[tsmigrationrequest] object Migrations {
   def apply[F[_]: Async: ReProvisioningStatus: Logger: MetricsRegistry: SparqlQueryTimeRecorder](
       config: Config
   ): F[List[Migration[F]]] = for {
-    datasetsCreator                   <- DatasetsCreator[F]
-    reProvisioning                    <- ReProvisioning[F](config)
-    malformedActivityIds              <- MalformedActivityIds[F]
-    multiplePersonNames               <- MultiplePersonNames[F]
-    malformedDSImageIds               <- MalformedDSImageIds[F]
-    multipleDSTopmostSameAs           <- MultipleDSTopmostSameAs[F]
-    multipleAllWrongTopmostSameAs     <- MultipleAllWrongTopmostSameAs[F]
-    multipleTopmostSameAsOnInternalDS <- MultipleTopmostSameAsOnInternalDS[F]
-    multipleOriginalIdentifiers       <- MultipleOriginalIdentifiers[F]
-    multipleDSDateCreated             <- MultipleDSDateCreated[F]
-    multipleDSSameAs                  <- MultipleDSSameAs[F]
-    removeNotLinkedPersons            <- RemoveNotLinkedPersons[F]
-    multipleDSDescriptions            <- MultipleDSDescriptions[F]
-    multipleTopmostDerivedFroms       <- MultipleTopmostDerivedFroms[F]
-    multipleProjectAgents             <- MultipleProjectAgents[F]
-    addProjectNamespaceField          <- AddProjectNamespaceField[F]
-    migrationToNamedGraphs            <- MigrationToNamedGraphs[F]
+    datasetsCreator        <- DatasetsCreator[F]
+    reProvisioning         <- ReProvisioning[F](config)
+    removeNotLinkedPersons <- RemoveNotLinkedPersons[F]
+    migrationToNamedGraphs <- MigrationToNamedGraphs[F]
     migrations <- validateNames(
                     datasetsCreator,
                     reProvisioning,
-                    malformedActivityIds,
-                    multiplePersonNames,
-                    malformedDSImageIds,
-                    multipleDSTopmostSameAs,
-                    multipleAllWrongTopmostSameAs,
-                    multipleTopmostSameAsOnInternalDS,
-                    multipleOriginalIdentifiers,
-                    multipleDSDateCreated,
-                    multipleDSSameAs,
                     removeNotLinkedPersons,
-                    multipleDSDescriptions,
-                    multipleTopmostDerivedFroms,
-                    multipleProjectAgents,
-                    addProjectNamespaceField,
                     migrationToNamedGraphs
                   )
   } yield migrations

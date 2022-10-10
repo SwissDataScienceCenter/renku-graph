@@ -63,8 +63,6 @@ spec:
                   key: jena-users-renku-password
             - name: RENKU_DISABLE_VERSION_CHECK
               value: "true"
-            - name: RE_PROVISIONING_REMOVAL_BATCH_SIZE
-              value: "{{ .Values.triplesGenerator.reProvisioningRemovalBatchSize }}"
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
               {{- if .Values.sentry.enabled }}

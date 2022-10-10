@@ -36,7 +36,7 @@ class ProjectsFinderSpec
     with IOSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset {
+    with ProjectsDataset {
 
   "findProjects" should {
 
@@ -44,7 +44,7 @@ class ProjectsFinderSpec
 
       val projects = anyProjectEntities.generateNonEmptyList().toList
 
-      projects foreach (upload(to = renkuDataset, _))
+      projects foreach (upload(to = projectsDataset, _))
 
       projectsFinder.findProjects.unsafeRunSync() should contain theSameElementsAs projects.map(_.path)
     }
@@ -54,11 +54,11 @@ class ProjectsFinderSpec
     val query = SparqlQuery.of(
       "find path",
       Prefixes of (schema -> "schema", renku -> "renku"),
-      """|SELECT ?path
-         |WHERE { ?id a schema:Project; renku:projectPath ?path }""".stripMargin
+      """|SELECT DISTINCT ?path
+         |WHERE { GRAPH ?g { ?id a schema:Project; renku:projectPath ?path } }""".stripMargin
     )
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val projectsFinder = new ProjectsFinderImpl[IO](query, renkuDSConnectionInfo)
+    val projectsFinder = new ProjectsFinderImpl[IO](query, projectsDSConnectionInfo)
   }
 }

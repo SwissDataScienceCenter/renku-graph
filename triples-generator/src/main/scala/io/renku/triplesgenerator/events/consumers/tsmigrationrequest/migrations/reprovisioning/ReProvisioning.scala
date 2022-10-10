@@ -33,11 +33,11 @@ import io.renku.logging.ExecutionTimeRecorder
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.MicroserviceUrlFinder
-import io.renku.triplesstore.{MigrationsConnectionConfig, RenkuConnectionConfig, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.Microservice
 import io.renku.triplesgenerator.config.VersionCompatibilityConfig
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.ConditionedMigration.MigrationRequired
+import io.renku.triplesstore.{MigrationsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
@@ -127,12 +127,11 @@ private[migrations] object ReProvisioning {
     for {
       retryDelay                 <- find[F, FiniteDuration]("re-provisioning-retry-delay", config)
       migrationsConnectionConfig <- MigrationsConnectionConfig[F](config)
-      renkuStoreConfig           <- RenkuConnectionConfig[F](config)
       eventSender                <- EventSender[F]
       microserviceUrlFinder      <- MicroserviceUrlFinder[F](Microservice.ServicePort)
       compatibilityMatrix        <- VersionCompatibilityConfig[F](config)
       executionTimeRecorder      <- ExecutionTimeRecorder[F]()
-      triplesRemover             <- TriplesRemoverImpl(renkuStoreConfig)
+      triplesRemover             <- TriplesRemoverImpl(config)
       judge <- ReProvisionJudge[F](migrationsConnectionConfig,
                                    ReProvisioningStatus[F],
                                    microserviceUrlFinder,

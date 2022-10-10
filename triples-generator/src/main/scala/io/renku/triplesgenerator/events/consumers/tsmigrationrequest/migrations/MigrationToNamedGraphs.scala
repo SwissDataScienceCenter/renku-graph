@@ -115,7 +115,7 @@ private class DefaultGraphProjectsFinderImpl[F[_]](recordsFinder: RecordsFinder[
   private val chunkSize: Int = 50
 
   override def findDefaultGraphProjects(page: Int): F[List[ProjectInfo]] =
-    recordsFinder.findRecords(query(page))
+    recordsFinder findRecords query(page)
 
   private def query(page: Int) = SparqlQuery.of(
     MigrationToNamedGraphs.name.asRefined,
