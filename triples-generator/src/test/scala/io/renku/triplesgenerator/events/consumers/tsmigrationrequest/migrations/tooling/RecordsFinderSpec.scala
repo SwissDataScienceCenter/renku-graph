@@ -27,9 +27,9 @@ import io.renku.generators.jsonld.JsonLDGenerators.entityIds
 import io.renku.graph.model.Schemas.schema
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -37,16 +37,17 @@ class RecordsFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with IOSpec {
 
   "findRecords" should {
 
     "use the given query and decoder and run it against the TS" in new TestCase {
 
+      val graphId  = entityIds.generateOne
       val entityId = entityIds.generateOne
       val name     = nonEmptyStrings().generateOne
-      insert(to = renkuDataset, Triple(entityId, schema / "name", name))
+      insert(to = projectsDataset, Quad(graphId, entityId, schema / "name", name))
 
       implicit val decoder: Decoder[List[String]] =
         ResultsDecoder[List, String](implicit cur => extract[String]("name"))
@@ -55,7 +56,7 @@ class RecordsFinderSpec
         .findRecords[String](
           SparqlQuery.of(nonBlankStrings().generateOne,
                          Prefixes of schema -> "schema",
-                         "SELECT ?name WHERE { ?s schema:name ?name }"
+                         "SELECT ?name WHERE { GRAPH ?g { ?s schema:name ?name } }"
           )
         )
         .unsafeRunSync() shouldBe List(name)
@@ -65,6 +66,6 @@ class RecordsFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val client = new RecordsFinderImpl[IO](renkuDSConnectionInfo)
+    val client = new RecordsFinderImpl[IO](projectsDSConnectionInfo)
   }
 }

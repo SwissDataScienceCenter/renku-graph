@@ -20,12 +20,11 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits.GenOps
-import io.renku.generators.Generators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -34,28 +33,26 @@ class TriplesRemoverSpec
     with IOSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset {
+    with ProjectsDataset {
 
   "removeAllTriples" should {
 
     "remove all the triples from the storage except for CLI version" in new TestCase {
 
-      upload(to = renkuDataset, anyRenkuProjectEntities.generateOne, anyRenkuProjectEntities.generateOne)
+      upload(to = projectsDataset, anyRenkuProjectEntities.generateOne, anyRenkuProjectEntities.generateOne)
 
-      triplesCount(on = renkuDataset) should be > 0L
+      triplesCount(on = projectsDataset) should be > 0L
 
       triplesRemover.removeAllTriples().unsafeRunSync() shouldBe ()
 
-      triplesCount(on = renkuDataset) shouldBe 0L
+      triplesCount(on = projectsDataset) shouldBe 0L
     }
   }
 
   private trait TestCase {
-    private val removalBatchSize = positiveLongs(max = 100000).generateOne
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    private val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
-    private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
-      TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
-    val triplesRemover = new TriplesRemoverImpl[IO](removalBatchSize, renkuDSConnectionInfo)
+    private val etr = TestExecutionTimeRecorder[IO]()
+    private implicit val tr: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO](etr)
+    val triplesRemover = new TriplesRemoverImpl[IO](projectsDSConnectionInfo)
   }
 }

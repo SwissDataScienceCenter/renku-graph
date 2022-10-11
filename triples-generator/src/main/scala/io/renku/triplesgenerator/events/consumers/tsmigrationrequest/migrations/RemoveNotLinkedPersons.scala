@@ -22,6 +22,7 @@ package migrations
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
+import io.renku.graph.model.GraphClass
 import io.renku.graph.model.Schemas.schema
 import io.renku.metrics.MetricsRegistry
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -38,20 +39,23 @@ private object RemoveNotLinkedPersons {
   private[migrations] lazy val query = SparqlQuery.of(
     name.asRefined,
     Prefixes of schema -> "schema",
-    s"""|DELETE { ?personId ?p ?o }
+    s"""|DELETE { GRAPH <${GraphClass.Persons.id}> { ?personId ?pp ?ps } }
         |WHERE {
-        |  SELECT ?personId ?p ?o
+        |  SELECT DISTINCT ?personId ?pp ?ps
         |  WHERE {
-        |    {
-        |      SELECT DISTINCT ?personId
-        |      WHERE {
-        |        ?personId a schema:Person.
-        |        FILTER NOT EXISTS { ?s ?p ?personId }
+        |    GRAPH <${GraphClass.Persons.id}> {
+        |      ?personId a schema:Person
+        |    }
+        |    FILTER NOT EXISTS {
+        |      GRAPH ?g {
+        |        ?s ?p ?personId 
         |      }
-        |    }  
-        |    ?personId ?p ?o
+        |    }
+        |    GRAPH <${GraphClass.Persons.id}> {
+        |      ?personId ?pp ?ps
+        |    }
         |  }
-        |  ORDER BY ?personId ?p
+        |  ORDER BY ?personId ?pp ?ps
         |}
         |""".stripMargin
   )

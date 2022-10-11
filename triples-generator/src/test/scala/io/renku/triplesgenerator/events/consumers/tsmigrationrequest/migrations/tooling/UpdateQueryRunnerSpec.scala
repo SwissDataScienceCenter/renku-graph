@@ -22,12 +22,13 @@ import cats.effect.IO
 import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
+import io.renku.generators.jsonld.JsonLDGenerators.entityIds
 import io.renku.graph.model.Schemas.schema
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
+import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
-import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -36,7 +37,7 @@ class UpdateQueryRunnerSpec
     with should.Matchers
     with IOSpec
     with InMemoryJenaForSpec
-    with RenkuDataset {
+    with ProjectsDataset {
 
   "run" should {
 
@@ -44,28 +45,31 @@ class UpdateQueryRunnerSpec
       val string = nonEmptyStrings().generateOne
       val query = SparqlQuery.of(
         "test query",
-        Prefixes of (schema -> "schema"),
-        s"""INSERT DATA { <http://localhost/test> schema:name '$string' }""".stripMargin
+        Prefixes of schema -> "schema",
+        s"""INSERT DATA { GRAPH <$graphId> { <$entityId> schema:name '$string' } }""".stripMargin
       )
 
-      runner.run(query).unsafeRunSync() shouldBe ()
+      (runner run query).unsafeRunSync() shouldBe ()
 
       findString shouldBe List(string)
     }
   }
 
   private trait TestCase {
+    val graphId  = entityIds.generateOne
+    val entityId = entityIds.generateOne
+
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val runner = new UpdateQueryRunnerImpl[IO](renkuDSConnectionInfo)
-  }
+    val runner = new UpdateQueryRunnerImpl[IO](projectsDSConnectionInfo)
 
-  private def findString = runSelect(
-    on = renkuDataset,
-    SparqlQuery.of("find triple",
-                   Prefixes of (schema -> "schema"),
-                   "SELECT ?str WHERE { <http://localhost/test> schema:name ?str }"
-    )
-  ).unsafeRunSync()
-    .map(_("str"))
+    def findString = runSelect(
+      on = projectsDataset,
+      SparqlQuery.of("find triple",
+                     Prefixes of schema -> "schema",
+                     s"SELECT ?str WHERE { GRAPH <$graphId> { <$entityId> schema:name ?str } }"
+      )
+    ).unsafeRunSync()
+      .map(_("str"))
+  }
 }

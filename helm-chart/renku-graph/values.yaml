@@ -113,7 +113,6 @@ triplesGenerator:
       memory: 2048Mi
       cpu: "1"
   jvmXmx: 1g
-  reProvisioningRemovalBatchSize: 1000
   gitlab:
     rateLimit: 30/sec
   ## a demanded number of concurrent triples generation processes

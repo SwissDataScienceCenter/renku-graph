@@ -127,7 +127,7 @@ trait InMemoryJena {
   def triplesCount(on: DatasetName)(implicit ioRuntime: IORuntime): Long =
     queryRunnerFor(on)
       .runQuery(
-        SparqlQuery.of("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { ?s ?p ?o }")
+        SparqlQuery.of("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ?g { ?s ?p ?o } }")
       )
       .map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
       .unsafeRunSync()
