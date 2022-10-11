@@ -22,11 +22,10 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import com.dimafeng.testcontainers._
-import io.renku.db.SessionResource
+import io.renku.db.{PostgresContainer, SessionResource}
 import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
-import org.testcontainers.utility.DockerImageName
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -36,12 +35,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
 
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
-  override val container: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:12.8-alpine"),
-    databaseName = "projects_tokens",
-    username = dbConfig.user.value,
-    password = dbConfig.pass.value
-  )
+  override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
 
   lazy val sessionResource: SessionResource[IO, ProjectsTokensDB] = new SessionResource[IO, ProjectsTokensDB](
     Session.single(

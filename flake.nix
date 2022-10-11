@@ -27,7 +27,7 @@
       in
         { devShell = pkgs.mkShell {
             buildInputs = with pkgs;
-              [ postgresql_14
+              [ postgresql_12
                 postgres-fg
                 apache-jena-fuseki
                 openjdk17

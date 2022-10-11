@@ -22,11 +22,11 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import com.dimafeng.testcontainers._
+import io.renku.db.PostgresContainer
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.testtools.IOSpec
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
-import org.testcontainers.utility.DockerImageName
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -36,12 +36,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
-  override val container: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:12.8-alpine"),
-    databaseName = dbConfig.name.value,
-    username = dbConfig.user.value,
-    password = dbConfig.pass.value
-  )
+  override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
 
   implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
     Session.single(

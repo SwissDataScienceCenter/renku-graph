@@ -29,7 +29,6 @@ import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.testcontainers.utility.DockerImageName
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -85,12 +84,7 @@ trait ContainerTestDb extends ForAllTestContainer {
 
   private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
 
-  override val container: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:12.8-alpine"),
-    databaseName = dbConfig.name.value,
-    username = dbConfig.user.value,
-    password = dbConfig.pass
-  )
+  override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
 
   lazy val sessionPoolResource: Resource[IO, Resource[IO, Session[IO]]] = Session.pooled(
     host = container.host,

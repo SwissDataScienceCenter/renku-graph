@@ -25,7 +25,7 @@ import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
-import io.renku.db.{DBConfigProvider, SessionResource}
+import io.renku.db.{DBConfigProvider, PostgresContainer, SessionResource}
 import io.renku.eventlog._
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.{CommitId, EventId, EventStatus}
@@ -95,7 +95,7 @@ object EventLog extends TypeSerializers {
     new EventLogDbConfigProvider[Try].get().fold(throw _, identity)
 
   private lazy val postgresContainer = FixedHostPortGenericContainer(
-    imageName = "postgres:12.8-alpine",
+    imageName = PostgresContainer.image,
     env = immutable.Map("POSTGRES_USER"     -> dbConfig.user.value,
                         "POSTGRES_PASSWORD" -> dbConfig.pass.value,
                         "POSTGRES_DB"       -> dbConfig.name.value
