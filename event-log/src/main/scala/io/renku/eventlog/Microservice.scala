@@ -135,16 +135,17 @@ object Microservice extends IOMicroservice {
             _.routes
           )
         exitCode <- microserviceRoutes.use { routes =>
-                      new MicroserviceRunner(serviceReadinessChecker,
-                                             certificateLoader,
-                                             sentryInitializer,
-                                             dbInitializer,
-                                             eventLogMetrics,
-                                             eventsQueue,
-                                             eventProducersRegistry,
-                                             eventConsumersRegistry,
-                                             metricsResetScheduler,
-                                             HttpServer[IO](serverPort = ServicePort.value, routes)
+                      new MicroserviceRunner(
+                        serviceReadinessChecker,
+                        certificateLoader,
+                        sentryInitializer,
+                        dbInitializer,
+                        eventLogMetrics,
+                        eventsQueue,
+                        eventProducersRegistry,
+                        eventConsumersRegistry,
+                        metricsResetScheduler,
+                        HttpServer[IO](serverPort = ServicePort.value, routes)
                       ).run()
                     }
       } yield exitCode

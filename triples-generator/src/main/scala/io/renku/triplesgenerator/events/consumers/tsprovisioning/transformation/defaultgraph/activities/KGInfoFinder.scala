@@ -45,10 +45,10 @@ private class KGInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     with KGInfoFinder[F] {
 
   override def findActivityAuthors(resourceId: activities.ResourceId): F[Set[persons.ResourceId]] =
-    queryExpecting[Set[persons.ResourceId]](using = queryFindingAuthor(resourceId))
+    queryExpecting[Set[persons.ResourceId]](selectQuery = queryFindingAuthor(resourceId))
 
   override def findAssociationPersonAgents(resourceId: activities.ResourceId): F[Set[persons.ResourceId]] =
-    queryExpecting[Set[persons.ResourceId]](using = queryFindingPersonAgent(resourceId))
+    queryExpecting[Set[persons.ResourceId]](selectQuery = queryFindingPersonAgent(resourceId))
 
   private def queryFindingAuthor(resourceId: activities.ResourceId) = SparqlQuery.of(
     name = "transformation - find activity author",

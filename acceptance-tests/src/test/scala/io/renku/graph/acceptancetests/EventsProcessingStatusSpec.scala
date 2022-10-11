@@ -45,7 +45,7 @@ class EventsProcessingStatusSpec
     with Eventually
     with AcceptanceTestPatience {
 
-  private implicit val graph: GraphClass = GraphClass.Default
+  private implicit val graph: GraphClass           = GraphClass.Default
   private val numberOfEvents: Int Refined Positive = 5
 
   Feature("Status of events processing for a given project") {

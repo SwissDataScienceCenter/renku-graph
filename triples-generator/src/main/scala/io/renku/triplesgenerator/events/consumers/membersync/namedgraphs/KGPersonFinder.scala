@@ -41,7 +41,7 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.circe.Decoder
 
   def findPersonIds(membersToAdd: Set[GitLabProjectMember]): F[Set[(GitLabProjectMember, Option[ResourceId])]] = for {
-    gitLabIdsAndIds <- queryExpecting[Set[(GitLabId, ResourceId)]](using = query(membersToAdd)).map(_.toMap)
+    gitLabIdsAndIds <- queryExpecting[Set[(GitLabId, ResourceId)]](selectQuery = query(membersToAdd)).map(_.toMap)
   } yield membersToAdd.map(member => member -> gitLabIdsAndIds.get(member.gitLabId))
 
   private def query(membersToAdd: Set[GitLabProjectMember]) = SparqlQuery.of(

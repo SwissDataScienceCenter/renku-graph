@@ -42,7 +42,7 @@ private class PartsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import PartsFinderImpl._
 
   def findParts(identifier: Identifier): F[List[DatasetPart]] =
-    queryExpecting[List[DatasetPart]](using = query(identifier))
+    queryExpecting[List[DatasetPart]](selectQuery = query(identifier))
 
   private def query(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - parts",

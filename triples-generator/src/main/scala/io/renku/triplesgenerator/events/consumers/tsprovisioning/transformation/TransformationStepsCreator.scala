@@ -71,13 +71,14 @@ private[consumers] object TransformationStepsCreator {
     namedGraphsProjectTransformer   <- namedgraphs.projects.ProjectTransformer[F]
     namedGraphsDatasetTransformer   <- namedgraphs.datasets.DatasetTransformer[F]
     namedGraphsActivityTransformer  <- namedgraphs.activities.ActivityTransformer[F]
-  } yield new TransformationStepsCreatorImpl[F](defaultGraphPersonTransformer,
-                                                defaultGraphProjectTransformer,
-                                                defaultGraphDatasetTransformer,
-                                                defaultGraphActivityTransformer,
-                                                namedGraphsPersonTransformer,
-                                                namedGraphsProjectTransformer,
-                                                namedGraphsDatasetTransformer,
-                                                namedGraphsActivityTransformer
+  } yield new TransformationStepsCreatorImpl[F](
+    defaultGraphPersonTransformer,
+    defaultGraphProjectTransformer,
+    defaultGraphDatasetTransformer,
+    defaultGraphActivityTransformer,
+    namedGraphsPersonTransformer,
+    namedGraphsProjectTransformer,
+    namedGraphsDatasetTransformer,
+    namedGraphsActivityTransformer
   )
 }

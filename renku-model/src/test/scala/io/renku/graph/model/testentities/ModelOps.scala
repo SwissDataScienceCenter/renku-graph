@@ -488,16 +488,17 @@ trait ModelOps extends Dataset.ProvenanceOps {
     def to[T](implicit convert: Plan => T): T = convert(plan)
 
     def invalidate(time: InvalidationTime): Plan with HavingInvalidationTime =
-      new Plan(plan.id,
-               plan.name,
-               plan.maybeDescription,
-               plan.maybeCommand,
-               plan.creators,
-               plan.dateCreated,
-               plan.maybeProgrammingLanguage,
-               plan.keywords,
-               plan.commandParameterFactories,
-               plan.successCodes
+      new Plan(
+        plan.id,
+        plan.name,
+        plan.maybeDescription,
+        plan.maybeCommand,
+        plan.creators,
+        plan.dateCreated,
+        plan.maybeProgrammingLanguage,
+        plan.keywords,
+        plan.commandParameterFactories,
+        plan.successCodes
       ) with HavingInvalidationTime {
         override val invalidationTime: InvalidationTime = time
       }

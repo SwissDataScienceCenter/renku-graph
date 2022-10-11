@@ -51,7 +51,7 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
   import io.renku.graph.model.Schemas._
 
   def findProjectDatasets(projectPath: Path): F[List[ProjectDataset]] =
-    queryExpecting[List[ProjectDataset]](using = query(projectPath))
+    queryExpecting[List[ProjectDataset]](selectQuery = query(projectPath))
 
   private def query(path: Path) = SparqlQuery.of(
     name = "ds projects",

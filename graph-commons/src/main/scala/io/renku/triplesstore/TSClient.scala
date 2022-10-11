@@ -65,17 +65,19 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import org.http4s.{Request, Response, Status}
   import triplesStoreConfig._
 
-  protected def updateWithNoResult(using: SparqlQuery): F[Unit] =
-    updateWitMapping[Unit](using, toFullResponseMapper(_ => ().pure[F]))
+  protected def updateWithNoResult(updateQuery: SparqlQuery): F[Unit] =
+    updateWitMapping[Unit](updateQuery, toFullResponseMapper(_ => ().pure[F]))
 
   protected def updateWitMapping[ResultType](
-      using:       SparqlQuery,
+      updateQuery: SparqlQuery,
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
-  ): F[ResultType] = runQuery(using, mapResponse, SparqlUpdate)
+  ): F[ResultType] = runQuery(updateQuery, mapResponse, SparqlUpdate)
 
-  protected def queryExpecting[ResultType](using: SparqlQuery)(implicit decoder: Decoder[ResultType]): F[ResultType] =
+  protected def queryExpecting[ResultType](
+      selectQuery:    SparqlQuery
+  )(implicit decoder: Decoder[ResultType]): F[ResultType] =
     runQuery(
-      using,
+      selectQuery,
       toFullResponseMapper(responseMapperFor[ResultType]),
       SparqlSelect
     )
@@ -151,11 +153,11 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
       override def findResults(pagingRequest: PagingRequest): F[List[ResultType]] = for {
         queryWithPaging <- query.include[F](pagingRequest)
-        results         <- queryExpecting[List[ResultType]](using = queryWithPaging)
+        results         <- queryExpecting[List[ResultType]](selectQuery = queryWithPaging)
       } yield results
 
       override def findTotal() =
-        queryExpecting[Option[Total]](using = (maybeCountQuery getOrElse query).toCountQuery).flatMap {
+        queryExpecting[Option[Total]](selectQuery = (maybeCountQuery getOrElse query).toCountQuery).flatMap {
           case Some(total) => total.pure[F]
           case None        => new Exception("Total number of records cannot be found").raiseError[F, Total]
         }

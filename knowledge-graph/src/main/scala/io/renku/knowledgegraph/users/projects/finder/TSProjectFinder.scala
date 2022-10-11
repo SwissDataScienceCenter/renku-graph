@@ -49,7 +49,7 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.triplesstore.SparqlQuery.Prefixes
 
   override def findProjectsInTS(criteria: Criteria): F[List[Project.Activated]] =
-    queryExpecting[List[Project.Activated]](using = query(criteria))
+    queryExpecting[List[Project.Activated]](selectQuery = query(criteria))
 
   private def query(criteria: Criteria) = SparqlQuery.of(
     name = "user projects by id",

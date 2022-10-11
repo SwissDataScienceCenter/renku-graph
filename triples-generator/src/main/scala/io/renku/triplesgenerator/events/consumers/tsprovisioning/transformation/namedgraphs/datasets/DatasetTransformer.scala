@@ -83,13 +83,14 @@ private[transformation] object DatasetTransformer {
     originalIdentifierUpdater      <- OriginalIdentifierUpdater[F]
     dateCreatedUpdater             <- DateCreatedUpdater[F]
     descriptionUpdater             <- DescriptionUpdater[F]
-  } yield new DatasetTransformerImpl[F](derivationHierarchyUpdater,
-                                        sameAsUpdater,
-                                        topmostSameAsUpdater,
-                                        originalIdentifierUpdater,
-                                        dateCreatedUpdater,
-                                        descriptionUpdater,
-                                        personLinksUpdater,
-                                        hierarchyOnInvalidationUpdater
+  } yield new DatasetTransformerImpl[F](
+    derivationHierarchyUpdater,
+    sameAsUpdater,
+    topmostSameAsUpdater,
+    originalIdentifierUpdater,
+    dateCreatedUpdater,
+    descriptionUpdater,
+    personLinksUpdater,
+    hierarchyOnInvalidationUpdater
   )
 }
