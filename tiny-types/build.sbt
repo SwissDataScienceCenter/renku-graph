@@ -35,6 +35,6 @@ val catsVersion = "2.8.0"
 libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free" % catsVersion
 
-libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.16.0"  % Test
+libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.17.0"  % Test
 libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.14"  % Test
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
