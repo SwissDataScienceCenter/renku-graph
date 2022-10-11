@@ -21,8 +21,10 @@ package io.renku.knowledgegraph.projects.details
 import KGProjectFinder._
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.config.RenkuUrlLoader
+import io.renku.graph.model._
 import io.renku.graph.model.projects._
-import io.renku.graph.model.{SchemaVersion, persons}
+import io.renku.graph.model.views.RdfResource
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -32,9 +34,9 @@ private trait KGProjectFinder[F[_]] {
   def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[KGProject]]
 }
 
-private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient(renkuConnectionConfig)
+private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)(
+    implicit renkuUrl: RenkuUrl
+) extends TSClient(storeConfig)
     with KGProjectFinder[F] {
 
   import cats.syntax.all._
@@ -43,45 +45,50 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.graph.model.Schemas._
 
   override def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[KGProject]] =
-    queryExpecting[Option[KGProject]](using = query(path, maybeAuthUser))(recordsDecoder(path))
+    queryExpecting[Option[KGProject]](using = query(ResourceId(path), maybeAuthUser))(recordsDecoder(path))
 
-  private def query(path: Path, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
+  private def query(resourceId: ResourceId, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "project by id",
-    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT ?resourceId ?name ?visibility ?maybeDescription ?dateCreated 
         |       ?maybeCreatorResourceId ?maybeCreatorName ?maybeCreatorEmail ?maybeCreatorAffiliation
         |       ?maybeParentResourceId ?maybeParentPath ?maybeParentName ?maybeParentDateCreated 
         |       ?maybeParentCreatorResourceId ?maybeParentCreatorName ?maybeParentCreatorEmail ?maybeParentCreatorAffiliation
         |       ?maybeSchemaVersion (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
         |WHERE {
-        |  ?resourceId a schema:Project;
-        |              renku:projectPath '$path';
-        |              schema:name ?name;
-        |              renku:projectVisibility ?visibility;
-        |              schema:dateCreated ?dateCreated.
-        |  OPTIONAL { ?resourceId schema:schemaVersion ?maybeSchemaVersion }
-        |  OPTIONAL { ?resourceId schema:description ?maybeDescription }
-        |  OPTIONAL { ?resourceId schema:keywords ?keyword }
-        |  OPTIONAL {
-        |    ?resourceId schema:creator ?maybeCreatorResourceId.
-        |    ?maybeCreatorResourceId a schema:Person;
-        |                            schema:name ?maybeCreatorName.
-        |    OPTIONAL { ?maybeCreatorResourceId schema:email ?maybeCreatorEmail }
-        |    OPTIONAL { ?maybeCreatorResourceId schema:affiliation ?maybeCreatorAffiliation }
-        |  }
-        |  OPTIONAL {
-        |    ?resourceId prov:wasDerivedFrom ?maybeParentResourceId.
-        |    ${parentMemberFilterQuery(maybeAuthUser)}
-        |    ?maybeParentResourceId a schema:Project;
-        |                           renku:projectPath ?maybeParentPath;
-        |                           schema:name ?maybeParentName;
-        |                           schema:dateCreated ?maybeParentDateCreated.
+        |  BIND (${resourceId.showAs[RdfResource]} AS ?resourceId)
+        |  GRAPH ?resourceId {
+        |    ?resourceId a schema:Project;
+        |                schema:name ?name;
+        |                renku:projectVisibility ?visibility;
+        |                schema:dateCreated ?dateCreated.
+        |    OPTIONAL { ?resourceId schema:schemaVersion ?maybeSchemaVersion }
+        |    OPTIONAL { ?resourceId schema:description ?maybeDescription }
+        |    OPTIONAL { ?resourceId schema:keywords ?keyword }
         |    OPTIONAL {
-        |      ?maybeParentResourceId schema:creator ?maybeParentCreatorResourceId.
-        |      ?maybeParentCreatorResourceId a schema:Person;
-        |                            schema:name ?maybeParentCreatorName.
-        |      OPTIONAL { ?maybeParentCreatorResourceId schema:email ?maybeParentCreatorEmail }
-        |      OPTIONAL { ?maybeParentCreatorResourceId schema:affiliation ?maybeParentCreatorAffiliation }
+        |      ?resourceId schema:creator ?maybeCreatorResourceId.
+        |      GRAPH <${GraphClass.Persons.id}> {
+        |        ?maybeCreatorResourceId schema:name ?maybeCreatorName.
+        |        OPTIONAL { ?maybeCreatorResourceId schema:email ?maybeCreatorEmail }
+        |        OPTIONAL { ?maybeCreatorResourceId schema:affiliation ?maybeCreatorAffiliation }
+        |      }
+        |    }
+        |    OPTIONAL {
+        |      ?resourceId prov:wasDerivedFrom ?maybeParentResourceId.
+        |      GRAPH ?maybeParentResourceId {
+        |        ${parentMemberFilterQuery(maybeAuthUser)}
+        |        ?maybeParentResourceId renku:projectPath ?maybeParentPath;
+        |                               schema:name ?maybeParentName;
+        |                               schema:dateCreated ?maybeParentDateCreated.
+        |        OPTIONAL {
+        |          ?maybeParentResourceId schema:creator ?maybeParentCreatorResourceId.
+        |          GRAPH <${GraphClass.Persons.id}> {
+        |            ?maybeParentCreatorResourceId schema:name ?maybeParentCreatorName.
+        |            OPTIONAL { ?maybeParentCreatorResourceId schema:email ?maybeParentCreatorEmail }
+        |            OPTIONAL { ?maybeParentCreatorResourceId schema:affiliation ?maybeParentCreatorAffiliation }
+        |          }
+        |        }
+        |      }
         |    }
         |  }
         |}
@@ -95,17 +102,20 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   private lazy val parentMemberFilterQuery: Option[AuthUser] => String = {
     case Some(user) =>
-      s"""|?maybeParentResourceId renku:projectVisibility ?parentVisibility .
+      s"""|?maybeParentResourceId renku:projectVisibility ?parentVisibility.
           |OPTIONAL {
-          |  ?maybeParentResourceId schema:member/schema:sameAs ?memberId.
-          |  ?memberId schema:additionalType 'GitLab';
-          |            schema:identifier ?userGitlabId .
+          |  ?maybeParentResourceId schema:member ?memberId.
+          |  GRAPH <${GraphClass.Persons.id}> {
+          |    ?memberId schema:sameAs ?memberSameAs.
+          |    ?memberSameAs schema:additionalType 'GitLab';
+          |                  schema:identifier ?userGitlabId
+          |  }
           |}
-          |FILTER ( ?parentVisibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value} )
+          |FILTER (?parentVisibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value})
           |""".stripMargin
     case _ =>
       s"""|?maybeParentResourceId renku:projectVisibility ?parentVisibility .
-          |FILTER(?parentVisibility = '${Visibility.Public.value}')
+          |FILTER (?parentVisibility = '${Visibility.Public.value}')
           |""".stripMargin
   }
 
@@ -197,6 +207,8 @@ private object KGProjectFinder {
                                   maybeAffiliation: Option[persons.Affiliation]
   )
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] =
-    RenkuConnectionConfig[F]().map(new KGProjectFinderImpl(_))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGProjectFinder[F]] = for {
+    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
+    storeConfig                   <- ProjectsConnectionConfig[F]()
+  } yield new KGProjectFinderImpl(storeConfig)
 }

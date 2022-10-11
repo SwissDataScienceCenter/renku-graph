@@ -28,7 +28,7 @@ import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -38,7 +38,7 @@ class KGProjectFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with ScalaCheckPropertyChecks
     with IOSpec {
 
@@ -46,7 +46,7 @@ class KGProjectFinderSpec
 
     "return details of the project with the given path when there's no parent" in new TestCase {
       forAll(Gen.oneOf(renkuProjectEntities(anyVisibility), nonRenkuProjectEntities(anyVisibility))) { project =>
-        upload(to = renkuDataset, anyProjectEntities.generateOne, project)
+        upload(to = projectsDataset, anyProjectEntities.generateOne, project)
 
         kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to(kgProjectConverter).some
@@ -57,7 +57,7 @@ class KGProjectFinderSpec
       forAll(
         Gen.oneOf(renkuProjectWithParentEntities(visibilityPublic), nonRenkuProjectWithParentEntities(visibilityPublic))
       ) { project =>
-        upload(to = renkuDataset, project, project.parent)
+        upload(to = projectsDataset, project, project.parent)
 
         kgProjectFinder.findProject(project.path, authUsers.generateOption).unsafeRunSync() shouldBe
           project.to(kgProjectConverter).some
@@ -69,14 +69,14 @@ class KGProjectFinderSpec
       val userAsMember = personEntities.generateOne.copy(maybeGitLabId = user.id.some)
       val project = Gen
         .oneOf(
-          renkuProjectWithParentEntities(visibilityNonPublic).map(_.copy(members = Set(userAsMember))),
-          nonRenkuProjectWithParentEntities(visibilityNonPublic).map(_.copy(members = Set(userAsMember)))
+          renkuProjectWithParentEntities(visibilityNonPublic).modify(replaceMembers(Set(userAsMember))),
+          nonRenkuProjectWithParentEntities(visibilityNonPublic).modify(replaceMembers(Set(userAsMember)))
         )
         .generateOne
 
       val parent = replaceMembers(Set(userAsMember))(project.parent)
 
-      upload(to = renkuDataset, project, parent)
+      upload(to = projectsDataset, project, parent)
 
       kgProjectFinder.findProject(project.path, user.some).unsafeRunSync() shouldBe
         project.to(kgProjectConverter).some
@@ -87,18 +87,16 @@ class KGProjectFinderSpec
         val user = authUsers.generateOne
         val project = Gen
           .oneOf(
-            renkuProjectWithParentEntities(visibilityNonPublic).map(
-              _.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
-            ),
-            nonRenkuProjectWithParentEntities(visibilityNonPublic).map(
-              _.copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
-            )
+            renkuProjectWithParentEntities(visibilityNonPublic)
+              .modify(replaceMembers(Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))),
+            nonRenkuProjectWithParentEntities(visibilityNonPublic)
+              .modify(replaceMembers(Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some))))
           )
           .generateOne
 
         val parent = replaceMembers(Set.empty)(project.parent)
 
-        upload(to = renkuDataset, project, parent)
+        upload(to = projectsDataset, project, parent)
 
         kgProjectFinder.findProject(project.path, Some(user)).unsafeRunSync() shouldBe Some {
           project.to(kgProjectConverter).copy(maybeParent = None)
@@ -113,13 +111,6 @@ class KGProjectFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val kgProjectFinder = new KGProjectFinderImpl[IO](renkuDSConnectionInfo)
-  }
-
-  private def replaceMembers(members: Set[Person]): Project => Project = {
-    case p: RenkuProject.WithParent       => p.copy(members = members)
-    case p: RenkuProject.WithoutParent    => p.copy(members = members)
-    case p: NonRenkuProject.WithParent    => p.copy(members = members)
-    case p: NonRenkuProject.WithoutParent => p.copy(members = members)
+    val kgProjectFinder = new KGProjectFinderImpl[IO](projectsDSConnectionInfo)
   }
 }
