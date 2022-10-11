@@ -45,7 +45,7 @@ private class KGProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.graph.model.Schemas._
 
   override def findProject(path: Path, maybeAuthUser: Option[AuthUser]): F[Option[KGProject]] =
-    queryExpecting[Option[KGProject]](using = query(ResourceId(path), maybeAuthUser))(recordsDecoder(path))
+    queryExpecting[Option[KGProject]](query(ResourceId(path), maybeAuthUser))(recordsDecoder(path))
 
   private def query(resourceId: ResourceId, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "project by id",

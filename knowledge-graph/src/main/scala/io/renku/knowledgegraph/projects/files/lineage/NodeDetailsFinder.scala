@@ -54,7 +54,7 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTi
   )(implicit query: (T, ResourceId) => SparqlQuery): F[Set[Node]] =
     ids.toList
       .map { id =>
-        queryExpecting[Option[Node]](using = query(id, ResourceId(projectPath)(renkuUrl)))
+        queryExpecting[Option[Node]](selectQuery = query(id, ResourceId(projectPath)(renkuUrl)))
           .flatMap(failIf(no = id))
       }
       .parSequence

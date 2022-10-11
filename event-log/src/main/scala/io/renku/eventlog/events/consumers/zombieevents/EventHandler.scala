@@ -110,13 +110,14 @@ private object EventHandler {
       underDeletionGauge:          LabeledGauge[F, projects.Path]
   ): F[EventHandler[F]] = for {
     zombieStatusCleaner <- ZombieStatusCleaner(queriesExecTimes)
-  } yield new EventHandler[F](categoryName,
-                              zombieStatusCleaner,
-                              awaitingGenerationGauge,
-                              underGenerationGauge,
-                              awaitingTransformationGauge,
-                              underTransformationGauge,
-                              awaitingDeletionGauge,
-                              underDeletionGauge
+  } yield new EventHandler[F](
+    categoryName,
+    zombieStatusCleaner,
+    awaitingGenerationGauge,
+    underGenerationGauge,
+    awaitingTransformationGauge,
+    underTransformationGauge,
+    awaitingDeletionGauge,
+    underDeletionGauge
   )
 }

@@ -55,7 +55,7 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
       extract[TopmostSameAs]("topmostSameAs")
     }(toOption(onMultiple = show"Multiple topmostSameAs found for dataset ${sameAs.show}"))
 
-    queryExpecting[Option[TopmostSameAs]](using = queryFindingSameAs(sameAs.value))
+    queryExpecting[Option[TopmostSameAs]](selectQuery = queryFindingSameAs(sameAs.value))
   }
 
   override def findTopmostSameAs(resourceId: ResourceId)(implicit
@@ -65,7 +65,7 @@ private class KGDatasetInfoFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecord
       extract[TopmostSameAs]("topmostSameAs")
     }
 
-    queryExpecting[Set[TopmostSameAs]](using = queryFindingSameAs(resourceId.value))
+    queryExpecting[Set[TopmostSameAs]](selectQuery = queryFindingSameAs(resourceId.value))
   }
 
   private def queryFindingSameAs(resourceId: String) = SparqlQuery.of(

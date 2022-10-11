@@ -49,7 +49,7 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import ProjectsFinderImpl._
 
   def findUsedIn(identifier: Identifier, authContext: AuthContext[Identifier]): F[List[DatasetProject]] =
-    queryExpecting[List[DatasetProject]](using = query(identifier, authContext.maybeAuthUser))
+    queryExpecting[List[DatasetProject]](selectQuery = query(identifier, authContext.maybeAuthUser))
 
   private def query(identifier: Identifier, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "ds by id - projects",

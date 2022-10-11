@@ -41,7 +41,7 @@ private class StatsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.graph.model.Schemas._
 
   override def entitiesCount(): F[Map[EntityLabel, Count]] =
-    queryExpecting[List[(EntityLabel, Count)]](using = query) map (_.toMap)
+    queryExpecting[List[(EntityLabel, Count)]](selectQuery = query) map (_.toMap)
 
   private lazy val query = SparqlQuery.of(
     name = "entities - counts",

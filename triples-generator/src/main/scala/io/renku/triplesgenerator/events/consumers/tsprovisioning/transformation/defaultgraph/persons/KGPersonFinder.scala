@@ -49,7 +49,7 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.circe.Decoder
 
   override def find(person: Person): F[Option[Person]] =
-    queryExpecting[Option[Person]](using = findByResourceId(person.resourceId))(recordsDecoder(person))
+    queryExpecting[Option[Person]](selectQuery = findByResourceId(person.resourceId))(recordsDecoder(person))
 
   private def findByResourceId(resourceId: ResourceId) = SparqlQuery.of(
     name = "transformation - find person by resourceId",

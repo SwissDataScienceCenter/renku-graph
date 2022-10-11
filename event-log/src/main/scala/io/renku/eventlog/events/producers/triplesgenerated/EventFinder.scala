@@ -211,11 +211,12 @@ private object EventFinder {
                                           underTransformationGauge: LabeledGauge[F, projects.Path],
                                           queriesExecTimes:         LabeledHistogram[F]
   ): F[producers.EventFinder[F, TriplesGeneratedEvent]] = MonadThrow[F].catchNonFatal {
-    new EventFinderImpl(awaitingTransformationGauge,
-                        underTransformationGauge,
-                        queriesExecTimes,
-                        projectsFetchingLimit = ProjectsFetchingLimit,
-                        projectPrioritisation = new ProjectPrioritisation()
+    new EventFinderImpl(
+      awaitingTransformationGauge,
+      underTransformationGauge,
+      queriesExecTimes,
+      projectsFetchingLimit = ProjectsFetchingLimit,
+      projectPrioritisation = new ProjectPrioritisation()
     )
   }
 }
