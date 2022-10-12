@@ -37,12 +37,12 @@ import java.time.Instant
 
 object EndpointDocs {
   def apply[F[_]: MonadThrow]: F[docs.EndpointDocs] = for {
-    gitLabUrl <- GitLabUrlLoader[F]()
-    apiUrl    <- renku.ApiUrl[F]()
-  } yield new EndpointDocsImpl()(gitLabUrl, apiUrl)
+    implicit0(gitLabUrl: GitLabUrl) <- GitLabUrlLoader[F]()
+    implicit0(apiUrl: renku.ApiUrl) <- renku.ApiUrl[F]()
+  } yield new EndpointDocsImpl
 }
 
-private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
+private class EndpointDocsImpl(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl) extends docs.EndpointDocs {
 
   override lazy val path: Path = Path(
     "Dataset details",
@@ -66,27 +66,31 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
 
   private lazy val identifier = Parameter.Path("identifier", Schema.String, "Dataset identifier".some)
 
-  private lazy val example = (Dataset
-    .NonModifiedDataset(
-      datasets.ResourceId("http://renku/datasets/123444"),
-      datasets.Identifier("123444"),
-      datasets.Title("title"),
-      datasets.Name("name"),
-      datasets.SameAs("http://datasets-repo/abcd"),
-      DatasetVersions(datasets.OriginalIdentifier("12333")),
-      Tag(publicationEvents.Name("2.0"), publicationEvents.Description("Tag Dataset was imported from").some).some,
-      datasets.Description("Dataset description").some,
-      List(
-        DatasetCreator(persons.Email("jan@mail.com").some,
-                       persons.Name("Jan Kowalski"),
-                       persons.Affiliation("SDSC").some
-        )
-      ),
-      datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
-      List(DatasetPart(datasets.PartLocation("data"))),
-      DatasetProject(projects.Path("group/subgroup/name"), projects.Name("name"), Visibility.Public),
-      List(DatasetProject(projects.Path("group/subgroup/name"), projects.Name("name"), Visibility.Public)),
-      List(datasets.Keyword("key")),
-      List(datasets.ImageUri("image.png"))
-    ): Dataset).asJson
+  private lazy val example = {
+    implicit val renkuUrl: RenkuUrl = RenkuUrl("http://renku")
+    val projectPath = projects.Path("group/subgroup/name")
+    Dataset
+      .NonModifiedDataset(
+        datasets.ResourceId((renkuUrl / "datasets/123444").show),
+        datasets.Identifier("123444"),
+        datasets.Title("title"),
+        datasets.Name("name"),
+        datasets.SameAs("http://datasets-repo/abcd"),
+        DatasetVersions(datasets.OriginalIdentifier("12333")),
+        Tag(publicationEvents.Name("2.0"), publicationEvents.Description("Tag Dataset was imported from").some).some,
+        datasets.Description("Dataset description").some,
+        List(
+          DatasetCreator(persons.Email("jan@mail.com").some,
+                         persons.Name("Jan Kowalski"),
+                         persons.Affiliation("SDSC").some
+          )
+        ),
+        datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+        List(DatasetPart(datasets.PartLocation("data"))),
+        DatasetProject(projects.ResourceId(projectPath), projectPath, projects.Name("name"), Visibility.Public),
+        List(DatasetProject(projects.ResourceId(projectPath), projectPath, projects.Name("name"), Visibility.Public)),
+        List(datasets.Keyword("key")),
+        List(datasets.ImageUri("image.png"))
+      ): Dataset
+  }.asJson
 }

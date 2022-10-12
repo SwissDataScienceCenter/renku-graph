@@ -32,7 +32,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.knowledgegraph.datasets.details.Dataset._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -43,7 +43,7 @@ class DatasetFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with ScalaCheckPropertyChecks
     with IOSpec {
 
@@ -56,13 +56,13 @@ class DatasetFinderSpec
           anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal),
           anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceNonModified)
         ) { case ((dataset, project), (_, otherProject)) =>
-          upload(to = renkuDataset, project, otherProject)
+          upload(to = projectsDataset, project, otherProject)
 
           datasetFinder
             .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
             .unsafeRunSync() shouldBe internalToNonModified(dataset, project).some
 
-          clear(renkuDataset)
+          clear(projectsDataset)
         }
       }
 
@@ -77,7 +77,7 @@ class DatasetFinderSpec
           .generateOne
 
         upload(
-          to = renkuDataset,
+          to = projectsDataset,
           project1,
           project2,
           anyRenkuProjectEntities(visibilityPublic).addDataset(datasetEntities(provenanceNonModified)).generateOne._2
@@ -108,7 +108,7 @@ class DatasetFinderSpec
           .addDataset(datasetEntities(provenanceImportedExternal(commonSameAs)))
           .generateOne
 
-        upload(to = renkuDataset, project1, project2)
+        upload(to = projectsDataset, project1, project2)
 
         datasetFinder
           .findDataset(dataset2.identifier, AuthContext(None, dataset2.identifier, Set(project2.path)))
@@ -126,7 +126,7 @@ class DatasetFinderSpec
             val (_, project1)        = (renkuProjectEntities(visibilityPublic) importDataset sourceDataset).generateOne
             val (dataset2, project2) = (renkuProjectEntities(visibilityPublic) importDataset sourceDataset).generateOne
 
-            upload(to = renkuDataset, sourceProject, project1, project2)
+            upload(to = projectsDataset, sourceProject, project1, project2)
 
             datasetFinder
               .findDataset(sourceDataset.identifier,
@@ -154,7 +154,7 @@ class DatasetFinderSpec
                 )
                 .some
 
-            clear(renkuDataset)
+            clear(projectsDataset)
         }
       }
 
@@ -170,7 +170,7 @@ class DatasetFinderSpec
           provenanceInternal
         )).generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       datasetFinder
         .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -193,7 +193,7 @@ class DatasetFinderSpec
       val datasetWithInvalidatedPart = dataset.invalidatePartNow(partToInvalidate)
       val projectBothDatasets        = project.addDatasets(datasetWithInvalidatedPart)
 
-      upload(to = renkuDataset, projectBothDatasets)
+      upload(to = projectsDataset, projectBothDatasets)
 
       datasetFinder
         .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
@@ -212,7 +212,7 @@ class DatasetFinderSpec
       val (dataset, project) =
         (anyRenkuProjectEntities(visibilityPublic) addDataset datasetEntities(provenanceInternal)).generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       datasetFinder
         .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(projectPaths.generateOne)))
@@ -229,7 +229,7 @@ class DatasetFinderSpec
         .importDataset(dataset)
         .generateOne
 
-      upload(to = renkuDataset, project, otherProject)
+      upload(to = projectsDataset, project, otherProject)
 
       datasetFinder
         .findDataset(dataset.identifier, AuthContext(authUser.some, dataset.identifier, Set(project.path)))
@@ -246,7 +246,7 @@ class DatasetFinderSpec
         .importDataset(dataset)
         .generateOne
 
-      upload(to = renkuDataset, project, otherProject)
+      upload(to = projectsDataset, project, otherProject)
 
       datasetFinder
         .findDataset(dataset.identifier,
@@ -267,7 +267,7 @@ class DatasetFinderSpec
           .forkOnce()
           .generateOne
 
-        upload(to = renkuDataset, originalProject, fork)
+        upload(to = projectsDataset, originalProject, fork)
 
         assume(originalProject.datasets === fork.datasets,
                "Datasets on original project and its fork should be the same"
@@ -294,7 +294,7 @@ class DatasetFinderSpec
           .forkOnce()
           .generateOne
 
-        upload(to = renkuDataset, project1, project2, project2Fork)
+        upload(to = projectsDataset, project1, project2, project2Fork)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -324,7 +324,7 @@ class DatasetFinderSpec
             val grandparentForked ::~ parent = grandparent.forkOnce()
             val parentForked ::~ child       = parent.forkOnce()
 
-            upload(to = renkuDataset, grandparentForked, parentForked, child)
+            upload(to = projectsDataset, grandparentForked, parentForked, child)
 
             assume(
               (grandparentForked.datasets === parentForked.datasets) && (parentForked.datasets === child.datasets),
@@ -344,7 +344,7 @@ class DatasetFinderSpec
                 .some
         }
 
-        clear(renkuDataset)
+        clear(projectsDataset)
       }
 
     "return details of the modified dataset with the given id " +
@@ -354,7 +354,7 @@ class DatasetFinderSpec
             .addDatasetAndModification(datasetEntities(provenanceInternal))
             .forkOnce()
         ) { case (original ::~ modified, project ::~ fork) =>
-          upload(to = renkuDataset, project, fork)
+          upload(to = projectsDataset, project, fork)
 
           datasetFinder
             .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -368,7 +368,7 @@ class DatasetFinderSpec
               .copy(usedIn = List(project.to[DatasetProject], fork.to[DatasetProject]).sorted)
               .some
 
-          clear(renkuDataset)
+          clear(projectsDataset)
         }
       }
 
@@ -380,7 +380,7 @@ class DatasetFinderSpec
           .generateOne
         val (modifiedAgain, projectUpdated) = project.addDataset(modified.createModification())
 
-        upload(to = renkuDataset, projectUpdated, fork)
+        upload(to = projectsDataset, projectUpdated, fork)
 
         datasetFinder
           .findDataset(original.identifier, AuthContext(None, original.identifier, Set(projectUpdated.path)))
@@ -404,7 +404,7 @@ class DatasetFinderSpec
           case (original, project ::~ fork) =>
             val (modifiedOnFork, forkUpdated) = fork.addDataset(original.createModification())
 
-            upload(to = renkuDataset, project, forkUpdated)
+            upload(to = projectsDataset, project, forkUpdated)
 
             datasetFinder
               .findDataset(original.identifier, AuthContext(None, original.identifier, Set(project.path)))
@@ -418,7 +418,7 @@ class DatasetFinderSpec
               .unsafeRunSync() shouldBe
               modifiedToModified(modifiedOnFork, forkUpdated).some
 
-            clear(renkuDataset)
+            clear(projectsDataset)
         }
       }
 
@@ -429,7 +429,7 @@ class DatasetFinderSpec
             val invalidation         = original.invalidateNow
             val forkWithInvalidation = fork.addDatasets(invalidation)
 
-            upload(to = renkuDataset, project, forkWithInvalidation)
+            upload(to = projectsDataset, project, forkWithInvalidation)
 
             datasetFinder
               .findDataset(original.identifier, AuthContext.forUnknownUser(original.identifier, Set(project.path)))
@@ -442,7 +442,7 @@ class DatasetFinderSpec
               )
               .unsafeRunSync() shouldBe None
 
-            clear(renkuDataset)
+            clear(projectsDataset)
         }
       }
 
@@ -456,7 +456,7 @@ class DatasetFinderSpec
         val invalidation            = original.invalidateNow
         val projectWithInvalidation = project.addDatasets(invalidation)
 
-        upload(to = renkuDataset, projectWithInvalidation, fork)
+        upload(to = projectsDataset, projectWithInvalidation, fork)
 
         datasetFinder
           .findDataset(original.identifier, AuthContext(None, original.identifier, Set(fork.path)))
@@ -475,7 +475,7 @@ class DatasetFinderSpec
           .forkOnce()
           .generateOne
 
-        upload(to = renkuDataset, originalProject, fork)
+        upload(to = projectsDataset, originalProject, fork)
 
         assume(originalProject.datasets === fork.datasets,
                "Datasets on original project and its fork should be the same"
@@ -503,7 +503,7 @@ class DatasetFinderSpec
           .generateOne
         val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
 
-        upload(to = renkuDataset, project1, project2, project3)
+        upload(to = projectsDataset, project1, project2, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -530,7 +530,7 @@ class DatasetFinderSpec
         val (dataset2, project2) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset1).generateOne
         val (dataset3, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2).generateOne
 
-        upload(to = renkuDataset, project1, project2, project3)
+        upload(to = projectsDataset, project1, project2, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -558,7 +558,7 @@ class DatasetFinderSpec
         val (dataset2Modified, project2Updated) = project2.addDataset(dataset2.createModification())
         val (_, project3) = anyRenkuProjectEntities(visibilityPublic).importDataset(dataset2Modified).generateOne
 
-        upload(to = renkuDataset, project1, project2Updated, project3)
+        upload(to = projectsDataset, project1, project2Updated, project3)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -582,7 +582,7 @@ class DatasetFinderSpec
         val dataset2Invalidation = dataset2.invalidateNow
         val project2Updated      = project2.addDatasets(dataset2Invalidation)
 
-        upload(to = renkuDataset, project1, project2Updated)
+        upload(to = projectsDataset, project1, project2Updated)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -607,7 +607,7 @@ class DatasetFinderSpec
         val dataset1Invalidation = dataset1.invalidateNow
         val project1Updated      = project1.addDatasets(dataset1Invalidation)
 
-        upload(to = renkuDataset, project1Updated, project2)
+        upload(to = projectsDataset, project1Updated, project2)
 
         datasetFinder
           .findDataset(dataset1.identifier, AuthContext(None, dataset1.identifier, Set(project1.path)))
@@ -630,7 +630,7 @@ class DatasetFinderSpec
         val datasetInvalidation = datasetModified.invalidateNow
         val projectUpdated      = project.addDatasets(datasetInvalidation)
 
-        upload(to = renkuDataset, projectUpdated)
+        upload(to = projectsDataset, projectUpdated)
 
         datasetFinder
           .findDataset(dataset.identifier, AuthContext(None, dataset.identifier, Set(project.path)))
@@ -664,7 +664,7 @@ class DatasetFinderSpec
         val (importedDS, importedDSProject) =
           anyRenkuProjectEntities(visibilityPublic).importDataset(originalDSTag).generateOne
 
-        upload(to = renkuDataset, originalDSProject, importedDSProject)
+        upload(to = projectsDataset, originalDSProject, importedDSProject)
 
         datasetFinder
           .findDataset(importedDS.identifier,
@@ -692,7 +692,7 @@ class DatasetFinderSpec
         val (importedDS, importedDSProject) =
           anyRenkuProjectEntities(visibilityPublic).importDataset(originalDSTag).generateOne
 
-        upload(to = renkuDataset, originalDSProject, importedDSProject)
+        upload(to = projectsDataset, originalDSProject, importedDSProject)
 
         datasetFinder
           .findDataset(importedDS.identifier, AuthContext(None, importedDS.identifier, Set(importedDSProject.path)))
@@ -717,7 +717,7 @@ class DatasetFinderSpec
           dsWithSameTag -> proj.replaceDatasets(dsWithSameTag)
         }
 
-        upload(to = renkuDataset, originalDSProject, importedDSProject)
+        upload(to = projectsDataset, originalDSProject, importedDSProject)
 
         originalDSTag.name             shouldBe importedDS.publicationEvents.head.name
         originalDSTag.maybeDescription shouldBe importedDS.publicationEvents.head.maybeDescription
@@ -739,10 +739,10 @@ class DatasetFinderSpec
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
     val datasetFinder = new DatasetFinderImpl[IO](
-      new BaseDetailsFinderImpl[IO](renkuDSConnectionInfo),
-      new CreatorsFinderImpl[IO](renkuDSConnectionInfo),
-      new PartsFinderImpl[IO](renkuDSConnectionInfo),
-      new ProjectsFinderImpl[IO](renkuDSConnectionInfo)
+      new BaseDetailsFinderImpl[IO](projectsDSConnectionInfo),
+      new CreatorsFinderImpl[IO](projectsDSConnectionInfo),
+      new PartsFinderImpl[IO](projectsDSConnectionInfo),
+      new ProjectsFinderImpl[IO](projectsDSConnectionInfo)
     )
   }
 

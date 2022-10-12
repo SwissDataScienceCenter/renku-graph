@@ -26,7 +26,7 @@ import cats.effect.{Async, Spawn}
 import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private trait DatasetFinder[F[_]] {
@@ -52,12 +52,12 @@ private class DatasetFinderImpl[F[_]: Spawn](
         def cancelledExceptionFor(process: String) = new Exception(s"$process finding process cancelled")
 
         for {
-          initialTagFiber <- Spawn[F].start(findInitialTag(identifier, authContext))
-          usedInFiber     <- Spawn[F].start(findUsedIn(identifier, authContext))
-          keywordsFiber   <- Spawn[F].start(findKeywords(identifier))
-          imagesFiber     <- Spawn[F].start(findImages(identifier))
-          creatorsFiber   <- Spawn[F].start(findCreators(identifier))
-          partsFiber      <- Spawn[F].start(findParts(identifier))
+          initialTagFiber <- Spawn[F].start(findInitialTag(dataset, authContext))
+          usedInFiber     <- Spawn[F].start(findUsedIn(dataset, authContext))
+          keywordsFiber   <- Spawn[F].start(findKeywords(dataset))
+          imagesFiber     <- Spawn[F].start(findImages(dataset))
+          creatorsFiber   <- Spawn[F].start(findCreators(identifier, dataset.project.id))
+          partsFiber      <- Spawn[F].start(findParts(dataset))
           maybeInitialTag <- initialTagFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("initial tag")))
           usedIn          <- usedInFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("usedIn")))
           keywords        <- keywordsFiber.joinWith(MonadThrow[F].raiseError(cancelledExceptionFor("keywords")))
@@ -107,10 +107,10 @@ private class DatasetFinderImpl[F[_]: Spawn](
 private object DatasetFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[DatasetFinder[F]] = for {
-    config           <- RenkuConnectionConfig[F]()
-    baseDetailFinder <- BaseDetailsFinder[F](config)
-    creatorsFinder   <- CreatorsFinder[F](config)
-    partsFinder      <- PartsFinder[F](config)
-    projectsFinder   <- ProjectsFinder[F](config)
+    storeConfig      <- ProjectsConnectionConfig[F]()
+    baseDetailFinder <- BaseDetailsFinder[F](storeConfig)
+    creatorsFinder   <- CreatorsFinder[F](storeConfig)
+    partsFinder      <- PartsFinder[F](storeConfig)
+    projectsFinder   <- ProjectsFinder[F](storeConfig)
   } yield new DatasetFinderImpl[F](baseDetailFinder, creatorsFinder, partsFinder, projectsFinder)
 }
