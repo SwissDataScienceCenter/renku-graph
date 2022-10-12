@@ -20,13 +20,12 @@ package io.renku.graph.http.server.security
 
 import cats.effect.IO
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabApiUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -34,7 +33,7 @@ class ProjectPathRecordsFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with should.Matchers {
 
   "apply" should {
@@ -42,7 +41,7 @@ class ProjectPathRecordsFinderSpec
     "return SecurityRecords with project visibility and all project members" in new TestCase {
       val project = anyProjectEntities.generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       recordsFinder(project.path).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, project.members.flatMap(_.maybeGitLabId))
@@ -52,7 +51,7 @@ class ProjectPathRecordsFinderSpec
     "return SecurityRecords with project visibility and no member is project has none" in new TestCase {
       val project = renkuProjectEntities(anyVisibility).generateOne.copy(members = Set.empty)
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       recordsFinder(project.path).unsafeRunSync() shouldBe List(
         (project.visibility, project.path, Set.empty)
@@ -64,11 +63,9 @@ class ProjectPathRecordsFinderSpec
     }
   }
 
-  private implicit lazy val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
-
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val recordsFinder = new ProjectPathRecordsFinderImpl[IO](renkuDSConnectionInfo)
+    val recordsFinder = new ProjectPathRecordsFinderImpl[IO](projectsDSConnectionInfo)
   }
 }
