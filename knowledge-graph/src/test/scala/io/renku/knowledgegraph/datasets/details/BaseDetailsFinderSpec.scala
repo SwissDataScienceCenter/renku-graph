@@ -98,15 +98,16 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
                                      description: String
   )(implicit renkuUrl:                            RenkuUrl) = {
     val binding = json"""{
-      "datasetId":      {"value": ${ResourceId(dataset.asEntityId.show)}},
-      "identifier":     {"value": ${dataset.identifier}},
-      "name":           {"value": ${dataset.identification.title}},
-      "slug":           {"value": ${dataset.identification.name}},
-      "description":    {"value": $description},
-      "topmostSameAs":  {"value": ${dataset.provenance.topmostSameAs}},
-      "initialVersion": {"value": ${dataset.provenance.originalIdentifier}},
-      "projectPath":    {"value": ${project.path}},
-      "projectName":    {"value": ${project.name}},
+      "datasetId":         {"value": ${ResourceId(dataset.asEntityId.show)}},
+      "identifier":        {"value": ${dataset.identifier}},
+      "name":              {"value": ${dataset.identification.title}},
+      "slug":              {"value": ${dataset.identification.name}},
+      "description":       {"value": $description},
+      "topmostSameAs":     {"value": ${dataset.provenance.topmostSameAs}},
+      "initialVersion":    {"value": ${dataset.provenance.originalIdentifier}},
+      "projectId":         {"value": ${project.resourceId}},
+      "projectPath":       {"value": ${project.path}},
+      "projectName":       {"value": ${project.name}},
       "projectVisibility": {"value": ${project.visibility}}
     }""" deepMerge {
       dataset.provenance.date match {
@@ -127,17 +128,18 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
                                   description: String
   ) = {
     val binding = json"""{
-      "datasetId":        {"value": ${ResourceId(dataset.asEntityId.show)}},
-      "identifier":       {"value": ${dataset.identifier}},
-      "name":             {"value": ${dataset.identification.title}},
-      "slug":             {"value": ${dataset.identification.name}},
-      "description":      {"value": $description},
-      "topmostSameAs":    {"value": ${dataset.provenance.topmostSameAs}},
-      "maybeDerivedFrom": {"value": ${dataset.provenance.derivedFrom}},
-      "maybeDateCreated": {"value": ${dataset.provenance.date}},
-      "initialVersion":   {"value": ${dataset.provenance.originalIdentifier}},
-      "projectPath":      {"value": ${project.path}},
-      "projectName":      {"value": ${project.name}},
+      "datasetId":         {"value": ${ResourceId(dataset.asEntityId.show)}},
+      "identifier":        {"value": ${dataset.identifier}},
+      "name":              {"value": ${dataset.identification.title}},
+      "slug":              {"value": ${dataset.identification.name}},
+      "description":       {"value": $description},
+      "topmostSameAs":     {"value": ${dataset.provenance.topmostSameAs}},
+      "maybeDerivedFrom":  {"value": ${dataset.provenance.derivedFrom}},
+      "maybeDateCreated":  {"value": ${dataset.provenance.date}},
+      "initialVersion":    {"value": ${dataset.provenance.originalIdentifier}},
+      "projectId":         {"value": ${project.resourceId}},
+      "projectPath":       {"value": ${project.path}},
+      "projectName":       {"value": ${project.name}},
       "projectVisibility": {"value": ${project.visibility}}
     }"""
 

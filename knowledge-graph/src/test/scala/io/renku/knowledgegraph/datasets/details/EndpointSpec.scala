@@ -173,8 +173,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
     }
   }
 
+  private implicit lazy val renkuUrl: RenkuUrl = renkuUrls.generateOne
+
   private trait TestCase {
-    implicit val renkuUrl: RenkuUrl = renkuUrls.generateOne
     val gitLabUrl = gitLabUrls.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
@@ -275,10 +276,10 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
 
   private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {
-      path       <- cursor.downField("path").as[Path]
+      path       <- cursor.downField("path").as[projects.Path]
       name       <- cursor.downField("name").as[projects.Name]
       visibility <- cursor.downField("visibility").as[projects.Visibility]
-    } yield DatasetProject(path, name, visibility)
+    } yield DatasetProject(projects.ResourceId(path), path, name, visibility)
 
   private implicit lazy val versionsDecoder: Decoder[DatasetVersions] = cursor =>
     for {

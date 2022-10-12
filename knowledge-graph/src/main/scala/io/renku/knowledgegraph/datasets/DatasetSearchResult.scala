@@ -19,7 +19,7 @@
 package io.renku.knowledgegraph
 package datasets
 
-import DatasetSearchResult.ProjectsCount
+import DatasetSearchResult.{ExemplarProject, ProjectsCount}
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.{Encoder, Json}
@@ -32,36 +32,36 @@ import io.renku.tinytypes.constraints.NonNegativeInt
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 
 final case class DatasetSearchResult(
-    id:                  Identifier,
-    title:               Title,
-    name:                Name,
-    maybeDescription:    Option[Description],
-    creators:            List[DatasetCreator],
-    date:                Date,
-    exemplarProjectPath: projects.Path,
-    projectsCount:       ProjectsCount,
-    keywords:            List[Keyword],
-    images:              List[ImageUri]
+    id:               Identifier,
+    title:            Title,
+    name:             Name,
+    maybeDescription: Option[Description],
+    creators:         List[DatasetCreator],
+    date:             Date,
+    exemplarProject:  ExemplarProject,
+    projectsCount:    ProjectsCount,
+    keywords:         List[Keyword],
+    images:           List[ImageUri]
 )
 
 object DatasetSearchResult {
 
-  implicit def encoder(implicit
-      gitLabUrl:   GitLabUrl,
-      renkuApiUrl: config.renku.ApiUrl
-  ): Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id,
-                             title,
-                             name,
-                             maybeDescription,
-                             creators,
-                             date,
-                             exemplarProjectPath,
-                             projectsCount,
-                             keywords,
-                             images
-        ) =>
-      json"""{
+  final case class ExemplarProject(id: projects.ResourceId, path: projects.Path)
+
+  implicit def encoder(implicit gitLabUrl: GitLabUrl, renkuApiUrl: config.renku.ApiUrl): Encoder[DatasetSearchResult] =
+    Encoder.instance[DatasetSearchResult] {
+      case DatasetSearchResult(id,
+                               title,
+                               name,
+                               maybeDescription,
+                               creators,
+                               date,
+                               exemplarProject,
+                               projectsCount,
+                               keywords,
+                               images
+          ) =>
+        json"""{
         "identifier":    $id,
         "title":         $title,
         "name":          $name,
@@ -69,11 +69,11 @@ object DatasetSearchResult {
         "date":          ${date.instant},
         "projectsCount": $projectsCount,
         "keywords":      $keywords,
-        "images":        ${images -> exemplarProjectPath}
+        "images":        ${images -> exemplarProject}
       }"""
-        .addIfDefined("description" -> maybeDescription)
-        .deepMerge(_links(Link(Rel("details") -> datasets.details.Endpoint.href(renkuApiUrl, id))))
-  }
+          .addIfDefined("description" -> maybeDescription)
+          .deepMerge(_links(Link(Rel("details") -> datasets.details.Endpoint.href(renkuApiUrl, id))))
+    }
 
   private implicit lazy val publishingEncoder: Encoder[(List[DatasetCreator], Date)] = Encoder.instance {
     case (creators, DatePublished(date)) => json"""{
@@ -91,14 +91,14 @@ object DatasetSearchResult {
   }""" addIfDefined ("email" -> maybeEmail)
   }
 
-  private implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], projects.Path)] =
-    Encoder.instance[(List[ImageUri], projects.Path)] { case (imageUris, exemplarProjectPath) =>
+  private implicit def imagesEncoder(implicit gitLabUrl: GitLabUrl): Encoder[(List[ImageUri], ExemplarProject)] =
+    Encoder.instance[(List[ImageUri], ExemplarProject)] { case (imageUris, ExemplarProject(_, projectPath)) =>
       Json.arr(imageUris.map {
         case uri: ImageUri.Relative =>
           json"""{
           "location": $uri  
         }""" deepMerge _links(
-            Link(Rel("view") -> Href(gitLabUrl / exemplarProjectPath / "raw" / "master" / uri))
+            Link(Rel("view") -> Href(gitLabUrl / projectPath / "raw" / "master" / uri))
           )
         case uri: ImageUri.Absolute =>
           json"""{
@@ -110,7 +110,6 @@ object DatasetSearchResult {
     }
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
-
   implicit object ProjectsCount
       extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_))
       with NonNegativeInt[ProjectsCount]

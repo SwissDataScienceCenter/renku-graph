@@ -34,7 +34,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.logging.ExecutionTimeRecorder
 import io.renku.tinytypes.constraints.NonBlank
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
@@ -103,12 +103,12 @@ class EndpointImpl[F[_]: Parallel: MonadThrow: Logger](
 object Endpoint {
 
   def apply[F[_]: Parallel: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    renkuConnectionConfig <- RenkuConnectionConfig[F]()
+    storeConfig           <- ProjectsConnectionConfig[F]()
     renkuResourceUrl      <- renku.ApiUrl[F]()
     gitLabUrl             <- GitLabUrlLoader[F]()
     executionTimeRecorder <- ExecutionTimeRecorder[F]()
-    creatorsFinder        <- CreatorsFinder(renkuConnectionConfig)
-    datasetsFinder        <- DatasetsFinder(renkuConnectionConfig, creatorsFinder)
+    creatorsFinder        <- CreatorsFinder(storeConfig)
+    datasetsFinder        <- DatasetsFinder(storeConfig, creatorsFinder)
   } yield new EndpointImpl[F](datasetsFinder, renkuResourceUrl, gitLabUrl, executionTimeRecorder)
 
   object Query {

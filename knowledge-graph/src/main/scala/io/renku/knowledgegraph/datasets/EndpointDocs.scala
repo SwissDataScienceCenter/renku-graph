@@ -101,23 +101,28 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
     "Link" -> Header("The set of prev/next/first/last link headers (prev and next are optional)".some, Schema.String)
   )
 
-  private lazy val example = Json.arr(
-    DatasetSearchResult(
-      datasets.Identifier("123444"),
-      datasets.Title("title"),
-      datasets.Name("name"),
-      datasets.Description("Some project").some,
-      List(
-        DatasetCreator(persons.Email("jan@mail.com").some,
-                       persons.Name("Jan Kowalski"),
-                       persons.Affiliation("SDSC").some
-        )
-      ),
-      datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
-      projects.Path("group/subgroup/name"),
-      ProjectsCount(1),
-      List(datasets.Keyword("key")),
-      List(datasets.ImageUri("image.png"))
-    ).asJson
-  )
+  private lazy val example = {
+    implicit val renkuUrl: RenkuUrl = RenkuUrl("http://renku")
+    val projectPath = projects.Path("group/subgroup/name")
+
+    Json.arr(
+      DatasetSearchResult(
+        datasets.Identifier("123444"),
+        datasets.Title("title"),
+        datasets.Name("name"),
+        datasets.Description("Some project").some,
+        List(
+          DatasetCreator(persons.Email("jan@mail.com").some,
+                         persons.Name("Jan Kowalski"),
+                         persons.Affiliation("SDSC").some
+          )
+        ),
+        datasets.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
+        ExemplarProject(projects.ResourceId(projectPath), projectPath),
+        ProjectsCount(1),
+        List(datasets.Keyword("key")),
+        List(datasets.ImageUri("image.png"))
+      ).asJson
+    )
+  }
 }
