@@ -42,7 +42,7 @@ libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.3.14"
 libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.5.0"
 
 // Test dependencies
-val testContainersScalaVersion = "0.40.10"
+val testContainersScalaVersion = "0.40.11"
 libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
 libraryDependencies += "com.github.tomakehurst" % "wiremock-jre8"                   % "2.34.0"                   % Test
