@@ -22,7 +22,7 @@ import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{GraphClass, RenkuUrl}
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
 import io.renku.graph.model.views.RdfResource
@@ -39,9 +39,9 @@ private trait EdgesFinder[F[_]] {
 }
 
 private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig,
-    renkuUrl:              RenkuUrl
-) extends TSClient(renkuConnectionConfig)
+    connectionConfig: ProjectsConnectionConfig,
+    renkuUrl:         RenkuUrl
+) extends TSClient(connectionConfig)
     with EdgesFinder[F] {
 
   private type EdgeData = (ExecutionInfo, Option[Location], Option[Node.Location])
@@ -52,13 +52,13 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   private def queryEdges(query: SparqlQuery): F[Set[EdgeData]] = {
     val pageSize = 2000
 
-    def fetchPaginatedResult(into: Set[EdgeData], `using`: SparqlQuery, offset: Int): F[Set[EdgeData]] = {
-      val queryWithOffset = `using`.copy(body = `using`.body + s"\nLIMIT $pageSize \nOFFSET $offset")
+    def fetchPaginatedResult(into: Set[EdgeData], query: SparqlQuery, offset: Int): F[Set[EdgeData]] = {
+      val queryWithOffset = query.copy(body = query.body + s"\nLIMIT $pageSize \nOFFSET $offset")
       for {
         edges <- queryExpecting[Set[EdgeData]](queryWithOffset)
         results <- edges match {
                      case e if e.size < pageSize => (into ++ edges).pure[F]
-                     case fullPage               => fetchPaginatedResult(into ++ fullPage, using, offset + pageSize)
+                     case fullPage               => fetchPaginatedResult(into ++ fullPage, query, offset + pageSize)
                    }
       } yield results
     }
@@ -71,19 +71,22 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?activity ?date ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
-        |   ${projectMemberFilterQuery(ResourceId(path)(renkuUrl).showAs[RdfResource])(maybeUser)}
-        |   ?activity a prov:Activity;
-        |             ^renku:hasActivity ${ResourceId(path)(renkuUrl).showAs[RdfResource]};
-        |             prov:startedAtTime ?date;
-        |             renku:parameter ?paramValue.
-        |   ?paramValue schema:valueReference ?parameter.
-        |   OPTIONAL {
-        | 	  ?parameter a renku:CommandInput.
-        |     ?paramValue schema:value ?sourceEntityLocation.
-        |   }
-        |   OPTIONAL {
-        | 	  ?parameter a renku:CommandOutput.
-        |     ?paramValue schema:value ?targetEntityLocation.
+        |   BIND (${ResourceId(path)(renkuUrl).showAs[RdfResource]} AS ?projectId)
+        |   Graph ?projectId {
+        |     ${projectMemberFilterQuery(ResourceId(path)(renkuUrl).showAs[RdfResource])(maybeUser)}
+        |     ?activity a prov:Activity;
+        |               ^renku:hasActivity ?projectId;
+        |               prov:startedAtTime ?date;
+        |               renku:parameter ?paramValue.
+        |     ?paramValue schema:valueReference ?parameter.
+        |     OPTIONAL {
+        | 	    ?parameter a renku:CommandInput.
+        |       ?paramValue schema:value ?sourceEntityLocation.
+        |     }
+        |     OPTIONAL {
+        | 	    ?parameter a renku:CommandOutput.
+        |       ?paramValue schema:value ?targetEntityLocation.
+        |     }
         |   }
         |}
         |ORDER BY ASC(?date)
@@ -143,9 +146,12 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     case Some(user) =>
       s"""|$projectResourceId renku:projectVisibility ?visibility .
           |OPTIONAL {
-          |  $projectResourceId schema:member/schema:sameAs ?memberId.
-          |  ?memberId  schema:additionalType 'GitLab';
-          |             schema:identifier ?userGitlabId .
+          |  $projectResourceId schema:member ?memberId
+          |  Graph <${GraphClass.Persons.id}> {
+          |    ?memberId schema:sameAs ?sameAsId.
+          |    ?sameAsId schema:additionalType 'GitLab';
+          |              schema:identifier ?userGitlabId .
+          |  }
           |}
           |FILTER ( ?visibility != '${Visibility.Private.value}' || ?userGitlabId = ${user.id.value} )
           |""".stripMargin
@@ -159,7 +165,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 private object EdgesFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[EdgesFinder[F]] = for {
-    config   <- RenkuConnectionConfig[F]()
+    config   <- ProjectsConnectionConfig[F]()
     renkuUrl <- RenkuUrlLoader[F]()
   } yield new EdgesFinderImpl[F](config, renkuUrl)
 }
