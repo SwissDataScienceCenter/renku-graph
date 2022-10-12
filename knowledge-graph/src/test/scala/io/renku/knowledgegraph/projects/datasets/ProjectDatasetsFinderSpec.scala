@@ -28,7 +28,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -37,7 +37,7 @@ class ProjectDatasetsFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with ExternalServiceStubbing
     with ScalaCheckPropertyChecks
     with IOSpec {
@@ -49,7 +49,7 @@ class ProjectDatasetsFinderSpec
         renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
       val (modification2, projectComplete) = project.addDataset(modification1.createModification())
 
-      upload(to = renkuDataset,
+      upload(to = projectsDataset,
              renkuProjectEntities(anyVisibility).addDataset(datasetEntities(provenanceNonModified)).generateOne._2,
              projectComplete
       )
@@ -73,7 +73,7 @@ class ProjectDatasetsFinderSpec
         .addDatasetAndModification(datasetEntities(provenanceInternal))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
         (dataset1.identification.identifier,
@@ -102,7 +102,7 @@ class ProjectDatasetsFinderSpec
       assume(dataset1.provenance.topmostSameAs == dataset2.provenance.topmostSameAs)
       assume(dataset1.provenance.topmostSameAs == original.provenance.topmostSameAs)
 
-      upload(to = renkuDataset, originalProject, project)
+      upload(to = projectsDataset, originalProject, project)
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
         (dataset1.identification.identifier,
@@ -132,7 +132,7 @@ class ProjectDatasetsFinderSpec
         .addDataset(datasetEntities(provenanceInternal))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
         (dataset2.identification.identifier,
@@ -149,7 +149,7 @@ class ProjectDatasetsFinderSpec
       val (_ ::~ modification, project) =
         renkuProjectEntities(anyVisibility).addDatasetAndModification(datasetEntities(provenanceInternal)).generateOne
 
-      upload(to = renkuDataset, project.addDatasets(modification.invalidateNow))
+      upload(to = projectsDataset, project.addDatasets(modification.invalidateNow))
 
       datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe Nil
     }
@@ -158,6 +158,6 @@ class ProjectDatasetsFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val datasetsFinder = new ProjectDatasetsFinderImpl[IO](renkuDSConnectionInfo)
+    val datasetsFinder = new ProjectDatasetsFinderImpl[IO](projectsDSConnectionInfo)
   }
 }
