@@ -20,7 +20,6 @@ package io.renku.webhookservice.crypto
 
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
-import eu.timepit.refined.auto._
 import io.renku.crypto.AesCrypto.Secret
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._

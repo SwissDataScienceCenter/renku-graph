@@ -18,27 +18,27 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
-import cats.effect._
+import GitLabApiStub.State
+import GitLabStateQueries._
+import GitLabStateUpdates._
+import JsonEncoders._
 import cats.data.{NonEmptyList, OptionT}
+import cats.effect._
 import cats.syntax.all._
+import com.comcast.ip4s.{Host, Port}
 import io.renku.graph.acceptancetests.data.Project
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
+import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons.{GitLabId, Name}
+import io.renku.graph.model.projects.Id
 import io.renku.graph.model.testentities.Person
 import io.renku.http.client.AccessToken
 import org.http4s._
-import org.http4s.dsl.Http4sDsl
-import org.http4s.circe.CirceEntityCodec._
-import org.typelevel.log4cats.Logger
-import JsonEncoders._
-import com.comcast.ip4s.{Host, Port}
 import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.circe.CirceEntityCodec._
 import org.http4s.client.Client
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStateQueries._
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStateUpdates._
-import io.renku.graph.model.events.CommitId
-import io.renku.graph.model.projects.Id
+import org.http4s.dsl.Http4sDsl
 import org.http4s.server.{Router, Server}
+import org.typelevel.log4cats.Logger
 
 import java.time.Instant
 

@@ -18,18 +18,18 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
+import GitLabStateUpdates.stateUpdateMonoid
 import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.acceptancetests.data.Project
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken
 import io.renku.http.server.security.model.AuthUser
 import io.renku.testtools.IOSpec
 import org.http4s.Uri
-import GitLabStateUpdates.stateUpdateMonoid
-import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.projects.Id
 
 /** Convenience syntax for test cases to update the [[GitLabApiStub]] state. */
 trait GitLabStubIOSyntax { self: IOSpec =>

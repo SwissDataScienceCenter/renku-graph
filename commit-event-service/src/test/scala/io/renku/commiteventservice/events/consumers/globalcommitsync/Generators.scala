@@ -19,8 +19,8 @@
 package io.renku.commiteventservice.events.consumers.globalcommitsync
 
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.renku.commiteventservice.events.consumers.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
 import io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration.{DateCondition, PageResult, ProjectCommitStats}
 import io.renku.events.consumers.Project

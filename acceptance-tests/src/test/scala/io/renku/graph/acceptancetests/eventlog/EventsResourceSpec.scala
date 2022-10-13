@@ -18,8 +18,8 @@
 
 package io.renku.graph.acceptancetests.eventlog
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.{Decoder, Json}
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
@@ -28,15 +28,14 @@ import io.renku.graph.acceptancetests.data.{TSData, dataProjects}
 import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.{GraphClass, events}
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{anyVisibility, renkuProjectEntities}
+import io.renku.graph.model.testentities.personEntities
+import io.renku.graph.model.{GraphClass, events}
 import io.renku.http.client.UrlEncoder.urlEncode
+import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
-import cats.data.NonEmptyList
-import io.renku.graph.model.testentities.personEntities
-import io.renku.http.server.security.model.AuthUser
 
 class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TSData with TSProvisioning {
 
@@ -45,7 +44,7 @@ class EventsResourceSpec extends AcceptanceSpec with ApplicationServices with TS
   Feature("GET /events?project-path=<path> to return info about all the project events") {
 
     Scenario("As a user I would like to see all events from the project with the given path") {
-      val commits: NonEmptyList[events.CommitId] = commitIds.generateNonEmptyList(maxElements = 6)
+      val commits: NonEmptyList[events.CommitId] = commitIds.generateNonEmptyList(max = 6)
       val user:    AuthUser                      = authUsers.generateOne
       val project = dataProjects(
         renkuProjectEntities(anyVisibility)

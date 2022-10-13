@@ -29,7 +29,6 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model._
 import GraphModelGenerators.{projectPaths, projectResourceIds}
 import cats.MonadThrow
-import eu.timepit.refined.api.Refined
 import io.renku.generators.Generators.{exceptions, positiveInts}
 import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.testentities._
@@ -50,7 +49,7 @@ class MigrationToNamedGraphsSpec extends AnyWordSpec with should.Matchers with I
 
     "find all projects that exists in the Default Graph but not in the Named Graphs dataset" in new TestCase {
 
-      val defaultOnlyProjects = projectInfos.generateList(max = chunkSize)
+      val defaultOnlyProjects = projectInfos.generateList(max = chunkSize.value)
       val bothDSProjects      = projectInfos.generateNonEmptyList().toList
 
       val allDefaultDSProjectsChunks = (defaultOnlyProjects ::: bothDSProjects)
@@ -157,9 +156,7 @@ class DefaultGraphProjectsFinderSpec
     "find requested page of projects that exists in the Default Graph" in new TestCase {
 
       val projects = anyRenkuProjectEntities
-        .generateList(min = Refined.unsafeApply(chunkSize + 1),
-                      max = Refined.unsafeApply(Gen.choose(chunkSize + 1, (2 * chunkSize) - 1).generateOne)
-        )
+        .generateList(min = chunkSize + 1, max = Gen.choose(chunkSize + 1, (2 * chunkSize) - 1).generateOne)
         .map(_.to[entities.Project])
         .sortBy(_.path)
 

@@ -27,9 +27,9 @@ import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
-import io.renku.triplesstore.TSAdminClient.CreationResult
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.TSAdminClient.CreationResult
 import org.http4s.Status._
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks

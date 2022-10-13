@@ -18,9 +18,12 @@
 
 package io.renku.graph.acceptancetests.flows
 
+import cats.data.NonEmptyList
 import cats.effect.unsafe.IORuntime
+import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data
+import io.renku.graph.acceptancetests.db.EventLog
 import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.ServiceClient.ClientResponse
 import io.renku.graph.acceptancetests.tooling.{ApplicationServices, ModelImplicits}
@@ -28,6 +31,7 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
+import io.renku.testtools.IOSpec
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 import org.scalatest.Assertion
@@ -35,13 +39,8 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 
 import java.lang.Thread.sleep
-import scala.concurrent.duration._
-import cats.data.NonEmptyList
-import io.renku.events.CategoryName
-import io.renku.graph.acceptancetests.db.EventLog
-import io.renku.testtools.IOSpec
-
 import scala.annotation.tailrec
+import scala.concurrent.duration._
 
 trait TSProvisioning
     extends ModelImplicits

@@ -22,8 +22,8 @@ import cats.Show
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.Decoder.decodeString
 import io.circe.Decoder
+import io.circe.Decoder.decodeString
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 import io.renku.tinytypes.contenttypes.ZippedContent

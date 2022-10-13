@@ -18,10 +18,9 @@
 
 package io.renku.eventlog.events.producers.eventdelivery
 
-import io.renku.graph.model.projects
 import cats.Show
 import cats.syntax.all._
-import io.renku.graph.model.events
+import io.renku.graph.model.{events, projects}
 
 sealed trait EventTypeId {
   def value: String

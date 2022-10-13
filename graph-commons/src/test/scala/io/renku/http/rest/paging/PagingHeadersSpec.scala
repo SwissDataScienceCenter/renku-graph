@@ -19,7 +19,6 @@
 package io.renku.http.rest.paging
 
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -162,10 +161,7 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
   private lazy val currentPageNeitherFirstNorLast: Gen[PagingResponse[NonBlank]] = for {
     page    <- pages.retryUntil(_.value > 2)
     perPage <- perPages
-    results <- nonEmptyList(nonBlankStrings(),
-                            minElements = Refined.unsafeApply(perPage.value),
-                            maxElements = Refined.unsafeApply(perPage.value)
-               )
+    results <- nonEmptyList(nonBlankStrings(), min = perPage.value, max = perPage.value)
     total = model.Total((page.value - 1) * perPage.value + results.size)
     currentPage <- Gen.choose(2, page.value - 1).map(model.Page(_))
   } yield PagingResponse
@@ -175,10 +171,7 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
   private lazy val currentPageLast: Gen[PagingResponse[NonBlank]] = for {
     page    <- pages.retryUntil(_.value > 1)
     perPage <- perPages
-    results <- nonEmptyList(nonBlankStrings(),
-                            minElements = Refined.unsafeApply(perPage.value),
-                            maxElements = Refined.unsafeApply(perPage.value)
-               )
+    results <- nonEmptyList(nonBlankStrings(), min = perPage.value, max = perPage.value)
     total = model.Total((page.value - 1) * perPage.value + results.size)
   } yield PagingResponse
     .from[Try, NonBlank](results.toList, PagingRequest(page, perPage), total)
@@ -187,10 +180,7 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
   private lazy val currentPageFirst: Gen[PagingResponse[NonBlank]] = for {
     page    <- pages.retryUntil(_.value > 1)
     perPage <- perPages
-    results <- nonEmptyList(nonBlankStrings(),
-                            minElements = Refined.unsafeApply(perPage.value),
-                            maxElements = Refined.unsafeApply(perPage.value)
-               )
+    results <- nonEmptyList(nonBlankStrings(), min = perPage.value, max = perPage.value)
     total = model.Total((page.value - 1) * perPage.value + results.size)
   } yield PagingResponse
     .from[Try, NonBlank](results.toList, PagingRequest(first, perPage), total)
@@ -198,13 +188,9 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
 
   private lazy val onePageOnly: Gen[PagingResponse[NonBlank]] = for {
     perPage <- perPages
-    results <- nonEmptyList(nonBlankStrings(),
-                            minElements = Refined.unsafeApply(perPage.value),
-                            maxElements = Refined.unsafeApply(perPage.value)
-               )
-    total = model.Total(results.size)
+    results <- nonEmptyList(nonBlankStrings(), min = perPage.value, max = perPage.value)
   } yield PagingResponse
-    .from[Try, NonBlank](results.toList, PagingRequest(first, perPage), total)
+    .from[Try, NonBlank](results.toList, PagingRequest(first, perPage), model.Total(results.size))
     .fold(throw _, identity)
 
   private def resourceUrlFrom(page: model.Page, perPage: model.PerPage): UrlTestType =

@@ -19,7 +19,6 @@
 package io.renku.commiteventservice.events.consumers.globalcommitsync.eventgeneration
 
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import io.renku.commiteventservice.events.consumers.common.Generators.{commitInfos => commitInfosGen}
 import io.renku.commiteventservice.events.consumers.common.UpdateResult.{Created, Skipped}
 import io.renku.commiteventservice.events.consumers.common._
@@ -60,7 +59,7 @@ class MissingCommitEventCreatorSpec extends AnyWordSpec with should.Matchers wit
 
     "return summary with new events and one event skipped" in new TestCase {
       val event          = globalCommitSyncEvents().generateOne
-      val newCommitsInGL = commitIds.generateNonEmptyList(minElements = Refined.unsafeApply(2)).toList
+      val newCommitsInGL = commitIds.generateNonEmptyList(min = 2).toList
       val commitInfos    = getCommitInfosForCommits(newCommitsInGL)
 
       givenCommitInfosFound(event.project.id, commitInfos)

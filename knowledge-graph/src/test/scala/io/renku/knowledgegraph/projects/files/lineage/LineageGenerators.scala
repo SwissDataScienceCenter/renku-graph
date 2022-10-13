@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph.projects.files.lineage
 
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators._
 import model._
 import org.scalacheck.Gen

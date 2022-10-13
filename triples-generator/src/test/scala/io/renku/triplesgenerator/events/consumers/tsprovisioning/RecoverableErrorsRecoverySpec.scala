@@ -22,8 +22,8 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
-import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError.{LogWorthyRecoverableError, SilentRecoverableError}
+import io.renku.triplesgenerator.events.consumers.{ProcessingNonRecoverableError, ProcessingRecoverableError}
 import org.http4s.Status
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks

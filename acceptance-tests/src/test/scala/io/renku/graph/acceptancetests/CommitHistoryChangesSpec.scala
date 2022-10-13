@@ -19,7 +19,6 @@
 package io.renku.graph.acceptancetests
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -29,9 +28,9 @@ import io.renku.graph.acceptancetests.flows.TSProvisioning
 import io.renku.graph.acceptancetests.knowledgegraph.{DatasetsApiEncoders, fullJson}
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
-import io.renku.graph.model.{GraphClass, events}
 import io.renku.graph.model.testentities.RenkuProject._
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphClass, events}
 import io.renku.http.client.AccessToken
 import io.renku.http.rest.Links
 import io.renku.http.server.EndpointTester.{JsonOps, jsonEntityDecoder}
@@ -58,7 +57,7 @@ class CommitHistoryChangesSpec
       val project = dataProjects(
         renkuProjectEntities(visibilityPublic).withDatasets(datasetEntities(provenanceInternal))
       ).generateOne
-      val commits = commitIds.generateNonEmptyList(minElements = 3)
+      val commits = commitIds.generateNonEmptyList(min = 3)
 
       Given("there is data in the TS")
 
@@ -76,7 +75,7 @@ class CommitHistoryChangesSpec
 
       When("the commit history changes")
 
-      val newCommits  = commitIds.generateNonEmptyList(minElements = 3)
+      val newCommits  = commitIds.generateNonEmptyList(min = 3)
       val newEntities = generateNewActivitiesAndDataset(project.entitiesProject)
 
       gitLabStub.replaceCommits(project.id, newCommits.toList: _*)
@@ -101,7 +100,7 @@ class CommitHistoryChangesSpec
     Scenario("Removing a project from GitLab should remove it from the knowledge-graph") {
 
       val project = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
-      val commits = commitIds.generateNonEmptyList(minElements = 3)
+      val commits = commitIds.generateNonEmptyList(min = 3)
 
       Given("There is data in the triple store")
 

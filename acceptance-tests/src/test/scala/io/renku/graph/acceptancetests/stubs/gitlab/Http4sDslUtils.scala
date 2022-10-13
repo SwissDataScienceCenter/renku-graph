@@ -28,8 +28,8 @@ import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Id, Path}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalQueryParamDecoderMatcher
-import org.http4s.{EntityEncoder, HttpApp, HttpRoutes, Response}
 import org.http4s.server.middleware.{Logger => LoggerMiddleware}
+import org.http4s.{EntityEncoder, HttpApp, HttpRoutes, Response}
 import org.typelevel.log4cats.Logger
 
 private[gitlab] trait Http4sDslUtils {

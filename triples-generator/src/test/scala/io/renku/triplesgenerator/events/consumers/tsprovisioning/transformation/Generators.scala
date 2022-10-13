@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation
 
 import cats.MonadThrow
 import cats.data.EitherT
-import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

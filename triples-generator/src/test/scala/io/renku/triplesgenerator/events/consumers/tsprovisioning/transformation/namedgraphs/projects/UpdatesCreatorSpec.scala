@@ -154,7 +154,7 @@ class UpdatesCreatorSpec
 
     "generate queries which deletes the project keywords when changed" in {
       val project       = anyProjectEntities.generateOne.to[entities.Project]
-      val kgProjectInfo = toProjectMutableData(project).copy(keywords = projectKeywords.generateSet(minElements = 1))
+      val kgProjectInfo = toProjectMutableData(project).copy(keywords = projectKeywords.generateSet(min = 1))
 
       upload(to = projectsDataset, project)
 

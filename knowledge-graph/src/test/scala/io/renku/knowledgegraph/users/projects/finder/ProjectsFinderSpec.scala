@@ -22,7 +22,6 @@ package finder
 import Endpoint.Criteria.Filters
 import Endpoint.Criteria.Filters._
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
 import io.renku.http.rest.paging.model.Total

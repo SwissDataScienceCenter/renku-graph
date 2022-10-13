@@ -18,7 +18,6 @@
 
 package io.renku.tokenrepository.repository.fetching
 
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._

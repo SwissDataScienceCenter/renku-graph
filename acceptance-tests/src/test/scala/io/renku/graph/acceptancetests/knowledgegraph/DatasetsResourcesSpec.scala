@@ -20,19 +20,19 @@ package io.renku.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.circe.literal._
 import io.circe.Json
+import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.acceptancetests.data._
 import io.renku.graph.acceptancetests.flows.TSProvisioning
-import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.acceptancetests.tooling.TestReadabilityTools._
+import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.testentities.::~
+import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.graph.model.{GraphClass, publicationEvents, testentities}
 import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode

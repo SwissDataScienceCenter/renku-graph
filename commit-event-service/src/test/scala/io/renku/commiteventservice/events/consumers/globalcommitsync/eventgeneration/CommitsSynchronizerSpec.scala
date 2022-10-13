@@ -22,7 +22,6 @@ package eventgeneration
 import Generators.{commitsInfos, globalCommitSyncEvents}
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.commiteventservice.events.consumers.common.SynchronizationSummary
 import io.renku.commiteventservice.events.consumers.common.UpdateResult._
 import io.renku.commiteventservice.events.consumers.globalcommitsync.GlobalCommitSyncEvent.CommitsInfo
@@ -137,7 +136,7 @@ class CommitsSynchronizerSpec
 
     "skip commits existing on EL and GL, create missing on EL, delete missing on GL " +
       "- case of events added after event arrival" in new TestCase {
-        val commonIds = commitIds.generateNonEmptyList(minElements = 2).toList
+        val commonIds = commitIds.generateNonEmptyList(min = 2).toList
         val glOnlyIds = commitIds.generateNonEmptyList().toList
         val elOnlyIds = commitIds.generateNonEmptyList().toList
 

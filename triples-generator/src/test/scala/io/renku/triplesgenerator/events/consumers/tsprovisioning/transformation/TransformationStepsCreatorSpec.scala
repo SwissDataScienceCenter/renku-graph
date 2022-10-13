@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.consumers
 package tsprovisioning.transformation
 
 import Generators._
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.TSVersion
 import org.scalamock.scalatest.MockFactory

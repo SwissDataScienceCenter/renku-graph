@@ -23,7 +23,6 @@ package triplesgenerated
 import CategoryGenerators._
 import cats.data.EitherT
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.events.consumers
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.generators.CommonGraphGenerators.accessTokens

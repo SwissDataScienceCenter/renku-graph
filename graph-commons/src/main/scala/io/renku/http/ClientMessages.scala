@@ -23,8 +23,8 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe._
 import io.renku.data.{ErrorMessage => DataErrorMessage}
 import io.renku.graph.model.Schemas.{renku, schema}
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
 

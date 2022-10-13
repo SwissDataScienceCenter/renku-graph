@@ -18,8 +18,8 @@
 
 package io.renku.http.rest.paging
 
-import cats.{MonadThrow, NonEmptyParallel}
 import cats.syntax.all._
+import cats.{MonadThrow, NonEmptyParallel}
 import io.renku.http.rest.paging.model.Total
 
 trait Paging[Result] {

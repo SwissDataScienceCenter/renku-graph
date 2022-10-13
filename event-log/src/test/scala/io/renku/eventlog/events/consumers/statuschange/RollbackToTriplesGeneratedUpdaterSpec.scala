@@ -25,7 +25,6 @@ import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import EventStatus._
-import eu.timepit.refined.auto._
 import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToTriplesGenerated
 import io.renku.metrics.TestLabeledHistogram

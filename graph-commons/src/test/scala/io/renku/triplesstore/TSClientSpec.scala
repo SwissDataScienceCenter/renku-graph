@@ -112,7 +112,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
     "do a call for total even if not full page is returned" in new QueryClientTestCase {
 
-      val items = nonEmptyList(nonBlankStrings(), maxElements = 1).generateOne.map(_.value).toList
+      val items = nonEmptyList(nonBlankStrings(), max = 1).generateOne.map(_.value).toList
       val responseBody =
         json"""{
           "results": {
@@ -164,7 +164,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
     "do a call to for total if a full page is returned" in new QueryClientTestCase {
 
-      val allItems      = nonEmptyList(nonBlankStrings(), minElements = 5).generateOne.map(_.value).toList
+      val allItems      = nonEmptyList(nonBlankStrings(), min = 5).generateOne.map(_.value).toList
       val pagingRequest = PagingRequest(Page.first, PerPage(4))
       val pageItems     = allItems.take(pagingRequest.perPage.value)
       val responseBody = json"""{
@@ -215,7 +215,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
     "use the special count query if given to fetch the total if a full page is returned" in new QueryClientTestCase {
 
-      val allItems      = nonEmptyList(nonBlankStrings(), minElements = 5).generateOne.map(_.value).toList
+      val allItems      = nonEmptyList(nonBlankStrings(), min = 5).generateOne.map(_.value).toList
       val pagingRequest = PagingRequest(Page.first, PerPage(4))
       val pageItems     = allItems.take(pagingRequest.perPage.value)
       val responseBody = json"""{

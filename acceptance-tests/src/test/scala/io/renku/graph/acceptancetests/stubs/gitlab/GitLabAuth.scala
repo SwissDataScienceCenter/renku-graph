@@ -18,6 +18,7 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
+import cats.Applicative
 import cats.data.{Kleisli, OptionT}
 import cats.effect._
 import cats.syntax.all._
@@ -29,7 +30,6 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.Authorization
 import org.http4s.server.AuthMiddleware
 import org.typelevel.ci._
-import cats.Applicative
 
 private[gitlab] object GitLabAuth {
   private def authFail[F[_]: Applicative]: AuthedRoutes[String, F] = {

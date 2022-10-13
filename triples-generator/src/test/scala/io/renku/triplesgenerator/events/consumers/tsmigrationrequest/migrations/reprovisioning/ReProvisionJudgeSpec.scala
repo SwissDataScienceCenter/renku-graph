@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
@@ -50,7 +49,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
       val tsVersionPair = renkuVersionPairs.generateOne
       (versionPairFinder.find _).expects().returning(tsVersionPair.some.pure[Try])
 
-      val matrixVersionPairs = renkuVersionPairs.generateNonEmptyList(minElements = 2)
+      val matrixVersionPairs = renkuVersionPairs.generateNonEmptyList(min = 2)
 
       judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]
     }
@@ -61,7 +60,7 @@ class ReProvisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFac
         (versionPairFinder.find _).expects().returning(tsVersionPair.some.pure[Try])
 
         val matrixVersionPairs = renkuVersionPairs
-          .generateNonEmptyList(minElements = 2)
+          .generateNonEmptyList(min = 2)
           .map(_.copy(schemaVersion = tsVersionPair.schemaVersion))
 
         judge(matrixVersionPairs).reProvisioningNeeded() shouldBe true.pure[Try]

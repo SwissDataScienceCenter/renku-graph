@@ -19,7 +19,6 @@
 package io.renku.compression
 
 import cats.effect.IO
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.testtools.IOSpec

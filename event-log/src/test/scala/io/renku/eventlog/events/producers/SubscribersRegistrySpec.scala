@@ -21,7 +21,6 @@ package io.renku.eventlog.events.producers
 import Generators._
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.generators.Generators.Implicits.GenOps
@@ -111,7 +110,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with IOSpec with MockFactory w
 
     "not always return the same subscriber" in new TestCase {
 
-      val subscribers = urlAndIdSubscriptionInfos.generateNonEmptyList(minElements = 10, maxElements = 20).toList
+      val subscribers = urlAndIdSubscriptionInfos.generateNonEmptyList(min = 10, max = 20).toList
 
       subscribers.map(registry.add).sequence.unsafeRunSync()
 

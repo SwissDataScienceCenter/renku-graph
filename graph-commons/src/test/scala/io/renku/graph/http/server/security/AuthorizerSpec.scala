@@ -24,8 +24,8 @@ import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityRecord}
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.model.projects.Visibility
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import org.scalacheck.Arbitrary
