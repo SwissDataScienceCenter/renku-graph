@@ -20,7 +20,7 @@ package io.renku.knowledgegraph.entities
 package finder
 
 import io.circe.Decoder
-import io.renku.graph.model.persons
+import io.renku.graph.model.{GraphClass, persons}
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
 
@@ -43,8 +43,10 @@ private case object PersonsQuery extends EntityQuery[model.Entity.Person] {
           |        ${filters.onQuery(
                    s"""(?id ?score) text:query (schema:name '${filters.query}').""",
                    matchingScoreVariableName = "?score")}
-          |        ?id a schema:Person;
-          |            schema:name ?name.
+          |        GRAPH <${GraphClass.Persons.id}> {
+          |          ?id a schema:Person;
+          |              schema:name ?name
+          |        }
           |        ${filters.maybeOnCreatorName("?name")}
           |      }
           |      GROUP BY ?name

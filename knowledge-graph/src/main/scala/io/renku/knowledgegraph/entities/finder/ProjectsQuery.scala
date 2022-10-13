@@ -20,7 +20,7 @@ package io.renku.knowledgegraph.entities
 package finder
 
 import io.circe.Decoder
-import io.renku.graph.model.{persons, projects}
+import io.renku.graph.model.{GraphClass, persons, projects}
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
@@ -51,34 +51,43 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
     s"""|    {
         |      SELECT ?projectId (MAX(?score) AS ?matchingScore)
         |      WHERE {
-        |        {
-        |          (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query}')
-        |        } {
-        |          ?id a schema:Project
-        |          BIND (?id AS ?projectId)
-        |        } UNION {
-        |          ?projectId schema:creator ?id;
-        |                     a schema:Project.
+        |        GRAPH ?g {
+        |          {
+        |            (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query}')
+        |          } {
+        |            ?id a schema:Project
+        |            BIND (?id AS ?projectId)
+        |          } UNION {
+        |            ?projectId schema:creator ?id;
+        |                       a schema:Project.
+        |          }
         |        }
         |      }
         |      GROUP BY ?projectId
         |    }
         |""")}
         |    BIND ('project' AS ?entityType)
-        |    ?projectId a schema:Project;
-        |               schema:name ?name;
-        |               renku:projectPath ?path;
-        |               renku:projectVisibility ?visibility;
-        |               renku:projectNamespace ?namespace;
-        |               schema:dateCreated ?date.
-        |    ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
-        |    ${filters.maybeOnVisibility("?visibility")}
-        |    ${filters.maybeOnNamespace("?namespace")}
-        |    ${filters.maybeOnDateCreated("?date")}
-        |    OPTIONAL { ?projectId schema:creator/schema:name ?maybeCreatorName }
-        |    ${filters.maybeOnCreatorName("?maybeCreatorName")}
-        |    OPTIONAL { ?projectId schema:description ?maybeDescription }
-        |    OPTIONAL { ?projectId schema:keywords ?keyword }
+        |    GRAPH ?projectId {
+        |      ?projectId a schema:Project;
+        |                 schema:name ?name;
+        |                 renku:projectPath ?path;
+        |                 renku:projectVisibility ?visibility;
+        |                 renku:projectNamespace ?namespace;
+        |                 schema:dateCreated ?date.
+        |      ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
+        |      ${filters.maybeOnVisibility("?visibility")}
+        |      ${filters.maybeOnNamespace("?namespace")}
+        |      ${filters.maybeOnDateCreated("?date")}
+        |      OPTIONAL { 
+        |        ?projectId schema:creator ?creatorId.
+        |        GRAPH <${GraphClass.Persons.id}> {
+        |          ?creatorId schema:name ?maybeCreatorName
+        |        }
+        |      }
+        |      ${filters.maybeOnCreatorName("?maybeCreatorName")}
+        |      OPTIONAL { ?projectId schema:description ?maybeDescription }
+        |      OPTIONAL { ?projectId schema:keywords ?keyword }
+        |    }
         |  }
         |  GROUP BY ?entityType ?matchingScore ?name ?path ?visibility ?date ?maybeCreatorName ?maybeDescription
         |}
