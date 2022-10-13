@@ -28,8 +28,8 @@ import io.renku.graph.model.testentities._
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.Query
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset}
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -38,7 +38,7 @@ class PersonsEntitiesFinderSpec
     with should.Matchers
     with FinderSpecOps
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with IOSpec {
 
   "findEntities - persons" should {
@@ -55,7 +55,7 @@ class PersonsEntitiesFinderSpec
         .map(_.copy(name = sentenceContaining(query).generateAs(persons.Name)))
         .generateOne
 
-      upload(to = renkuDataset, person1SameName, person2SameName, person3, personEntities.generateOne)
+      upload(to = projectsDataset, person1SameName, person2SameName, person3, personEntities.generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
