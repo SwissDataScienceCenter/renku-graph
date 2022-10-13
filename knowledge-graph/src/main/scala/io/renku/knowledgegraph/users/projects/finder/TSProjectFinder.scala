@@ -93,7 +93,7 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
               |    $projectIdVariable schema:member ?projectMemberId
               |    GRAPH <${GraphClass.Persons.id}> {
               |      ?projectMemberId schema:sameAs ?projectMemberSameAs.
-              |      ?projectMemberSameAs schema:additionalType 'GitLab';
+              |      ?projectMemberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
               |                           schema:identifier ?userGitlabId
               |    }
               |}

@@ -20,6 +20,7 @@ package io.renku.knowledgegraph.entities
 
 import cats.Show
 import cats.syntax.all._
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
@@ -37,7 +38,7 @@ package object finder {
             |    $projectIdVariable schema:member ?memberId.
             |    GRAPH <${GraphClass.Persons.id}> {
             |      ?memberId schema:sameAs ?memberSameAs.
-            |      ?memberSameAs schema:additionalType 'GitLab';
+            |      ?memberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
             |                    schema:identifier ?userGitlabId
             |    }
             |}

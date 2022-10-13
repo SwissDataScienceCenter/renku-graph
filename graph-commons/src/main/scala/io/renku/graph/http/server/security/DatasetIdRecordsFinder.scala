@@ -22,6 +22,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{GraphClass, datasets, projects}
@@ -59,7 +60,7 @@ private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
         |      ?projectId schema:member ?memberId.
         |      GRAPH <${GraphClass.Persons.id}> {
         |        ?memberId schema:sameAs ?sameAsId.
-        |        ?sameAsId schema:additionalType 'GitLab';
+        |        ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
         |                  schema:identifier ?maybeMemberGitLabId
         |      }
         |    }

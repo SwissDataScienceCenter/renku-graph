@@ -23,6 +23,7 @@ import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Visibility._
 import io.renku.graph.model.projects.{ResourceId, Visibility}
@@ -62,7 +63,7 @@ private class ProjectPathRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeR
         |             renku:projectVisibility ?visibility.
         |  OPTIONAL {
         |    ?projectId schema:member/schema:sameAs ?sameAsId.
-        |    ?sameAsId schema:additionalType 'GitLab';
+        |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
         |              schema:identifier ?maybeMemberGitLabId.
         |  }
         |}

@@ -25,6 +25,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.Identifier
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.http.server.security.model.AuthUser
@@ -84,7 +85,7 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](s
           |  ?projectId schema:member ?memberId
           |  GRAPH <${GraphClass.Persons.id}> {
           |    ?memberId schema:sameAs ?sameAsId.
-          |    ?sameAsId schema:additionalType 'GitLab';
+          |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
           |              schema:identifier ?userGitlabId
           |  }
           |}

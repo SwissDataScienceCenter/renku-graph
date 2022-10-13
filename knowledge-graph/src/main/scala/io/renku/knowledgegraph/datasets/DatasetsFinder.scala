@@ -29,6 +29,7 @@ import io.circe.literal._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.{DateCreated, DatePublished, Description, Identifier, ImageUri, Keyword, Name, Title}
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
@@ -164,7 +165,7 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
           |    ?projectId schema:member ?memberId.
           |    GRAPH <${GraphClass.Persons.id}> {
           |      ?memberId schema:sameAs ?memberSameAs.
-          |      ?memberSameAs schema:additionalType 'GitLab';
+          |      ?memberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
           |                    schema:identifier ?userGitlabId
           |    }
           |}

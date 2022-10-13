@@ -24,6 +24,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.{GraphClass, RenkuUrl}
 import io.renku.graph.model.Schemas._
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
 import io.renku.graph.model.views.RdfResource
 import io.renku.http.server.security.model.AuthUser
@@ -149,7 +150,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
           |  $projectResourceId schema:member ?memberId
           |  Graph <${GraphClass.Persons.id}> {
           |    ?memberId schema:sameAs ?sameAsId.
-          |    ?sameAsId schema:additionalType 'GitLab';
+          |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
           |              schema:identifier ?userGitlabId .
           |  }
           |}

@@ -23,6 +23,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Path, ResourceId}
 import io.renku.graph.model.views.RdfResource
@@ -61,9 +62,9 @@ private class KGProjectMembersFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRec
         |WHERE {
         |  ${ResourceId(path)(renkuUrl).showAs[RdfResource]} a schema:Project;
         |                                                        schema:member ?memberId.                                                     
-        |  ?sameAsId  schema:additionalType  'GitLab';
-        |             schema:identifier      ?gitLabId ;
-        |             ^schema:sameAs         ?memberId .
+        |  ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+        |            schema:identifier ?gitLabId;
+        |            ^schema:sameAs ?memberId.
         |}
         |""".stripMargin
   )

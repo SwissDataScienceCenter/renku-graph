@@ -62,8 +62,8 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |  OPTIONAL { ?resourceId schema:email ?maybeEmail }
         |  OPTIONAL {
         |    ?resourceId schema:sameAs ?sameAsId.
-        |    ?sameAsId schema:additionalType  'GitLab';
-        |              schema:identifier      ?maybeGitLabId.
+        |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+        |              schema:identifier ?maybeGitLabId.
         |  }
         |  OPTIONAL {
         |    ?resourceId schema:sameAs ?maybeOrcidId.

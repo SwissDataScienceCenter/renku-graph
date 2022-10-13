@@ -22,6 +22,7 @@ package namedgraphs
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.Schemas.schema
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.{GitLabId, ResourceId}
 import io.renku.graph.model.{GraphClass, persons}
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -51,8 +52,8 @@ private class KGPersonFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |FROM <${GraphClass.Persons.id}> {
         |  ?personId a schema:Person;
         |            schema:sameAs ?sameAsId.
-        |  ?sameAsId schema:additionalType  'GitLab';
-        |            schema:identifier      ?gitLabId.
+        |  ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+        |            schema:identifier ?gitLabId.
         |  FILTER (?gitLabId IN (${membersToAdd.map(_.gitLabId).mkString(", ")}))
         |}
         |""".stripMargin
