@@ -21,7 +21,6 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._

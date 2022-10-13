@@ -21,10 +21,10 @@ package io.renku.generators
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
+import io.renku.config._
 import io.renku.config.certificates.Certificate
 import io.renku.config.sentry.SentryConfig
 import io.renku.config.sentry.SentryConfig.{Dsn, Environment}
-import io.renku.config._
 import io.renku.control.{RateLimit, RateLimitUnit}
 import io.renku.crypto.AesCrypto
 import io.renku.generators.Generators.Implicits._
@@ -207,7 +207,7 @@ object CommonGraphGenerators {
   def pagingResponses[Result](resultsGen: Gen[Result]): Gen[PagingResponse[Result]] = for {
     page    <- pages
     perPage <- perPages
-    results <- listOf(resultsGen, maxElements = Refined.unsafeApply(perPage.value))
+    results <- listOf(resultsGen, max = perPage.value)
     total = Total((page.value - 1) * perPage.value + results.size)
   } yield PagingResponse
     .from[Try, Result](results, PagingRequest(page, perPage), total)
@@ -289,6 +289,6 @@ object CommonGraphGenerators {
   implicit def authContexts[Key](implicit keysGen: Gen[Key]): Gen[AuthContext[Key]] = for {
     maybeAuthUser   <- authUsers.toGeneratorOfOptions
     key             <- keysGen
-    allowedProjects <- projectPaths.toGeneratorOfSet(minElements = 0)
+    allowedProjects <- projectPaths.toGeneratorOfSet(min = 0)
   } yield AuthContext(maybeAuthUser, key, allowedProjects)
 }

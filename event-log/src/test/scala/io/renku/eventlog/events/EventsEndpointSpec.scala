@@ -21,7 +21,6 @@ package io.renku.eventlog.events
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Decoder
-import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog.events.EventsEndpoint._
 import io.renku.eventlog.events.Generators.eventInfos
@@ -113,7 +112,7 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
     import EventsEndpoint.Criteria._
 
     val filtersOnDates: Gen[FiltersOnDate] =
-      eventDates.toGeneratorOfList(minElements = 1, maxElements = 2).map {
+      eventDates.toGeneratorOfList(min = 1, max = 2).map {
         case head :: Nil => if (Random.nextBoolean()) Filters.EventsSince(head) else Filters.EventsUntil(head)
         case since :: until :: Nil =>
           Filters.EventsSinceAndUntil(Filters.EventsSince(since), Filters.EventsUntil(until))

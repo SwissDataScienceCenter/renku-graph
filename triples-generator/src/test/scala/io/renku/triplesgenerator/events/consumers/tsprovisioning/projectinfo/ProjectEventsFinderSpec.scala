@@ -193,7 +193,7 @@ class ProjectEventsFinderSpec
 
   private lazy val pushEvents: Gen[GitLabPushEvent] = for {
     projectId <- projectIds
-    commitIds <- commitIds.toGeneratorOfSet(minElements = 2, maxElements = 2)
+    commitIds <- commitIds.toGeneratorOfSet(min = 2, max = 2)
     userId    <- personGitLabIds
     userName  <- personNames
   } yield GitLabPushEvent(projectId, commitIds.headOption, commitIds.tail.headOption, userId, userName)

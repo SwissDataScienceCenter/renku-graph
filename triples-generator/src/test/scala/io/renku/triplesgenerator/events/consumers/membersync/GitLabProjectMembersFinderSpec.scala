@@ -86,8 +86,8 @@ class GitLabProjectMembersFinderSpec
     }
 
     "collect users from paged results" in new TestCase {
-      val projectUsers   = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList.toSet
-      val projectMembers = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList.toSet
+      val projectUsers   = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
+      val projectMembers = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
 
       setGitLabClientExpectation(path, "users", "project-users", None, returning = (Set(projectUsers.head), 2.some))
       setGitLabClientExpectation(path, "users", "project-users", 2.some, returning = (projectUsers.tail, None))
@@ -105,7 +105,7 @@ class GitLabProjectMembersFinderSpec
     // test map response
 
     "parse results and request next page" in new TestCase {
-      val projectUsers = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList.toSet
+      val projectUsers = gitLabProjectMembers.generateNonEmptyList(min = 2).toList.toSet
 
       val nextPage   = 2
       val totalPages = 2

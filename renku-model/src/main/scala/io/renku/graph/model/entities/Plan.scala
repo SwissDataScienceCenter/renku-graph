@@ -21,7 +21,7 @@ package io.renku.graph.model.entities
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.plans.{Command, DateCreated, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
-import io.renku.graph.model.{GitLabApiUrl, GraphClass, InvalidationTime, RenkuUrl, commandParameters}
+import io.renku.graph.model._
 import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.JsonLDDecoder.decodeList
 

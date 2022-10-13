@@ -28,8 +28,8 @@ import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.graph.model.projects
 import io.renku.metrics.MetricsRegistry
-import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
+import io.renku.triplesstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import org.typelevel.log4cats.Logger
 
 private[migrations] class QueryBasedMigration[F[_]: MonadThrow: Logger](

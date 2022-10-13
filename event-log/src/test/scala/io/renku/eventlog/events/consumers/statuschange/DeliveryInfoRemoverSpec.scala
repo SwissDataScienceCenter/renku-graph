@@ -19,7 +19,6 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec

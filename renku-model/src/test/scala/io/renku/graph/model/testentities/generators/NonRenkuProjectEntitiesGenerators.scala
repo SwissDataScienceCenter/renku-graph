@@ -19,7 +19,6 @@
 package io.renku.graph.model.testentities
 package generators
 
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.{projectCreatedDates, projectDescriptions, projectKeywords, projectPaths}
 import io.renku.graph.model.projects
@@ -48,8 +47,8 @@ trait NonRenkuProjectEntitiesGenerators {
     maybeCreator     <- personEntities(withGitLabId).toGeneratorOfOptions
     visibility       <- visibilityGen
     forksCount       <- forksCountGen
-    keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
-    members          <- personEntities(withGitLabId).toGeneratorOfSet(minElements = 0)
+    keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
+    members          <- personEntities(withGitLabId).toGeneratorOfSet(min = 0)
   } yield NonRenkuProject.WithoutParent(path,
                                         name,
                                         maybeDescription,

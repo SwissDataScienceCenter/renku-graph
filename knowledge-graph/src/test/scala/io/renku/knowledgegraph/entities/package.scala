@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph
 
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{localDatesNotInTheFuture, nonBlankStrings}
 import io.renku.graph.model.testentities.{Entity => _, _}

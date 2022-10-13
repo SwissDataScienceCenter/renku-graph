@@ -21,7 +21,6 @@ package defaultgraph.projects
 
 import Generators._
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.exceptions
@@ -128,7 +127,7 @@ class ProjectTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     maybeParentId  <- projectResourceIds.toGeneratorOfOptions
     visibility     <- projectVisibilities
     maybeDesc      <- projectDescriptions.toGeneratorOfOptions
-    keywords       <- projectKeywords.toGeneratorOfSet(minElements = 0)
+    keywords       <- projectKeywords.toGeneratorOfSet(min = 0)
     maybeAgent     <- cliVersions.toGeneratorOfOptions
     maybeCreatorId <- personResourceIds.toGeneratorOfOptions
   } yield ProjectMutableData(name,

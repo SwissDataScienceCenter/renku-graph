@@ -19,7 +19,6 @@
 package io.renku.eventlog.eventdetails
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec

@@ -20,7 +20,6 @@ package io.renku.knowledgegraph.datasets
 
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -86,7 +85,7 @@ class DatasetsFinderSpec
 
           val projects = renkuProjectEntities(visibilityPublic)
             .withDatasets(datasetEntities(provenanceImportedExternal))
-            .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
+            .generateNonEmptyList(max = PagingRequest.default.perPage.value)
             .toList
 
           upload(to = projectsDataset, projects: _*)

@@ -24,7 +24,6 @@ import Criteria.Filters._
 import Criteria.{Filters, Sorting}
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

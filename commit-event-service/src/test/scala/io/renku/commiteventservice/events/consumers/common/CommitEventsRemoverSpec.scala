@@ -22,9 +22,9 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.commiteventservice.events.consumers.commitsync.categoryName
 import io.renku.commiteventservice.events.consumers.common.UpdateResult.{Deleted, Failed}
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators.commitIds

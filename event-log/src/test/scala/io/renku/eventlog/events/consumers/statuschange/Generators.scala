@@ -21,13 +21,14 @@ package io.renku.eventlog.events.consumers.statuschange
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.events.consumers.ConsumersModelGenerators._
+import io.renku.events.consumers.Project
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
 import org.scalacheck.Gen
-import io.renku.generators.Generators.Implicits._
+
 import java.time.Duration
-import io.renku.events.consumers.Project
 
 private object Generators {
 

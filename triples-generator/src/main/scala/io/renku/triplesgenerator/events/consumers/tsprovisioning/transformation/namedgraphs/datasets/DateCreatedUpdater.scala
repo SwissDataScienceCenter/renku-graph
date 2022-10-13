@@ -22,8 +22,8 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.entities.Project
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.Queries
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private trait DateCreatedUpdater[F[_]] {

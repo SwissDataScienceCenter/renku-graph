@@ -21,7 +21,6 @@ package defaultgraph.datasets
 
 import Generators._
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.datasetTopmostSameAs
@@ -69,7 +68,7 @@ class TopmostSameAsUpdaterSpec extends AnyWordSpec with MockFactory with should.
         )
 
         findingParentTopmostSameAsFor(dataset2.provenance.sameAs, returning = None.pure[Try])
-        val dataset2KgTopmostSameAses = datasetTopmostSameAs.generateSet(minElements = 1)
+        val dataset2KgTopmostSameAses = datasetTopmostSameAs.generateSet(min = 1)
         findingTopmostSameAsFor(dataset2.identification.resourceId, returning = dataset2KgTopmostSameAses.pure[Try])
         val dataset2Queries = sparqlQueries.generateList()
         prepareQueriesForSameAs(dataset2 -> dataset2KgTopmostSameAses, returning = dataset2Queries)

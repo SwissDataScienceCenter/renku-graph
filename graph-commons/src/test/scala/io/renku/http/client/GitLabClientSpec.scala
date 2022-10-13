@@ -44,7 +44,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import eu.timepit.refined.auto._
 
 class GitLabClientSpec
     extends AnyWordSpec

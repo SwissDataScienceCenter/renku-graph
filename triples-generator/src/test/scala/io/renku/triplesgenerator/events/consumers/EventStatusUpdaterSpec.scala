@@ -23,10 +23,10 @@ import cats.syntax.all._
 import io.circe.literal._
 import io.renku.compression.Zip
 import io.renku.data.ErrorMessage
-import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.events.Generators.categoryNames
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
+import io.renku.events.{CategoryName, EventRequestContent}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.generators.jsonld.JsonLDGenerators.jsonLDEntities

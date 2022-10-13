@@ -26,10 +26,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.triplesstore.TSAdminClient.CreationResult
-import io.renku.triplesstore.{DatasetConfigFile, DatasetName, TSAdminClient}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.tooling.RecoverableErrorsRecovery
 import io.renku.triplesgenerator.generators.ErrorGenerators.processingRecoverableErrors
+import io.renku.triplesstore.TSAdminClient.CreationResult
+import io.renku.triplesstore.{DatasetConfigFile, DatasetName, TSAdminClient}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

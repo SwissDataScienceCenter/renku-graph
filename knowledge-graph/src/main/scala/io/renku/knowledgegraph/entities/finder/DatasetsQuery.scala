@@ -22,7 +22,7 @@ package finder
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
-import io.renku.graph.model.{GraphClass, datasets, persons, projects}
+import io.renku.graph.model._
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
 

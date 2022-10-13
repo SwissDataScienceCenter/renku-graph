@@ -21,7 +21,6 @@ package io.renku.eventlog.events.consumers.statuschange
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators.eventDates
 import io.renku.eventlog._

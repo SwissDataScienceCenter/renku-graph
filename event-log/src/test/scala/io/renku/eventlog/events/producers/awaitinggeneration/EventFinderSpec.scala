@@ -278,7 +278,7 @@ private class EventFinderSpec
     "find the latest events from each project" in new TestCase {
 
       val events = readyStatuses
-        .generateNonEmptyList(minElements = 2)
+        .generateNonEmptyList(min = 2)
         .map(createEvent(_))
         .toList
 
@@ -312,7 +312,7 @@ private class EventFinderSpec
       )
 
       val events = readyStatuses
-        .generateNonEmptyList(minElements = 3, maxElements = 6)
+        .generateNonEmptyList(min = 3, max = 6)
         .toList
         .flatMap { status =>
           (1 to positiveInts(max = 2).generateOne.value)

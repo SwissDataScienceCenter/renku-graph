@@ -19,7 +19,6 @@
 package io.renku.commiteventservice.events.consumers.common
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.commiteventservice.events.consumers.common.UpdateResult._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -51,7 +50,7 @@ class SynchronizationSummarySpec extends AnyWordSpec with should.Matchers with S
   "increment" should {
 
     "increment the count for the given key" in {
-      forAll(summaries, updateResults.toGeneratorOfList(maxElements = 10)) { (initialSummary, results) =>
+      forAll(summaries, updateResults.toGeneratorOfList(max = 10)) { (initialSummary, results) =>
         val summary = results.foldLeft(initialSummary)(_.incrementCount(_))
 
         summary.get(Skipped) shouldBe initialSummary.get(Skipped) + results.count(_ == Skipped)
@@ -83,7 +82,7 @@ class SynchronizationSummarySpec extends AnyWordSpec with should.Matchers with S
     Gen.oneOf(Skipped, Created, Existed, Deleted, Failed(nonEmptyStrings().generateOne, exceptions.generateOne))
 
   private lazy val resultsAndMaybeCountList: Gen[List[(Option[Int], UpdateResult)]] =
-    nonNegativeInts().map(_.value).toGeneratorOfOptions.toGeneratorOfList(minElements = 5, maxElements = 5).map {
+    nonNegativeInts().map(_.value).toGeneratorOfOptions.toGeneratorOfList(min = 5, max = 5).map {
       maybeCounts =>
         maybeCounts
           .zip(Set(Skipped, Created, Existed, Deleted, Failed(nonEmptyStrings().generateOne, exceptions.generateOne)))

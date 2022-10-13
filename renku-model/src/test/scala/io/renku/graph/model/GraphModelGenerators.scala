@@ -19,7 +19,6 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.datasets._
@@ -58,7 +57,7 @@ object GraphModelGenerators {
     val nonFirstCharGen = frequency(13 -> alphaChar, 6 -> numChar, 1 -> oneOf("!#$&*+-/=?_~.".toList))
     val beforeAts = for {
       firstChar  <- firstCharGen
-      otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
+      otherChars <- nonEmptyList(nonFirstCharGen, min = 5, max = 10)
     } yield s"$firstChar${otherChars.toList.mkString("")}"
 
     for {
@@ -93,7 +92,7 @@ object GraphModelGenerators {
   implicit lazy val personOrcidIds: Gen[persons.OrcidId] =
     Gen
       .choose(1000, 9999)
-      .toGeneratorOfList(minElements = 4, maxElements = 4)
+      .toGeneratorOfList(min = 4, max = 4)
       .map(_.mkString("https://orcid.org/", "-", ""))
       .toGeneratorOf(persons.OrcidId)
 
@@ -109,7 +108,7 @@ object GraphModelGenerators {
     val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf('_', '.', '-'))
     for {
       firstChar  <- firstCharGen
-      otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
+      otherChars <- nonEmptyList(nonFirstCharGen, min = 5, max = 10)
     } yield projects.Namespace(s"$firstChar${otherChars.toList.mkString("")}")
   }
 

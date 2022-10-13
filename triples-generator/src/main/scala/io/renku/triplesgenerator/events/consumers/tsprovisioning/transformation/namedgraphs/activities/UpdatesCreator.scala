@@ -22,7 +22,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas.{prov, schema}
 import io.renku.graph.model.entities.{Activity, ActivityLens}
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{GraphClass, entities, persons, projects}
+import io.renku.graph.model._
 import io.renku.triplesstore.SparqlQuery
 import io.renku.triplesstore.SparqlQuery.Prefixes
 

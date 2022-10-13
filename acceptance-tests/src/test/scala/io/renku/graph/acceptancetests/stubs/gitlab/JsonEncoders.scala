@@ -21,8 +21,8 @@ package io.renku.graph.acceptancetests.stubs.gitlab
 import io.circe._
 import io.circe.syntax._
 import io.renku.graph.acceptancetests.data.Project
+import io.renku.graph.acceptancetests.data.Project.Permissions._
 import io.renku.graph.acceptancetests.data.Project.{Permissions, Statistics}
-import io.renku.graph.acceptancetests.data.Project.Permissions.{AccessLevel, GroupPermissions, ProjectAndGroupPermissions, ProjectPermissions}
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.{CommitData, PushEvent, Webhook}
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.testentities.{Parent, Person}

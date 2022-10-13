@@ -284,7 +284,7 @@ class StatsFinderSpec
 
     "return info about number of events with the given status in the queue grouped by projects" in {
       val events = generateEventsFor(
-        projectPaths.generateNonEmptyList(minElements = 2, maxElements = 8).toList
+        projectPaths.generateNonEmptyList(min = 2, max = 8).toList
       )
 
       events foreach store
@@ -302,7 +302,7 @@ class StatsFinderSpec
     }
 
     "return info about number of events with the given status in the queue from the first given number of projects" in {
-      val projectPathsList = nonEmptyList(projectPaths, minElements = 3, maxElements = 8).generateOne
+      val projectPathsList = nonEmptyList(projectPaths, min = 3, max = 8).generateOne
       val events           = generateEventsFor(projectPathsList.toList)
 
       events foreach store
@@ -355,7 +355,7 @@ class StatsFinderSpec
 
   private def generateEventsFor(projectPaths: List[Path]) =
     projectPaths flatMap { projectPath =>
-      nonEmptyList(eventData, maxElements = 20).generateOne.toList.map { case (commitId, status, eventDate) =>
+      nonEmptyList(eventData, max = 20).generateOne.toList.map { case (commitId, status, eventDate) =>
         (projectPath, commitId, status, eventDate)
       }
     }

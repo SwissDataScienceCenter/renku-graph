@@ -21,7 +21,6 @@ package io.renku.eventlog.events.producers.zombieevents
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.events.consumers.subscriptions._
@@ -111,7 +110,7 @@ class ZombieNodesCleanerSpec
           .atLeastOnce()
         upsertSubscriber(inactiveSubscriberId, inactiveSubscriberUrl, microserviceBaseUrl)
 
-        val otherSources = microserviceBaseUrls.generateNonEmptyList(minElements = 3)
+        val otherSources = microserviceBaseUrls.generateNonEmptyList(min = 3)
         otherSources map (upsertSubscriber(inactiveSubscriberId, inactiveSubscriberUrl, _))
 
         val someInactiveSource = otherSources.head

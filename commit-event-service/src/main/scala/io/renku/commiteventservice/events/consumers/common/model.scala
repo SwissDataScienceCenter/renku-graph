@@ -21,8 +21,8 @@ package io.renku.commiteventservice.events.consumers.common
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.{New, Skipped}
 import io.renku.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
-import io.renku.graph.model.projects.{Id, Path, Visibility}
 import io.renku.graph.model.persons.Email
+import io.renku.graph.model.projects.{Id, Path, Visibility}
 import io.renku.graph.model.{persons, projects}
 
 private[consumers] final case class ProjectInfo(

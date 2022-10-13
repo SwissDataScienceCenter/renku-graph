@@ -24,7 +24,7 @@ import io.renku.graph.model.entities.Person
 import io.renku.graph.model.{GraphClass, projects}
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
-import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyType, TinyTypeFactory}
+import io.renku.tinytypes._
 
 import java.time.{Instant, ZoneOffset}
 

@@ -22,11 +22,11 @@ import cats.effect._
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.graph.config.RenkuUrlLoader
-import io.renku.graph.model.{GraphClass, RenkuUrl}
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
 import io.renku.graph.model.views.RdfResource
+import io.renku.graph.model.{GraphClass, RenkuUrl}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.EntityId
 import io.renku.triplesstore.SparqlQuery.Prefixes

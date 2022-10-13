@@ -29,8 +29,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
-import io.renku.graph.model.{GraphClass, projects}
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._

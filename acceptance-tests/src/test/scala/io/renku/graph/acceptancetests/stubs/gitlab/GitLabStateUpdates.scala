@@ -18,21 +18,20 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
+import GitLabApiStub.{CommitData, State, Webhook}
+import GitLabStateGenerators._
+import cats.Monoid
 import cats.data.NonEmptyList
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.{CommitData, State, Webhook}
+import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Id
+import io.renku.graph.model.testentities.{Person, Project => RenkuProject}
+import io.renku.graph.model.{RenkuUrl, entities}
 import io.renku.http.client.AccessToken
 import org.http4s.Uri
-import GitLabStateGenerators._
-import cats.Monoid
-import io.renku.graph.model.RenkuUrl
-import io.renku.graph.model.entities
-import io.renku.graph.model.entities.EntityFunctions
-import io.renku.graph.model.testentities.{Person, Project => RenkuProject}
 
 /** Collection of functions to update the state in [[GitLabApiStub]]. */
 trait GitLabStateUpdates {

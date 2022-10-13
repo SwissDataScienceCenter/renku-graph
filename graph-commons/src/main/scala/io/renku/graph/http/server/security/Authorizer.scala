@@ -23,10 +23,10 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.http.server.security.Authorizer.{AuthContext, SecurityRecord, SecurityRecordFinder}
+import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.projects.Visibility._
-import io.renku.graph.model.persons.GitLabId
 import io.renku.http.server.security.EndpointSecurityException
 import io.renku.http.server.security.EndpointSecurityException.AuthorizationFailure
 import io.renku.http.server.security.model.AuthUser

@@ -19,7 +19,7 @@
 package io.renku.graph.model.testentities
 
 import cats.syntax.all._
-import io.renku.graph.model.{GraphClass, RenkuUrl, associations, entities}
+import io.renku.graph.model._
 import io.renku.jsonld._
 
 sealed trait Association {

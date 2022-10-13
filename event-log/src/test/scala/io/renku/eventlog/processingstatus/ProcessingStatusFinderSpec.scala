@@ -19,7 +19,6 @@
 package io.renku.eventlog.processingstatus
 
 import cats.data.NonEmptyList
-import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
@@ -56,13 +55,13 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with IOSpec with InMemoryEv
                     GenerationRecoverableFailure,
                     TransformationRecoverableFailure
           ),
-          minElements = 10,
-          maxElements = 20
+          min = 10,
+          max = 20
         ).generateOne
         val doneEvents = nonEmptyList(
           Gen.oneOf(TriplesStore, Skipped, GenerationNonRecoverableFailure, TransformationNonRecoverableFailure),
-          minElements = 10,
-          maxElements = 20
+          min = 10,
+          max = 20
         ).generateOne
         val batchDate = batchDates.generateOne
         storeEvents(projectId, batchDate, toBeProcessedEvents ::: doneEvents)

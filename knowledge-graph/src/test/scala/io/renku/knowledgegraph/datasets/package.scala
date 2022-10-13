@@ -18,7 +18,6 @@
 
 package io.renku.knowledgegraph
 
-import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sortBys
 import io.renku.generators.Generators.nonBlankStrings
 import io.renku.graph.model.testentities.Person

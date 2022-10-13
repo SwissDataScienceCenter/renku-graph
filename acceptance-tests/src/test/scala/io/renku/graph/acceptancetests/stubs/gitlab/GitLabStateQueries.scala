@@ -18,11 +18,11 @@
 
 package io.renku.graph.acceptancetests.stubs.gitlab
 
+import GitLabApiStub._
 import cats.Monad
 import cats.syntax.all._
-import io.renku.graph.acceptancetests.data.Project
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.{CommitData, PushEvent, State, Webhook}
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.model.GraphModelGenerators
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons.GitLabId

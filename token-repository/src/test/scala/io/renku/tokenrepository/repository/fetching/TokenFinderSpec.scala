@@ -21,6 +21,7 @@ package io.renku.tokenrepository.repository.fetching
 import cats.data.OptionT
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.types.numeric
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -34,7 +35,6 @@ import io.renku.tokenrepository.repository.RepositoryGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import eu.timepit.refined.types.numeric
 
 class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 

@@ -21,7 +21,6 @@ package generators
 
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{fixed, nonNegativeInts, positiveInts}
@@ -77,8 +76,8 @@ trait RenkuProjectEntitiesGenerators {
     maybeCreator     <- personEntities(withGitLabId).toGeneratorOfOptions
     visibility       <- visibilityGen
     forksCount       <- forksCountGen
-    keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
-    members          <- personEntities(withGitLabId).toGeneratorOfSet(minElements = 0)
+    keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
+    members          <- personEntities(withGitLabId).toGeneratorOfSet(min = 0)
     version          <- projectSchemaVersions
     activities       <- activityFactories.map(_.apply(dateCreated)).sequence
     datasets         <- datasetFactories.map(_.apply(dateCreated)).sequence
@@ -114,8 +113,8 @@ trait RenkuProjectEntitiesGenerators {
     maybeDescription <- projectDescriptions.toGeneratorOfOptions
     dateCreated      <- projectCreatedDates()
     maybeCreator     <- projectMembers.toGeneratorOfOptions
-    keywords         <- projectKeywords.toGeneratorOfSet(minElements = 0)
-    members          <- projectMembers.toGeneratorOfList(minElements = 1).map(_.toSet)
+    keywords         <- projectKeywords.toGeneratorOfSet(min = 0)
+    members          <- projectMembers.toGeneratorOfList(min = 1).map(_.toSet)
     visibility       <- projectVisibilities
     maybeParentPath  <- projectPaths.toGeneratorOfOptions
   } yield GitLabProjectInfo(id,

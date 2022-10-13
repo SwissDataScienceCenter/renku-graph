@@ -19,7 +19,6 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.{DecodingFailure, Json}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -119,7 +118,7 @@ class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Mat
     val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> Gen.oneOf('_', '.', '-'))
     for {
       firstChar  <- firstCharGen
-      otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
+      otherChars <- nonEmptyList(nonFirstCharGen, min = 5, max = 10)
     } yield s"$firstChar${otherChars.toList.mkString("")}"
   }
 }

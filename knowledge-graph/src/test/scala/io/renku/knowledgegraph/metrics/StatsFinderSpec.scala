@@ -20,7 +20,6 @@ package io.renku.knowledgegraph.metrics
 
 import cats.effect.IO
 import cats.implicits.toShow
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
@@ -59,7 +58,7 @@ class StatsFinderSpec
         anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateNonEmptyList().toList
       val projectsWithActivities = anyRenkuProjectEntities
         .withActivities(activityEntities(planEntities()))
-        .generateNonEmptyList(minElements = 10, maxElements = 50)
+        .generateNonEmptyList(min = 10, max = 50)
         .toList
       val persons = projectsWithActivities.flatMap(_.activities.map(_.author))
 

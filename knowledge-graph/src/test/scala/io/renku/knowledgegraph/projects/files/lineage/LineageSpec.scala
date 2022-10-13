@@ -115,7 +115,7 @@ class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
 
   private lazy val edgesSets: Gen[Set[Edge]] = for {
     edgesNumber <- positiveInts(max = 20)
-    edgesSet    <- setOf[Edge](edges, minElements = 1, maxElements = edgesNumber)
+    edgesSet    <- setOf[Edge](edges, min = 1, max = edgesNumber)
   } yield edgesSet
 
   private def generateNodes(edges: Set[Edge]): Set[Node] =

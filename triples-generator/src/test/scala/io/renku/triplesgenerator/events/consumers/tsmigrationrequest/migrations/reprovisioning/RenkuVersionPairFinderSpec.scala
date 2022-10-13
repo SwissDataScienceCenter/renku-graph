@@ -26,9 +26,9 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
-import io.renku.triplesstore.{InMemoryJenaForSpec, MigrationsDataset, SparqlQueryTimeRecorder}
 import io.renku.testtools.IOSpec
 import io.renku.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
+import io.renku.triplesstore.{InMemoryJenaForSpec, MigrationsDataset, SparqlQueryTimeRecorder}
 import org.scalatest._
 import matchers._
 import org.scalatest.wordspec.AnyWordSpec

@@ -18,9 +18,9 @@
 
 package io.renku.knowledgegraph.docs
 
+import cats.syntax.all._
 import io.renku.knowledgegraph.docs.model.Status
 import org.http4s
-import cats.syntax.all._
 
 object Implicits {
   implicit class StatusOps(status: http4s.Status) {

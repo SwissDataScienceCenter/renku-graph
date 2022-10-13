@@ -23,10 +23,10 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{Queries, Transformation}
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.{RecoverableErrorsRecovery, TransformationStep}
+import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.typelevel.log4cats.Logger
 
 private[transformation] trait DatasetTransformer[F[_]] {
@@ -47,10 +47,10 @@ private[transformation] class DatasetTransformerImpl[F[_]: MonadThrow](
 
   import dateCreatedUpdater._
   import derivationHierarchyUpdater._
+  import descriptionUpdater._
   import hierarchyOnInvalidationUpdater._
   import originalIdentifierUpdater._
   import personLinksUpdater._
-  import descriptionUpdater._
   import recoverableErrorsRecovery._
   import sameAsUpdater._
   import topmostSameAsUpdater._

@@ -20,7 +20,6 @@ package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -635,10 +634,10 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val projectInfo = gitLabProjectInfos.generateOne.copy(maybeParentPath = None,
                                                             dateCreated = gitlabDate,
                                                             maybeDescription = projectDescriptions.generateSome,
-                                                            keywords = projectKeywords.generateSet(minElements = 1)
+                                                            keywords = projectKeywords.generateSet(min = 1)
       )
       val description   = projectDescriptions.generateSome
-      val keywords      = projectKeywords.generateSet(minElements = 1)
+      val keywords      = projectKeywords.generateSet(min = 1)
       val cliVersion    = cliVersions.generateOne
       val schemaVersion = projectSchemaVersions.generateOne
       val resourceId    = projects.ResourceId(projectInfo.path)
@@ -680,7 +679,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val projectInfo = gitLabProjectInfos.generateOne.copy(maybeParentPath = None,
                                                             dateCreated = gitlabDate,
                                                             maybeDescription = projectDescriptions.generateSome,
-                                                            keywords = projectKeywords.generateSet(minElements = 1)
+                                                            keywords = projectKeywords.generateSet(min = 1)
       )
       val cliVersion    = cliVersions.generateOne
       val schemaVersion = projectSchemaVersions.generateOne

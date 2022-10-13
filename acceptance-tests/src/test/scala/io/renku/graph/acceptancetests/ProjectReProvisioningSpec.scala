@@ -35,9 +35,9 @@ import io.renku.http.client.AccessToken
 import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.scalactic.source.Position
+import org.scalatest.Assertion
 import org.scalatest.enablers.Retrying
 import org.scalatest.time.{Minutes, Seconds, Span}
-import org.scalatest.Assertion
 
 import java.lang.Thread.sleep
 import scala.concurrent.duration._

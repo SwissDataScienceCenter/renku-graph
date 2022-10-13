@@ -27,8 +27,8 @@ import io.renku.config.ServiceVersion
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus.Done
-import io.renku.eventlog.events.producers
 import io.renku.eventlog._
+import io.renku.eventlog.events.producers
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion

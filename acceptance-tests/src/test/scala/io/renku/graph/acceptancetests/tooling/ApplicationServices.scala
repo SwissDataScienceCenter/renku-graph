@@ -22,8 +22,8 @@ import cats.effect._
 import cats.effect.std.Semaphore
 import io.renku._
 import io.renku.graph.acceptancetests.db.{EventLog, TokenRepository, TriplesStore}
-import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubSupport
 import io.renku.graph.acceptancetests.stubs.RemoteTriplesGenerator
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabStubSupport
 import io.renku.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import io.renku.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import io.renku.triplesstore.FusekiUrl
