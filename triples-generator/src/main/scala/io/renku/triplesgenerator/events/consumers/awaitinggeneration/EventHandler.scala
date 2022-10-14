@@ -55,14 +55,14 @@ private[events] class EventHandler[F[_]: MonadThrow: Concurrent: Logger](
       subscriptionMechanism.renewSubscription()
     )
 
-  private def startProcessingEvent(requestContent: EventRequestContent, deferred: Deferred[F, Unit]) = for {
+  private def startProcessingEvent(requestContent: EventRequestContent, processing: Deferred[F, Unit]) = for {
     eventBody <- requestContent match {
                    case EventRequestContent.WithPayload(_, payload: String) => EitherT.rightT(EventBody(payload))
                    case _                                                   => EitherT.leftT(BadRequest)
                  }
     event <- toCommitEvent(eventBody).toRightT(recoverTo = BadRequest)
     result <- Concurrent[F]
-                .start(eventProcessor.process(event).recoverWith(errorLogging(event)) >> deferred.complete(()))
+                .start((eventProcessor process event).recoverWith(errorLogging(event)) >> processing.complete(()))
                 .toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(event))

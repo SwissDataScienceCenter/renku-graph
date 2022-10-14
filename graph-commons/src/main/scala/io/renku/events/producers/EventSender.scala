@@ -97,9 +97,8 @@ class EventSenderImpl[F[_]: Async: Logger](
     send(request)(responseMapping)
       .recoverWith(retryOnServerError(Eval.always(sendWithRetry(request, context)), context))
 
-  private def retryOnServerError(
-      retry:   Eval[F[Status]],
-      context: EventContext
+  private def retryOnServerError(retry:   Eval[F[Status]],
+                                 context: EventContext
   ): PartialFunction[Throwable, F[Status]] = {
     case exception @ UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, _) =>
       waitAndRetry(retry, exception, context.errorMessage)

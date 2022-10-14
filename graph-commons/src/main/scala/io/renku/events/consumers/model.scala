@@ -72,9 +72,7 @@ object EventHandlingProcess {
   ): F[EventHandlingProcess[F]] =
     Deferred[F, Unit].map(deferred => new EventHandlingProcess[F](deferred, process(deferred), releaseProcess.some))
 
-  def apply[F[_]: Concurrent](
-      process: EitherT[F, EventSchedulingResult, Accepted]
-  ): F[EventHandlingProcess[F]] = for {
+  def apply[F[_]: Concurrent](process: EitherT[F, EventSchedulingResult, Accepted]): F[EventHandlingProcess[F]] = for {
     deferred <- Deferred[F, Unit]
     _        <- deferred.complete(())
   } yield new EventHandlingProcess[F](deferred, process)
