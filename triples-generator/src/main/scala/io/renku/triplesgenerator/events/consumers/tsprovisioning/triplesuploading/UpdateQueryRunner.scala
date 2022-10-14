@@ -42,8 +42,8 @@ private class UpdateQueryRunnerImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     recoveryStrategy:   RecoverableErrorsRecovery = RecoverableErrorsRecovery,
     retryInterval:      FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:         Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-    idleTimeout:        Duration = 11 minutes,
-    requestTimeout:     Duration = 10 minutes
+    idleTimeout:        Duration = 21 minutes,
+    requestTimeout:     Duration = 20 minutes
 ) extends TSClient[F](dsConnectionConfig,
                       retryInterval,
                       maxRetries,
