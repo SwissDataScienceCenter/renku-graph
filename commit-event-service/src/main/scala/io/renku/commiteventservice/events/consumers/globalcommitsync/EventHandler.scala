@@ -60,7 +60,7 @@ private[events] class EventHandler[F[_]: Spawn: Concurrent: Logger](
     event <- fromEither[F](request.event.as[GlobalCommitSyncEvent].leftMap(_ => BadRequest))
     result <-
       Spawn[F]
-        .start(synchronizeEvents(event).recoverWith(errorLogging(event)) >> process.complete(()))
+        .start((synchronizeEvents(event) recoverWith logError(event)) >> process.complete(()))
         .toRightT
         .map(_ => Accepted)
         .semiflatTap(Logger[F] log event)

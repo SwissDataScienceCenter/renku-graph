@@ -48,7 +48,7 @@ private class EventHandler[F[_]: Concurrent: Logger](override val categoryName: 
   private def startProcessingEvent(request: EventRequestContent, processing: Deferred[F, Unit]) = for {
     event <- fromEither(request.event.getProject).map(p => ProjectSyncEvent(p.id, p.path))
     result <- Spawn[F]
-                .start(syncProjectInfo(event).recoverWith(errorLogging(event)) >> processing.complete(()))
+                .start((syncProjectInfo(event) recoverWith logError(event)) >> processing.complete(()))
                 .toRightT
                 .map(_ => Accepted)
                 .semiflatTap(Logger[F].log(event))
