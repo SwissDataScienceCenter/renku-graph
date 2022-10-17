@@ -89,35 +89,29 @@ abstract class EventHandlerWithProcessLimiter[F[_]: Monad: Logger](processesLimi
     }
   }
 
-  protected def errorLogging[E](event: E)(implicit show: Show[E]): PartialFunction[Throwable, F[Unit]] = {
-    case NonFatal(exception) =>
-      Logger[F].error(exception)(show"$categoryName: $event failed")
+  protected def logError[E](event: E)(implicit show: Show[E]): PartialFunction[Throwable, F[Unit]] = { case exception =>
+    Logger[F].error(exception)(show"$categoryName: $event failed")
   }
 
   protected implicit class LoggerOps(logger: Logger[F])(implicit ME: MonadThrow[F]) {
 
-    def log[EventInfo](
-        eventInfo: EventInfo
-    )(result:      EventSchedulingResult)(implicit show: Show[EventInfo]): F[Unit] = result match {
-      case Accepted                           => logger.info(show"$categoryName: $eventInfo -> $result")
-      case error @ SchedulingError(exception) => logger.error(exception)(show"$categoryName: $eventInfo -> $error")
-      case _                                  => ME.unit
-    }
+    def log[EventInfo](eventInfo: EventInfo)(result: EventSchedulingResult)(implicit show: Show[EventInfo]): F[Unit] =
+      result match {
+        case Accepted                           => logger.info(show"$categoryName: $eventInfo -> $result")
+        case error @ SchedulingError(exception) => logger.error(exception)(show"$categoryName: $eventInfo -> $error")
+        case _                                  => ME.unit
+      }
 
-    def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit
-        show:                         Show[EventInfo]
-    ): F[Unit] = logger.info(show"$categoryName: $eventInfo -> $message")
+    def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit show: Show[EventInfo]): F[Unit] =
+      logger.info(show"$categoryName: $eventInfo -> $message")
 
-    def logError[EventInfo](eventInfo: EventInfo, exception: Throwable)(implicit
-        show:                          Show[EventInfo]
-    ): F[Unit] = logger.error(exception)(show"$categoryName: $eventInfo -> Failure")
+    def logError[EventInfo](eventInfo: EventInfo, exception: Throwable)(implicit show: Show[EventInfo]): F[Unit] =
+      logger.error(exception)(show"$categoryName: $eventInfo -> Failure")
   }
 
   protected implicit class EitherTOps[T](operation: F[T])(implicit ME: MonadThrow[F]) {
 
-    def toRightT(
-        recoverTo: EventSchedulingResult
-    ): EitherT[F, EventSchedulingResult, T] = EitherT {
+    def toRightT(recoverTo: EventSchedulingResult): EitherT[F, EventSchedulingResult, T] = EitherT {
       operation.map(_.asRight[EventSchedulingResult]) recover as(recoverTo)
     }
 
