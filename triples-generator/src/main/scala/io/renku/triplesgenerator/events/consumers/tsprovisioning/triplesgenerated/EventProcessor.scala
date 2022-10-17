@@ -81,8 +81,8 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   }
 
   private def transformAndUpload(
-      event:              TriplesGeneratedEvent
-  )(implicit accessToken: Option[AccessToken]): F[EventUploadingResult] = {
+      event:      TriplesGeneratedEvent
+  )(implicit mat: Option[AccessToken]): F[EventUploadingResult] = {
     for {
       project  <- buildEntity(event) leftSemiflatMap toUploadingError(event)
       dgResult <- right[EventUploadingResult](createAndRunSteps(DefaultGraph, project) >>= toUploadingResult(event))

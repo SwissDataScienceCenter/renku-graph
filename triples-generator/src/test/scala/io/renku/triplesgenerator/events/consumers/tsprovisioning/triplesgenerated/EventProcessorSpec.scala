@@ -160,11 +160,11 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         val project = anyProjectEntities.generateOne.to[entities.Project]
         givenEntityBuilding(triplesGeneratedEvent, returning = EitherT.rightT(project))
 
+        successfulTriplesTransformationAndUpload(project, TSVersion.DefaultGraph)
+
         val processingRecoverableError = logWorthyRecoverableErrors.generateOne
         val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-        successfulStepsCreation(project, TSVersion.DefaultGraph, runningToReturn = failure.pure[Try])
-
-        successfulTriplesTransformationAndUpload(project, TSVersion.NamedGraphs)
+        successfulStepsCreation(project, TSVersion.NamedGraphs, runningToReturn = failure.pure[Try])
 
         expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent, failure.error)
 

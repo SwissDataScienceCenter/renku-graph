@@ -26,15 +26,22 @@ import io.renku.graph.model.projects
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
+import scala.concurrent.duration._
+
 private[membersync] object KGSynchronizer {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[KGSynchronizer[F]] = for {
     kgProjectMembersFinder <- KGProjectMembersFinder[F]
     kgPersonFinder         <- KGPersonFinder[F]
     updatesCreator         <- UpdatesCreator[F]
     renkuConnectionConfig  <- RenkuConnectionConfig[F]()
-    querySender <- MonadThrow[F].catchNonFatal(new TSClient(renkuConnectionConfig) with QuerySender[F] {
-                     override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
-                   })
+    querySender <- MonadThrow[F].catchNonFatal(
+                     new TSClient(renkuConnectionConfig,
+                                  idleTimeoutOverride = (11 minutes).some,
+                                  requestTimeoutOverride = (10 minutes).some
+                     ) with QuerySender[F] {
+                       override def send(query: SparqlQuery): F[Unit] = updateWithNoResult(query)
+                     }
+                   )
   } yield new KGSynchronizerImpl[F](kgProjectMembersFinder, kgPersonFinder, updatesCreator, querySender)
 
 }
