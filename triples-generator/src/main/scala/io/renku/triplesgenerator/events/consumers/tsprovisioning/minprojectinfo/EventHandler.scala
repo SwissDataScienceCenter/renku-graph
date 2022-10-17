@@ -55,7 +55,7 @@ private[events] class EventHandler[F[_]: Concurrent: Logger](
     project <- fromEither(request.event.getProject)
     result <-
       Spawn[F]
-        .start(process(MinProjectInfoEvent(project)).recoverWith(errorLogging(project)) >> processing.complete(()))
+        .start((process(MinProjectInfoEvent(project)) recoverWith logError(project)) >> processing.complete(()))
         .toRightT
         .map(_ => Accepted)
         .semiflatTap(Logger[F].log(project))
