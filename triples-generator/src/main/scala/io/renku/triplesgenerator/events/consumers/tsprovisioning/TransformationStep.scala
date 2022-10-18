@@ -42,8 +42,8 @@ private[tsprovisioning] object TransformationStep {
   final case class Queries(preDataUploadQueries: List[SparqlQuery], postDataUploadQueries: List[SparqlQuery])
 
   object Queries {
-    val empty:                                           Queries = Queries(Nil, Nil)
-    def preDataQueriesOnly(queries: List[SparqlQuery]):  Queries = Queries(queries, Nil)
+    val empty: Queries = Queries(Nil, Nil)
+    def preDataQueriesOnly(queries:  List[SparqlQuery]): Queries = Queries(queries, Nil)
     def postDataQueriesOnly(queries: List[SparqlQuery]): Queries = Queries(Nil, queries)
 
     implicit val queriesSemigroup: Semigroup[Queries] = (x: Queries, y: Queries) =>

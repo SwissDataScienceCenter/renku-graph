@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.datasets
 import cats.syntax.all._
 import io.renku.graph.model.datasets.{PartLocation, ResourceId, SameAs}
 import io.renku.graph.model.testentities.Project._
-import io.renku.graph.model.testentities.{HavingInvalidationTime, RenkuProject, Dataset => ModelDataset}
+import io.renku.graph.model.testentities.{Dataset => ModelDataset, HavingInvalidationTime, RenkuProject}
 import io.renku.graph.model.{RenkuUrl, testentities}
 import io.renku.jsonld.syntax._
 

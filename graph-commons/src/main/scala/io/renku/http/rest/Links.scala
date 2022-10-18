@@ -86,7 +86,7 @@ object Links {
   final case class Link(rel: Rel, href: Href, method: Method = Method.GET)
 
   object Link {
-    def self(href: Href):          Link = Link(Rel.Self, href)
+    def self(href:   Href):        Link = Link(Rel.Self, href)
     def apply(tuple: (Rel, Href)): Link = Link(tuple._1, tuple._2)
   }
 
