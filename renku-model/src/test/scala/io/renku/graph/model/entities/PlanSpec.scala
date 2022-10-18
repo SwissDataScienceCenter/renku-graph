@@ -19,12 +19,15 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
+import io.circe.Json
+import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{nonEmptyStrings, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{nonEmptyStrings, timestamps, timestampsNotInTheFuture}
+import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.Position
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, entities, plans}
+import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -36,11 +39,44 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
   (GraphClass.Default :: GraphClass.Persons :: Nil).foreach { implicit graphClass =>
     show"decode via graphClass=$graphClass" should {
       "turn JsonLD Plan entity into the Plan object" in {
-        forAll(planObjects) { plan =>
+        forAll(stepPlanObjects) { plan =>
           plan.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
             .as[List[entities.Plan]] shouldBe List(plan.to[entities.Plan]).asRight
+        }
+      }
+
+      "decode if invalidation after the creation date" in {
+
+        val plan = stepPlanObjects
+          .map(p =>
+            p.invalidate(
+              timestampsNotInTheFuture(butYoungerThan = p.dateCreated.value).generateAs(InvalidationTime)
+            ).fold(err => fail(err.intercalate("; ")), identity)
+          )
+          .generateOne
+          .to[entities.Plan]
+
+        plan.asJsonLD.flatten.fold(throw _, identity).cursor.as[List[entities.Plan]] shouldBe List(plan).asRight
+      }
+
+      "fail if invalidation done before the creation date" in {
+
+        val plan = stepPlanObjects.generateOne.to[entities.Plan]
+
+        val invalidationTime = timestamps(max = plan.dateCreated.value.minusSeconds(1)).generateAs(InvalidationTime)
+        val jsonLD = parse {
+          plan.asJsonLD.toJson.deepMerge(
+            Json.obj(
+              (prov / "invalidatedAtTime").show -> json"""{"@value": ${invalidationTime.show}}"""
+            )
+          )
+        }.flatMap(_.flatten).fold(throw _, identity)
+
+        val Left(message) = jsonLD.cursor.as[List[entities.Plan]].leftMap(_.message)
+        message should include {
+          show"Invalidation time $invalidationTime on StepPlan with id: ${plan.resourceId} is older than dateCreated ${plan.dateCreated}"
         }
       }
     }
@@ -54,7 +90,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     mappedOutputs      <- mappedCommandOutputObjects.toGeneratorOfList()
   } yield explicitParameters ::: locationInputs ::: mappedInputs ::: locationOutputs ::: mappedOutputs
 
-  private lazy val planObjects: Gen[Plan] = for {
+  private lazy val stepPlanObjects: Gen[StepPlan] = for {
     name                     <- planNames
     maybeCommand             <- planCommands.toGeneratorOfOptions
     maybeDescription         <- planDescriptions.toGeneratorOfOptions
@@ -64,18 +100,18 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     paramFactories           <- parameterFactoryLists
     successCodes             <- planSuccessCodes.toGeneratorOfList()
     creators                 <- personEntities.toGeneratorOfList()
-  } yield Plan(
+  } yield StepPlan(
     planIdentifiers.generateOne,
     name,
     maybeDescription,
-    maybeCommand,
     creators.toSet,
     dateCreated,
-    maybeProgrammingLanguage,
     keywords,
+    maybeCommand,
+    maybeProgrammingLanguage,
+    successCodes,
     commandParameterFactories = paramFactories.zipWithIndex.map { case (factory, idx) =>
       factory(Position(idx + 1))
-    },
-    successCodes
+    }
   )
 }

@@ -333,7 +333,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         projectInfo.keywords,
         projectInfo.maybeCreator.map(c => c.toCLIPayloadPerson(c.chooseSomeName)),
         projectInfo.dateCreated,
-        activities = activityEntities(planEntities())
+        activities = activityEntities(stepPlanEntities())
           .withDateBefore(projectInfo.dateCreated)
           .generateFixedSizeList(1)
           .map(_.to[entities.Activity]),
@@ -379,7 +379,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     "return a DecodingFailure when there's an Activity entity created before project creation" in {
       val projectInfo = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
-      val activity    = activityEntities(planEntities()).withDateBefore(projectInfo.dateCreated).generateOne
+      val activity    = activityEntities(stepPlanEntities()).withDateBefore(projectInfo.dateCreated).generateOne
       val jsonLD = cliLikeJsonLD(
         resourceId,
         cliVersions.generateOne,
@@ -1026,11 +1026,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   }
 
   private def activityWith(author: entities.Person): projects.DateCreated => entities.Activity = dateCreated =>
-    activityEntities(planEntities())(dateCreated).generateOne.to[entities.Activity].copy(author = author)
+    activityEntities(stepPlanEntities())(dateCreated).generateOne.to[entities.Activity].copy(author = author)
 
   private def activityWithAssociationAgent(agent: entities.Person): projects.DateCreated => entities.Activity =
     dateCreated => {
-      val activity = activityEntities(planEntities())(dateCreated).generateOne.to[entities.Activity]
+      val activity = activityEntities(stepPlanEntities())(dateCreated).generateOne.to[entities.Activity]
       activity.copy(association =
         entities.Association.WithPersonAgent(activity.association.resourceId, agent, activity.association.plan)
       )

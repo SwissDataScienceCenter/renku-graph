@@ -45,7 +45,7 @@ class ActivityLensSpec extends AnyWordSpec with should.Matchers with EntitiesGen
   }
 
   private def createActivity =
-    activityEntities(planEntities())
+    activityEntities(stepPlanEntities())
       .apply(GraphModelGenerators.projectCreatedDates().generateOne)
       .generateOne
       .to[Activity]

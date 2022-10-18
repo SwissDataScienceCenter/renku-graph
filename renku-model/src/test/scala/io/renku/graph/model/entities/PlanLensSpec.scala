@@ -37,7 +37,7 @@ class PlanLensSpec extends AnyWordSpec with should.Matchers with EntitiesGenerat
   }
 
   private def createPlan =
-    planEntities()
+    stepPlanEntities()
       .apply(GraphModelGenerators.projectCreatedDates().generateOne)
       .generateOne
       .to[Plan]

@@ -291,7 +291,7 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
     val input      = entityLocations.generateOne
     val output     = entityLocations.generateOne
     executionPlanners(
-      planEntities(
+      stepPlanEntities(
         CommandParameter.from(paramValue),
         CommandInput.fromLocation(input),
         CommandOutput.fromLocation(output)

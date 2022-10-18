@@ -55,7 +55,7 @@ trait RenkuProjectEntitiesGenerators {
   lazy val renkuProjectEntitiesWithDatasetsAndActivities: Gen[RenkuProject] =
     renkuProjectEntities(anyVisibility)
       .withActivities(
-        List.fill(nonNegativeInts(max = 5).generateOne.value)(activityEntities(planEntities())): _*
+        List.fill(nonNegativeInts(max = 5).generateOne.value)(activityEntities(stepPlanEntities())): _*
       )
       .withDatasets(
         List.fill(nonNegativeInts(max = 5).generateOne.value)(datasetEntities(provenanceNonModified)): _*

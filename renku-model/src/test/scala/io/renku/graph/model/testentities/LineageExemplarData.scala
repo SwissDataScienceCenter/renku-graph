@@ -31,7 +31,7 @@ import io.renku.graph.model.testentities.CommandParameterBase._
 import io.renku.graph.model.testentities.Entity.InputEntity
 import io.renku.graph.model.testentities.ParameterValue.CommandParameterValue
 import io.renku.graph.model.testentities.ParameterValue.LocationParameterValue.{CommandInputValue, CommandOutputValue}
-import io.renku.graph.model.testentities.Plan.CommandParameters
+import io.renku.graph.model.testentities.StepPlan.CommandParameters
 import io.renku.jsonld.syntax.JsonEncoderOps
 
 /** ====================== Exemplar data visualization ====================== zhbikes folder clean_data \ / run plan 1 \
@@ -210,9 +210,12 @@ object NodeDef {
     )
 
   private implicit lazy val activityShow: Show[Activity] = Show.show { activity =>
-    val commandComponent = activity.association.plan.maybeCommand match {
-      case Some(command) => s"$command "
-      case None          => ""
+    val commandComponent = activity.association.plan match {
+      case p: StepPlan =>
+        p.maybeCommand match {
+          case Some(command) => s"$command "
+          case None          => ""
+        }
     }
     activity.parameters
       .collect {

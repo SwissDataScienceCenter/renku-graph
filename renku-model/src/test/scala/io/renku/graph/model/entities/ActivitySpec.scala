@@ -39,7 +39,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Activity entity into the Activity object" in {
-      forAll(activityEntities(planEntities())(projectCreatedDates().generateOne)) { activity =>
+      forAll(activityEntities(stepPlanEntities())(projectCreatedDates().generateOne)) { activity =>
         JsonLD
           .arr(activity.asJsonLD, activity.association.plan.asJsonLD)
           .flatten
@@ -52,7 +52,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there are Input Parameter Values for non-existing Usage Entities" in {
       val location = entityLocations.generateOne
       val activity =
-        executionPlanners(planEntities(CommandInput.fromLocation(location)),
+        executionPlanners(stepPlanEntities(CommandInput.fromLocation(location)),
                           anyRenkuProjectEntities.generateOne
         ).generateOne
           .planInputParameterValuesFromChecksum(location -> entityChecksums.generateOne)
@@ -87,7 +87,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     "fail if there are Output Parameter Values for non-existing Generation Entities" in {
       val location = entityLocations.generateOne
       val activity = executionPlanners(
-        planEntities(CommandOutput.fromLocation(location)),
+        stepPlanEntities(CommandOutput.fromLocation(location)),
         anyRenkuProjectEntities.generateOne
       ).generateOne.buildProvenanceUnsafe()
 
@@ -118,7 +118,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     }
 
     "fail if there is no Agent entity" in {
-      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+      val activity = executionPlanners(stepPlanEntities(), anyRenkuProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 
@@ -148,7 +148,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     }
 
     "fail if there is no Author entity" in {
-      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+      val activity = executionPlanners(stepPlanEntities(), anyRenkuProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 
@@ -182,7 +182,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     implicit val graph: GraphClass = GraphClass.Default
 
     "produce JsonLD with all the relevant properties" in {
-      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+      val activity = executionPlanners(stepPlanEntities(), anyRenkuProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 
@@ -204,7 +204,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
     implicit val graph: GraphClass = GraphClass.Project
 
     "produce JsonLD with all the relevant properties and only links to Person entities" in {
-      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+      val activity = executionPlanners(stepPlanEntities(), anyRenkuProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 
@@ -227,7 +227,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
   "entityFunctions.findAllPersons" should {
 
     "return Activity's author and Association's agent if exists" in {
-      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+      val activity = executionPlanners(stepPlanEntities(), anyRenkuProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 
@@ -244,7 +244,7 @@ class ActivitySpec extends AnyWordSpec with should.Matchers with ScalaCheckPrope
   "entityFunctions.encoder" should {
 
     "return encoder that honors the given GraphClass" in {
-      val activity = executionPlanners(planEntities(), anyRenkuProjectEntities.generateOne).generateOne
+      val activity = executionPlanners(stepPlanEntities(), anyRenkuProjectEntities.generateOne).generateOne
         .buildProvenanceUnsafe()
         .to[entities.Activity]
 

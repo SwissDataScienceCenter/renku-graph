@@ -181,7 +181,7 @@ object datasets {
 
     final def apply(entityId: EntityId): TopmostDerivedFrom = apply(entityId.toString)
 
-    implicit lazy val topmostDerivedFromJsonLdEncoder: JsonLDEncoder[TopmostDerivedFrom] =
+    implicit lazy val jsonLDEncoder: JsonLDEncoder[TopmostDerivedFrom] =
       derivedFrom => EntityId.of(derivedFrom.value).asJsonLD
   }
 

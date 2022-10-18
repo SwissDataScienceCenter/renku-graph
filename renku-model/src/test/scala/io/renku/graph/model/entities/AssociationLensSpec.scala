@@ -63,7 +63,7 @@ class AssociationLensSpec extends AnyWordSpec with should.Matchers with Entities
   }
 
   private def createPlan =
-    planEntities()
+    stepPlanEntities()
       .apply(GraphModelGenerators.projectCreatedDates().generateOne)
       .generateOne
       .to[Plan]

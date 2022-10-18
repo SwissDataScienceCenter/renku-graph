@@ -44,7 +44,7 @@ class WorkflowsEntitiesFinderSpec
 
     "de-duplicate workflows when on forked projects" in new TestCase {
       val original ::~ fork = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
         .forkOnce()
       val plan :: Nil = fork.plans.toList
@@ -68,7 +68,7 @@ class WorkflowsEntitiesFinderSpec
     "favour workflows on public projects if exist" in new TestCase {
 
       val publicProject = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
@@ -95,7 +95,7 @@ class WorkflowsEntitiesFinderSpec
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .modify(replaceMembers(to = Set(member)))
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
 
       val original ::~ fork = {
@@ -121,7 +121,7 @@ class WorkflowsEntitiesFinderSpec
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(replaceMembers(to = Set(member)))
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
       val plan :: Nil = privateProject.plans.toList
 

@@ -18,10 +18,13 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.{Validated, ValidatedNel}
+import cats.syntax.all._
+import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas._
+import io.renku.graph.model._
 import io.renku.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.plans.{Command, DateCreated, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
-import io.renku.graph.model._
 import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.JsonLDDecoder.decodeList
 
@@ -38,9 +41,9 @@ final case class Plan(resourceId:               ResourceId,
                       outputs:                  List[CommandOutput],
                       successCodes:             List[SuccessCode],
                       maybeInvalidationTime:    Option[InvalidationTime]
-) extends PlanOps
+) extends PlanAlg
 
-sealed trait PlanOps {
+sealed trait PlanAlg {
   self: Plan =>
 
   def findParameter(parameterId: commandParameters.ResourceId): Option[CommandParameter] =
@@ -58,14 +61,54 @@ object Plan {
   import io.renku.jsonld.syntax._
   import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
 
+  def from(resourceId:               ResourceId,
+           name:                     Name,
+           maybeDescription:         Option[Description],
+           maybeCommand:             Option[Command],
+           creators:                 Set[Person],
+           dateCreated:              DateCreated,
+           maybeProgrammingLanguage: Option[ProgrammingLanguage],
+           keywords:                 List[Keyword],
+           parameters:               List[CommandParameter],
+           inputs:                   List[CommandInput],
+           outputs:                  List[CommandOutput],
+           successCodes:             List[SuccessCode],
+           maybeInvalidationTime:    Option[InvalidationTime]
+  ): ValidatedNel[String, Plan] = {
+    def validateInvalidation: Option[InvalidationTime] => ValidatedNel[String, Option[InvalidationTime]] = {
+      case None => Validated.validNel(Option.empty[InvalidationTime])
+      case mit @ Some(invalidationTime) =>
+        Validated.condNel(
+          test = (dateCreated.value compareTo invalidationTime.value) <= 0,
+          mit,
+          s"Invalidation time $invalidationTime on StepPlan with id: $resourceId is older than dateCreated $dateCreated"
+        )
+    }
+
+    validateInvalidation(maybeInvalidationTime).map(mit =>
+      Plan(resourceId,
+           name,
+           maybeDescription,
+           maybeCommand,
+           creators,
+           dateCreated,
+           maybeProgrammingLanguage,
+           keywords,
+           parameters,
+           inputs,
+           outputs,
+           successCodes,
+           mit
+      )
+    )
+  }
+
   private val entityTypes = EntityTypes.of(prov / "Plan", schema / "Action", schema / "CreativeWork")
 
   implicit def entityFunctions(implicit gitLabApiUrl: GitLabApiUrl): EntityFunctions[Plan] =
     new EntityFunctions[Plan] {
-      val findAllPersons: Plan => Set[Person] =
-        _.creators
-      val encoder: GraphClass => JsonLDEncoder[Plan] =
-        Plan.encoder(gitLabApiUrl, _)
+      val findAllPersons: Plan => Set[Person]               = _.creators
+      val encoder:        GraphClass => JsonLDEncoder[Plan] = Plan.encoder(gitLabApiUrl, _)
     }
 
   implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl, graphClass: GraphClass): JsonLDEncoder[Plan] =
@@ -105,21 +148,25 @@ object Plan {
         outputs               <- cursor.downField(renku / "hasOutputs").as[List[CommandOutput]]
         successCodes          <- cursor.downField(renku / "successCodes").as[List[SuccessCode]]
         maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-      } yield Plan(
-        resourceId,
-        name,
-        maybeDescription,
-        maybeCommand,
-        creators,
-        dateCreated,
-        maybeProgrammingLang,
-        keywords,
-        parameters,
-        inputs,
-        outputs,
-        successCodes,
-        maybeInvalidationTime
-      )
+        plan <- Plan
+                  .from(
+                    resourceId,
+                    name,
+                    maybeDescription,
+                    maybeCommand,
+                    creators,
+                    dateCreated,
+                    maybeProgrammingLang,
+                    keywords,
+                    parameters,
+                    inputs,
+                    outputs,
+                    successCodes,
+                    maybeInvalidationTime
+                  )
+                  .toEither
+                  .leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
+      } yield plan
   }
 
   lazy val ontology: Type = Type.Def(

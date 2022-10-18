@@ -48,7 +48,7 @@ class UpdatesCreatorSpec
 
     "prepare delete query if new activity has different author that it's set in the TS" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -70,7 +70,7 @@ class UpdatesCreatorSpec
 
     "prepare delete query if there's more than one author for the activity in the TS" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -111,7 +111,7 @@ class UpdatesCreatorSpec
 
     "prepare no queries if there's no author in KG" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -122,7 +122,7 @@ class UpdatesCreatorSpec
 
     "prepare no queries if there's no change in Activity author" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -136,7 +136,7 @@ class UpdatesCreatorSpec
 
     "prepare delete query if the new Association's person agent is different from what's set in the TS" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -165,7 +165,7 @@ class UpdatesCreatorSpec
 
     "prepare delete query if there's more than one person agent for the Association set in the TS" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -204,7 +204,7 @@ class UpdatesCreatorSpec
 
     "prepare no queries for association with SoftwareAgent" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -219,7 +219,7 @@ class UpdatesCreatorSpec
 
     "prepare no queries if there's no Person agent in KG" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -230,7 +230,7 @@ class UpdatesCreatorSpec
 
     "prepare no queries if there's no change in association's person agent" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
         .map(_.to[entities.RenkuProject])
         .generateOne
 

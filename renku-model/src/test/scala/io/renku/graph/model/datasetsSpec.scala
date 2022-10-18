@@ -228,7 +228,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     "serialise TopmostDerivedFrom to an object having @id property as the DerivedFrom's value" in {
       val derivedFrom = datasetTopmostDerivedFroms.generateOne
 
-      val json = TopmostDerivedFrom.topmostDerivedFromJsonLdEncoder(derivedFrom).toJson
+      val json = TopmostDerivedFrom.jsonLDEncoder(derivedFrom).toJson
 
       json.hcursor.downField("@id").as[String] shouldBe Right(derivedFrom.toString)
     }

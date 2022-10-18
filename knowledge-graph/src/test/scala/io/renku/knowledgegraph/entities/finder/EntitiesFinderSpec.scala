@@ -55,7 +55,7 @@ class EntitiesFinderSpec
 
     "return all entities sorted by name if no query is given" in new TestCase {
       val project = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -91,14 +91,14 @@ class EntitiesFinderSpec
       val planProject = renkuProjectEntities(visibilityPublic)
         .withActivities(
           activityEntities(
-            planEntities().modify(replacePlanName(to = sentenceContaining(query).generateAs(plans.Name)))
+            stepPlanEntities().modify(_.replacePlanName(to = sentenceContaining(query).generateAs(plans.Name)))
           )
         )
         .generateOne
       val plan :: Nil = planProject.plans.toList
 
       val notMatchingProject = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -139,8 +139,8 @@ class EntitiesFinderSpec
       val planProject = renkuProjectEntities(visibilityPublic)
         .withActivities(
           activityEntities(
-            planEntities().modify(
-              replacePlanKeywords(to =
+            stepPlanEntities().modify(
+              _.replacePlanKeywords(to =
                 List(sentenceContaining(query).generateAs(plans.Keyword), planKeywords.generateOne)
               )
             )
@@ -180,7 +180,8 @@ class EntitiesFinderSpec
       val planProject = renkuProjectEntities(visibilityPublic)
         .withActivities(
           activityEntities(
-            planEntities().modify(replacePlanDesc(to = sentenceContaining(query).generateAs(plans.Description).some))
+            stepPlanEntities()
+              .modify(_.replacePlanDesc(to = sentenceContaining(query).generateAs(plans.Description).some))
           )
         )
         .generateOne
@@ -250,7 +251,7 @@ class EntitiesFinderSpec
 
     "return only projects when 'project' type given" in new TestCase {
       val project = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -264,7 +265,7 @@ class EntitiesFinderSpec
 
     "return only datasets when 'dataset' type given" in new TestCase {
       val dsAndProject @ _ ::~ project = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -278,7 +279,7 @@ class EntitiesFinderSpec
 
     "return only workflows when 'workflow' type given" in new TestCase {
       val project = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -434,19 +435,19 @@ class EntitiesFinderSpec
     "return entities with matching visibility only" in new TestCase {
 
       val publicProject = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
       val internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(replaceMembers(to = Set(member)))
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -469,7 +470,7 @@ class EntitiesFinderSpec
 
     "return no entities when no match on visibility" in new TestCase {
       val _ ::~ project = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -487,12 +488,12 @@ class EntitiesFinderSpec
     "return entities with matching namespace only" in new TestCase {
 
       val matchingProject = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
       val nonMatchingProject = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -513,7 +514,7 @@ class EntitiesFinderSpec
 
     "return no namespace aware entities when no match on namespace" in new TestCase {
       val _ ::~ project = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -537,8 +538,8 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            planEntities().modify(
-              replacePlanDateCreated(to =
+            stepPlanEntities().modify(
+              _.replacePlanDateCreated(to =
                 timestampsNotInTheFuture(butYoungerThan = projectDateCreated.value).generateAs[plans.DateCreated]
               )
             )
@@ -578,8 +579,8 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            planEntities().modify(
-              replacePlanDateCreated(to =
+            stepPlanEntities().modify(
+              _.replacePlanDateCreated(to =
                 timestamps(min = projectDateCreated.value, max = sinceAsInstant minus (1, DAYS))
                   .generateAs[plans.DateCreated]
               )
@@ -666,8 +667,8 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            planEntities().modify(
-              replacePlanDateCreated(to =
+            stepPlanEntities().modify(
+              _.replacePlanDateCreated(to =
                 timestamps(min = projectDateCreated.value, max = untilAsInstant).generateAs[plans.DateCreated]
               )
             )
@@ -708,8 +709,8 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            planEntities().modify(
-              replacePlanDateCreated(to =
+            stepPlanEntities().modify(
+              _.replacePlanDateCreated(to =
                 timestampsNotInTheFuture(butYoungerThan = projectDateCreated.value).generateAs[plans.DateCreated]
               )
             )
@@ -800,8 +801,8 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            planEntities().modify(
-              replacePlanDateCreated(to =
+            stepPlanEntities().modify(
+              _.replacePlanDateCreated(to =
                 timestamps(min = projectDateCreated.value, max = untilAsInstant).generateAs[plans.DateCreated]
               )
             )
@@ -864,7 +865,7 @@ class EntitiesFinderSpec
 
     "be sorting by Name if requested" in new TestCase {
       val project = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
@@ -880,7 +881,7 @@ class EntitiesFinderSpec
 
     "be sorting by Date if requested" in new TestCase {
       val project = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()), activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()), activityEntities(stepPlanEntities()))
         .withDatasets(datasetEntities(provenanceImportedExternal))
         .withDatasets(datasetEntities(provenanceInternal))
         .generateOne
@@ -917,7 +918,7 @@ class EntitiesFinderSpec
 
       val ds ::~ project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(to = projects.Name(query.value)))
-        .withActivities(activityEntities(planEntities().modify(replacePlanName(to = plans.Name(s"smth $query")))))
+        .withActivities(activityEntities(stepPlanEntities().modify(_.replacePlanName(to = plans.Name(s"smth $query")))))
         .addDataset(
           datasetEntities(provenanceNonModified)
             .modify(replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name)))
@@ -1015,19 +1016,19 @@ class EntitiesFinderSpec
 
     val privateProject = renkuProjectEntities(fixed(Visibility.Private))
       .modify(replaceMembers(to = Set(member)))
-      .withActivities(activityEntities(planEntities()))
+      .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 
     val internalProject = renkuProjectEntities(fixed(Visibility.Internal))
       .modify(replaceMembers(to = Set(member)))
-      .withActivities(activityEntities(planEntities()))
+      .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 
     val publicProject = renkuProjectEntities(visibilityPublic)
       .modify(replaceMembers(to = Set(member)))
-      .withActivities(activityEntities(planEntities()))
+      .withActivities(activityEntities(stepPlanEntities()))
       .withDatasets(datasetEntities(provenanceNonModified))
       .generateOne
 

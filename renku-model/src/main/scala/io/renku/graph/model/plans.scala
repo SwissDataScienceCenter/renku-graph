@@ -88,5 +88,4 @@ object plans {
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
       with InstantNotInTheFuture[DateCreated]
       with TinyTypeJsonLDOps[DateCreated]
-
 }

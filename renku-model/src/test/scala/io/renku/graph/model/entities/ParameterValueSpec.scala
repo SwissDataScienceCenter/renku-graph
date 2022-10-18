@@ -40,7 +40,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
       forAll(nonEmptyStrings().toGeneratorOf(ParameterDefaultValue), parameterValueOverrides) {
         (defaultValue, valueOverride) =>
           val activity =
-            executionPlannersDecoupledFromProject(planEntities(CommandParameter.from(defaultValue))).generateOne
+            executionPlannersDecoupledFromProject(stepPlanEntities(CommandParameter.from(defaultValue))).generateOne
               .planParameterValues(defaultValue -> valueOverride)
               .buildProvenanceUnsafe()
               .to[entities.Activity]
@@ -60,7 +60,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
     "turn JsonLD InputParameterValue entity into the InputParameterValue object " in {
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
         val activity = executionPlannersDecoupledFromProject(
-          planEntities(CommandInput.fromLocation(location))
+          stepPlanEntities(CommandInput.fromLocation(location))
         ).generateOne
           .planInputParameterValuesFromChecksum(location -> checksum)
           .buildProvenanceUnsafe()
@@ -81,7 +81,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
     "turn JsonLD OutputParameterValue entity into the OutputParameterValue object " in {
       forAll(entityLocations) { location =>
         val activity = executionPlannersDecoupledFromProject(
-          planEntities(CommandOutput.fromLocation(location))
+          stepPlanEntities(CommandOutput.fromLocation(location))
         ).generateOne
           .buildProvenanceUnsafe()
           .to[entities.Activity]
@@ -102,7 +102,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
       val defaultValue  = nonEmptyStrings().toGeneratorOf(ParameterDefaultValue).generateOne
       val valueOverride = parameterValueOverrides.generateOne
       val activity = executionPlannersDecoupledFromProject(
-        planEntities(CommandParameter.from(defaultValue))
+        stepPlanEntities(CommandParameter.from(defaultValue))
       ).generateOne
         .planParameterValues(defaultValue -> valueOverride)
         .buildProvenanceUnsafe()
@@ -124,7 +124,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
       val location = entityLocations.generateOne
       val checksum = entityChecksums.generateOne
       val activity = executionPlannersDecoupledFromProject(
-        planEntities(CommandInput.fromLocation(location))
+        stepPlanEntities(CommandInput.fromLocation(location))
       ).generateOne
         .planInputParameterValuesFromChecksum(location -> checksum)
         .buildProvenanceUnsafe()
@@ -145,7 +145,7 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
     "fail if there are OutputParameterValue for non-existing OutputParameters" in {
       val location = entityLocations.generateOne
       val activity = executionPlannersDecoupledFromProject(
-        planEntities(CommandOutput.fromLocation(location))
+        stepPlanEntities(CommandOutput.fromLocation(location))
       ).generateOne
         .buildProvenanceUnsafe()
 
