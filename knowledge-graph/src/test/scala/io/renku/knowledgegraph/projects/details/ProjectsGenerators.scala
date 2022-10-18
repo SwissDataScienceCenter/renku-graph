@@ -21,7 +21,7 @@ package io.renku.knowledgegraph.projects.details
 import Converters._
 import GitLabProjectFinder.GitLabProject
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{nonBlankStrings, nonEmptyList, nonNegativeInts, timestampsNotInTheFuture, httpUrls => urls}
+import io.renku.generators.Generators.{httpUrls => urls, nonBlankStrings, nonEmptyList, nonNegativeInts, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths, projectVisibilities}
 import io.renku.graph.model.testentities.{Project => _, _}
 import model.Forking.ForksCount

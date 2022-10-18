@@ -30,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.temporal.ChronoUnit.{HOURS, SECONDS}
-import java.time.{Clock, Instant, ZoneId, Duration => JavaDuration}
+import java.time.{Clock, Duration => JavaDuration, Instant, ZoneId}
 import scala.util.Random
 
 class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {

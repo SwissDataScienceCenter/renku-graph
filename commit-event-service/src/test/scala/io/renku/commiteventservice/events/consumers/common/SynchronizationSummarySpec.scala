@@ -82,10 +82,9 @@ class SynchronizationSummarySpec extends AnyWordSpec with should.Matchers with S
     Gen.oneOf(Skipped, Created, Existed, Deleted, Failed(nonEmptyStrings().generateOne, exceptions.generateOne))
 
   private lazy val resultsAndMaybeCountList: Gen[List[(Option[Int], UpdateResult)]] =
-    nonNegativeInts().map(_.value).toGeneratorOfOptions.toGeneratorOfList(min = 5, max = 5).map {
-      maybeCounts =>
-        maybeCounts
-          .zip(Set(Skipped, Created, Existed, Deleted, Failed(nonEmptyStrings().generateOne, exceptions.generateOne)))
+    nonNegativeInts().map(_.value).toGeneratorOfOptions.toGeneratorOfList(min = 5, max = 5).map { maybeCounts =>
+      maybeCounts
+        .zip(Set(Skipped, Created, Existed, Deleted, Failed(nonEmptyStrings().generateOne, exceptions.generateOne)))
     }
 
   private lazy val summaries: Gen[SynchronizationSummary] =

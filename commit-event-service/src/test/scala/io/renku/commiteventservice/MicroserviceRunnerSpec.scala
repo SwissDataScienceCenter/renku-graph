@@ -132,6 +132,6 @@ class MicroserviceRunnerSpec
     private def keepGoing = Temporal[IO].delayBy(counter.update(_ + 1), 1000 millis)
 
     override def handle(requestContent: EventRequestContent) = fail("Shouldn't be called")
-    override def renewAllSubscriptions()                     = fail("Shouldn't be called")
+    override def renewAllSubscriptions() = fail("Shouldn't be called")
   }
 }
