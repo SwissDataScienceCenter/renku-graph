@@ -26,7 +26,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 
-sealed trait RenkuProject extends Project with RenkuProject.ProjectOps with Product with Serializable {
+sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with Product with Serializable {
   val path:             Path
   val name:             Name
   val maybeDescription: Option[Description]
@@ -40,10 +40,11 @@ sealed trait RenkuProject extends Project with RenkuProject.ProjectOps with Prod
   val version:          SchemaVersion
   val activities:       List[Activity]
   val datasets:         List[Dataset[Dataset.Provenance]]
+  val otherPlans:       Set[Plan]
 
   type ProjectType <: RenkuProject
 
-  lazy val plans: Set[Plan] = activities.map(_.association.plan).toSet
+  lazy val plans: Set[Plan] = activities.map(_.association.plan).toSet ++ otherPlans
 }
 
 object RenkuProject {
@@ -60,7 +61,8 @@ object RenkuProject {
                                  members:          Set[Person],
                                  version:          SchemaVersion,
                                  activities:       List[Activity],
-                                 datasets:         List[Dataset[Dataset.Provenance]]
+                                 datasets:         List[Dataset[Dataset.Provenance]],
+                                 otherPlans:       Set[Plan] = Set.empty
   ) extends RenkuProject {
 
     validateDates(dateCreated, activities, datasets)
@@ -80,6 +82,9 @@ object RenkuProject {
       val dataset = factory(dateCreated).generateOne
       dataset -> copy(datasets = datasets ::: dataset :: Nil)
     }
+
+    override def addOtherPlan(plan: Plan): ProjectType =
+      copy(otherPlans = otherPlans + plan)
 
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithoutParent =
       copy(datasets = newDatasets.toList)
@@ -128,7 +133,8 @@ object RenkuProject {
                               version:          SchemaVersion,
                               activities:       List[Activity],
                               datasets:         List[Dataset[Dataset.Provenance]],
-                              parent:           RenkuProject
+                              parent:           RenkuProject,
+                              otherPlans:       Set[Plan] = Set.empty
   ) extends RenkuProject
       with Parent {
     override type ProjectType = RenkuProject.WithParent
@@ -146,6 +152,9 @@ object RenkuProject {
       dataset -> copy(datasets = datasets ::: dataset :: Nil)
     }
 
+    override def addOtherPlan(plan: Plan): ProjectType =
+      copy(otherPlans = otherPlans + plan)
+
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithParent =
       copy(datasets = newDatasets.toList)
 
@@ -156,7 +165,7 @@ object RenkuProject {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  trait ProjectOps {
+  trait RenkuProjectAlg {
     self: RenkuProject =>
 
     lazy val topAncestorDateCreated: DateCreated = this match {
@@ -169,6 +178,8 @@ object RenkuProject {
     def addDatasets[P <: Dataset.Provenance](toAdd: Dataset[P]*): ProjectType
 
     def addDataset[P <: Dataset.Provenance](toAdd: DatasetGenFactory[P]): (Dataset[P], ProjectType)
+
+    def addOtherPlan(plan: Plan): ProjectType
 
     def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): ProjectType
 

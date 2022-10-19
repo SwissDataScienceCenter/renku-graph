@@ -19,7 +19,8 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
-import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
+import io.renku.jsonld.EntityId
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 
@@ -32,7 +33,7 @@ object plans {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with EntityIdJsonLdOps[ResourceId] {
+      with EntityIdJsonLDOps[ResourceId] {
 
     def apply(identifier: Identifier)(implicit renkuUrl: RenkuUrl): ResourceId =
       ResourceId((renkuUrl / "plans" / identifier).value)
@@ -88,4 +89,14 @@ object plans {
       extends TinyTypeFactory[DateCreated](new DateCreated(_))
       with InstantNotInTheFuture[DateCreated]
       with TinyTypeJsonLDOps[DateCreated]
+
+  final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
+  implicit object DerivedFrom
+      extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_))
+      with constraints.Url[DerivedFrom]
+      with AnyResourceRenderer[DerivedFrom]
+      with EntityIdJsonLDOps[DerivedFrom] {
+
+    def apply(entityId: EntityId): DerivedFrom = DerivedFrom(entityId.toString)
+  }
 }

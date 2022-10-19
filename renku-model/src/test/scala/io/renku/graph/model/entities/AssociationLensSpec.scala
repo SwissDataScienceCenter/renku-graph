@@ -66,7 +66,7 @@ class AssociationLensSpec extends AnyWordSpec with should.Matchers with Entities
     stepPlanEntities()
       .apply(GraphModelGenerators.projectCreatedDates().generateOne)
       .generateOne
-      .to[Plan]
+      .to[StepPlan]
 
   private def createAssociationAgent: Association.WithRenkuAgent =
     Association.WithRenkuAgent(

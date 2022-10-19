@@ -22,6 +22,14 @@ import monocle.Lens
 
 object PlanLens {
 
-  val planCreators: Lens[Plan, Set[Person]] =
-    Lens[Plan, Set[Person]](_.creators)(persons => plan => plan.copy(creators = persons))
+  val stepPlanCreators: Lens[StepPlan, Set[Person]] = Lens[StepPlan, Set[Person]](_.creators) { persons =>
+    {
+      case plan: StepPlan.NonModified => plan.copy(creators = persons)
+      case plan: StepPlan.Modified    => plan.copy(creators = persons)
+    }
+  }
+
+  val planCreators: Lens[Plan, Set[Person]] = Lens[Plan, Set[Person]](_.creators) { persons =>
+    { case plan: StepPlan => stepPlanCreators.modify(_ => persons)(plan) }
+  }
 }

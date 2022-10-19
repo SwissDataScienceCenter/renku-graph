@@ -42,7 +42,7 @@ object datasets {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with UrlConstraint[ResourceId]
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLDOps[ResourceId]
       with AnyResourceRenderer[ResourceId]
 
   sealed trait DatasetIdentifier extends Any with StringTinyType
@@ -100,7 +100,7 @@ object datasets {
   implicit object ImageResourceId
       extends TinyTypeFactory[ImageResourceId](new ImageResourceId(_))
       with UrlConstraint[ImageResourceId]
-      with EntityIdJsonLdOps[ImageResourceId]
+      with EntityIdJsonLDOps[ImageResourceId]
 
   final class ImagePosition private (val value: Int) extends AnyVal with IntTinyType
   implicit object ImagePosition
@@ -175,14 +175,11 @@ object datasets {
       extends TinyTypeFactory[TopmostDerivedFrom](new TopmostDerivedFrom(_))
       with constraints.Url[TopmostDerivedFrom]
       with UrlResourceRenderer[TopmostDerivedFrom]
-      with EntityIdJsonLdOps[TopmostDerivedFrom] {
+      with EntityIdJsonLDOps[TopmostDerivedFrom] {
 
     final def apply(derivedFrom: DerivedFrom): TopmostDerivedFrom = apply(derivedFrom.value)
 
     final def apply(entityId: EntityId): TopmostDerivedFrom = apply(entityId.toString)
-
-    implicit lazy val jsonLDEncoder: JsonLDEncoder[TopmostDerivedFrom] =
-      derivedFrom => EntityId.of(derivedFrom.value).asJsonLD
   }
 
   sealed trait SameAs extends Any with UrlTinyType {
@@ -277,20 +274,18 @@ object datasets {
       extends TinyTypeFactory[TopmostSameAs](new TopmostSameAs(_))
       with constraints.Url[TopmostSameAs]
       with UrlResourceRenderer[TopmostSameAs]
-      with EntityIdJsonLdOps[TopmostSameAs] {
+      with EntityIdJsonLDOps[TopmostSameAs] {
 
     final def apply(sameAs: SameAs): TopmostSameAs = apply(sameAs.value)
 
     final def apply(entityId: EntityId): TopmostSameAs = apply(entityId.toString)
-
-    implicit lazy val topmostSameAsJsonLdEncoder: JsonLDEncoder[TopmostSameAs] = _.asEntityId.asJsonLD
   }
 
   class PartResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object PartResourceId
       extends TinyTypeFactory[PartResourceId](new PartResourceId(_))
       with UrlConstraint[PartResourceId]
-      with EntityIdJsonLdOps[PartResourceId]
+      with EntityIdJsonLDOps[PartResourceId]
 
   sealed trait Date extends Any with TinyType {
     def instant: Instant

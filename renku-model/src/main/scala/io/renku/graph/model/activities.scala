@@ -21,7 +21,7 @@ package io.renku.graph.model
 import cats.syntax.all._
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{BoundedInstant, Url}
-import views.{AnyResourceRenderer, EntityIdJsonLdOps, TinyTypeJsonLDOps}
+import views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
 
 import java.time.Instant
 
@@ -31,7 +31,7 @@ object activities {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLDOps[ResourceId]
       with AnyResourceRenderer[ResourceId]
 
   final class StartTime private (val value: Instant) extends AnyVal with InstantTinyType

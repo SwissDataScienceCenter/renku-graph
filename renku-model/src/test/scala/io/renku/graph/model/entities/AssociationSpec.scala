@@ -35,13 +35,14 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
     implicit val graph: GraphClass = GraphClass.Default
 
     "turn JsonLD Association entity with Renku agent into the Association object" in {
-      forAll(activityEntities(stepPlanEntities())(projectCreatedDates().generateOne).map(_.association)) { association =>
-        JsonLD
-          .arr(association.asJsonLD, association.plan.asJsonLD)
-          .flatten
-          .fold(throw _, identity)
-          .cursor
-          .as[List[entities.Association]] shouldBe List(association.to[entities.Association]).asRight
+      forAll(activityEntities(stepPlanEntities())(projectCreatedDates().generateOne).map(_.association)) {
+        association =>
+          JsonLD
+            .arr(association.asJsonLD, association.plan.asJsonLD)
+            .flatten
+            .fold(throw _, identity)
+            .cursor
+            .as[List[entities.Association]] shouldBe List(association.to[entities.Association]).asRight
       }
     }
 
@@ -96,7 +97,8 @@ class AssociationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPr
 
       val (association, agent) = generateAssociationWithPersonAgent
 
-      EntityFunctions[entities.Association].findAllPersons(association) shouldBe Set(agent.to[entities.Person])
+      EntityFunctions[entities.Association].findAllPersons(association) shouldBe
+        Set(agent.to[entities.Person]) ++ association.plan.creators
     }
   }
 

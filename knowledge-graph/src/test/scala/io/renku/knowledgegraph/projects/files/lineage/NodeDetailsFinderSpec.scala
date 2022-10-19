@@ -208,7 +208,7 @@ class NodeDetailsFinderSpec
               CommandInput.streamedFromLocation(input),
               CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
               CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
-            ).andThen(genPlan => genPlan.map(_.copy(maybeCommand = None))),
+            ).andThen(genPlan => genPlan.map(_.replaceCommand(to = None))),
             project
           ).map(
             _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne) // add some override values

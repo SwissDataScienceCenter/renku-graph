@@ -31,7 +31,7 @@ sealed trait Association {
   type AgentType
   val resourceId: ResourceId
   val agent:      AgentType
-  val plan:       Plan
+  val plan:       StepPlan
 
   def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A
 }
@@ -47,16 +47,15 @@ object Association {
       override val encoder: GraphClass => JsonLDEncoder[Association] = Association.encoder(glUrl, _)
     }
 
-  final case class WithRenkuAgent(resourceId: ResourceId, agent: Agent, plan: Plan) extends Association {
+  final case class WithRenkuAgent(resourceId: ResourceId, agent: Agent, plan: StepPlan) extends Association {
     type AgentType = Agent
 
-    def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A =
-      fb(this)
+    def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A = fb(this)
   }
-  final case class WithPersonAgent(resourceId: ResourceId, agent: Person, plan: Plan) extends Association {
+  final case class WithPersonAgent(resourceId: ResourceId, agent: Person, plan: StepPlan) extends Association {
     type AgentType = Person
-    def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A =
-      fa(this)
+
+    def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A = fa(this)
   }
 
   val entityTypes: EntityTypes = EntityTypes of (prov / "Association")
@@ -83,7 +82,7 @@ object Association {
     JsonLDDecoder.entity(entityTypes) { implicit cursor =>
       for {
         resourceId <- cursor.downEntityId.as[ResourceId]
-        plan       <- cursor.downField(prov / "hadPlan").as[Plan]
+        plan       <- cursor.downField(prov / "hadPlan").as[StepPlan]
         association <- cursor.downField(prov / "agent").as[Option[Agent]] match {
                          case Right(Some(agent)) => Association.WithRenkuAgent(resourceId, agent, plan).asRight
                          case _                  => tryAsPersonAgent(resourceId, plan)
@@ -91,7 +90,7 @@ object Association {
       } yield association
     }
 
-  private def tryAsPersonAgent(resourceId: ResourceId, plan: Plan)(implicit cursor: Cursor, renkuUrl: RenkuUrl) =
+  private def tryAsPersonAgent(resourceId: ResourceId, plan: StepPlan)(implicit cursor: Cursor, renkuUrl: RenkuUrl) =
     cursor.downField(prov / "agent").as[Option[Person]] >>= {
       case Some(agent) => Association.WithPersonAgent(resourceId, agent, plan).asRight
       case None        => DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
@@ -100,6 +99,6 @@ object Association {
   lazy val ontology: Type = Type.Def(
     Class(prov / "Association"),
     ObjectProperty(prov / "agent", Agent.ontology),
-    ObjectProperty(prov / "hadPlan", Plan.ontology)
+    ObjectProperty(prov / "hadPlan", StepPlan.ontology)
   )
 }

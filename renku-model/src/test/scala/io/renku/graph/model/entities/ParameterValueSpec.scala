@@ -27,6 +27,7 @@ import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities}
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.syntax._
+import monocle.Lens
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -111,12 +112,16 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         .fold(throw _, identity)
         .cursor
         .as[List[entities.ParameterValue]](
-          decodeList(entities.ParameterValue.decoder(activity.plan.to[entities.Plan].copy(parameters = Nil)))
+          decodeList(
+            entities.ParameterValue.decoder(
+              planParametersLens.modify(_ => Nil)(activity.plan.to[entities.StepPlan])
+            )
+          )
         )
 
       failure shouldBe a[DecodingFailure]
       failure.message should endWith(
-        s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].parameters.map(_.resourceId).head}"
+        s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.StepPlan].parameters.map(_.resourceId).head}"
       )
     }
 
@@ -133,12 +138,15 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         .fold(throw _, identity)
         .cursor
         .as[List[entities.ParameterValue]](
-          decodeList(entities.ParameterValue.decoder(activity.plan.to[entities.Plan].copy(inputs = Nil)))
+          decodeList(
+            entities.ParameterValue
+              .decoder(planInputsLens.modify(_ => Nil)(activity.plan.to[entities.StepPlan]))
+          )
         )
 
       failure shouldBe a[DecodingFailure]
       failure.message should endWith(
-        s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].inputs.map(_.resourceId).head}"
+        s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.StepPlan].inputs.map(_.resourceId).head}"
       )
     }
 
@@ -153,13 +161,39 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
         .fold(throw _, identity)
         .cursor
         .as[List[entities.ParameterValue]](
-          decodeList(entities.ParameterValue.decoder(activity.plan.to[entities.Plan].copy(outputs = Nil)))
+          decodeList(
+            entities.ParameterValue.decoder(planOutputsLens.modify(_ => Nil)(activity.plan.to[entities.StepPlan]))
+          )
         )
 
       failure shouldBe a[DecodingFailure]
       failure.message should endWith(
-        s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.Plan].outputs.map(_.resourceId).head}"
+        s"ParameterValue points to a non-existing command parameter ${activity.plan.to[entities.StepPlan].outputs.map(_.resourceId).head}"
       )
     }
   }
+
+  private lazy val planParametersLens: Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandParameter]] =
+    Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandParameter]](_.parameters) { params =>
+      {
+        case plan: entities.StepPlan.NonModified => plan.copy(parameters = params)
+        case plan: entities.StepPlan.Modified    => plan.copy(parameters = params)
+      }
+    }
+
+  private lazy val planInputsLens: Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandInput]] =
+    Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandInput]](_.inputs) { inputs =>
+      {
+        case plan: entities.StepPlan.NonModified => plan.copy(inputs = inputs)
+        case plan: entities.StepPlan.Modified    => plan.copy(inputs = inputs)
+      }
+    }
+
+  private lazy val planOutputsLens: Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandOutput]] =
+    Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandOutput]](_.outputs) { outputs =>
+      {
+        case plan: entities.StepPlan.NonModified => plan.copy(outputs = outputs)
+        case plan: entities.StepPlan.Modified    => plan.copy(outputs = outputs)
+      }
+    }
 }

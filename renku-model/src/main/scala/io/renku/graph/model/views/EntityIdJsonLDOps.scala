@@ -20,16 +20,19 @@ package io.renku.graph.model.views
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
+import io.renku.jsonld.syntax._
+import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder, JsonLDEncoder}
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 
-trait EntityIdJsonLdOps[TT <: TinyType { type V = String }] {
+trait EntityIdJsonLDOps[TT <: TinyType { type V = String }] {
   self: TinyTypeFactory[TT] =>
 
-  implicit lazy val encoder: EntityIdEncoder[TT] =
+  implicit lazy val entityIdEncoder: EntityIdEncoder[TT] =
     EntityIdEncoder.instance[TT](id => EntityId.of(id.value))
 
-  implicit lazy val decoder: JsonLDDecoder[TT] =
+  implicit lazy val ttEncoder: JsonLDEncoder[TT] = _.asEntityId.asJsonLD
+
+  implicit lazy val ttDecoder: JsonLDDecoder[TT] =
     JsonLDDecoder.instance {
       JsonLDDecoder.decodeEntityId >>> {
         _.flatMap(entityId =>

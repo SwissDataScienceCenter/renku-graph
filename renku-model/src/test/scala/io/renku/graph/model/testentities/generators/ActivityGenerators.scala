@@ -103,7 +103,8 @@ trait ActivityGenerators {
       name         <- planNames
       maybeCommand <- planCommandsGen.toGeneratorOfOptions
       dateCreated  <- planDatesCreated(after = projectDateCreated)
-    } yield Plan.of(name, maybeCommand, dateCreated, CommandParameters.of(parameterFactories: _*))
+      creators     <- personEntities.toGeneratorOfSet(min = 0, max = 2)
+    } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
 
   def executionPlanners(planGen: projects.DateCreated => Gen[StepPlan], project: RenkuProject): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)

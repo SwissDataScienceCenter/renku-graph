@@ -31,9 +31,9 @@ object ActivityLens {
   val activityAssociationAgent: Lens[Activity, Either[Agent, Person]] =
     activityAssociation >>> AssociationLens.associationAgent
 
-  val activityPlan: Lens[Activity, Plan] =
+  val activityPlan: Lens[Activity, StepPlan] =
     activityAssociation >>> AssociationLens.associationPlan
 
   val activityPlanCreators: Lens[Activity, Set[Person]] =
-    activityPlan >>> PlanLens.planCreators
+    activityPlan >>> PlanLens.stepPlanCreators
 }

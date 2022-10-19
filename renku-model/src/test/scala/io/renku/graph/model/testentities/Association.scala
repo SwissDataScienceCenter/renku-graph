@@ -26,19 +26,19 @@ sealed trait Association {
   type AgentType
   val activity: Activity
   val agent:    AgentType
-  val plan:     Plan
+  val plan:     StepPlan
 }
 
 object Association {
 
-  final case class WithRenkuAgent(activity: Activity, agent: Agent, plan: Plan) extends Association {
+  final case class WithRenkuAgent(activity: Activity, agent: Agent, plan: StepPlan) extends Association {
     type AgentType = Agent
   }
-  final case class WithPersonAgent(activity: Activity, agent: Person, plan: Plan) extends Association {
+  final case class WithPersonAgent(activity: Activity, agent: Person, plan: StepPlan) extends Association {
     type AgentType = Person
   }
 
-  def factory(agent: Agent, plan: Plan): Activity => Association = Association.WithRenkuAgent(_, agent, plan)
+  def factory(agent: Agent, plan: StepPlan): Activity => Association = Association.WithRenkuAgent(_, agent, plan)
 
   import io.renku.jsonld.syntax._
 
@@ -46,12 +46,12 @@ object Association {
     case a @ Association.WithRenkuAgent(_, agent, plan) =>
       entities.Association.WithRenkuAgent(associations.ResourceId(a.asEntityId.show),
                                           agent.to[entities.Agent],
-                                          plan.to[entities.Plan]
+                                          plan.to[entities.StepPlan]
       )
     case a @ Association.WithPersonAgent(_, agent, plan) =>
       entities.Association.WithPersonAgent(associations.ResourceId(a.asEntityId.show),
                                            agent.to[entities.Person],
-                                           plan.to[entities.Plan]
+                                           plan.to[entities.StepPlan]
       )
   }
 

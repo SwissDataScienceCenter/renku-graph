@@ -91,7 +91,7 @@ object ParameterValue {
         )
     }
 
-  def decoder(plan: Plan): JsonLDDecoder[ParameterValue] = JsonLDDecoder.entity(parameterValueTypes) { cursor =>
+  def decoder(plan: StepPlan): JsonLDDecoder[ParameterValue] = JsonLDDecoder.entity(parameterValueTypes) { cursor =>
     def maybeCommandParameter(resourceId: ResourceId, valueReferenceId: commandParameters.ResourceId) = plan
       .findParameter(valueReferenceId)
       .map(parameter =>

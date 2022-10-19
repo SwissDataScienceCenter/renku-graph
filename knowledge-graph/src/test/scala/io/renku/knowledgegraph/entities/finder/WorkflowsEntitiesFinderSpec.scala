@@ -137,4 +137,25 @@ class WorkflowsEntitiesFinderSpec
         .results shouldBe List((plan -> privateProject).to[model.Entity.Workflow])
     }
   }
+
+  "findEntities - in case of invalidated Plans" should {
+
+    "not return workflows that have been invalidated" in new TestCase {
+
+      val project = {
+        val p = renkuProjectEntities(visibilityPublic)
+          .withActivities(activityEntities(stepPlanEntities()))
+          .generateOne
+
+        p.addOtherPlan(p.plans.toList.head.invalidate())
+      }
+
+      upload(to = projectsDataset, project)
+
+      finder
+        .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))
+        .unsafeRunSync()
+        .results shouldBe List.empty
+    }
+  }
 }
