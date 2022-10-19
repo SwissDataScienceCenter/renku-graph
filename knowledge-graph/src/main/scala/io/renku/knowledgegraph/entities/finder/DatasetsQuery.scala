@@ -70,13 +70,15 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
     s"""|            {
         |              SELECT ?dsId (MAX(?score) AS ?matchingScore)
         |              WHERE {
-        |                GRAPH ?g {
-        |                  {
-        |                    (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
-        |                  } {
+        |                {
+        |                  (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
+        |                } {
+        |                  GRAPH ?projectId {
         |                    ?id a schema:Dataset
-        |                    BIND (?id AS ?dsId)
-        |                  } UNION {
+        |                  }
+        |                  BIND (?id AS ?dsId)
+        |                } UNION {
+        |                  GRAPH ?projectId {
         |                    ?dsId schema:creator ?id;
         |                          a schema:Dataset
         |                  }

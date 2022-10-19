@@ -98,20 +98,24 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
         |          (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds) 
         |          (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
         |        WHERE {
-        |          GRAPH ?someGraph {
-        |            {
-        |              SELECT DISTINCT ?id
-        |              WHERE { ?id text:query (schema:name schema:description renku:slug schema:keywords '$phrase') }
-        |            } {
-        |              ?id a schema:Dataset.
-        |              BIND(?id AS ?dsId)
-        |            } UNION {
-        |              GRAPH <${GraphClass.Persons.id}> {
-        |                ?id a schema:Person
-        |              }
-        |              ?dsId schema:creator ?id;
-        |                    a schema:Dataset.
+        |          {
+        |            SELECT DISTINCT ?projectId ?id
+        |            WHERE { ?id text:query (schema:name schema:description renku:slug schema:keywords '$phrase') }
+        |          } {
+        |            GRAPH ?projectId {
+        |              ?id a schema:Dataset
         |            }
+        |            BIND(?id AS ?dsId)
+        |          } UNION {
+        |            GRAPH <${GraphClass.Persons.id}> {
+        |              ?id a schema:Person
+        |            }
+        |            GRAPH ?projectId {
+        |              ?dsId schema:creator ?id;
+        |                    a schema:Dataset
+        |            }
+        |          }
+        |          GRAPH ?projectId {
         |            ?dsId renku:topmostSameAs ?sameAs;
         |                  ^renku:hasDataset ?projectId.
         |            ${projectMemberFilterQuery(maybeUser)}
