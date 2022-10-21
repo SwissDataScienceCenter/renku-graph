@@ -47,7 +47,7 @@ class WorkflowsEntitiesFinderSpec
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
         .forkOnce()
-      val plan :: Nil = fork.plans.toList
+      val plan :: Nil = fork.plans
 
       upload(to = projectsDataset, original, fork)
 
@@ -76,7 +76,7 @@ class WorkflowsEntitiesFinderSpec
         val original ::~ fork = publicProject.forkOnce()
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
       }
-      val plan :: Nil = publicProject.plans.toList
+      val plan :: Nil = publicProject.plans
 
       upload(to = projectsDataset, original, fork)
 
@@ -102,7 +102,7 @@ class WorkflowsEntitiesFinderSpec
         val original ::~ fork = internalProject.forkOnce()
         original -> fork.copy(visibility = projects.Visibility.Private, members = Set(member))
       }
-      val plan :: Nil = internalProject.plans.toList
+      val plan :: Nil = internalProject.plans
 
       upload(to = projectsDataset, original, fork)
 
@@ -123,7 +123,7 @@ class WorkflowsEntitiesFinderSpec
         .modify(replaceMembers(to = Set(member)))
         .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
-      val plan :: Nil = privateProject.plans.toList
+      val plan :: Nil = privateProject.plans
 
       upload(to = projectsDataset, privateProject)
 
@@ -147,7 +147,7 @@ class WorkflowsEntitiesFinderSpec
           .withActivities(activityEntities(stepPlanEntities()))
           .generateOne
 
-        p.addOtherPlan(p.plans.toList.head.invalidate())
+        p.addUnlinkedStepPlan(p.stepPlans.head.invalidate())
       }
 
       upload(to = projectsDataset, project)

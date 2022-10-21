@@ -46,12 +46,12 @@ object Association {
     case a @ Association.WithRenkuAgent(_, agent, plan) =>
       entities.Association.WithRenkuAgent(associations.ResourceId(a.asEntityId.show),
                                           agent.to[entities.Agent],
-                                          plan.to[entities.StepPlan]
+                                          plan.to[entities.StepPlan].resourceId
       )
     case a @ Association.WithPersonAgent(_, agent, plan) =>
       entities.Association.WithPersonAgent(associations.ResourceId(a.asEntityId.show),
                                            agent.to[entities.Person],
-                                           plan.to[entities.StepPlan]
+                                           plan.to[entities.StepPlan].resourceId
       )
   }
 

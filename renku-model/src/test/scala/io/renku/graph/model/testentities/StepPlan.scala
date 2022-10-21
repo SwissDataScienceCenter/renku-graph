@@ -52,7 +52,7 @@ object StepPlan {
   case class NonModified(id:                        Identifier,
                          name:                      Name,
                          maybeDescription:          Option[Description],
-                         creators:                  Set[Person],
+                         creators:                  List[Person],
                          dateCreated:               DateCreated,
                          keywords:                  List[Keyword],
                          maybeCommand:              Option[Command],
@@ -126,7 +126,7 @@ object StepPlan {
         }
       )
 
-    override def replaceCreators(creators: Set[Person]): StepPlan.NonModified = copy(creators = creators)
+    override def replaceCreators(creators: List[Person]): StepPlan.NonModified = copy(creators = creators)
 
     override def replacePlanName(to: plans.Name): StepPlan.NonModified = copy(name = to)
 
@@ -142,7 +142,7 @@ object StepPlan {
   case class Modified(id:                        Identifier,
                       name:                      Name,
                       maybeDescription:          Option[Description],
-                      creators:                  Set[Person],
+                      creators:                  List[Person],
                       dateCreated:               DateCreated,
                       keywords:                  List[Keyword],
                       maybeCommand:              Option[Command],
@@ -236,7 +236,7 @@ object StepPlan {
       case _ => Validated.valid(())
     }
 
-    override def replaceCreators(creators: Set[Person]): StepPlan.Modified = copy(creators = creators)
+    override def replaceCreators(creators: List[Person]): StepPlan.Modified = copy(creators = creators)
 
     override def replacePlanName(to: plans.Name): StepPlan.Modified = copy(name = to)
 
@@ -252,7 +252,7 @@ object StepPlan {
   def of(name:                      Name,
          maybeCommand:              Option[Command],
          dateCreated:               DateCreated,
-         creators:                  Set[Person],
+         creators:                  List[Person],
          commandParameterFactories: List[Position => StepPlan => CommandParameterBase]
   ): StepPlan.NonModified = StepPlan.NonModified(
     planIdentifiers.generateOne,

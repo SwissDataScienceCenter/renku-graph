@@ -38,8 +38,9 @@ private trait ProjectFunctions {
     project
       .updateMember(oldPerson, newPerson)
       .updateCreator(oldPerson, newPerson)
-      .updateActivities(_.updateAuthorsAndAgents(oldPerson, newPerson))
-      .updateDatasets(_.updateCreators(oldPerson, newPerson))
+      .updateActivities(updateAuthorsAndAgents(oldPerson, newPerson))
+      .updateDatasets(updateDatasetCreators(oldPerson, newPerson))
+      .updatePlans(updatePlanCreators(oldPerson, newPerson))
 
   def update(oldDataset: Dataset[Provenance], newDataset: Dataset[Provenance]): Project => Project = project =>
     if (oldDataset == newDataset) project
@@ -120,12 +121,12 @@ private object ProjectFunctions extends ProjectFunctions {
   private implicit class ProjectOps(project: Project) {
 
     def updateMember(oldPerson: Person, newPerson: Person): Project =
-      projectMembersLens.modify {
-        membersLens.modify {
+      projectMembersLens
+        .composeTraversal(membersLens)
+        .modify {
           case `oldPerson` => newPerson
           case p           => p
-        }
-      }(project)
+        }(project)
 
     def updateCreator(oldPerson: Person, newPerson: Person): Project =
       projectCreatorLens.modify {
@@ -138,45 +139,49 @@ private object ProjectFunctions extends ProjectFunctions {
 
     def updateDatasets(function: List[Dataset[Dataset.Provenance]] => List[Dataset[Dataset.Provenance]]): Project =
       projectDatasetsLens.modify(function)(project)
+
+    def updatePlans(function: List[Plan] => List[Plan]): Project =
+      projectPlans.modify(function)(project)
   }
 
-  private implicit class ActivitiesOps(activities: List[Activity]) {
+  private def updateAuthorsAndAgents(oldPerson: Person, newPerson: Person): List[Activity] => List[Activity] = {
 
-    def updateAuthorsAndAgents(oldPerson: Person, newPerson: Person): List[Activity] =
-      activitiesLens.modify {
-        updateAuthor(oldPerson, newPerson) >>> updateAssociationAgents(oldPerson, newPerson) >>> updatePlanCreators(
-          oldPerson,
-          newPerson
-        )
-      }(activities)
-
-    private def updateAuthor(oldPerson: Person, newPerson: Person) =
+    def updateAuthor(oldPerson: Person, newPerson: Person) =
       ActivityLens.activityAuthor.modify {
         case `oldPerson` => newPerson
         case other       => other
       }
 
-    private def updateAssociationAgents(oldPerson: Person, newPerson: Person): Activity => Activity =
+    def updateAssociationAgents(oldPerson: Person, newPerson: Person): Activity => Activity =
       ActivityLens.activityAssociationAgent.modify {
         case Right(`oldPerson`) => Right(newPerson)
         case other              => other
       }
 
-    private def updatePlanCreators(oldPerson: Person, newPerson: Person): Activity => Activity =
-      ActivityLens.activityPlanCreators.modify(_.map(p => if (p == oldPerson) newPerson else p))
+    activitiesLens.modify {
+      updateAuthor(oldPerson, newPerson) >>> updateAssociationAgents(oldPerson, newPerson)
+    }
   }
 
-  private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
+  private def updateDatasetCreators(oldPerson: Person,
+                                    newPerson: Person
+  ): List[Dataset[Provenance]] => List[Dataset[Provenance]] =
+    datasetsLens
+      .composeLens(provenanceLens >>> provCreatorsLens)
+      .composeTraversal(creatorsLens)
+      .modify {
+        case `oldPerson` => newPerson
+        case p           => p
+      }
 
-    def updateCreators(oldPerson: Person, newPerson: Person): List[Dataset[Provenance]] =
-      datasetsLens
-        .composeLens(provenanceLens >>> provCreatorsLens)
-        .composeTraversal(creatorsLens)
-        .modify {
-          case `oldPerson` => newPerson
-          case p           => p
-        }(datasets)
-  }
+  private def updatePlanCreators(oldPerson: Person, newPerson: Person): List[Plan] => List[Plan] =
+    plansLens
+      .composeLens(PlanLens.planCreators)
+      .composeTraversal(Traversal.fromTraverse[List, Person])
+      .modify {
+        case `oldPerson` => newPerson
+        case p           => p
+      }
 
   private object Lenses {
     val membersLens = Traversal.fromTraverse[List, Person]
@@ -217,5 +222,12 @@ private object ProjectFunctions extends ProjectFunctions {
         case p: Provenance.Modified                         => p.copy(creators = crts.sortBy(_.name))
       }
     }
+
+    val projectPlans: Lens[Project, List[Plan]] = Lens[Project, List[Plan]](_.plans)(plans => {
+      case p: RenkuProject.WithoutParent => p.copy(plans = plans)
+      case p: RenkuProject.WithParent    => p.copy(plans = plans)
+      case p: NonRenkuProject            => p
+    })
+    val plansLens: Traversal[List[Plan], Plan] = Traversal.fromTraverse[List, Plan]
   }
 }

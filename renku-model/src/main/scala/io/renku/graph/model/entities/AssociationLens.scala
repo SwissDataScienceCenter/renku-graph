@@ -23,9 +23,6 @@ import monocle.Lens
 
 object AssociationLens {
 
-  val associationPlan: Lens[Association, StepPlan] =
-    Lens[Association, StepPlan](_.plan)(p => a => a.fold[Association](_.copy(plan = p))(_.copy(plan = p)))
-
   val associationAgent: Lens[Association, Either[Agent, Person]] =
     Lens[Association, Either[Agent, Person]](_.fold(_.agent.asRight[Agent])(_.agent.asLeft[Person])) {
       case Right(person) => {

@@ -23,7 +23,7 @@ import StepPlan.CommandParameters
 import StepPlan.CommandParameters.CommandParameterFactory
 import generators.EntitiesGenerators.{ActivityGenFactory, StepPlanGenFactory}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestamps, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates}
 import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
@@ -103,7 +103,7 @@ trait ActivityGenerators {
       name         <- planNames
       maybeCommand <- planCommandsGen.toGeneratorOfOptions
       dateCreated  <- planDatesCreated(after = projectDateCreated)
-      creators     <- personEntities.toGeneratorOfSet(min = 0, max = 2)
+      creators     <- personEntities.toGeneratorOfList(max = 2)
     } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
 
   def executionPlanners(planGen: projects.DateCreated => Gen[StepPlan], project: RenkuProject): Gen[ExecutionPlanner] =
@@ -116,7 +116,7 @@ trait ActivityGenerators {
     author     <- personEntities
     cliVersion <- cliVersions
   } yield ExecutionPlanner.of(plan,
-                              activityStartTimes(projectDateCreated).generateOne,
+                              activityStartTimes(plan.dateCreated).generateOne,
                               author,
                               cliVersion,
                               projectDateCreated
@@ -131,10 +131,6 @@ trait ActivityGenerators {
       factory(projectDateCreated).generateList()
 
     def multiple: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne.value)(factory)
-
-    def withDateBefore(max: InstantTinyType): Gen[Activity] =
-      factory(projects.DateCreated(max.value))
-        .map(_.copy(startTime = timestamps(max = max.value).generateAs[activities.StartTime]))
 
     def modify(f: Activity => Activity): ActivityGenFactory =
       projectCreationDate => factory(projectCreationDate).map(f)
@@ -164,9 +160,9 @@ trait ActivityGenerators {
   def setPlanCreator(person: Person): Activity => Activity = activity =>
     activity.copy(associationFactory = activity.associationFactory.andThen {
       case p: Association.WithPersonAgent =>
-        Association.WithPersonAgent(p.activity, p.agent, p.plan.replaceCreators(Set(person)))
+        Association.WithPersonAgent(p.activity, p.agent, p.plan.replaceCreators(person :: Nil))
       case p: Association.WithRenkuAgent =>
-        Association.WithRenkuAgent(p.activity, p.agent, p.plan.replaceCreators(Set(person)))
+        Association.WithRenkuAgent(p.activity, p.agent, p.plan.replaceCreators(person :: Nil))
     })
 
   implicit class PlanGenFactoryOps(factory: StepPlanGenFactory) {

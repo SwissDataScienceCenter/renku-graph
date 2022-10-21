@@ -119,7 +119,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     implicit val graph: GraphClass = GraphClass.Default
 
     "produce JsonLD for a non-modified Plan with all the relevant properties" in {
-      val plan = plans.generateOne.replaceCreators(personEntities.generateSet(min = 1)).to[entities.StepPlan]
+      val plan = plans.generateOne.replaceCreators(personEntities.generateList(min = 1)).to[entities.StepPlan]
 
       plan.asJsonLD shouldBe JsonLD
         .entity(
@@ -128,7 +128,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           schema / "name"                -> plan.name.asJsonLD,
           schema / "description"         -> plan.maybeDescription.asJsonLD,
           renku / "command"              -> plan.maybeCommand.asJsonLD,
-          schema / "creator"             -> plan.creators.toList.asJsonLD,
+          schema / "creator"             -> plan.creators.asJsonLD,
           schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
           schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
           schema / "keywords"            -> plan.keywords.asJsonLD,
@@ -142,7 +142,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     "produce JsonLD for a modified Plan with all the relevant properties" in {
       val plan = plans.generateOne
         .invalidate()
-        .replaceCreators(personEntities.generateSet(min = 1))
+        .replaceCreators(personEntities.generateList(min = 1))
         .to(StepPlan.Modified.toEntitiesStepPlan)
 
       plan.asJsonLD shouldBe JsonLD
@@ -170,7 +170,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     implicit val graph: GraphClass = GraphClass.Project
 
     "produce JsonLD for a non-modified Plan with all the relevant properties" in {
-      val plan = plans.generateOne.replaceCreators(personEntities.generateSet(min = 1)).to[entities.StepPlan]
+      val plan = plans.generateOne.replaceCreators(personEntities.generateList(min = 1)).to[entities.StepPlan]
 
       plan.asJsonLD shouldBe JsonLD
         .entity(
@@ -179,7 +179,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           schema / "name"                -> plan.name.asJsonLD,
           schema / "description"         -> plan.maybeDescription.asJsonLD,
           renku / "command"              -> plan.maybeCommand.asJsonLD,
-          schema / "creator"             -> plan.creators.toList.map(_.resourceId.asEntityId).asJsonLD,
+          schema / "creator"             -> plan.creators.map(_.resourceId.asEntityId).asJsonLD,
           schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
           schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
           schema / "keywords"            -> plan.keywords.asJsonLD,
@@ -193,7 +193,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     "produce JsonLD for a modified Plan with all the relevant properties" in {
       val plan = plans.generateOne
         .invalidate()
-        .replaceCreators(personEntities.generateSet(min = 1))
+        .replaceCreators(personEntities.generateList(min = 1))
         .to(StepPlan.Modified.toEntitiesStepPlan)
 
       plan.asJsonLD shouldBe JsonLD
@@ -221,10 +221,10 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
 
     "return all creators" in {
       val plan = plans.generateOne
-        .replaceCreators(personEntities.generateSet(min = 1))
+        .replaceCreators(personEntities.generateList(min = 1))
         .to[entities.StepPlan]
 
-      EntityFunctions[entities.Plan].findAllPersons shouldBe plan.creators
+      EntityFunctions[entities.Plan].findAllPersons(plan) shouldBe plan.creators.toSet
     }
   }
 
@@ -242,5 +242,5 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
   }
 
   private lazy val plans = stepPlanEntities(commandParametersLists.generateOne: _*)(planCommands)
-    .modify(_.replaceCreators(personEntities.generateSet(max = 2)))(projectCreatedDates().generateOne)
+    .modify(_.replaceCreators(personEntities.generateList(max = 2)))(projectCreatedDates().generateOne)
 }

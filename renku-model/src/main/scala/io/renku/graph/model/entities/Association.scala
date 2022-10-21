@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.prov
 import io.renku.graph.model.associations.ResourceId
-import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl}
+import io.renku.graph.model._
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
@@ -31,28 +31,29 @@ sealed trait Association {
   type AgentType
   val resourceId: ResourceId
   val agent:      AgentType
-  val plan:       StepPlan
+  val planId:     plans.ResourceId
 
   def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A
 }
 
 object Association {
 
-  implicit def functions(implicit glUrl: GitLabApiUrl, efp: EntityFunctions[Plan]): EntityFunctions[Association] =
+  implicit def functions(implicit glUrl: GitLabApiUrl): EntityFunctions[Association] =
     new EntityFunctions[Association] {
 
       override val findAllPersons: Association => Set[Person] =
-        a => efp.findAllPersons(a.plan) ++ AssociationLens.associationAgent.get(a).toOption.toSet
+        AssociationLens.associationAgent.get(_).toOption.toSet
 
       override val encoder: GraphClass => JsonLDEncoder[Association] = Association.encoder(glUrl, _)
     }
 
-  final case class WithRenkuAgent(resourceId: ResourceId, agent: Agent, plan: StepPlan) extends Association {
+  final case class WithRenkuAgent(resourceId: ResourceId, agent: Agent, planId: plans.ResourceId) extends Association {
     type AgentType = Agent
 
     def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A = fb(this)
   }
-  final case class WithPersonAgent(resourceId: ResourceId, agent: Person, plan: StepPlan) extends Association {
+  final case class WithPersonAgent(resourceId: ResourceId, agent: Person, planId: plans.ResourceId)
+      extends Association {
     type AgentType = Person
 
     def fold[A](fa: Association.WithPersonAgent => A)(fb: Association.WithRenkuAgent => A): A = fa(this)
@@ -60,41 +61,49 @@ object Association {
 
   val entityTypes: EntityTypes = EntityTypes of (prov / "Association")
 
-  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl, graph: GraphClass): JsonLDEncoder[Association] =
+  implicit def encoder(implicit glApiUrl: GitLabApiUrl, gc: GraphClass): JsonLDEncoder[Association] =
     JsonLDEncoder.instance {
-      case WithRenkuAgent(resourceId, agent, plan) =>
+      case WithRenkuAgent(resourceId, agent, planId) =>
         JsonLD.entity(
           resourceId.asEntityId,
           entityTypes,
           prov / "agent"   -> agent.asJsonLD,
-          prov / "hadPlan" -> plan.resourceId.asEntityId.asJsonLD
+          prov / "hadPlan" -> planId.asEntityId.asJsonLD
         )
-      case WithPersonAgent(resourceId, agent, plan) =>
+      case WithPersonAgent(resourceId, agent, planId) =>
         JsonLD.entity(
           resourceId.asEntityId,
           entityTypes,
           prov / "agent"   -> agent.asJsonLD,
-          prov / "hadPlan" -> plan.resourceId.asEntityId.asJsonLD
+          prov / "hadPlan" -> planId.asEntityId.asJsonLD
         )
     }
 
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Association] =
-    JsonLDDecoder.entity(entityTypes) { implicit cursor =>
+  implicit def decoder(implicit dependencyLinks: DependencyLinks, renkuUrl: RenkuUrl): JsonLDDecoder[Association] = {
+    def checkValid(implicit associationId: ResourceId): plans.ResourceId => JsonLDDecoder.Result[Unit] = planId =>
+      dependencyLinks.findStepPlan(planId) match {
+        case Some(_) => ().asRight
+        case None => DecodingFailure(show"Association $associationId points to a non-existing Plan $planId", Nil).asLeft
+      }
+
+    JsonLDDecoder.entity(entityTypes) { cursor =>
       for {
-        resourceId <- cursor.downEntityId.as[ResourceId]
-        plan       <- cursor.downField(prov / "hadPlan").as[StepPlan]
+        implicit0(resourceId: ResourceId) <- cursor.downEntityId.as[ResourceId]
+        planId <- cursor.downField(prov / "hadPlan").downEntityId.as[plans.ResourceId] flatTap checkValid
         association <- cursor.downField(prov / "agent").as[Option[Agent]] match {
-                         case Right(Some(agent)) => Association.WithRenkuAgent(resourceId, agent, plan).asRight
-                         case _                  => tryAsPersonAgent(resourceId, plan)
+                         case Right(Some(agent)) => Association.WithRenkuAgent(resourceId, agent, planId).asRight
+                         case _                  => tryAsPersonAgent(cursor, resourceId, planId)
                        }
       } yield association
     }
+  }
 
-  private def tryAsPersonAgent(resourceId: ResourceId, plan: StepPlan)(implicit cursor: Cursor, renkuUrl: RenkuUrl) =
-    cursor.downField(prov / "agent").as[Option[Person]] >>= {
-      case Some(agent) => Association.WithPersonAgent(resourceId, agent, plan).asRight
-      case None        => DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
-    }
+  private def tryAsPersonAgent(cursor: Cursor, resourceId: ResourceId, planId: plans.ResourceId)(implicit
+      renkuUrl:                        RenkuUrl
+  ) = cursor.downField(prov / "agent").as[Option[Person]] >>= {
+    case Some(agent) => Association.WithPersonAgent(resourceId, agent, planId).asRight
+    case None        => DecodingFailure(show"Association $resourceId without a valid ${prov / "agent"}", Nil).asLeft
+  }
 
   lazy val ontology: Type = Type.Def(
     Class(prov / "Association"),

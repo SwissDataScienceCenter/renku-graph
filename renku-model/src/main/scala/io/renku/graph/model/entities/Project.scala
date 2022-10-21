@@ -18,14 +18,15 @@
 
 package io.renku.graph.model.entities
 
+import cats.Show
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
-import io.renku.graph.model
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.projects._
 import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.ontology._
+import io.renku.tinytypes.InstantTinyType
 import monocle.{Lens, Traversal}
 
 sealed trait Project extends Product with Serializable {
@@ -41,14 +42,14 @@ sealed trait Project extends Product with Serializable {
 
   val activities: List[Activity]
   val datasets:   List[Dataset[Dataset.Provenance]]
-  val plans:      Set[Plan]
+  val plans:      List[Plan]
   lazy val namespaces: List[Namespace] = path.toNamespaces
 }
 
 sealed trait NonRenkuProject extends Project with Product with Serializable {
   lazy val activities: List[Activity]                    = Nil
   lazy val datasets:   List[Dataset[Dataset.Provenance]] = Nil
-  lazy val plans:      Set[Plan]                         = Set.empty
+  lazy val plans:      List[Plan]                        = Nil
 }
 
 sealed trait Parent {
@@ -88,8 +89,7 @@ sealed trait RenkuProject extends Project with Product with Serializable {
   val version:    SchemaVersion
   val activities: List[Activity]
   val datasets:   List[Dataset[Dataset.Provenance]]
-
-  lazy val plans: Set[Plan] = activities.map(_.association.plan).toSet
+  val plans:      List[Plan]
 }
 
 object RenkuProject {
@@ -105,7 +105,8 @@ object RenkuProject {
                                  members:          Set[Person],
                                  version:          SchemaVersion,
                                  activities:       List[Activity],
-                                 datasets:         List[Dataset[Dataset.Provenance]]
+                                 datasets:         List[Dataset[Dataset.Provenance]],
+                                 plans:            List[Plan]
   ) extends RenkuProject
 
   object WithoutParent extends ProjectFactory {
@@ -122,12 +123,13 @@ object RenkuProject {
              members:          Set[Person],
              version:          SchemaVersion,
              activities:       List[Activity],
-             datasets:         List[Dataset[Dataset.Provenance]]
+             datasets:         List[Dataset[Dataset.Provenance]],
+             plans:            List[Plan]
     ): ValidatedNel[String, RenkuProject.WithoutParent] =
-      (validateDates(dateCreated, activities, datasets), validateDatasets(datasets))
+      (validateDates(dateCreated, activities, datasets, plans), validateDatasets(datasets))
         .mapN { (_, _) =>
-          val (syncedActivities, syncedDatasets) =
-            syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
+          val (syncedActivities, syncedDatasets, syncedPlans) =
+            syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, plans)
           RenkuProject.WithoutParent(resourceId,
                                      path,
                                      name,
@@ -140,44 +142,50 @@ object RenkuProject {
                                      members,
                                      version,
                                      syncedActivities,
-                                     syncedDatasets
+                                     syncedDatasets,
+                                     syncedPlans
           )
         }
 
     private def validateDates(dateCreated: DateCreated,
                               activities:  List[Activity],
-                              datasets:    List[Dataset[Provenance]]
+                              datasets:    List[Dataset[Provenance]],
+                              plans:       List[Plan]
     ): ValidatedNel[String, Unit] =
-      activities
-        .map { activity =>
-          import activity._
-          if ((startTime.value compareTo dateCreated.value) >= 0) ().validNel[String]
-          else s"Activity $resourceId startTime $startTime is older than project $dateCreated".invalidNel
-        }
-        .sequence
-        .void |+| datasets
-        .map {
-          def compareDateWithProject(dataset: Dataset[Provenance], dsCreated: model.datasets.DateCreated) =
-            if ((dsCreated.value compareTo dateCreated.value) >= 0) ().validNel[String]
-            else
-              s"Dataset ${dataset.identification.identifier} date $dsCreated is older than project $dateCreated".invalidNel
+      validateDates(dateCreated, activitiesDates(activities)) |+|
+        validateDates(dateCreated, datasetsDates(datasets)) |+|
+        validateDates(dateCreated, planDates(plans))
 
-          dataset =>
-            dataset.provenance match {
-              case p: Provenance.Internal => compareDateWithProject(dataset, p.date)
-              case p: Provenance.Modified => compareDateWithProject(dataset, p.date)
-              case _ => ().validNel[String]
-            }
+    private type DatedEntity[R] = (String, R, InstantTinyType)
+
+    private def activitiesDates(entities: List[Activity]): List[DatedEntity[activities.ResourceId]] =
+      entities.map(a => ("Activity", a.resourceId, a.startTime))
+
+    private def datasetsDates(entities: List[Dataset[Provenance]]): List[DatedEntity[datasets.ResourceId]] =
+      entities.collect { ds =>
+        ds.provenance match {
+          case p: Provenance.Internal => ("Dataset", ds.resourceId, p.date)
+          case p: Provenance.Modified => ("Dataset", ds.resourceId, p.date)
         }
-        .sequence
-        .void |+| activities
-        .map { activity =>
-          import activity.association.plan
-          if ((plan.dateCreated.value compareTo dateCreated.value) >= 0) ().validNel[String]
-          else s"Plan ${plan.resourceId} dateCreated ${plan.dateCreated} is older than project $dateCreated".invalidNel
+      }
+
+    private def planDates(entities: List[Plan]): List[DatedEntity[plans.ResourceId]] =
+      entities.map(p => ("Plan", p.resourceId, p.dateCreated))
+
+    private def validateDates[R](
+        projectDate:   DateCreated,
+        toValidate:    List[DatedEntity[R]]
+    )(implicit idShow: Show[R]) = {
+      implicit lazy val show: Show[InstantTinyType] = Show.show(_.toString)
+
+      toValidate
+        .map { case (name, id, date) =>
+          if ((date.value compareTo projectDate.value) >= 0) ().validNel[String]
+          else show"$name $id date $date is older than project $projectDate".invalidNel
         }
         .sequence
         .void
+    }
   }
 
   final case class WithParent(resourceId:       ResourceId,
@@ -193,6 +201,7 @@ object RenkuProject {
                               version:          SchemaVersion,
                               activities:       List[Activity],
                               datasets:         List[Dataset[Dataset.Provenance]],
+                              plans:            List[Plan],
                               parentResourceId: ResourceId
   ) extends RenkuProject
       with Parent
@@ -212,10 +221,11 @@ object RenkuProject {
              version:          SchemaVersion,
              activities:       List[Activity],
              datasets:         List[Dataset[Dataset.Provenance]],
+             plans:            List[Plan],
              parentResourceId: ResourceId
     ): ValidatedNel[String, RenkuProject.WithParent] = validateDatasets(datasets) map { _ =>
-      val (syncedActivities, syncedDatasets) =
-        syncPersons(projectPersons = members ++ maybeCreator, activities, datasets)
+      val (syncedActivities, syncedDatasets, syncedPlans) =
+        syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, plans)
       RenkuProject.WithParent(
         resourceId,
         path,
@@ -230,6 +240,7 @@ object RenkuProject {
         version,
         syncedActivities,
         syncedDatasets,
+        syncedPlans,
         parentResourceId
       )
     }
@@ -262,14 +273,18 @@ object RenkuProject {
 
     protected def syncPersons(projectPersons: Set[Person],
                               activities:     List[Activity],
-                              datasets:       List[Dataset[Provenance]]
-    ): (List[Activity], List[Dataset[Provenance]]) =
-      activities.updatePersons(from = projectPersons) -> datasets.updateCreators(from = projectPersons)
+                              datasets:       List[Dataset[Provenance]],
+                              plans:          List[Plan]
+    ): (List[Activity], List[Dataset[Provenance]], List[Plan]) = (
+      activities.updatePersons(from = projectPersons),
+      datasets.updateCreators(from = projectPersons),
+      plans.updateCreators(from = projectPersons)
+    )
 
     private implicit class ActivitiesOps(activities: List[Activity]) {
 
       def updatePersons(from: Set[Person]): List[Activity] =
-        (updateAuthors(from) andThen updateAssociationAgents(from) andThen updatePlanCreators(from))(activities)
+        (updateAuthors(from) andThen updateAssociationAgents(from))(activities)
 
       private def updateAuthors(from: Set[Person]): List[Activity] => List[Activity] =
         activitiesLens.composeLens(ActivityLens.activityAuthor).modify { author =>
@@ -284,11 +299,6 @@ object RenkuProject {
             Right(from.find(byEmail(person)).getOrElse(person))
           case other => other
         }
-
-      private def updatePlanCreators(from: Set[Person]): List[Activity] => List[Activity] =
-        activitiesLens
-          .composeLens(ActivityLens.activityPlanCreators)
-          .modify(ps => ps.map(p => from.find(byEmail(p)).getOrElse(p)))
     }
 
     private implicit class DatasetsOps(datasets: List[Dataset[Provenance]]) {
@@ -299,6 +309,14 @@ object RenkuProject {
           .composeLens(provCreatorsLens)
           .composeTraversal(creatorsLens)
           .modify(creator => from.find(byEmail(creator)).getOrElse(creator))(datasets)
+    }
+
+    private implicit class PlansOps(plans: List[Plan]) {
+
+      def updateCreators(from: Set[Person]): List[Plan] =
+        plansLens
+          .composeLens(PlanLens.planCreators)
+          .modify(_.map(p => from.find(byEmail(p)).getOrElse(p)))(plans)
     }
 
     private lazy val byEmail: Person => Person => Boolean = { person1 => person2 =>
@@ -319,6 +337,8 @@ object RenkuProject {
         case p: Provenance.Modified                         => p.copy(creators = crts.sortBy(_.name))
       }
     }
+
+    private val plansLens = Traversal.fromTraverse[List, Plan]
   }
 }
 
@@ -333,7 +353,8 @@ object Project {
         project.members ++
           project.maybeCreator ++
           project.activities.flatMap(EntityFunctions[Activity].findAllPersons) ++
-          project.datasets.flatMap(EntityFunctions[Dataset[Dataset.Provenance]].findAllPersons)
+          project.datasets.flatMap(EntityFunctions[Dataset[Dataset.Provenance]].findAllPersons) ++
+          project.plans.flatMap(EntityFunctions[Plan].findAllPersons)
       }
 
       override val encoder: GraphClass => JsonLDEncoder[P] = Project.encoder(renkuUrl, glApiUrl, _)
@@ -371,7 +392,7 @@ object Project {
           schema / "member"           -> project.members.toList.asJsonLD,
           schema / "schemaVersion"    -> project.version.asJsonLD,
           renku / "hasActivity"       -> project.activities.asJsonLD,
-          renku / "hasPlan"           -> project.plans.toList.asJsonLD,
+          renku / "hasPlan"           -> project.plans.asJsonLD,
           renku / "hasDataset"        -> project.datasets.asJsonLD,
           prov / "wasDerivedFrom"     -> maybeDerivedFrom.asJsonLD
         ) :: project.datasets.flatMap(_.publicationEvents.map(_.asJsonLD)): _*

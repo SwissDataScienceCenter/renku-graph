@@ -30,7 +30,7 @@ trait Plan extends PlanAlg {
   val id:               Identifier
   val name:             Name
   val maybeDescription: Option[Description]
-  val creators:         Set[Person]
+  val creators:         List[Person]
   val dateCreated:      DateCreated
   val keywords:         List[Keyword]
   type PlanGroup <: Plan
@@ -59,7 +59,9 @@ trait PlanAlg { self: Plan =>
       show"Invalidation time $invalidationTime on StepPlan with id: $id is older than dateCreated"
     )
 
-  def replaceCreators(creators: Set[Person]): PlanType
+  def replaceCreators(creators: List[Person]): PlanType
+
+  def removeCreators(): PlanType = replaceCreators(Nil)
 
   def replacePlanName(to: plans.Name): PlanType
 
@@ -85,7 +87,7 @@ object Plan {
   def of(name:                      Name,
          maybeCommand:              Option[Command],
          dateCreated:               DateCreated,
-         creators:                  Set[Person],
+         creators:                  List[Person],
          commandParameterFactories: List[Position => StepPlan => CommandParameterBase]
   ): StepPlan.NonModified = StepPlan.of(name, maybeCommand, dateCreated, creators, commandParameterFactories)
 

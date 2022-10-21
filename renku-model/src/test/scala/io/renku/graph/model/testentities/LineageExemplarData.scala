@@ -98,7 +98,7 @@ object LineageExemplarData {
       plans.Name("plan1"),
       Command("python").some,
       planDatesCreated(after = project.dateCreated).generateOne,
-      creators = Set.empty,
+      creators = Nil,
       CommandParameters.of(CommandInput.fromLocation(cleanData),
                            CommandInput.fromLocation(zhbikesFolder),
                            CommandOutput.fromLocation(bikesParquet)
@@ -118,7 +118,7 @@ object LineageExemplarData {
       plans.Name("plan2"),
       Command("python").some,
       planDatesCreated(after = project.dateCreated).generateOne,
-      creators = Set.empty,
+      creators = Nil,
       CommandParameters.of(
         CommandInput.fromLocation(plotData),
         CommandInput.fromLocation(bikesParquet),

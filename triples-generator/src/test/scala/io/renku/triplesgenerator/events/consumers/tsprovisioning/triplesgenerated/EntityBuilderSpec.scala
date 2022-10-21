@@ -228,7 +228,11 @@ class EntityBuilderSpec extends AnyWordSpec with MockFactory with should.Matcher
               .to[entities.RenkuProject.WithoutParent]
               .copy(activities =
                 activityEntities
-                  .withDateBefore(project.dateCreated)
+                  .modify(
+                    _.replaceStartTime(
+                      timestamps(max = project.dateCreated.value.minusSeconds(1)).generateAs(activities.StartTime)
+                    )
+                  )(project.dateCreated)
                   .generateFixedSizeList(1)
                   .map(_.to[entities.Activity])
               )

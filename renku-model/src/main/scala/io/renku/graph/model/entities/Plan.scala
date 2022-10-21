@@ -34,7 +34,7 @@ sealed trait Plan extends Product with Serializable {
   val resourceId:       ResourceId
   val name:             Name
   val maybeDescription: Option[Description]
-  val creators:         Set[Person]
+  val creators:         List[Person]
   val dateCreated:      DateCreated
   val keywords:         List[Keyword]
 
@@ -45,7 +45,7 @@ object Plan {
 
   implicit def entityFunctions(implicit gitLabApiUrl: GitLabApiUrl): EntityFunctions[Plan] =
     new EntityFunctions[Plan] {
-      val findAllPersons: Plan => Set[Person]               = _.creators
+      val findAllPersons: Plan => Set[Person]               = _.creators.toSet
       val encoder:        GraphClass => JsonLDEncoder[Plan] = Plan.encoder(gitLabApiUrl, _)
     }
 
@@ -86,7 +86,7 @@ object StepPlan {
   final case class NonModified(resourceId:               ResourceId,
                                name:                     Name,
                                maybeDescription:         Option[Description],
-                               creators:                 Set[Person],
+                               creators:                 List[Person],
                                dateCreated:              DateCreated,
                                keywords:                 List[Keyword],
                                maybeCommand:             Option[Command],
@@ -100,7 +100,7 @@ object StepPlan {
   final case class Modified(resourceId:               ResourceId,
                             name:                     Name,
                             maybeDescription:         Option[Description],
-                            creators:                 Set[Person],
+                            creators:                 List[Person],
                             dateCreated:              DateCreated,
                             keywords:                 List[Keyword],
                             maybeCommand:             Option[Command],
@@ -117,7 +117,7 @@ object StepPlan {
            name:                     Name,
            maybeDescription:         Option[Description],
            maybeCommand:             Option[Command],
-           creators:                 Set[Person],
+           creators:                 List[Person],
            dateCreated:              DateCreated,
            maybeProgrammingLanguage: Option[ProgrammingLanguage],
            keywords:                 List[Keyword],
@@ -143,7 +143,7 @@ object StepPlan {
            name:                     Name,
            maybeDescription:         Option[Description],
            maybeCommand:             Option[Command],
-           creators:                 Set[Person],
+           creators:                 List[Person],
            dateCreated:              DateCreated,
            maybeProgrammingLanguage: Option[ProgrammingLanguage],
            keywords:                 List[Keyword],
@@ -197,7 +197,7 @@ object StepPlan {
           schema / "name"                -> plan.name.asJsonLD,
           schema / "description"         -> plan.maybeDescription.asJsonLD,
           renku / "command"              -> plan.maybeCommand.asJsonLD,
-          schema / "creator"             -> plan.creators.toList.asJsonLD,
+          schema / "creator"             -> plan.creators.asJsonLD,
           schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
           schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
           schema / "keywords"            -> plan.keywords.asJsonLD,
@@ -213,7 +213,7 @@ object StepPlan {
           schema / "name"                -> plan.name.asJsonLD,
           schema / "description"         -> plan.maybeDescription.asJsonLD,
           renku / "command"              -> plan.maybeCommand.asJsonLD,
-          schema / "creator"             -> plan.creators.toList.asJsonLD,
+          schema / "creator"             -> plan.creators.asJsonLD,
           schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
           schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
           schema / "keywords"            -> plan.keywords.asJsonLD,
@@ -234,7 +234,7 @@ object StepPlan {
         name                  <- cursor.downField(schema / "name").as[Name]
         maybeDescription      <- cursor.downField(schema / "description").as[Option[Description]]
         maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
-        creators              <- cursor.downField(schema / "creator").as[List[Person]].map(_.toSet)
+        creators              <- cursor.downField(schema / "creator").as[List[Person]]
         dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
         maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
         keywords              <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten)

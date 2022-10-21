@@ -58,6 +58,10 @@ final case class Activity(id:                  Id,
 
   def findGenerationChecksum(location: Location): Option[Checksum] =
     findGenerationEntity(location).map(_.checksum)
+
+  def replaceStartTime(startTime: StartTime) = copy(startTime = startTime)
+
+  def modify(f: Activity => Activity) = f(this)
 }
 
 object Activity {

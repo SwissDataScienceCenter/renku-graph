@@ -24,7 +24,7 @@ import io.renku.graph.model._
 import GraphModelGenerators.datasetTopmostDerivedFroms
 import cats.data.NonEmptyList
 import io.renku.graph.model.datasets.TopmostDerivedFrom
-import io.renku.graph.model.entities.ActivityLens
+import io.renku.graph.model.entities.{ActivityLens, PlanLens}
 import io.renku.graph.model.testentities._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -124,9 +124,8 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val newPerson         = personEntities().generateOne.to[entities.Person]
 
       val updated = update(entitiesOldPerson, newPerson)(project)
-      updated.activities shouldBe project.activities.map {
-        ActivityLens.activityPlanCreators.set(Set(newPerson))
-      }
+
+      updated.plans shouldBe project.plans.map(PlanLens.planCreators.set(List(newPerson)))
     }
 
     "replace the old person with the new on all datasets" in {
