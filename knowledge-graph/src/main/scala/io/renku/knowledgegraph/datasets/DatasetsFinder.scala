@@ -143,17 +143,22 @@ private class DatasetsFinderImpl[F[_]: Parallel: Async: Logger: SparqlQueryTimeR
         |                renku:slug ?slug. 
         |    ?projectIdSample renku:projectPath ?projectPath.
         |    OPTIONAL {
-        |      ?dsIdSample schema:image ?imageId .
-        |      ?imageId schema:position ?imagePosition ;
-        |               schema:contentUrl ?imageUrl .
-        |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |      ?dsIdSample schema:image ?imageId.
+        |      ?imageId schema:position ?imagePosition;
+        |               schema:contentUrl ?imageUrl.
+        |      BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
         |    }
         |    OPTIONAL { ?dsIdSample schema:keywords ?keyword }
         |    OPTIONAL { ?dsIdSample schema:description ?maybeDescription }
-        |    OPTIONAL { ?dsIdSample schema:datePublished ?maybeDatePublished }
-        |    OPTIONAL { ?dsIdSample schema:dateCreated ?maybeDateCreated }
         |    OPTIONAL { ?dsIdSample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
-        |    BIND (IF(BOUND(?maybeDatePublished), ?maybeDatePublished, ?maybeDateCreated) AS ?date)
+        |    OPTIONAL {
+        |      ?dsIdSample schema:dateCreated ?maybeDateCreated.
+        |      BIND (?maybeDateCreated AS ?date)
+        |    }
+        |    OPTIONAL {
+        |      ?dsIdSample schema:datePublished ?maybeDatePublished
+        |      BIND (?maybeDatePublished AS ?date)
+        |    }
         |  }
         |}
         |GROUP BY ?identifier ?name ?slug ?maybeDescription ?maybeDatePublished ?maybeDateCreated ?date
