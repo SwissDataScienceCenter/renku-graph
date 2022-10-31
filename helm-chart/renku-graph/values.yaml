@@ -25,6 +25,8 @@ global:
       # Password for the `tokenstorage` user
       # Generate one using: `openssl rand -hex 16`
       value:
+  ## to enable debug mode
+  debug: false
 
 jena:
   image:
