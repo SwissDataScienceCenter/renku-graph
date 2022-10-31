@@ -51,15 +51,17 @@ private case object ProjectsQuery extends EntityQuery[model.Entity.Project] {
     s"""|    {
         |      SELECT ?projectId (MAX(?score) AS ?matchingScore)
         |      WHERE {
-        |        GRAPH ?g {
-        |          {
-        |            (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query}')
-        |          } {
+        |        {
+        |          (?id ?score) text:query (schema:name schema:keywords schema:description renku:projectNamespaces '${filters.query}')
+        |        } {
+        |          GRAPH ?id {
         |            ?id a schema:Project
-        |            BIND (?id AS ?projectId)
-        |          } UNION {
+        |          }
+        |          BIND (?id AS ?projectId)
+        |        } UNION {
+        |          GRAPH ?projectId {
         |            ?projectId schema:creator ?id;
-        |                       a schema:Project.
+        |                       a schema:Project
         |          }
         |        }
         |      }
