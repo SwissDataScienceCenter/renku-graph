@@ -155,6 +155,11 @@ object StepPlan {
       with ModifiedAlg {
     override type ParentType = StepPlan
     override type PlanType   = StepPlan.Modified
+
+    lazy val topmostParent: StepPlan = parent match {
+      case p: NonModified => p
+      case p: Modified    => p.topmostParent
+    }
   }
 
   object Modified {
@@ -178,7 +183,9 @@ object StepPlan {
           plan.inputs.map(_.to[entities.CommandParameterBase.CommandInput]),
           plan.outputs.map(_.to[entities.CommandParameterBase.CommandOutput]),
           plan.successCodes,
-          DerivedFrom(plan.parent.asEntityId),
+          entities.Plan.Derivation(DerivedFrom(plan.parent.asEntityId),
+                                   plans.ResourceId(plan.topmostParent.asEntityId.show)
+          ),
           maybeInvalidationTime
         )
       }

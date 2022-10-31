@@ -24,6 +24,7 @@ import io.circe.literal._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.GraphModelGenerators.{graphClasses, projectCreatedDates}
+import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
@@ -135,6 +136,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           renku / "hasArguments"         -> plan.parameters.asJsonLD,
           renku / "hasInputs"            -> plan.inputs.asJsonLD,
           renku / "hasOutputs"           -> plan.outputs.asJsonLD,
+          renku / "topmostDerivedFrom"   -> plan.resourceId.asEntityId.asJsonLD,
           renku / "successCodes"         -> plan.successCodes.asJsonLD
         )
     }
@@ -160,7 +162,8 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           renku / "hasInputs"            -> plan.inputs.asJsonLD,
           renku / "hasOutputs"           -> plan.outputs.asJsonLD,
           renku / "successCodes"         -> plan.successCodes.asJsonLD,
-          prov / "wasDerivedFrom"        -> plan.derivedFrom.asJsonLD,
+          prov / "wasDerivedFrom"        -> plan.derivation.derivedFrom.asJsonLD,
+          renku / "topmostDerivedFrom"   -> plan.derivation.originalResourceId.asEntityId.asJsonLD,
           prov / "invalidatedAtTime"     -> plan.maybeInvalidationTime.asJsonLD
         )
     }
@@ -186,6 +189,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           renku / "hasArguments"         -> plan.parameters.asJsonLD,
           renku / "hasInputs"            -> plan.inputs.asJsonLD,
           renku / "hasOutputs"           -> plan.outputs.asJsonLD,
+          renku / "topmostDerivedFrom"   -> plan.resourceId.asEntityId.asJsonLD,
           renku / "successCodes"         -> plan.successCodes.asJsonLD
         )
     }
@@ -211,7 +215,8 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           renku / "hasInputs"            -> plan.inputs.asJsonLD,
           renku / "hasOutputs"           -> plan.outputs.asJsonLD,
           renku / "successCodes"         -> plan.successCodes.asJsonLD,
-          prov / "wasDerivedFrom"        -> plan.derivedFrom.asJsonLD,
+          prov / "wasDerivedFrom"        -> plan.derivation.derivedFrom.asJsonLD,
+          renku / "topmostDerivedFrom"   -> plan.derivation.originalResourceId.asEntityId.asJsonLD,
           prov / "invalidatedAtTime"     -> plan.maybeInvalidationTime.asJsonLD
         )
     }

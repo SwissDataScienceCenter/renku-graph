@@ -43,6 +43,8 @@ sealed trait Plan extends Product with Serializable {
 
 object Plan {
 
+  final case class Derivation(derivedFrom: DerivedFrom, originalResourceId: ResourceId)
+
   implicit def entityFunctions(implicit gitLabApiUrl: GitLabApiUrl): EntityFunctions[Plan] =
     new EntityFunctions[Plan] {
       val findAllPersons: Plan => Set[Person]               = _.creators.toSet
@@ -82,6 +84,7 @@ sealed trait StepPlanAlg {
 }
 
 object StepPlan {
+  import Plan._
 
   final case class NonModified(resourceId:               ResourceId,
                                name:                     Name,
@@ -109,7 +112,7 @@ object StepPlan {
                             inputs:                   List[CommandInput],
                             outputs:                  List[CommandOutput],
                             successCodes:             List[SuccessCode],
-                            derivedFrom:              DerivedFrom,
+                            derivation:               Derivation,
                             maybeInvalidationTime:    Option[InvalidationTime]
   ) extends StepPlan
 
@@ -151,7 +154,7 @@ object StepPlan {
            inputs:                   List[CommandInput],
            outputs:                  List[CommandOutput],
            successCodes:             List[SuccessCode],
-           derivedFrom:              DerivedFrom,
+           derivation:               Derivation,
            maybeInvalidationTime:    Option[InvalidationTime]
   ): ValidatedNel[String, StepPlan] = {
 
@@ -179,7 +182,7 @@ object StepPlan {
         inputs,
         outputs,
         successCodes,
-        derivedFrom,
+        derivation,
         maybeInvalidationTime
       )
     )
@@ -204,6 +207,7 @@ object StepPlan {
           renku / "hasArguments"         -> plan.parameters.asJsonLD,
           renku / "hasInputs"            -> plan.inputs.asJsonLD,
           renku / "hasOutputs"           -> plan.outputs.asJsonLD,
+          renku / "topmostDerivedFrom"   -> plan.resourceId.asEntityId.asJsonLD,
           renku / "successCodes"         -> plan.successCodes.asJsonLD
         )
       case plan: StepPlan.Modified =>
@@ -221,7 +225,8 @@ object StepPlan {
           renku / "hasInputs"            -> plan.inputs.asJsonLD,
           renku / "hasOutputs"           -> plan.outputs.asJsonLD,
           renku / "successCodes"         -> plan.successCodes.asJsonLD,
-          prov / "wasDerivedFrom"        -> plan.derivedFrom.asJsonLD,
+          prov / "wasDerivedFrom"        -> plan.derivation.derivedFrom.asJsonLD,
+          renku / "topmostDerivedFrom"   -> plan.derivation.originalResourceId.asEntityId.asJsonLD,
           prov / "invalidatedAtTime"     -> plan.maybeInvalidationTime.asJsonLD
         )
     }
@@ -277,7 +282,7 @@ object StepPlan {
                           inputs,
                           outputs,
                           successCodes,
-                          derivedFrom,
+                          Derivation(derivedFrom, ResourceId(derivedFrom.value)),
                           mit
                         )
                     case (None, Some(_)) => show"Plan $resourceId has no parent but invalidation time".invalidNel
@@ -295,7 +300,8 @@ object StepPlan {
         ObjectProperty(renku / "hasInputs", CommandParameterBase.CommandInput.ontology),
         ObjectProperty(renku / "hasOutputs", CommandParameterBase.CommandOutput.ontology),
         ObjectProperty(schema / "creator", Person.ontology),
-        ObjectProperty(prov / "wasDerivedFrom", planClass)
+        ObjectProperty(prov / "wasDerivedFrom", planClass),
+        ObjectProperty(renku / "topmostDerivedFrom", planClass)
       ),
       DataProperties(
         DataProperty(schema / "name", xsd / "string"),
