@@ -1050,7 +1050,9 @@ class EntitiesFinderSpec
 
       finder
         .findEntities(
-          Criteria(maybeUser = personEntities(personGitLabIds.toGeneratorOfSomes).generateSome.map(_.toAuthUser))
+          Criteria(maybeUser = personEntities(personGitLabIds.toGeneratorOfSomes).generateSome.map(_.toAuthUser),
+                   paging = PagingRequest.default.copy(perPage = PerPage(50))
+          )
         )
         .unsafeRunSync()
         .results shouldBe List
@@ -1065,7 +1067,12 @@ class EntitiesFinderSpec
 
       upload(to = projectsDataset, privateProject, internalProject, publicProject)
 
-      finder.findEntities(Criteria(maybeUser = member.toAuthUser.some)).unsafeRunSync().results shouldBe List
+      finder
+        .findEntities(
+          Criteria(maybeUser = member.toAuthUser.some, paging = PagingRequest.default.copy(perPage = PerPage(50)))
+        )
+        .unsafeRunSync()
+        .results shouldBe List
         .empty[model.Entity]
         .addAllEntitiesFrom(publicProject)
         .addAllEntitiesFrom(internalProject)
