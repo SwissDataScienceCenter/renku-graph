@@ -19,7 +19,9 @@
 package io.renku.triplesstore
 
 import cats.syntax.all._
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -107,6 +109,18 @@ class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
             |$body
             |LIMIT ${pagingRequest.perPage}
             |OFFSET ${(pagingRequest.page.value - 1) * pagingRequest.perPage.value}""".stripMargin
+    }
+  }
+
+  "show" should {
+
+    "return a String representation of the query containing its name and the toString" in {
+      val name: String Refined NonEmpty = "test query"
+      val prefix = nonBlankStrings().generateOne
+      val body   = sentences().generateOne.value
+      val query  = SparqlQuery(name, Set(prefix), body)
+
+      query.show shouldBe s"$name:\n$query"
     }
   }
 
