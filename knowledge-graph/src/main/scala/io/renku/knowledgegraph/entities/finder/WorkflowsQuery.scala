@@ -43,11 +43,12 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |      WHERE {
         |        ${filters.onQuery(
     s"""|        {
-        |          SELECT ?wkId (MAX(?score) AS ?matchingScore)
+        |          SELECT ?wkId (MAX(?score) AS ?matchingScore) (SAMPLE(?projId) AS ?projectId)
         |          WHERE {
+        |            (?wkId ?score) text:query (schema:name schema:keywords schema:description '${filters.query}').
         |            GRAPH ?g {
-        |              (?wkId ?score) text:query (schema:name schema:keywords schema:description '${filters.query}').
-        |              ?wkId a prov:Plan
+        |              ?wkId a prov:Plan;
+        |                    ^renku:hasPlan ?projId
         |            }
         |          }
         |          GROUP BY ?wkId
