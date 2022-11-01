@@ -196,7 +196,7 @@ object StepPlan {
 
     override def to[T](implicit convert: StepPlan.Modified => T): T = convert(this)
 
-    def createModification(f: StepPlan.Modified => StepPlan.Modified): StepPlan.Modified = {
+    def createModification(f: StepPlan.Modified => StepPlan.Modified = identity): StepPlan.Modified = {
       val modified = f(self)
       if (modified.isInstanceOf[HavingInvalidationTime])
         throw new UnsupportedOperationException("Creating modification out of invalidated Plan not supported")

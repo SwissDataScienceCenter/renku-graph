@@ -21,6 +21,7 @@ package io.renku.graph.model.entities
 import cats.Show
 import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
+import io.renku.graph.model
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
 import io.renku.graph.model.projects._
@@ -125,27 +126,30 @@ object RenkuProject {
              activities:       List[Activity],
              datasets:         List[Dataset[Dataset.Provenance]],
              plans:            List[Plan]
-    ): ValidatedNel[String, RenkuProject.WithoutParent] =
-      (validateDates(dateCreated, activities, datasets, plans), validateDatasets(datasets))
-        .mapN { (_, _) =>
-          val (syncedActivities, syncedDatasets, syncedPlans) =
-            syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, plans)
-          RenkuProject.WithoutParent(resourceId,
-                                     path,
-                                     name,
-                                     maybeDescription,
-                                     agent,
-                                     dateCreated,
-                                     maybeCreator,
-                                     visibility,
-                                     keywords,
-                                     members,
-                                     version,
-                                     syncedActivities,
-                                     syncedDatasets,
-                                     syncedPlans
-          )
-        }
+    ): ValidatedNel[String, RenkuProject.WithoutParent] = (
+      validateDates(dateCreated, activities, datasets, plans),
+      validateDatasets(datasets),
+      updatePlansOriginalId(plans)
+    )
+      .mapN { (_, _, updatedPlans) =>
+        val (syncedActivities, syncedDatasets, syncedPlans) =
+          syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
+        RenkuProject.WithoutParent(resourceId,
+                                   path,
+                                   name,
+                                   maybeDescription,
+                                   agent,
+                                   dateCreated,
+                                   maybeCreator,
+                                   visibility,
+                                   keywords,
+                                   members,
+                                   version,
+                                   syncedActivities,
+                                   syncedDatasets,
+                                   syncedPlans
+        )
+      }
 
     private def validateDates(dateCreated: DateCreated,
                               activities:  List[Activity],
@@ -223,9 +227,12 @@ object RenkuProject {
              datasets:         List[Dataset[Dataset.Provenance]],
              plans:            List[Plan],
              parentResourceId: ResourceId
-    ): ValidatedNel[String, RenkuProject.WithParent] = validateDatasets(datasets) map { _ =>
+    ): ValidatedNel[String, RenkuProject.WithParent] = (
+      validateDatasets(datasets),
+      updatePlansOriginalId(plans)
+    ) mapN { (_, updatedPlans) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
-        syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, plans)
+        syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithParent(
         resourceId,
         path,
@@ -269,6 +276,32 @@ object RenkuProject {
             )
             .invalid[Unit]
       }
+    }
+
+    protected def updatePlansOriginalId(plans: List[Plan]): ValidatedNel[String, List[Plan]] = {
+
+      def findParentPlan(derivedFrom: model.plans.DerivedFrom): Option[Plan] =
+        plans.find(_.resourceId.value == derivedFrom.value)
+
+      def findTopParent(derivedFrom: model.plans.DerivedFrom): Option[Plan] =
+        findParentPlan(derivedFrom) >>= {
+          case p: StepPlan.NonModified => p.some
+          case p: StepPlan.Modified    => findParentPlan(p.derivation.derivedFrom)
+        }
+
+      plans
+        .foldLeft(List.empty[ValidatedNel[String, Plan]]) {
+          case (checked, p: StepPlan.NonModified) => p.validNel[String] :: checked
+          case (checked, p: StepPlan.Modified) =>
+            findTopParent(p.derivation.derivedFrom) match {
+              case None => show"Cannot find parent plan ${p.derivation.derivedFrom}".invalidNel[Plan] :: checked
+              case Some(parent) =>
+                p.copy(derivation = p.derivation.copy(originalResourceId = parent.resourceId))
+                  .validNel[String] :: checked
+            }
+        }
+        .sequence
+        .map(_.reverse)
     }
 
     protected def syncPersons(projectPersons: Set[Person],

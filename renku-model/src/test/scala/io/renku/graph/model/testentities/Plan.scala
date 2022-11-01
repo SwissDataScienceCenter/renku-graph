@@ -42,7 +42,7 @@ trait PlanAlg { self: Plan =>
 
   def to[T](implicit convert: PlanType => T): T
 
-  def createModification(f: PlanType => PlanType): PlanGroupModified
+  def createModification(f: PlanType => PlanType = identity): PlanGroupModified
 
   def invalidate(): PlanGroupModified with HavingInvalidationTime = invalidate(
     timestampsNotInTheFuture(butYoungerThan = this.dateCreated.value).generateAs(InvalidationTime)

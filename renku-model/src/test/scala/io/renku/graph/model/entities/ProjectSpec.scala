@@ -26,8 +26,8 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Project.ProjectMember
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
+import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.persons.Name
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword}
 import io.renku.graph.model.testentities._
@@ -35,6 +35,7 @@ import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
+import monocle.Lens
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -61,58 +62,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
   "decode" should {
     implicit val graph: GraphClass = GraphClass.Default
 
-    "match persons in plan.creators" in {
-      forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
-        (projectInfo, cliVersion, schemaVersion) =>
-          val creator = projectMembersWithEmail.generateOne
-          val member2 = projectMembersWithEmail.generateOne
-
-          val info               = projectInfo.copy(maybeCreator = creator.some, members = Set(member2))
-          val resourceId         = projects.ResourceId(info.path)
-          val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
-          val (activity, plan) = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(info.dateCreated)
-            .bimap(identity, PlanLens.planCreators.set(List(creatorAsCliPerson)))
-
-          val jsonLD = cliLikeJsonLD(
-            resourceId,
-            cliVersion,
-            schemaVersion,
-            info.maybeDescription,
-            info.keywords,
-            creatorAsCliPerson.some,
-            info.dateCreated,
-            activity :: Nil,
-            datasets = Nil,
-            plan :: Nil
-          )
-          val mergedCreator    = merge(creatorAsCliPerson, creator)
-          val mergedMember2    = merge(activity.author, member2)
-          val expectedActivity = ActivityLens.activityAuthor.set(mergedMember2)(activity)
-          val expectedPlan     = PlanLens.planCreators.set(List(mergedCreator))(plan)
-
-          jsonLD.cursor.as(decodeList(entities.Project.decoder(info))) shouldBe List(
-            entities.RenkuProject.WithoutParent(
-              resourceId,
-              info.path,
-              info.name,
-              info.maybeDescription,
-              cliVersion,
-              info.dateCreated,
-              maybeCreator = mergedCreator.some,
-              info.visibility,
-              info.keywords,
-              members = Set(mergedMember2.some).flatten,
-              schemaVersion,
-              expectedActivity :: Nil,
-              datasets = Nil,
-              expectedPlan :: Nil
-            )
-          ).asRight
-      }
-    }
-
     "turn JsonLD Project entity without parent into the Project object" in {
-      forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None)), cliVersions, projectSchemaVersions) {
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(None)), cliVersions, projectSchemaVersions) {
         (projectInfo, cliVersion, schemaVersion) =>
           val creator    = projectMembersWithEmail.generateOne
           val member1    = projectMembersNoEmail.generateOne
@@ -178,7 +129,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "turn JsonLD Project entity with parent into the Project object" in {
-      forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = projectPaths.generateSome)),
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome)),
              cliVersions,
              projectSchemaVersions
       ) { (projectInfo, cliVersion, schemaVersion) =>
@@ -207,7 +158,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           schemaVersion,
           info.maybeDescription,
           info.keywords,
-          None,
+          maybeCreator = None,
           info.dateCreated,
           activity1 :: activity2 :: activity3 :: Nil,
           dataset1 :: dataset2 :: Nil,
@@ -247,7 +198,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "turn non-renku JsonLD Project entity without parent into the NonRenkuProject object" in {
-      forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = None))) { projectInfo =>
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(None))) { projectInfo =>
         val creator    = projectMembersWithEmail.generateOne
         val members    = projectMembers.generateSet()
         val info       = projectInfo.copy(maybeCreator = creator.some, members = members)
@@ -272,7 +223,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "turn non-renku JsonLD Project entity with parent into the NonRenkuProject object" in {
-      forAll(gitLabProjectInfos.map(_.copy(maybeParentPath = projectPaths.generateSome))) { projectInfo =>
+      forAll(gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome))) { projectInfo =>
         val creator    = projectMembersWithEmail.generateOne
         val members    = projectMembers.generateSet()
         val info       = projectInfo.copy(maybeCreator = creator.some, members = members)
@@ -297,8 +248,84 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       }
     }
 
+    forAll {
+      Table(
+        "Project type"   -> "Project Info",
+        "without parent" -> gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne,
+        "with parent"    -> gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome)).generateOne
+      )
+    } { (projectType, info) =>
+      s"match persons in plan.creators for project $projectType" in {
+        val cliVersion    = cliVersions.generateOne
+        val schemaVersion = projectSchemaVersions.generateOne
+        val creator       = projectMembersWithEmail.generateOne
+        val member2       = projectMembersWithEmail.generateOne
+
+        val projectInfo        = info.copy(maybeCreator = creator.some, members = Set(member2))
+        val resourceId         = projects.ResourceId(projectInfo.path)
+        val creatorAsCliPerson = creator.toCLIPayloadPerson(creator.chooseSomeName)
+        val (activity, plan) = activityWith(member2.toCLIPayloadPerson(member2.chooseSomeName))(projectInfo.dateCreated)
+          .bimap(identity, PlanLens.planCreators.set(List(creatorAsCliPerson)))
+
+        val jsonLD = cliLikeJsonLD(
+          resourceId,
+          cliVersion,
+          schemaVersion,
+          projectInfo.maybeDescription,
+          projectInfo.keywords,
+          creatorAsCliPerson.some,
+          projectInfo.dateCreated,
+          activities = activity :: Nil,
+          plans = plan :: Nil
+        )
+
+        val mergedCreator = merge(creatorAsCliPerson, creator)
+        val mergedMember2 = merge(activity.author, member2)
+
+        val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(projectInfo)))
+
+        actual.maybeCreator shouldBe mergedCreator.some
+        actual.members      shouldBe Set(mergedMember2)
+        actual.activities   shouldBe ActivityLens.activityAuthor.set(mergedMember2)(activity) :: Nil
+        actual.plans        shouldBe PlanLens.planCreators.set(List(mergedCreator))(plan) :: Nil
+      }
+
+      s"update Plans' originalResourceId for project $projectType" in {
+        val cliVersion                = cliVersions.generateOne
+        val schemaVersion             = projectSchemaVersions.generateOne
+        val resourceId                = projects.ResourceId(info.path)
+        val activity                  = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
+        val plan                      = activity.plan
+        val entitiesPlan              = plan.to[entities.Plan]
+        val planModification1         = plan.createModification()
+        val entitiesPlanModification1 = planModification1.to[entities.StepPlan.Modified]
+        val planModification2         = planModification1.createModification()
+        val entitiesPlanModification2 = planModification2.to[entities.StepPlan.Modified]
+
+        val jsonLD = cliLikeJsonLD(
+          resourceId,
+          cliVersion,
+          schemaVersion,
+          info.maybeDescription,
+          info.keywords,
+          maybeCreator = None,
+          info.dateCreated,
+          activities = activity.to[entities.Activity] :: Nil,
+          plans = entitiesPlan :: entitiesPlanModification1 :: entitiesPlanModification2 :: Nil
+        )
+
+        val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
+
+        val actualPlan1 :: actualPlan2 :: actualPlan3 :: Nil = actual.plans
+        actualPlan1 shouldBe entitiesPlan
+        actualPlan2 shouldBe entitiesPlanModification1
+        actualPlan3 shouldBe (modifiedPlanDerivation >>> planDerivationOriginalId)
+          .set(entitiesPlan.resourceId)(entitiesPlanModification2)
+      }
+    }
+
     "return a DecodingFailure when there's a Person entity that cannot be decoded" in {
-      val projectInfo = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
       val jsonLD = cliLikeJsonLD(
         resourceId,
@@ -330,7 +357,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "return a DecodingFailure when there's a Dataset entity that cannot be decoded" in {
-      val projectInfo = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
       val jsonLD = cliLikeJsonLD(
         resourceId,
@@ -356,7 +383,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "return a DecodingFailure when there's an Activity entity created before project creation" in {
-      val projectInfo       = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
+      val projectInfo       = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId        = projects.ResourceId(projectInfo.path)
       val dateBeforeProject = timestamps(max = projectInfo.dateCreated.value.minusSeconds(1)).generateOne
       val activity = activityEntities(
@@ -390,7 +417,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "return a DecodingFailure when there's an internal Dataset entity created before project without parent" in {
-      val projectInfo     = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
+      val projectInfo     = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId      = projects.ResourceId(projectInfo.path)
       val dataset         = datasetEntities(provenanceInternal).withDateBefore(projectInfo.dateCreated).generateOne
       val entitiesDataset = dataset.to[entities.Dataset[entities.Dataset.Provenance.Internal]]
@@ -415,7 +442,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "return a DecodingFailure when there's a Plan entity created before project without parent" in {
-      val projectInfo = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
       val plan = stepPlanEntities()(planCommands)(projectInfo.dateCreated).generateOne
         .replacePlanDateCreated(timestamps(max = projectInfo.dateCreated.value).generateAs[plans.DateCreated])
@@ -442,7 +469,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     "decode project when there's an internal or modified Dataset entity created before project with parent" in {
       val parentPath    = projectPaths.generateOne
-      val projectInfo   = gitLabProjectInfos.map(_.copy(maybeParentPath = parentPath.some)).generateOne
+      val projectInfo   = gitLabProjectInfos.map(projectInfoMaybeParent.set(parentPath.some)).generateOne
       val cliVersion    = cliVersions.generateOne
       val schemaVersion = projectSchemaVersions.generateOne
       val resourceId    = projects.ResourceId(projectInfo.path)
@@ -491,7 +518,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "return a DecodingFailure when there's a modified Dataset entity created before project without parent" in {
-      val projectInfo = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
+      val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
       val (dataset, modifiedDataset) =
         datasetAndModificationEntities(provenanceImportedExternal).map { case (orig, modified) =>
@@ -529,7 +556,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "decode project when there's a Dataset (neither internal nor modified) created before project creation" in {
-      val projectInfo   = gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne
+      val projectInfo   = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val cliVersion    = cliVersions.generateOne
       val schemaVersion = projectSchemaVersions.generateOne
       val resourceId    = projects.ResourceId(projectInfo.path)
@@ -573,8 +600,8 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     "return a DecodingFailure when there's a modified Dataset that is derived from a non-existing dataset" in {
       Set(
-        gitLabProjectInfos.map(_.copy(maybeParentPath = None)).generateOne,
-        gitLabProjectInfos.map(_.copy(maybeParentPath = projectPaths.generateSome)).generateOne
+        gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne,
+        gitLabProjectInfos.map(projectInfoMaybeParent.set(projectPaths.generateSome)).generateOne
       ) foreach { projectInfo =>
         val resourceId = projects.ResourceId(projectInfo.path)
         val (original, modified) =
@@ -1079,4 +1106,13 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     person
       .add(member.gitLabId)
       .copy(name = member.name, maybeEmail = member.email.some)
+
+  private lazy val projectInfoMaybeParent: Lens[GitLabProjectInfo, Option[projects.Path]] =
+    Lens[GitLabProjectInfo, Option[projects.Path]](_.maybeParentPath)(mpp => _.copy(maybeParentPath = mpp))
+
+  private lazy val modifiedPlanDerivation: Lens[entities.StepPlan.Modified, entities.Plan.Derivation] =
+    Lens[entities.StepPlan.Modified, entities.Plan.Derivation](_.derivation)(d => _.copy(derivation = d))
+
+  private lazy val planDerivationOriginalId: Lens[entities.Plan.Derivation, plans.ResourceId] =
+    Lens[entities.Plan.Derivation, plans.ResourceId](_.originalResourceId)(id => _.copy(originalResourceId = id))
 }

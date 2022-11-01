@@ -51,7 +51,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     }
 
     "turn JsonLD of a modified Plan entity into the StepPlan object" in {
-      forAll(plans.map(_.createModification(identity))) { plan =>
+      forAll(plans.map(_.createModification())) { plan =>
         plan.asJsonLD.flatten
           .fold(throw _, identity)
           .cursor

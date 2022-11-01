@@ -158,7 +158,7 @@ object StepPlan {
            maybeInvalidationTime:    Option[InvalidationTime]
   ): ValidatedNel[String, StepPlan] = {
 
-    def validateInvalidation(mit: Option[InvalidationTime]): ValidatedNel[String, Unit] = mit match {
+    lazy val validateInvalidationTime: ValidatedNel[String, Unit] = maybeInvalidationTime match {
       case None => Validated.validNel(())
       case Some(time) =>
         Validated.condNel(
@@ -168,7 +168,7 @@ object StepPlan {
         )
     }
 
-    validateInvalidation(maybeInvalidationTime).map(_ =>
+    validateInvalidationTime.map(_ =>
       Modified(
         resourceId,
         name,
