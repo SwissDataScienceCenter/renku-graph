@@ -19,7 +19,7 @@
 package io.renku.graph.model.entities
 
 import cats.Show
-import cats.data.{NonEmptyList, ValidatedNel}
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.graph.model
 import io.renku.graph.model._
@@ -128,10 +128,11 @@ object RenkuProject {
              plans:            List[Plan]
     ): ValidatedNel[String, RenkuProject.WithoutParent] = (
       validateDates(dateCreated, activities, datasets, plans),
+      validatePlansDates(plans),
       validateDatasets(datasets),
       updatePlansOriginalId(plans)
     )
-      .mapN { (_, _, updatedPlans) =>
+      .mapN { (_, _, _, updatedPlans) =>
         val (syncedActivities, syncedDatasets, syncedPlans) =
           syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
         RenkuProject.WithoutParent(resourceId,
@@ -229,8 +230,9 @@ object RenkuProject {
              parentResourceId: ResourceId
     ): ValidatedNel[String, RenkuProject.WithParent] = (
       validateDatasets(datasets),
-      updatePlansOriginalId(plans)
-    ) mapN { (_, updatedPlans) =>
+      updatePlansOriginalId(plans),
+      validatePlansDates(plans)
+    ) mapN { (_, updatedPlans, _) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
         syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithParent(
@@ -280,29 +282,47 @@ object RenkuProject {
 
     protected def updatePlansOriginalId(plans: List[Plan]): ValidatedNel[String, List[Plan]] = {
 
-      def findParentPlan(derivedFrom: model.plans.DerivedFrom): Option[Plan] =
-        plans.find(_.resourceId.value == derivedFrom.value)
-
-      def findTopParent(derivedFrom: model.plans.DerivedFrom): Option[Plan] =
-        findParentPlan(derivedFrom) >>= {
-          case p: StepPlan.NonModified => p.some
-          case p: StepPlan.Modified    => findParentPlan(p.derivation.derivedFrom)
+      def findTopParent(derivedFrom: model.plans.DerivedFrom): ValidatedNel[String, Plan] =
+        findParentPlan(derivedFrom, plans) match {
+          case Validated.Valid(p: StepPlan.NonModified) => p.validNel
+          case Validated.Valid(p: StepPlan.Modified)    => findParentPlan(p.derivation.derivedFrom, plans)
+          case vp                                       => vp
         }
 
       plans
         .foldLeft(List.empty[ValidatedNel[String, Plan]]) {
           case (checked, p: StepPlan.NonModified) => p.validNel[String] :: checked
           case (checked, p: StepPlan.Modified) =>
-            findTopParent(p.derivation.derivedFrom) match {
-              case None => show"Cannot find parent plan ${p.derivation.derivedFrom}".invalidNel[Plan] :: checked
-              case Some(parent) =>
-                p.copy(derivation = p.derivation.copy(originalResourceId = parent.resourceId))
-                  .validNel[String] :: checked
-            }
+            findTopParent(p.derivation.derivedFrom).map { parent =>
+              p.copy(derivation = p.derivation.copy(originalResourceId = parent.resourceId))
+            } :: checked
         }
         .sequence
         .map(_.reverse)
     }
+
+    private def findParentPlan(derivedFrom: model.plans.DerivedFrom, plans: List[Plan]) =
+      Validated.fromOption(plans.find(_.resourceId.value == derivedFrom.value),
+                           NonEmptyList.one(show"Cannot find parent plan $derivedFrom")
+      )
+
+    protected def validatePlansDates(plans: List[Plan]): ValidatedNel[String, Unit] =
+      plans
+        .foldLeft(List.empty[ValidatedNel[String, Unit]]) {
+          case (checked, _: StepPlan.NonModified) => ().validNel[String] :: checked
+          case (checked, p: StepPlan.Modified) =>
+            findParentPlan(p.derivation.derivedFrom, plans) match {
+              case Validated.Valid(parent) =>
+                Validated.cond(
+                  (p.dateCreated.value compareTo parent.dateCreated.value) >= 0,
+                  (),
+                  NonEmptyList.one(show"Plan ${p.resourceId} is older than it's parent ${parent.resourceId}")
+                ) :: checked
+              case vp => vp.void :: checked
+            }
+        }
+        .sequence
+        .void
 
     protected def syncPersons(projectPersons: Set[Person],
                               activities:     List[Activity],
