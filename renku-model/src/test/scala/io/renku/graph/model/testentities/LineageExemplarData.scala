@@ -106,7 +106,7 @@ object LineageExemplarData {
     )
 
     val activity1Plan1 = ExecutionPlanner
-      .of(plan1, activityStartTimes(after = project.dateCreated).generateOne, personEntities.generateOne, project)
+      .of(plan1, activityStartTimes(after = plan1.dateCreated).generateOne, personEntities.generateOne, project)
       .planInputParameterValuesFromChecksum(
         cleanData     -> entityChecksums.generateOne,
         zhbikesFolder -> entityChecksums.generateOne
@@ -117,7 +117,7 @@ object LineageExemplarData {
     val plan2 = Plan.of(
       plans.Name("plan2"),
       Command("python").some,
-      planDatesCreated(after = project.dateCreated).generateOne,
+      planDatesCreated(after = activity1Plan1.startTime).generateOne,
       creators = Nil,
       CommandParameters.of(
         CommandInput.fromLocation(plotData),
@@ -128,7 +128,7 @@ object LineageExemplarData {
     )
 
     val activity2Plan2 = ExecutionPlanner
-      .of(plan2, activityStartTimes(after = activity1Plan1.startTime).generateOne, personEntities.generateOne, project)
+      .of(plan2, activityStartTimes(after = plan2.dateCreated).generateOne, personEntities.generateOne, project)
       .planInputParameterValuesFromChecksum(
         plotData -> entityChecksums.generateOne
       )
