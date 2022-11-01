@@ -351,6 +351,38 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       error.getMessage() should include(s"Finding Person entities for project ${projectInfo.path} failed: ")
     }
 
+    "return a DecodingFailure if there's a modified Plan pointing to a non-existing parent" in new TestCase {
+
+      val info         = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
+      val resourceId   = projects.ResourceId(info.path)
+      val activity     = activityEntities(stepPlanEntities())(info.dateCreated).generateOne
+      val plan         = activity.plan
+      val entitiesPlan = plan.to[entities.Plan]
+      val planModification = plan
+        .createModification()
+        .to[entities.StepPlan.Modified]
+        .copy(derivation =
+          entities.Plan.Derivation(plans.DerivedFrom(planResourceIds.generateOne.value), planResourceIds.generateOne)
+        )
+
+      val jsonLD = cliLikeJsonLD(
+        resourceId,
+        cliVersion,
+        schemaVersion,
+        info.maybeDescription,
+        info.keywords,
+        maybeCreator = None,
+        info.dateCreated,
+        activities = activity.to[entities.Activity] :: Nil,
+        plans = entitiesPlan :: planModification :: Nil
+      )
+
+      val Left(error) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
+
+      error            shouldBe a[DecodingFailure]
+      error.getMessage() should include(s"Cannot find parent plan ${planModification.derivation.derivedFrom}")
+    }
+
     "return a DecodingFailure when there's a Dataset entity that cannot be decoded" in new TestCase {
       val projectInfo = gitLabProjectInfos.map(projectInfoMaybeParent.set(None)).generateOne
       val resourceId  = projects.ResourceId(projectInfo.path)
