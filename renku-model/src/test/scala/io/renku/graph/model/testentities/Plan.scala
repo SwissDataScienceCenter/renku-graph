@@ -18,90 +18,85 @@
 
 package io.renku.graph.model.testentities
 
+import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.Position
-import io.renku.graph.model.entityModel.Location
 import io.renku.graph.model.plans._
-import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 
-case class Plan(id:                        Identifier,
-                name:                      Name,
-                maybeDescription:          Option[Description],
-                maybeCommand:              Option[Command],
-                creators:                  Set[Person],
-                dateCreated:               DateCreated,
-                maybeProgrammingLanguage:  Option[ProgrammingLanguage],
-                keywords:                  List[Keyword],
-                commandParameterFactories: List[Plan => CommandParameterBase],
-                successCodes:              List[SuccessCode]
-) {
-  private val commandParameters: List[CommandParameterBase] = commandParameterFactories.map(_.apply(this))
-  val parameters: List[CommandParameter] = commandParameters.collect { case param: CommandParameter => param }
-  val inputs:     List[CommandInput]     = commandParameters.collect { case in: CommandInput => in }
-  val outputs:    List[CommandOutput]    = commandParameters.collect { case out: CommandOutput => out }
+trait Plan extends PlanAlg {
+  val id:               Identifier
+  val name:             Name
+  val maybeDescription: Option[Description]
+  val creators:         List[Person]
+  val dateCreated:      DateCreated
+  val keywords:         List[Keyword]
+  type PlanGroup <: Plan
+  type PlanGroupModified <: PlanGroup with Plan.Modified
+  type PlanType <: PlanGroup
+}
 
-  def getInput(location: Location): Option[CommandInput] = inputs.find(_.defaultValue.value == location)
+trait PlanAlg { self: Plan =>
+
+  def to[T](implicit convert: PlanType => T): T
+
+  def createModification(f: PlanType => PlanType = identity): PlanGroupModified
+
+  def invalidate(): PlanGroupModified with HavingInvalidationTime = invalidate(
+    timestampsNotInTheFuture(butYoungerThan = this.dateCreated.value).generateAs(InvalidationTime)
+  ).fold(err => throw new Exception(s"Save invalidate failed: ${err.intercalate("; ")}"), identity)
+
+  def invalidate(time: InvalidationTime): ValidatedNel[String, PlanGroupModified with HavingInvalidationTime]
+
+  protected def validate(dateCreated:      plans.DateCreated,
+                         invalidationTime: InvalidationTime
+  ): ValidatedNel[String, InvalidationTime] =
+    Validated.condNel(
+      test = (invalidationTime.value compareTo dateCreated.value) >= 0,
+      invalidationTime,
+      show"Invalidation time $invalidationTime on StepPlan with id: $id is older than dateCreated"
+    )
+
+  def replaceCreators(creators: List[Person]): PlanType
+
+  def removeCreators(): PlanType = replaceCreators(Nil)
+
+  def replacePlanName(to: plans.Name): PlanType
+
+  def replaceCommand(to: Option[Command]): PlanType
+
+  def replacePlanKeywords(to: List[plans.Keyword]): PlanType
+
+  def replacePlanDesc(to: Option[plans.Description]): PlanType
+
+  def replacePlanDateCreated(to: plans.DateCreated): PlanType
 }
 
 object Plan {
 
-  import io.renku.generators.Generators.Implicits._
+  trait Modified { self: Plan =>
+    type ParentType <: Plan
+    val parent: ParentType
+  }
+
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def of(
-      name:                      Name,
-      maybeCommand:              Option[Command],
-      dateCreated:               DateCreated,
-      commandParameterFactories: List[Position => Plan => CommandParameterBase]
-  ): Plan = Plan(
-    planIdentifiers.generateOne,
-    name,
-    maybeDescription = None,
-    maybeCommand,
-    Set.empty,
-    dateCreated,
-    maybeProgrammingLanguage = None,
-    keywords = Nil,
-    commandParameterFactories = commandParameterFactories.zipWithIndex.map { case (factory, idx) =>
-      factory(Position(idx + 1))
-    },
-    successCodes = Nil
-  )
+  def of(name:                      Name,
+         maybeCommand:              Option[Command],
+         dateCreated:               DateCreated,
+         creators:                  List[Person],
+         commandParameterFactories: List[Position => StepPlan => CommandParameterBase]
+  ): StepPlan.NonModified = StepPlan.of(name, maybeCommand, dateCreated, creators, commandParameterFactories)
 
-  object CommandParameters {
-
-    type CommandParameterFactory = Position => Plan => CommandParameterBase
-
-    def of(parameters: CommandParameterFactory*): List[CommandParameterFactory] = parameters.toList
+  implicit def toEntitiesPlan[P <: Plan](implicit renkuUrl: RenkuUrl): P => entities.Plan = {
+    case p: StepPlan.NonModified => p.to[entities.Plan](StepPlan.NonModified.toEntitiesStepPlan)
+    case p: StepPlan.Modified    => p.to[entities.Plan](StepPlan.Modified.toEntitiesStepPlan)
   }
 
-  implicit def toEntitiesPlan(implicit renkuUrl: RenkuUrl): Plan => entities.Plan =
-    plan => {
-      val maybeInvalidationTime = plan match {
-        case plan: Plan with HavingInvalidationTime => plan.invalidationTime.some
-        case _ => None
-      }
-
-      entities.Plan(
-        plans.ResourceId(plan.asEntityId.show),
-        plan.name,
-        plan.maybeDescription,
-        plan.maybeCommand,
-        plan.creators.map(_.to[entities.Person]),
-        plan.dateCreated,
-        plan.maybeProgrammingLanguage,
-        plan.keywords,
-        plan.parameters.map(_.to[entities.CommandParameterBase.CommandParameter]),
-        plan.inputs.map(_.to[entities.CommandParameterBase.CommandInput]),
-        plan.outputs.map(_.to[entities.CommandParameterBase.CommandOutput]),
-        plan.successCodes,
-        maybeInvalidationTime
-      )
-    }
-
-  implicit def encoder(implicit renkuUrl: RenkuUrl, graphClass: GraphClass): JsonLDEncoder[Plan] =
+  implicit def encoder[P <: Plan](implicit renkuUrl: RenkuUrl, graphClass: GraphClass): JsonLDEncoder[P] =
     JsonLDEncoder.instance(_.to[entities.Plan].asJsonLD)
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuUrl: RenkuUrl): EntityIdEncoder[R] =

@@ -38,7 +38,7 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with should.Matchers with
 
     "return activity author's resourceIds" in new TestCase {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
         .to[entities.RenkuProject]
 
@@ -65,7 +65,7 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with should.Matchers with
 
     "return activity association person agent resourceIds" in new TestCase {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
         .generateOne
         .to[entities.RenkuProject]
 
@@ -95,7 +95,7 @@ class KGInfoFinderSpec extends AnyWordSpec with IOSpec with should.Matchers with
 
     "return no agent if there's association with SoftwareAgent agent" in new TestCase {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
         .to[entities.RenkuProject]
 

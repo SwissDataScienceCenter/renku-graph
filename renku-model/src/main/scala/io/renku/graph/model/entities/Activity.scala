@@ -114,43 +114,47 @@ object Activity {
       renkuUrl: RenkuUrl,
       glApiUrl: GitLabApiUrl,
       graph:    GraphClass
-  ): JsonLDEncoder[Activity] =
-    JsonLDEncoder.instance { activity =>
-      JsonLD.entity(
-        activity.resourceId.asEntityId,
-        entityTypes,
-        Reverse.ofJsonLDsUnsafe((prov / "activity") -> activity.generations.asJsonLD),
-        prov / "startedAtTime"        -> activity.startTime.asJsonLD,
-        prov / "endedAtTime"          -> activity.endTime.asJsonLD,
-        prov / "wasAssociatedWith"    -> JsonLD.arr(activity.agent.asJsonLD, activity.author.asJsonLD),
-        prov / "qualifiedAssociation" -> activity.association.asJsonLD,
-        prov / "qualifiedUsage"       -> activity.usages.asJsonLD,
-        renku / "parameter"           -> activity.parameters.asJsonLD
-      )
-    }
+  ): JsonLDEncoder[Activity] = JsonLDEncoder.instance { activity =>
+    JsonLD.entity(
+      activity.resourceId.asEntityId,
+      entityTypes,
+      Reverse.ofJsonLDsUnsafe((prov / "activity") -> activity.generations.asJsonLD),
+      prov / "startedAtTime"        -> activity.startTime.asJsonLD,
+      prov / "endedAtTime"          -> activity.endTime.asJsonLD,
+      prov / "wasAssociatedWith"    -> JsonLD.arr(activity.agent.asJsonLD, activity.author.asJsonLD),
+      prov / "qualifiedAssociation" -> activity.association.asJsonLD,
+      prov / "qualifiedUsage"       -> activity.usages.asJsonLD,
+      renku / "parameter"           -> activity.parameters.asJsonLD
+    )
+  }
 
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Activity] =
+  implicit def decoder(implicit dependencyLinks: DependencyLinks, renkuUrl: RenkuUrl): JsonLDDecoder[Activity] =
     JsonLDDecoder.entity(entityTypes) { cursor =>
       import io.renku.jsonld.JsonLDDecoder.decodeList
 
+      def checkValid(association: Association)(implicit id: ResourceId): StartTime => JsonLDDecoder.Result[Unit] =
+        startTime =>
+          dependencyLinks.findStepPlan(association.planId) match {
+            case Some(plan) if (startTime.value compareTo plan.dateCreated.value) < 0 =>
+              DecodingFailure(show"Activity $id date $startTime is older than plan ${plan.dateCreated}", Nil).asLeft
+            case _ => ().asRight
+          }
+
+      def checkSingle[T](prop: String)(implicit id: ResourceId): List[T] => JsonLDDecoder.Result[T] = {
+        case prop :: Nil => Right(prop)
+        case _           => Left(DecodingFailure(s"Activity $id without or with multiple ${prop}s", Nil))
+      }
+
       for {
-        resourceId    <- cursor.downEntityId.as[ResourceId]
-        generations   <- cursor.focusTop.as(decodeList(Generation.decoder(resourceId)))
-        startedAtTime <- cursor.downField(prov / "startedAtTime").as[StartTime]
+        implicit0(resourceId: ResourceId) <- cursor.downEntityId.as[ResourceId]
+        generations                       <- cursor.focusTop.as(decodeList(Generation.decoder(resourceId)))
+        agent         <- cursor.downField(prov / "wasAssociatedWith").as[List[Agent]] >>= checkSingle("agent")
+        author        <- cursor.downField(prov / "wasAssociatedWith").as[List[Person]] >>= checkSingle("author")
+        association   <- cursor.downField(prov / "qualifiedAssociation").as[Association]
+        usages        <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]
+        startedAtTime <- cursor.downField(prov / "startedAtTime").as[StartTime] flatTap checkValid(association)
         endedAtTime   <- cursor.downField(prov / "endedAtTime").as[EndTime]
-        agent <- cursor.downField(prov / "wasAssociatedWith").as[List[Agent]] >>= {
-                   case agent :: Nil => Right(agent)
-                   case _ => Left(DecodingFailure(s"Activity $resourceId without or with multiple agents", Nil))
-                 }
-        author <- cursor.downField(prov / "wasAssociatedWith").as[List[Person]] >>= {
-                    case author :: Nil => Right(author)
-                    case _ => Left(DecodingFailure(s"Activity $resourceId without or with multiple authors", Nil))
-                  }
-        association <- cursor.downField(prov / "qualifiedAssociation").as[Association]
-        usages      <- cursor.downField(prov / "qualifiedUsage").as[List[Usage]]
-        parameters <- cursor
-                        .downField(renku / "parameter")
-                        .as[List[ParameterValue]](decodeList(ParameterValue.decoder(association.plan)))
+        parameters    <- cursor.downField(renku / "parameter").as(decodeList(ParameterValue.decoder(association)))
         activity <-
           Activity
             .from(resourceId, startedAtTime, endedAtTime, author, agent, association, usages, generations, parameters)

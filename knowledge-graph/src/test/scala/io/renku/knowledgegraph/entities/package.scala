@@ -41,7 +41,7 @@ package object entities {
   private[entities] val modelDatasets: Gen[model.Entity.Dataset] =
     anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).map(_.to[model.Entity.Dataset])
   private[entities] val modelWorkflows: Gen[model.Entity.Workflow] =
-    anyRenkuProjectEntities.withActivities(activityEntities(planEntities())) map { project =>
+    anyRenkuProjectEntities.withActivities(activityEntities(stepPlanEntities())) map { project =>
       val plan :: Nil = project.plans.toList
       (plan -> project).to[model.Entity.Workflow]
     }

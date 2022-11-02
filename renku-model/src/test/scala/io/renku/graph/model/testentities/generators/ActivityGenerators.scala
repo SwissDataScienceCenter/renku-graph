@@ -19,8 +19,11 @@
 package io.renku.graph.model.testentities
 package generators
 
+import StepPlan.CommandParameters
+import StepPlan.CommandParameters.CommandParameterFactory
+import generators.EntitiesGenerators.{ActivityGenFactory, StepPlanGenFactory}
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestamps, timestampsNotInTheFuture}
+import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates}
 import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
@@ -28,9 +31,6 @@ import io.renku.graph.model.entityModel.{Checksum, Location}
 import io.renku.graph.model.parameterValues.ValueOverride
 import io.renku.graph.model.plans.Command
 import io.renku.graph.model.testentities.Entity.{InputEntity, OutputEntity}
-import io.renku.graph.model.testentities.Plan.CommandParameters
-import io.renku.graph.model.testentities.Plan.CommandParameters.CommandParameterFactory
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.{ActivityGenFactory, PlanGenFactory}
 import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
 
@@ -51,6 +51,7 @@ trait ActivityGenerators {
   val entityChecksums:       Gen[Checksum]        = nonBlankStrings(40, 40).map(_.value).map(Checksum.apply)
 
   implicit val planIdentifiers: Gen[plans.Identifier] = noDashUuid.toGeneratorOf(plans.Identifier)
+  def planResourceIds(implicit renkuUrl: RenkuUrl): Gen[plans.ResourceId] = planIdentifiers.map(plans.ResourceId(_))
   implicit val planNames:    Gen[plans.Name]    = nonBlankStrings(minLength = 5).map(_.value).toGeneratorOf[plans.Name]
   implicit val planKeywords: Gen[plans.Keyword] = nonBlankStrings(minLength = 5) map (_.value) map plans.Keyword.apply
   implicit val planDescriptions: Gen[plans.Description] = sentences().map(_.value).toGeneratorOf[plans.Description]
@@ -93,35 +94,36 @@ trait ActivityGenerators {
   lazy val parameterValueOverrides: Gen[ValueOverride] =
     nonBlankStrings().map(v => ValueOverride(v.value))
 
-  def activityEntities(planGen: projects.DateCreated => Gen[Plan]): ActivityGenFactory =
+  def activityEntities(planGen: projects.DateCreated => Gen[StepPlan]): ActivityGenFactory =
     executionPlanners(planGen, _: projects.DateCreated).map(_.buildProvenanceUnsafe())
 
-  def planEntities(
+  def stepPlanEntities(
       parameterFactories:     CommandParameterFactory*
-  )(implicit planCommandsGen: Gen[Command]): PlanGenFactory = projectDateCreated =>
+  )(implicit planCommandsGen: Gen[Command]): StepPlanGenFactory = projectDateCreated =>
     for {
       name         <- planNames
       maybeCommand <- planCommandsGen.toGeneratorOfOptions
       dateCreated  <- planDatesCreated(after = projectDateCreated)
-    } yield Plan.of(name, maybeCommand, dateCreated, CommandParameters.of(parameterFactories: _*))
+      creators     <- personEntities.toGeneratorOfList(max = 2)
+    } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
 
-  def executionPlanners(planGen: projects.DateCreated => Gen[Plan], project: RenkuProject): Gen[ExecutionPlanner] =
+  def executionPlanners(planGen: projects.DateCreated => Gen[StepPlan], project: RenkuProject): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)
 
-  def executionPlanners(planGen:            projects.DateCreated => Gen[Plan],
+  def executionPlanners(planGen:            projects.DateCreated => Gen[StepPlan],
                         projectDateCreated: projects.DateCreated
   ): Gen[ExecutionPlanner] = for {
     plan       <- planGen(projectDateCreated)
     author     <- personEntities
     cliVersion <- cliVersions
   } yield ExecutionPlanner.of(plan,
-                              activityStartTimes(projectDateCreated).generateOne,
+                              activityStartTimes(plan.dateCreated).generateOne,
                               author,
                               cliVersion,
                               projectDateCreated
   )
 
-  def executionPlannersDecoupledFromProject(planGen: projects.DateCreated => Gen[Plan]): Gen[ExecutionPlanner] =
+  def executionPlannersDecoupledFromProject(planGen: projects.DateCreated => Gen[StepPlan]): Gen[ExecutionPlanner] =
     executionPlanners(planGen, projectCreatedDates().generateOne)
 
   implicit class ActivityGenFactoryOps(factory: ActivityGenFactory) {
@@ -130,10 +132,6 @@ trait ActivityGenerators {
       factory(projectDateCreated).generateList()
 
     def multiple: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne.value)(factory)
-
-    def withDateBefore(max: InstantTinyType): Gen[Activity] =
-      factory(projects.DateCreated(max.value))
-        .map(_.copy(startTime = timestamps(max = max.value).generateAs[activities.StartTime]))
 
     def modify(f: Activity => Activity): ActivityGenFactory =
       projectCreationDate => factory(projectCreationDate).map(f)
@@ -160,26 +158,17 @@ trait ActivityGenerators {
           p.copy(agent = agent)
       })
 
-  def setPlanCreator(person: Person): Activity => Activity =
-    activity =>
-      activity.copy(associationFactory = activity.associationFactory.andThen {
-        case p: Association.WithPersonAgent =>
-          Association.WithPersonAgent(p.activity, p.agent, p.plan.copy(creators = Set(person)))
-        case p: Association.WithRenkuAgent =>
-          Association.WithRenkuAgent(p.activity, p.agent, p.plan.copy(creators = Set(person)))
-      })
+  def setPlanCreator(person: Person): Activity => Activity = activity =>
+    activity.copy(associationFactory = activity.associationFactory.andThen {
+      case p: Association.WithPersonAgent =>
+        Association.WithPersonAgent(p.activity, p.agent, p.plan.replaceCreators(person :: Nil))
+      case p: Association.WithRenkuAgent =>
+        Association.WithRenkuAgent(p.activity, p.agent, p.plan.replaceCreators(person :: Nil))
+    })
 
-  implicit class PlanGenFactoryOps(factory: PlanGenFactory) {
+  implicit class PlanGenFactoryOps(factory: StepPlanGenFactory) {
 
-    def modify(f: Plan => Plan): PlanGenFactory =
+    def modify(f: StepPlan => StepPlan): StepPlanGenFactory =
       projectCreationDate => factory(projectCreationDate).map(f)
   }
-
-  def replacePlanName(to: plans.Name): Plan => Plan = _.copy(name = to)
-
-  def replacePlanKeywords(to: List[plans.Keyword]): Plan => Plan = _.copy(keywords = to)
-
-  def replacePlanDesc(to: Option[plans.Description]): Plan => Plan = _.copy(maybeDescription = to)
-
-  def replacePlanDateCreated(to: plans.DateCreated): Plan => Plan = _.copy(dateCreated = to)
 }

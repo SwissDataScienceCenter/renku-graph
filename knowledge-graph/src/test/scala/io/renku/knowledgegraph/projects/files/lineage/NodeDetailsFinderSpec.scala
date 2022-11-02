@@ -56,7 +56,7 @@ class NodeDetailsFinderSpec
       val project = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
-            planEntities(
+            stepPlanEntities(
               CommandInput.fromLocation(input),
               CommandOutput.fromLocation(output)
             ),
@@ -88,7 +88,7 @@ class NodeDetailsFinderSpec
       val project = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
-            planEntities(
+            stepPlanEntities(
               CommandInput.fromLocation(input),
               CommandOutput.fromLocation(output)
             ),
@@ -126,7 +126,7 @@ class NodeDetailsFinderSpec
       val project = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
-            planEntities(
+            stepPlanEntities(
               CommandInput.fromLocation(input),
               CommandOutput.fromLocation(output)
             ),
@@ -138,7 +138,7 @@ class NodeDetailsFinderSpec
         )
         .addActivity(project =>
           executionPlanners(
-            planEntities(CommandInput.fromLocation(output)),
+            stepPlanEntities(CommandInput.fromLocation(output)),
             project
           ).generateOne
             .planInputParameterValuesFromEntity(
@@ -172,7 +172,7 @@ class NodeDetailsFinderSpec
       val project = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
-            planEntities(
+            stepPlanEntities(
               CommandInput.streamedFromLocation(input),
               CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
               CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
@@ -204,11 +204,11 @@ class NodeDetailsFinderSpec
       val project: RenkuProject = anyRenkuProjectEntities
         .addActivity(project =>
           executionPlanners(
-            planEntities(
+            stepPlanEntities(
               CommandInput.streamedFromLocation(input),
               CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
               CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
-            ).andThen(genPlan => genPlan.map(_.copy(maybeCommand = None))),
+            ).andThen(genPlan => genPlan.map(_.replaceCommand(to = None))),
             project
           ).map(
             _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne) // add some override values

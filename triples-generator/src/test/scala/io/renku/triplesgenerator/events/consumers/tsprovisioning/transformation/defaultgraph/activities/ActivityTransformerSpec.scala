@@ -42,7 +42,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
     "create update queries for changed/deleted activities' authors " +
       "and associations' agents" in new TestCase {
         val project = anyRenkuProjectEntities
-          .withActivities(activityEntities(planEntities()).modify(toAssociationPersonAgent).multiple: _*)
+          .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent).multiple: _*)
           .generateOne
           .to[entities.RenkuProject]
 
@@ -59,7 +59,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error " +
       "- failure in the author unlinking flow" in new TestCase {
         val project = anyRenkuProjectEntities
-          .withActivities(activityEntities(planEntities()))
+          .withActivities(activityEntities(stepPlanEntities()))
           .generateOne
           .to[entities.RenkuProject]
 
@@ -79,7 +79,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
     "return the ProcessingRecoverableFailure if calls to KG fails with a network or HTTP error " +
       "- failure in the agent unlinking flow" in new TestCase {
         val project = anyRenkuProjectEntities
-          .withActivities(activityEntities(planEntities()))
+          .withActivities(activityEntities(stepPlanEntities()))
           .generateOne
           .to[entities.RenkuProject]
 
@@ -101,7 +101,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
     "fail with NonRecoverableFailure if calls to KG fails with an unknown exception " +
       "- failure in the author unlinking flow" in new TestCase {
         val project = anyRenkuProjectEntities
-          .withActivities(activityEntities(planEntities()))
+          .withActivities(activityEntities(stepPlanEntities()))
           .generateOne
           .to[entities.RenkuProject]
 
@@ -117,7 +117,7 @@ class ActivityTransformerSpec extends AnyWordSpec with should.Matchers with Mock
     "fail with NonRecoverableFailure if calls to KG fails with an unknown exception " +
       "- failure in the agent unlinking flow" in new TestCase {
         val project = anyRenkuProjectEntities
-          .withActivities(activityEntities(planEntities()))
+          .withActivities(activityEntities(stepPlanEntities()))
           .generateOne
           .to[entities.RenkuProject]
 

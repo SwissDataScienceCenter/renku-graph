@@ -20,7 +20,7 @@ package io.renku.graph.model
 
 import cats.syntax.all._
 import io.circe.DecodingFailure
-import io.renku.graph.model.views.{EntityIdJsonLdOps, RdfResource, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, RdfResource, TinyTypeJsonLDOps}
 import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{NonBlank, NonNegativeInt}
@@ -172,7 +172,7 @@ object persons {
   }
   implicit object OrcidId
       extends TinyTypeFactory[OrcidId](new OrcidId(_))
-      with EntityIdJsonLdOps[OrcidId]
+      with EntityIdJsonLDOps[OrcidId]
       with Constraints[OrcidId]
       with NonBlank[OrcidId] {
     private[persons] val validator      = "^https:\\/\\/orcid.org\\/(\\d{4}-\\d{4}-\\d{4}-\\d{4})$"

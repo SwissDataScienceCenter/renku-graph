@@ -36,7 +36,7 @@ class UsageSpec extends AnyWordSpec with should.Matchers with ScalaCheckProperty
 
     "turn JsonLD Usage entity into the Usage object" in {
       forAll(entityLocations, entityChecksums) { (location, checksum) =>
-        val activity = executionPlanners(planEntities(CommandInput.fromLocation(location)),
+        val activity = executionPlanners(stepPlanEntities(CommandInput.fromLocation(location)),
                                          projectCreatedDates().generateOne
         ).generateOne
           .planInputParameterValuesFromChecksum(location -> checksum)

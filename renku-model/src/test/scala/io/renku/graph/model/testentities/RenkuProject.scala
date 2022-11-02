@@ -26,41 +26,44 @@ import io.renku.graph.model._
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
 
-sealed trait RenkuProject extends Project with RenkuProject.ProjectOps with Product with Serializable {
-  val path:             Path
-  val name:             Name
-  val maybeDescription: Option[Description]
-  val agent:            CliVersion
-  val dateCreated:      DateCreated
-  val maybeCreator:     Option[Person]
-  val visibility:       Visibility
-  val forksCount:       ForksCount
-  val keywords:         Set[Keyword]
-  val members:          Set[Person]
-  val version:          SchemaVersion
-  val activities:       List[Activity]
-  val datasets:         List[Dataset[Dataset.Provenance]]
+sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with Product with Serializable {
+  val path:              Path
+  val name:              Name
+  val maybeDescription:  Option[Description]
+  val agent:             CliVersion
+  val dateCreated:       DateCreated
+  val maybeCreator:      Option[Person]
+  val visibility:        Visibility
+  val forksCount:        ForksCount
+  val keywords:          Set[Keyword]
+  val members:           Set[Person]
+  val version:           SchemaVersion
+  val activities:        List[Activity]
+  val datasets:          List[Dataset[Dataset.Provenance]]
+  val unlinkedStepPlans: List[StepPlan]
 
   type ProjectType <: RenkuProject
 
-  lazy val plans: Set[Plan] = activities.map(_.association.plan).toSet
+  lazy val plans:     List[Plan]     = activities.map(_.association.plan) ::: unlinkedStepPlans
+  lazy val stepPlans: List[StepPlan] = plans.collect { case p: StepPlan => p }
 }
 
 object RenkuProject {
 
-  final case class WithoutParent(path:             Path,
-                                 name:             Name,
-                                 maybeDescription: Option[Description],
-                                 agent:            CliVersion,
-                                 dateCreated:      DateCreated,
-                                 maybeCreator:     Option[Person],
-                                 visibility:       Visibility,
-                                 forksCount:       ForksCount,
-                                 keywords:         Set[Keyword],
-                                 members:          Set[Person],
-                                 version:          SchemaVersion,
-                                 activities:       List[Activity],
-                                 datasets:         List[Dataset[Dataset.Provenance]]
+  final case class WithoutParent(path:              Path,
+                                 name:              Name,
+                                 maybeDescription:  Option[Description],
+                                 agent:             CliVersion,
+                                 dateCreated:       DateCreated,
+                                 maybeCreator:      Option[Person],
+                                 visibility:        Visibility,
+                                 forksCount:        ForksCount,
+                                 keywords:          Set[Keyword],
+                                 members:           Set[Person],
+                                 version:           SchemaVersion,
+                                 activities:        List[Activity],
+                                 datasets:          List[Dataset[Dataset.Provenance]],
+                                 unlinkedStepPlans: List[StepPlan] = List.empty
   ) extends RenkuProject {
 
     validateDates(dateCreated, activities, datasets)
@@ -80,6 +83,9 @@ object RenkuProject {
       val dataset = factory(dateCreated).generateOne
       dataset -> copy(datasets = datasets ::: dataset :: Nil)
     }
+
+    override def addUnlinkedStepPlan(plan: StepPlan): ProjectType =
+      copy(unlinkedStepPlans = plan :: unlinkedStepPlans)
 
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithoutParent =
       copy(datasets = newDatasets.toList)
@@ -115,20 +121,21 @@ object RenkuProject {
       .void
   }
 
-  final case class WithParent(path:             Path,
-                              name:             Name,
-                              maybeDescription: Option[Description],
-                              agent:            CliVersion,
-                              dateCreated:      DateCreated,
-                              maybeCreator:     Option[Person],
-                              visibility:       Visibility,
-                              forksCount:       ForksCount,
-                              keywords:         Set[Keyword],
-                              members:          Set[Person],
-                              version:          SchemaVersion,
-                              activities:       List[Activity],
-                              datasets:         List[Dataset[Dataset.Provenance]],
-                              parent:           RenkuProject
+  final case class WithParent(path:              Path,
+                              name:              Name,
+                              maybeDescription:  Option[Description],
+                              agent:             CliVersion,
+                              dateCreated:       DateCreated,
+                              maybeCreator:      Option[Person],
+                              visibility:        Visibility,
+                              forksCount:        ForksCount,
+                              keywords:          Set[Keyword],
+                              members:           Set[Person],
+                              version:           SchemaVersion,
+                              activities:        List[Activity],
+                              datasets:          List[Dataset[Dataset.Provenance]],
+                              parent:            RenkuProject,
+                              unlinkedStepPlans: List[StepPlan] = Nil
   ) extends RenkuProject
       with Parent {
     override type ProjectType = RenkuProject.WithParent
@@ -146,6 +153,8 @@ object RenkuProject {
       dataset -> copy(datasets = datasets ::: dataset :: Nil)
     }
 
+    override def addUnlinkedStepPlan(plan: StepPlan): ProjectType = copy(unlinkedStepPlans = plan :: unlinkedStepPlans)
+
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithParent =
       copy(datasets = newDatasets.toList)
 
@@ -156,7 +165,7 @@ object RenkuProject {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  trait ProjectOps {
+  trait RenkuProjectAlg {
     self: RenkuProject =>
 
     lazy val topAncestorDateCreated: DateCreated = this match {
@@ -170,14 +179,16 @@ object RenkuProject {
 
     def addDataset[P <: Dataset.Provenance](toAdd: DatasetGenFactory[P]): (Dataset[P], ProjectType)
 
+    def addUnlinkedStepPlan(plan: StepPlan): ProjectType
+
     def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): ProjectType
 
     def replaceActivities(newActivities: Activity*): ProjectType
   }
 
   implicit def toEntitiesRenkuProject(implicit renkuUrl: RenkuUrl): RenkuProject => entities.RenkuProject = {
-    case p: RenkuProject.WithParent    => toEntitiesRenkuProjectWithParent(renkuUrl)(p)
     case p: RenkuProject.WithoutParent => toEntitiesRenkuProjectWithoutParent(renkuUrl)(p)
+    case p: RenkuProject.WithParent    => toEntitiesRenkuProjectWithParent(renkuUrl)(p)
   }
 
   implicit def toEntitiesRenkuProjectWithoutParent(implicit
@@ -198,7 +209,8 @@ object RenkuProject {
           project.members.map(_.to[entities.Person]),
           project.version,
           project.activities.map(_.to[entities.Activity]),
-          project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]])
+          project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
+          project.plans.map(_.to[entities.Plan])
         )
         .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)
 
@@ -221,6 +233,7 @@ object RenkuProject {
           project.version,
           project.activities.map(_.to[entities.Activity]),
           project.datasets.map(_.to[entities.Dataset[entities.Dataset.Provenance]]),
+          project.plans.map(_.to[entities.Plan]),
           projects.ResourceId(project.parent.asEntityId)
         )
         .fold(errors => throw new IllegalStateException(errors.intercalate("; ")), identity)

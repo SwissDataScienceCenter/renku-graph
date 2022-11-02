@@ -16,32 +16,62 @@
  * limitations under the License.
  */
 
-package io.renku.graph.model.entities
+package io.renku.graph.model
+package entities
 
-import io.renku.graph.model.Schemas._
-import io.renku.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import io.renku.graph.model.plans.{Command, DateCreated, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
-import io.renku.graph.model._
-import io.renku.jsonld.JsonLDDecoder
-import io.renku.jsonld.JsonLDDecoder.decodeList
+import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import Schemas.{prov, renku, schema}
+import cats.data.{Validated, ValidatedNel}
+import cats.syntax.all._
+import io.circe.DecodingFailure
+import io.renku.jsonld.JsonLDDecoder.{decodeList, decodeOption}
+import io.renku.jsonld._
+import io.renku.jsonld.ontology._
+import io.renku.jsonld.syntax._
+import plans.{Command, DateCreated, DerivedFrom, Description, Keyword, Name, ProgrammingLanguage, ResourceId, SuccessCode}
 
-final case class Plan(resourceId:               ResourceId,
-                      name:                     Name,
-                      maybeDescription:         Option[Description],
-                      maybeCommand:             Option[Command],
-                      creators:                 Set[Person],
-                      dateCreated:              DateCreated,
-                      maybeProgrammingLanguage: Option[ProgrammingLanguage],
-                      keywords:                 List[Keyword],
-                      parameters:               List[CommandParameter],
-                      inputs:                   List[CommandInput],
-                      outputs:                  List[CommandOutput],
-                      successCodes:             List[SuccessCode],
-                      maybeInvalidationTime:    Option[InvalidationTime]
-) extends PlanOps
+sealed trait Plan extends Product with Serializable {
+  val resourceId:       ResourceId
+  val name:             Name
+  val maybeDescription: Option[Description]
+  val creators:         List[Person]
+  val dateCreated:      DateCreated
+  val keywords:         List[Keyword]
 
-sealed trait PlanOps {
-  self: Plan =>
+  type PlanGroup <: Plan
+}
+
+object Plan {
+
+  final case class Derivation(derivedFrom: DerivedFrom, originalResourceId: ResourceId)
+
+  implicit def entityFunctions(implicit gitLabApiUrl: GitLabApiUrl): EntityFunctions[Plan] =
+    new EntityFunctions[Plan] {
+      val findAllPersons: Plan => Set[Person]               = _.creators.toSet
+      val encoder:        GraphClass => JsonLDEncoder[Plan] = Plan.encoder(gitLabApiUrl, _)
+    }
+
+  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl, graphClass: GraphClass): JsonLDEncoder[Plan] =
+    JsonLDEncoder.instance { case p: StepPlan => p.asJsonLD }
+
+  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Plan] =
+    StepPlan.decoder.asInstanceOf[JsonLDDecoder[Plan]]
+
+  lazy val ontology: Type = StepPlan.ontology
+}
+
+sealed trait StepPlan extends Plan with StepPlanAlg {
+  val maybeCommand:             Option[Command]
+  val maybeProgrammingLanguage: Option[ProgrammingLanguage]
+  val parameters:               List[CommandParameter]
+  val inputs:                   List[CommandInput]
+  val outputs:                  List[CommandOutput]
+  val successCodes:             List[SuccessCode]
+  override type PlanGroup = StepPlan
+}
+
+sealed trait StepPlanAlg {
+  self: StepPlan =>
 
   def findParameter(parameterId: commandParameters.ResourceId): Option[CommandParameter] =
     parameters.find(_.resourceId == parameterId)
@@ -53,50 +83,163 @@ sealed trait PlanOps {
     outputs.find(_.resourceId == parameterId)
 }
 
-object Plan {
-  import io.renku.jsonld.ontology._
-  import io.renku.jsonld.syntax._
-  import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
+object StepPlan {
+  import Plan._
 
-  private val entityTypes = EntityTypes.of(prov / "Plan", schema / "Action", schema / "CreativeWork")
+  final case class NonModified(resourceId:               ResourceId,
+                               name:                     Name,
+                               maybeDescription:         Option[Description],
+                               creators:                 List[Person],
+                               dateCreated:              DateCreated,
+                               keywords:                 List[Keyword],
+                               maybeCommand:             Option[Command],
+                               maybeProgrammingLanguage: Option[ProgrammingLanguage],
+                               parameters:               List[CommandParameter],
+                               inputs:                   List[CommandInput],
+                               outputs:                  List[CommandOutput],
+                               successCodes:             List[SuccessCode]
+  ) extends StepPlan
 
-  implicit def entityFunctions(implicit gitLabApiUrl: GitLabApiUrl): EntityFunctions[Plan] =
-    new EntityFunctions[Plan] {
-      val findAllPersons: Plan => Set[Person] =
-        _.creators
-      val encoder: GraphClass => JsonLDEncoder[Plan] =
-        Plan.encoder(gitLabApiUrl, _)
+  final case class Modified(resourceId:               ResourceId,
+                            name:                     Name,
+                            maybeDescription:         Option[Description],
+                            creators:                 List[Person],
+                            dateCreated:              DateCreated,
+                            keywords:                 List[Keyword],
+                            maybeCommand:             Option[Command],
+                            maybeProgrammingLanguage: Option[ProgrammingLanguage],
+                            parameters:               List[CommandParameter],
+                            inputs:                   List[CommandInput],
+                            outputs:                  List[CommandOutput],
+                            successCodes:             List[SuccessCode],
+                            derivation:               Derivation,
+                            maybeInvalidationTime:    Option[InvalidationTime]
+  ) extends StepPlan
+
+  def from(resourceId:               ResourceId,
+           name:                     Name,
+           maybeDescription:         Option[Description],
+           maybeCommand:             Option[Command],
+           creators:                 List[Person],
+           dateCreated:              DateCreated,
+           maybeProgrammingLanguage: Option[ProgrammingLanguage],
+           keywords:                 List[Keyword],
+           parameters:               List[CommandParameter],
+           inputs:                   List[CommandInput],
+           outputs:                  List[CommandOutput],
+           successCodes:             List[SuccessCode]
+  ): ValidatedNel[String, StepPlan.NonModified] = NonModified(resourceId,
+                                                              name,
+                                                              maybeDescription,
+                                                              creators,
+                                                              dateCreated,
+                                                              keywords,
+                                                              maybeCommand,
+                                                              maybeProgrammingLanguage,
+                                                              parameters,
+                                                              inputs,
+                                                              outputs,
+                                                              successCodes
+  ).validNel
+
+  def from(resourceId:               ResourceId,
+           name:                     Name,
+           maybeDescription:         Option[Description],
+           maybeCommand:             Option[Command],
+           creators:                 List[Person],
+           dateCreated:              DateCreated,
+           maybeProgrammingLanguage: Option[ProgrammingLanguage],
+           keywords:                 List[Keyword],
+           parameters:               List[CommandParameter],
+           inputs:                   List[CommandInput],
+           outputs:                  List[CommandOutput],
+           successCodes:             List[SuccessCode],
+           derivation:               Derivation,
+           maybeInvalidationTime:    Option[InvalidationTime]
+  ): ValidatedNel[String, StepPlan] = {
+
+    lazy val validateInvalidationTime: ValidatedNel[String, Unit] = maybeInvalidationTime match {
+      case None => Validated.validNel(())
+      case Some(time) =>
+        Validated.condNel(
+          test = (time.value compareTo dateCreated.value) >= 0,
+          (),
+          show"Invalidation time $time on StepPlan $resourceId is older than dateCreated $dateCreated"
+        )
     }
 
-  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl, graphClass: GraphClass): JsonLDEncoder[Plan] =
-    JsonLDEncoder.instance { plan =>
-      JsonLD.entity(
-        plan.resourceId.asEntityId,
-        entityTypes,
-        schema / "name"                -> plan.name.asJsonLD,
-        schema / "description"         -> plan.maybeDescription.asJsonLD,
-        renku / "command"              -> plan.maybeCommand.asJsonLD,
-        schema / "creator"             -> plan.creators.toList.asJsonLD,
-        schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
-        schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
-        schema / "keywords"            -> plan.keywords.asJsonLD,
-        renku / "hasArguments"         -> plan.parameters.asJsonLD,
-        renku / "hasInputs"            -> plan.inputs.asJsonLD,
-        renku / "hasOutputs"           -> plan.outputs.asJsonLD,
-        renku / "successCodes"         -> plan.successCodes.asJsonLD,
-        prov / "invalidatedAtTime"     -> plan.maybeInvalidationTime.asJsonLD
+    validateInvalidationTime.map(_ =>
+      Modified(
+        resourceId,
+        name,
+        maybeDescription,
+        creators,
+        dateCreated,
+        keywords,
+        maybeCommand,
+        maybeProgrammingLanguage,
+        parameters,
+        inputs,
+        outputs,
+        successCodes,
+        derivation,
+        maybeInvalidationTime
       )
+    )
+  }
+
+  val entityTypes: EntityTypes =
+    EntityTypes of (renku / "Plan", prov / "Plan", schema / "Action", schema / "CreativeWork")
+
+  implicit def encoder[P <: StepPlan](implicit gitLabApiUrl: GitLabApiUrl, graphClass: GraphClass): JsonLDEncoder[P] =
+    JsonLDEncoder.instance {
+      case plan: StepPlan.NonModified =>
+        JsonLD.entity(
+          plan.resourceId.asEntityId,
+          entityTypes,
+          schema / "name"                -> plan.name.asJsonLD,
+          schema / "description"         -> plan.maybeDescription.asJsonLD,
+          renku / "command"              -> plan.maybeCommand.asJsonLD,
+          schema / "creator"             -> plan.creators.asJsonLD,
+          schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
+          schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
+          schema / "keywords"            -> plan.keywords.asJsonLD,
+          renku / "hasArguments"         -> plan.parameters.asJsonLD,
+          renku / "hasInputs"            -> plan.inputs.asJsonLD,
+          renku / "hasOutputs"           -> plan.outputs.asJsonLD,
+          renku / "topmostDerivedFrom"   -> plan.resourceId.asEntityId.asJsonLD,
+          renku / "successCodes"         -> plan.successCodes.asJsonLD
+        )
+      case plan: StepPlan.Modified =>
+        JsonLD.entity(
+          plan.resourceId.asEntityId,
+          entityTypes,
+          schema / "name"                -> plan.name.asJsonLD,
+          schema / "description"         -> plan.maybeDescription.asJsonLD,
+          renku / "command"              -> plan.maybeCommand.asJsonLD,
+          schema / "creator"             -> plan.creators.asJsonLD,
+          schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
+          schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
+          schema / "keywords"            -> plan.keywords.asJsonLD,
+          renku / "hasArguments"         -> plan.parameters.asJsonLD,
+          renku / "hasInputs"            -> plan.inputs.asJsonLD,
+          renku / "hasOutputs"           -> plan.outputs.asJsonLD,
+          renku / "successCodes"         -> plan.successCodes.asJsonLD,
+          prov / "wasDerivedFrom"        -> plan.derivation.derivedFrom.asJsonLD,
+          renku / "topmostDerivedFrom"   -> plan.derivation.originalResourceId.asEntityId.asJsonLD,
+          prov / "invalidatedAtTime"     -> plan.maybeInvalidationTime.asJsonLD
+        )
     }
 
-  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Plan] = JsonLDDecoder.cacheableEntity(entityTypes) {
-    cursor =>
+  implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[StepPlan] =
+    JsonLDDecoder.cacheableEntity(entityTypes) { cursor =>
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
       for {
         resourceId            <- cursor.downEntityId.as[ResourceId]
         name                  <- cursor.downField(schema / "name").as[Name]
         maybeDescription      <- cursor.downField(schema / "description").as[Option[Description]]
         maybeCommand          <- cursor.downField(renku / "command").as[Option[Command]]
-        creators              <- cursor.downField(schema / "creator").as[List[Person]].map(_.toSet)
+        creators              <- cursor.downField(schema / "creator").as[List[Person]]
         dateCreated           <- cursor.downField(schema / "dateCreated").as[DateCreated]
         maybeProgrammingLang  <- cursor.downField(schema / "programmingLanguage").as[Option[ProgrammingLanguage]]
         keywords              <- cursor.downField(schema / "keywords").as[List[Option[Keyword]]].map(_.flatten)
@@ -104,41 +247,72 @@ object Plan {
         inputs                <- cursor.downField(renku / "hasInputs").as[List[CommandInput]]
         outputs               <- cursor.downField(renku / "hasOutputs").as[List[CommandOutput]]
         successCodes          <- cursor.downField(renku / "successCodes").as[List[SuccessCode]]
+        maybeDerivedFrom      <- cursor.downField(prov / "wasDerivedFrom").as(decodeOption(DerivedFrom.ttDecoder))
         maybeInvalidationTime <- cursor.downField(prov / "invalidatedAtTime").as[Option[InvalidationTime]]
-      } yield Plan(
-        resourceId,
-        name,
-        maybeDescription,
-        maybeCommand,
-        creators,
-        dateCreated,
-        maybeProgrammingLang,
-        keywords,
-        parameters,
-        inputs,
-        outputs,
-        successCodes,
-        maybeInvalidationTime
-      )
-  }
+        plan <- {
+                  (maybeDerivedFrom, maybeInvalidationTime) match {
+                    case (None, None) =>
+                      StepPlan
+                        .from(
+                          resourceId,
+                          name,
+                          maybeDescription,
+                          maybeCommand,
+                          creators,
+                          dateCreated,
+                          maybeProgrammingLang,
+                          keywords,
+                          parameters,
+                          inputs,
+                          outputs,
+                          successCodes
+                        )
+                    case (Some(derivedFrom), mit) =>
+                      StepPlan
+                        .from(
+                          resourceId,
+                          name,
+                          maybeDescription,
+                          maybeCommand,
+                          creators,
+                          dateCreated,
+                          maybeProgrammingLang,
+                          keywords,
+                          parameters,
+                          inputs,
+                          outputs,
+                          successCodes,
+                          Derivation(derivedFrom, ResourceId(derivedFrom.value)),
+                          mit
+                        )
+                    case (None, Some(_)) => show"Plan $resourceId has no parent but invalidation time".invalidNel
+                  }
+                }.toEither.leftMap(errors => DecodingFailure(errors.intercalate("; "), Nil))
+      } yield plan
+    }
 
-  lazy val ontology: Type = Type.Def(
-    Class(prov / "Plan"),
-    ObjectProperties(
-      ObjectProperty(renku / "hasArguments", CommandParameterBase.CommandParameter.ontology),
-      ObjectProperty(renku / "hasInputs", CommandParameterBase.CommandInput.ontology),
-      ObjectProperty(renku / "hasOutputs", CommandParameterBase.CommandOutput.ontology),
-      ObjectProperty(schema / "creator", Person.ontology)
-    ),
-    DataProperties(
-      DataProperty(schema / "name", xsd / "string"),
-      DataProperty(schema / "description", xsd / "string"),
-      DataProperty(renku / "command", xsd / "string"),
-      DataProperty(schema / "dateCreated", xsd / "dateTime"),
-      DataProperty(schema / "programmingLanguage", xsd / "string"),
-      DataProperty(schema / "keywords", xsd / "string"),
-      DataProperty(renku / "successCodes", xsd / "int"),
-      DataProperty(prov / "invalidatedAtTime", xsd / "dateTime")
+  lazy val ontology: Type = {
+    val planClass = Class(renku / "Plan")
+    Type.Def(
+      planClass,
+      ObjectProperties(
+        ObjectProperty(renku / "hasArguments", CommandParameterBase.CommandParameter.ontology),
+        ObjectProperty(renku / "hasInputs", CommandParameterBase.CommandInput.ontology),
+        ObjectProperty(renku / "hasOutputs", CommandParameterBase.CommandOutput.ontology),
+        ObjectProperty(schema / "creator", Person.ontology),
+        ObjectProperty(prov / "wasDerivedFrom", planClass),
+        ObjectProperty(renku / "topmostDerivedFrom", planClass)
+      ),
+      DataProperties(
+        DataProperty(schema / "name", xsd / "string"),
+        DataProperty(schema / "description", xsd / "string"),
+        DataProperty(renku / "command", xsd / "string"),
+        DataProperty(schema / "dateCreated", xsd / "dateTime"),
+        DataProperty(schema / "programmingLanguage", xsd / "string"),
+        DataProperty(schema / "keywords", xsd / "string"),
+        DataProperty(renku / "successCodes", xsd / "int"),
+        DataProperty(prov / "invalidatedAtTime", xsd / "dateTime")
+      )
     )
-  )
+  }
 }

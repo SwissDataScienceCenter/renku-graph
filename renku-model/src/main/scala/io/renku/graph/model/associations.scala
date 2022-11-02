@@ -18,7 +18,7 @@
 
 package io.renku.graph.model
 
-import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLdOps}
+import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps}
 import io.renku.tinytypes.constraints.Url
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
@@ -27,6 +27,6 @@ object associations {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLDOps[ResourceId]
       with AnyResourceRenderer[ResourceId]
 }

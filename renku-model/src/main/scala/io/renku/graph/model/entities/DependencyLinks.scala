@@ -18,18 +18,8 @@
 
 package io.renku.graph.model.entities
 
-import monocle.Lens
+import io.renku.graph.model.plans
 
-object PlanLens {
-
-  val stepPlanCreators: Lens[StepPlan, List[Person]] = Lens[StepPlan, List[Person]](_.creators) { persons =>
-    {
-      case plan: StepPlan.NonModified => plan.copy(creators = persons)
-      case plan: StepPlan.Modified    => plan.copy(creators = persons)
-    }
-  }
-
-  val planCreators: Lens[Plan, List[Person]] = Lens[Plan, List[Person]](_.creators) { persons =>
-    { case plan: StepPlan => stepPlanCreators.modify(_ => persons)(plan) }
-  }
+trait DependencyLinks {
+  def findStepPlan(planId: plans.ResourceId): Option[StepPlan]
 }

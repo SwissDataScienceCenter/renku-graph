@@ -46,7 +46,6 @@ trait GitLabStubSupport extends BeforeAndAfterAll with BeforeAndAfter with GitLa
 
   override def afterAll(): Unit = {
     super.afterAll()
-    testLogger.info("Shutting down GitLabApiStub").unsafeRunSync()
     gitLabStubStarter.shutdown()
   }
 
