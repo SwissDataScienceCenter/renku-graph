@@ -26,9 +26,9 @@ import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventStatus
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import EventStatus._
-import eu.timepit.refined.auto._
 import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToAwaitingDeletion
+import io.renku.events.consumers.Project
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
@@ -36,7 +36,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
-import io.renku.events.consumers.Project
 
 class RollbackToAwaitingDeletionUpdaterSpec
     extends AnyWordSpec

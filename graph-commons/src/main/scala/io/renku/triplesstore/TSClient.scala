@@ -18,9 +18,9 @@
 
 package io.renku.triplesstore
 
-import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
+import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.circe.Decoder
@@ -43,7 +43,7 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
     idleTimeoutOverride:    Option[Duration] = None,
     requestTimeoutOverride: Option[Duration] = None,
-    printQueries:           Boolean = false
+    logQueries:             Boolean = false
 ) extends RestClient(Throttler.noThrottling,
                      Some(implicitly[SparqlQueryTimeRecorder[F]].instance),
                      retryInterval,
@@ -54,7 +54,9 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     with ResultsDecoder
     with RdfMediaTypes {
 
+  private val applicative: Applicative[F] = Applicative[F]
   import TSClient._
+  import applicative.whenA
   import eu.timepit.refined.auto._
   import io.renku.http.client.UrlEncoder.urlEncode
   import org.http4s.MediaType.application._
@@ -65,17 +67,19 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import org.http4s.{Request, Response, Status}
   import triplesStoreConfig._
 
-  protected def updateWithNoResult(using: SparqlQuery): F[Unit] =
-    updateWitMapping[Unit](using, toFullResponseMapper(_ => ().pure[F]))
+  protected def updateWithNoResult(updateQuery: SparqlQuery): F[Unit] =
+    updateWitMapping[Unit](updateQuery, toFullResponseMapper(_ => ().pure[F]))
 
   protected def updateWitMapping[ResultType](
-      using:       SparqlQuery,
+      updateQuery: SparqlQuery,
       mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ResultType]]
-  ): F[ResultType] = runQuery(using, mapResponse, SparqlUpdate)
+  ): F[ResultType] = runQuery(updateQuery, mapResponse, SparqlUpdate)
 
-  protected def queryExpecting[ResultType](using: SparqlQuery)(implicit decoder: Decoder[ResultType]): F[ResultType] =
+  protected def queryExpecting[ResultType](
+      selectQuery:    SparqlQuery
+  )(implicit decoder: Decoder[ResultType]): F[ResultType] =
     runQuery(
-      using,
+      selectQuery,
       toFullResponseMapper(responseMapperFor[ResultType]),
       SparqlSelect
     )
@@ -105,8 +109,11 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       queryType:   SparqlQueryType
   ): F[ResultType] = for {
     uri    <- validateUri((fusekiUrl / datasetName / path(queryType)).toString)
+    _      <- log(query)
     result <- send(sparqlQueryRequest(uri, queryType, query))(mapResponse)
   } yield result
+
+  private def log(query: SparqlQuery) = whenA(logQueries)(Logger[F] info query.show)
 
   private def sparqlQueryRequest(uri: Uri, queryType: SparqlQueryType, query: SparqlQuery) = HttpRequest(
     request(POST, uri, triplesStoreConfig.authCredentials)
@@ -127,13 +134,11 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       decoder: Decoder[ResultType]
   ): Response[F] => F[ResultType] = _.as[ResultType](MonadThrow[F], jsonOf[F, ResultType])
 
-  private def toEntity(queryType: SparqlQueryType, query: SparqlQuery): String = {
-    if (printQueries) println(query)
+  private def toEntity(queryType: SparqlQueryType, query: SparqlQuery): String =
     queryType match {
       case _: SparqlSelect => s"query=${urlEncode(query.toString)}"
       case _ => s"update=${urlEncode(query.toString)}"
     }
-  }
 
   private def path(queryType: SparqlQueryType): String = queryType match {
     case _: SparqlSelect => "sparql"
@@ -151,11 +156,11 @@ abstract class TSClient[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
       override def findResults(pagingRequest: PagingRequest): F[List[ResultType]] = for {
         queryWithPaging <- query.include[F](pagingRequest)
-        results         <- queryExpecting[List[ResultType]](using = queryWithPaging)
+        results         <- queryExpecting[List[ResultType]](selectQuery = queryWithPaging)
       } yield results
 
       override def findTotal() =
-        queryExpecting[Option[Total]](using = (maybeCountQuery getOrElse query).toCountQuery).flatMap {
+        queryExpecting[Option[Total]](selectQuery = (maybeCountQuery getOrElse query).toCountQuery).flatMap {
           case Some(total) => total.pure[F]
           case None        => new Exception("Total number of records cannot be found").raiseError[F, Total]
         }

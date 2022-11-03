@@ -21,7 +21,6 @@ package io.renku.knowledgegraph.projects.files.lineage
 import LineageGenerators._
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
@@ -168,7 +167,7 @@ class NodeDetailsFinderSpec
 
     "find details of a Plan with mapped command parameters" in new TestCase {
       val input +: output +: errOutput +: Nil =
-        entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
+        entityLocations.generateNonEmptyList(min = 3, max = 3).toList
 
       val project = anyRenkuProjectEntities
         .addActivity(project =>
@@ -200,7 +199,7 @@ class NodeDetailsFinderSpec
 
     "find details of a Plan with no command" in new TestCase {
       val input +: output +: errOutput +: Nil =
-        entityLocations.generateNonEmptyList(minElements = 3, maxElements = 3).toList
+        entityLocations.generateNonEmptyList(min = 3, max = 3).toList
 
       val project: RenkuProject = anyRenkuProjectEntities
         .addActivity(project =>

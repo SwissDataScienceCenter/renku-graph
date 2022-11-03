@@ -27,11 +27,16 @@ import io.renku.http.rest.paging.model.Total
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaForSpec with RenkuDataset with IOSpec {
+class TagsFinderSpec
+    extends AnyWordSpec
+    with should.Matchers
+    with InMemoryJenaForSpec
+    with ProjectsDataset
+    with IOSpec {
 
   "findTags" should {
 
@@ -54,7 +59,7 @@ class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaF
         (original, modified, projStage4)
       }
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       original.identification.name shouldBe modified.identification.name
 
@@ -84,7 +89,7 @@ class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaF
         .importDataset(dsPublicationEvent)
         .generateOne
 
-      upload(to = renkuDataset, project, projectWithImportedDs)
+      upload(to = projectsDataset, project, projectWithImportedDs)
 
       project.datasets.flatMap(_.publicationEvents).size               shouldBe 1
       projectWithImportedDs.datasets.flatMap(_.publicationEvents).size shouldBe 1
@@ -115,7 +120,7 @@ class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaF
       .addDataset(datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(Nil)))
       .generateOne
 
-    upload(to = renkuDataset, project)
+    upload(to = projectsDataset, project)
 
     val response = finder.findTags(Criteria(project.path, original.identification.name)).unsafeRunSync()
 
@@ -137,7 +142,7 @@ class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaF
       .addDataset(datasetEntities(provenanceInternal).modify(_.replacePublicationEvents(Nil)))
       .generateOne
 
-    upload(to = renkuDataset, project)
+    upload(to = projectsDataset, project)
 
     val response = finder.findTags(Criteria(projectPaths.generateOne, original.identification.name)).unsafeRunSync()
 
@@ -148,7 +153,7 @@ class TagsFinderSpec extends AnyWordSpec with should.Matchers with InMemoryJenaF
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new TagsFinderImpl[IO](renkuDSConnectionInfo)
+    val finder = new TagsFinderImpl[IO](projectsDSConnectionInfo)
   }
 
   private implicit lazy val toTag: PublicationEvent => model.Tag = event =>

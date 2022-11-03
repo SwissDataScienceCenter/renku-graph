@@ -25,6 +25,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model._
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.views.RdfResource
@@ -118,7 +119,7 @@ private class UpdatesCreator(renkuUrl: RenkuUrl, gitLabApiUrl: GitLabApiUrl) {
           |                 schema:sameAs <$sameAsId>.
           |<$sameAsId> a schema:URL;
           |            schema:identifier ${member.gitLabId};
-          |            schema:additionalType 'GitLab'.
+          |            schema:additionalType '${Person.gitLabSameAsAdditionalType}'
           |""".stripMargin
   }
 

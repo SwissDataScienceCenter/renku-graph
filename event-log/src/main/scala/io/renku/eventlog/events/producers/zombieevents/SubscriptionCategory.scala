@@ -19,13 +19,13 @@
 package io.renku.eventlog.events.producers
 package zombieevents
 
+import ZombieEventEncoder.encodeEvent
 import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers.UrlAndIdSubscriberTracker
 import io.renku.eventlog.events.producers.eventdelivery.EventDelivery
-import ZombieEventEncoder.encodeEvent
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
 import org.typelevel.log4cats.Logger

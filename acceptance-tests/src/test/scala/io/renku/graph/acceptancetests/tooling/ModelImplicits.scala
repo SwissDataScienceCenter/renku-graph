@@ -21,8 +21,8 @@ package io.renku.graph.acceptancetests.tooling
 import cats.data.NonEmptyList
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.testentities.Person
 import io.renku.graph.model.persons
+import io.renku.graph.model.testentities.Person
 
 trait ModelImplicits {
 

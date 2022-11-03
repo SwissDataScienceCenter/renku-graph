@@ -18,11 +18,11 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning
 
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.exceptions
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.generators.Generators.exceptions
-import io.renku.generators.Generators.Implicits._
 
 class UploadingResultSpec extends AnyWordSpec with should.Matchers with TableDrivenPropertyChecks {
 

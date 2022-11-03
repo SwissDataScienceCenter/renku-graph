@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2022 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,8 +16,22 @@
  * limitations under the License.
  */
 
-name := "token-repository"
+package io.renku.db
 
-Test / fork := true
+import com.dimafeng.testcontainers.PostgreSQLContainer
+import org.testcontainers.utility.DockerImageName
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.4.4"
+object PostgresContainer {
+  val version = "12.8-alpine"
+
+  val image = s"postgres:$version"
+
+  val imageName: DockerImageName = DockerImageName.parse(image)
+
+  def container(dbConfig: DBConfigProvider.DBConfig[_]): PostgreSQLContainer = PostgreSQLContainer(
+    dockerImageNameOverride = imageName,
+    databaseName = dbConfig.name.value,
+    username = dbConfig.user.value,
+    password = dbConfig.pass.value
+  )
+}

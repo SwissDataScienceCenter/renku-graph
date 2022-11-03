@@ -21,7 +21,6 @@ package io.renku.triplesgenerator.config
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.{CliVersion, RenkuVersionPair, SchemaVersion}

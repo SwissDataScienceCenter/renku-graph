@@ -49,9 +49,9 @@ object Endpoint {
   import io.renku.graph.config.RenkuUrlLoader
 
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    tagsFinder  <- TagsFinder[F]
-    renkuUrl    <- RenkuUrlLoader()
-    renkuApiUrl <- renku.ApiUrl()
+    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader()
+    tagsFinder                    <- TagsFinder[F]
+    renkuApiUrl                   <- renku.ApiUrl()
   } yield new EndpointImpl(tagsFinder, renkuUrl, renkuApiUrl)
 
   def href(renkuApiUrl: renku.ApiUrl, projectPath: graph.model.projects.Path, name: datasets.Name): Href =

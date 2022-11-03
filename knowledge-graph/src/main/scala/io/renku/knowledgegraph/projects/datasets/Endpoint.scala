@@ -24,13 +24,13 @@ import cats.syntax.all._
 import io.circe.Encoder
 import io.circe.syntax._
 import io.renku.config.renku
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
+import io.renku.graph.model.{GitLabUrl, RenkuUrl, projects}
 import io.renku.http.ErrorMessage
 import io.renku.http.InfoMessage._
 import io.renku.http.rest.Links._
 import io.renku.logging.ExecutionTimeRecorder
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder}
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 import org.typelevel.log4cats.Logger
@@ -80,11 +80,12 @@ class EndpointImpl[F[_]: MonadCancelThrow: Logger](
 object Endpoint {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[Endpoint[F]] = for {
-    renkuConnectionConfig <- RenkuConnectionConfig[F]()
-    gitLabUrl             <- GitLabUrlLoader[F]()
-    renkuResourceUrl      <- renku.ApiUrl[F]()
-    executionTimeRecorder <- ExecutionTimeRecorder[F]()
-    projectDatasetFinder  <- ProjectDatasetsFinder(renkuConnectionConfig)
+    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader()
+    renkuConnectionConfig         <- ProjectsConnectionConfig[F]()
+    gitLabUrl                     <- GitLabUrlLoader[F]()
+    renkuResourceUrl              <- renku.ApiUrl[F]()
+    executionTimeRecorder         <- ExecutionTimeRecorder[F]()
+    projectDatasetFinder          <- ProjectDatasetsFinder(renkuConnectionConfig)
   } yield new EndpointImpl[F](
     projectDatasetFinder,
     renkuResourceUrl,

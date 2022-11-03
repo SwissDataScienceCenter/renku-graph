@@ -22,7 +22,7 @@ import cats.Applicative
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import com.dimafeng.testcontainers.FixedHostPortGenericContainer
-import io.renku.db.DBConfigProvider
+import io.renku.db.{DBConfigProvider, PostgresContainer}
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 import org.typelevel.log4cats.Logger
 
@@ -34,7 +34,7 @@ object TokenRepository {
     new ProjectsTokensDbConfigProvider[Try].get().fold(throw _, identity)
 
   private lazy val postgresContainer = FixedHostPortGenericContainer(
-    imageName = "postgres:12.8-alpine",
+    imageName = PostgresContainer.image,
     env = Map("POSTGRES_USER"     -> dbConfig.user.value,
               "POSTGRES_PASSWORD" -> dbConfig.pass.value,
               "POSTGRES_DB"       -> dbConfig.name.value

@@ -363,7 +363,7 @@ private class EventFinderSpec
     "return events from all the projects" in new TestCase {
 
       val events = readyStatuses
-        .generateNonEmptyList(minElements = 2)
+        .generateNonEmptyList(min = 2)
         .map(status => createEvent(status))
         .toList
 
@@ -396,7 +396,7 @@ private class EventFinderSpec
       )
 
       val events = readyStatuses
-        .generateNonEmptyList(minElements = 3, maxElements = 6)
+        .generateNonEmptyList(min = 3, max = 6)
         .toList
         .flatMap { status =>
           val projectId   = projectIds.generateOne

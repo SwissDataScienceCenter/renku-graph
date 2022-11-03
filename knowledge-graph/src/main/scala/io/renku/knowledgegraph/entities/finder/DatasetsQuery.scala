@@ -22,7 +22,7 @@ package finder
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
-import io.renku.graph.model.{datasets, persons, projects}
+import io.renku.graph.model._
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
 
@@ -73,53 +73,77 @@ private case object DatasetsQuery extends EntityQuery[model.Entity.Dataset] {
         |                {
         |                  (?id ?score) text:query (renku:slug schema:keywords schema:description schema:name '${filters.query}').
         |                } {
-        |                  ?id a schema:Dataset
+        |                  GRAPH ?projectId {
+        |                    ?id a schema:Dataset
+        |                  }
         |                  BIND (?id AS ?dsId)
         |                } UNION {
-        |                  ?dsId schema:creator ?id;
-        |                        a schema:Dataset.
+        |                  GRAPH ?projectId {
+        |                    ?dsId schema:creator ?id;
+        |                          a schema:Dataset
+        |                  }
         |                }
         |              }
         |              GROUP BY ?dsId
         |            }
         |""")}
-        |            ?dsId a schema:Dataset;
-        |                  renku:topmostSameAs ?sameAs;
-        |                  ^renku:hasDataset ?projectId.
-        |            OPTIONAL {
-        |            ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
-        |                       ^renku:hasDataset ?childProjectId.
+        |            GRAPH ?projectId {
+        |              ?dsId a schema:Dataset;
+        |                    renku:topmostSameAs ?sameAs;
+        |                    ^renku:hasDataset ?projectId.
         |            }
         |            OPTIONAL {
-        |              ?dsId prov:invalidatedAtTime ?invalidationTime;
-        |                    ^renku:hasDataset ?projectIdWhereInvalidated
+        |              GRAPH ?childProjectId {
+        |                ?childDsId prov:wasDerivedFrom/schema:url ?dsId;
+        |                           ^renku:hasDataset ?childProjectId
+        |              }
+        |            }
+        |            OPTIONAL {
+        |              GRAPH ?projectIdWhereInvalidated {
+        |                ?dsId prov:invalidatedAtTime ?invalidationTime;
+        |                      ^renku:hasDataset ?projectIdWhereInvalidated
+        |              }
         |            }
         |          }
         |          GROUP BY ?sameAs ?dsId ?projectId ?matchingScore
         |        }
+        |
         |        FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
         |        FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
-        |        ?projectId renku:projectVisibility ?visibility;
-        |                   renku:projectNamespace ?namespace;
-        |                   renku:projectPath ?projectPath.
-        |        ?dsId schema:identifier ?identifier;
-        |              renku:slug ?name.
-        |        BIND (CONCAT(STR(?identifier), STR(':'), STR(?projectPath), STR(':'), STR(?visibility)) AS ?idPathVisibility)
-        |        ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
-        |        ${filters.maybeOnVisibility("?visibility")}
-        |        ${filters.maybeOnNamespace("?namespace")}
-        |        OPTIONAL { ?dsId schema:creator/schema:name ?creatorName }
-        |        OPTIONAL { ?dsId schema:dateCreated ?maybeDateCreated }.
-        |        OPTIONAL { ?dsId schema:datePublished ?maybeDatePublished }.
-        |        BIND (IF (BOUND(?maybeDateCreated), ?maybeDateCreated, ?maybeDatePublished) AS ?date)
-        |        ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
-        |        OPTIONAL { ?dsId schema:keywords ?keyword }
-        |        OPTIONAL { ?dsId schema:description ?maybeDescription }
-        |        OPTIONAL {
-        |          ?dsId schema:image ?imageId .
-        |          ?imageId schema:position ?imagePosition ;
-        |                   schema:contentUrl ?imageUrl .
-        |          BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |
+        |        GRAPH ?projectId {
+        |          ?projectId renku:projectVisibility ?visibility;
+        |                     renku:projectNamespace ?namespace;
+        |                     renku:projectPath ?projectPath.
+        |          ?dsId schema:identifier ?identifier;
+        |                renku:slug ?name.
+        |          BIND (CONCAT(STR(?identifier), STR(':'), STR(?projectPath), STR(':'), STR(?visibility)) AS ?idPathVisibility)
+        |          ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
+        |          ${filters.maybeOnVisibility("?visibility")}
+        |          ${filters.maybeOnNamespace("?namespace")}
+        |          OPTIONAL { 
+        |            ?dsId schema:creator ?creatorId.
+        |            GRAPH <${GraphClass.Persons.id}> {
+        |              ?creatorId schema:name ?creatorName
+        |            }
+        |          }
+        |          OPTIONAL {
+        |            ?dsId schema:dateCreated ?maybeDateCreated.
+        |            BIND (?maybeDateCreated AS ?date)
+        |          }
+        |          OPTIONAL {
+        |            ?dsId schema:datePublished ?maybeDatePublished
+        |            BIND (?maybeDatePublished AS ?date)
+        |          }
+        |          ${filters.maybeOnDatasetDates("?maybeDateCreated", "?maybeDatePublished")}
+        |          OPTIONAL { ?dsId schema:keywords ?keyword }
+        |          OPTIONAL { ?dsId schema:description ?maybeDescription }
+        |          OPTIONAL {
+        |            ?dsId schema:image ?imageId .
+        |            ?imageId schema:position ?imagePosition ;
+        |                     schema:contentUrl ?imageUrl .
+        |            BIND (CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |          }
         |        }
         |      }
         |      GROUP BY ?sameAs ?name ?matchingScore ?maybeDateCreated ?maybeDatePublished ?date ?maybeDescription

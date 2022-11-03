@@ -43,6 +43,7 @@ class EventsFinderSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       zombieEventFinder.popEvent() shouldBe zombieEvent.some.pure[Try]
     }
+
     "returns the event if found by the LostSubscriberEventFinder" in new TestCase {
       val zombieEvent = zombieEvents.generateOne
       (zombieNodesCleaner.removeZombieNodes _).expects().returning(().pure[Try])

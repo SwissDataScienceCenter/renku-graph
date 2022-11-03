@@ -21,14 +21,14 @@ name := "knowledge-graph"
 Test / fork := true
 
 // log4j-core is needed only by widoco
-libraryDependencies += "org.apache.logging.log4j" % "log4j-core"      % "2.18.0"
-libraryDependencies += "ch.qos.logback"           % "logback-classic" % "1.4.0"
+libraryDependencies += "ch.qos.logback"           % "logback-classic" % "1.4.4"
+libraryDependencies += "org.apache.logging.log4j" % "log4j-core"      % "2.19.0"
 
 libraryDependencies += "com.github.dgarijo" % "widoco" % "1.4.17"
 
-libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.1.2"
+libraryDependencies += "io.swagger.parser.v3" % "swagger-parser" % "2.1.7"
 
-libraryDependencies += "org.sangria-graphql" %% "sangria"       % "3.2.0"
+libraryDependencies += "org.sangria-graphql" %% "sangria"       % "3.4.0"
 libraryDependencies += "org.sangria-graphql" %% "sangria-circe" % "1.3.2"
 
 resolvers += "jitpack" at "https://jitpack.io"

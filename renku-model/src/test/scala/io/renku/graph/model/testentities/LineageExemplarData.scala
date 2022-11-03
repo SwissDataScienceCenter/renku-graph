@@ -65,7 +65,7 @@ object LineageExemplarData {
 
   def apply(
       project:         RenkuProject = renkuProjectEntities(visibilityPublic, forksCountGen = anyForksCount).generateOne
-  )(implicit renkuUrl: RenkuUrl, graph: GraphClass): ExemplarData = {
+  )(implicit renkuUrl: RenkuUrl): ExemplarData = {
 
     val zhbikesFolder = Location.Folder("data/zhbikes")
     val velo2018      = Location.File(zhbikesFolder, "2018velo.csv")
@@ -202,11 +202,12 @@ object NodeDef {
         )
       )
 
-  def apply(activity: Activity)(implicit renkuUrl: RenkuUrl, graph: GraphClass): NodeDef = NodeDef(
-    activity.asJsonLD.entityId.getOrElse(throw new Exception("Non entity id found for Activity")).show,
-    activity.show,
-    activity.asJsonLD.entityTypes.getOrElse(throw new Exception("No entityTypes found")).toList.map(_.show).toSet
-  )
+  def apply(activity: Activity)(implicit renkuUrl: RenkuUrl): NodeDef =
+    NodeDef(
+      activity.asEntityId.show,
+      activity.show,
+      entities.Activity.entityTypes.toList.map(_.show).toSet
+    )
 
   private implicit lazy val activityShow: Show[Activity] = Show.show { activity =>
     val commandComponent = activity.association.plan.maybeCommand match {

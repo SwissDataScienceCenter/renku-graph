@@ -89,16 +89,17 @@ object Endpoint {
     userProjectsEndpoint       <- users.projects.EndpointDocs[F]
     docsEndpointEndpoint       <- EndpointDocs[F]
     serviceVersion             <- ServiceVersion.readFromConfig[F]()
-  } yield new EndpointImpl[F](serviceVersion,
-                              datasetsEndpoint,
-                              datasetDetailsEndpoint,
-                              entitiesEndpoint,
-                              ontologyEndpoint,
-                              projectDetailsEndpoint,
-                              projects.files.lineage.EndpointDocs,
-                              projectDatasetsEndpoint,
-                              projectDatasetTagsEndpoint,
-                              docsEndpointEndpoint,
-                              userProjectsEndpoint
+  } yield new EndpointImpl[F](
+    serviceVersion,
+    datasetsEndpoint,
+    datasetDetailsEndpoint,
+    entitiesEndpoint,
+    ontologyEndpoint,
+    projectDetailsEndpoint,
+    projects.files.lineage.EndpointDocs,
+    projectDatasetsEndpoint,
+    projectDatasetTagsEndpoint,
+    docsEndpointEndpoint,
+    userProjectsEndpoint
   )
 }

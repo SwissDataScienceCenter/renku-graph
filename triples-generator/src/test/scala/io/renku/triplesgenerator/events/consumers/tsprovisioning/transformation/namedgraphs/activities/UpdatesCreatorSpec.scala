@@ -26,6 +26,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.entities.{ActivityLens, AssociationLens, EntityFunctions}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
+import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -34,7 +35,6 @@ import org.apache.jena.util.URIref
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import io.renku.jsonld.syntax._
 
 class UpdatesCreatorSpec
     extends AnyWordSpec

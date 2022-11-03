@@ -21,8 +21,10 @@ package io.renku.knowledgegraph.projects.datasets
 import ProjectDatasetsFinder.{ProjectDataset, SameAsOrDerived}
 import cats.MonadThrow
 import cats.effect.kernel.Async
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, Name, OriginalIdentifier, SameAs, Title}
-import io.renku.graph.model.projects.Path
+import io.renku.graph.model.projects.{Path, ResourceId}
+import io.renku.graph.model.views.RdfResource
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
@@ -35,15 +37,18 @@ private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
   type ProjectDataset  = (Identifier, OriginalIdentifier, Title, Name, SameAsOrDerived, List[ImageUri])
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](renkuConnectionConfig: RenkuConnectionConfig) =
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](connectionConfig: ProjectsConnectionConfig)(implicit
+      renkuUrl: RenkuUrl
+  ) =
     MonadThrow[F].catchNonFatal(
-      new ProjectDatasetsFinderImpl[F](renkuConnectionConfig)
+      new ProjectDatasetsFinderImpl[F](connectionConfig)
     )
 }
 
 private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient(renkuConnectionConfig)
+    connectionConfig: ProjectsConnectionConfig
+)(implicit renkuUrl:  RenkuUrl)
+    extends TSClient(connectionConfig)
     with ProjectDatasetsFinder[F] {
 
   import ProjectDatasetsFinderImpl._
@@ -51,7 +56,7 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
   import io.renku.graph.model.Schemas._
 
   def findProjectDatasets(projectPath: Path): F[List[ProjectDataset]] =
-    queryExpecting[List[ProjectDataset]](using = query(projectPath))
+    queryExpecting[List[ProjectDataset]](selectQuery = query(projectPath))
 
   private def query(path: Path) = SparqlQuery.of(
     name = "ds projects",
@@ -59,24 +64,25 @@ private class ProjectDatasetsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeReco
     s"""|SELECT ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?originalId
         | (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
-        |   ?projectId a schema:Project;
-        |              renku:projectPath '$path';
-        |              renku:hasDataset ?datasetId.
-        |    ?datasetId a schema:Dataset;
+        |   BIND (${ResourceId(path).showAs[RdfResource]} AS ?projectId)
+        |   Graph ?projectId {
+        |     ?projectId renku:hasDataset ?datasetId.
+        |     ?datasetId a schema:Dataset;
         |               schema:identifier ?identifier;
         |               schema:name ?name;
         |               renku:slug ?slug;
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?originalId.
-        |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
-        |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
-        |    FILTER NOT EXISTS { ?datasetId prov:invalidatedAtTime ?invalidationTime. }
-        |    OPTIONAL { 
-        |      ?imageId schema:position ?imagePosition ;
-        |               schema:contentUrl ?imageUrl ;
-        |               ^schema:image ?datasetId .
-        |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-        |    }
+        |     OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
+        |     FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
+        |     FILTER NOT EXISTS { ?datasetId prov:invalidatedAtTime ?invalidationTime. }
+        |     OPTIONAL { 
+        |       ?imageId schema:position ?imagePosition ;
+        |                schema:contentUrl ?imageUrl ;
+        |                ^schema:image ?datasetId .
+        |       BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |     }
+        |   }
         |}
         |GROUP BY ?identifier ?name ?slug ?topmostSameAs ?maybeDerivedFrom ?originalId
         |ORDER BY ?name

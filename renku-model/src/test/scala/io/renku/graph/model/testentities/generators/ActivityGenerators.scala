@@ -19,7 +19,6 @@
 package io.renku.graph.model.testentities
 package generators
 
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates}
@@ -130,7 +129,7 @@ trait ActivityGenerators {
     def generateList(projectDateCreated: projects.DateCreated): List[Activity] =
       factory(projectDateCreated).generateList()
 
-    def multiple: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne)(factory)
+    def multiple: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne.value)(factory)
 
     def withDateBefore(max: InstantTinyType): Gen[Activity] =
       factory(projects.DateCreated(max.value))

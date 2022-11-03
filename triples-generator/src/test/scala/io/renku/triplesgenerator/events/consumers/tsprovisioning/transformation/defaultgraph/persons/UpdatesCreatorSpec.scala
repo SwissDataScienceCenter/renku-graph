@@ -23,6 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.entities
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.testentities._
 import io.renku.testtools.IOSpec
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -198,7 +199,7 @@ class UpdatesCreatorSpec
             |  OPTIONAL { ?id schema:affiliation ?affiliation } .
             |  OPTIONAL { ?id schema:sameAs ?sameAsId.
             |             ?sameAsId a schema:URL;
-            |                       schema:additionalType 'GitLab';
+            |                       schema:additionalType '${Person.gitLabSameAsAdditionalType}';
             |                       schema:identifier ?gitlabId.
             |  }
             |}

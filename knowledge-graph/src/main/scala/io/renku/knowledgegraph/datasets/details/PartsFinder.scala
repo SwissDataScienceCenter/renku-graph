@@ -24,6 +24,7 @@ import cats.MonadThrow
 import cats.effect.Async
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
+import io.renku.graph.model.GraphClass
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets._
 import io.renku.triplesstore.SparqlQuery.Prefixes
@@ -31,34 +32,35 @@ import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait PartsFinder[F[_]] {
-  def findParts(identifier: Identifier): F[List[DatasetPart]]
+  def findParts(dataset: Dataset): F[List[DatasetPart]]
 }
 
-private class PartsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient(renkuConnectionConfig)
+private class PartsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
+    extends TSClient(storeConfig)
     with PartsFinder[F] {
 
   import PartsFinderImpl._
 
-  def findParts(identifier: Identifier): F[List[DatasetPart]] =
-    queryExpecting[List[DatasetPart]](using = query(identifier))
+  def findParts(dataset: Dataset): F[List[DatasetPart]] =
+    queryExpecting[List[DatasetPart]](query(dataset))
 
-  private def query(identifier: Identifier) = SparqlQuery.of(
+  private def query(ds: Dataset) = SparqlQuery.of(
     name = "ds by id - parts",
-    Prefixes.of(prov -> "prov", schema -> "schema"),
+    Prefixes of (prov -> "prov", schema -> "schema"),
     s"""|SELECT DISTINCT ?partLocation
         |WHERE {
-        |  ?dataset a schema:Dataset ;
-        |           schema:identifier '$identifier' ;
-        |           schema:hasPart ?partResource .
+        |  GRAPH <${GraphClass.Project.id(ds.project.id)}> {
+        |    ?dataset a schema:Dataset ;
+        |             schema:identifier '${ds.id}' ;
+        |             schema:hasPart ?partResource.
         |
-        |  ?partResource a schema:DigitalDocument;
-        |                prov:entity / prov:atLocation ?partLocation
-        |  
-        |  FILTER NOT EXISTS {
-        |    ?partResource prov:invalidatedAtTime ?invalidation           
-        |  }  
+        |    ?partResource a schema:DigitalDocument;
+        |                  prov:entity/prov:atLocation ?partLocation.
+        |    
+        |    FILTER NOT EXISTS {
+        |      ?partResource prov:invalidatedAtTime ?invalidation           
+        |    }
+        |  }
         |}
         |ORDER BY ASC(?partLocation)
         |""".stripMargin
@@ -84,7 +86,6 @@ private object PartsFinderImpl {
 
 private object PartsFinder {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      renkuConnectionConfig: RenkuConnectionConfig
-  ): F[PartsFinder[F]] = MonadThrow[F].catchNonFatal(new PartsFinderImpl[F](renkuConnectionConfig))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig): F[PartsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new PartsFinderImpl[F](storeConfig))
 }

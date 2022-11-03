@@ -22,8 +22,11 @@ import Endpoint.Criteria
 import cats.NonEmptyParallel
 import cats.effect.Async
 import cats.syntax.all._
+import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.projects.ResourceId
+import io.renku.graph.model.views.RdfResource
 import io.renku.http.rest.paging.{Paging, PagingResponse}
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 private trait TagsFinder[F[_]] {
@@ -31,13 +34,16 @@ private trait TagsFinder[F[_]] {
 }
 
 private object TagsFinder {
-  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[TagsFinder[F]] =
-    RenkuConnectionConfig[F]().map(new TagsFinderImpl(_))
+  def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](implicit
+      renkuUrl: RenkuUrl
+  ): F[TagsFinder[F]] =
+    ProjectsConnectionConfig[F]().map(new TagsFinderImpl(_))
 }
 
 private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient[F](renkuConnectionConfig)
+    connectionConfig: ProjectsConnectionConfig
+)(implicit renkuUrl:  RenkuUrl)
+    extends TSClient[F](connectionConfig)
     with TagsFinder[F]
     with Paging[model.Tag] {
 
@@ -59,15 +65,16 @@ private class TagsFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryT
     Prefixes of (renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?name ?startDate ?maybeDesc ?dsIdentifier
         |WHERE {
-        |  ?projId a schema:Project;
-        |          renku:projectPath '${criteria.projectPath}';
-        |          renku:hasDataset ?dsId.
-        |  ?dsId renku:slug '${criteria.datasetName}';
-        |        schema:identifier ?dsIdentifier.
-        |  ?eventId schema:about/schema:url ?dsId;
-        |           schema:name ?name;
-        |           schema:startDate ?startDate.
-        |  OPTIONAL { ?eventId schema:description ?maybeDesc }
+        |  BIND (${ResourceId(criteria.projectPath).showAs[RdfResource]} AS ?projId)
+        |  Graph ?projId {
+        |    ?projId renku:hasDataset ?dsId.
+        |    ?dsId renku:slug '${criteria.datasetName}';
+        |          schema:identifier ?dsIdentifier.
+        |    ?eventId schema:about/schema:url ?dsId;
+        |             schema:name ?name;
+        |             schema:startDate ?startDate.
+        |    OPTIONAL { ?eventId schema:description ?maybeDesc }
+        |  }
         |}
         |ORDER BY DESC(?startDate)
         |""".stripMargin

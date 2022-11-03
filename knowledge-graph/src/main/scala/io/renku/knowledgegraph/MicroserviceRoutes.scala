@@ -316,21 +316,22 @@ private object MicroserviceRoutes {
     projectPathAuthorizer                 <- Authorizer.using(ProjectPathRecordsFinder[IO])
     datasetIdAuthorizer                   <- Authorizer.using(DatasetIdRecordsFinder[IO])
     versionRoutes                         <- version.Routes[IO]
-  } yield new MicroserviceRoutes(datasetsSearchEndpoint,
-                                 datasetDetailsEndpoint,
-                                 entitiesEndpoint,
-                                 queryEndpoint,
-                                 lineageEndpoint,
-                                 ontologyEndpoint,
-                                 projectDetailsEndpoint,
-                                 projectDatasetsEndpoint,
-                                 projectDatasetTagsEndpoint,
-                                 docsEndpoint,
-                                 usersProjectsEndpoint,
-                                 authMiddleware,
-                                 projectPathAuthorizer,
-                                 datasetIdAuthorizer,
-                                 new RoutesMetrics[IO],
-                                 versionRoutes
+  } yield new MicroserviceRoutes(
+    datasetsSearchEndpoint,
+    datasetDetailsEndpoint,
+    entitiesEndpoint,
+    queryEndpoint,
+    lineageEndpoint,
+    ontologyEndpoint,
+    projectDetailsEndpoint,
+    projectDatasetsEndpoint,
+    projectDatasetTagsEndpoint,
+    docsEndpoint,
+    usersProjectsEndpoint,
+    authMiddleware,
+    projectPathAuthorizer,
+    datasetIdAuthorizer,
+    new RoutesMetrics[IO],
+    versionRoutes
   )
 }

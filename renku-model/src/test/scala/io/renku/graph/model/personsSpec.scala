@@ -19,7 +19,6 @@
 package io.renku.graph.model
 
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -85,7 +84,7 @@ class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
     val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> Gen.oneOf("!#$%&*+-/=?_~.".toList))
     val beforeAts = for {
       firstChar  <- firstCharGen
-      otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
+      otherChars <- nonEmptyList(nonFirstCharGen, min = 5, max = 10)
     } yield s"$firstChar${otherChars.toList.mkString("")}"
 
     for {

@@ -23,6 +23,8 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.graph.model.GraphClass
+import io.renku.graph.model.entities.Person
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -32,16 +34,15 @@ private trait StatsFinder[F[_]] {
   def entitiesCount(): F[Map[EntityLabel, Count]]
 }
 
-private class StatsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient[F](renkuConnectionConfig)
+private class StatsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
+    extends TSClient[F](storeConfig)
     with StatsFinder[F] {
 
   import EntityCount._
   import io.renku.graph.model.Schemas._
 
   override def entitiesCount(): F[Map[EntityLabel, Count]] =
-    queryExpecting[List[(EntityLabel, Count)]](using = query) map (_.toMap)
+    queryExpecting[List[(EntityLabel, Count)]](selectQuery = query) map (_.toMap)
 
   private lazy val query = SparqlQuery.of(
     name = "entities - counts",
@@ -50,30 +51,36 @@ private class StatsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
         |WHERE {
         |  {
         |    SELECT (schema:Dataset AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id a schema:Dataset }
+        |    WHERE { GRAPH ?g { ?id a schema:Dataset } }
         |  } UNION {
         |    SELECT (schema:Project AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id a schema:Project }
+        |    WHERE { GRAPH ?g { ?id a schema:Project } }
         |  } UNION {
         |    SELECT (prov:Activity AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id a prov:Activity }
+        |    WHERE { GRAPH ?g { ?id a prov:Activity } }
         |  } UNION {
         |    SELECT (prov:Plan AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { ?id a prov:Plan }
+        |    WHERE { GRAPH ?g { ?id a prov:Plan } }
         |  } UNION {
         |    SELECT (schema:Person AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { 
-        |      ?activityId a prov:Activity;
-        |                  prov:wasAssociatedWith ?id.
-        |      ?id a schema:Person.
+        |    WHERE {
+        |      GRAPH ?g { 
+        |        ?activityId a prov:Activity;
+        |                    prov:wasAssociatedWith ?id
+        |      }
+        |      GRAPH <${GraphClass.Persons.id}> { ?id a schema:Person }
         |    }
         |  } UNION {
         |    SELECT (CONCAT(STR(schema:Person), ' with GitLabId') AS ?type) (COUNT(DISTINCT ?id) AS ?count)
-        |    WHERE { 
-        |      ?activityId a prov:Activity;
-        |                  prov:wasAssociatedWith ?id.
-        |      ?id a schema:Person;
-        |          schema:sameAs/schema:additionalType 'GitLab'.
+        |    WHERE {
+        |      GRAPH ?g {
+        |        ?activityId a prov:Activity;
+        |                    prov:wasAssociatedWith ?id.
+        |        GRAPH <${GraphClass.Persons.id}> {
+        |          ?id a schema:Person;
+        |              schema:sameAs/schema:additionalType '${Person.gitLabSameAsAdditionalType}'.
+        |        }
+        |      }
         |    }
         |  }
         |}
@@ -112,5 +119,5 @@ private object EntityCount {
 
 private object StatsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[StatsFinder[F]] =
-    RenkuConnectionConfig[F]().map(new StatsFinderImpl[F](_))
+    ProjectsConnectionConfig[F]().map(new StatsFinderImpl[F](_))
 }

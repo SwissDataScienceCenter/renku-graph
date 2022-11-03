@@ -39,9 +39,7 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
 
     "fail if the number of results > perPage" in {
       forAll(perPages, pages) { (perPage, page) =>
-        val results = nonEmptyStrings().generateList(min = Refined.unsafeApply(perPage.value + 1),
-                                                     max = Refined.unsafeApply(perPage.value * 2)
-        )
+        val results = nonEmptyStrings().generateList(min = perPage.value + 1, max = perPage.value * 2)
         val total   = Total((page.value - 1) * perPage.value + results.size)
         val request = PagingRequest(page, perPage)
 
@@ -54,7 +52,7 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
 
     "fix the total if results is not empty and (page.value - 1) * perPage.value + results.size > total.value" in {
       forAll(perPages.retryUntil(_.value > 1), pages.retryUntil(_.value > 1)) { (perPage, page) =>
-        val results = nonEmptyStrings().generateNonEmptyList(maxElements = perPage.asRefined).toList
+        val results = nonEmptyStrings().generateNonEmptyList(max = perPage.value).toList
         val total   = positiveInts((page.value - 1) * perPage.value + results.size - 1).map(_.value).generateAs(Total)
         val request = PagingRequest(page, perPage)
 
@@ -82,7 +80,7 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
 
     "instantiate successfully in other cases" in {
       forAll(perPages, pages) { (perPage, page) =>
-        val results = nonEmptyStrings().generateNonEmptyList(maxElements = perPage.asRefined).toList
+        val results = nonEmptyStrings().generateNonEmptyList(max = perPage.value).toList
         val total   = ints(min = (page.value - 1) * perPage.value + results.size).generateAs(Total)
         val request = PagingRequest(page, perPage)
 
@@ -99,7 +97,7 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
 
     "calculate the total from the given results if results size <= perPage - case of the first page" in {
       val paging  = pagingRequests.generateOne.copy(page = Page(1))
-      val results = nonBlankStrings().generateNonEmptyList(maxElements = paging.perPage.asRefined).toList
+      val results = nonBlankStrings().generateNonEmptyList(max = paging.perPage.value).toList
 
       val Success(actual) = PagingResponse.from[Try, NonBlank](results, paging)
 
@@ -111,9 +109,7 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
     "calculate the total from the given results if results size <= perPage - case not of the first page" in {
       val paging = pagingRequests.generateOne.copy(page = Page(2))
       val results = nonBlankStrings()
-        .generateNonEmptyList(minElements = Refined.unsafeApply(paging.perPage.value + 1),
-                              maxElements = Refined.unsafeApply(paging.page.value * paging.perPage.value)
-        )
+        .generateNonEmptyList(min = paging.perPage.value + 1, max = paging.page.value * paging.perPage.value)
         .toList
 
       val Success(actual) = PagingResponse.from[Try, NonBlank](results, paging)
@@ -137,7 +133,7 @@ class PagingResponseSpec extends AnyWordSpec with IOSpec with ScalaCheckProperty
       val paging =
         PagingRequest(page = Gen.oneOf(2, 3, 4, 5).generateAs(Page), perPage = ints(2, 100).generateAs[PerPage])
       val results = nonBlankStrings()
-        .generateNonEmptyList(maxElements = Refined.unsafeApply(paging.perPage.value - 1))
+        .generateNonEmptyList(max = paging.perPage.value - 1)
         .toList
 
       val Failure(exception) = PagingResponse.from[Try, NonBlank](results, paging)

@@ -22,8 +22,8 @@ import TSStateChecker.TSState
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, nonEmptyStrings}
-import io.renku.triplesstore.{DatasetName, TSAdminClient}
 import io.renku.triplesgenerator.events.consumers.tsmigrationrequest.migrations.reprovisioning.ReProvisioningStatus
+import io.renku.triplesstore.{DatasetName, TSAdminClient}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

@@ -27,7 +27,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
 import io.renku.graph.model.entities.{EntityFunctions, Person}
-import io.renku.graph.model.{GitLabApiUrl, GraphClass, RenkuUrl, projects, testentities}
+import io.renku.graph.model._
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
@@ -127,7 +127,7 @@ trait InMemoryJena {
   def triplesCount(on: DatasetName)(implicit ioRuntime: IORuntime): Long =
     queryRunnerFor(on)
       .runQuery(
-        SparqlQuery.of("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { ?s ?p ?o }")
+        SparqlQuery.of("triples count", "SELECT (COUNT(?s) AS ?count) WHERE { GRAPH ?g { ?s ?p ?o } }")
       )
       .map(_.headOption.map(_.apply("count")).flatMap(_.toLongOption).getOrElse(0L))
       .unsafeRunSync()
@@ -160,7 +160,7 @@ trait InMemoryJena {
     def runQuery(query: SparqlQuery): IO[List[Map[String, String]]] =
       queryExpecting[List[Map[String, String]]](query)
 
-    def runUpdate(query: SparqlQuery): IO[Unit] = updateWithNoResult(using = query)
+    def runUpdate(query: SparqlQuery): IO[Unit] = updateWithNoResult(updateQuery = query)
 
     private implicit lazy val valuesDecoder: Decoder[List[Map[String, String]]] = { cursor =>
       for {

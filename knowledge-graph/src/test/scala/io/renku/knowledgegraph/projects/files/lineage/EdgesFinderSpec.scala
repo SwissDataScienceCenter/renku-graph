@@ -33,7 +33,7 @@ import io.renku.jsonld.syntax._
 import io.renku.logging.{TestExecutionTimeRecorder, TestSparqlQueryTimeRecorder}
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -42,7 +42,7 @@ class EdgesFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with ExternalServiceStubbing
     with IOSpec {
 
@@ -55,7 +55,7 @@ class EdgesFinderSpec
 
         import exemplarData._
 
-        upload(to = renkuDataset, project)
+        upload(to = projectsDataset, project)
 
         edgesFinder
           .findEdges(project.path, maybeUser = None)
@@ -113,7 +113,7 @@ class EdgesFinderSpec
         .planOutputParameterOverrides(out1 -> out2)
         .buildProvenanceUnsafe()
 
-      upload(to = renkuDataset, project.addActivities(activity1, activity2))
+      upload(to = projectsDataset, project.addActivities(activity1, activity2))
 
       edgesFinder
         .findEdges(project.path, maybeUser = None)
@@ -141,7 +141,7 @@ class EdgesFinderSpec
         "case when the user is not authenticated" in new TestCase {
           val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(visibility)).generateOne)
 
-          upload(to = renkuDataset, exemplarData.project)
+          upload(to = projectsDataset, exemplarData.project)
 
           edgesFinder
             .findEdges(projectPaths.generateOne, authUsers.generateOption)
@@ -155,7 +155,7 @@ class EdgesFinderSpec
       "case when the user is authenticated but he's not the project member" in new TestCase {
         val exemplarData = LineageExemplarData(renkuProjectEntities(fixed(Visibility.Private)).generateOne)
 
-        upload(to = renkuDataset, exemplarData.project)
+        upload(to = projectsDataset, exemplarData.project)
 
         edgesFinder
           .findEdges(projectPaths.generateOne, authUsers.generateSome)
@@ -177,7 +177,7 @@ class EdgesFinderSpec
 
           import exemplarData._
 
-          upload(to = renkuDataset, project)
+          upload(to = projectsDataset, project)
 
           edgesFinder
             .findEdges(project.path, Some(authUser))
@@ -210,7 +210,7 @@ class EdgesFinderSpec
 
         import exemplarData._
 
-        upload(to = renkuDataset, project)
+        upload(to = projectsDataset, project)
 
         edgesFinder
           .findEdges(project.path, Some(authUser))
@@ -240,7 +240,7 @@ class EdgesFinderSpec
     val executionTimeRecorder = TestExecutionTimeRecorder[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] =
       TestSparqlQueryTimeRecorder[IO](executionTimeRecorder)
-    val edgesFinder = new EdgesFinderImpl[IO](renkuDSConnectionInfo, renkuUrl)
+    val edgesFinder = new EdgesFinderImpl[IO](projectsDSConnectionInfo, renkuUrl)
   }
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {

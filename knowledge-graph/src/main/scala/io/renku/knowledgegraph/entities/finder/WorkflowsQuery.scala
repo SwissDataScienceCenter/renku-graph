@@ -43,31 +43,38 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |      WHERE {
         |        ${filters.onQuery(
     s"""|        {
-        |          SELECT ?wkId (MAX(?score) AS ?matchingScore)
+        |          SELECT ?wkId (MAX(?score) AS ?matchingScore) (SAMPLE(?projId) AS ?projectId)
         |          WHERE {
         |            (?wkId ?score) text:query (schema:name schema:keywords schema:description '${filters.query}').
-        |            ?wkId a prov:Plan
+        |            GRAPH ?g {
+        |              ?wkId a prov:Plan;
+        |                    ^renku:hasPlan ?projId
+        |            }
         |          }
         |          GROUP BY ?wkId
         |        }
         |""")}
-        |        ?wkId a prov:Plan;
-        |              schema:name ?name;
-        |              schema:dateCreated ?date;
-        |              ^renku:hasPlan ?projectId.
-        |        ?projectId renku:projectVisibility ?visibility;
-        |                   renku:projectNamespace ?namespace.
-        |        ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
-        |        ${filters.maybeOnVisibility("?visibility")}
-        |        ${filters.maybeOnNamespace("?namespace")}
-        |        ${filters.maybeOnDateCreated("?date")}
+        |        GRAPH ?projectId {
+        |          ?wkId a prov:Plan;
+        |                schema:name ?name;
+        |                schema:dateCreated ?date;
+        |                ^renku:hasPlan ?projectId.
+        |          ?projectId renku:projectVisibility ?visibility;
+        |                     renku:projectNamespace ?namespace.
+        |          ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
+        |          ${filters.maybeOnVisibility("?visibility")}
+        |          ${filters.maybeOnNamespace("?namespace")}
+        |          ${filters.maybeOnDateCreated("?date")}
+        |        }
         |      }
         |      GROUP BY ?wkId ?matchingScore ?date
         |    }
         |    BIND ('workflow' AS ?entityType)
-        |    ?wkId schema:name ?name.
-        |    OPTIONAL { ?wkId schema:description ?maybeDescription }
-        |    OPTIONAL { ?wkId schema:keywords ?keyword }
+        |    GRAPH ?g {
+        |      ?wkId schema:name ?name.
+        |      OPTIONAL { ?wkId schema:description ?maybeDescription }
+        |      OPTIONAL { ?wkId schema:keywords ?keyword }
+        |    }
         |  }
         |  GROUP BY ?entityType ?matchingScore ?wkId ?name ?visibilities ?date ?maybeDescription
         |}

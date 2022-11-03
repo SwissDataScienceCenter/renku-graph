@@ -18,9 +18,9 @@
 
 package io.renku.events.producers
 
-import cats.{Applicative, Eval}
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
+import cats.{Applicative, Eval}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.control.Throttler

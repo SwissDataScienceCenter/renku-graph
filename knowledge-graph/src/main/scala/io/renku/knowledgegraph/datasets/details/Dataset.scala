@@ -90,7 +90,11 @@ private object Dataset {
   final case class DatasetVersions(initial: OriginalIdentifier)
   final case class Tag(name: model.publicationEvents.Name, maybeDesc: Option[model.publicationEvents.Description])
 
-  final case class DatasetProject(path: model.projects.Path, name: model.projects.Name, visibility: Visibility)
+  final case class DatasetProject(id:         model.projects.ResourceId,
+                                  path:       model.projects.Path,
+                                  name:       model.projects.Name,
+                                  visibility: Visibility
+  )
 
   // format: off
   implicit def encoder(implicit gitLabUrl: GitLabUrl, renkuApiUrl: renku.ApiUrl): Encoder[Dataset] = Encoder.instance[Dataset] { dataset =>

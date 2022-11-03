@@ -33,16 +33,13 @@ private trait ProjectsFinder[F[_]] {
 
 private object ProjectsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](query: SparqlQuery): F[ProjectsFinder[F]] =
-    RenkuConnectionConfig[F]().map(new ProjectsFinderImpl(query, _))
+    ProjectsConnectionConfig[F]().map(new ProjectsFinderImpl(query, _))
 }
 
 private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    query:                 SparqlQuery,
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient[F](renkuConnectionConfig,
-                      idleTimeoutOverride = (16 minutes).some,
-                      requestTimeoutOverride = (15 minutes).some
-    )
+    query:       SparqlQuery,
+    storeConfig: ProjectsConnectionConfig
+) extends TSClient[F](storeConfig, idleTimeoutOverride = (16 minutes).some, requestTimeoutOverride = (15 minutes).some)
     with ProjectsFinder[F] {
 
   override def findProjects: F[List[projects.Path]] = queryExpecting[List[projects.Path]](query)

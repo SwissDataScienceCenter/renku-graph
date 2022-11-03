@@ -29,7 +29,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.interpreters.TestLogger
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -38,7 +38,7 @@ class TSProjectFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with IOSpec {
 
   "findProjectsInTS" should {
@@ -60,7 +60,7 @@ class TSProjectFinderSpec
 
       val projectWithoutMatchingMember = projectEntities(visibilityPublic).generateOne
 
-      upload(to = renkuDataset, project1WithMatchingMember, project2WithMatchingMember, projectWithoutMatchingMember)
+      upload(to = projectsDataset, project1WithMatchingMember, project2WithMatchingMember, projectWithoutMatchingMember)
 
       finder.findProjectsInTS(criteria).unsafeRunSync() should contain theSameElementsAs
         List(project1WithMatchingMember, project2WithMatchingMember).map(_.to[model.Project.Activated])
@@ -89,7 +89,7 @@ class TSProjectFinderSpec
         .generateOne
 
       upload(
-        to = renkuDataset,
+        to = projectsDataset,
         privateProjectWithMatchingMemberAndAuthUser,
         privateProjectWithMatchingMemberOnly,
         nonPrivateProjectWithMatchingMemberOnly,
@@ -108,7 +108,7 @@ class TSProjectFinderSpec
         c.copy(maybeUser = authUsers.generateOne.copy(id = c.userId).some)
       }
 
-      upload(to = renkuDataset, projectEntities(visibilityPublic).generateOne)
+      upload(to = projectsDataset, projectEntities(visibilityPublic).generateOne)
 
       finder.findProjectsInTS(criteria).unsafeRunSync() shouldBe Nil
     }
@@ -117,6 +117,6 @@ class TSProjectFinderSpec
   private trait TestCase {
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val finder = new TSProjectFinderImpl[IO](renkuDSConnectionInfo)
+    val finder = new TSProjectFinderImpl[IO](projectsDSConnectionInfo)
   }
 }

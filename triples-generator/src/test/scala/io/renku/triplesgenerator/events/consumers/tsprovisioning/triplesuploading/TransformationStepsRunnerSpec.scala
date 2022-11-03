@@ -29,8 +29,8 @@ import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.personNames
-import io.renku.graph.model.{TSVersion, entities}
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{TSVersion, entities}
 import io.renku.triplesgenerator.generators.ErrorGenerators.{logWorthyRecoverableErrors, processingRecoverableErrors}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory

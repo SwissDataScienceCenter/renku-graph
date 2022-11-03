@@ -27,7 +27,6 @@ import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eve
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import EventStatus._
-import eu.timepit.refined.auto._
 import io.renku.eventlog._
 import EventContentGenerators.{eventDates, eventMessages}
 import cats.data.Kleisli

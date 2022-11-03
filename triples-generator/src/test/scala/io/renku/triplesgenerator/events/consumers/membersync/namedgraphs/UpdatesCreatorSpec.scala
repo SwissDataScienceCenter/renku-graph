@@ -25,6 +25,7 @@ import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.{Email, GitLabId}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.views.RdfResource
@@ -179,8 +180,8 @@ class UpdatesCreatorSpec
             |FROM <${GraphClass.Persons.id}>
             |FROM <${GraphClass.Project.id(projectId)}> {
             |  ${projectId.showAs[RdfResource]} schema:member/schema:sameAs ?sameAsId.
-            |  ?sameAsId schema:additionalType 'GitLab';
-            |            schema:identifier     ?gitLabId.
+            |  ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+            |            schema:identifier ?gitLabId.
             |}
             |""".stripMargin
       )
@@ -203,8 +204,8 @@ class UpdatesCreatorSpec
             |  ?memberId a schema:Person;
             |            schema:sameAs ?sameAsId. 
             |             
-            |  ?sameAsId schema:additionalType 'GitLab';
-            |            schema:identifier     ?gitLabId. 
+            |  ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+            |            schema:identifier ?gitLabId.
             |             
             |  OPTIONAL {
             |    ?memberId schema:email ?email. 

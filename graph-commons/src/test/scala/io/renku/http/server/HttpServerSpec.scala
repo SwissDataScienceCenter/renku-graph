@@ -63,7 +63,6 @@ class HttpServerSpec extends AnyWordSpec with IOSpec with Http4sDsl[IO] with sho
           }
         }
         .unsafeRunSync()
-
     }
   }
 
@@ -71,6 +70,6 @@ class HttpServerSpec extends AnyWordSpec with IOSpec with Http4sDsl[IO] with sho
     private lazy val port = httpPorts.generateOne
     lazy val baseUri: Uri = Uri.unsafeFromString(s"http://localhost:$port")
     private lazy val routes = HttpRoutes.of[IO] { case GET -> Root / "resource" => Ok("response") }
-    val client: Client[IO] = Client.fromHttpApp(HttpServer[IO](port.value, routes).httpApp)
+    val client: Client[IO] = Client.fromHttpApp(HttpServer[IO](port, routes).httpApp)
   }
 }

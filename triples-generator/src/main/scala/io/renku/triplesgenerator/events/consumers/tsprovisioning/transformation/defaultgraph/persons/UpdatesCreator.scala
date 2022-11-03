@@ -18,8 +18,8 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.transformation.defaultgraph.persons
 
-import eu.timepit.refined.auto._
 import cats.syntax.all._
+import eu.timepit.refined.auto._
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.entities.Person
 import io.renku.graph.model.views.RdfResource

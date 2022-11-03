@@ -23,8 +23,8 @@ import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.circe.Decoder
 import io.renku.graph.model.Schemas.{prov, schema}
-import io.renku.graph.model.views.RdfResource
 import io.renku.graph.model._
+import io.renku.graph.model.views.RdfResource
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger

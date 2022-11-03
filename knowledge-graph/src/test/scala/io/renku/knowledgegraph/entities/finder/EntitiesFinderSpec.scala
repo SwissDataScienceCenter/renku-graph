@@ -24,7 +24,6 @@ import Criteria.Filters._
 import Criteria.{Filters, Sorting}
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.CommonGraphGenerators.sortingDirections
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -35,8 +34,8 @@ import io.renku.graph.model.testentities._
 import io.renku.http.rest.SortBy
 import io.renku.http.rest.paging.PagingRequest
 import io.renku.http.rest.paging.model._
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset}
 import io.renku.testtools.IOSpec
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -49,7 +48,7 @@ class EntitiesFinderSpec
     with should.Matchers
     with FinderSpecOps
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with IOSpec {
 
   "findEntities - no filters" should {
@@ -60,7 +59,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder.findEntities(Criteria()).unsafeRunSync().results shouldBe
         allEntitiesFrom(project).sortBy(_.name.value)
@@ -103,7 +102,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, loneProject, dsProject, planProject, notMatchingProject)
+      upload(to = projectsDataset, loneProject, dsProject, planProject, notMatchingProject)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -150,7 +149,7 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: Nil = planProject.plans.toList
 
-      upload(to = renkuDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = projectsDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -187,7 +186,7 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: Nil = planProject.plans.toList
 
-      upload(to = renkuDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = projectsDataset, soleProject, dsProject, planProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -206,7 +205,7 @@ class EntitiesFinderSpec
         .modify(_.copy(path = projects.Path(s"$query/${relativePaths(maxSegments = 2).generateOne}")))
         .generateOne
 
-      upload(to = renkuDataset, soleProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = projectsDataset, soleProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -233,7 +232,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = projectsDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(maybeQuery = Query(query.value).some)))
@@ -255,7 +254,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Project))))
@@ -269,7 +268,7 @@ class EntitiesFinderSpec
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Dataset))))
@@ -283,7 +282,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Workflow))))
@@ -298,7 +297,7 @@ class EntitiesFinderSpec
         .modify(removeMembers())
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person, EntityType.Project))))
@@ -316,7 +315,7 @@ class EntitiesFinderSpec
         .modify(removeMembers())
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(entityTypes = Set(EntityType.Person))))
@@ -344,7 +343,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = projectsDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(creators = Set(creator.name))))
@@ -373,7 +372,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, soleProject, dsProject)
+      upload(to = projectsDataset, soleProject, dsProject)
 
       finder
         .findEntities(Criteria(Filters(creators = Set(randomiseCases(creator.name.show).generateAs(persons.Name)))))
@@ -403,7 +402,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
+      upload(to = projectsDataset, soleProject, dsProject, projectEntities(visibilityPublic).generateOne)
 
       finder
         .findEntities(Criteria(Filters(creators = Set(projectCreator.name, dsCreator.name))))
@@ -421,7 +420,7 @@ class EntitiesFinderSpec
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(creators = Set(personNames.generateOne))))
@@ -451,7 +450,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, publicProject, internalProject, privateProject)
+      upload(to = projectsDataset, publicProject, internalProject, privateProject)
 
       finder
         .findEntities(
@@ -474,7 +473,7 @@ class EntitiesFinderSpec
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(visibilities = visibilityNonPublic.generateSome.toSet)))
@@ -497,7 +496,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, matchingProject, nonMatchingProject)
+      upload(to = projectsDataset, matchingProject, nonMatchingProject)
 
       finder
         .findEntities(
@@ -518,7 +517,7 @@ class EntitiesFinderSpec
         .addDataset(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(namespaces = projectNamespaces.generateFixedSizeSet(1))))
@@ -558,7 +557,7 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: _ = project.plans.toList
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
@@ -612,7 +611,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
@@ -645,7 +644,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, dsProject)
+      upload(to = projectsDataset, dsProject)
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some)))
@@ -687,7 +686,7 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: _ = project.plans.toList
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeUntil = until.some)))
@@ -740,7 +739,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeUntil = until.some)))
@@ -773,7 +772,7 @@ class EntitiesFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, dsProject)
+      upload(to = projectsDataset, dsProject)
 
       finder
         .findEntities(Criteria(Filters(maybeUntil = until.some)))
@@ -847,7 +846,7 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: _ = project.plans.toList
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       finder
         .findEntities(Criteria(Filters(maybeSince = since.some, maybeUntil = until.some)))
@@ -869,7 +868,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceNonModified))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val direction = sortingDirections.generateOne
 
@@ -886,7 +885,7 @@ class EntitiesFinderSpec
         .withDatasets(datasetEntities(provenanceInternal))
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val direction = sortingDirections.generateOne
 
@@ -926,7 +925,7 @@ class EntitiesFinderSpec
         .generateOne
       val plan :: Nil = project.plans.toList
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val direction = sortingDirections.generateOne
 
@@ -956,7 +955,7 @@ class EntitiesFinderSpec
 
     "return the only page" in new TestCase {
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val paging = PagingRequest(Page(1), PerPage(3))
 
@@ -973,7 +972,7 @@ class EntitiesFinderSpec
 
     "return the requested page with info if there are more" in new TestCase {
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val paging = PagingRequest(Page(Random.nextInt(3) + 1), PerPage(1))
 
@@ -994,7 +993,7 @@ class EntitiesFinderSpec
 
     "return no results if non-existing page requested" in new TestCase {
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val paging = PagingRequest(Page(4), PerPage(1))
 
@@ -1034,7 +1033,7 @@ class EntitiesFinderSpec
 
     "return public entities only if no auth user is given" in new TestCase {
 
-      upload(to = renkuDataset, privateProject, internalProject, publicProject)
+      upload(to = projectsDataset, privateProject, internalProject, publicProject)
 
       finder.findEntities(Criteria()).unsafeRunSync().results shouldBe List
         .empty[model.Entity]
@@ -1046,7 +1045,7 @@ class EntitiesFinderSpec
 
     "return public and internal entities only if auth user is given" in new TestCase {
 
-      upload(to = renkuDataset, privateProject, internalProject, publicProject)
+      upload(to = projectsDataset, privateProject, internalProject, publicProject)
 
       finder
         .findEntities(
@@ -1063,7 +1062,7 @@ class EntitiesFinderSpec
 
     "return any visibility entities if the given auth user has access to them" in new TestCase {
 
-      upload(to = renkuDataset, privateProject, internalProject, publicProject)
+      upload(to = projectsDataset, privateProject, internalProject, publicProject)
 
       finder.findEntities(Criteria(maybeUser = member.toAuthUser.some)).unsafeRunSync().results shouldBe List
         .empty[model.Entity]

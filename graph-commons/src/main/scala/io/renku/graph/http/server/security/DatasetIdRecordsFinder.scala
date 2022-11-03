@@ -22,66 +22,66 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.{SecurityRecord, SecurityRecordFinder}
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.{datasets, projects}
+import io.renku.graph.model.{GraphClass, datasets, projects}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 object DatasetIdRecordsFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[SecurityRecordFinder[F, datasets.Identifier]] =
-    RenkuConnectionConfig[F]().map(new DatasetIdRecordsFinderImpl(_))
+    ProjectsConnectionConfig[F]().map(new DatasetIdRecordsFinderImpl(_))
 }
 
 private class DatasetIdRecordsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient(renkuConnectionConfig)
+    storeConfig: ProjectsConnectionConfig
+) extends TSClient(storeConfig)
     with SecurityRecordFinder[F, datasets.Identifier] {
 
   override def apply(id: datasets.Identifier): F[List[SecurityRecord]] =
-    queryExpecting[List[SecurityRecord]](using = query(id))(recordsDecoder)
+    queryExpecting[List[SecurityRecord]](selectQuery = query(id))(recordsDecoder)
 
   import eu.timepit.refined.auto._
   import io.renku.graph.model.Schemas._
 
   private def query(id: datasets.Identifier) = SparqlQuery.of(
     name = "authorise - dataset id",
-    Prefixes.of(schema -> "schema", renku -> "renku"),
+    Prefixes of (renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?projectId ?path ?visibility (GROUP_CONCAT(?maybeMemberGitLabId; separator=',') AS ?memberGitLabIds)
         |WHERE {
-        |  ?projectId a schema:Project;
-        |             renku:hasDataset/schema:identifier '$id';
-        |             renku:projectPath ?path;
-        |             renku:projectVisibility ?visibility.
-        |  OPTIONAL {
-        |    ?projectId schema:member/schema:sameAs ?sameAsId.
-        |    ?sameAsId schema:additionalType 'GitLab';
-        |              schema:identifier ?maybeMemberGitLabId.
+        |  GRAPH ?projectGraph {
+        |    ?projectId a schema:Project;
+        |               renku:hasDataset/schema:identifier '$id';
+        |               renku:projectPath ?path;
+        |               renku:projectVisibility ?visibility
+        |    OPTIONAL {
+        |      ?projectId schema:member ?memberId.
+        |      GRAPH <${GraphClass.Persons.id}> {
+        |        ?memberId schema:sameAs ?sameAsId.
+        |        ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+        |                  schema:identifier ?maybeMemberGitLabId
+        |      }
+        |    }
         |  }
         |}
         |GROUP BY ?projectId ?path ?visibility
         |""".stripMargin
   )
 
-  private lazy val recordsDecoder: Decoder[List[SecurityRecord]] = {
-    import Decoder._
-    import io.renku.tinytypes.json.TinyTypeDecoders._
+  private lazy val recordsDecoder: Decoder[List[SecurityRecord]] = ResultsDecoder[List, SecurityRecord] {
+    implicit cur =>
+      import Decoder._
+      import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    val recordDecoder: Decoder[SecurityRecord] = { cursor =>
       for {
-        visibility <- cursor.downField("visibility").downField("value").as[Visibility]
-        path       <- cursor.downField("path").downField("value").as[projects.Path]
-        userIds <- cursor
-                     .downField("memberGitLabIds")
-                     .downField("value")
-                     .as[Option[String]]
+        visibility <- extract[Visibility]("visibility")
+        path       <- extract[projects.Path]("path")
+        userIds <- extract[Option[String]]("memberGitLabIds")
                      .map(_.map(_.split(",").toList).getOrElse(List.empty))
                      .flatMap(_.map(GitLabId.parse).sequence.leftMap(ex => DecodingFailure(ex.getMessage, Nil)))
                      .map(_.toSet)
       } yield (visibility, path, userIds)
-    }
-
-    _.downField("results").downField("bindings").as(decodeList(recordDecoder))
   }
 }

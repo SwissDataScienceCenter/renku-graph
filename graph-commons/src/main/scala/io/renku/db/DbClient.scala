@@ -18,9 +18,9 @@
 
 package io.renku.db
 
-import cats.{Monad, Show}
 import cats.data.Kleisli
 import cats.syntax.all._
+import cats.{Monad, Show}
 import io.renku.metrics.LabeledHistogram
 import skunk.Session
 import skunk.data.Completion

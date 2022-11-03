@@ -20,10 +20,11 @@ package io.renku.knowledgegraph.entities
 
 import cats.Show
 import cats.syntax.all._
-import io.renku.graph.model.projects
+import io.renku.graph.model.entities.Person
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.knowledgegraph.entities.Endpoint.Criteria
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
-import io.renku.tinytypes.{LocalDateTinyType, StringTinyType, TinyType, TinyTypeFactory}
+import io.renku.tinytypes._
 
 import java.time.{Instant, ZoneOffset}
 
@@ -34,9 +35,12 @@ package object finder {
     def maybeOnAccessRights(projectIdVariable: String, visibilityVariable: String): String = criteria.maybeUser match {
       case Some(user) =>
         s"""|OPTIONAL {
-            |    $projectIdVariable schema:member/schema:sameAs ?memberId.
-            |    ?memberId schema:additionalType 'GitLab';
-            |              schema:identifier ?userGitlabId .
+            |    $projectIdVariable schema:member ?memberId.
+            |    GRAPH <${GraphClass.Persons.id}> {
+            |      ?memberId schema:sameAs ?memberSameAs.
+            |      ?memberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+            |                    schema:identifier ?userGitlabId
+            |    }
             |}
             |FILTER (
             |  $visibilityVariable != '${projects.Visibility.Private.value}' || ?userGitlabId = ${user.id.value}
@@ -64,7 +68,7 @@ package object finder {
 
     def onQuery(snippet: String, matchingScoreVariableName: String = "?matchingScore"): String =
       if (query.trim != queryAll) snippet
-      else s"BIND(xsd:float(1.0) AS $matchingScoreVariableName)"
+      else s"BIND (xsd:float(1.0) AS $matchingScoreVariableName)"
 
     lazy val withNoOrPublicVisibility: Boolean = filters.visibilities match {
       case v if v.isEmpty => true
@@ -83,7 +87,7 @@ package object finder {
         case creators if creators.isEmpty => ""
         case creators =>
           s"""FILTER (IF (BOUND($variableName), ${creators
-              .map(c => s"CONTAINS(LCASE($variableName), ${c.toLowerCase.asSparqlEncodedLiteral})")
+              .map(c => s"CONTAINS (LCASE($variableName), ${c.toLowerCase.asSparqlEncodedLiteral})")
               .mkString(" || ")} , false))"""
       }
 

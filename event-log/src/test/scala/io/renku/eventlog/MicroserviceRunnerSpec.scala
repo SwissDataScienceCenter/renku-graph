@@ -246,16 +246,17 @@ class MicroserviceRunnerSpec
     val eventsQueue             = mock[StatusChangeEventsQueue[IO]]
     val httpServer              = mock[HttpServer[IO]]
     val gaugeScheduler          = mock[GaugeResetScheduler[IO]]
-    lazy val runner = new MicroserviceRunner(serviceReadinessChecker,
-                                             certificateLoader,
-                                             sentryInitializer,
-                                             dbInitializer,
-                                             metrics,
-                                             eventsQueue,
-                                             eventProducersRegistry,
-                                             eventConsumersRegistry,
-                                             gaugeScheduler,
-                                             httpServer
+    lazy val runner = new MicroserviceRunner(
+      serviceReadinessChecker,
+      certificateLoader,
+      sentryInitializer,
+      dbInitializer,
+      metrics,
+      eventsQueue,
+      eventProducersRegistry,
+      eventConsumersRegistry,
+      gaugeScheduler,
+      httpServer
     )
   }
 

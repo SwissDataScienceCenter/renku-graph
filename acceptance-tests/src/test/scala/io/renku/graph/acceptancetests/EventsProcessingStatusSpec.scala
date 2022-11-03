@@ -45,7 +45,7 @@ class EventsProcessingStatusSpec
     with Eventually
     with AcceptanceTestPatience {
 
-  private implicit val graph: GraphClass = GraphClass.Default
+  private implicit val graph: GraphClass           = GraphClass.Default
   private val numberOfEvents: Int Refined Positive = 5
 
   Feature("Status of events processing for a given project") {
@@ -61,7 +61,7 @@ class EventsProcessingStatusSpec
 
       When("there is a webhook created")
       And("there are events under processing")
-      val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents)
+      val allCommitIds = commitIds.generateNonEmptyList(min = numberOfEvents, max = numberOfEvents)
       gitLabStub.addAuthenticated(user)
       gitLabStub.setupProject(project, allCommitIds.toList: _*)
       mockCommitDataOnTripleGenerator(project, project.entitiesProject.asJsonLD, allCommitIds)

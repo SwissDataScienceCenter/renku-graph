@@ -21,7 +21,6 @@ package migrations.reprovisioning
 
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.events.producers.EventSender
 import io.renku.events.producers.EventSender.EventContext

@@ -26,7 +26,7 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.{Paging, PagingResponse}
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import model._
 import org.typelevel.log4cats.Logger
 
@@ -36,13 +36,13 @@ private[entities] trait EntitiesFinder[F[_]] {
 
 private[entities] object EntitiesFinder {
   def apply[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder]: F[EntitiesFinder[F]] =
-    RenkuConnectionConfig[F]().map(new EntitiesFinderImpl(_))
+    ProjectsConnectionConfig[F]().map(new EntitiesFinderImpl(_))
 }
 
 private class EntitiesFinderImpl[F[_]: Async: NonEmptyParallel: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig,
-    entityQueries:         List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
-) extends TSClient[F](renkuConnectionConfig)
+    storeConfig:   ProjectsConnectionConfig,
+    entityQueries: List[EntityQuery[Entity]] = List(ProjectsQuery, DatasetsQuery, WorkflowsQuery, PersonsQuery)
+) extends TSClient[F](storeConfig)
     with EntitiesFinder[F]
     with Paging[Entity] {
 

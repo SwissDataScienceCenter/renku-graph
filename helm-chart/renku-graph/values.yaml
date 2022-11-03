@@ -25,6 +25,8 @@ global:
       # Password for the `tokenstorage` user
       # Generate one using: `openssl rand -hex 16`
       value:
+  ## to enable debug mode
+  debug: false
 
 jena:
   image:
@@ -113,7 +115,6 @@ triplesGenerator:
       memory: 2048Mi
       cpu: "1"
   jvmXmx: 1g
-  reProvisioningRemovalBatchSize: 1000
   gitlab:
     rateLimit: 30/sec
   ## a demanded number of concurrent triples generation processes

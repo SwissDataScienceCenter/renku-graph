@@ -26,40 +26,44 @@ import io.circe.Decoder
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets._
 import io.renku.graph.model.persons.{Affiliation, Email, Name => UserName}
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
 private trait CreatorsFinder[F[_]] {
-  def findCreators(identifier: Identifier): F[NonEmptyList[DatasetCreator]]
+  def findCreators(identifier: Identifier, projectId: projects.ResourceId): F[NonEmptyList[DatasetCreator]]
 }
 
-private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient(renkuConnectionConfig)
+private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
+    extends TSClient(storeConfig)
     with CreatorsFinder[F] {
 
   import CreatorsFinder._
 
-  def findCreators(identifier: Identifier): F[NonEmptyList[DatasetCreator]] = {
+  def findCreators(identifier: Identifier, projectId: projects.ResourceId): F[NonEmptyList[DatasetCreator]] = {
     implicit val decoder: Decoder[NonEmptyList[DatasetCreator]] = creatorsDecoder(identifier)
-    queryExpecting[NonEmptyList[DatasetCreator]](using = query(identifier))
+    queryExpecting[NonEmptyList[DatasetCreator]](query(identifier, projectId))
   }
 
-  private def query(identifier: Identifier) = SparqlQuery.of(
+  private def query(identifier: Identifier, projectId: projects.ResourceId) = SparqlQuery.of(
     name = "ds by id - creators",
     Prefixes of schema -> "schema",
     s"""|SELECT DISTINCT ?email ?name ?affiliation
-        |WHERE {
+        |FROM <${GraphClass.Project.id(projectId)}> 
+        |FROM <${GraphClass.Persons.id}> {
         |  ?dataset a schema:Dataset ;
-        |           schema:identifier '$identifier' ;
-        |           schema:creator ?creatorResource .
-        |  OPTIONAL { ?creatorResource a schema:Person ;
-        |                              schema:email ?email . } .
-        |  OPTIONAL { ?creatorResource a schema:Person ;
-        |                              schema:affiliation ?affiliation . } .
-        |  ?creatorResource a schema:Person ;
-        |                   schema:name ?name .
+        |           schema:identifier '$identifier';
+        |           schema:creator ?creatorResource.
+        |  
+        |  OPTIONAL { 
+        |    ?creatorResource schema:email ?email
+        |  }
+        |  OPTIONAL { 
+        |    ?creatorResource schema:affiliation ?affiliation
+        |  }
+        |  ?creatorResource a schema:Person;
+        |                   schema:name ?name
         |}
         |""".stripMargin
   )
@@ -67,9 +71,8 @@ private class CreatorsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
 private object CreatorsFinder {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      renkuConnectionConfig: RenkuConnectionConfig
-  ): F[CreatorsFinder[F]] = MonadThrow[F].catchNonFatal(new CreatorsFinderImpl(renkuConnectionConfig))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig): F[CreatorsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new CreatorsFinderImpl(storeConfig))
 
   import ResultsDecoder._
   import io.circe.Decoder
@@ -79,9 +82,9 @@ private object CreatorsFinder {
       import io.renku.tinytypes.json.TinyTypeDecoders._
 
       for {
-        maybeEmail       <- cursor.downField("email").downField("value").as[Option[Email]]
-        name             <- cursor.downField("name").downField("value").as[UserName]
-        maybeAffiliation <- cursor.downField("affiliation").downField("value").as[Option[Affiliation]]
+        maybeEmail       <- extract[Option[Email]]("email")
+        name             <- extract[UserName]("name")
+        maybeAffiliation <- extract[Option[Affiliation]]("affiliation")
       } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
     }(toNonEmptyList(onEmpty = s"No creators on dataset $identifier")).map(_.sortBy(_.name))
 }

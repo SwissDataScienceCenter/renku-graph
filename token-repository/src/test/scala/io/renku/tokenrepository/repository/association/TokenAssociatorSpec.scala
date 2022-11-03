@@ -18,8 +18,10 @@
 
 package io.renku.tokenrepository.repository.association
 
+import cats.data.OptionT
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.types.numeric.NonNegInt
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -31,12 +33,10 @@ import io.renku.tokenrepository.repository.AccessTokenCrypto
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.RepositoryGenerators._
 import io.renku.tokenrepository.repository.deletion.TokenRemover
+import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
-import cats.data.OptionT
-import eu.timepit.refined.types.numeric.NonNegInt
 
 class TokenAssociatorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 

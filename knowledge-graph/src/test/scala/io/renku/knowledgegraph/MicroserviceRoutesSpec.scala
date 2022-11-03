@@ -22,7 +22,6 @@ import cats.data.EitherT.{leftT, rightT}
 import cats.data.{Kleisli, OptionT}
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.circe.Json
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
@@ -264,7 +263,7 @@ class MicroserviceRoutesSpec
           .map(t => uri"/knowledge-graph/entities" +? ("type" -> t.value) -> Criteria(Filters(entityTypes = Set(t))))
           .generateOne,
         typeParams
-          .toGeneratorOfList(minElements = 2)
+          .toGeneratorOfList(min = 2)
           .map { list =>
             val uri = uri"/knowledge-graph/entities" ++? ("type" -> list.map(_.show))
             uri -> Criteria(Filters(entityTypes = list.toSet))
@@ -276,7 +275,7 @@ class MicroserviceRoutesSpec
           )
           .generateOne,
         personNames
-          .toGeneratorOfList(minElements = 2)
+          .toGeneratorOfList(min = 2)
           .map { list =>
             val uri = uri"/knowledge-graph/entities" ++? ("creator" -> list.map(_.show))
             uri -> Criteria(Filters(creators = list.toSet))
@@ -288,7 +287,7 @@ class MicroserviceRoutesSpec
           )
           .generateOne,
         projectVisibilities
-          .toGeneratorOfList(minElements = 2)
+          .toGeneratorOfList(min = 2)
           .map { list =>
             val uri = uri"/knowledge-graph/entities" ++? ("visibility" -> list.map(_.show))
             uri -> Criteria(Filters(visibilities = list.toSet))
@@ -300,7 +299,7 @@ class MicroserviceRoutesSpec
           )
           .generateOne,
         projectNamespaces
-          .toGeneratorOfList(minElements = 2)
+          .toGeneratorOfList(min = 2)
           .map { list =>
             val uri = uri"/knowledge-graph/entities" ++? ("namespace" -> list.map(_.show))
             uri -> Criteria(Filters(namespaces = list.toSet))

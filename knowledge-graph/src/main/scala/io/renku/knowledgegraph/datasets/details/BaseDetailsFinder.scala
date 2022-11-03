@@ -27,8 +27,9 @@ import eu.timepit.refined.auto._
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.datasets.{Identifier, ImageUri, Keyword}
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.Path
-import io.renku.graph.model.{projects, publicationEvents}
+import io.renku.graph.model.{GraphClass, projects, publicationEvents}
 import io.renku.http.server.security.model.AuthUser
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -36,14 +37,13 @@ import org.typelevel.log4cats.Logger
 
 private trait BaseDetailsFinder[F[_]] {
   def findBaseDetails(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]]
-  def findInitialTag(identifier:  Identifier, authContext: AuthContext[Identifier]): F[Option[Tag]]
-  def findKeywords(identifier:    Identifier): F[List[Keyword]]
-  def findImages(identifier:      Identifier): F[List[ImageUri]]
+  def findInitialTag(dataset:     Dataset, authContext:    AuthContext[Identifier]): F[Option[Tag]]
+  def findKeywords(dataset:       Dataset): F[List[Keyword]]
+  def findImages(dataset:         Dataset): F[List[ImageUri]]
 }
 
-private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient(renkuConnectionConfig)
+private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
+    extends TSClient(storeConfig)
     with BaseDetailsFinder[F] {
 
   import BaseDetailsFinderImpl._
@@ -51,75 +51,86 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 
   def findBaseDetails(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Dataset]] = {
     implicit val decoder: Decoder[Option[Dataset]] = maybeDatasetDecoder(identifier)
-    queryExpecting[Option[Dataset]](using = queryForDatasetDetails(identifier, authContext))
+    queryExpecting[Option[Dataset]](selectQuery = queryForDatasetDetails(identifier, authContext))
   }
 
   private def queryForDatasetDetails(identifier: Identifier, authContext: AuthContext[Identifier]) = SparqlQuery.of(
     name = "ds by id - details",
-    Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?maybeDateCreated ?slug 
-        |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished ?projectPath ?projectName ?projectVisibility
+        |  ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybeDatePublished 
+        |  ?projectId ?projectPath ?projectName ?projectVisibility
         |WHERE {        
         |  {
         |    SELECT ?projectId ?projectPath ?projectName ?projectVisibility
         |    WHERE {
-        |      ?datasetId a schema:Dataset;
-        |                 schema:identifier '$identifier';
-        |                 ^renku:hasDataset  ?projectId.
-        |      ?projectId schema:dateCreated ?dateCreated ;
-        |                 schema:name ?projectName;
-        |                 renku:projectVisibility ?projectVisibility;
-        |                 renku:projectPath ?projectPath.
-        |      FILTER (?projectPath IN (${authContext.allowedProjects.map(p => s"'$p'").mkString(", ")})) 
-        |      FILTER NOT EXISTS {
-        |        ?datasetId prov:invalidatedAtTime ?invalidationTime.
-        |      }
-        |      FILTER NOT EXISTS {
-        |        ?parentDsId prov:wasDerivedFrom / schema:url ?datasetId.
-        |        ?parentDsId prov:invalidatedAtTime ?invalidationTimeOnChild;
-        |                    ^renku:hasDataset  ?projectId.
+        |      GRAPH ?projectGraph {
+        |        ?datasetId a schema:Dataset;
+        |                   schema:identifier '$identifier';
+        |                   ^renku:hasDataset  ?projectId.
+        |        ?projectId schema:dateCreated ?dateCreated ;
+        |                   schema:name ?projectName;
+        |                   renku:projectVisibility ?projectVisibility;
+        |                   renku:projectPath ?projectPath.
+        |        FILTER (?projectPath IN (${authContext.allowedProjects.map(p => s"'$p'").mkString(", ")})) 
+        |        FILTER NOT EXISTS {
+        |          ?datasetId prov:invalidatedAtTime ?invalidationTime.
+        |        }
+        |        FILTER NOT EXISTS {
+        |          ?parentDsId prov:wasDerivedFrom / schema:url ?datasetId.
+        |          ?parentDsId prov:invalidatedAtTime ?invalidationTimeOnChild;
+        |                      ^renku:hasDataset  ?projectId.
+        |        }
         |      }
         |    }
         |    ORDER BY ?dateCreated ?projectName
         |    LIMIT 1
         |  }
-        |  
-        |  ?datasetId schema:identifier '$identifier';
-        |             schema:identifier ?identifier;
-        |             a schema:Dataset;
-        |             ^renku:hasDataset ?projectId;   
-        |             schema:name ?name;
-        |             renku:slug ?slug;
-        |             renku:topmostSameAs ?topmostSameAs;
-        |             renku:topmostDerivedFrom/schema:identifier ?initialVersion .
-        |  OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
-        |  OPTIONAL { ?datasetId schema:description ?description }.
-        |  OPTIONAL { ?datasetId schema:dateCreated ?maybeDateCreated }.
-        |  OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }.
+        |
+        |  GRAPH ?projectId {
+        |    ?datasetId schema:identifier '$identifier';
+        |               schema:identifier ?identifier;
+        |               a schema:Dataset;
+        |               ^renku:hasDataset ?projectId;
+        |               schema:name ?name;
+        |               renku:slug ?slug;
+        |               renku:topmostSameAs ?topmostSameAs;
+        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion .
+        |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
+        |    OPTIONAL { ?datasetId schema:description ?description }
+        |    OPTIONAL { ?datasetId schema:dateCreated ?maybeDateCreated }
+        |    OPTIONAL { ?datasetId schema:datePublished ?maybeDatePublished }
+        |  }
         |}
         |""".stripMargin
   )
 
-  def findInitialTag(identifier: Identifier, authContext: AuthContext[Identifier]): F[Option[Tag]] =
-    queryExpecting[Option[Tag]](using = queryInitialTag(identifier, authContext))
+  def findInitialTag(dataset: Dataset, authContext: AuthContext[Identifier]): F[Option[Tag]] =
+    queryExpecting[Option[Tag]](queryInitialTag(dataset, authContext))
 
-  private def queryInitialTag(identifier: Identifier, authContext: AuthContext[Identifier]) = SparqlQuery.of(
+  private def queryInitialTag(ds: Dataset, authContext: AuthContext[Identifier]) = SparqlQuery.of(
     name = "ds by id - initial tag",
     Prefixes of (renku -> "renku", schema -> "schema"),
     s"""|SELECT DISTINCT ?tagName ?maybeTagDesc
         |WHERE {
-        |  ?datasetId schema:identifier '$identifier';
-        |             schema:version ?version;
-        |             schema:sameAs/schema:url ?originalDsId.
-        |  ?originalDsProjId renku:hasDataset ?originalDsId;
-        |                    renku:projectPath ?projectPath.
-        |  ${allowedProjectFilterQuery(authContext.maybeAuthUser)}
-        |  ?originalDsTagId schema:about/schema:url ?originalDsId;
-        |                   schema:name ?version.
-        |  ?datasetTagId schema:about/schema:url ?datasetId;
-        |                schema:name ?version.
-        |  BIND (?version AS ?tagName)
-        |  OPTIONAL { ?datasetTagId schema:description ?maybeTagDesc }
+        |  GRAPH <${GraphClass.Project.id(ds.project.id)}> {
+        |    ?datasetId schema:identifier '${ds.id}';
+        |               schema:version ?version;
+        |               schema:sameAs/schema:url ?originalDsId
+        |  }
+        |  GRAPH ?originalDsProjId {
+        |    ?originalDsProjId renku:hasDataset ?originalDsId;
+        |                      renku:projectPath ?projectPath.
+        |    ${allowedProjectFilterQuery(authContext.maybeAuthUser)}
+        |    ?originalDsTagId schema:about/schema:url ?originalDsId;
+        |                     schema:name ?version
+        |  }
+        |  GRAPH <${GraphClass.Project.id(ds.project.id)}> {
+        |    ?datasetTagId schema:about/schema:url ?datasetId;
+        |                  schema:name ?version.
+        |    BIND (?version AS ?tagName)
+        |    OPTIONAL { ?datasetTagId schema:description ?maybeTagDesc }
+        |  }
         |}
         |LIMIT 1
         |""".stripMargin
@@ -129,46 +140,49 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
     case Some(user) =>
       s"""|?originalDsProjId renku:projectVisibility ?visibility .
           |OPTIONAL {
-          |  ?originalDsProjId schema:member/schema:sameAs ?memberId.
-          |  ?memberId schema:additionalType 'GitLab';
-          |            schema:identifier ?userGitlabId .
+          |  ?originalDsProjId schema:member ?memberId
+          |  GRAPH <${GraphClass.Persons.id}> {
+          |    ?memberId schema:sameAs ?sameAsId.
+          |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+          |              schema:identifier ?userGitlabId
+          |  }
           |}
-          |FILTER ( ?visibility = '${projects.Visibility.Public.value}' || ?userGitlabId = ${user.id.value} )
+          |FILTER (?visibility = '${projects.Visibility.Public.value}' || ?userGitlabId = ${user.id.value})
           |""".stripMargin
     case _ =>
       s"""|?originalDsProjId renku:projectVisibility ?visibility .
-          |FILTER(?visibility = '${projects.Visibility.Public.value}')
+          |FILTER (?visibility = '${projects.Visibility.Public.value}')
           |""".stripMargin
   }
 
-  def findKeywords(identifier: Identifier): F[List[Keyword]] =
-    queryExpecting[List[Keyword]](using = queryKeywords(identifier))
+  def findKeywords(dataset: Dataset): F[List[Keyword]] =
+    queryExpecting[List[Keyword]](queryKeywords(dataset))
 
-  private def queryKeywords(identifier: Identifier) = SparqlQuery.of(
+  private def queryKeywords(ds: Dataset) = SparqlQuery.of(
     name = "ds by id - keywords",
     Prefixes of schema -> "schema",
     s"""|SELECT DISTINCT ?keyword
-        |WHERE {
-        |  ?datasetId schema:identifier '$identifier' ;
-        |             schema:keywords ?keyword .
+        |FROM <${GraphClass.Project.id(ds.project.id)}> {
+        |  ?datasetId schema:identifier '${ds.id}';
+        |             schema:keywords ?keyword
         |}
         |ORDER BY ASC(?keyword)
         |""".stripMargin
   )
 
-  def findImages(identifier: Identifier): F[List[ImageUri]] =
-    queryExpecting[List[ImageUri]](using = queryImages(identifier))
+  def findImages(dataset: Dataset): F[List[ImageUri]] =
+    queryExpecting[List[ImageUri]](queryImages(dataset))
 
-  private def queryImages(identifier: Identifier) = SparqlQuery.of(
+  private def queryImages(ds: Dataset) = SparqlQuery.of(
     name = "ds by id - image urls",
     Prefixes of schema -> "schema",
     s"""|SELECT DISTINCT ?contentUrl
-        |WHERE {
-        |    ?datasetId schema:identifier '$identifier' ;
-        |               schema:image ?imageId .
-        |    ?imageId a schema:ImageObject;
-        |             schema:contentUrl ?contentUrl ;
-        |             schema:position ?position .
+        |FROM <${GraphClass.Project.id(ds.project.id)}> {
+        |  ?datasetId schema:identifier '${ds.id}';
+        |             schema:image ?imageId .
+        |  ?imageId a schema:ImageObject;
+        |           schema:contentUrl ?contentUrl ;
+        |           schema:position ?position
         |}
         |ORDER BY ASC(?position)
         |""".stripMargin
@@ -178,8 +192,8 @@ private class BaseDetailsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder
 private object BaseDetailsFinder {
 
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      renkuConnectionConfig: RenkuConnectionConfig
-  ): F[BaseDetailsFinder[F]] = MonadThrow[F].catchNonFatal(new BaseDetailsFinderImpl[F](renkuConnectionConfig))
+      storeConfig: ProjectsConnectionConfig
+  ): F[BaseDetailsFinder[F]] = MonadThrow[F].catchNonFatal(new BaseDetailsFinderImpl[F](storeConfig))
 }
 
 private object BaseDetailsFinderImpl {
@@ -267,22 +281,22 @@ private object BaseDetailsFinderImpl {
                 }
         maybeDescription <- extract[Option[Description]]("description")
 
-        project <- (extract[projects.Path]("projectPath"),
+        project <- (extract[projects.ResourceId]("projectId"),
+                    extract[projects.Path]("projectPath"),
                     extract[projects.Name]("projectName"),
                     extract[projects.Visibility]("projectVisibility")
                    ).mapN(DatasetProject)
 
-        dataset <- createDataset(
-                     resourceId,
-                     identifier,
-                     title,
-                     name,
-                     maybeDerivedFrom,
-                     sameAs,
-                     initialVersion,
-                     date,
-                     maybeDescription,
-                     project
+        dataset <- createDataset(resourceId,
+                                 identifier,
+                                 title,
+                                 name,
+                                 maybeDerivedFrom,
+                                 sameAs,
+                                 initialVersion,
+                                 date,
+                                 maybeDescription,
+                                 project
                    )
       } yield dataset
     }(toOption(show"More than one dataset with $dsId id"))

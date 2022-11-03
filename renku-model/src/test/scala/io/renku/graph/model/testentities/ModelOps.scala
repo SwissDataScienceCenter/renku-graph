@@ -27,11 +27,11 @@ import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetPartIds}
+import io.renku.graph.model._
 import io.renku.graph.model.datasets.{DateCreated, DerivedFrom, Description, InternalSameAs, Keyword, Name, OriginalIdentifier, SameAs, Title, TopmostSameAs}
 import io.renku.graph.model.projects.ForksCount
 import io.renku.graph.model.testentities.Dataset.Provenance
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
-import io.renku.graph.model._
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 
@@ -41,7 +41,7 @@ trait ModelOps extends Dataset.ProvenanceOps {
 
     lazy val resourceId: persons.ResourceId = person.to[entities.Person].resourceId
 
-    def to[T](implicit convert: Person => T):              T         = convert(person)
+    def to[T](implicit convert:      Person => T):         T         = convert(person)
     def toMaybe[T](implicit convert: Person => Option[T]): Option[T] = convert(person)
   }
 
@@ -488,16 +488,17 @@ trait ModelOps extends Dataset.ProvenanceOps {
     def to[T](implicit convert: Plan => T): T = convert(plan)
 
     def invalidate(time: InvalidationTime): Plan with HavingInvalidationTime =
-      new Plan(plan.id,
-               plan.name,
-               plan.maybeDescription,
-               plan.maybeCommand,
-               plan.creators,
-               plan.dateCreated,
-               plan.maybeProgrammingLanguage,
-               plan.keywords,
-               plan.commandParameterFactories,
-               plan.successCodes
+      new Plan(
+        plan.id,
+        plan.name,
+        plan.maybeDescription,
+        plan.maybeCommand,
+        plan.creators,
+        plan.dateCreated,
+        plan.maybeProgrammingLanguage,
+        plan.keywords,
+        plan.commandParameterFactories,
+        plan.successCodes
       ) with HavingInvalidationTime {
         override val invalidationTime: InvalidationTime = time
       }

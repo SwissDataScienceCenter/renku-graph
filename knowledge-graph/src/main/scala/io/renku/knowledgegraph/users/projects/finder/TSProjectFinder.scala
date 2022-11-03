@@ -24,9 +24,9 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.graph.model.entities.Person
-import io.renku.graph.model.projects
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.knowledgegraph.users.projects.model.Project
-import io.renku.triplesstore.{RenkuConnectionConfig, SparqlQueryTimeRecorder, TSClient}
+import io.renku.triplesstore.{ProjectsConnectionConfig, SparqlQueryTimeRecorder, TSClient}
 import org.typelevel.log4cats.Logger
 
 private trait TSProjectFinder[F[_]] {
@@ -35,12 +35,11 @@ private trait TSProjectFinder[F[_]] {
 
 private object TSProjectFinder {
   def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder]: F[TSProjectFinder[F]] =
-    RenkuConnectionConfig[F]().map(new TSProjectFinderImpl(_))
+    ProjectsConnectionConfig[F]().map(new TSProjectFinderImpl(_))
 }
 
-private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient(renkuConnectionConfig)
+private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
+    extends TSClient(storeConfig)
     with TSProjectFinder[F] {
 
   import eu.timepit.refined.auto._
@@ -49,33 +48,39 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
   import io.renku.triplesstore.SparqlQuery.Prefixes
 
   override def findProjectsInTS(criteria: Criteria): F[List[Project.Activated]] =
-    queryExpecting[List[Project.Activated]](using = query(criteria))
+    queryExpecting[List[Project.Activated]](query(criteria))
 
   private def query(criteria: Criteria) = SparqlQuery.of(
     name = "user projects by id",
-    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
     s"""|SELECT ?name ?path ?visibility ?dateCreated ?maybeCreatorName 
         |       (GROUP_CONCAT(?keyword; separator=',') AS ?keywords)
         |       ?maybeDescription 
         |WHERE {
-        |  ?resourceId a schema:Project;
-        |              renku:projectPath ?path;
-        |              schema:name ?name;
-        |              renku:projectVisibility ?visibility;
-        |              schema:dateCreated ?dateCreated.
-        |  ${criteria.maybeOnAccessRights("?resourceId", "?visibility")}
-        |  ?resourceId schema:member/schema:sameAs ?memberSameAs.
-        |  ?memberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
-        |                schema:identifier ${criteria.userId.value}.
-        |  OPTIONAL { ?resourceId schema:description ?maybeDescription }
-        |  OPTIONAL { ?resourceId schema:keywords ?keyword }
-        |  OPTIONAL {
-        |    ?resourceId schema:creator ?maybeCreatorResourceId.
-        |    ?maybeCreatorResourceId a schema:Person;
-        |                            schema:name ?maybeCreatorName.
+        |  GRAPH <${GraphClass.Persons.id}> {
+        |    ?memberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+        |                  schema:identifier ${criteria.userId.value};
+        |                  ^schema:sameAs ?memberId
+        |  }
+        |  GRAPH ?projectId {
+        |    ?projectId schema:member ?memberId;
+        |               a schema:Project;
+        |               renku:projectPath ?path;
+        |               schema:name ?name;
+        |               renku:projectVisibility ?visibility;
+        |               schema:dateCreated ?dateCreated.
+        |    ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
+        |    OPTIONAL { ?projectId schema:description ?maybeDescription }
+        |    OPTIONAL { ?projectId schema:keywords ?keyword }
+        |    OPTIONAL {
+        |      ?projectId schema:creator ?maybeCreatorResourceId.
+        |      GRAPH <${GraphClass.Persons.id}> {
+        |        ?maybeCreatorResourceId schema:name ?maybeCreatorName
+        |      }
+        |    }
         |  }
         |}
-        |GROUP BY ?resourceId ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
+        |GROUP BY ?projectId ?name ?path ?visibility ?dateCreated ?maybeCreatorName ?maybeDescription
         |""".stripMargin
   )
 
@@ -83,14 +88,17 @@ private class TSProjectFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
     def maybeOnAccessRights(projectIdVariable: String, visibilityVariable: String): String =
       criteria.maybeUser match {
-        case Some(user) =>
+        case Some(authUser) =>
           s"""|OPTIONAL {
-              |    $projectIdVariable schema:member/schema:sameAs ?memberId.
-              |    ?memberId schema:additionalType 'GitLab';
-              |              schema:identifier ?userGitlabId .
+              |    $projectIdVariable schema:member ?projectMemberId
+              |    GRAPH <${GraphClass.Persons.id}> {
+              |      ?projectMemberId schema:sameAs ?projectMemberSameAs.
+              |      ?projectMemberSameAs schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+              |                           schema:identifier ?userGitlabId
+              |    }
               |}
               |FILTER (
-              |  $visibilityVariable != '${projects.Visibility.Private.value}' || ?userGitlabId = ${user.id.value}
+              |  $visibilityVariable != '${projects.Visibility.Private.value}' || ?userGitlabId = ${authUser.id.value}
               |)
               |""".stripMargin
         case _ =>

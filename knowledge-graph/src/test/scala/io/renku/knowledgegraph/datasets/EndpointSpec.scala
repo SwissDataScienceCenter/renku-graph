@@ -152,7 +152,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
                                maybeDescription,
                                creators,
                                date,
-                               exemplarProjectPath,
+                               exemplarProject,
                                projectsCount,
                                keywords,
                                images
@@ -165,7 +165,7 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
           "date":          ${date.instant},
           "projectsCount": ${projectsCount.value},
           "keywords":      ${keywords.map(_.value)},
-          "images":        ${images -> exemplarProjectPath},
+          "images":        ${images -> exemplarProject},
           "_links": [{
             "rel":  "details",
             "href": ${(renkuApiUrl / "datasets" / id).value}
@@ -190,14 +190,14 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       }""" addIfDefined ("email" -> maybeEmail)
     }
 
-    private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], projects.Path)] =
-      Encoder.instance[(List[ImageUri], projects.Path)] { case (images, exemplarProjectPath) =>
+    private implicit lazy val imagesEncoder: Encoder[(List[ImageUri], ExemplarProject)] =
+      Encoder.instance[(List[ImageUri], ExemplarProject)] { case (images, ExemplarProject(_, path)) =>
         Json.arr(images.map {
           case uri: ImageUri.Relative => json"""{
             "location": $uri,
             "_links": [{
               "rel":  "view",
-              "href": ${s"$gitLabUrl/$exemplarProjectPath/raw/master/$uri"}
+              "href": ${s"$gitLabUrl/$path/raw/master/$uri"}
             }]
           }"""
           case uri: ImageUri.Absolute => json"""{
@@ -219,25 +219,26 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
   }
 
   private implicit lazy val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
-    id                  <- datasetIdentifiers
-    title               <- datasetTitles
-    name                <- datasetNames
-    maybeDescription    <- datasetDescriptions.toGeneratorOfOptions
-    creators            <- personEntities.toGeneratorOfNonEmptyList(maxElements = 4)
-    dates               <- datasetDates
-    exemplarProjectPath <- projectPaths
-    projectsCount       <- nonNegativeInts() map (_.value) map ProjectsCount.apply
-    keywords            <- datasetKeywords.toGeneratorOfList()
-    images              <- datasetImageUris.toGeneratorOfList()
-  } yield DatasetSearchResult(id,
-                              title,
-                              name,
-                              maybeDescription,
-                              creators.map(_.to[DatasetCreator]).toList,
-                              dates,
-                              exemplarProjectPath,
-                              projectsCount,
-                              keywords,
-                              images
+    id                <- datasetIdentifiers
+    title             <- datasetTitles
+    name              <- datasetNames
+    maybeDescription  <- datasetDescriptions.toGeneratorOfOptions
+    creators          <- personEntities.toGeneratorOfNonEmptyList(maxElements = 4)
+    dates             <- datasetDates
+    exemplarProjectId <- projectResourceIds
+    projectsCount     <- nonNegativeInts() map (_.value) map ProjectsCount.apply
+    keywords          <- datasetKeywords.toGeneratorOfList()
+    images            <- datasetImageUris.toGeneratorOfList()
+  } yield DatasetSearchResult(
+    id,
+    title,
+    name,
+    maybeDescription,
+    creators.map(_.to[DatasetCreator]).toList,
+    dates,
+    ExemplarProject(exemplarProjectId, exemplarProjectId.toUnsafe[projects.Path]),
+    projectsCount,
+    keywords,
+    images
   )
 }

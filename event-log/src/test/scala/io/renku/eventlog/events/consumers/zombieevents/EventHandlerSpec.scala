@@ -177,14 +177,15 @@ class EventHandlerSpec
     val underTransformationGauge    = mock[LabeledGauge[IO, projects.Path]]
     val awaitingDeletionGauge       = mock[LabeledGauge[IO, projects.Path]]
     val underDeletionGauge          = mock[LabeledGauge[IO, projects.Path]]
-    val handler = new EventHandler[IO](categoryName,
-                                       zombieStatusCleaner,
-                                       awaitingGenerationGauge,
-                                       underGenerationGauge,
-                                       awaitingTransformationGauge,
-                                       underTransformationGauge,
-                                       awaitingDeletionGauge,
-                                       underDeletionGauge
+    val handler = new EventHandler[IO](
+      categoryName,
+      zombieStatusCleaner,
+      awaitingGenerationGauge,
+      underGenerationGauge,
+      awaitingTransformationGauge,
+      underTransformationGauge,
+      awaitingDeletionGauge,
+      underDeletionGauge
     )
 
     val gaugesFor: ProcessingStatus => (LabeledGauge[IO, projects.Path], LabeledGauge[IO, projects.Path]) = {

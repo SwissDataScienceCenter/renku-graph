@@ -20,7 +20,6 @@ package io.renku.triplesgenerator.events.consumers
 package tsprovisioning.transformation
 
 import Generators._
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.TSVersion
 import org.scalamock.scalatest.MockFactory
@@ -66,14 +65,15 @@ class TransformationStepsCreatorSpec extends AnyWordSpec with MockFactory with s
     val ngProjectTransformer  = mock[namedgraphs.projects.ProjectTransformer[Try]]
     val ngDatasetTransformer  = mock[namedgraphs.datasets.DatasetTransformer[Try]]
     val ngActivityTransformer = mock[namedgraphs.activities.ActivityTransformer[Try]]
-    val stepsCreator = new TransformationStepsCreatorImpl[Try](dgPersonTransformer,
-                                                               dgProjectTransformer,
-                                                               dgDatasetTransformer,
-                                                               dgActivityTransformer,
-                                                               ngPersonTransformer,
-                                                               ngProjectTransformer,
-                                                               ngDatasetTransformer,
-                                                               ngActivityTransformer
+    val stepsCreator = new TransformationStepsCreatorImpl[Try](
+      dgPersonTransformer,
+      dgProjectTransformer,
+      dgDatasetTransformer,
+      dgActivityTransformer,
+      ngPersonTransformer,
+      ngProjectTransformer,
+      ngDatasetTransformer,
+      ngActivityTransformer
     )
   }
 }

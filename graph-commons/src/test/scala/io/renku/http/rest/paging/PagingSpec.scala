@@ -20,7 +20,6 @@ package io.renku.http.rest.paging
 
 import cats.effect.IO
 import cats.syntax.all._
-import eu.timepit.refined.auto._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
@@ -36,7 +35,7 @@ class PagingSpec extends AnyWordSpec with should.Matchers with IOSpec {
     "call the findResults and return found items " +
       "if the first page requested and per page is greater than the number of found items" in {
 
-        val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
+        val results = nonEmptyList(positiveInts(), min = 6, max = 6).generateOne.map(_.value).toList
 
         val resultsFinder = new ResultsFinder(returning = results.pure[IO])()
 
@@ -52,7 +51,7 @@ class PagingSpec extends AnyWordSpec with should.Matchers with IOSpec {
     "call the findResults and find total number of results " +
       "if the combination of requested page and per page is equal to the number of found items" in {
 
-        val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
+        val results = nonEmptyList(positiveInts(), min = 6, max = 6).generateOne.map(_.value).toList
 
         val resultsFinder = new ResultsFinder(returning = results.pure[IO])()
 
@@ -83,7 +82,7 @@ class PagingSpec extends AnyWordSpec with should.Matchers with IOSpec {
     "call the findResults and find total number of results " +
       "if the combination of requested page and per page is less than the number of found items" in {
 
-        val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
+        val results = nonEmptyList(positiveInts(), min = 6, max = 6).generateOne.map(_.value).toList
 
         val resultsFinder = new ResultsFinder(returning = results.pure[IO])()
 

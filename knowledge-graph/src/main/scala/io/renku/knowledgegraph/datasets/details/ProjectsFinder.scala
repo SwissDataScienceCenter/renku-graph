@@ -18,61 +18,61 @@
 
 package io.renku.knowledgegraph.datasets.details
 
+import Dataset.DatasetProject
 import cats.MonadThrow
 import cats.effect.kernel.Async
-import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.circe.Decoder.decodeList
-import io.circe.DecodingFailure
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.datasets.Identifier
-import io.renku.graph.model.projects
+import io.renku.graph.model.entities.Person
 import io.renku.graph.model.projects.{Path, ResourceId, Visibility}
+import io.renku.graph.model.{GraphClass, projects}
 import io.renku.http.server.security.model.AuthUser
-import Dataset.DatasetProject
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
 import org.typelevel.log4cats.Logger
 
-import scala.util.Try
-
 private trait ProjectsFinder[F[_]] {
-  def findUsedIn(identifier: Identifier, authContext: AuthContext[Identifier]): F[List[DatasetProject]]
+  def findUsedIn(dataset: Dataset, authContext: AuthContext[Identifier]): F[List[DatasetProject]]
 }
 
-private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig
-) extends TSClient(renkuConnectionConfig)
+private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig)
+    extends TSClient(storeConfig)
     with ProjectsFinder[F] {
 
   import ProjectsFinderImpl._
 
-  def findUsedIn(identifier: Identifier, authContext: AuthContext[Identifier]): F[List[DatasetProject]] =
-    queryExpecting[List[DatasetProject]](using = query(identifier, authContext.maybeAuthUser))
+  def findUsedIn(dataset: Dataset, authContext: AuthContext[Identifier]): F[List[DatasetProject]] =
+    queryExpecting[List[DatasetProject]](query(dataset, authContext.maybeAuthUser))
 
-  private def query(identifier: Identifier, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
+  private def query(ds: Dataset, maybeAuthUser: Option[AuthUser]) = SparqlQuery.of(
     name = "ds by id - projects",
-    Prefixes.of(schema -> "schema", prov -> "prov", renku -> "renku"),
-    s"""|SELECT DISTINCT ?projectId ?projectName ?projectVisibility
+    Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
+    s"""|SELECT DISTINCT ?projectId ?projectPath ?projectName ?projectVisibility
         |WHERE {
-        |  ?dsId a schema:Dataset;
-        |        schema:identifier '$identifier';
-        |        renku:topmostSameAs ?topmostSameAs.
-        |  
-        |  ?allDsId a schema:Dataset;
-        |           renku:topmostSameAs ?topmostSameAs;
-        |           ^renku:hasDataset ?projectId.
-        |  ${allowedProjectFilterQuery(maybeAuthUser)}
-        |  FILTER NOT EXISTS {
-        |    ?projectDatasets prov:wasDerivedFrom / schema:url ?allDsId;
-        |                     ^renku:hasDataset ?projectId. 
+        |  GRAPH <${GraphClass.Project.id(ds.project.id)}> {
+        |    ?dsId a schema:Dataset;
+        |          schema:identifier '${ds.id}';
+        |          renku:topmostSameAs ?topmostSameAs
         |  }
-        |  FILTER NOT EXISTS {
-        |    ?allDsId prov:invalidatedAtTime ?invalidationTime .
-        |  }  
-        |  ?projectId schema:name ?projectName;
-        |             renku:projectVisibility ?projectVisibility.
+        |  
+        |  GRAPH ?projectId {
+        |    ?allDsId a schema:Dataset;
+        |             renku:topmostSameAs ?topmostSameAs;
+        |             ^renku:hasDataset ?projectId.
+        |    ${allowedProjectFilterQuery(maybeAuthUser)}
+        |    FILTER NOT EXISTS {
+        |      ?projectDatasets prov:wasDerivedFrom/schema:url ?allDsId;
+        |                       ^renku:hasDataset ?projectId. 
+        |    }
+        |    FILTER NOT EXISTS {
+        |      ?allDsId prov:invalidatedAtTime ?invalidationTime .
+        |    }  
+        |    ?projectId schema:name ?projectName;
+        |               renku:projectPath ?projectPath;
+        |               renku:projectVisibility ?projectVisibility.
+        |  }
         |}
         |ORDER BY ASC(?projectName)
         |""".stripMargin
@@ -80,49 +80,43 @@ private class ProjectsFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 
   private lazy val allowedProjectFilterQuery: Option[AuthUser] => String = {
     case Some(user) =>
-      s"""|?projectId renku:projectVisibility ?parentVisibility .
+      s"""|?projectId renku:projectVisibility ?parentVisibility.
           |OPTIONAL {
-          |  ?projectId schema:member/schema:sameAs ?memberId.
-          |  ?memberId schema:additionalType 'GitLab';
-          |            schema:identifier ?userGitlabId .
+          |  ?projectId schema:member ?memberId
+          |  GRAPH <${GraphClass.Persons.id}> {
+          |    ?memberId schema:sameAs ?sameAsId.
+          |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
+          |              schema:identifier ?userGitlabId
+          |  }
           |}
-          |FILTER ( ?parentVisibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value} )
+          |FILTER (?parentVisibility = '${Visibility.Public.value}' || ?userGitlabId = ${user.id.value})
           |""".stripMargin
     case _ =>
       s"""|?projectId renku:projectVisibility ?parentVisibility .
-          |FILTER(?parentVisibility = '${Visibility.Public.value}')
+          |FILTER (?parentVisibility = '${Visibility.Public.value}')
           |""".stripMargin
   }
 }
 
 private object ProjectsFinderImpl {
 
+  import ResultsDecoder._
   import io.circe.Decoder
 
-  private implicit val projectsDecoder: Decoder[List[DatasetProject]] = {
-    import io.renku.tinytypes.json.TinyTypeDecoders._
-
-    def toProjectPath(projectPath: ResourceId) =
-      projectPath
-        .as[Try, Path]
-        .toEither
-        .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
-
-    implicit val projectDecoder: Decoder[DatasetProject] = { cursor =>
+  private implicit val projectsDecoder: Decoder[List[DatasetProject]] = ResultsDecoder[List, DatasetProject] {
+    implicit cur =>
+      import io.renku.tinytypes.json.TinyTypeDecoders._
       for {
-        path       <- cursor.downField("projectId").downField("value").as[ResourceId].flatMap(toProjectPath)
-        name       <- cursor.downField("projectName").downField("value").as[projects.Name]
-        visibility <- cursor.downField("projectVisibility").downField("value").as[Visibility]
-      } yield DatasetProject(path, name, visibility)
-    }
-
-    _.downField("results").downField("bindings").as(decodeList[DatasetProject])
+        id         <- extract[projects.ResourceId]("projectId")
+        path       <- extract[projects.Path]("projectPath")
+        name       <- extract[projects.Name]("projectName")
+        visibility <- extract[projects.Visibility]("projectVisibility")
+      } yield DatasetProject(id, path, name, visibility)
   }
 }
 
 private object ProjectsFinder {
 
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](
-      renkuConnectionConfig: RenkuConnectionConfig
-  ): F[ProjectsFinder[F]] = MonadThrow[F].catchNonFatal(new ProjectsFinderImpl[F](renkuConnectionConfig))
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig): F[ProjectsFinder[F]] =
+    MonadThrow[F].catchNonFatal(new ProjectsFinderImpl[F](storeConfig))
 }

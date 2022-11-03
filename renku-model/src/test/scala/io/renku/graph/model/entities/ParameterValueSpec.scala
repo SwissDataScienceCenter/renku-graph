@@ -22,9 +22,9 @@ import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
-import io.renku.graph.model.{GraphClass, entities}
 import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.{GraphClass, entities}
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
