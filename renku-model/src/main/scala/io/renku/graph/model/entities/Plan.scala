@@ -21,7 +21,7 @@ package entities
 
 import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import Schemas.{prov, renku, schema}
-import cats.data.{Validated, ValidatedNel}
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLDDecoder.{decodeList, decodeOption}
@@ -52,7 +52,10 @@ object Plan {
     }
 
   implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl, graphClass: GraphClass): JsonLDEncoder[Plan] =
-    JsonLDEncoder.instance { case p: StepPlan => p.asJsonLD }
+    JsonLDEncoder.instance {
+      case p: StepPlan      => p.asJsonLD
+      case p: CompositePlan => p.asJsonLD
+    }
 
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDDecoder[Plan] =
     StepPlan.decoder.asInstanceOf[JsonLDDecoder[Plan]]
@@ -315,4 +318,91 @@ object StepPlan {
       )
     )
   }
+}
+
+sealed trait CompositePlan extends Plan {
+  def plans:    NonEmptyList[ResourceId]
+  def mappings: List[ParameterMapping]
+  def links:    List[ParameterLink]
+}
+
+object CompositePlan {
+
+  final case class NonModified(
+      resourceId:       ResourceId,
+      name:             Name,
+      maybeDescription: Option[Description],
+      creators:         List[Person],
+      dateCreated:      DateCreated,
+      keywords:         List[Keyword],
+      plans:            NonEmptyList[ResourceId],
+      mappings:         List[ParameterMapping],
+      links:            List[ParameterLink]
+  ) extends CompositePlan
+
+  final case class Modified(
+      resourceId:            ResourceId,
+      name:                  Name,
+      maybeDescription:      Option[Description],
+      creators:              List[Person],
+      dateCreated:           DateCreated,
+      keywords:              List[Keyword],
+      plans:                 NonEmptyList[ResourceId],
+      mappings:              List[ParameterMapping],
+      links:                 List[ParameterLink],
+      maybeInvalidationTime: Option[InvalidationTime],
+      derivation:            Plan.Derivation
+  ) extends CompositePlan
+
+  val entityTypes: EntityTypes =
+    EntityTypes of (renku / "CompositePlan", renku / "Plan", prov / "Plan", schema / "Action", schema / "CreativeWork")
+
+  lazy val ontology: Type = {
+    val clazz = Class(renku / "CompositePlan")
+    Type.Def(
+      clazz,
+      ObjectProperties(
+        ObjectProperty(schema / "creators", Person.ontology),
+        ObjectProperty(prov / "wasDerivedFrom", clazz),
+        ObjectProperty(renku / "topmostDerivedFrom", clazz),
+        ObjectProperty(renku / "hasSubprocess", Plan.ontology),
+        ObjectProperty(renku / "workflowLinks", ParameterLink.ontology),
+        ObjectProperty(renku / "hasMappings", ParameterMapping.ontology)
+      ),
+      DataProperties(
+        DataProperty(schema / "name", xsd / "string"),
+        DataProperty(schema / "description", xsd / "string"),
+        DataProperty(schema / "dateCreated", xsd / "dateTime"),
+        DataProperty(schema / "keywords", xsd / "string"),
+        DataProperty(prov / "invalidatedAtTime", xsd / "dateTime")
+      )
+    )
+  }
+
+  implicit def encoder(implicit gitLabApiUrl: GitLabApiUrl, graphClass: GraphClass): JsonLDEncoder[CompositePlan] =
+    JsonLDEncoder.instance { plan =>
+      JsonLD.entity(
+        plan.resourceId.asEntityId,
+        entityTypes,
+        Map(
+          schema / "name"         -> plan.name.asJsonLD,
+          schema / "description"  -> plan.maybeDescription.asJsonLD,
+          schema / "creator"      -> plan.creators.asJsonLD,
+          schema / "dateCreated"  -> plan.dateCreated.asJsonLD,
+          schema / "keywords"     -> plan.keywords.asJsonLD,
+          renku / "hasSubprocess" -> plan.plans.toList.asJsonLD,
+          renku / "workflowLinks" -> plan.links.asJsonLD,
+          renku / "hasMappings"   -> plan.mappings.asJsonLD
+        ) ++ PlanLens.getModifiedProperties
+          .get(plan)
+          .map { case (derivation, invalidationTime) =>
+            Map(
+              prov / "wasDerivedFrom"      -> derivation.derivedFrom.asJsonLD,
+              renku / "topmostDerivedFrom" -> derivation.originalResourceId.asEntityId.asJsonLD,
+              prov / "invalidatedAtTime"   -> invalidationTime.asJsonLD
+            )
+          }
+          .getOrElse(Map(renku / "topmostDerivedFrom" -> plan.resourceId.asEntityId.asJsonLD))
+      )
+    }
 }

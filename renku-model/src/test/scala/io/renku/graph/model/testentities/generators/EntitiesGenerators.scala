@@ -33,6 +33,7 @@ object EntitiesGenerators extends EntitiesGenerators {
   type DatasetGenFactory[+P <: Dataset.Provenance] = projects.DateCreated => Gen[Dataset[P]]
   type ActivityGenFactory                          = projects.DateCreated => Gen[Activity]
   type StepPlanGenFactory                          = projects.DateCreated => Gen[StepPlan]
+  type CompositePlanGenFactory                     = projects.DateCreated => Gen[CompositePlan]
 }
 
 private object Instances {

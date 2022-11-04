@@ -207,7 +207,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           schema / "name"                -> plan.name.asJsonLD,
           schema / "description"         -> plan.maybeDescription.asJsonLD,
           renku / "command"              -> plan.maybeCommand.asJsonLD,
-          schema / "creator"             -> plan.creators.toList.map(_.resourceId.asEntityId).asJsonLD,
+          schema / "creator"             -> plan.creators.map(_.resourceId.asEntityId).asJsonLD,
           schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
           schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
           schema / "keywords"            -> plan.keywords.asJsonLD,
@@ -219,6 +219,26 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           renku / "topmostDerivedFrom"   -> plan.derivation.originalResourceId.asEntityId.asJsonLD,
           prov / "invalidatedAtTime"     -> plan.maybeInvalidationTime.asJsonLD
         )
+    }
+
+    "produce JsonLD for a non-modified composite plan" in {
+      val plan: entities.CompositePlan =
+        compositePlanEntities()(projectCreatedDates().generateOne).generateOne
+          .to[entities.CompositePlan]
+
+      plan.asJsonLD shouldBe JsonLD.entity(
+        plan.resourceId.asEntityId,
+        entities.CompositePlan.entityTypes,
+        schema / "name"              -> plan.name.asJsonLD,
+        schema / "description"       -> plan.maybeDescription.asJsonLD,
+        schema / "creator"           -> plan.creators.map(_.resourceId.asEntityId).asJsonLD,
+        schema / "dateCreated"       -> plan.dateCreated.asJsonLD,
+        schema / "keywords"          -> plan.keywords.asJsonLD,
+        renku / "hasSubprocess"      -> plan.plans.toList.asJsonLD,
+        renku / "workflowLinks"      -> plan.links.asJsonLD,
+        renku / "hasMappings"        -> plan.mappings.asJsonLD,
+        renku / "topmostDerivedFrom" -> plan.resourceId.asEntityId.asJsonLD
+      )
     }
   }
 

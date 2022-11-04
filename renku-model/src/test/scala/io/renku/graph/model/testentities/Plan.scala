@@ -92,8 +92,10 @@ object Plan {
   ): StepPlan.NonModified = StepPlan.of(name, maybeCommand, dateCreated, creators, commandParameterFactories)
 
   implicit def toEntitiesPlan[P <: Plan](implicit renkuUrl: RenkuUrl): P => entities.Plan = {
-    case p: StepPlan.NonModified => p.to[entities.Plan](StepPlan.NonModified.toEntitiesStepPlan)
-    case p: StepPlan.Modified    => p.to[entities.Plan](StepPlan.Modified.toEntitiesStepPlan)
+    case p: StepPlan.NonModified      => p.to[entities.Plan](StepPlan.NonModified.toEntitiesStepPlan)
+    case p: StepPlan.Modified         => p.to[entities.Plan](StepPlan.Modified.toEntitiesStepPlan)
+    case p: CompositePlan.NonModified => p.to[entities.Plan](CompositePlan.NonModified.toEntitiesCompositePlan)
+    case p: CompositePlan.Modified    => p.to[entities.Plan](CompositePlan.Modified.toEntitiesCompositePlan)
   }
 
   implicit def encoder[P <: Plan](implicit renkuUrl: RenkuUrl, graphClass: GraphClass): JsonLDEncoder[P] =

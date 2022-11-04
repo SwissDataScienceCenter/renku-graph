@@ -19,7 +19,7 @@
 package io.renku.graph.model.entities
 
 import PlanLens._
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
@@ -350,6 +350,36 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
           planDateCreated.set(plans.DateCreated(entitiesActivity.startTime.value))(entitiesPlan)
         )
         actual.activities shouldBe List(entitiesActivity)
+      }
+    }
+
+    "update plans original id across multiple links" in {
+      val info    = gitLabProjectInfos.generateOne
+      val topPlan = stepPlanEntities().apply(info.dateCreated).generateOne
+      val plan1   = topPlan.createModification()
+      val plan2   = plan1.createModification()
+      val plan3   = plan2.createModification()
+      val plan4   = plan3.createModification()
+
+      val realPlans = List(topPlan, plan1, plan2, plan3, plan4).map(_.to[entities.Plan])
+
+      val update = new (List[entities.Plan] => ValidatedNel[String, List[entities.Plan]])
+        with entities.RenkuProject.ProjectFactory {
+        def apply(plans: List[entities.Plan]): ValidatedNel[String, List[entities.Plan]] =
+          this.updatePlansOriginalId(plans)
+      }
+
+      val updatedPlans = update(realPlans)
+        .fold(msgs => fail(s"updateOriginalIds failed: $msgs"), identity)
+        .groupBy(_.resourceId)
+        .view
+        .mapValues(_.head)
+        .toMap
+
+      realPlans.tail.foreach { plan =>
+        val updatedPlan = updatedPlans(plan.resourceId)
+        val derivation  = PlanLens.getPlanDerivation.get(updatedPlan).get
+        derivation.originalResourceId.value shouldBe realPlans.head.resourceId.value
       }
     }
 

@@ -25,6 +25,7 @@ import cats.syntax.all._
 import io.renku.graph.model
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
+import io.renku.graph.model.entities.PlanLens.{getPlanDerivation, setPlanDerivation}
 import io.renku.graph.model.projects._
 import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.ontology._
@@ -281,24 +282,24 @@ object RenkuProject {
     }
 
     protected def updatePlansOriginalId(plans: List[Plan]): ValidatedNel[String, List[Plan]] = {
-
       def findTopParent(derivedFrom: model.plans.DerivedFrom): ValidatedNel[String, Plan] =
-        findParentPlan(derivedFrom, plans) match {
-          case Validated.Valid(p: StepPlan.NonModified) => p.validNel
-          case Validated.Valid(p: StepPlan.Modified)    => findParentPlan(p.derivation.derivedFrom, plans)
-          case vp                                       => vp
+        findParentPlan(derivedFrom, plans).andThen { parentPlan =>
+          getPlanDerivation
+            .get(parentPlan)
+            .map(derivation => findTopParent(derivation.derivedFrom))
+            .getOrElse(parentPlan.validNel)
         }
 
-      plans
-        .foldLeft(List.empty[ValidatedNel[String, Plan]]) {
-          case (checked, p: StepPlan.NonModified) => p.validNel[String] :: checked
-          case (checked, p: StepPlan.Modified) =>
-            findTopParent(p.derivation.derivedFrom).map { parent =>
-              p.copy(derivation = p.derivation.copy(originalResourceId = parent.resourceId))
-            } :: checked
-        }
-        .sequence
-        .map(_.reverse)
+      plans.traverse { plan =>
+        getPlanDerivation
+          .get(plan)
+          .map(derivation =>
+            findTopParent(derivation.derivedFrom).map { topParent =>
+              setPlanDerivation.modify(_.copy(originalResourceId = topParent.resourceId))(plan)
+            }
+          )
+          .getOrElse(plan.validNel)
+      }
     }
 
     // The Plan dateCreated is updated only because of a bug on CLI which can produce Activities with dates before the Plan
@@ -331,22 +332,21 @@ object RenkuProject {
       )
 
     protected def validatePlansDates(plans: List[Plan]): ValidatedNel[String, Unit] =
-      plans
-        .foldLeft(List.empty[ValidatedNel[String, Unit]]) {
-          case (checked, _: StepPlan.NonModified) => ().validNel[String] :: checked
-          case (checked, p: StepPlan.Modified) =>
-            findParentPlan(p.derivation.derivedFrom, plans) match {
-              case Validated.Valid(parent) =>
-                Validated.cond(
-                  (p.dateCreated.value compareTo parent.dateCreated.value) >= 0,
-                  (),
-                  NonEmptyList.one(show"Plan ${p.resourceId} is older than it's parent ${parent.resourceId}")
-                ) :: checked
-              case vp => vp.void :: checked
-            }
-        }
-        .sequence
-        .void
+      plans.traverse { plan =>
+        getPlanDerivation
+          .get(plan)
+          .map { derivation =>
+            findParentPlan(derivation.derivedFrom, plans)
+              .andThen(parentPlan =>
+                Validated.condNel[String, Plan](
+                  (plan.dateCreated.value compareTo parentPlan.dateCreated.value) >= 0,
+                  plan,
+                  show"Plan ${plan.resourceId} is older than it's parent ${parentPlan.resourceId}"
+                )
+              )
+          }
+          .getOrElse(plan.validNel)
+      }.void
 
     protected def syncPersons(projectPersons: Set[Person],
                               activities:     List[Activity],

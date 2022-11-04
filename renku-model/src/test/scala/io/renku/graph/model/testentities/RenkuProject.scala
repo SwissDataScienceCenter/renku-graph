@@ -44,7 +44,9 @@ sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with
 
   type ProjectType <: RenkuProject
 
-  lazy val plans:     List[Plan]     = activities.map(_.association.plan) ::: unlinkedStepPlans
+  lazy val plans: List[Plan] = activities.map(_.association.plan) ::: unlinkedStepPlans
+
+  // todo maybe go deep?
   lazy val stepPlans: List[StepPlan] = plans.collect { case p: StepPlan => p }
 }
 

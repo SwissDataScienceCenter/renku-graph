@@ -21,7 +21,8 @@ package generators
 
 import StepPlan.CommandParameters
 import StepPlan.CommandParameters.CommandParameterFactory
-import generators.EntitiesGenerators.{ActivityGenFactory, StepPlanGenFactory}
+import cats.data.NonEmptyList
+import generators.EntitiesGenerators.{ActivityGenFactory, CompositePlanGenFactory, StepPlanGenFactory}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates}
@@ -106,6 +107,26 @@ trait ActivityGenerators {
       dateCreated  <- planDatesCreated(after = projectDateCreated)
       creators     <- personEntities.toGeneratorOfList(max = 2)
     } yield Plan.of(name, maybeCommand, dateCreated, creators, CommandParameters.of(parameterFactories: _*))
+
+  def compositePlanEntities(): CompositePlanGenFactory =
+    projectCreated =>
+      for {
+        id          <- planIdentifiers
+        name        <- planNames
+        dateCreated <- planDatesCreated(after = projectCreated)
+        creators    <- personEntities.toGeneratorOfList(max = 2)
+        childPlan   <- planIdentifiers
+      } yield CompositePlan.NonModified(
+        id = id,
+        name = name,
+        maybeDescription = None,
+        creators = creators,
+        dateCreated = dateCreated,
+        keywords = Nil,
+        plans = NonEmptyList.one(childPlan),
+        mappings = Nil,
+        links = Nil
+      )
 
   def executionPlanners(planGen: projects.DateCreated => Gen[StepPlan], project: RenkuProject): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)
