@@ -36,12 +36,10 @@ private[tsmigrationrequest] object Migrations {
     datasetsCreator        <- DatasetsCreator[F]
     reProvisioning         <- ReProvisioning[F](config)
     removeNotLinkedPersons <- RemoveNotLinkedPersons[F]
-    migrationToNamedGraphs <- MigrationToNamedGraphs[F]
     migrations <- validateNames(
                     datasetsCreator,
                     reProvisioning,
-                    removeNotLinkedPersons,
-                    migrationToNamedGraphs
+                    removeNotLinkedPersons
                   )
   } yield migrations
 
