@@ -26,8 +26,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.{Decoder, HCursor, Json}
-import io.renku.graph.model.entities.{EntityFunctions, Person}
 import io.renku.graph.model._
+import io.renku.graph.model.entities.{EntityFunctions, Person}
 import io.renku.graph.triplesstore.DatasetTTLs._
 import io.renku.http.client._
 import io.renku.interpreters.TestLogger
@@ -229,36 +229,6 @@ trait GraphsProducer[T] {
 }
 
 trait JenaDataset { self: InMemoryJena => }
-
-trait RenkuDataset extends JenaDataset with DefaultGraphDataset {
-  self: InMemoryJena =>
-
-  private lazy val configFile: Either[Exception, DatasetConfigFile] = RenkuTTL.fromTtlFile()
-  private lazy val connectionInfoFactory: FusekiUrl => RenkuConnectionConfig = RenkuConnectionConfig(
-    _,
-    BasicAuthCredentials(BasicAuthUsername("renku"), BasicAuthPassword("renku"))
-  )
-
-  def renkuDataset:          DatasetName           = renkuDSConnectionInfo.datasetName
-  def renkuDSConnectionInfo: RenkuConnectionConfig = connectionInfoFactory(fusekiUrl)
-
-  registerDataset(connectionInfoFactory, configFile)
-
-  protected implicit val graph: GraphClass = GraphClass.Default
-
-  protected implicit def renkuDSGraphsProducer[A](implicit
-      renkuUrl: RenkuUrl,
-      glApiUrl: GitLabApiUrl
-  ): GraphsProducer[A] = new GraphsProducer[A] {
-    import io.renku.jsonld.DefaultGraph
-    import io.renku.jsonld.syntax._
-
-    override def apply(entity: A)(implicit entityFunctions: EntityFunctions[A]): List[Graph] = {
-      implicit val enc: JsonLDEncoder[A] = entityFunctions.encoder(GraphClass.Default)
-      List(DefaultGraph.fromJsonLDsUnsafe(entity.asJsonLD))
-    }
-  }
-}
 
 trait ProjectsDataset extends JenaDataset with NamedGraphDataset {
   self: InMemoryJena =>
