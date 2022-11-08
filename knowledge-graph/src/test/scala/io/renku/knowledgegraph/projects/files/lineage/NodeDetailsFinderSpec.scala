@@ -31,7 +31,7 @@ import io.renku.jsonld.syntax._
 import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.{InMemoryJenaForSpec, RenkuDataset, SparqlQueryTimeRecorder}
+import io.renku.triplesstore.{InMemoryJenaForSpec, ProjectsDataset, SparqlQueryTimeRecorder}
 import model._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -40,7 +40,7 @@ class NodeDetailsFinderSpec
     extends AnyWordSpec
     with should.Matchers
     with InMemoryJenaForSpec
-    with RenkuDataset
+    with ProjectsDataset
     with ExternalServiceStubbing
     with IOSpec {
 
@@ -65,7 +65,7 @@ class NodeDetailsFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val inputEntityNode  = NodeDef(project.activities.head, input).toNode
       val outputEntityNode = NodeDef(project.activities.head, output).toNode
@@ -99,7 +99,7 @@ class NodeDetailsFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val missingLocation = nodeLocations.generateOne
 
@@ -150,7 +150,7 @@ class NodeDetailsFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val activity1 :: activity2 :: Nil = project.activities
 
@@ -185,7 +185,7 @@ class NodeDetailsFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val activity = project.activities.head
 
@@ -217,7 +217,7 @@ class NodeDetailsFinderSpec
         )
         .generateOne
 
-      upload(to = renkuDataset, project)
+      upload(to = projectsDataset, project)
 
       val activity = project.activities.head
       val ids = Set(
@@ -259,7 +259,7 @@ class NodeDetailsFinderSpec
   private trait TestCase {
     implicit val logger:               TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    val nodeDetailsFinder = new NodeDetailsFinderImpl[IO](renkuDSConnectionInfo, renkuUrl)
+    val nodeDetailsFinder = new NodeDetailsFinderImpl[IO](projectsDSConnectionInfo)
   }
 
   private implicit class NodeDefOps(nodeDef: NodeDef) {
