@@ -32,15 +32,12 @@ private trait EventProcessor[F[_]] {
   def process(project: Project): F[Unit]
 }
 
-private class EventProcessorImpl[F[_]: Async: Logger](defaultGraphCleaner: defaultgraph.TSCleaner[F],
-                                                      namedGraphsCleaner: namedgraphs.TSCleaner[F],
-                                                      statusUpdater:      EventStatusUpdater[F]
+private class EventProcessorImpl[F[_]: Async: Logger](tsCleaner: namedgraphs.TSCleaner[F],
+                                                      statusUpdater: EventStatusUpdater[F]
 ) extends EventProcessor[F] {
 
   override def process(project: Project): F[Unit] = {
-    defaultGraphCleaner.removeTriples(project.path) >>
-      namedGraphsCleaner.removeTriples(project.path) >>
-      statusUpdater.projectToNew(project)
+    tsCleaner.removeTriples(project.path) >> statusUpdater.projectToNew(project)
   }.recoverWith(logError(project))
 
   private def logError(project: Project): PartialFunction[Throwable, F[Unit]] = { case NonFatal(error) =>
@@ -50,8 +47,7 @@ private class EventProcessorImpl[F[_]: Async: Logger](defaultGraphCleaner: defau
 
 private object EventProcessor {
   def apply[F[_]: Async: Logger: MetricsRegistry: SparqlQueryTimeRecorder]: F[EventProcessor[F]] = for {
-    eventStatusUpdater  <- EventStatusUpdater(categoryName)
-    defaultGraphCleaner <- defaultgraph.TSCleaner[F]()
-    namedGraphsCleaner  <- namedgraphs.TSCleaner[F]()
-  } yield new EventProcessorImpl[F](defaultGraphCleaner, namedGraphsCleaner, eventStatusUpdater)
+    eventStatusUpdater <- EventStatusUpdater(categoryName)
+    tsCleaner          <- namedgraphs.TSCleaner[F]()
+  } yield new EventProcessorImpl[F](tsCleaner, eventStatusUpdater)
 }
