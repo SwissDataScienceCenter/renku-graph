@@ -20,6 +20,7 @@ package io.renku.graph.model.testentities
 
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.{InvalidationTime, RenkuUrl, commandParameters, entities, parameterLinks, plans}
 import io.renku.graph.model.plans.{Command, DateCreated, DerivedFrom, Description, Identifier, Keyword, Name, ResourceId}
 import io.renku.jsonld.syntax._
@@ -169,7 +170,23 @@ object CompositePlan {
     override def createModification(f: Modified => Modified): Modified =
       f(this).copy(parent = this)
 
-    override def invalidate(time: InvalidationTime): ValidatedNel[String, Modified with HavingInvalidationTime] = ???
+    override def invalidate(time: InvalidationTime): ValidatedNel[String, Modified with HavingInvalidationTime] =
+      validate(dateCreated, time).map(time =>
+        new Modified(
+          planIdentifiers.generateOne,
+          name,
+          maybeDescription,
+          creators,
+          dateCreated,
+          keywords,
+          plans,
+          mappings,
+          links,
+          parent
+        ) with HavingInvalidationTime {
+          override val invalidationTime: InvalidationTime = time
+        }
+      )
 
     override def replaceCreators(creators: List[Person]): Modified =
       copy(creators = creators)

@@ -116,6 +116,80 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
     }
   }
 
+  "decode (CompositeEntity)" should {
+    implicit val graphClass: GraphClass = GraphClass.Default
+
+    "return json for a non-modified composite plan" in {
+      forAll(compositePlanEntities()(projectCreatedDates().generateOne)) { plan =>
+        plan.asJsonLD.flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.CompositePlan]] shouldBe List(plan.to[entities.CompositePlan]).asRight
+      }
+    }
+
+    "return json for a modified composite plan" in {
+      forAll(compositePlanEntities()(projectCreatedDates().generateOne).map(_.createModification())) { plan =>
+        plan.asJsonLD.flatten
+          .fold(throw _, identity)
+          .cursor
+          .as[List[entities.CompositePlan]] shouldBe List(plan.to[entities.CompositePlan]).asRight
+      }
+    }
+
+    "decode if invalidation after the creation date (composite plan)" in {
+      val plan = compositePlanEntities()(projectCreatedDates().generateOne)
+        .map(_.createModification().invalidate())
+        .generateOne
+        .to[entities.CompositePlan]
+
+      plan.asJsonLD.flatten.fold(throw _, identity).cursor.as[List[entities.CompositePlan]] shouldBe List(plan).asRight
+    }
+
+    "fail if invalidatedAtTime present on non-modified CompositePlan" in {
+      val plan = compositePlanEntities()(projectCreatedDates().generateOne)
+        .map(_.createModification().invalidate())
+        .generateOne
+        .to[entities.CompositePlan]
+      val jsonString = plan.asJsonLD.toJson.hcursor
+        .downField((prov / "wasDerivedFrom").show)
+        .delete
+        .top
+        .getOrElse(fail("Invalid Json after removing property"))
+
+      val jsonLD = parse(jsonString).flatMap(_.flatten).fold(throw _, identity)
+
+      val Left(message) = jsonLD.cursor.as[List[entities.CompositePlan]].leftMap(_.message)
+      message should include(show"Plan ${plan.resourceId} has no parent but invalidation time")
+    }
+
+    "fail if invalidation done before the creation date on a CompositePlan" in {
+      val plan = compositePlanEntities()(projectCreatedDates().generateOne)
+        .map(_.createModification().invalidate())
+        .generateOne
+        .to[entities.CompositePlan]
+
+      val invalidationTime = timestamps(max = plan.dateCreated.value.minusSeconds(1)).generateAs(InvalidationTime)
+      val jsonLD = parse {
+        plan.asJsonLD.toJson.hcursor
+          .downField((prov / "invalidatedAtTime").show)
+          .delete
+          .top
+          .getOrElse(fail("Invalid Json after removing property"))
+          .deepMerge(
+            Json.obj(
+              (prov / "invalidatedAtTime").show -> json"""{"@value": ${invalidationTime.show}}"""
+            )
+          )
+      }.flatMap(_.flatten).fold(throw _, identity)
+
+      val Left(message) = jsonLD.cursor.as[List[entities.CompositePlan]].leftMap(_.message)
+      message should include {
+        show"Invalidation time $invalidationTime on CompositePlan ${plan.resourceId} is older than dateCreated ${plan.dateCreated}"
+      }
+    }
+  }
+
   "encode for the Default Graph (StepEntity)" should {
     implicit val graph: GraphClass = GraphClass.Default
 
@@ -154,7 +228,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           schema / "name"                -> plan.name.asJsonLD,
           schema / "description"         -> plan.maybeDescription.asJsonLD,
           renku / "command"              -> plan.maybeCommand.asJsonLD,
-          schema / "creator"             -> plan.creators.toList.asJsonLD,
+          schema / "creator"             -> plan.creators.asJsonLD,
           schema / "dateCreated"         -> plan.dateCreated.asJsonLD,
           schema / "programmingLanguage" -> plan.maybeProgrammingLanguage.asJsonLD,
           schema / "keywords"            -> plan.keywords.asJsonLD,
@@ -220,6 +294,9 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
           prov / "invalidatedAtTime"     -> plan.maybeInvalidationTime.asJsonLD
         )
     }
+  }
+  "encode for the Named Graphs (CompositePlan)" should {
+    implicit val graph: GraphClass = GraphClass.Project
 
     "produce JsonLD for a non-modified composite plan" in {
       val plan: entities.CompositePlan =
@@ -228,7 +305,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
 
       plan.asJsonLD shouldBe JsonLD.entity(
         plan.resourceId.asEntityId,
-        entities.CompositePlan.entityTypes,
+        entities.CompositePlan.Ontology.entityTypes,
         schema / "name"              -> plan.name.asJsonLD,
         schema / "description"       -> plan.maybeDescription.asJsonLD,
         schema / "creator"           -> plan.creators.map(_.resourceId.asEntityId).asJsonLD,
@@ -238,6 +315,31 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
         renku / "workflowLinks"      -> plan.links.asJsonLD,
         renku / "hasMappings"        -> plan.mappings.asJsonLD,
         renku / "topmostDerivedFrom" -> plan.resourceId.asEntityId.asJsonLD
+      )
+    }
+
+    "produce JsonLD for a modified composite plan" in {
+      val plan =
+        compositePlanEntities()(projectCreatedDates().generateOne).generateOne
+          .createModification(identity)
+          .invalidate()
+          .to(CompositePlan.Modified.toEntitiesCompositePlan)
+
+      (plan: entities.CompositePlan).asJsonLD shouldBe JsonLD.entity(
+        plan.resourceId.asEntityId,
+        entities.CompositePlan.Ontology.entityTypes,
+        schema / "name"              -> plan.name.asJsonLD,
+        schema / "description"       -> plan.maybeDescription.asJsonLD,
+        schema / "creator"           -> plan.creators.map(_.resourceId.asEntityId).asJsonLD,
+        schema / "dateCreated"       -> plan.dateCreated.asJsonLD,
+        schema / "keywords"          -> plan.keywords.asJsonLD,
+        renku / "hasSubprocess"      -> plan.plans.toList.asJsonLD,
+        renku / "workflowLinks"      -> plan.links.asJsonLD,
+        renku / "hasMappings"        -> plan.mappings.asJsonLD,
+        renku / "topmostDerivedFrom" -> plan.resourceId.asEntityId.asJsonLD,
+        prov / "invalidatedAtTime"   -> plan.maybeInvalidationTime.asJsonLD,
+        prov / "wasDerivedFrom"      -> plan.derivation.derivedFrom.asJsonLD,
+        renku / "topmostDerivedFrom" -> plan.derivation.originalResourceId.asEntityId.asJsonLD
       )
     }
   }

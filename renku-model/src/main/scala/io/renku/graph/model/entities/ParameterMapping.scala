@@ -19,11 +19,11 @@
 package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
-import cats.syntax.all._
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.commandParameters._
 import io.renku.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
+import io.renku.graph.model.views.TinyTypeJsonLDOps
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
@@ -40,42 +40,61 @@ final case class ParameterMapping(
 object ParameterMapping {
   final case class DefaultValue(value: String) extends StringTinyType
 
-  object DefaultValue extends TinyTypeFactory[DefaultValue](new DefaultValue(_)) {
-    implicit val jsonEncoder: JsonLDEncoder[DefaultValue] =
-      JsonLDEncoder.encodeString.contramap(_.value)
-  }
+  object DefaultValue extends TinyTypeFactory[DefaultValue](new DefaultValue(_)) with TinyTypeJsonLDOps[DefaultValue]
 
-  val entityTypes: EntityTypes = EntityTypes.of(renku / "ParameterMapping", renku / "CommandParameterBase")
-  val ontology: Type = {
-    val mappingClass = Class(renku / "ParameterMapping")
-    Type.Def(
-      mappingClass,
-      ObjectProperties(
-        ObjectProperty(
-          renku / "mapsTo",
-          mappingClass,
-          CommandInput.ontology.clazz,
-          CommandOutput.ontology.clazz,
-          CommandParameter.ontology.clazz
+  // noinspection TypeAnnotation
+  object Ontology {
+    val entityTypes: EntityTypes = EntityTypes.of(renku / "ParameterMapping", renku / "CommandParameterBase")
+
+    val parameterMappingClass = Class(renku / "ParameterMapping")
+
+    val mapsTo       = renku / "mapsTo"
+    val name         = renku / "name"
+    val description  = schema / "description"
+    val defaultValue = schema / "defaultValue"
+
+    val typeDef: Type =
+      Type.Def(
+        parameterMappingClass,
+        ObjectProperties(
+          ObjectProperty(
+            mapsTo,
+            parameterMappingClass,
+            CommandInput.ontology.clazz,
+            CommandOutput.ontology.clazz,
+            CommandParameter.ontology.clazz
+          )
+        ),
+        DataProperties(
+          DataProperty(name, xsd / "string"),
+          DataProperty(description, xsd / "string"),
+          DataProperty(defaultValue, xsd / "string")
         )
-      ),
-      DataProperties(
-        DataProperty(renku / "name", xsd / "string"),
-        DataProperty(schema / "description", xsd / "string"),
-        DataProperty(schema / "defaultValue", xsd / "string")
       )
-    )
   }
 
   implicit def encoder: JsonLDEncoder[ParameterMapping] =
     JsonLDEncoder.instance { mapping =>
       JsonLD.entity(
         mapping.resourceId.asEntityId,
-        entityTypes,
-        schema / "name"         -> mapping.name.asJsonLD,
-        schema / "description"  -> mapping.maybeDescription.asJsonLD,
-        schema / "defaultValue" -> mapping.defaultValue.asJsonLD,
-        renku / "mapsTo"        -> mapping.mappedParameter.toList.asJsonLD
+        Ontology.entityTypes,
+        Ontology.name         -> mapping.name.asJsonLD,
+        Ontology.description  -> mapping.maybeDescription.asJsonLD,
+        Ontology.defaultValue -> mapping.defaultValue.asJsonLD,
+        Ontology.mapsTo       -> mapping.mappedParameter.toList.asJsonLD
       )
+    }
+
+  implicit def decoder: JsonLDDecoder[ParameterMapping] =
+    JsonLDDecoder.instance { cursor =>
+      import ExtraJsonLDDecoder._
+
+      for {
+        id          <- cursor.downEntityId.as[ResourceId]
+        name        <- cursor.downField(Ontology.name).as[Name]
+        defaultVal  <- cursor.downField(Ontology.defaultValue).as[DefaultValue]
+        descr       <- cursor.downField(Ontology.description).as[Option[Description]]
+        mappedParam <- cursor.downField(Ontology.mapsTo).as[NonEmptyList[ResourceId]]
+      } yield ParameterMapping(id, defaultVal, descr, name, mappedParam)
     }
 }

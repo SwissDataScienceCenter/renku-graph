@@ -19,11 +19,11 @@
 package io.renku.graph.model.entities
 
 import cats.data.NonEmptyList
-import io.renku.graph.model.Schemas.{renku, schema}
+import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.commandParameters.{ResourceId => ParamResourceId}
 import io.renku.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.parameterLinks.ResourceId
-import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDEncoder}
+import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 import io.renku.jsonld.ontology.{Class, ObjectProperty, Type}
 import io.renku.jsonld.syntax._
 
@@ -33,21 +33,39 @@ import io.renku.jsonld.syntax._
 final case class ParameterLink(resourceId: ResourceId, source: ParamResourceId, sinks: NonEmptyList[ParamResourceId])
 
 object ParameterLink {
-  val entityTypes: EntityTypes = EntityTypes.of(renku / "ParameterLink")
 
-  val ontology: Type = Type.Def(
-    Class(renku / "ParameterLink"),
-    ObjectProperty(renku / "linkSource", CommandOutput.ontology),
-    ObjectProperty(renku / "linkSink", CommandInput.ontology, CommandParameter.ontology)
-  )
+  // noinspection TypeAnnotation
+  object Ontology {
+    val parameterLinkClass = Class(renku / "ParameterLink")
+    val entityTypes: EntityTypes = EntityTypes.of(renku / "ParameterLink")
+
+    val linkSource = renku / "linkSource"
+    val linkSink   = renku / "linkSink"
+
+    val typeDef: Type = Type.Def(
+      parameterLinkClass,
+      ObjectProperty(linkSource, CommandOutput.ontology),
+      ObjectProperty(linkSink, CommandInput.ontology, CommandParameter.ontology)
+    )
+  }
 
   implicit def encoder: JsonLDEncoder[ParameterLink] =
     JsonLDEncoder.instance { link =>
       JsonLD.entity(
         link.resourceId.asEntityId,
-        entityTypes,
-        schema / "linkSource" -> link.source.asJsonLD,
-        schema / "linkSink"   -> link.sinks.toList.asJsonLD
+        Ontology.entityTypes,
+        Ontology.linkSource -> link.source.asJsonLD,
+        Ontology.linkSink   -> link.sinks.toList.asJsonLD
       )
+    }
+
+  implicit def decoder: JsonLDDecoder[ParameterLink] =
+    JsonLDDecoder.instance { cursor =>
+      import ExtraJsonLDDecoder._
+      for {
+        id     <- cursor.downEntityId.as[ResourceId]
+        source <- cursor.downField(Ontology.linkSource).as[ParamResourceId]
+        sinks  <- cursor.downField(Ontology.linkSink).as[NonEmptyList[ParamResourceId]]
+      } yield ParameterLink(id, source, sinks)
     }
 }
