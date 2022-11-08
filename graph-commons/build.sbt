@@ -20,7 +20,7 @@ name := "graph-commons"
 
 Test / fork := true
 
-val pureConfigVersion = "0.17.1"
+val pureConfigVersion = "0.17.2"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
