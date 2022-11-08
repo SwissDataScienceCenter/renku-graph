@@ -28,10 +28,10 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
+import io.renku.graph.model.entities
 import io.renku.graph.model.entities.Project
 import io.renku.graph.model.projects.Path
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{TSVersion, entities}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger
@@ -66,8 +66,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       val project = anyNonRenkuProjectEntities.generateOne.to[entities.Project]
       givenEntityBuilding(event, returning = rightT(project))
 
-      successfulTriplesTransformationAndUpload(project, TSVersion.DefaultGraph)
-      successfulTriplesTransformationAndUpload(project, TSVersion.NamedGraphs)
+      successfulTriplesTransformationAndUpload(project)
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -139,9 +138,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       val processingRecoverableError = logWorthyRecoverableErrors.generateOne
       val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-      successfulStepsCreation(project, TSVersion.DefaultGraph, failure.pure[Try])
-
-      successfulTriplesTransformationAndUpload(project, TSVersion.NamedGraphs)
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -159,9 +156,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       val processingRecoverableError = silentRecoverableErrors.generateOne
       val failure                    = TriplesUploadResult.RecoverableFailure(processingRecoverableError)
-      successfulStepsCreation(project, TSVersion.DefaultGraph, failure.pure[Try])
-
-      successfulTriplesTransformationAndUpload(project, TSVersion.NamedGraphs)
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -178,9 +173,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       val failure =
         TriplesUploadResult.RecoverableFailure(SilentRecoverableError(exceptions.generateOne.getMessage))
-      successfulStepsCreation(project, TSVersion.DefaultGraph, failure.pure[Try])
-
-      successfulTriplesTransformationAndUpload(project, TSVersion.NamedGraphs)
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -197,7 +190,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       givenEntityBuilding(event, returning = rightT(project))
 
       val exception = exceptions.generateOne
-      successfulStepsCreation(project, TSVersion.DefaultGraph, exception.raiseError[Try, TriplesUploadResult])
+      successfulStepsCreation(project, exception.raiseError[Try, TriplesUploadResult])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -215,9 +208,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
       val failure =
         nonEmptyStrings().map(message => RecoverableFailure(LogWorthyRecoverableError(message))).generateOne
-      successfulStepsCreation(project, TSVersion.DefaultGraph, failure.pure[Try])
-
-      successfulTriplesTransformationAndUpload(project, TSVersion.NamedGraphs)
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -233,8 +224,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
       givenEntityBuilding(event, returning = rightT(project))
 
       val failure = NonRecoverableFailure("error")
-      successfulStepsCreation(project, TSVersion.DefaultGraph, failure.pure[Try])
-      successfulStepsCreation(project, TSVersion.NamedGraphs, failure.pure[Try])
+      successfulStepsCreation(project, failure.pure[Try])
 
       eventProcessor.process(event) shouldBe ().pure[Try]
 
@@ -273,25 +263,24 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
         .findAccessToken(_: Path)(_: Path => String))
         .expects(forProjectPath, projectPathToPath)
 
-    def successfulTriplesTransformationAndUpload(project: Project, tsVersion: TSVersion) =
-      successfulStepsCreation(project, tsVersion, runningToReturn = DeliverySuccess.pure[Try])
+    def successfulTriplesTransformationAndUpload(project: Project) =
+      successfulStepsCreation(project, runningToReturn = DeliverySuccess.pure[Try])
 
-    def successfulStepsCreation(project: Project, tsVersion: TSVersion, runningToReturn: Try[TriplesUploadResult]) = {
+    def successfulStepsCreation(project: Project, runningToReturn: Try[TriplesUploadResult]) = {
       val steps = transformationSteps[Try].generateList()
-      (stepsCreator.createSteps _)
-        .expects(tsVersion)
+      (() => stepsCreator.createSteps)
+        .expects()
         .returning(steps)
 
-      givenStepsRunnerFor(tsVersion, steps, project, returning = runningToReturn)
+      givenStepsRunnerFor(steps, project, returning = runningToReturn)
     }
 
-    def givenStepsRunnerFor(tsVersion: TSVersion,
-                            steps:     List[TransformationStep[Try]],
+    def givenStepsRunnerFor(steps:     List[TransformationStep[Try]],
                             project:   Project,
                             returning: Try[TriplesUploadResult]
     ) = (stepsRunner
-      .run(_: List[TransformationStep[Try]], _: Project)(_: TSVersion))
-      .expects(steps, project, tsVersion)
+      .run(_: List[TransformationStep[Try]], _: Project))
+      .expects(steps, project)
       .returning(returning)
 
     def givenEntityBuilding(event: MinProjectInfoEvent, returning: EitherT[Try, ProcessingRecoverableError, Project]) =

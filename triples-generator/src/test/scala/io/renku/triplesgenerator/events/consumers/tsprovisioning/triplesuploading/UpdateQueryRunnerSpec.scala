@@ -92,7 +92,7 @@ class UpdateQueryRunnerSpec extends AnyWordSpec with IOSpec with ExternalService
 
       failure shouldBe a[LogWorthyRecoverableError]
       failure.getMessage should startWith(
-        s"Triples transformation update 'curation update' failed: POST $externalServiceBaseUrl/${renkuConnectionConfig.datasetName}/update error"
+        s"Triples transformation update 'curation update' failed: POST $externalServiceBaseUrl/${tsConnectionConfig.datasetName}/update error"
       )
     }
   }
@@ -102,15 +102,15 @@ class UpdateQueryRunnerSpec extends AnyWordSpec with IOSpec with ExternalService
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    lazy val renkuConnectionConfig =
+    lazy val tsConnectionConfig =
       renkuConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
     lazy val queryRunner =
-      new UpdateQueryRunnerImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
+      new UpdateQueryRunnerImpl[IO](tsConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) = stubFor {
-      post(s"/${renkuConnectionConfig.datasetName}/update")
-        .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                       renkuConnectionConfig.authCredentials.password.value
+      post(s"/${tsConnectionConfig.datasetName}/update")
+        .withBasicAuth(tsConnectionConfig.authCredentials.username.value,
+                       tsConnectionConfig.authCredentials.password.value
         )
         .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
         .withRequestBody(equalTo(s"update=${urlEncode(forUpdate.toString)}"))

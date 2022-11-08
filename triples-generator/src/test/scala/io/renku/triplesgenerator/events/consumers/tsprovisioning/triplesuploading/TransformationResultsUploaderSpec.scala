@@ -19,20 +19,16 @@
 package io.renku.triplesgenerator.events.consumers.tsprovisioning.triplesuploading
 
 import cats.data.EitherT.rightT
-import cats.effect.IO
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.sparqlQueries
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.Schemas.schema
 import io.renku.graph.model.entities.EntityFunctions
 import io.renku.graph.model.testentities._
-import io.renku.graph.model.{GraphClass, TSVersion, entities}
-import io.renku.interpreters.TestLogger
+import io.renku.graph.model.{GraphClass, entities}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{JsonLDEncoder, NamedGraph}
-import io.renku.logging.TestSparqlQueryTimeRecorder
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.SparqlQueryTimeRecorder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -40,57 +36,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.util.Try
 
 class TransformationResultsUploaderSpec extends AnyWordSpec with MockFactory with should.Matchers with IOSpec {
-
-  "apply" should {
-
-    "return a facility allowing to find a TransformationResultsUploader relevant for the given TSVersion" in {
-      implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
-      implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-
-      val uploader = TransformationResultsUploader[IO].unsafeRunSync()
-
-      uploader(TSVersion.DefaultGraph).getClass shouldBe classOf[DefaultGraphResultsUploader[IO]]
-      uploader(TSVersion.NamedGraphs).getClass  shouldBe classOf[NamedGraphsResultsUploader[IO]]
-    }
-  }
-}
-
-class DefaultGraphResultsUploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
-
-  private implicit val graph: GraphClass = GraphClass.Default
-
-  "execute" should {
-
-    "call the queryRunner's run with the given query" in new TestCase {
-      val query = sparqlQueries.generateOne
-
-      (queryRunner.run _).expects(query).returning(rightT(()))
-
-      uploader.execute(query).value shouldBe ().asRight.pure[Try]
-    }
-  }
-
-  "upload" should {
-
-    "encode the given project to JsonLD, flatten it and pass to the projectUploader" in new TestCase {
-      val project = anyProjectEntities.generateOne.to[entities.Project]
-
-      val projectJsonLD = project.asJsonLD.flatten.fold(throw _, identity)
-
-      (jsonLDUploader.uploadJsonLD _).expects(projectJsonLD).returning(rightT(()))
-
-      uploader.upload(project).value shouldBe ().asRight.pure[Try]
-    }
-  }
-
-  private trait TestCase {
-    val jsonLDUploader = mock[JsonLDUploader[Try]]
-    val queryRunner    = mock[UpdateQueryRunner[Try]]
-    val uploader       = new DefaultGraphResultsUploader(jsonLDUploader, queryRunner)
-  }
-}
-
-class NamedGraphsResultsUploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "execute" should {
 
@@ -142,6 +87,6 @@ class NamedGraphsResultsUploaderSpec extends AnyWordSpec with MockFactory with s
   private trait TestCase {
     val jsonLDUploader = mock[JsonLDUploader[Try]]
     val queryRunner    = mock[UpdateQueryRunner[Try]]
-    val uploader       = new NamedGraphsResultsUploader(jsonLDUploader, queryRunner)
+    val uploader       = new TransformationResultsUploaderImpl(jsonLDUploader, queryRunner)
   }
 }

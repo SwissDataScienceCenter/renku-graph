@@ -25,9 +25,6 @@ import cats.data.EitherT.right
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
-import io.renku.graph.model.TSVersion
-import io.renku.graph.model.TSVersion.{DefaultGraph, NamedGraphs}
-import io.renku.graph.model.entities.Project
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.logging.ExecutionTimeRecorder
@@ -74,14 +71,10 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
       event:                   MinProjectInfoEvent
   )(implicit maybeAccessToken: Option[AccessToken]): F[EventUploadingResult] = {
     for {
-      project  <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      dgResult <- right[EventUploadingResult](createAndRunSteps(DefaultGraph, project) >>= toUploadingResult(event))
-      ngResult <- right[EventUploadingResult](createAndRunSteps(NamedGraphs, project) >>= toUploadingResult(event))
-    } yield dgResult merge ngResult
+      project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
+      result  <- right[EventUploadingResult](run(createSteps, project) >>= toUploadingResult(event))
+    } yield result
   }.merge recoverWith nonRecoverableFailure(event)
-
-  private def createAndRunSteps(tsVersion: TSVersion, project: Project) =
-    run(createSteps(tsVersion), project)(tsVersion)
 
   private def toUploadingError(event: MinProjectInfoEvent): PartialFunction[Throwable, F[EventUploadingResult]] = {
     case error: LogWorthyRecoverableError =>
@@ -126,7 +119,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
 
   private def logMessageCommon(event: MinProjectInfoEvent): String = show"$categoryName: $event"
 
-  private sealed trait EventUploadingResult extends UploadingResult[EventUploadingResult] {
+  private sealed trait EventUploadingResult extends UploadingResult {
     val event: MinProjectInfoEvent
   }
 
@@ -135,17 +128,15 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   }
 
   private object EventUploadingResult {
-    case class Uploaded(event: MinProjectInfoEvent)
-        extends EventUploadingResult
-        with UploadingResult.Uploaded[EventUploadingResult]
+    case class Uploaded(event: MinProjectInfoEvent) extends EventUploadingResult with UploadingResult.Uploaded
 
     case class RecoverableError(event: MinProjectInfoEvent, cause: ProcessingRecoverableError)
         extends UploadingError
-        with UploadingResult.RecoverableError[EventUploadingResult]
+        with UploadingResult.RecoverableError
 
     case class NonRecoverableError(event: MinProjectInfoEvent, cause: Throwable)
         extends UploadingError
-        with UploadingResult.NonRecoverableError[EventUploadingResult]
+        with UploadingResult.NonRecoverableError
   }
 }
 
