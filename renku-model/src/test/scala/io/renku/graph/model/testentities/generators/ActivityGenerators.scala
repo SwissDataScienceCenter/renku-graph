@@ -23,6 +23,7 @@ import StepPlan.CommandParameters
 import StepPlan.CommandParameters.CommandParameterFactory
 import cats.data.NonEmptyList
 import generators.EntitiesGenerators.{ActivityGenFactory, CompositePlanGenFactory, StepPlanGenFactory}
+import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestampsNotInTheFuture}
 import io.renku.graph.model.GraphModelGenerators.{cliVersions, projectCreatedDates}
@@ -30,7 +31,7 @@ import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
 import io.renku.graph.model.entityModel.{Checksum, Location}
 import io.renku.graph.model.parameterValues.ValueOverride
-import io.renku.graph.model.plans.Command
+import io.renku.graph.model.plans.{Command, Identifier}
 import io.renku.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import io.renku.tinytypes.InstantTinyType
 import org.scalacheck.Gen
@@ -127,6 +128,22 @@ trait ActivityGenerators {
         mappings = Nil,
         links = Nil
       )
+
+  def parameterLinkEntities: Gen[CompositePlan.ParameterLink] =
+    for {
+      id     <- noDashUuid.toGeneratorOf[Identifier]
+      source <- noDashUuid.toGeneratorOf[Identifier]
+      sinks  <- noDashUuid.toGeneratorOfList(min = 1).map(_.map(Identifier(_)))
+    } yield CompositePlan.ParameterLink(id, source, NonEmptyList.fromListUnsafe(sinks))
+
+  def parameterMappingEntities: Gen[CompositePlan.ParameterMapping] =
+    for {
+      id     <- noDashUuid.toGeneratorOf[Identifier]
+      defval <- nonBlankStrings()
+      descr  <- Generators.paragraphs().map(v => commandParameters.Description(v.value)).toGeneratorOfOptions
+      name   <- commandParameterNames
+      ids    <- noDashUuid.toGeneratorOfList(min = 1).map(_.map(Identifier(_)))
+    } yield CompositePlan.ParameterMapping(id, defval.value, descr, name, NonEmptyList.fromListUnsafe(ids))
 
   def executionPlanners(planGen: projects.DateCreated => Gen[StepPlan], project: RenkuProject): Gen[ExecutionPlanner] =
     executionPlanners(planGen, project.topAncestorDateCreated)

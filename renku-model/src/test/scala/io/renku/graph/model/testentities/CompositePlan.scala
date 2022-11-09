@@ -28,6 +28,16 @@ import io.renku.jsonld.syntax._
 sealed trait CompositePlan extends Plan {
   override type PlanGroup         = CompositePlan
   override type PlanGroupModified = CompositePlan.Modified
+
+  def addLink(link: CompositePlan.ParameterLink): PlanType
+
+  def resetLinks: PlanType
+
+  def addParamMapping(pm: CompositePlan.ParameterMapping): PlanType
+
+  def resetMappings: PlanType
+
+  def modify(f: PlanType => PlanType): PlanType
 }
 
 object CompositePlan {
@@ -38,13 +48,14 @@ object CompositePlan {
       name:             commandParameters.Name,
       mappedParameter:  NonEmptyList[Identifier]
   ) {
-    def toEntitiesParameterMapping: entities.ParameterMapping =
+    implicit def toEntitiesParameterMapping(implicit renkuUrl: RenkuUrl): entities.ParameterMapping =
       entities.ParameterMapping(
-        resourceId = commandParameters.ResourceId(id.value),
+        resourceId = commandParameters.ResourceId((renkuUrl / "parameterMapping" / id.value).value),
         defaultValue = entities.ParameterMapping.DefaultValue(defaultValue),
         maybeDescription = maybeDescription,
         name = name,
-        mappedParameter = mappedParameter.map(id => commandParameters.ResourceId(id.value))
+        mappedParameter =
+          mappedParameter.map(id => commandParameters.ResourceId((renkuUrl / "parameterMapping" / id.value).value))
       )
   }
 
@@ -68,11 +79,11 @@ object CompositePlan {
   }
 
   final case class ParameterLink(id: Identifier, source: Identifier, sinks: NonEmptyList[Identifier]) {
-    def toEntitiesMapping: entities.ParameterLink =
+    implicit def toEntitiesMapping(implicit renkuUrl: RenkuUrl): entities.ParameterLink =
       entities.ParameterLink(
-        resourceId = parameterLinks.ResourceId(id.value),
-        source = commandParameters.ResourceId(source.value),
-        sinks = sinks.map(id => commandParameters.ResourceId(id.value))
+        resourceId = parameterLinks.ResourceId((renkuUrl / "link" / id.value).value),
+        source = commandParameters.ResourceId((renkuUrl / "output" / source.value).value),
+        sinks = sinks.map(id => commandParameters.ResourceId((renkuUrl / "sink" / id).value))
       )
   }
 
@@ -94,11 +105,18 @@ object CompositePlan {
   ) extends CompositePlan {
     override type PlanType = NonModified
 
+    def modify(f: NonModified => NonModified): NonModified =
+      f(this)
+
     def addLink(link: ParameterLink): NonModified =
       copy(links = link :: links.filterNot(_.id == link.id))
 
     def addParamMapping(pm: ParameterMapping): NonModified =
       copy(mappings = pm :: mappings.filterNot(_.id == pm.id))
+
+    def resetLinks: NonModified = copy(links = Nil)
+
+    def resetMappings: NonModified = copy(mappings = Nil)
 
     override def to[T](implicit convert: NonModified => T): T = convert(this)
 
@@ -139,8 +157,8 @@ object CompositePlan {
           dateCreated = plan.dateCreated,
           keywords = plan.keywords,
           plans = plan.plans.map(cid => ResourceId(cid)),
-          mappings = plan.mappings.map(_.toEntitiesParameterMapping),
-          links = plan.links.map(_.toEntitiesMapping)
+          mappings = plan.mappings.map(_.toEntitiesParameterMapping(renkuUrl)),
+          links = plan.links.map(_.toEntitiesMapping(renkuUrl))
         )
   }
 
@@ -169,6 +187,19 @@ object CompositePlan {
 
     override def createModification(f: Modified => Modified): Modified =
       f(this).copy(parent = this)
+
+    def modify(f: Modified => Modified): Modified =
+      f(this)
+
+    def addLink(link: ParameterLink): Modified =
+      copy(links = link :: links.filterNot(_.id == link.id))
+
+    def addParamMapping(pm: ParameterMapping): Modified =
+      copy(mappings = pm :: mappings.filterNot(_.id == pm.id))
+
+    def resetLinks: Modified = copy(links = Nil)
+
+    def resetMappings: Modified = copy(mappings = Nil)
 
     override def invalidate(time: InvalidationTime): ValidatedNel[String, Modified with HavingInvalidationTime] =
       validate(dateCreated, time).map(time =>
@@ -218,8 +249,8 @@ object CompositePlan {
           dateCreated = plan.dateCreated,
           keywords = plan.keywords,
           plans = plan.plans.map(id => plans.ResourceId(id)),
-          mappings = plan.mappings.map(_.toEntitiesParameterMapping),
-          links = plan.links.map(_.toEntitiesMapping),
+          mappings = plan.mappings.map(_.toEntitiesParameterMapping(renkuUrl)),
+          links = plan.links.map(_.toEntitiesMapping(renkuUrl)),
           maybeInvalidationTime = plan match {
             case p: HavingInvalidationTime => p.invalidationTime.some
             case _ => None

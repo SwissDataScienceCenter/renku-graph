@@ -482,21 +482,33 @@ object CompositePlan {
       } yield plan
     }
 
-  private def validate(plan: CompositePlan): ValidatedNel[String, CompositePlan] =
-    plan match {
-      case _: NonModified => plan.validNel
-      case p: Modified =>
-        val checkInvalidationTime =
-          p.maybeInvalidationTime
-            .map(time =>
-              Validated.condNel(
-                time.value >= p.dateCreated.value,
-                plan,
-                show"Invalidation time $time on CompositePlan ${p.resourceId} is older than dateCreated ${p.dateCreated}"
-              )
-            )
-            .getOrElse(Validated.validNel(plan))
+  private def validate(plan: CompositePlan): ValidatedNel[String, CompositePlan] = {
+    val selfMapping =
+      plan.mappings.traverse_(pm =>
+        Validated.condNel(pm.mappedParameter.forall(_ != pm.resourceId),
+                          (),
+                          show"Parameter ${pm.resourceId} maps to itself."
+        )
+      )
 
-        checkInvalidationTime.as(plan)
-    }
+    val checks =
+      plan match {
+        case _: NonModified => Validated.validNel(())
+        case p: Modified =>
+          val checkInvalidationTime =
+            p.maybeInvalidationTime
+              .map(time =>
+                Validated.condNel(
+                  time.value >= p.dateCreated.value,
+                  (),
+                  show"Invalidation time $time on CompositePlan ${p.resourceId} is older than dateCreated ${p.dateCreated}"
+                )
+              )
+              .getOrElse(Validated.validNel(()))
+
+          checkInvalidationTime
+      }
+
+    (selfMapping |+| checks).as(plan)
+  }
 }

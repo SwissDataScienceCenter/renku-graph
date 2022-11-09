@@ -232,8 +232,9 @@ object RenkuProject {
     ): ValidatedNel[String, RenkuProject.WithParent] = (
       validateDatasets(datasets),
       validatePlansDates(plans),
-      updatePlansOriginalId(updatePlansDateCreated(plans, activities))
-    ) mapN { (_, _, updatedPlans) =>
+      updatePlansOriginalId(updatePlansDateCreated(plans, activities)),
+      validateCompositePlanData(plans)
+    ) mapN { (_, _, updatedPlans, _) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
         syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithParent(
@@ -347,6 +348,67 @@ object RenkuProject {
           }
           .getOrElse(plan.validNel)
       }.void
+
+    protected def validateCompositePlanData(projectPlans: List[Plan]): ValidatedNel[String, Unit] =
+      projectPlans.collect { case p: CompositePlan => p } match {
+        case Nil => Validated.validNel(())
+        case cps =>
+          val allPlans = projectPlans.groupMapReduce(_.resourceId)(identity)((a, _) => a)
+          cps.traverse_ { cp =>
+            val checkSubprocess = cp.plans.traverse_(validateSubprocessPlan(allPlans.keySet))
+            val subSteps        = ProjectLens.collectAllSubPlans(allPlans)(cp)
+            val subComp         = ProjectLens.collectAllSubCompositePlans(allPlans)(cp)
+            val inputParamIds = subSteps.flatMap { p =>
+              p.inputs.map(_.resourceId).toSet ++ p.parameters.map(_.resourceId).toSet
+            }
+            val outputIds = subSteps.flatMap { p =>
+              p.outputs.map(_.resourceId).toSet
+            }
+            val mappingIds = subComp.flatMap { p =>
+              p.mappings.map(_.resourceId).toSet
+            }
+
+            val checkMappings =
+              cp.mappings.traverse_(validateParameterMapping(mappingIds ++ inputParamIds ++ outputIds))
+            val checkLinks = cp.links.traverse_(validateLinks(outputIds, inputParamIds))
+
+            checkLinks |+| checkMappings |+| checkSubprocess
+          }
+      }
+
+    private def validateSubprocessPlan(projectPlans: Set[plans.ResourceId])(
+        id:                                          plans.ResourceId
+    ): ValidatedNel[String, Unit] =
+      Validated.condNel(projectPlans.contains(id), (), show"The subprocess plan $id is missing in the project.")
+
+    private def validateParameterMapping(
+        relevantIds: Set[commandParameters.ResourceId]
+    )(pm:            ParameterMapping): ValidatedNel[String, Unit] =
+      pm.mappedParameter.traverse_ { id =>
+        Validated.condNel(
+          relevantIds.contains(id),
+          (),
+          show"ParameterMapping '$id' does not exist in the set of plans."
+        )
+      }
+
+    private def validateLinks(
+        outputIds:     Set[commandParameters.ResourceId],
+        inputParamIds: Set[commandParameters.ResourceId]
+    )(
+        pl: ParameterLink
+    ): ValidatedNel[String, Unit] = {
+      val checkSource = Validated.condNel(
+        outputIds.contains(pl.source),
+        (),
+        show"The source ${pl.source} is not available in the set of plans."
+      )
+      val checkSink = pl.sinks.traverse_(id =>
+        Validated.condNel(inputParamIds.contains(id), (), show"The sink $id is not available in the set of plans")
+      )
+
+      (checkSource |+| checkSink).void
+    }
 
     protected def syncPersons(projectPersons: Set[Person],
                               activities:     List[Activity],

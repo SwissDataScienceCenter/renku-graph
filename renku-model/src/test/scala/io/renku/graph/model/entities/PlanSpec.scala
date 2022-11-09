@@ -18,6 +18,7 @@
 
 package io.renku.graph.model.entities
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal._
@@ -28,7 +29,7 @@ import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
-import io.renku.jsonld.JsonLD
+import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import io.renku.jsonld.JsonLDEncoder.encodeEntityId
 import io.renku.jsonld.parser._
 import io.renku.jsonld.syntax._
@@ -43,18 +44,14 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
 
     "turn JsonLD of a non-modified Plan entity into the StepPlan object" in {
       forAll(plans) { plan =>
-        plan.asJsonLD.flatten
-          .fold(throw _, identity)
-          .cursor
+        flattenedJsonLD(plan).cursor
           .as[List[entities.StepPlan]] shouldBe List(plan.to[entities.StepPlan]).asRight
       }
     }
 
     "turn JsonLD of a modified Plan entity into the StepPlan object" in {
       forAll(plans.map(_.createModification())) { plan =>
-        plan.asJsonLD.flatten
-          .fold(throw _, identity)
-          .cursor
+        flattenedJsonLD(plan).cursor
           .as[List[entities.StepPlan]] shouldBe List(plan.to[entities.StepPlan]).asRight
       }
     }
@@ -66,7 +63,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
         .generateOne
         .to[entities.StepPlan]
 
-      plan.asJsonLD.flatten.fold(throw _, identity).cursor.as[List[entities.StepPlan]] shouldBe List(plan).asRight
+      flattenedJsonLD(plan).cursor.as[List[entities.StepPlan]] shouldBe List(plan).asRight
     }
 
     "fail if invalidatedAtTime present on non-modified Plan" in {
@@ -121,18 +118,14 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
 
     "return json for a non-modified composite plan" in {
       forAll(compositePlanEntities()(projectCreatedDates().generateOne)) { plan =>
-        plan.asJsonLD.flatten
-          .fold(throw _, identity)
-          .cursor
+        flattenedJsonLD(plan).cursor
           .as[List[entities.CompositePlan]] shouldBe List(plan.to[entities.CompositePlan]).asRight
       }
     }
 
     "return json for a modified composite plan" in {
       forAll(compositePlanEntities()(projectCreatedDates().generateOne).map(_.createModification())) { plan =>
-        plan.asJsonLD.flatten
-          .fold(throw _, identity)
-          .cursor
+        flattenedJsonLD(plan).cursor
           .as[List[entities.CompositePlan]] shouldBe List(plan.to[entities.CompositePlan]).asRight
       }
     }
@@ -143,7 +136,39 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
         .generateOne
         .to[entities.CompositePlan]
 
-      plan.asJsonLD.flatten.fold(throw _, identity).cursor.as[List[entities.CompositePlan]] shouldBe List(plan).asRight
+      flattenedJsonLD(plan).cursor.as[List[entities.CompositePlan]] shouldBe List(plan).asRight
+    }
+
+    "pick up the correct decoder" in {
+      val cp = compositePlanEntities()(projectCreatedDates().generateOne).generateOne
+        .to[entities.CompositePlan]
+
+      val sp = plans.generateOne.to[entities.StepPlan]
+
+      val spDecoded = flattenedJsonLD(sp).cursor.as[List[entities.Plan]]
+      val cpDecoded = flattenedJsonLD(cp).cursor.as[List[entities.Plan]]
+
+      spDecoded shouldBe Right(List(sp))
+      cpDecoded shouldBe Right(List(cp))
+    }
+
+    "fail decode if a parameter maps to itself" in {
+      val pm_ = parameterMappingEntities.generateOne
+      val pm  = pm_.copy(mappedParameter = NonEmptyList.one(pm_.id.value))
+
+      val cp = compositePlanEntities()(projectCreatedDates().generateOne).generateOne
+        .asInstanceOf[CompositePlan.NonModified]
+        .addParamMapping(pm)
+        .to[entities.CompositePlan]
+
+      val decoded = flattenedJsonLD(cp).cursor
+        .as[List[entities.CompositePlan]]
+        .swap
+        .getOrElse(sys.error("Expected decoding to fail, but it was successful"))
+
+      decoded.message should include(
+        show"Parameter ${pm.toEntitiesParameterMapping.resourceId} maps to itself"
+      )
     }
 
     "fail if invalidatedAtTime present on non-modified CompositePlan" in {
@@ -151,13 +176,13 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
         .map(_.createModification().invalidate())
         .generateOne
         .to[entities.CompositePlan]
-      val jsonString = plan.asJsonLD.toJson.hcursor
+      val jsonValue = plan.asJsonLD.toJson.hcursor
         .downField((prov / "wasDerivedFrom").show)
         .delete
         .top
         .getOrElse(fail("Invalid Json after removing property"))
 
-      val jsonLD = parse(jsonString).flatMap(_.flatten).fold(throw _, identity)
+      val jsonLD = parse(jsonValue).flatMap(_.flatten).fold(throw _, identity)
 
       val Left(message) = jsonLD.cursor.as[List[entities.CompositePlan]].leftMap(_.message)
       message should include(show"Plan ${plan.resourceId} has no parent but invalidation time")
@@ -370,4 +395,7 @@ class PlanSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyC
 
   private lazy val plans = stepPlanEntities(commandParametersLists.generateOne: _*)(planCommands)
     .modify(_.replaceCreators(personEntities.generateList(max = 2)))(projectCreatedDates().generateOne)
+
+  private def flattenedJsonLD[A: JsonLDEncoder](value: A): JsonLD =
+    JsonLDEncoder[A].apply(value).flatten.fold(fail(_), identity)
 }
