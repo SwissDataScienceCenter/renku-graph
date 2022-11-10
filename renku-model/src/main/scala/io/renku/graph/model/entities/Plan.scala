@@ -65,8 +65,20 @@ object Plan {
       .asInstanceOf[JsonLDEntityDecoder[Plan]]
       .orElse(StepPlan.decoder.asInstanceOf[JsonLDEntityDecoder[Plan]])
 
-  // todo: how can I union this with CompositePlan?
-  lazy val ontology: Type = StepPlan.ontology
+  lazy val ontology: Type =
+    Type.Def(
+      // This prov/Plan can be a renku/Plan or renku/CompositePlan
+      Class(prov / "Plan"),
+      ObjectProperties(
+        ObjectProperty(CompositePlan.Ontology.creators, Person.ontology)
+      ),
+      DataProperties(
+        DataProperty(CompositePlan.Ontology.name, xsd / "string"),
+        DataProperty(CompositePlan.Ontology.description, xsd / "string"),
+        DataProperty(CompositePlan.Ontology.dateCreated, xsd / "dateTime"),
+        DataProperty(CompositePlan.Ontology.keywords, xsd / "string")
+      )
+    )
 }
 
 sealed trait StepPlan extends Plan with StepPlanAlg {
@@ -301,7 +313,7 @@ object StepPlan {
     }
 
   lazy val ontology: Type = {
-    val planClass = Class(renku / "Plan")
+    val planClass = Class(renku / "Plan", ParentClass(prov / "Plan"))
     Type.Def(
       planClass,
       ObjectProperties(
@@ -363,9 +375,9 @@ object CompositePlan {
   // noinspection TypeAnnotation
   object Ontology {
     val entityTypes: EntityTypes =
-      EntityTypes.of(renku / "CompositePlan", renku / "Plan", prov / "Plan", schema / "Action", schema / "CreativeWork")
+      EntityTypes.of(renku / "CompositePlan", prov / "Plan", schema / "Action", schema / "CreativeWork")
 
-    val compositePlanType = Class(renku / "CompositePlan")
+    val compositePlanType = Class(renku / "CompositePlan", ParentClass(prov / "Plan"))
 
     val name               = schema / "name"
     val description        = schema / "description"
@@ -430,7 +442,6 @@ object CompositePlan {
   implicit def decoder(implicit renkuUrl: RenkuUrl): JsonLDEntityDecoder[CompositePlan] =
     JsonLDDecoder.cacheableEntity(Ontology.entityTypes) { cursor =>
       import io.renku.graph.model.views.StringTinyTypeJsonLDDecoders._
-      import ExtraJsonLDDecoder._
       for {
         resourceId            <- cursor.downEntityId.as[ResourceId]
         name                  <- cursor.downField(Ontology.name).as[Name]

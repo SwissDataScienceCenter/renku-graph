@@ -46,7 +46,7 @@ object ParameterMapping {
   object Ontology {
     val entityTypes: EntityTypes = EntityTypes.of(renku / "ParameterMapping", renku / "CommandParameterBase")
 
-    val parameterMappingClass = Class(renku / "ParameterMapping")
+    val parameterMappingClass = Class(renku / "ParameterMapping", ParentClass(renku / "CommandParameterBase"))
 
     val mapsTo       = renku / "mapsTo"
     val name         = renku / "name"
@@ -87,8 +87,6 @@ object ParameterMapping {
 
   implicit def decoder: JsonLDDecoder[ParameterMapping] =
     JsonLDDecoder.instance { cursor =>
-      import ExtraJsonLDDecoder._
-
       for {
         id          <- cursor.downEntityId.as[ResourceId]
         name        <- cursor.downField(Ontology.name).as[Name]
