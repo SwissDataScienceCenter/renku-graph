@@ -26,7 +26,7 @@ import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 
-object TriplesStore extends InMemoryJena with RenkuDataset with MigrationsDataset {
+object TriplesStore extends InMemoryJena with ProjectsDataset with MigrationsDataset {
 
   protected override val jenaRunMode: JenaRunMode = JenaRunMode.FixedPortContainer(3030)
 
