@@ -28,8 +28,8 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.control.Throttler
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.client.{HttpRequest, RestClient}
-import org.http4s.Method.{GET, POST}
-import org.http4s.Status.{Conflict, NotFound, Ok}
+import org.http4s.Method.{DELETE, GET, POST}
+import org.http4s.Status.{Conflict, MethodNotAllowed, NotFound, Ok}
 import org.http4s.Uri
 import org.http4s.headers.`Content-Type`
 import org.typelevel.log4cats.Logger
@@ -39,6 +39,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 trait TSAdminClient[F[_]] {
   def createDataset(datasetConfigFile: DatasetConfigFile): F[CreationResult]
   def checkDatasetExists(datasetName:  DatasetName):       F[Boolean]
+  def removeDataset(datasetName:       DatasetName):       F[RemovalResult]
 }
 
 object TSAdminClient {
@@ -53,6 +54,22 @@ object TSAdminClient {
     implicit val show: Show[CreationResult] = Show.show {
       case Created => "created"
       case Existed => "existed"
+    }
+  }
+
+  sealed trait RemovalResult extends Product with Serializable
+  object RemovalResult {
+    case object Removed extends RemovalResult
+    type Removed = Removed.type
+    case object NotExisted extends RemovalResult
+    type NotExisted = NotExisted.type
+    case object NotAllowed extends RemovalResult
+    type NotAllowed = NotAllowed.type
+
+    implicit val show: Show[RemovalResult] = Show.show {
+      case Removed    => "removed"
+      case NotExisted => "not-existed"
+      case NotAllowed => "not-allowed"
     }
   }
 
@@ -81,30 +98,50 @@ private class TSAdminClientImpl[F[_]: Async: Logger](
 
   import adminConnectionConfig._
 
-  override def createDataset(datasetConfigFile: DatasetConfigFile): F[CreationResult] = for {
-    uri          <- validateUri(s"$fusekiUrl/$$/datasets")
-    uploadResult <- send(datasetCreationRequest(uri, datasetConfigFile))(mapCreationResponse)
-  } yield uploadResult
+  override def createDataset(datasetConfigFile: DatasetConfigFile): F[CreationResult] = {
 
-  private def datasetCreationRequest(uri: Uri, configFile: DatasetConfigFile) = HttpRequest[F](
-    request(POST, uri, authCredentials)
-      .withEntity(configFile.show)
-      .putHeaders(`Content-Type`(`text/turtle`)),
-    name = "dataset creation"
-  )
+    val responseMapping: ResponseMapping[CreationResult] = {
+      case (Ok, _, _)       => CreationResult.Created.pure[F].widen
+      case (Conflict, _, _) => CreationResult.Existed.pure[F].widen
+    }
 
-  private lazy val mapCreationResponse: ResponseMapping[CreationResult] = {
-    case (Ok, _, _)       => CreationResult.Created.pure[F].widen
-    case (Conflict, _, _) => CreationResult.Existed.pure[F].widen
+    def datasetCreationRequest(uri: Uri, configFile: DatasetConfigFile) = HttpRequest[F](
+      request(POST, uri, authCredentials)
+        .withEntity(configFile.show)
+        .putHeaders(`Content-Type`(`text/turtle`)),
+      name = "dataset creation"
+    )
+
+    for {
+      uri          <- validateUri(s"$fusekiUrl/$$/datasets")
+      uploadResult <- send(datasetCreationRequest(uri, datasetConfigFile))(responseMapping)
+    } yield uploadResult
   }
 
-  override def checkDatasetExists(datasetName: DatasetName): F[Boolean] = for {
-    uri          <- validateUri(show"$fusekiUrl/$$/datasets/$datasetName")
-    uploadResult <- send(request(GET, uri, authCredentials))(mapDatasetExistenceCheckResponse)
-  } yield uploadResult
+  override def checkDatasetExists(datasetName: DatasetName): F[Boolean] = {
 
-  private lazy val mapDatasetExistenceCheckResponse: ResponseMapping[Boolean] = {
-    case (Ok, _, _)       => true.pure[F]
-    case (NotFound, _, _) => false.pure[F]
+    val responseMapping: ResponseMapping[Boolean] = {
+      case (Ok, _, _)       => true.pure[F]
+      case (NotFound, _, _) => false.pure[F]
+    }
+
+    for {
+      uri    <- validateUri(show"$fusekiUrl/$$/datasets/$datasetName")
+      result <- send(request(GET, uri, authCredentials))(responseMapping)
+    } yield result
+  }
+
+  override def removeDataset(datasetName: DatasetName): F[RemovalResult] = {
+
+    val responseMapping: ResponseMapping[RemovalResult] = {
+      case (Ok, _, _)               => RemovalResult.Removed.pure[F].widen
+      case (NotFound, _, _)         => RemovalResult.NotExisted.pure[F].widen
+      case (MethodNotAllowed, _, _) => RemovalResult.NotAllowed.pure[F].widen
+    }
+
+    for {
+      uri    <- validateUri(show"$fusekiUrl/$$/datasets/$datasetName")
+      result <- send(request(DELETE, uri, authCredentials))(responseMapping)
+    } yield result
   }
 }

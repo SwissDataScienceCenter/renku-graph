@@ -24,7 +24,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects.Path
-import io.renku.graph.model.{RenkuUrl, TSVersion, projects}
+import io.renku.graph.model.{RenkuUrl, projects}
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.graph.tokenrepository.AccessTokenFinder.Implicits.projectPathToPath
 import io.renku.http.client.AccessToken
@@ -42,7 +42,7 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
 
   "synchronizeMembers" should {
 
-    "pulls members from GitLab and sync the members in both versions of TS" in new TestCase {
+    "pulls members from GitLab and sync the members in the TS" in new TestCase {
 
       val membersInGitLab = gitLabProjectMembers.generateSet()
 
@@ -57,21 +57,14 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
         .expects(projectPath, maybeAccessToken)
         .returning(membersInGitLab.pure[Try])
 
-      val dgSyncSummary = syncSummaries.generateOne
-      (defaultGraphSynchronizer.syncMembers _)
+      val syncSummary = syncSummaries.generateOne
+      (kgSynchronizer.syncMembers _)
         .expects(projectPath, membersInGitLab)
-        .returning(dgSyncSummary.pure[Try])
-      val ngSyncSummary = syncSummaries.generateOne
-      (namedGraphsSynchronizer.syncMembers _)
-        .expects(projectPath, membersInGitLab)
-        .returning(ngSyncSummary.pure[Try])
+        .returning(syncSummary.pure[Try])
 
       synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
 
-      logger.loggedOnly(
-        infoMessage(dgSyncSummary, TSVersion.DefaultGraph),
-        infoMessage(ngSyncSummary, TSVersion.NamedGraphs)
-      )
+      logger.loggedOnly(infoMessage(syncSummary))
     }
 
     "recover with log statement if collaborator fails" in new TestCase {
@@ -103,17 +96,13 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
     implicit val logger:            TestLogger[Try]        = TestLogger[Try]()
     implicit val accessTokenFinder: AccessTokenFinder[Try] = mock[AccessTokenFinder[Try]]
     val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[Try]]
-    val defaultGraphSynchronizer   = mock[KGSynchronizer[Try]]
-    val namedGraphsSynchronizer    = mock[KGSynchronizer[Try]]
+    val kgSynchronizer             = mock[KGSynchronizer[Try]]
     val executionTimeRecorder      = TestExecutionTimeRecorder[Try](maybeHistogram = None)
-    val synchronizer = new MembersSynchronizerImpl[Try](gitLabProjectMembersFinder,
-                                                        defaultGraphSynchronizer,
-                                                        namedGraphsSynchronizer,
-                                                        executionTimeRecorder
-    )
+    val synchronizer =
+      new MembersSynchronizerImpl[Try](gitLabProjectMembersFinder, kgSynchronizer, executionTimeRecorder)
 
-    def infoMessage(syncSummary: SyncSummary, tsVersion: TSVersion) = Info(
-      s"$categoryName: Members for project: $projectPath in $tsVersion synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
+    def infoMessage(syncSummary: SyncSummary) = Info(
+      s"$categoryName: members for project: $projectPath synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
         s"${syncSummary.membersAdded} member(s) added, ${syncSummary.membersRemoved} member(s) removed"
     )
   }

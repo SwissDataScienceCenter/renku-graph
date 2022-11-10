@@ -27,7 +27,7 @@ import io.renku.graph.config.RenkuUrlLoader
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.projects.ResourceId
 import io.renku.graph.model.views.RdfResource
-import io.renku.graph.model.{RenkuUrl, projects}
+import io.renku.graph.model.{GraphClass, RenkuUrl, projects}
 import io.renku.tinytypes.json.TinyTypeDecoders
 import io.renku.triplesstore.SparqlQuery.Prefixes
 import io.renku.triplesstore._
@@ -43,9 +43,9 @@ private trait NodeDetailsFinder[F[_]] {
 }
 
 private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder](
-    renkuConnectionConfig: RenkuConnectionConfig,
-    renkuUrl:              RenkuUrl
-) extends TSClient[F](renkuConnectionConfig)
+    storeConfig:     ProjectsConnectionConfig
+)(implicit renkuUrl: RenkuUrl)
+    extends TSClient[F](storeConfig)
     with NodeDetailsFinder[F] {
 
   override def findDetails[T](
@@ -54,7 +54,7 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTi
   )(implicit query: (T, ResourceId) => SparqlQuery): F[Set[Node]] =
     ids.toList
       .map { id =>
-        queryExpecting[Option[Node]](selectQuery = query(id, ResourceId(projectPath)(renkuUrl)))
+        queryExpecting[Option[Node]](selectQuery = query(id, ResourceId(projectPath)))
           .flatMap(failIf(no = id))
       }
       .parSequence
@@ -112,26 +112,32 @@ private class NodeDetailsFinderImpl[F[_]: Async: Parallel: Logger: SparqlQueryTi
 private object NodeDetailsFinder {
 
   def apply[F[_]: Async: Parallel: Logger: SparqlQueryTimeRecorder]: F[NodeDetailsFinder[F]] = for {
-    config   <- RenkuConnectionConfig[F]()
-    renkuUrl <- RenkuUrlLoader[F]()
-  } yield new NodeDetailsFinderImpl[F](config, renkuUrl)
+    config                        <- ProjectsConnectionConfig[F]()
+    implicit0(renkuUrl: RenkuUrl) <- RenkuUrlLoader[F]()
+  } yield new NodeDetailsFinderImpl[F](config)
 
-  implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, path) =>
+  implicit val locationQuery: (Node.Location, ResourceId) => SparqlQuery = (location, projectId) =>
     SparqlQuery.of(
       name = "lineage - entity details",
-      Prefixes.of(prov -> "prov", schema -> "schema", renku -> "renku"),
+      Prefixes of (prov -> "prov", schema -> "schema", renku -> "renku"),
       s"""|SELECT DISTINCT ?type ?location ?label
           |WHERE {
-          |  { 
-          |    ?entity prov:atLocation '$location';
-          |          a prov:Entity;
-          |          a ?type .
+          |  {
+          |    GRAPH <${GraphClass.Project.id(projectId)}> {
+          |      ?entity prov:atLocation '$location';
+          |              a prov:Entity;
+          |              a ?type
+          |    }
           |  } {
-          |    ?activityId a prov:Activity ;
-          |                prov:qualifiedUsage / prov:entity ?entity ;
-          |                ^renku:hasActivity ${path.showAs[RdfResource]} .
+          |    GRAPH <${GraphClass.Project.id(projectId)}> {
+          |      ?activityId a prov:Activity;
+          |                  prov:qualifiedUsage / prov:entity ?entity;
+          |                  ^renku:hasActivity ${projectId.showAs[RdfResource]}
+          |    }
           |  } UNION {
-          |    ?entity prov:qualifiedGeneration / prov:activity / ^renku:hasActivity ${path.showAs[RdfResource]} .
+          |    GRAPH <${GraphClass.Project.id(projectId)}> {
+          |      ?entity prov:qualifiedGeneration / prov:activity / ^renku:hasActivity ${projectId.showAs[RdfResource]}
+          |    }
           |  }
           |  BIND ('$location' AS ?location)
           |  BIND ('$location' AS ?label)
@@ -139,69 +145,78 @@ private object NodeDetailsFinder {
           |""".stripMargin
     )
 
-  implicit val activityIdQuery: (ExecutionInfo, ResourceId) => SparqlQuery = { case (ExecutionInfo(activityId, _), _) =>
-    SparqlQuery.of(
-      name = "lineage - plan details",
-      Prefixes.of(prov -> "prov", renku -> "renku", schema -> "schema"),
-      s"""|SELECT DISTINCT ?type (CONCAT(STR(?command), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
-          |WHERE {
-          |  {
-          |    SELECT DISTINCT ?command ?type ?location
-          |    WHERE {
-          |      <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId;
-          |                    a ?type.
-          |      OPTIONAL { ?planId renku:command ?maybeCommand. }
-          |      BIND (IF(bound(?maybeCommand), CONCAT(STR(?maybeCommand), STR(' ')), '') AS ?command).
-          |      BIND (<$activityId> AS ?location)
-          |    }
-          |  } {
-          |    SELECT ?position ?commandParameter
-          |     WHERE {
-          |      { # inputs
-          |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
-          |        ?planId renku:hasInputs ?input .
-          |        ?paramValue a renku:ParameterValue ;
-          |                    schema:valueReference ?input .
-          |        ?paramValue schema:value ?value .
-          |        OPTIONAL { ?input renku:mappedTo/renku:streamType ?maybeStreamType. }
-          |        ?input renku:position ?position.
-          |        OPTIONAL { ?input renku:prefix ?maybePrefix }
-          |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
-          |        BIND (IF(?streamType = 'stdin', '< ', '') AS ?streamOperator).
-          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
-          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
-          |      } UNION { # outputs
-          |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
-          |        ?planId renku:hasOutputs ?output .
-          |        ?paramValue a renku:ParameterValue ;
-          |                    schema:valueReference ?output .
-          |        ?paramValue schema:value ?value .
-          |        ?output renku:position ?position.
-          |        OPTIONAL { ?output renku:mappedTo/renku:streamType ?maybeStreamType. }
-          |        OPTIONAL { ?output renku:prefix ?maybePrefix }
-          |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
-          |        BIND (IF(?streamType = 'stdout', '> ', IF(?streamType = 'stderr', '2> ', '')) AS ?streamOperator).
-          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-          |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
-          |      } UNION { # parameters
-          |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
-          |        ?planId renku:hasArguments ?parameter .
-          |        ?paramValue a renku:ParameterValue;
-          |                    schema:valueReference ?parameter .
-          |        ?paramValue schema:value ?value .
-          |        ?parameter renku:position ?position .
-          |        OPTIONAL { ?parameter renku:prefix ?maybePrefix }
-          |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
-          |        BIND (CONCAT(?prefix, STR(?value)) AS ?commandParameter) .
-          |      }
-          |    }
-          |    GROUP BY ?position ?commandParameter
-          |    HAVING (COUNT(*) > 0)
-          |    ORDER BY ?position
-          |  }
-          |}
-          |GROUP BY ?command ?type ?location
-          |""".stripMargin
-    )
+  implicit val activityIdQuery: (ExecutionInfo, ResourceId) => SparqlQuery = {
+    case (ExecutionInfo(activityId, _), projectId) =>
+      SparqlQuery.of(
+        name = "lineage - plan details",
+        Prefixes of (prov -> "prov", renku -> "renku", schema -> "schema"),
+        s"""|SELECT DISTINCT ?type (CONCAT(STR(?command), (GROUP_CONCAT(?commandParameter; separator=' '))) AS ?label) ?location
+            |WHERE {
+            |  {
+            |    SELECT DISTINCT ?command ?type ?location
+            |    WHERE {
+            |      GRAPH <${GraphClass.Project.id(projectId)}> {
+            |        <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId;
+            |                      a ?type.
+            |        OPTIONAL { ?planId renku:command ?maybeCommand. }
+            |      }
+            |      BIND (IF(bound(?maybeCommand), CONCAT(STR(?maybeCommand), STR(' ')), '') AS ?command).
+            |      BIND (<$activityId> AS ?location)
+            |    }
+            |  } {
+            |    SELECT ?position ?commandParameter
+            |     WHERE {
+            |      { # inputs
+            |        GRAPH <${GraphClass.Project.id(projectId)}> {
+            |          <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
+            |          ?planId renku:hasInputs ?input .
+            |          ?paramValue a renku:ParameterValue ;
+            |                      schema:valueReference ?input .
+            |          ?paramValue schema:value ?value .
+            |          OPTIONAL { ?input renku:mappedTo/renku:streamType ?maybeStreamType. }
+            |          ?input renku:position ?position.
+            |          OPTIONAL { ?input renku:prefix ?maybePrefix }
+            |        }
+            |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
+            |        BIND (IF(?streamType = 'stdin', '< ', '') AS ?streamOperator).
+            |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix).
+            |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
+            |      } UNION { # outputs
+            |        GRAPH <${GraphClass.Project.id(projectId)}> {
+            |          <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
+            |          ?planId renku:hasOutputs ?output .
+            |          ?paramValue a renku:ParameterValue ;
+            |                      schema:valueReference ?output .
+            |          ?paramValue schema:value ?value .
+            |          ?output renku:position ?position.
+            |          OPTIONAL { ?output renku:mappedTo/renku:streamType ?maybeStreamType. }
+            |          OPTIONAL { ?output renku:prefix ?maybePrefix }
+            |        }
+            |        BIND (IF(bound(?maybeStreamType), ?maybeStreamType, '') AS ?streamType).
+            |        BIND (IF(?streamType = 'stdout', '> ', IF(?streamType = 'stderr', '2> ', '')) AS ?streamOperator).
+            |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+            |        BIND (CONCAT(?prefix, ?streamOperator, STR(?value)) AS ?commandParameter) .
+            |      } UNION { # parameters
+            |        GRAPH <${GraphClass.Project.id(projectId)}> {
+            |          <$activityId> prov:qualifiedAssociation/prov:hadPlan ?planId.
+            |          ?planId renku:hasArguments ?parameter .
+            |          ?paramValue a renku:ParameterValue;
+            |                      schema:valueReference ?parameter .
+            |          ?paramValue schema:value ?value .
+            |          ?parameter renku:position ?position .
+            |          OPTIONAL { ?parameter renku:prefix ?maybePrefix }
+            |        }
+            |        BIND (IF(bound(?maybePrefix), STR(?maybePrefix), '') AS ?prefix) .
+            |        BIND (CONCAT(?prefix, STR(?value)) AS ?commandParameter) .
+            |      }
+            |    }
+            |    GROUP BY ?position ?commandParameter
+            |    HAVING (COUNT(*) > 0)
+            |    ORDER BY ?position
+            |  }
+            |}
+            |GROUP BY ?command ?type ?location
+            |""".stripMargin
+      )
   }
 }

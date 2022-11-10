@@ -45,7 +45,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
-import io.renku.triplesstore._
+import io.renku.triplesstore.{DatasetConnectionConfig, _}
 import org.http4s.Status
 import org.http4s.Status._
 import org.scalacheck.{Arbitrary, Gen}
@@ -105,6 +105,17 @@ object CommonGraphGenerators {
     credentials <- basicAuthCredentials
   } yield AdminConnectionConfig(url, credentials)
 
+  final case class TestDatasetConnectionConfig(fusekiUrl:       FusekiUrl,
+                                               datasetName:     DatasetName,
+                                               authCredentials: BasicAuthCredentials
+  ) extends DatasetConnectionConfig
+
+  implicit val storeConnectionConfigs: Gen[TestDatasetConnectionConfig] = for {
+    url         <- httpUrls() map FusekiUrl.apply
+    name        <- nonEmptyStrings().toGeneratorOf(DatasetName)
+    credentials <- basicAuthCredentials
+  } yield new TestDatasetConnectionConfig(url, name, credentials)
+
   implicit val datasetConnectionConfigs: Gen[DatasetConnectionConfig] = for {
     url         <- httpUrls() map FusekiUrl.apply
     dataset     <- nonEmptyStrings().toGeneratorOf(DatasetName)
@@ -114,11 +125,6 @@ object CommonGraphGenerators {
     override val datasetName     = dataset
     override val authCredentials = credentials
   }
-
-  implicit val renkuConnectionConfigs: Gen[RenkuConnectionConfig] = for {
-    fusekiUrl       <- httpUrls() map FusekiUrl.apply
-    authCredentials <- basicAuthCredentials
-  } yield RenkuConnectionConfig(fusekiUrl, authCredentials)
 
   implicit val microserviceBaseUrls: Gen[MicroserviceBaseUrl] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {

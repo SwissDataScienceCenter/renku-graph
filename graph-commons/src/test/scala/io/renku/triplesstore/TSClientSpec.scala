@@ -396,7 +396,7 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
 
   private trait TestCase {
     val fusekiUrl             = FusekiUrl(externalServiceBaseUrl)
-    val renkuConnectionConfig = renkuConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
+    val renkuConnectionConfig = storeConnectionConfigs.generateOne.copy(fusekiUrl = fusekiUrl)
     implicit val logger:       Logger[IO]                  = TestLogger[IO]()
     implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
   }
@@ -419,10 +419,10 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
   }
 
   private class TestTSClientImpl(
-      val query:             SparqlQuery,
-      renkuConnectionConfig: RenkuConnectionConfig
-  )(implicit logger:         Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
-      extends TSClient[IO](renkuConnectionConfig) {
+      val query:     SparqlQuery,
+      storeConfig:   DatasetConnectionConfig
+  )(implicit logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])
+      extends TSClient[IO](storeConfig) {
 
     def sendUpdate: IO[Unit] = updateWithNoResult(query)
 
@@ -433,10 +433,10 @@ class TSClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing 
     def uploadJson(json: JsonLD): IO[Unit] = upload(json)
   }
 
-  private class TestTSQueryClientImpl(val query: SparqlQuery, renkuConnectionConfig: RenkuConnectionConfig)(implicit
+  private class TestTSQueryClientImpl(val query: SparqlQuery, storeConfig: DatasetConnectionConfig)(implicit
       logger:                                    Logger[IO],
       timeRecorder:                              SparqlQueryTimeRecorder[IO]
-  ) extends TSClient[IO](renkuConnectionConfig)
+  ) extends TSClient[IO](storeConfig)
       with Paging[String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)

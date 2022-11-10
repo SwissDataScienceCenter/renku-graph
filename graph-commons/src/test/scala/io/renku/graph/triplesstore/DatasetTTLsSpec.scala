@@ -29,7 +29,6 @@ class DatasetTTLsSpec extends AnyWordSpec with should.Matchers {
 
     "return a List comprised of Renku and Migrations datasets" in {
       DatasetTTLs.allNamesAndConfigs shouldBe List(
-        RenkuTTL.fromTtlFile().map(RenkuTTL.datasetName -> _),
         ProjectsTTL.fromTtlFile().map(ProjectsTTL.datasetName -> _),
         MigrationsTTL.fromTtlFile().map(MigrationsTTL.datasetName -> _)
       ).sequence

@@ -23,10 +23,6 @@ import io.renku.triplesstore.{DatasetConfigFile, DatasetConfigFileFactory, Datas
 
 object DatasetTTLs {
 
-  final class RenkuTTL private (val value: String) extends DatasetConfigFile
-  object RenkuTTL
-      extends DatasetConfigFileFactory[RenkuTTL](DatasetName("renku"), new RenkuTTL(_), ttlFileName = "renku-ds.ttl")
-
   final class ProjectsTTL private (val value: String) extends DatasetConfigFile
   object ProjectsTTL
       extends DatasetConfigFileFactory[ProjectsTTL](DatasetName("projects"),
@@ -41,7 +37,7 @@ object DatasetTTLs {
                                                       ttlFileName = "migrations-ds.ttl"
       )
 
-  val allFactories: List[DatasetConfigFileFactory[_ <: DatasetConfigFile]] = List(RenkuTTL, ProjectsTTL, MigrationsTTL)
+  val allFactories: List[DatasetConfigFileFactory[_ <: DatasetConfigFile]] = List(ProjectsTTL, MigrationsTTL)
 
   val allNamesAndConfigs: Either[Exception, List[(DatasetName, DatasetConfigFile)]] =
     allFactories.map(factory => factory.fromTtlFile().map(factory.datasetName -> _)).sequence

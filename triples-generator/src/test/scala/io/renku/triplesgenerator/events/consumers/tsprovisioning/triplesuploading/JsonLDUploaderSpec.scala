@@ -98,7 +98,7 @@ class JsonLDUploaderSpec
 
       failure shouldBe a[LogWorthyRecoverableError]
       failure.getMessage should startWith(
-        s"POST $externalServiceBaseUrl/${renkuConnectionConfig.datasetName}/data error"
+        s"POST $externalServiceBaseUrl/${storeConfig.datasetName}/data error"
       )
     }
   }
@@ -109,16 +109,12 @@ class JsonLDUploaderSpec
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    lazy val renkuConnectionConfig =
-      renkuConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
-    lazy val uploader =
-      new JsonLDUploaderImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
+    lazy val storeConfig = storeConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
+    lazy val uploader    = new JsonLDUploaderImpl[IO](storeConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenUploader(returning: ResponseDefinitionBuilder) = stubFor {
-      post(s"/${renkuConnectionConfig.datasetName}/data")
-        .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                       renkuConnectionConfig.authCredentials.password.value
-        )
+      post(s"/${storeConfig.datasetName}/data")
+        .withBasicAuth(storeConfig.authCredentials.username.value, storeConfig.authCredentials.password.value)
         .withHeader("content-type", equalTo("application/ld+json"))
         .withRequestBody(equalToJson(triples.toJson.toString()))
         .willReturn(returning)

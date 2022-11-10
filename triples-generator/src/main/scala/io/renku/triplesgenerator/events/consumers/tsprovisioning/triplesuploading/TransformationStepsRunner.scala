@@ -24,7 +24,6 @@ import cats.MonadThrow
 import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.all._
-import io.renku.graph.model.TSVersion
 import io.renku.graph.model.entities.Project
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep
 import io.renku.triplesgenerator.events.consumers.tsprovisioning.TransformationStep.{ProjectWithQueries, Queries}
@@ -34,19 +33,16 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 private[tsprovisioning] trait TransformationStepsRunner[F[_]] {
-  def run(steps: List[TransformationStep[F]], project: Project)(on: TSVersion): F[TriplesUploadResult]
+  def run(steps: List[TransformationStep[F]], project: Project): F[TriplesUploadResult]
 }
 
 private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
-    resultsUploader: TransformationResultsUploader.Locator[F]
+    resultsUploader: TransformationResultsUploader[F]
 ) extends TransformationStepsRunner[F] {
 
   import TriplesUploadResult._
 
-  override def run(steps:   List[TransformationStep[F]],
-                   project: Project
-  )(tsVersion:              TSVersion): F[TriplesUploadResult] = {
-    implicit val uploader: TransformationResultsUploader[F] = resultsUploader(tsVersion)
+  override def run(steps: List[TransformationStep[F]], project: Project): F[TriplesUploadResult] = {
     runAll(steps)(project) >>=
       executeAllPreDataUploadQueries >>=
       encodeAndSendProject >>=
@@ -67,29 +63,24 @@ private class TransformationStepsRunnerImpl[F[_]: MonadThrow](
         }
     )
 
-  private def executeAllPreDataUploadQueries(implicit
-      uploader: TransformationResultsUploader[F]
-  ): ((Project, Queries)) => ProjectWithQueries[F] = { case projectAndQueries @ (_, Queries(preQueries, _)) =>
-    execute(preQueries) map (_ => projectAndQueries)
+  private def executeAllPreDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
+    case projectAndQueries @ (_, Queries(preQueries, _)) =>
+      execute(preQueries) map (_ => projectAndQueries)
   }
 
-  private def encodeAndSendProject(implicit
-      uploader: TransformationResultsUploader[F]
-  ): ((Project, Queries)) => ProjectWithQueries[F] = { case projectAndQueries @ (project, _) =>
-    uploader.upload(project) map (_ => projectAndQueries)
+  private def encodeAndSendProject: ((Project, Queries)) => ProjectWithQueries[F] = {
+    case projectAndQueries @ (project, _) =>
+      resultsUploader.upload(project) map (_ => projectAndQueries)
   }
 
-  private def executeAllPostDataUploadQueries(implicit
-      uploader: TransformationResultsUploader[F]
-  ): ((Project, Queries)) => ProjectWithQueries[F] = { case projectAndQueries @ (_, Queries(_, postQueries)) =>
-    execute(postQueries) map (_ => projectAndQueries)
+  private def executeAllPostDataUploadQueries: ((Project, Queries)) => ProjectWithQueries[F] = {
+    case projectAndQueries @ (_, Queries(_, postQueries)) =>
+      execute(postQueries) map (_ => projectAndQueries)
   }
 
-  private def execute(queries: List[SparqlQuery])(implicit
-      uploader:                TransformationResultsUploader[F]
-  ): EitherT[F, ProcessingRecoverableError, Unit] =
+  private def execute(queries: List[SparqlQuery]): EitherT[F, ProcessingRecoverableError, Unit] =
     queries.foldLeft(EitherT.rightT[F, ProcessingRecoverableError](())) { (previousResult, query) =>
-      previousResult >> uploader.execute(query)
+      previousResult >> resultsUploader.execute(query)
     }
 
   private def transformationFailure(project: Project): PartialFunction[Throwable, F[TriplesUploadResult]] = {

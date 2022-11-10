@@ -18,39 +18,14 @@
 
 package io.renku.triplesgenerator.events.consumers.tsprovisioning
 
-private trait UploadingResult[T <: UploadingResult[T]] extends Product with Serializable with UploadingResultAlg[T]
+private trait UploadingResult extends Product with Serializable
 
-private trait UploadingError[T <: UploadingResult[T]] extends UploadingResult[T] {
+private trait UploadingError extends UploadingResult {
   val cause: Throwable
 }
 
-private trait UploadingResultAlg[T <: UploadingResult[T]] {
-  self: UploadingResult[T] =>
-  def merge(other: UploadingResult[T]): T
-}
-
 private object UploadingResult {
-  trait Uploaded[T <: UploadingResult[T]] extends UploadingResult[T] {
-    override def merge(other: UploadingResult[T]): T = other match {
-      case r: Uploaded[T]            => r.asInstanceOf[T]
-      case r: RecoverableError[T]    => r.asInstanceOf[T]
-      case _: NonRecoverableError[T] => this.asInstanceOf[T]
-    }
-  }
-
-  trait RecoverableError[T <: UploadingResult[T]] extends UploadingError[T] {
-    override def merge(other: UploadingResult[T]): T = other match {
-      case _: Uploaded[T]            => this.asInstanceOf[T]
-      case _: RecoverableError[T]    => this.asInstanceOf[T]
-      case _: NonRecoverableError[T] => this.asInstanceOf[T]
-    }
-  }
-
-  trait NonRecoverableError[T <: UploadingResult[T]] extends UploadingError[T] {
-    override def merge(other: UploadingResult[T]): T = other match {
-      case r: Uploaded[T]            => r.asInstanceOf[T]
-      case r: RecoverableError[T]    => r.asInstanceOf[T]
-      case _: NonRecoverableError[T] => this.asInstanceOf[T]
-    }
-  }
+  trait Uploaded            extends UploadingResult
+  trait RecoverableError    extends UploadingError
+  trait NonRecoverableError extends UploadingError
 }

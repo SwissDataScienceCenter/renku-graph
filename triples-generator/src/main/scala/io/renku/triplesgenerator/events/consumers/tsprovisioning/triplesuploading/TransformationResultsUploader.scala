@@ -26,7 +26,6 @@ import cats.syntax.all._
 import io.renku.graph.config.{GitLabUrlLoader, RenkuUrlLoader}
 import io.renku.graph.model._
 import io.renku.graph.model.entities.{EntityFunctions, Person, Project}
-import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import io.renku.triplesgenerator.events.consumers.ProcessingRecoverableError
 import io.renku.triplesstore._
@@ -39,57 +38,18 @@ private trait TransformationResultsUploader[F[_]] {
 
 private object TransformationResultsUploader {
 
-  trait Locator[F[_]] {
-    def apply(tsVersion: TSVersion): TransformationResultsUploader[F]
-  }
-
-  private class LocatorImpl[F[_]](defaultGraphResultsUploader: TransformationResultsUploader[F],
-                                  namedGraphsResultsUploader:  TransformationResultsUploader[F]
-  ) extends Locator[F] {
-
-    override def apply(tsVersion: TSVersion): TransformationResultsUploader[F] = tsVersion match {
-      case TSVersion.DefaultGraph => defaultGraphResultsUploader
-      case TSVersion.NamedGraphs  => namedGraphsResultsUploader
-    }
-  }
-
-  def apply[F[_]: Async: SparqlQueryTimeRecorder: Logger]: F[TransformationResultsUploader.Locator[F]] = for {
+  def apply[F[_]: Async: SparqlQueryTimeRecorder: Logger]: F[TransformationResultsUploader[F]] = for {
     implicit0(renkuUrl: RenkuUrl)     <- RenkuUrlLoader[F]()
     implicit0(glApiUrl: GitLabApiUrl) <- GitLabUrlLoader[F]().map(_.apiV4)
-    renkuConnectionConfig             <- RenkuConnectionConfig[F]()
     projectsConnectionConfig          <- ProjectsConnectionConfig[F]()
-  } yield new LocatorImpl(
-    new DefaultGraphResultsUploader[F](new JsonLDUploaderImpl[F](renkuConnectionConfig),
-                                       new UpdateQueryRunnerImpl(renkuConnectionConfig)
-    ),
-    new NamedGraphsResultsUploader[F](new JsonLDUploaderImpl[F](projectsConnectionConfig),
-                                      new UpdateQueryRunnerImpl(projectsConnectionConfig)
-    )
+  } yield new TransformationResultsUploaderImpl[F](new JsonLDUploaderImpl[F](projectsConnectionConfig),
+                                                   new UpdateQueryRunnerImpl(projectsConnectionConfig)
   )
 }
 
-private class DefaultGraphResultsUploader[F[_]: MonadThrow](jsonLDUploader: JsonLDUploader[F],
-                                                            updateQueryRunner: UpdateQueryRunner[F]
-)(implicit renkuUrl:                                                           RenkuUrl, gitLabUrl: GitLabApiUrl)
-    extends TransformationResultsUploader[F] {
-
-  private implicit val graph: GraphClass = GraphClass.Default
-  import jsonLDUploader._
-
-  override def execute(query: SparqlQuery) = updateQueryRunner run query
-
-  override def upload(project: Project) = encode(project) >>= uploadJsonLD
-
-  private def encode(project: Project): EitherT[F, ProcessingRecoverableError, JsonLD] = EitherT
-    .fromEither[F](project.asJsonLD.flatten)
-    .leftSemiflatMap(error =>
-      NonRecoverableFailure(s"Encoding '${project.path}' failed", error).raiseError[F, ProcessingRecoverableError]
-    )
-}
-
-private class NamedGraphsResultsUploader[F[_]: MonadThrow](jsonLDUploader: JsonLDUploader[F],
-                                                           updateQueryRunner: UpdateQueryRunner[F]
-)(implicit renkuUrl:                                                          RenkuUrl, gitLabUrl: GitLabApiUrl)
+private class TransformationResultsUploaderImpl[F[_]: MonadThrow](jsonLDUploader: JsonLDUploader[F],
+                                                                  updateQueryRunner: UpdateQueryRunner[F]
+)(implicit renkuUrl:                                                                 RenkuUrl, gitLabUrl: GitLabApiUrl)
     extends TransformationResultsUploader[F] {
 
   import Schemas.schema

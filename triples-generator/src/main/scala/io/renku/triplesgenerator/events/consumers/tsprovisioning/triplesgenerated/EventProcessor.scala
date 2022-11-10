@@ -25,9 +25,6 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Parallel}
 import eu.timepit.refined.auto._
-import io.renku.graph.model.TSVersion
-import io.renku.graph.model.TSVersion._
-import io.renku.graph.model.entities.Project
 import io.renku.graph.model.events.EventStatus.TriplesGenerated
 import io.renku.graph.model.events.{EventProcessingTime, EventStatus}
 import io.renku.graph.tokenrepository.AccessTokenFinder
@@ -84,14 +81,10 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
       event:      TriplesGeneratedEvent
   )(implicit mat: Option[AccessToken]): F[EventUploadingResult] = {
     for {
-      project  <- buildEntity(event) leftSemiflatMap toUploadingError(event)
-      dgResult <- right[EventUploadingResult](createAndRunSteps(DefaultGraph, project) >>= toUploadingResult(event))
-      ngResult <- right[EventUploadingResult](createAndRunSteps(NamedGraphs, project) >>= toUploadingResult(event))
-    } yield dgResult merge ngResult
+      project <- buildEntity(event) leftSemiflatMap toUploadingError(event)
+      result  <- right[EventUploadingResult](run(createSteps, project) >>= toUploadingResult(event))
+    } yield result
   }.merge recoverWith nonRecoverableFailure(event)
-
-  private def createAndRunSteps(tsVersion: TSVersion, project: Project) =
-    run(createSteps(tsVersion), project)(tsVersion)
 
   private def toUploadingResult(event: TriplesGeneratedEvent): TriplesUploadResult => F[EventUploadingResult] = {
     case DeliverySuccess =>
@@ -180,7 +173,7 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
     ) >> new Exception("transformation failure -> Event rolled back", exception).raiseError[F, Option[AccessToken]]
   }
 
-  private sealed trait EventUploadingResult extends UploadingResult[EventUploadingResult] {
+  private sealed trait EventUploadingResult extends UploadingResult {
     val event: TriplesGeneratedEvent
   }
 
@@ -189,17 +182,15 @@ private class EventProcessorImpl[F[_]: MonadThrow: AccessTokenFinder: Logger](
   }
 
   private object EventUploadingResult {
-    case class Uploaded(event: TriplesGeneratedEvent)
-        extends EventUploadingResult
-        with UploadingResult.Uploaded[EventUploadingResult]
+    case class Uploaded(event: TriplesGeneratedEvent) extends EventUploadingResult with UploadingResult.Uploaded
 
     case class RecoverableError(event: TriplesGeneratedEvent, cause: ProcessingRecoverableError)
         extends EventUploadingError
-        with UploadingResult.RecoverableError[EventUploadingResult]
+        with UploadingResult.RecoverableError
 
     case class NonRecoverableError(event: TriplesGeneratedEvent, cause: Throwable)
         extends EventUploadingError
-        with UploadingResult.NonRecoverableError[EventUploadingResult]
+        with UploadingResult.NonRecoverableError
   }
 }
 
