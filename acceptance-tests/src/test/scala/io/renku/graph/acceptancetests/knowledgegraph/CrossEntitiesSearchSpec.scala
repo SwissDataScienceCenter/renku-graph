@@ -56,7 +56,7 @@ class CrossEntitiesSearchSpec extends AcceptanceSpec with ApplicationServices wi
         )
         .withActivities(
           activityEntities(
-            planEntities().modify(replacePlanName(sentenceContaining(commonPhrase).generateAs[plans.Name]))
+            stepPlanEntities().modify(_.replacePlanName(sentenceContaining(commonPhrase).generateAs[plans.Name]))
           )
         )
         .withDatasets(

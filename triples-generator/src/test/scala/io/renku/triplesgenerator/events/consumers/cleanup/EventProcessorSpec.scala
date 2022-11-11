@@ -33,16 +33,13 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Random
-
 class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
   "processEvent" should {
 
     "remove the triples linked to the project and notify the EL when the process is done" in new TestCase {
 
-      (defaultGraphCleaner.removeTriples _).expects(path).returns(().pure[IO])
-      (namedGraphsCleaner.removeTriples _).expects(path).returns(().pure[IO])
+      (tsCleaner.removeTriples _).expects(path).returns(().pure[IO])
 
       (eventStatusUpdater.projectToNew _).expects(project).returns(().pure[IO])
 
@@ -52,12 +49,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     "do not fail but log an error if the removal of the triples fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      if (Random.nextBoolean())
-        (defaultGraphCleaner.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
-      else {
-        (defaultGraphCleaner.removeTriples _).expects(path).returns(().pure[IO])
-        (namedGraphsCleaner.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
-      }
+      (tsCleaner.removeTriples _).expects(path).returns(exception.raiseError[IO, Unit])
 
       (eventProcessor process project).unsafeRunSync() shouldBe ()
 
@@ -68,8 +60,7 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     "do not fail but log an error if the notification of the EL fails" in new TestCase {
 
-      (defaultGraphCleaner.removeTriples _).expects(path).returns(().pure[IO])
-      (namedGraphsCleaner.removeTriples _).expects(path).returns(().pure[IO])
+      (tsCleaner.removeTriples _).expects(path).returns(().pure[IO])
 
       val exception = exceptions.generateOne
       (eventStatusUpdater.projectToNew _).expects(project).returns(exception.raiseError[IO, Unit])
@@ -89,9 +80,8 @@ class EventProcessorSpec extends AnyWordSpec with IOSpec with MockFactory with s
     val project: Project       = Project(projectIds.generateOne, path)
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val defaultGraphCleaner = mock[defaultgraph.TSCleaner[IO]]
-    val namedGraphsCleaner  = mock[namedgraphs.TSCleaner[IO]]
-    val eventStatusUpdater  = mock[EventStatusUpdater[IO]]
-    val eventProcessor      = new EventProcessorImpl[IO](defaultGraphCleaner, namedGraphsCleaner, eventStatusUpdater)
+    val tsCleaner          = mock[namedgraphs.TSCleaner[IO]]
+    val eventStatusUpdater = mock[EventStatusUpdater[IO]]
+    val eventProcessor     = new EventProcessorImpl[IO](tsCleaner, eventStatusUpdater)
   }
 }

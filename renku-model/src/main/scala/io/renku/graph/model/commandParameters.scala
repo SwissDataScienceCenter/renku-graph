@@ -25,7 +25,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.entityModel.{Location, LocationLike}
-import io.renku.graph.model.views.{EntityIdJsonLdOps, TinyTypeJsonLDOps}
+import io.renku.graph.model.views.{EntityIdJsonLDOps, TinyTypeJsonLDOps}
 import io.renku.jsonld._
 import io.renku.jsonld.ontology._
 import io.renku.jsonld.syntax._
@@ -38,7 +38,7 @@ object commandParameters {
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with EntityIdJsonLdOps[ResourceId]
+      with EntityIdJsonLDOps[ResourceId]
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
@@ -110,7 +110,7 @@ object commandParameters {
     implicit object ResourceId
         extends TinyTypeFactory[ResourceId](new ResourceId(_))
         with Url[ResourceId]
-        with EntityIdJsonLdOps[ResourceId]
+        with EntityIdJsonLDOps[ResourceId]
 
     sealed trait In                                       extends IOStream
     sealed trait Out                                      extends IOStream

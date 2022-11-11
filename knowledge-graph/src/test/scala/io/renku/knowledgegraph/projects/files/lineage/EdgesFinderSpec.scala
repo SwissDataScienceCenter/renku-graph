@@ -96,9 +96,9 @@ class EdgesFinderSpec
       val in1  = entityLocations.generateOne
       val in2  = entityLocations.generateOne
       val out1 = entityLocations.generateOne
-      val plan = planEntities(CommandInput.fromLocation(in1),
-                              CommandInput.fromLocation(in2),
-                              CommandOutput.fromLocation(out1)
+      val plan = stepPlanEntities(CommandInput.fromLocation(in1),
+                                  CommandInput.fromLocation(in2),
+                                  CommandOutput.fromLocation(out1)
       )(planCommands)(project.dateCreated).generateOne
 
       val activity1 = executionPlanners(_ => fixed(plan), project).generateOne

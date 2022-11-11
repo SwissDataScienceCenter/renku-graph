@@ -102,7 +102,7 @@ class ReProvisioningSpec extends AcceptanceSpec with ApplicationServices with TS
 
     val testEntitiesProject = renkuProjectEntities(visibilityPublic)
       .map(_.copy(version = initialProjectSchemaVersion))
-      .withActivities(activityEntities(planEntities()))
+      .withActivities(activityEntities(stepPlanEntities()))
       .generateOne
       .copy(members = Set(personEntities.generateOne.copy(maybeGitLabId = user.id.some)))
   }

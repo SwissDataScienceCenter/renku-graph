@@ -16,27 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.graph.model.views
+package io.renku.graph.model.entities
 
-import cats.syntax.all._
-import io.circe.DecodingFailure
-import io.renku.jsonld.{EntityId, EntityIdEncoder, JsonLDDecoder}
-import io.renku.tinytypes.{TinyType, TinyTypeFactory}
+import io.renku.graph.model.plans
 
-trait EntityIdJsonLdOps[TT <: TinyType { type V = String }] {
-  self: TinyTypeFactory[TT] =>
-
-  implicit lazy val encoder: EntityIdEncoder[TT] =
-    EntityIdEncoder.instance[TT](id => EntityId.of(id.value))
-
-  implicit lazy val decoder: JsonLDDecoder[TT] =
-    JsonLDDecoder.instance {
-      JsonLDDecoder.decodeEntityId >>> {
-        _.flatMap(entityId =>
-          self
-            .from(entityId.toString)
-            .leftMap(e => DecodingFailure(s"Cannot decode $entityId entityId: ${e.getMessage}", Nil))
-        )
-      }
-    }
+trait DependencyLinks {
+  def findStepPlan(planId: plans.ResourceId): Option[StepPlan]
 }

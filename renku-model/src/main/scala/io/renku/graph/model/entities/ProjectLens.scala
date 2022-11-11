@@ -16,12 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.graph.model
+package io.renku.graph.model.entities
 
-sealed trait TSVersion extends Product with Serializable
-object TSVersion {
-  case object DefaultGraph extends TSVersion
-  type DefaultGraph = DefaultGraph.type
-  case object NamedGraphs extends TSVersion
-  type NamedGraphs = NamedGraphs.type
+object ProjectLens {
+
+  val collectStepPlans: List[Plan] => List[StepPlan] = _.collect { case p: StepPlan => p }
 }

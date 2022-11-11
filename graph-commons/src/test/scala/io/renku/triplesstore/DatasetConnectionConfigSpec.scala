@@ -22,6 +22,7 @@ import com.typesafe.config.ConfigFactory
 import io.renku.config.ConfigLoader.ConfigLoadingException
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.httpUrls
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -118,10 +119,15 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
     }
   }
 
-  "RenkuConnectionConfig.apply" should {
+  "ProjectsConnectionConfig.apply" should {
+
+    val projectsConnectionConfig = for {
+      url         <- httpUrls() map FusekiUrl.apply
+      credentials <- basicAuthCredentials
+    } yield ProjectsConnectionConfig(url, credentials)
 
     "read 'services.fuseki.url', 'services.fuseki.renku.username' and 'services.fuseki.renku.password' to instantiate the RenkuConnectionConfig" in {
-      forAll(renkuConnectionConfigs) { storeConfig =>
+      forAll(projectsConnectionConfig) { storeConfig =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(
@@ -136,10 +142,10 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
           ).asJava
         )
 
-        val Success(actual) = RenkuConnectionConfig[Try](config)
+        val Success(actual) = ProjectsConnectionConfig[Try](config)
 
         actual.fusekiUrl                shouldBe storeConfig.fusekiUrl
-        actual.datasetName              shouldBe DatasetName("renku")
+        actual.datasetName              shouldBe DatasetName("projects")
         actual.authCredentials.username shouldBe storeConfig.authCredentials.username
         actual.authCredentials.password shouldBe storeConfig.authCredentials.password
       }
@@ -152,15 +158,15 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
             "fuseki" -> Map[String, Any](
               "url" -> "invalid-url",
               "renku" -> Map(
-                "username" -> renkuConnectionConfigs.generateOne.authCredentials.username.value,
-                "password" -> renkuConnectionConfigs.generateOne.authCredentials.password.value
+                "username" -> projectsConnectionConfig.generateOne.authCredentials.username.value,
+                "password" -> projectsConnectionConfig.generateOne.authCredentials.password.value
               ).asJava
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = RenkuConnectionConfig[Try](config)
+      val Failure(exception) = ProjectsConnectionConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -170,17 +176,17 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         Map(
           "services" -> Map(
             "fuseki" -> Map[String, Any](
-              "url" -> renkuConnectionConfigs.generateOne.fusekiUrl.toString,
+              "url" -> projectsConnectionConfig.generateOne.fusekiUrl.toString,
               "renku" -> Map(
                 "username" -> "  ",
-                "password" -> renkuConnectionConfigs.generateOne.authCredentials.password.value
+                "password" -> projectsConnectionConfig.generateOne.authCredentials.password.value
               ).asJava
             ).asJava
           ).asJava
         ).asJava
       )
 
-      val Failure(exception) = RenkuConnectionConfig[Try](config)
+      val Failure(exception) = ProjectsConnectionConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -190,9 +196,9 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         Map(
           "services" -> Map(
             "fuseki" -> Map[String, Any](
-              "url" -> renkuConnectionConfigs.generateOne.fusekiUrl.toString,
+              "url" -> projectsConnectionConfig.generateOne.fusekiUrl.toString,
               "renku" -> Map(
-                "username" -> renkuConnectionConfigs.generateOne.authCredentials.username.value,
+                "username" -> projectsConnectionConfig.generateOne.authCredentials.username.value,
                 "password" -> ""
               ).asJava
             ).asJava
@@ -200,7 +206,7 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
         ).asJava
       )
 
-      val Failure(exception) = RenkuConnectionConfig[Try](config)
+      val Failure(exception) = ProjectsConnectionConfig[Try](config)
 
       exception shouldBe an[ConfigLoadingException]
     }
@@ -208,8 +214,13 @@ class DatasetConnectionConfigSpec extends AnyWordSpec with ScalaCheckPropertyChe
 
   "MigrationsConnectionConfig.apply" should {
 
+    val migrationsConnectionConfig = for {
+      url         <- httpUrls() map FusekiUrl.apply
+      credentials <- basicAuthCredentials
+    } yield MigrationsConnectionConfig(url, credentials)
+
     "read 'services.fuseki.url', 'services.fuseki.admin.username' and 'services.fuseki.admin.password' to instantiate the RenkuConnectionConfig" in {
-      forAll(renkuConnectionConfigs) { storeConfig =>
+      forAll(migrationsConnectionConfig) { storeConfig =>
         val config = ConfigFactory.parseMap(
           Map(
             "services" -> Map(

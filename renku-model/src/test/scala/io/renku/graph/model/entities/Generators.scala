@@ -25,6 +25,7 @@ import io.renku.graph.model.commandParameters._
 import io.renku.graph.model.testentities.CommandParameterBase.CommandInput._
 import io.renku.graph.model.testentities.CommandParameterBase.CommandOutput._
 import io.renku.graph.model.testentities.CommandParameterBase._
+import io.renku.graph.model.testentities.StepPlan.CommandParameters.CommandParameterFactory
 import io.renku.graph.model.testentities._
 import org.scalacheck.Gen
 
@@ -128,4 +129,13 @@ private object Generators {
     IOStream.StdErr(IOStream.ResourceId((renkuUrl / nonEmptyStrings().generateOne).show))
   )
 
+  implicit lazy val commandParametersLists: Gen[List[CommandParameterFactory]] = for {
+    explicitParameters <- explicitCommandParameterObjects.toGeneratorOfList()
+    locationInputs     <- locationCommandInputObjects.toGeneratorOfList()
+    mappedInputs       <- mappedCommandInputObjects.toGeneratorOfList()
+    implicitInputs     <- implicitCommandInputObjects.toGeneratorOfList()
+    locationOutputs    <- locationCommandOutputObjects.toGeneratorOfList()
+    mappedOutputs      <- mappedCommandOutputObjects.toGeneratorOfList()
+    implicitOutputs    <- implicitCommandOutputObjects.toGeneratorOfList()
+  } yield explicitParameters ::: locationInputs ::: mappedInputs ::: implicitInputs ::: locationOutputs ::: mappedOutputs ::: implicitOutputs
 }

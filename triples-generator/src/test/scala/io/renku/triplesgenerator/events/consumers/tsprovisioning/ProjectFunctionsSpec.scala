@@ -24,8 +24,8 @@ import io.renku.graph.model._
 import GraphModelGenerators.datasetTopmostDerivedFroms
 import cats.data.NonEmptyList
 import io.renku.graph.model.datasets.TopmostDerivedFrom
-import io.renku.graph.model.entities.ActivityLens
-import io.renku.graph.model.testentities.{::~, activityEntities, anyRenkuProjectEntities, anyVisibility, creatorsLens, datasetAndModificationEntities, datasetEntities, personEntities, planEntities, provenanceInternal, provenanceLens, provenanceNonModified, renkuProjectEntities, renkuProjectWithParentEntities, _}
+import io.renku.graph.model.entities.{ActivityLens, PlanLens}
+import io.renku.graph.model.testentities._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -74,8 +74,8 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val project = anyRenkuProjectEntities
         .withActivities(
-          activityEntities(planEntities()).modify(_.copy(author = oldPerson)),
-          activityEntities(planEntities())
+          activityEntities(stepPlanEntities()).modify(_.copy(author = oldPerson)),
+          activityEntities(stepPlanEntities())
         )
         .generateOne
         .to[entities.Project]
@@ -93,8 +93,8 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val project = anyRenkuProjectEntities
         .withActivities(
-          activityEntities(planEntities()).modify(toAssociationPersonAgent(oldPerson)),
-          activityEntities(planEntities())
+          activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent(oldPerson)),
+          activityEntities(stepPlanEntities())
         )
         .generateOne
         .to[entities.Project]
@@ -110,10 +110,10 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
     "replace the old person with the new person in all plan creators" in {
       val project = anyRenkuProjectEntities
         .withActivities(
-          activityEntities(planEntities())
+          activityEntities(stepPlanEntities())
             .modify(setPlanCreator(oldPerson))
             .modify(toAssociationRenkuAgent(agentEntities.generateOne)),
-          activityEntities(planEntities())
+          activityEntities(stepPlanEntities())
             .modify(setPlanCreator(oldPerson))
             .modify(toAssociationRenkuAgent(agentEntities.generateOne))
         )
@@ -124,9 +124,8 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val newPerson         = personEntities().generateOne.to[entities.Person]
 
       val updated = update(entitiesOldPerson, newPerson)(project)
-      updated.activities shouldBe project.activities.map {
-        ActivityLens.activityPlanCreators.set(Set(newPerson))
-      }
+
+      updated.plans shouldBe project.plans.map(PlanLens.planCreators.set(List(newPerson)))
     }
 
     "replace the old person with the new on all datasets" in {

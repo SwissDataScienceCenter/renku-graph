@@ -36,7 +36,7 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
 
       "turn JsonLD of ExplicitCommandParameter entity into the ExplicitCommandParameter object" in {
         forAll(explicitCommandParameterObjects) { parameterFactory =>
-          val plan      = planEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
+          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
           val parameter = plan.parameters.head
 
           plan.asJsonLD.flatten
@@ -49,7 +49,7 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
 
       "turn JsonLD of ImplicitCommandParameter entity into the ExplicitCommandParameter object" in {
         forAll(implicitCommandParameterObjects) { parameterFactory =>
-          val plan      = planEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
+          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
           val parameter = plan.parameters.head
 
           plan.asJsonLD.flatten
@@ -65,7 +65,7 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
 
       "turn JsonLD of LocationCommandInput entity into the LocationCommandInput object" in {
         forAll(locationCommandInputObjects) { parameterFactory =>
-          val plan      = planEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
+          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
           val parameter = plan.inputs.head
 
           plan.asJsonLD.flatten
@@ -78,7 +78,7 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
 
       "turn JsonLD of MappedCommandInput entity into the MappedCommandInput object" in {
         forAll(mappedCommandInputObjects) { parameterFactory =>
-          val plan      = planEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
+          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
           val parameter = plan.inputs.head
 
           plan.asJsonLD.flatten
@@ -91,7 +91,7 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
 
       "turn JsonLD of ImplicitCommandInput entity into the ImplicitCommandInput object" in {
         forAll(implicitCommandInputObjects) { parameterFactory =>
-          val plan      = planEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
+          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
           val parameter = plan.inputs.head
 
           plan.asJsonLD.flatten
@@ -107,7 +107,7 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
 
       "turn JsonLD of LocationCommandOutput entity into the LocationCommandOutput object" in {
         forAll(locationCommandOutputObjects) { parameterFactory =>
-          val plan      = planEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
+          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
           val parameter = plan.outputs.head
 
           plan.asJsonLD.flatten
@@ -120,7 +120,7 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
 
       "turn JsonLD of MappedCommandOutput entity into the MappedCommandOutput object" in {
         forAll(mappedCommandOutputObjects) { parameterFactory =>
-          val plan      = planEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
+          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
           val parameter = plan.outputs.head
 
           plan.asJsonLD.flatten
@@ -133,7 +133,7 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
 
       "turn JsonLD of ImplicitCommandOutput entity into the ImplicitCommandOutput object" in {
         forAll(implicitCommandOutputObjects) { parameterFactory =>
-          val plan      = planEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
+          val plan = stepPlanEntities(parameterFactory)(planCommands)(projectCreatedDates().generateOne).generateOne
           val parameter = plan.outputs.head
 
           plan.asJsonLD.flatten

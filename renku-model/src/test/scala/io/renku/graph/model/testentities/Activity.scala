@@ -39,7 +39,7 @@ final case class Activity(id:                  Id,
 ) {
 
   val association: Association          = associationFactory(this)
-  val plan:        Plan                 = association.plan
+  val plan:        StepPlan             = association.plan
   val usages:      List[Usage]          = usageFactories.map(_.apply(this))
   val parameters:  List[ParameterValue] = parameterFactories.map(_.apply(this))
   val generations: List[Generation]     = generationFactories.map(_.apply(this))
@@ -58,6 +58,10 @@ final case class Activity(id:                  Id,
 
   def findGenerationChecksum(location: Location): Option[Checksum] =
     findGenerationEntity(location).map(_.checksum)
+
+  def replaceStartTime(startTime: StartTime) = copy(startTime = startTime)
+
+  def modify(f: Activity => Activity) = f(this)
 }
 
 object Activity {

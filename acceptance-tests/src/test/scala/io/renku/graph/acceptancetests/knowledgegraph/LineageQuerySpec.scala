@@ -19,8 +19,8 @@
 package io.renku.graph.acceptancetests.knowledgegraph
 
 import cats.syntax.all._
-import io.circe.Json
 import io.circe.literal._
+import io.circe.{DecodingFailure, Json}
 import io.renku.generators.CommonGraphGenerators.authUsers
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
@@ -254,33 +254,29 @@ class LineageQuerySpec extends AcceptanceSpec with ApplicationServices with TSPr
       }
     }"""
 
-  private def theExpectedEdges(exemplarData: ExemplarData): Right[Nothing, Set[Json]] = {
+  private def theExpectedEdges(exemplarData: ExemplarData): Either[DecodingFailure, Set[Json]] = {
     import exemplarData._
-    Right {
-      Set(
-        json"""{"source": ${`zhbikes folder`.location},     "target": ${`activity3 node`.location}}""",
-        json"""{"source": ${`clean_data entity`.location},  "target": ${`activity3 node`.location}}""",
-        json"""{"source": ${`activity3 node`.location},     "target": ${`bikesparquet entity`.location}}""",
-        json"""{"source": ${`bikesparquet entity`.location},"target": ${`activity4 node`.location}}""",
-        json"""{"source": ${`plot_data entity`.location},   "target": ${`activity4 node`.location}}""",
-        json"""{"source": ${`activity4 node`.location},     "target": ${`grid_plot entity`.location}}"""
-      )
-    }
+    Set(
+      json"""{"source": ${`zhbikes folder`.location},     "target": ${`activity3 node`.location}}""",
+      json"""{"source": ${`clean_data entity`.location},  "target": ${`activity3 node`.location}}""",
+      json"""{"source": ${`activity3 node`.location},     "target": ${`bikesparquet entity`.location}}""",
+      json"""{"source": ${`bikesparquet entity`.location},"target": ${`activity4 node`.location}}""",
+      json"""{"source": ${`plot_data entity`.location},   "target": ${`activity4 node`.location}}""",
+      json"""{"source": ${`activity4 node`.location},     "target": ${`grid_plot entity`.location}}"""
+    ).asRight
   }
 
-  private def theExpectedNodes(exemplarData: ExemplarData): Right[Nothing, Set[Json]] = {
+  private def theExpectedNodes(exemplarData: ExemplarData): Either[DecodingFailure, Set[Json]] = {
     import exemplarData._
-    Right {
-      Set(
-        json"""{"id": ${`zhbikes folder`.location},      "location": ${`zhbikes folder`.location},      "label": ${`zhbikes folder`.label},      "type": ${`zhbikes folder`.singleWordType}}""",
-        json"""{"id": ${`activity3 node`.location},      "location": ${`activity3 node`.location},      "label": ${`activity3 node`.label},      "type": ${`activity3 node`.singleWordType}}""",
-        json"""{"id": ${`clean_data entity`.location},   "location": ${`clean_data entity`.location},   "label": ${`clean_data entity`.label},   "type": ${`clean_data entity`.singleWordType}}""",
-        json"""{"id": ${`bikesparquet entity`.location}, "location": ${`bikesparquet entity`.location}, "label": ${`bikesparquet entity`.label}, "type": ${`bikesparquet entity`.singleWordType}}""",
-        json"""{"id": ${`plot_data entity`.location},    "location": ${`plot_data entity`.location},    "label": ${`plot_data entity`.label},    "type": ${`plot_data entity`.singleWordType}}""",
-        json"""{"id": ${`activity4 node`.location},      "location": ${`activity4 node`.location},      "label": ${`activity4 node`.label},      "type": ${`activity4 node`.singleWordType}}""",
-        json"""{"id": ${`grid_plot entity`.location},    "location": ${`grid_plot entity`.location},    "label": ${`grid_plot entity`.label},    "type": ${`grid_plot entity`.singleWordType}}"""
-      )
-    }
+    Set(
+      json"""{"id": ${`zhbikes folder`.location},      "location": ${`zhbikes folder`.location},      "label": ${`zhbikes folder`.label},      "type": ${`zhbikes folder`.singleWordType}}""",
+      json"""{"id": ${`activity3 node`.location},      "location": ${`activity3 node`.location},      "label": ${`activity3 node`.label},      "type": ${`activity3 node`.singleWordType}}""",
+      json"""{"id": ${`clean_data entity`.location},   "location": ${`clean_data entity`.location},   "label": ${`clean_data entity`.label},   "type": ${`clean_data entity`.singleWordType}}""",
+      json"""{"id": ${`bikesparquet entity`.location}, "location": ${`bikesparquet entity`.location}, "label": ${`bikesparquet entity`.label}, "type": ${`bikesparquet entity`.singleWordType}}""",
+      json"""{"id": ${`plot_data entity`.location},    "location": ${`plot_data entity`.location},    "label": ${`plot_data entity`.label},    "type": ${`plot_data entity`.singleWordType}}""",
+      json"""{"id": ${`activity4 node`.location},      "location": ${`activity4 node`.location},      "label": ${`activity4 node`.label},      "type": ${`activity4 node`.singleWordType}}""",
+      json"""{"id": ${`grid_plot entity`.location},    "location": ${`grid_plot entity`.location},    "label": ${`grid_plot entity`.label},    "type": ${`grid_plot entity`.singleWordType}}"""
+    ).asRight
   }
 
   private implicit class NodeOps(node: NodeDef) {

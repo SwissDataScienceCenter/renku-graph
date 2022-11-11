@@ -19,7 +19,8 @@
 package io.renku.knowledgegraph.entities
 package finder
 
-import io.circe.Decoder
+import cats.data.NonEmptyList
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.graph.model.{plans, projects}
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
@@ -28,32 +29,64 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
 
   override val entityType: EntityType = EntityType.Workflow
 
-  override val selectVariables =
-    Set("?entityType", "?matchingScore", "?wkId", "?name", "?visibilities", "?date", "?maybeDescription", "?keywords")
+  override val selectVariables = Set("?entityType",
+                                     "?matchingScore",
+                                     "?wkId",
+                                     "?name",
+                                     "?date",
+                                     "?maybeDescription",
+                                     "?keywords",
+                                     "?projectIdVisibilities"
+  )
 
   override def query(criteria: Endpoint.Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
     // format: off
     s"""|{
-        |  SELECT ?entityType ?matchingScore ?wkId ?name ?visibilities ?date ?maybeDescription
-        |    (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+        |  SELECT ?entityType ?matchingScore ?wkId ?name ?date ?maybeDescription ?keywords ?projectIdVisibilities
         |  WHERE {
         |    {
-        |      SELECT ?wkId ?matchingScore ?date (GROUP_CONCAT(DISTINCT ?visibility; separator=',') AS ?visibilities)
+        |      SELECT ?matchingScore ?wkId ?name ?date ?maybeDescription
+        |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
+        |        (GROUP_CONCAT(DISTINCT ?projectIdVisibility; separator=',') AS ?projectIdVisibilities)
         |      WHERE {
-        |        ${filters.onQuery(
-    s"""|        {
-        |          SELECT ?wkId (MAX(?score) AS ?matchingScore) (SAMPLE(?projId) AS ?projectId)
+        |        {
+        |          SELECT ?wkId ?projectId ?matchingScore
+        |            (GROUP_CONCAT(DISTINCT ?childProjectId; separator='|') AS ?childProjectsIds)
+        |            (GROUP_CONCAT(DISTINCT ?projectIdWhereInvalidated; separator='|') AS ?projectsIdsWhereInvalidated)
         |          WHERE {
-        |            (?wkId ?score) text:query (schema:name schema:keywords schema:description '${filters.query}').
-        |            GRAPH ?g {
-        |              ?wkId a prov:Plan;
-        |                    ^renku:hasPlan ?projId
+        |            ${filters.onQuery(
+    s"""|            {
+        |              SELECT ?wkId (MAX(?score) AS ?matchingScore) (SAMPLE(?projId) AS ?projectId)
+        |              WHERE {
+        |                (?wkId ?score) text:query (schema:name schema:keywords schema:description '${filters.query}').
+        |                GRAPH ?g {
+        |                  ?wkId a prov:Plan;
+        |                        ^renku:hasPlan ?projId
+        |                }
+        |              }
+        |              GROUP BY ?wkId
+        |            }
+        |""")}
+        |            OPTIONAL {
+        |              GRAPH ?childProjectId {
+        |                ?childWkId prov:wasDerivedFrom ?wkId;
+        |                           ^renku:hasPlan ?childProjectId
+        |              }
+        |            }
+        |            OPTIONAL {
+        |              GRAPH ?projectIdWhereInvalidated {
+        |                ?wkId prov:invalidatedAtTime ?invalidationTime;
+        |                      ^renku:hasPlan ?projectIdWhereInvalidated
+        |              }
         |            }
         |          }
-        |          GROUP BY ?wkId
+        |          GROUP BY ?wkId ?projectId ?matchingScore
         |        }
-        |""")}
+        |
+        |        FILTER (IF (BOUND(?childProjectsIds), !CONTAINS(STR(?childProjectsIds), STR(?projectId)), true))
+        |        FILTER (IF (BOUND(?projectsIdsWhereInvalidated), !CONTAINS(STR(?projectsIdsWhereInvalidated), STR(?projectId)), true))
+        |
         |        GRAPH ?projectId {
         |          ?wkId a prov:Plan;
         |                schema:name ?name;
@@ -61,22 +94,19 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |                ^renku:hasPlan ?projectId.
         |          ?projectId renku:projectVisibility ?visibility;
         |                     renku:projectNamespace ?namespace.
+        |          BIND (CONCAT(STR(?projectId), STR('::'), STR(?visibility)) AS ?projectIdVisibility)
         |          ${criteria.maybeOnAccessRights("?projectId", "?visibility")}
         |          ${filters.maybeOnVisibility("?visibility")}
         |          ${filters.maybeOnNamespace("?namespace")}
         |          ${filters.maybeOnDateCreated("?date")}
+        |          OPTIONAL { ?wkId schema:description ?maybeDescription }
+        |          OPTIONAL { ?wkId schema:keywords ?keyword }
         |        }
         |      }
-        |      GROUP BY ?wkId ?matchingScore ?date
+        |      GROUP BY ?wkId ?matchingScore ?name ?date ?maybeDescription
         |    }
         |    BIND ('workflow' AS ?entityType)
-        |    GRAPH ?g {
-        |      ?wkId schema:name ?name.
-        |      OPTIONAL { ?wkId schema:description ?maybeDescription }
-        |      OPTIONAL { ?wkId schema:keywords ?keyword }
-        |    }
         |  }
-        |  GROUP BY ?entityType ?matchingScore ?wkId ?name ?visibilities ?date ?maybeDescription
         |}
         |""".stripMargin
     // format: on
@@ -87,18 +117,41 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
     import cats.syntax.all._
     import io.renku.tinytypes.json.TinyTypeDecoders._
 
-    lazy val selectBroaderVisibility: List[projects.Visibility] => projects.Visibility = list =>
-      list
-        .find(_ == projects.Visibility.Public)
-        .orElse(list.find(_ == projects.Visibility.Internal))
-        .getOrElse(projects.Visibility.Private)
+    lazy val toListOfProjectIdsAndVisibilities
+        : Option[String] => Decoder.Result[NonEmptyList[(projects.ResourceId, projects.Visibility)]] =
+      _.map(
+        _.split(",")
+          .map(_.trim)
+          .map { case s"$projectId::$visibility" =>
+            (projects.ResourceId.from(projectId) -> projects.Visibility.from(visibility)).mapN((_, _))
+          }
+          .toList
+          .sequence
+          .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
+          .map {
+            case head :: tail => NonEmptyList.of(head, tail: _*).some
+            case Nil          => None
+          }
+      ).getOrElse(Option.empty[NonEmptyList[(projects.ResourceId, projects.Visibility)]].asRight)
+        .flatMap {
+          case Some(tuples) => tuples.asRight
+          case None         => DecodingFailure("Plan's project and visibility not found", Nil).asLeft
+        }
+
+    lazy val selectBroaderVisibility: NonEmptyList[(projects.ResourceId, projects.Visibility)] => projects.Visibility =
+      list =>
+        list
+          .find(_._2 == projects.Visibility.Public)
+          .orElse(list.find(_._2 == projects.Visibility.Internal))
+          .map(_._2)
+          .getOrElse(projects.Visibility.Private)
 
     for {
       matchingScore <- extract[MatchingScore]("matchingScore")
       name          <- extract[plans.Name]("name")
       dateCreated   <- extract[plans.DateCreated]("date")
-      visibility <- extract[Option[String]]("visibilities")
-                      .flatMap(toListOf[projects.Visibility, projects.Visibility.type](projects.Visibility))
+      visibility <- extract[Option[String]]("projectIdVisibilities")
+                      .flatMap(toListOfProjectIdsAndVisibilities)
                       .map(selectBroaderVisibility)
       keywords <- extract[Option[String]]("keywords") >>= toListOf[plans.Keyword, plans.Keyword.type](plans.Keyword)
       maybeDescription <- extract[Option[plans.Description]]("maybeDescription")

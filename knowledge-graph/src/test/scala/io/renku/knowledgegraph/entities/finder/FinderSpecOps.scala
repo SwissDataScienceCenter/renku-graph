@@ -93,6 +93,7 @@ trait FinderSpecOps {
       addPersons((project.members ++ project.maybeCreator).toList)
         .addPersons(project.datasets.flatMap(_.provenance.creators.toList))
         .addPersons(project.activities.map(_.author))
+        .addPersons(project.plans.flatMap(_.creators))
         .distinct
 
     def removeAllPersons(): List[model.Entity] = entities.filterNot {

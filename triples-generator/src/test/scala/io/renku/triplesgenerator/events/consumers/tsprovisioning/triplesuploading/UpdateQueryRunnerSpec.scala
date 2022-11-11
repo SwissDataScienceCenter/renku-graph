@@ -24,7 +24,7 @@ import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
 import eu.timepit.refined.auto._
-import io.renku.generators.CommonGraphGenerators.{renkuConnectionConfigs, sparqlQueries}
+import io.renku.generators.CommonGraphGenerators.{sparqlQueries, storeConnectionConfigs}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.client.UrlEncoder.urlEncode
@@ -92,7 +92,7 @@ class UpdateQueryRunnerSpec extends AnyWordSpec with IOSpec with ExternalService
 
       failure shouldBe a[LogWorthyRecoverableError]
       failure.getMessage should startWith(
-        s"Triples transformation update 'curation update' failed: POST $externalServiceBaseUrl/${renkuConnectionConfig.datasetName}/update error"
+        s"Triples transformation update 'curation update' failed: POST $externalServiceBaseUrl/${storeConfig.datasetName}/update error"
       )
     }
   }
@@ -102,16 +102,12 @@ class UpdateQueryRunnerSpec extends AnyWordSpec with IOSpec with ExternalService
 
     private implicit val logger:       TestLogger[IO]              = TestLogger[IO]()
     private implicit val timeRecorder: SparqlQueryTimeRecorder[IO] = TestSparqlQueryTimeRecorder[IO]
-    lazy val renkuConnectionConfig =
-      renkuConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
-    lazy val queryRunner =
-      new UpdateQueryRunnerImpl[IO](renkuConnectionConfig, retryInterval = 100 millis, maxRetries = 1)
+    lazy val storeConfig = storeConnectionConfigs.generateOne.copy(fusekiUrl = FusekiUrl(externalServiceBaseUrl))
+    lazy val queryRunner = new UpdateQueryRunnerImpl[IO](storeConfig, retryInterval = 100 millis, maxRetries = 1)
 
     def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) = stubFor {
-      post(s"/${renkuConnectionConfig.datasetName}/update")
-        .withBasicAuth(renkuConnectionConfig.authCredentials.username.value,
-                       renkuConnectionConfig.authCredentials.password.value
-        )
+      post(s"/${storeConfig.datasetName}/update")
+        .withBasicAuth(storeConfig.authCredentials.username.value, storeConfig.authCredentials.password.value)
         .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
         .withRequestBody(equalTo(s"update=${urlEncode(forUpdate.toString)}"))
         .willReturn(returning)

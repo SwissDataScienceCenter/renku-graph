@@ -57,7 +57,7 @@ class StatsFinderSpec
       val projectsWithDatasets =
         anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).generateNonEmptyList().toList
       val projectsWithActivities = anyRenkuProjectEntities
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateNonEmptyList(min = 10, max = 50)
         .toList
       val persons = projectsWithActivities.flatMap(_.activities.map(_.author))

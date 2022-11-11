@@ -22,6 +22,7 @@ import cats.syntax.all._
 import monocle.Lens
 
 object ActivityLens {
+
   val activityAssociation: Lens[Activity, Association] =
     Lens[Activity, Association](_.association)(assoc => act => act.copy(association = assoc))
 
@@ -30,10 +31,4 @@ object ActivityLens {
 
   val activityAssociationAgent: Lens[Activity, Either[Agent, Person]] =
     activityAssociation >>> AssociationLens.associationAgent
-
-  val activityPlan: Lens[Activity, Plan] =
-    activityAssociation >>> AssociationLens.associationPlan
-
-  val activityPlanCreators: Lens[Activity, Set[Person]] =
-    activityPlan >>> PlanLens.planCreators
 }

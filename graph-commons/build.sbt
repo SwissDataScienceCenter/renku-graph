@@ -20,12 +20,12 @@ name := "graph-commons"
 
 Test / fork := true
 
-val pureConfigVersion = "0.17.1"
+val pureConfigVersion = "0.17.2"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
 libraryDependencies += "eu.timepit"   %% "refined-pureconfig" % "0.10.1"
-libraryDependencies += "io.sentry"     % "sentry-logback"     % "6.6.0"
+libraryDependencies += "io.sentry"     % "sentry-logback"     % "6.7.0"
 libraryDependencies += "org.tpolecat" %% "skunk-core"         % "0.3.2"
 
 val http4sVersion           = "0.23.16"
@@ -45,6 +45,6 @@ libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.5.0"
 val testContainersScalaVersion = "0.40.11"
 libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng"          %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
-libraryDependencies += "com.github.tomakehurst" % "wiremock-jre8"                   % "2.34.0"                   % Test
+libraryDependencies += "com.github.tomakehurst" % "wiremock-jre8"                   % "2.35.0"                   % Test
 
 libraryDependencies += "org.scalamock" %% "scalamock" % "5.2.0" % Test
