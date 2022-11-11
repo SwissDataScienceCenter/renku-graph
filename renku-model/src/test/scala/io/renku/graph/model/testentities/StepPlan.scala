@@ -19,7 +19,7 @@
 package io.renku.graph.model
 package testentities
 
-import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import cats.data.{Validated, ValidatedNel}
 import cats.syntax.all._
 import commandParameters.Position
@@ -76,9 +76,9 @@ object StepPlan {
         plan.keywords,
         plan.maybeCommand,
         plan.maybeProgrammingLanguage,
-        plan.parameters.map(_.to[entities.CommandParameterBase.CommandParameter]),
-        plan.inputs.map(_.to[entities.CommandParameterBase.CommandInput]),
-        plan.outputs.map(_.to[entities.CommandParameterBase.CommandOutput]),
+        plan.parameters.map(_.to[entities.StepPlanCommandParameter.CommandParameter]),
+        plan.inputs.map(_.to[entities.StepPlanCommandParameter.CommandInput]),
+        plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput]),
         plan.successCodes
       )
   }
@@ -179,9 +179,9 @@ object StepPlan {
           plan.keywords,
           plan.maybeCommand,
           plan.maybeProgrammingLanguage,
-          plan.parameters.map(_.to[entities.CommandParameterBase.CommandParameter]),
-          plan.inputs.map(_.to[entities.CommandParameterBase.CommandInput]),
-          plan.outputs.map(_.to[entities.CommandParameterBase.CommandOutput]),
+          plan.parameters.map(_.to[entities.StepPlanCommandParameter.CommandParameter]),
+          plan.inputs.map(_.to[entities.StepPlanCommandParameter.CommandInput]),
+          plan.outputs.map(_.to[entities.StepPlanCommandParameter.CommandOutput]),
           plan.successCodes,
           entities.Plan.Derivation(DerivedFrom(plan.parent.asEntityId),
                                    plans.ResourceId(plan.topmostParent.asEntityId.show)

@@ -23,7 +23,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.noDashUuid
 import io.renku.graph.model.entityModel.LocationLike
 import io.renku.graph.model.parameterValues.ValueOverride
-import io.renku.graph.model.testentities.CommandParameterBase._
+import io.renku.graph.model.testentities.StepPlanCommandParameter._
 import io.renku.graph.model.testentities.ParameterValue.LocationParameterValue.{CommandInputValue, CommandOutputValue}
 import io.renku.graph.model.testentities.ParameterValue._
 import io.renku.graph.model.{RenkuUrl, entities, parameterValues}
@@ -51,19 +51,20 @@ object ParameterValue {
 
   implicit def toEntitiesParameterValue(implicit renkuUrl: RenkuUrl): ParameterValue => entities.ParameterValue = {
     case p: CommandParameterValue =>
-      entities.ParameterValue.CommandParameterValue(parameterValues.ResourceId(p.asEntityId.show),
-                                                    p.value,
-                                                    p.valueReference.to[entities.CommandParameterBase.CommandParameter]
+      entities.ParameterValue.CommandParameterValue(
+        parameterValues.ResourceId(p.asEntityId.show),
+        p.value,
+        p.valueReference.to[entities.StepPlanCommandParameter.CommandParameter]
       )
     case p: CommandOutputValue =>
       entities.ParameterValue.CommandOutputValue(parameterValues.ResourceId(p.asEntityId.show),
                                                  p.value,
-                                                 p.valueReference.to[entities.CommandParameterBase.CommandOutput]
+                                                 p.valueReference.to[entities.StepPlanCommandParameter.CommandOutput]
       )
     case p: CommandInputValue =>
       entities.ParameterValue.CommandInputValue(parameterValues.ResourceId(p.asEntityId.show),
                                                 p.value,
-                                                p.valueReference.to[entities.CommandParameterBase.CommandInput]
+                                                p.valueReference.to[entities.StepPlanCommandParameter.CommandInput]
       )
   }
 

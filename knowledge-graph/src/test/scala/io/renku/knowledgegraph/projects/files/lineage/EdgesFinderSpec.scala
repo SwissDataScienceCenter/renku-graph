@@ -25,7 +25,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.projects.Visibility
-import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput}
+import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput}
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn

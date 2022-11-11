@@ -25,9 +25,9 @@ import io.renku.graph.model._
 import io.renku.graph.model.commandParameters.IOStream
 import io.renku.graph.model.entityModel.{Location, LocationLike}
 import io.renku.graph.model.plans.Command
-import io.renku.graph.model.testentities.CommandParameterBase.CommandInput._
-import io.renku.graph.model.testentities.CommandParameterBase.CommandOutput.{ImplicitCommandOutput, LocationCommandOutput, MappedCommandOutput}
-import io.renku.graph.model.testentities.CommandParameterBase._
+import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandInput._
+import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandOutput.{ImplicitCommandOutput, LocationCommandOutput, MappedCommandOutput}
+import io.renku.graph.model.testentities.StepPlanCommandParameter._
 import io.renku.graph.model.testentities.Entity.InputEntity
 import io.renku.graph.model.testentities.ParameterValue.CommandParameterValue
 import io.renku.graph.model.testentities.ParameterValue.LocationParameterValue.{CommandInputValue, CommandOutputValue}

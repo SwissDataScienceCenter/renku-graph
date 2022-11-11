@@ -31,7 +31,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
-import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.ActivityGenFactory
 import io.renku.http.client.AccessToken

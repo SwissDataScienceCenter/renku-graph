@@ -21,7 +21,7 @@ package io.renku.graph.model.entities
 import cats.data.NonEmptyList
 import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model.commandParameters.{ResourceId => ParamResourceId}
-import io.renku.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import io.renku.graph.model.entities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.parameterLinks.ResourceId
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 import io.renku.jsonld.ontology.{Class, ObjectProperty, Type}

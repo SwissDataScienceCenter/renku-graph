@@ -21,7 +21,7 @@ package io.renku.graph.model.entities
 import cats.data.NonEmptyList
 import io.renku.graph.model.Schemas.{renku, schema}
 import io.renku.graph.model.commandParameters._
-import io.renku.graph.model.entities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import io.renku.graph.model.entities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.jsonld.{EntityTypes, JsonLD, JsonLDDecoder, JsonLDEncoder}
 import io.renku.jsonld.ontology._
@@ -35,7 +35,11 @@ final case class ParameterMapping(
     maybeDescription: Option[Description],
     name:             Name,
     mappedParameter:  NonEmptyList[ResourceId]
-)
+) extends CommandParameterBase {
+  override type DefaultValue = ParameterMapping.DefaultValue
+  // ParameterMappings do not have a prefix.
+  override val maybePrefix: Option[Prefix] = None
+}
 
 object ParameterMapping {
   final case class DefaultValue(value: String) extends StringTinyType

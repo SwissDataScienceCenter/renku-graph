@@ -19,7 +19,7 @@
 package io.renku.graph.model
 package entities
 
-import CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import Schemas.{prov, renku, schema}
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
@@ -317,9 +317,9 @@ object StepPlan {
     Type.Def(
       planClass,
       ObjectProperties(
-        ObjectProperty(renku / "hasArguments", CommandParameterBase.CommandParameter.ontology),
-        ObjectProperty(renku / "hasInputs", CommandParameterBase.CommandInput.ontology),
-        ObjectProperty(renku / "hasOutputs", CommandParameterBase.CommandOutput.ontology),
+        ObjectProperty(renku / "hasArguments", StepPlanCommandParameter.CommandParameter.ontology),
+        ObjectProperty(renku / "hasInputs", StepPlanCommandParameter.CommandInput.ontology),
+        ObjectProperty(renku / "hasOutputs", StepPlanCommandParameter.CommandOutput.ontology),
         ObjectProperty(schema / "creator", Person.ontology),
         ObjectProperty(prov / "wasDerivedFrom", planClass),
         ObjectProperty(renku / "topmostDerivedFrom", planClass)

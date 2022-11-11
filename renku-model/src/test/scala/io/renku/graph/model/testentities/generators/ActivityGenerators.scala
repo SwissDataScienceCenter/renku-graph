@@ -22,7 +22,7 @@ package generators
 import StepPlan.CommandParameters
 import StepPlan.CommandParameters.CommandParameterFactory
 import cats.data.NonEmptyList
-import generators.EntitiesGenerators.{ActivityGenFactory, CompositePlanGenFactory, StepPlanGenFactory}
+import generators.EntitiesGenerators.{ActivityGenFactory, CompositePlanGenFactory, PlanGenFactory, StepPlanGenFactory}
 import io.renku.generators.Generators
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{noDashUuid, nonBlankStrings, nonEmptyStrings, positiveInts, relativePaths, sentences, timestampsNotInTheFuture}
@@ -127,6 +127,15 @@ trait ActivityGenerators {
         plans = NonEmptyList.one(childPlan),
         mappings = Nil,
         links = Nil
+      )
+
+  def planEntities(
+      parameterFactories:     CommandParameterFactory*
+  )(implicit planCommandsGen: Gen[Command]): PlanGenFactory =
+    dateCreated =>
+      Gen.oneOf(
+        stepPlanEntities(parameterFactories: _*)(planCommandsGen)(dateCreated),
+        compositePlanEntities()(dateCreated)
       )
 
   def parameterLinkEntities: Gen[CompositePlan.ParameterLink] =

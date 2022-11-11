@@ -34,6 +34,7 @@ object EntitiesGenerators extends EntitiesGenerators {
   type ActivityGenFactory                          = projects.DateCreated => Gen[Activity]
   type StepPlanGenFactory                          = projects.DateCreated => Gen[StepPlan]
   type CompositePlanGenFactory                     = projects.DateCreated => Gen[CompositePlan]
+  type PlanGenFactory                              = projects.DateCreated => Gen[Plan]
 }
 
 private object Instances {

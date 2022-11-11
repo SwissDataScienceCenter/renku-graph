@@ -147,7 +147,7 @@ class WorkflowsEntitiesFinderSpec
           .withActivities(activityEntities(stepPlanEntities()))
           .generateOne
 
-        p.addUnlinkedStepPlan(p.stepPlans.head.invalidate())
+        p.addUnlinkedPlan(p.stepPlans.head.invalidate())
       }
 
       upload(to = projectsDataset, project)
