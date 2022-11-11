@@ -439,7 +439,6 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
     "validate a composite plan that has references outside its children" in {
       val testPlan = compositePlanGen()
-        .suchThat(p => p.mappings.nonEmpty)
         .generateOne
         .asInstanceOf[CompositePlan.NonModified]
 

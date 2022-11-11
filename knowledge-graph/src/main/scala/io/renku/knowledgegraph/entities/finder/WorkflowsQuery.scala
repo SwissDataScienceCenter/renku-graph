@@ -20,9 +20,12 @@ package io.renku.knowledgegraph.entities
 package finder
 
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import io.circe.{Decoder, DecodingFailure}
+import io.renku.graph.model.entities.{CompositePlan, StepPlan}
 import io.renku.graph.model.{plans, projects}
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters.EntityType
+import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
 import io.renku.knowledgegraph.entities.model.{Entity, MatchingScore}
 
 private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
@@ -36,19 +39,21 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
                                      "?date",
                                      "?maybeDescription",
                                      "?keywords",
-                                     "?projectIdVisibilities"
+                                     "?projectIdVisibilities",
+                                     "?workflowTypes"
   )
 
   override def query(criteria: Endpoint.Criteria) = (criteria.filters whenRequesting entityType) {
     import criteria._
     // format: off
     s"""|{
-        |  SELECT ?entityType ?matchingScore ?wkId ?name ?date ?maybeDescription ?keywords ?projectIdVisibilities
+        |  SELECT ?entityType ?matchingScore ?wkId ?name ?date ?maybeDescription ?keywords ?projectIdVisibilities ?workflowTypes
         |  WHERE {
         |    {
         |      SELECT ?matchingScore ?wkId ?name ?date ?maybeDescription
         |        (GROUP_CONCAT(DISTINCT ?keyword; separator=',') AS ?keywords)
         |        (GROUP_CONCAT(DISTINCT ?projectIdVisibility; separator=',') AS ?projectIdVisibilities)
+        |        (GROUP_CONCAT(DISTINCT ?workflowType; separator=',') AS ?workflowTypes)
         |      WHERE {
         |        {
         |          SELECT ?wkId ?projectId ?matchingScore
@@ -89,6 +94,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
         |
         |        GRAPH ?projectId {
         |          ?wkId a prov:Plan;
+        |                a ?workflowType;
         |                schema:name ?name;
         |                schema:dateCreated ?date;
         |                ^renku:hasPlan ?projectId.
@@ -155,6 +161,20 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
                       .map(selectBroaderVisibility)
       keywords <- extract[Option[String]]("keywords") >>= toListOf[plans.Keyword, plans.Keyword.type](plans.Keyword)
       maybeDescription <- extract[Option[plans.Description]]("maybeDescription")
-    } yield Entity.Workflow(matchingScore, name, visibility, dateCreated, keywords, maybeDescription)
+      workflowTypes    <- extract[WorkflowType]("workflowTypes")
+    } yield Entity.Workflow(matchingScore, name, visibility, dateCreated, keywords, maybeDescription, workflowTypes)
   }
+
+  def workflowTypeFromString(str: String): Either[String, WorkflowType] =
+    str match {
+      case _ if str.contains(CompositePlan.Ontology.typeDef.clazz.id.show) =>
+        Right(WorkflowType.Composite)
+      case _ if str.contains(StepPlan.ontology.clazz.id.show) =>
+        Right(WorkflowType.Basic)
+      case _ =>
+        Left(s"Unknown workflowType value: $str")
+    }
+
+  implicit val workflowTypeDecoder: Decoder[WorkflowType] =
+    Decoder.decodeString.emap(workflowTypeFromString)
 }

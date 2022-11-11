@@ -19,6 +19,7 @@
 package io.renku.knowledgegraph.entities
 
 import Endpoint.Criteria
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.literal._
 import io.circe.syntax._
@@ -166,13 +167,31 @@ private object model {
         visibility:       projects.Visibility,
         date:             plans.DateCreated,
         keywords:         List[plans.Keyword],
-        maybeDescription: Option[plans.Description]
+        maybeDescription: Option[plans.Description],
+        workflowType:     Workflow.WorkflowType
     ) extends Entity {
       override type Name = plans.Name
       override type Date = plans.DateCreated
     }
 
     object Workflow {
+      sealed trait WorkflowType { self: Product =>
+        final def name: String = self.productPrefix.toLowerCase
+      }
+      object WorkflowType {
+        case object Composite extends WorkflowType
+        case object Basic     extends WorkflowType
+
+        val all: NonEmptyList[WorkflowType] =
+          NonEmptyList.of(Composite, Basic)
+
+        def fromName(str: String): Either[String, WorkflowType] =
+          all.find(_.name.equalsIgnoreCase(str)).toRight(s"Invalid workflowType name: $str")
+
+        implicit val encoder: Encoder[WorkflowType] =
+          Encoder.encodeString.contramap(_.name)
+      }
+
       private[entities] implicit lazy val encoder: Encoder[model.Entity.Workflow] =
         Encoder.instance { workflow =>
           json"""{
@@ -181,7 +200,8 @@ private object model {
             "name":          ${workflow.name},
             "visibility":    ${workflow.visibility},
             "date":          ${workflow.date},
-            "keywords":      ${workflow.keywords}
+            "keywords":      ${workflow.keywords},
+            "workflowType": ${workflow.workflowType}
           }"""
             .addIfDefined("description" -> workflow.maybeDescription)
         }

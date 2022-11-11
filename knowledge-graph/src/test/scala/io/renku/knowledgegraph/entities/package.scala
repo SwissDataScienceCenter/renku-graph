@@ -28,6 +28,7 @@ import org.scalacheck.Gen.choose
 package object entities {
   import Endpoint.Criteria._
   import entities.model._
+  import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
 
   val queryParams: Gen[Filters.Query]      = nonBlankStrings(minLength = 5).map(v => Filters.Query(v.value))
   val typeParams:  Gen[Filters.EntityType] = Gen.oneOf(Filters.EntityType.all)
@@ -42,7 +43,7 @@ package object entities {
     anyRenkuProjectEntities.addDataset(datasetEntities(provenanceNonModified)).map(_.to[model.Entity.Dataset])
   private[entities] val modelWorkflows: Gen[model.Entity.Workflow] =
     anyRenkuProjectEntities.withActivities(activityEntities(stepPlanEntities())) map { project =>
-      val plan :: Nil = project.plans.toList
+      val plan :: Nil = project.plans
       (plan -> project).to[model.Entity.Workflow]
     }
   private[entities] val modelPersons: Gen[model.Entity.Person] = personEntities.map(_.to[model.Entity.Person])
@@ -85,12 +86,17 @@ package object entities {
 
   private[entities] implicit def planConverter[P <: testentities.Project]
       : ((testentities.Plan, P)) => Entity.Workflow = { case (plan, project) =>
-    Entity.Workflow(MatchingScore.min,
-                    plan.name,
-                    project.visibility,
-                    plan.dateCreated,
-                    plan.keywords.sorted,
-                    plan.maybeDescription
+    Entity.Workflow(
+      MatchingScore.min,
+      plan.name,
+      project.visibility,
+      plan.dateCreated,
+      plan.keywords.sorted,
+      plan.maybeDescription,
+      plan match {
+        case _: CompositePlan => WorkflowType.Composite
+        case _: StepPlan      => WorkflowType.Basic
+      }
     )
   }
 

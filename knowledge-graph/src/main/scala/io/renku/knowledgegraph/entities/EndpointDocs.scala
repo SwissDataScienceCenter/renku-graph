@@ -167,7 +167,8 @@ private class EndpointDocsImpl()(implicit gitLabUrl: GitLabUrl, renkuApiUrl: ren
       projects.Visibility.Public,
       plans.DateCreated(Instant.parse("2012-11-15T10:00:00.000Z")),
       List(plans.Keyword("key")),
-      plans.Description("description").some
+      plans.Description("description").some,
+      Workflow.WorkflowType.Basic
     ).asJson,
     Person(
       MatchingScore(1),

@@ -167,7 +167,7 @@ class PlanSpec
     }
 
     "fail decode if a parameter maps to itself" in {
-      val plan = compositePlanGen().filter(_.mappings.nonEmpty).generateOne
+      val plan = compositePlanGen().generateOne
       val pm_  = plan.mappings.head
       val pm   = pm_.copy(mappedParam = NonEmptyList.one(pm_))
 
