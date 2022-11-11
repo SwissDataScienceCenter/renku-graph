@@ -33,7 +33,7 @@ import io.renku.graph.model.testentities.Entity.{InputEntity, OutputEntity}
 import io.renku.graph.model.testentities.ExecutionPlanner.ActivityData
 import io.renku.graph.model.testentities.ParameterValue.{CommandParameterValue, LocationParameterValue}
 
-final case class ExecutionPlanner(plan:                     Plan,
+final case class ExecutionPlanner(plan:                     StepPlan,
                                   activityData:             ActivityData,
                                   parametersValueOverrides: List[(ParameterDefaultValue, ValueOverride)],
                                   inputsValueOverrides:     List[(InputDefaultValue, Entity)],
@@ -213,10 +213,10 @@ object ExecutionPlanner {
 
   private type ActivityData = (activities.StartTime, Person, CliVersion)
 
-  def of(plan: Plan, activityTime: activities.StartTime, author: Person, project: RenkuProject): ExecutionPlanner =
+  def of(plan: StepPlan, activityTime: activities.StartTime, author: Person, project: RenkuProject): ExecutionPlanner =
     of(plan, activityTime, author, project.agent, project.topAncestorDateCreated)
 
-  def of(plan:               Plan,
+  def of(plan:               StepPlan,
          activityTime:       activities.StartTime,
          author:             Person,
          cliVersion:         CliVersion,

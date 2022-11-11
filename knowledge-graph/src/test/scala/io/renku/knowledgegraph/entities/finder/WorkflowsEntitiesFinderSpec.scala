@@ -44,10 +44,10 @@ class WorkflowsEntitiesFinderSpec
 
     "de-duplicate workflows when on forked projects" in new TestCase {
       val original ::~ fork = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
         .forkOnce()
-      val plan :: Nil = fork.plans.toList
+      val plan :: Nil = fork.plans
 
       upload(to = projectsDataset, original, fork)
 
@@ -68,7 +68,7 @@ class WorkflowsEntitiesFinderSpec
     "favour workflows on public projects if exist" in new TestCase {
 
       val publicProject = renkuProjectEntities(visibilityPublic)
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
 
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
@@ -76,7 +76,7 @@ class WorkflowsEntitiesFinderSpec
         val original ::~ fork = publicProject.forkOnce()
         original -> fork.copy(visibility = visibilityNonPublic.generateOne, members = Set(member))
       }
-      val plan :: Nil = publicProject.plans.toList
+      val plan :: Nil = publicProject.plans
 
       upload(to = projectsDataset, original, fork)
 
@@ -95,14 +95,14 @@ class WorkflowsEntitiesFinderSpec
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val internalProject = renkuProjectEntities(fixed(projects.Visibility.Internal))
         .modify(replaceMembers(to = Set(member)))
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
 
       val original ::~ fork = {
         val original ::~ fork = internalProject.forkOnce()
         original -> fork.copy(visibility = projects.Visibility.Private, members = Set(member))
       }
-      val plan :: Nil = internalProject.plans.toList
+      val plan :: Nil = internalProject.plans
 
       upload(to = projectsDataset, original, fork)
 
@@ -121,9 +121,9 @@ class WorkflowsEntitiesFinderSpec
       val member = personEntities(personGitLabIds.toGeneratorOfSomes).generateOne
       val privateProject = renkuProjectEntities(fixed(projects.Visibility.Private))
         .modify(replaceMembers(to = Set(member)))
-        .withActivities(activityEntities(planEntities()))
+        .withActivities(activityEntities(stepPlanEntities()))
         .generateOne
-      val plan :: Nil = privateProject.plans.toList
+      val plan :: Nil = privateProject.plans
 
       upload(to = projectsDataset, privateProject)
 
@@ -135,6 +135,27 @@ class WorkflowsEntitiesFinderSpec
         )
         .unsafeRunSync()
         .results shouldBe List((plan -> privateProject).to[model.Entity.Workflow])
+    }
+  }
+
+  "findEntities - in case of invalidated Plans" should {
+
+    "not return workflows that have been invalidated" in new TestCase {
+
+      val project = {
+        val p = renkuProjectEntities(visibilityPublic)
+          .withActivities(activityEntities(stepPlanEntities()))
+          .generateOne
+
+        p.addUnlinkedStepPlan(p.stepPlans.head.invalidate())
+      }
+
+      upload(to = projectsDataset, project)
+
+      finder
+        .findEntities(Criteria(filters = Filters(entityTypes = Set(Filters.EntityType.Workflow))))
+        .unsafeRunSync()
+        .results shouldBe List.empty
     }
   }
 }

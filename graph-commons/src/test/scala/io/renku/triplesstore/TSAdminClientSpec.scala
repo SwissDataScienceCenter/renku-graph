@@ -29,7 +29,8 @@ import io.renku.generators.Generators._
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.IOSpec
-import io.renku.triplesstore.TSAdminClient.CreationResult
+import io.renku.triplesstore.TSAdminClient.{CreationResult, RemovalResult}
+import org.http4s.Status
 import org.http4s.Status._
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -145,6 +146,45 @@ class TSAdminClientSpec
 
       val exception = intercept[Exception] {
         client.checkDatasetExists(datasetName).unsafeRunSync()
+      }
+
+      exception.getMessage should include(BadRequest.toString)
+    }
+  }
+
+  "removeDataset" should {
+
+    val datasetName = nonEmptyStrings().generateAs(DatasetName)
+
+    forAll {
+      Table(
+        "status"                -> "expected result",
+        Status.Ok               -> RemovalResult.Removed,
+        Status.NotFound         -> RemovalResult.NotExisted,
+        Status.MethodNotAllowed -> RemovalResult.NotAllowed
+      )
+    } { (status, result) =>
+      "send a DELETE request to delete the dataset with the given name " +
+        s"and return $result for $status" in new TestCase {
+
+          stubFor {
+            delete(s"/$$/datasets/$datasetName").withAuth
+              .willReturn(aResponse.withStatus(status.code))
+          }
+
+          (client removeDataset datasetName).unsafeRunSync() shouldBe result
+        }
+    }
+
+    "fail for other response statuses" in new TestCase {
+
+      stubFor {
+        delete(s"/$$/datasets/$datasetName").withAuth
+          .willReturn(aResponse.withStatus(BadRequest.code))
+      }
+
+      val exception = intercept[Exception] {
+        client.removeDataset(datasetName).unsafeRunSync()
       }
 
       exception.getMessage should include(BadRequest.toString)

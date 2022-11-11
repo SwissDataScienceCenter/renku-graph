@@ -38,9 +38,9 @@ class GenerationSpec extends AnyWordSpec with should.Matchers with ScalaCheckPro
 
     "turn JsonLD Generation entity into the Generation object " in {
       forAll(locationCommandOutputObjects) { commandOutput =>
-        val activity1 = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+        val activity1 = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
           .to[entities.Activity]
-        val activity2 = activityEntities(planEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
+        val activity2 = activityEntities(stepPlanEntities(commandOutput))(projectCreatedDates().generateOne).generateOne
           .to[entities.Activity]
 
         JsonLD

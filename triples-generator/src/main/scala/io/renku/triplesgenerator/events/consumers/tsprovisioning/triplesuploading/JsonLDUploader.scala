@@ -68,14 +68,14 @@ private class JsonLDUploaderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
 }
 
 private object JsonLDUploader {
-  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](renkuConnectionConfig: RenkuConnectionConfig,
+  def apply[F[_]: Async: Logger: SparqlQueryTimeRecorder](storeConfig: ProjectsConnectionConfig,
                                                           retryInterval: FiniteDuration = SleepAfterConnectionIssue,
                                                           maxRetries: Int Refined NonNegative =
                                                             MaxRetriesAfterConnectionTimeout,
                                                           idleTimeout:    Duration = 6 minutes,
                                                           requestTimeout: Duration = 5 minutes
   ): F[JsonLDUploaderImpl[F]] = MonadThrow[F].catchNonFatal(
-    new JsonLDUploaderImpl[F](renkuConnectionConfig,
+    new JsonLDUploaderImpl[F](storeConfig,
                               RecoverableErrorsRecovery,
                               retryInterval,
                               maxRetries,

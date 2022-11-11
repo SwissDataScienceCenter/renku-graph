@@ -73,7 +73,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
     s"""|SELECT DISTINCT ?activity ?date ?sourceEntityLocation ?targetEntityLocation
         |WHERE {
         |   BIND (${ResourceId(path)(renkuUrl).showAs[RdfResource]} AS ?projectId)
-        |   Graph ?projectId {
+        |   GRAPH ?projectId {
         |     ${projectMemberFilterQuery(ResourceId(path)(renkuUrl).showAs[RdfResource])(maybeUser)}
         |     ?activity a prov:Activity;
         |               ^renku:hasActivity ?projectId;
@@ -148,7 +148,7 @@ private class EdgesFinderImpl[F[_]: Async: Logger: SparqlQueryTimeRecorder](
       s"""|$projectResourceId renku:projectVisibility ?visibility .
           |OPTIONAL {
           |  $projectResourceId schema:member ?memberId
-          |  Graph <${GraphClass.Persons.id}> {
+          |  GRAPH <${GraphClass.Persons.id}> {
           |    ?memberId schema:sameAs ?sameAsId.
           |    ?sameAsId schema:additionalType '${Person.gitLabSameAsAdditionalType}';
           |              schema:identifier ?userGitlabId .

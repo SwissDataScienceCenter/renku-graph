@@ -28,18 +28,6 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class AssociationLensSpec extends AnyWordSpec with should.Matchers with EntitiesGenerators {
 
-  "associationPlan" should {
-    "get and set" in {
-      val assoc1 = createAssociationPerson
-      val assoc2 = createAssociationAgent
-
-      AssociationLens.associationPlan.get(assoc1)              shouldBe assoc1.plan
-      AssociationLens.associationPlan.get(assoc2)              shouldBe assoc2.plan
-      AssociationLens.associationPlan.set(assoc1.plan)(assoc2) shouldBe assoc2.copy(plan = assoc1.plan)
-      AssociationLens.associationPlan.set(assoc2.plan)(assoc1) shouldBe assoc1.copy(plan = assoc2.plan)
-    }
-  }
-
   "associationAgent" should {
     "get and set" in {
       val assoc1 = createAssociationAgent
@@ -49,9 +37,9 @@ class AssociationLensSpec extends AnyWordSpec with should.Matchers with Entities
       AssociationLens.associationAgent.get(assoc2) shouldBe Right(assoc2.agent)
 
       AssociationLens.associationAgent.set(assoc1.agent.asLeft)(assoc2) shouldBe
-        Association.WithRenkuAgent(assoc2.resourceId, assoc1.agent, assoc2.plan)
+        Association.WithRenkuAgent(assoc2.resourceId, assoc1.agent, assoc2.planId)
       AssociationLens.associationAgent.set(assoc2.agent.asRight)(assoc1) shouldBe
-        Association.WithPersonAgent(assoc1.resourceId, assoc2.agent, assoc1.plan)
+        Association.WithPersonAgent(assoc1.resourceId, assoc2.agent, assoc1.planId)
 
       val assoc3 = createAssociationAgent
       val assoc4 = createAssociationPerson
@@ -63,22 +51,22 @@ class AssociationLensSpec extends AnyWordSpec with should.Matchers with Entities
   }
 
   private def createPlan =
-    planEntities()
+    stepPlanEntities()
       .apply(GraphModelGenerators.projectCreatedDates().generateOne)
       .generateOne
-      .to[Plan]
+      .to[StepPlan]
 
   private def createAssociationAgent: Association.WithRenkuAgent =
     Association.WithRenkuAgent(
       ResourceId(s"http://localhost/${activityIds.generateOne.value}"),
       EntitiesGenerators.agentEntities.generateOne,
-      createPlan
+      createPlan.resourceId
     )
 
   private def createAssociationPerson: Association.WithPersonAgent =
     Association.WithPersonAgent(
       ResourceId(s"http://localhost/${activityIds.generateOne.value}"),
       personEntities.generateOne.to[Person],
-      createPlan
+      createPlan.resourceId
     )
 }

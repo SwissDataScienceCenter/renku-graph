@@ -34,14 +34,14 @@ private[tsmigrationrequest] object Migrations {
       config: Config
   ): F[List[Migration[F]]] = for {
     datasetsCreator        <- DatasetsCreator[F]
+    datasetsRemover        <- DatasetsRemover[F]
     reProvisioning         <- ReProvisioning[F](config)
     removeNotLinkedPersons <- RemoveNotLinkedPersons[F]
-    migrationToNamedGraphs <- MigrationToNamedGraphs[F]
     migrations <- validateNames(
                     datasetsCreator,
+                    datasetsRemover,
                     reProvisioning,
-                    removeNotLinkedPersons,
-                    migrationToNamedGraphs
+                    removeNotLinkedPersons
                   )
   } yield migrations
 

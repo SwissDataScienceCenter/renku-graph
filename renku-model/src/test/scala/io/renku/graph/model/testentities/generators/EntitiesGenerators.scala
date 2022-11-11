@@ -32,7 +32,7 @@ import java.time.Instant
 object EntitiesGenerators extends EntitiesGenerators {
   type DatasetGenFactory[+P <: Dataset.Provenance] = projects.DateCreated => Gen[Dataset[P]]
   type ActivityGenFactory                          = projects.DateCreated => Gen[Activity]
-  type PlanGenFactory                              = projects.DateCreated => Gen[Plan]
+  type StepPlanGenFactory                          = projects.DateCreated => Gen[StepPlan]
 }
 
 private object Instances {
