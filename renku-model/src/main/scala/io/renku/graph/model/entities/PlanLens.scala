@@ -18,6 +18,7 @@
 
 package io.renku.graph.model.entities
 
+import io.renku.graph.model.plans.DateCreated
 import monocle.Lens
 
 object PlanLens {
@@ -31,5 +32,12 @@ object PlanLens {
 
   val planCreators: Lens[Plan, List[Person]] = Lens[Plan, List[Person]](_.creators) { persons =>
     { case plan: StepPlan => stepPlanCreators.modify(_ => persons)(plan) }
+  }
+
+  val planDateCreated: Lens[Plan, DateCreated] = Lens[Plan, DateCreated](_.dateCreated) { date =>
+    {
+      case plan: StepPlan.NonModified => plan.copy(dateCreated = date)
+      case plan: StepPlan.Modified    => plan.copy(dateCreated = date)
+    }
   }
 }
