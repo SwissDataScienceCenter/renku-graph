@@ -31,12 +31,13 @@ class TransformationStepsCreatorSpec extends AnyWordSpec with MockFactory with s
 
   "createSteps" should {
     "combine steps from person/project/dataset/activity transformers" in new TestCase {
-      val steps @ step1 :: step2 :: step3 :: step4 :: Nil = transformationSteps[Try].generateFixedSizeList(4)
+      val steps @ step1 :: step2 :: step3 :: step4 :: step5 :: Nil = transformationSteps[Try].generateFixedSizeList(5)
 
       (() => personTransformer.createTransformationStep).expects().returning(step1)
       (() => projectTransformer.createTransformationStep).expects().returning(step2)
       (() => datasetTransformer.createTransformationStep).expects().returning(step3)
-      (() => activityTransformer.createTransformationStep).expects().returning(step4)
+      (() => planTransformer.createTransformationStep).expects().returning(step4)
+      (() => activityTransformer.createTransformationStep).expects().returning(step5)
 
       stepsCreator.createSteps shouldBe steps
     }
@@ -46,10 +47,12 @@ class TransformationStepsCreatorSpec extends AnyWordSpec with MockFactory with s
     val personTransformer   = mock[namedgraphs.persons.PersonTransformer[Try]]
     val projectTransformer  = mock[namedgraphs.projects.ProjectTransformer[Try]]
     val datasetTransformer  = mock[namedgraphs.datasets.DatasetTransformer[Try]]
+    val planTransformer     = mock[namedgraphs.plans.PlanTransformer[Try]]
     val activityTransformer = mock[namedgraphs.activities.ActivityTransformer[Try]]
     val stepsCreator = new TransformationStepsCreatorImpl[Try](personTransformer,
                                                                projectTransformer,
                                                                datasetTransformer,
+                                                               planTransformer,
                                                                activityTransformer
     )
   }

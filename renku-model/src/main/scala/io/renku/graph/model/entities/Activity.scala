@@ -133,12 +133,14 @@ object Activity {
       import io.renku.jsonld.JsonLDDecoder.decodeList
 
       def checkValid(association: Association)(implicit id: ResourceId): StartTime => JsonLDDecoder.Result[Unit] =
-        startTime =>
-          dependencyLinks.findStepPlan(association.planId) match {
-            case Some(plan) if (startTime.value compareTo plan.dateCreated.value) < 0 =>
-              DecodingFailure(show"Activity $id date $startTime is older than plan ${plan.dateCreated}", Nil).asLeft
-            case _ => ().asRight
-          }
+        _ => association.asRight.map(_ => ())
+//    This code has been temporarily disabled; see https://github.com/SwissDataScienceCenter/renku-graph/issues/1187
+//        startTime =>
+//          dependencyLinks.findStepPlan(association.planId) match {
+//            case Some(plan) if (startTime.value compareTo plan.dateCreated.value) < 0 =>
+//              DecodingFailure(show"Activity $id date $startTime is older than plan ${plan.dateCreated}", Nil).asLeft
+//            case _ => ().asRight
+//          }
 
       def checkSingle[T](prop: String)(implicit id: ResourceId): List[T] => JsonLDDecoder.Result[T] = {
         case prop :: Nil => Right(prop)
