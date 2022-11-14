@@ -20,7 +20,6 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.IO
-import cats.syntax.all._
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.init.Generators._

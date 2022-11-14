@@ -20,7 +20,6 @@ package io.renku.eventlog
 
 import cats.data.Kleisli
 import cats.effect.IO
-import cats.syntax.all._
 import com.dimafeng.testcontainers._
 import io.renku.db.PostgresContainer
 import io.renku.eventlog.EventLogDB.SessionResource

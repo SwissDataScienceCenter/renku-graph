@@ -20,7 +20,6 @@ package io.renku.tokenrepository.repository
 
 import cats.data.Kleisli
 import cats.effect.IO
-import cats.syntax.all._
 import com.dimafeng.testcontainers._
 import io.renku.db.{PostgresContainer, SessionResource}
 import io.renku.testtools.IOSpec
