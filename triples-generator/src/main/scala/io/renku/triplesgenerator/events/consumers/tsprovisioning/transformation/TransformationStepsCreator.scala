@@ -34,6 +34,7 @@ private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
     personTransformer:   namedgraphs.persons.PersonTransformer[F],
     projectTransformer:  namedgraphs.projects.ProjectTransformer[F],
     datasetTransformer:  namedgraphs.datasets.DatasetTransformer[F],
+    planTransformer:     namedgraphs.plans.PlanTransformer[F],
     activityTransformer: namedgraphs.activities.ActivityTransformer[F]
 ) extends TransformationStepsCreator[F] {
 
@@ -41,6 +42,7 @@ private[tsprovisioning] class TransformationStepsCreatorImpl[F[_]: MonadThrow](
     personTransformer.createTransformationStep,
     projectTransformer.createTransformationStep,
     datasetTransformer.createTransformationStep,
+    planTransformer.createTransformationStep,
     activityTransformer.createTransformationStep
   )
 }
@@ -51,10 +53,12 @@ private[consumers] object TransformationStepsCreator {
     personTransformer   <- namedgraphs.persons.PersonTransformer[F]
     projectTransformer  <- namedgraphs.projects.ProjectTransformer[F]
     datasetTransformer  <- namedgraphs.datasets.DatasetTransformer[F]
+    planTransformer     <- namedgraphs.plans.PlanTransformer[F]
     activityTransformer <- namedgraphs.activities.ActivityTransformer[F]
   } yield new TransformationStepsCreatorImpl[F](personTransformer,
                                                 projectTransformer,
                                                 datasetTransformer,
+                                                planTransformer,
                                                 activityTransformer
   )
 }
