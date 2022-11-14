@@ -20,7 +20,6 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.IO
-import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info
