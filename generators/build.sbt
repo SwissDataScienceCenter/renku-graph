@@ -21,6 +21,6 @@ name := "generators"
 
 libraryDependencies += "eu.timepit"     %% "refined"    % "0.10.1"
 libraryDependencies += "io.circe"       %% "circe-core" % "0.14.3"
-libraryDependencies += "io.renku"       %% "jsonld4s"   % "0.7.0"
+libraryDependencies += "io.renku"       %% "jsonld4s"   % "0.6.0"
 libraryDependencies += "org.typelevel"  %% "cats-core"  % "2.8.0"
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.17.0"
