@@ -19,6 +19,7 @@
 package io.renku.graph.model.entities
 
 import cats.syntax.all._
+import io.renku.graph.model.entities.ProjectLens.collectStepPlans
 import monocle.Lens
 
 object ActivityLens {
@@ -31,4 +32,7 @@ object ActivityLens {
 
   val activityAssociationAgent: Lens[Activity, Either[Agent, Person]] =
     activityAssociation >>> AssociationLens.associationAgent
+
+  def activityStepPlan(plans: List[Plan]): Lens[Activity, StepPlan] =
+    ActivityLens.activityAssociation >>> AssociationLens.associationStepPlan(collectStepPlans(plans))
 }

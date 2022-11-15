@@ -38,4 +38,16 @@ object AssociationLens {
           assoc.copy(agent = agent)
       }
     }
+
+  def associationStepPlan(stepPlans: List[StepPlan]): Lens[Association, StepPlan] =
+    Lens[Association, StepPlan](a =>
+      stepPlans
+        .find(_.resourceId == a.planId)
+        .getOrElse(
+          throw new IllegalStateException(s"Association ${a.resourceId} pointing to non-existing plan ${a.planId}")
+        )
+    )(p => {
+      case a: Association.WithPersonAgent => a.copy(planId = p.resourceId)
+      case a: Association.WithRenkuAgent  => a.copy(planId = p.resourceId)
+    })
 }

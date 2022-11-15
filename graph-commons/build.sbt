@@ -38,7 +38,7 @@ libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersi
 libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sPrometheusVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
 
-libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.3.14"
+libraryDependencies += "org.typelevel" %% "cats-effect"   % "3.4.0"
 libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.5.0"
 
 // Test dependencies

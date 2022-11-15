@@ -29,11 +29,11 @@ import java.time.Instant
 object plans {
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
-
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url[ResourceId]
-      with EntityIdJsonLDOps[ResourceId] {
+      with EntityIdJsonLDOps[ResourceId]
+      with AnyResourceRenderer[ResourceId] {
 
     def apply(identifier: Identifier)(implicit renkuUrl: RenkuUrl): ResourceId =
       ResourceId((renkuUrl / "plans" / identifier).value)

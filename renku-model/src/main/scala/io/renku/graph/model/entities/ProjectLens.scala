@@ -18,7 +18,15 @@
 
 package io.renku.graph.model.entities
 
+import monocle.Lens
+
 object ProjectLens {
 
   val collectStepPlans: List[Plan] => List[StepPlan] = _.collect { case p: StepPlan => p }
+
+  def plansLens[P <: Project]: Lens[P, List[Plan]] = Lens[P, List[Plan]](_.plans)(plans => {
+    case p: RenkuProject.WithParent    => p.copy(plans = plans).asInstanceOf[P]
+    case p: RenkuProject.WithoutParent => p.copy(plans = plans).asInstanceOf[P]
+    case p => p
+  })
 }
