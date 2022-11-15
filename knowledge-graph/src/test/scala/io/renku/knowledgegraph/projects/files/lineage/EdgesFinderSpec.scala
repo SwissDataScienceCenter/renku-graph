@@ -27,6 +27,7 @@ import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.projects.Visibility
 import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput}
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.StepPlanGenFactory
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Warn
 import io.renku.jsonld.syntax._
@@ -101,13 +102,13 @@ class EdgesFinderSpec
                                   CommandOutput.fromLocation(out1)
       )(planCommands)(project.dateCreated).generateOne
 
-      val activity1 = executionPlanners(_ => fixed(plan), project).generateOne
+      val activity1 = executionPlanners(StepPlanGenFactory.pure(plan), project).generateOne
         .planInputParameterValuesFromChecksum(in1 -> entityChecksums.generateOne, in2 -> entityChecksums.generateOne)
         .buildProvenanceUnsafe()
 
       val in3  = entityLocations.generateOne
       val out2 = entityLocations.generateOne
-      val activity2 = executionPlanners(_ => fixed(plan), project).generateOne
+      val activity2 = executionPlanners(StepPlanGenFactory.pure(plan), project).generateOne
         .planInputParameterOverrides(in1 -> Entity.InputEntity(in3, entityChecksums.generateOne))
         .planInputParameterValuesFromChecksum(in2 -> entityChecksums.generateOne)
         .planOutputParameterOverrides(out1 -> out2)

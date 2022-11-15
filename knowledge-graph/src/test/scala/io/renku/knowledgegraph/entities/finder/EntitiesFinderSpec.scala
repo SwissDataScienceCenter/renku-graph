@@ -91,7 +91,7 @@ class EntitiesFinderSpec
       val planProject = renkuProjectEntities(visibilityPublic)
         .withActivities(
           activityEntities(
-            stepPlanEntities().modify(_.replacePlanName(to = sentenceContaining(query).generateAs(plans.Name)))
+            stepPlanEntities().map(_.replacePlanName(to = sentenceContaining(query).generateAs(plans.Name)))
           )
         )
         .generateOne
@@ -139,7 +139,7 @@ class EntitiesFinderSpec
       val planProject = renkuProjectEntities(visibilityPublic)
         .withActivities(
           activityEntities(
-            stepPlanEntities().modify(
+            stepPlanEntities().map(
               _.replacePlanKeywords(to =
                 List(sentenceContaining(query).generateAs(plans.Keyword), planKeywords.generateOne)
               )
@@ -181,7 +181,7 @@ class EntitiesFinderSpec
         .withActivities(
           activityEntities(
             stepPlanEntities()
-              .modify(_.replacePlanDesc(to = sentenceContaining(query).generateAs(plans.Description).some))
+              .map(_.replacePlanDesc(to = sentenceContaining(query).generateAs(plans.Description).some))
           )
         )
         .generateOne
@@ -538,7 +538,7 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            stepPlanEntities().modify(
+            stepPlanEntities().map(
               _.replacePlanDateCreated(to =
                 timestampsNotInTheFuture(butYoungerThan = projectDateCreated.value).generateAs[plans.DateCreated]
               )
@@ -579,7 +579,7 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            stepPlanEntities().modify(
+            stepPlanEntities().map(
               _.replacePlanDateCreated(to =
                 timestamps(min = projectDateCreated.value, max = sinceAsInstant minus (1, DAYS))
                   .generateAs[plans.DateCreated]
@@ -667,7 +667,7 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            stepPlanEntities().modify(
+            stepPlanEntities().map(
               _.replacePlanDateCreated(to =
                 timestamps(min = projectDateCreated.value, max = untilAsInstant).generateAs[plans.DateCreated]
               )
@@ -709,7 +709,7 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            stepPlanEntities().modify(
+            stepPlanEntities().map(
               _.replacePlanDateCreated(to =
                 timestampsNotInTheFuture(butYoungerThan = projectDateCreated.value).generateAs[plans.DateCreated]
               )
@@ -801,7 +801,7 @@ class EntitiesFinderSpec
         .modify(replaceProjectDateCreated(to = projectDateCreated))
         .withActivities(
           activityEntities(
-            stepPlanEntities().modify(
+            stepPlanEntities().map(
               _.replacePlanDateCreated(to =
                 timestamps(min = projectDateCreated.value, max = untilAsInstant).generateAs[plans.DateCreated]
               )
@@ -918,13 +918,13 @@ class EntitiesFinderSpec
 
       val ds ::~ project = renkuProjectEntities(visibilityPublic)
         .modify(replaceProjectName(to = projects.Name(query.value)))
-        .withActivities(activityEntities(stepPlanEntities().modify(_.replacePlanName(to = plans.Name(s"smth $query")))))
+        .withActivities(activityEntities(stepPlanEntities().map(_.replacePlanName(to = plans.Name(s"smth $query")))))
         .addDataset(
           datasetEntities(provenanceNonModified)
             .modify(replaceDSName(to = sentenceContaining(query).generateAs(datasets.Name)))
         )
         .generateOne
-      val plan :: Nil = project.plans.toList
+      val plan :: Nil = project.plans
 
       upload(to = projectsDataset, project)
 

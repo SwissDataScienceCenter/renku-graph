@@ -41,6 +41,8 @@ trait StepPlan extends Plan {
   lazy val outputs:    List[CommandOutput]    = commandParameters.collect { case out: CommandOutput => out }
 
   def getInput(location: Location): Option[CommandInput] = inputs.find(_.defaultValue.value == location)
+
+  final def widen: Plan = this
 }
 
 object StepPlan {

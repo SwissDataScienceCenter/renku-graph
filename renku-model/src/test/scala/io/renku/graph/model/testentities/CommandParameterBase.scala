@@ -18,7 +18,10 @@
 
 package io.renku.graph.model.testentities
 
+import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.commandParameters.{Name, Prefix}
+import io.renku.jsonld.EntityIdEncoder
+import io.renku.jsonld.syntax._
 
 trait CommandParameterBase {
   type DefaultValue
@@ -27,4 +30,15 @@ trait CommandParameterBase {
   val maybePrefix:  Option[Prefix]
   val defaultValue: DefaultValue
   val plan:         Plan
+}
+
+object CommandParameterBase {
+
+  implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[CommandParameterBase] =
+    EntityIdEncoder.instance {
+      case c: StepPlanCommandParameter.CommandInput     => c.asEntityId
+      case c: StepPlanCommandParameter.CommandOutput    => c.asEntityId
+      case c: StepPlanCommandParameter.CommandParameter => c.asEntityId
+      case c: ParameterMapping                          => c.id.asEntityId
+    }
 }

@@ -19,6 +19,7 @@
 package io.renku.graph.model.testentities
 package generators
 
+import cats.data.Kleisli
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -32,9 +33,13 @@ import java.time.Instant
 object EntitiesGenerators extends EntitiesGenerators {
   type DatasetGenFactory[+P <: Dataset.Provenance] = projects.DateCreated => Gen[Dataset[P]]
   type ActivityGenFactory                          = projects.DateCreated => Gen[Activity]
-  type StepPlanGenFactory                          = projects.DateCreated => Gen[StepPlan]
-  type CompositePlanGenFactory                     = projects.DateCreated => Gen[CompositePlan]
-  type PlanGenFactory                              = projects.DateCreated => Gen[Plan]
+  type StepPlanGenFactory                          = Kleisli[Gen, projects.DateCreated, StepPlan]
+  type CompositePlanGenFactory                     = Kleisli[Gen, projects.DateCreated, CompositePlan]
+  type PlanGenFactory                              = Kleisli[Gen, projects.DateCreated, Plan]
+
+  object StepPlanGenFactory {
+    def pure(p: StepPlan): StepPlanGenFactory = Kleisli.pure(p)
+  }
 }
 
 private object Instances {

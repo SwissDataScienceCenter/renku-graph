@@ -493,7 +493,7 @@ object CompositePlan {
       } yield plan
     }
 
-  private def validate(plan: CompositePlan): ValidatedNel[String, CompositePlan] = {
+  def validate(plan: CompositePlan): ValidatedNel[String, CompositePlan] = {
     val selfMapping =
       plan.mappings.traverse_(pm =>
         Validated.condNel(pm.mappedParameter.forall(_ != pm.resourceId),
