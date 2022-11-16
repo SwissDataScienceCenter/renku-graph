@@ -32,7 +32,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.http.server.security.Authorizer.AuthContext
 import io.renku.graph.model.GraphModelGenerators.{personGitLabIds, projectPaths}
 import io.renku.graph.model.Schemas
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken._
 import io.renku.http.client.RestClientError._
 import io.renku.http.client._
 import io.renku.http.rest.Links.{Href, Link, Rel}
@@ -45,7 +45,7 @@ import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.Schema
 import io.renku.logging.ExecutionTimeRecorder.ElapsedTime
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
-import io.renku.triplesstore.{DatasetConnectionConfig, _}
+import io.renku.triplesstore._
 import org.http4s.Status
 import org.http4s.Status._
 import org.scalacheck.{Arbitrary, Gen}
@@ -74,13 +74,16 @@ object CommonGraphGenerators {
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
   } yield OAuthAccessToken(chars.mkString(""))
 
+  implicit val projectAccessTokens: Gen[ProjectAccessToken] = for {
+    chars <- Gen.listOfN(20, Gen.oneOf(('A' to 'Z').map(_.toString) ++ ('a' to 'z').map(_.toString)))
+  } yield ProjectAccessToken(s"glpat-${chars.mkString("")}")
+
   implicit val securityExceptions: Gen[EndpointSecurityException] =
     Gen.oneOf(AuthenticationFailure, AuthorizationFailure)
 
-  implicit val accessTokens: Gen[AccessToken] = for {
-    boolean     <- Gen.oneOf(true, false)
-    accessToken <- if (boolean) personalAccessTokens else oauthAccessTokens
-  } yield accessToken
+  implicit val userAccessTokens: Gen[UserAccessToken] = Gen.oneOf(oauthAccessTokens, personalAccessTokens)
+
+  implicit val accessTokens: Gen[AccessToken] = Gen.oneOf(projectAccessTokens, oauthAccessTokens, personalAccessTokens)
 
   implicit val basicAuthUsernames: Gen[BasicAuthUsername] = nonEmptyStrings() map BasicAuthUsername.apply
   implicit val basicAuthPasswords: Gen[BasicAuthPassword] = nonEmptyStrings() map BasicAuthPassword.apply
@@ -289,7 +292,7 @@ object CommonGraphGenerators {
 
   implicit val authUsers: Gen[AuthUser] = for {
     gitLabId    <- personGitLabIds
-    accessToken <- accessTokens
+    accessToken <- userAccessTokens
   } yield AuthUser(gitLabId, accessToken)
 
   implicit def authContexts[Key](implicit keysGen: Gen[Key]): Gen[AuthContext[Key]] = for {

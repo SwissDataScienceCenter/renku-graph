@@ -27,7 +27,7 @@ import io.renku.config.ServiceUrl
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.AccessToken
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.parser._
 import io.renku.tinytypes.{TinyType, TinyTypeFactory}
@@ -63,8 +63,9 @@ private object Commands {
 
     private lazy val findUrlTokenPart: Option[AccessToken] => String = {
       case None                             => ""
-      case Some(PersonalAccessToken(token)) => s"gitlab-ci-token:$token@"
+      case Some(ProjectAccessToken(token))  => s"oauth2:$token@"
       case Some(OAuthAccessToken(token))    => s"oauth2:$token@"
+      case Some(PersonalAccessToken(token)) => s"gitlab-ci-token:$token@"
     }
 
     private def merge(gitLabUrl: GitLabUrl, urlTokenPart: String, projectPath: projects.Path): F[ServiceUrl] =

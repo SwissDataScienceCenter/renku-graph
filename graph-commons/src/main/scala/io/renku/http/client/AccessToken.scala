@@ -28,40 +28,60 @@ import java.util.Base64
 
 sealed trait AccessToken extends Any with StringTinyType with Sensitive
 
+sealed trait UserAccessToken extends Any with AccessToken
+
 object AccessToken {
 
-  final class PersonalAccessToken private (val value: String) extends AnyVal with AccessToken
+  final class PersonalAccessToken private (val value: String) extends AnyVal with UserAccessToken
   object PersonalAccessToken
       extends TinyTypeFactory[PersonalAccessToken](new PersonalAccessToken(_))
       with NonBlank[PersonalAccessToken]
 
-  final class OAuthAccessToken private (val value: String) extends AnyVal with AccessToken
+  final class OAuthAccessToken private (val value: String) extends AnyVal with UserAccessToken
   object OAuthAccessToken
       extends TinyTypeFactory[OAuthAccessToken](new OAuthAccessToken(_))
       with NonBlank[OAuthAccessToken]
+
+  final class ProjectAccessToken private (val value: String) extends AnyVal with AccessToken
+  object ProjectAccessToken
+      extends TinyTypeFactory[ProjectAccessToken](new ProjectAccessToken(_))
+      with NonBlank[ProjectAccessToken]
 
   private val base64Decoder = Base64.getDecoder
   private val base64Encoder = Base64.getEncoder
 
   implicit val accessTokenEncoder: Encoder[AccessToken] = {
+    case ProjectAccessToken(token) =>
+      Json.obj("projectAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
     case OAuthAccessToken(token) =>
       Json.obj("oauthAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
     case PersonalAccessToken(token) =>
       Json.obj("personalAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
   }
 
-  implicit val accessTokenDecoder: Decoder[AccessToken] = cursor =>
-    for {
-      maybeOauth    <- cursor.downField("oauthAccessToken").as[Option[String]].flatMap(to(OAuthAccessToken.from))
-      maybePersonal <- cursor.downField("personalAccessToken").as[Option[String]].flatMap(to(PersonalAccessToken.from))
-      token <- Either.fromOption(maybeOauth orElse maybePersonal,
-                                 ifNone = DecodingFailure("Access token cannot be deserialized", Nil)
-               )
-    } yield token
+  implicit val accessTokenDecoder: Decoder[AccessToken] = cursor => {
+
+    def maybeExtract(field: String, as: String => Either[IllegalArgumentException, AccessToken]) =
+      cursor.downField(field).as[Option[String]].flatMap(to(as))
+
+    maybeExtract("projectAccessToken", as = ProjectAccessToken.from)
+      .flatMap {
+        case token @ Some(_) => token.asRight
+        case None            => maybeExtract("oauthAccessToken", as = OAuthAccessToken.from)
+      }
+      .flatMap {
+        case token @ Some(_) => token.asRight
+        case None            => maybeExtract("personalAccessToken", as = PersonalAccessToken.from)
+      }
+      .flatMap {
+        case Some(token) => token.asRight
+        case None        => DecodingFailure("Access token cannot be deserialized", Nil).asLeft
+      }
+  }
 
   private def to[T <: AccessToken](
       from: String => Either[IllegalArgumentException, T]
-  ): Option[String] => DecodingFailure Either Option[AccessToken] = {
+  ): Option[String] => Either[DecodingFailure, Option[AccessToken]] = {
     case None => Right(None)
     case Some(token) =>
       from(new String(base64Decoder.decode(token.getBytes(UTF_8)), UTF_8))

@@ -98,7 +98,7 @@ class ProjectPathFinderSpec
 
       intercept[Exception] {
         pathFinder.findProjectPath(projectId, None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId returned ${Status.BadRequest}; body: some error"
+      }.getMessage shouldBe s"GET $gitLabApiUrl/projects/$projectId returned ${Status.BadRequest}; body: some error"
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
@@ -111,18 +111,18 @@ class ProjectPathFinderSpec
       intercept[Exception] {
         pathFinder.findProjectPath(projectId, None).unsafeRunSync()
       }.getMessage should startWith(
-        s"GET $gitLabUrl/api/v4/projects/$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
+        s"GET $gitLabApiUrl/projects/$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
       )
     }
   }
 
   private trait TestCase {
-    val gitLabUrl   = GitLabUrl(externalServiceBaseUrl)
-    val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val gitLabApiUrl = GitLabUrl(externalServiceBaseUrl).apiV4
+    val projectId    = projectIds.generateOne
+    val projectPath  = projectPaths.generateOne
 
     private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val pathFinder = new ProjectPathFinderImpl[IO](gitLabUrl, Throttler.noThrottling)
+    val pathFinder = new ProjectPathFinderImpl[IO](gitLabApiUrl, Throttler.noThrottling)
 
     lazy val projectJson: String = json"""{
       "id": ${projectId.value},

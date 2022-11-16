@@ -20,7 +20,7 @@ package io.renku.tokenrepository.repository.association
 
 import cats.MonadThrow
 import cats.effect.Async
-import cats.effect.kernel.{Concurrent, Temporal}
+import cats.effect.kernel.Concurrent
 import cats.syntax.all._
 import io.renku.db.SessionResource
 import io.renku.graph.model.projects.Id
@@ -55,8 +55,7 @@ class AssociateTokenEndpointImpl[F[_]: Concurrent: Logger](
     } yield response
   } recoverWith httpResponse(projectId)
 
-  private implicit lazy val accessTokenEntityDecoder: EntityDecoder[F, AccessToken] =
-    jsonOf[F, AccessToken]
+  private implicit lazy val entityDecoder: EntityDecoder[F, AccessToken] = jsonOf[F, AccessToken]
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
@@ -69,17 +68,16 @@ class AssociateTokenEndpointImpl[F[_]: Concurrent: Logger](
       BadRequest(ErrorMessage(exception))
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Associating token with projectId: $projectId failed")
-      Logger[F].error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+      Logger[F].error(exception)(errorMessage.value) >> InternalServerError(errorMessage)
   }
 }
 
 object AssociateTokenEndpoint {
 
-  def apply[F[_]: Async: Temporal: Logger](
+  def apply[F[_]: Async: Logger](
       sessionResource:  SessionResource[F, ProjectsTokensDB],
       queriesExecTimes: LabeledHistogram[F]
-  ): F[AssociateTokenEndpoint[F]] = for {
-    tokenAssociator <- TokenAssociator(sessionResource, queriesExecTimes)
-  } yield new AssociateTokenEndpointImpl[F](tokenAssociator)
+  ): F[AssociateTokenEndpoint[F]] =
+    TokenAssociator(sessionResource, queriesExecTimes)
+      .map(new AssociateTokenEndpointImpl[F](_))
 }

@@ -24,14 +24,13 @@ import data.dataProjects
 import flows.TSProvisioning
 import io.circe.Decoder._
 import io.circe.Json
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.CommonGraphGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphModelGenerators.personGitLabIds
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, projects}
-import io.renku.http.client.AccessToken
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status.Ok
@@ -47,9 +46,9 @@ class UserProjectsResourceSpec extends AcceptanceSpec with ApplicationServices w
 
       Given("user has an activated project")
 
-      val userId = personGitLabIds.generateOne
-      val user   = personEntities(fixed(userId.some)).generateOne
-      val accessToken: AccessToken = accessTokens.generateOne
+      val userId      = personGitLabIds.generateOne
+      val user        = personEntities(fixed(userId.some)).generateOne
+      val accessToken = userAccessTokens.generateOne
       gitLabStub.addAuthenticated(userId, accessToken)
 
       val activatedProject = dataProjects(

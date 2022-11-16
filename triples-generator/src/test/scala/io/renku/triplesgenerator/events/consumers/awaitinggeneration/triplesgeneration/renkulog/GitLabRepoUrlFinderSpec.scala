@@ -18,6 +18,7 @@
 
 package io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.renkulog
 
+import Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl}
 import cats.syntax.all._
 import io.renku.config.ServiceUrl
 import io.renku.generators.CommonGraphGenerators._
@@ -26,14 +27,14 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.client.AccessToken
-import io.renku.triplesgenerator.events.consumers.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, GitLabRepoUrlFinderImpl}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.Matchers with TableDrivenPropertyChecks {
 
   "findRepositoryUrl" should {
 
@@ -52,7 +53,7 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
           ServiceUrl(s"$protocol://$host:$port/$path.git").pure[Try]
       }
 
-      s"return '$protocol://gitlab-ci-token:<token>@$host:$port/$path.git' for personal access token" in new TestCase {
+      s"return '$protocol://gitlab-ci-token:<token>@$host:$port/$path.git' for Personal Access Token" in new TestCase {
 
         implicit val token @ Some(accessToken) = personalAccessTokens.generateSome
 
@@ -62,14 +63,22 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
           ServiceUrl(s"$protocol://gitlab-ci-token:${accessToken.value}@$host:$port/$path.git").pure[Try]
       }
 
-      s"return '$protocol://oauth2:<token>@$host:$port/$path.git' for personal access token" in new TestCase {
+      forAll {
+        Table(
+          "token type"           -> "token",
+          "Project Access Token" -> projectAccessTokens.generateOne,
+          "OAuth Access Token"   -> oauthAccessTokens.generateOne
+        )
+      } { (tokenType, accessToken: AccessToken) =>
+        s"return '$protocol://oauth2:<token>@$host:$port/$path.git' for $tokenType" in new TestCase {
 
-        implicit val token @ Some(accessToken) = oauthAccessTokens.generateSome
+          implicit val someToken: Option[AccessToken] = accessToken.some
 
-        val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
+          val repoUrlFinder = newRepoUrlFinder(GitLabUrl(s"$protocol://$host:$port"))
 
-        repoUrlFinder.findRepositoryUrl(path) shouldBe
-          ServiceUrl(s"$protocol://oauth2:${accessToken.value}@$host:$port/$path.git").pure[Try]
+          repoUrlFinder.findRepositoryUrl(path) shouldBe
+            ServiceUrl(s"$protocol://oauth2:${accessToken.value}@$host:$port/$path.git").pure[Try]
+        }
       }
     }
   }

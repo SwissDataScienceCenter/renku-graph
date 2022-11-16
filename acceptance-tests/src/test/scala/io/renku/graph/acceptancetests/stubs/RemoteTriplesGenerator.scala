@@ -70,8 +70,7 @@ trait RemoteTriplesGenerator {
       triples:   JsonLD,
       commitId:  CommitId,
       commitIds: CommitId*
-  ): Unit =
-    mockCommitDataOnTripleGenerator(project, triples, NonEmptyList(commitId, commitIds.toList))
+  ): Unit = mockCommitDataOnTripleGenerator(project, triples, NonEmptyList(commitId, commitIds.toList))
 
   def mockCommitDataOnTripleGenerator(
       project:   data.Project,

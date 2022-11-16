@@ -31,7 +31,7 @@ import io.circe.parser._
 import io.renku.crypto.AesCrypto
 import io.renku.crypto.AesCrypto.Secret
 import io.renku.http.client.AccessToken
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken._
 
 import scala.util.control.NonFatal
 
@@ -46,7 +46,7 @@ private class AccessTokenCryptoImpl[F[_]: MonadThrow](
     with AccessTokenCrypto[F] {
 
   override def encrypt(accessToken: AccessToken): F[EncryptedAccessToken] = for {
-    serializedToken  <- pure(serialize(accessToken))
+    serializedToken  <- serialize(accessToken).pure[F]
     encoded          <- encryptAndEncode(serializedToken)
     validatedDecoded <- validate(encoded)
   } yield validatedDecoded
@@ -59,6 +59,7 @@ private class AccessTokenCryptoImpl[F[_]: MonadThrow](
   } recoverWith meaningfulError
 
   private lazy val serialize: AccessToken => String = {
+    case ProjectAccessToken(token)  => Json.obj("projectAccessToken" -> Json.fromString(token)).noSpaces
     case OAuthAccessToken(token)    => Json.obj("oauth" -> Json.fromString(token)).noSpaces
     case PersonalAccessToken(token) => Json.obj("personal" -> Json.fromString(token)).noSpaces
   }
@@ -68,14 +69,25 @@ private class AccessTokenCryptoImpl[F[_]: MonadThrow](
       EncryptedAccessToken.from(value)
     }
 
-  private implicit val accessTokenDecoder: Decoder[AccessToken] = cursor =>
-    for {
-      maybeOauth    <- cursor.downField("oauth").as[Option[String]].flatMap(to(OAuthAccessToken.from))
-      maybePersonal <- cursor.downField("personal").as[Option[String]].flatMap(to(PersonalAccessToken.from))
-      token <- Either.fromOption(maybeOauth orElse maybePersonal,
-                                 ifNone = DecodingFailure("Access token cannot be deserialized", Nil)
-               )
-    } yield token
+  private implicit val accessTokenDecoder: Decoder[AccessToken] = cursor => {
+
+    def maybeExtract(field: String, as: String => Either[IllegalArgumentException, AccessToken]) =
+      cursor.downField(field).as[Option[String]].flatMap(to(as))
+
+    maybeExtract("projectAccessToken", as = ProjectAccessToken.from)
+      .flatMap {
+        case token @ Some(_) => token.asRight
+        case None            => maybeExtract("oauth", as = OAuthAccessToken.from)
+      }
+      .flatMap {
+        case token @ Some(_) => token.asRight
+        case None            => maybeExtract("personal", as = PersonalAccessToken.from)
+      }
+      .flatMap {
+        case Some(token) => token.asRight
+        case None        => DecodingFailure("Access token cannot be deserialized", Nil).asLeft
+      }
+  }
 
   private def to[T <: AccessToken](
       from: String => Either[IllegalArgumentException, T]

@@ -24,7 +24,7 @@ import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken._
 import io.renku.tinytypes.Sensitive
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -34,11 +34,12 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
 class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
-  val base64Encoder = Base64.getEncoder
+
+  private val base64Encoder = Base64.getEncoder
 
   "PersonalAccessToken" should {
 
-    "be Sensitive" in {
+    "be a Sensitive" in {
       personalAccessTokens.generateOne shouldBe a[Sensitive]
     }
 
@@ -57,7 +58,7 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 
   "OAuthAccessToken" should {
 
-    "be Sensitive" in {
+    "be a Sensitive" in {
       oauthAccessTokens.generateOne shouldBe a[Sensitive]
     }
 
@@ -74,7 +75,32 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
     }
   }
 
+  "ProjectAccessToken" should {
+
+    "be a Sensitive" in {
+      projectAccessTokens.generateOne shouldBe a[Sensitive]
+    }
+
+    "be instantiatable from a non-blank String" in {
+      forAll(nonEmptyStrings()) { value =>
+        ProjectAccessToken.from(value).map(_.value) shouldBe Right(value)
+      }
+    }
+
+    "fail instantiation for a blank String" in {
+      val Left(exception) = ProjectAccessToken.from(" ")
+
+      exception shouldBe an[IllegalArgumentException]
+    }
+  }
+
   "accessToken json decoder" should {
+
+    "decode PersonalAccessToken" in {
+      val accessToken  = personalAccessTokens.generateOne
+      val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
+      json"""{"personalAccessToken": $encodedToken}""".as[AccessToken] shouldBe Right(accessToken)
+    }
 
     "decode OAuthAccessToken" in {
       val accessToken  = oauthAccessTokens.generateOne
@@ -82,10 +108,10 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       json"""{"oauthAccessToken": $encodedToken}""".as[AccessToken] shouldBe Right(accessToken)
     }
 
-    "decode PersonalAccessToken" in {
-      val accessToken  = personalAccessTokens.generateOne
+    "decode ProjectAccessToken" in {
+      val accessToken  = projectAccessTokens.generateOne
       val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
-      json"""{"personalAccessToken": $encodedToken}""".as[AccessToken] shouldBe Right(accessToken)
+      json"""{"projectAccessToken": $encodedToken}""".as[AccessToken] shouldBe Right(accessToken)
     }
 
     "fail for a invalid access token json" in {
@@ -96,16 +122,22 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 
   "accessToken json encoder" should {
 
+    "encode PersonalAccessToken" in {
+      val accessToken: AccessToken = personalAccessTokens.generateOne
+      val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
+      accessToken.asJson shouldBe json"""{"personalAccessToken": $encodedToken}"""
+    }
+
     "encode OAuthAccessToken" in {
       val accessToken: AccessToken = oauthAccessTokens.generateOne
       val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
       accessToken.asJson shouldBe json"""{"oauthAccessToken": $encodedToken}"""
     }
 
-    "encode PersonalAccessToken" in {
-      val accessToken: AccessToken = personalAccessTokens.generateOne
+    "encode ProjectAccessToken" in {
+      val accessToken: AccessToken = projectAccessTokens.generateOne
       val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
-      accessToken.asJson shouldBe json"""{"personalAccessToken": $encodedToken}"""
+      accessToken.asJson shouldBe json"""{"projectAccessToken": $encodedToken}"""
     }
   }
 }
