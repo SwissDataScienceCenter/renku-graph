@@ -27,6 +27,32 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+class GitLabUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  "from" should {
+
+    "instantiate GitLabUrl when valid url is given" in {
+      forAll(httpUrls()) { path =>
+        GitLabUrl.from(path).map(_.value) shouldBe path.asRight
+      }
+    }
+
+    "instantiate GitLabUrl when valid url is given with a slash at the end" in {
+      val path = httpUrls().generateOne
+      GitLabUrl.from(s"$path/").map(_.value) shouldBe path.asRight
+    }
+
+    "fail instantiation for invalid url" in {
+      val value = nonEmptyStrings().generateOne
+
+      val Left(ex) = GitLabUrl.from(value).map(_.value)
+
+      ex          shouldBe an[IllegalArgumentException]
+      ex.getMessage should include(s"Cannot instantiate ${GitLabUrl.typeName} with '$value'")
+    }
+  }
+}
+
 class CliVersionSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "from" should {
