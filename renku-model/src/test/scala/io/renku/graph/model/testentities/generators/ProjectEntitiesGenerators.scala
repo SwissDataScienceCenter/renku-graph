@@ -37,10 +37,6 @@ trait ProjectEntitiesGenerators {
     nonRenkuProjectWithParentEntities(visibilityGen)
   )
 
-  implicit class ProjectGenFactoryOps(projectGen: Gen[Project]) {
-    def modify(f: Project => Project): Gen[Project] = projectGen.map(f)
-  }
-
   lazy val memberGitLabIdLens: Lens[ProjectMember, persons.GitLabId] =
     Lens[ProjectMember, persons.GitLabId](_.gitLabId) { gitLabId =>
       {

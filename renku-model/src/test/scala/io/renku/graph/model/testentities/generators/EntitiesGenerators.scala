@@ -32,13 +32,16 @@ import java.time.Instant
 
 object EntitiesGenerators extends EntitiesGenerators {
   type DatasetGenFactory[+P <: Dataset.Provenance] = projects.DateCreated => Gen[Dataset[P]]
+  type ProjectBasedGenFactory[A]                   = Kleisli[Gen, projects.DateCreated, A]
   type ActivityGenFactory                          = projects.DateCreated => Gen[Activity]
-  type StepPlanGenFactory                          = Kleisli[Gen, projects.DateCreated, StepPlan]
-  type CompositePlanGenFactory                     = Kleisli[Gen, projects.DateCreated, CompositePlan]
-  type PlanGenFactory                              = Kleisli[Gen, projects.DateCreated, Plan]
+  type StepPlanGenFactory                          = ProjectBasedGenFactory[StepPlan]
+  type CompositePlanGenFactory                     = ProjectBasedGenFactory[CompositePlan]
+  type PlanGenFactory                              = ProjectBasedGenFactory[Plan]
 
-  object StepPlanGenFactory {
-    def pure(p: StepPlan): StepPlanGenFactory = Kleisli.pure(p)
+  object ProjectBasedGenFactory {
+    def pure[A](a: A): ProjectBasedGenFactory[A] = Kleisli.pure(a)
+
+    def liftF[A](fa: Gen[A]): ProjectBasedGenFactory[A] = Kleisli.liftF(fa)
   }
 }
 

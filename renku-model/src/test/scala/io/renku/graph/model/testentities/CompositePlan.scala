@@ -21,13 +21,16 @@ package io.renku.graph.model.testentities
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.{InvalidationTime, RenkuUrl, entities, plans}
+import io.renku.graph.model.{GitLabApiUrl, GraphClass, InvalidationTime, RenkuUrl, entities, plans}
 import io.renku.graph.model.plans.{Command, DateCreated, DerivedFrom, Description, Identifier, Keyword, Name}
+import io.renku.jsonld.JsonLDEncoder
 import io.renku.jsonld.syntax._
 
 sealed trait CompositePlan extends Plan {
   override type PlanGroup         = CompositePlan
   override type PlanGroupModified = CompositePlan.Modified
+
+  def plans: NonEmptyList[Plan]
 
   def links: List[ParameterLink]
 
@@ -230,4 +233,16 @@ object CompositePlan {
     case p: NonModified => NonModified.toEntitiesCompositePlan(renkuUrl)(p)
     case p: Modified    => Modified.toEntitiesCompositePlan(renkuUrl)(p)
   }
+
+  // maybe just use the project encoder on the production entities
+  implicit def jsonLDEncoder(implicit
+      renkuUrl:     RenkuUrl,
+      gitLabApiUrl: GitLabApiUrl,
+      graphClass:   GraphClass
+  ): JsonLDEncoder[CompositePlan] =
+    // we need to serialize the child plans completely and not only their ids
+    JsonLDEncoder.instance { cp =>
+      val children = cp.plans.map(_.asJsonLD)
+      (cp.to[entities.CompositePlan].asJsonLD :: children).asJsonLD
+    }
 }

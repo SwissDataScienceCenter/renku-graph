@@ -24,7 +24,8 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model
 import io.renku.graph.model._
 import io.renku.graph.model.projects._
-import io.renku.graph.model.testentities.generators.EntitiesGenerators.DatasetGenFactory
+import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{CompositePlanGenFactory, DatasetGenFactory, ProjectBasedGenFactory}
 
 sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with Product with Serializable {
   val path:             Path
@@ -40,17 +41,30 @@ sealed trait RenkuProject extends Project with RenkuProject.RenkuProjectAlg with
   val version:          SchemaVersion
   val activities:       List[Activity]
   val datasets:         List[Dataset[Dataset.Provenance]]
-  val unlinkedPlans:    List[Plan]
+  val unlinkedPlans:    List[StepPlan]
+  val compositePlans:   List[CreateCompositePlan]
 
   type ProjectType <: RenkuProject
 
-  lazy val plans: List[Plan] = activities.map(_.association.plan) ::: unlinkedPlans
+  lazy val stepPlans: List[StepPlan] = activities.map(_.association.plan) ::: unlinkedPlans
 
-  // todo maybe go deep?
-  lazy val stepPlans: List[StepPlan] = plans.collect { case p: StepPlan => p }
+  lazy val plans: List[Plan] = stepPlans ::: compositePlans.flatMap(_.apply(stepPlans, dateCreated))
+
 }
 
 object RenkuProject {
+
+  type CreateCompositePlan = (List[StepPlan], DateCreated) => Option[CompositePlan]
+
+  /** For more convenient creation given the composite plan generator. Example:
+   * {{{
+   * p.addCompositePlan(CreateCompositePlan(compositePlanEntities))
+   * }}}
+   */
+  object CreateCompositePlan {
+    def apply(f: ProjectBasedGenFactory[List[Plan]] => CompositePlanGenFactory): CreateCompositePlan =
+      (plans, created) => Option.when(plans.nonEmpty)(f(ProjectBasedGenFactory.pure(plans)).run(created).generateOne)
+  }
 
   final case class WithoutParent(path:             Path,
                                  name:             Name,
@@ -65,7 +79,8 @@ object RenkuProject {
                                  version:          SchemaVersion,
                                  activities:       List[Activity],
                                  datasets:         List[Dataset[Dataset.Provenance]],
-                                 unlinkedPlans:    List[Plan] = List.empty
+                                 unlinkedPlans:    List[StepPlan] = List.empty,
+                                 compositePlans:   List[CreateCompositePlan] = List.empty
   ) extends RenkuProject {
 
     validateDates(dateCreated, activities, datasets)
@@ -86,8 +101,10 @@ object RenkuProject {
       dataset -> copy(datasets = datasets ::: dataset :: Nil)
     }
 
-    override def addUnlinkedPlan(plan: Plan): ProjectType =
+    override def addUnlinkedPlan(plan: StepPlan): ProjectType =
       copy(unlinkedPlans = plan :: unlinkedPlans)
+
+    override def addCompositePlan(cp: CreateCompositePlan): WithoutParent = copy(compositePlans = cp :: compositePlans)
 
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithoutParent =
       copy(datasets = newDatasets.toList)
@@ -137,7 +154,8 @@ object RenkuProject {
                               activities:       List[Activity],
                               datasets:         List[Dataset[Dataset.Provenance]],
                               parent:           RenkuProject,
-                              unlinkedPlans:    List[Plan] = Nil
+                              unlinkedPlans:    List[StepPlan] = Nil,
+                              compositePlans:   List[CreateCompositePlan] = Nil
   ) extends RenkuProject
       with Parent {
     override type ProjectType = RenkuProject.WithParent
@@ -155,7 +173,9 @@ object RenkuProject {
       dataset -> copy(datasets = datasets ::: dataset :: Nil)
     }
 
-    override def addUnlinkedPlan(plan: Plan): ProjectType = copy(unlinkedPlans = plan :: unlinkedPlans)
+    override def addUnlinkedPlan(plan: StepPlan): ProjectType = copy(unlinkedPlans = plan :: unlinkedPlans)
+
+    override def addCompositePlan(cp: CreateCompositePlan): WithParent = copy(compositePlans = cp :: compositePlans)
 
     override def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): RenkuProject.WithParent =
       copy(datasets = newDatasets.toList)
@@ -181,7 +201,9 @@ object RenkuProject {
 
     def addDataset[P <: Dataset.Provenance](toAdd: DatasetGenFactory[P]): (Dataset[P], ProjectType)
 
-    def addUnlinkedPlan(plan: Plan): ProjectType
+    def addUnlinkedPlan(plan: StepPlan): ProjectType
+
+    def addCompositePlan(cp: CreateCompositePlan): ProjectType
 
     def replaceDatasets(newDatasets: Dataset[Dataset.Provenance]*): ProjectType
 

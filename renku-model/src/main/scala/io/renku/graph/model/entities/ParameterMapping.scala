@@ -53,7 +53,7 @@ object ParameterMapping {
     val parameterMappingClass = Class(renku / "ParameterMapping", ParentClass(renku / "CommandParameterBase"))
 
     val mapsTo       = renku / "mapsTo"
-    val name         = renku / "name"
+    val name         = schema / "name"
     val description  = schema / "description"
     val defaultValue = schema / "defaultValue"
 
@@ -90,7 +90,7 @@ object ParameterMapping {
     }
 
   implicit def decoder: JsonLDDecoder[ParameterMapping] =
-    JsonLDDecoder.instance { cursor =>
+    JsonLDDecoder.entity(Ontology.entityTypes) { cursor =>
       for {
         id          <- cursor.downEntityId.as[ResourceId]
         name        <- cursor.downField(Ontology.name).as[Name]

@@ -52,10 +52,10 @@ class TSProjectFinderSpec
 
       val matchingMember = personEntities(withGitLabId).generateOne.copy(maybeGitLabId = criteria.userId.some)
       val project1WithMatchingMember = anyProjectEntities
-        .modify(replaceMembers(Set(personEntities(withGitLabId).generateOne, matchingMember)))
+        .map(replaceMembers(Set(personEntities(withGitLabId).generateOne, matchingMember)))
         .generateOne
       val project2WithMatchingMember = anyProjectEntities
-        .modify(replaceMembers(personEntities(withGitLabId).generateSet() + matchingMember))
+        .map(replaceMembers(personEntities(withGitLabId).generateSet() + matchingMember))
         .generateOne
 
       val projectWithoutMatchingMember = projectEntities(visibilityPublic).generateOne
@@ -75,17 +75,17 @@ class TSProjectFinderSpec
 
       val matchingMember = personEntities(withGitLabId).generateOne.copy(maybeGitLabId = criteria.userId.some)
       val privateProjectWithMatchingMemberAndAuthUser = projectEntities(visibilityPrivate)
-        .modify(replaceMembers(Set(authUser, matchingMember)))
+        .map(replaceMembers(Set(authUser, matchingMember)))
         .generateOne
       val privateProjectWithMatchingMemberOnly = projectEntities(visibilityPrivate)
-        .modify(replaceMembers(personEntities(withGitLabId).generateSet() + matchingMember))
+        .map(replaceMembers(personEntities(withGitLabId).generateSet() + matchingMember))
         .generateOne
       val nonPrivateProjectWithMatchingMemberOnly =
         projectEntities(Gen.oneOf(projects.Visibility.Public, projects.Visibility.Internal))
-          .modify(replaceMembers(personEntities(withGitLabId).generateSet() + matchingMember))
+          .map(replaceMembers(personEntities(withGitLabId).generateSet() + matchingMember))
           .generateOne
       val projectWithMatchingAuthUserOnly = anyProjectEntities
-        .modify(replaceMembers(Set(authUser)))
+        .map(replaceMembers(Set(authUser)))
         .generateOne
 
       upload(

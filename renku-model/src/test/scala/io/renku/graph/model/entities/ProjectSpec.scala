@@ -1408,6 +1408,6 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     for {
       created        <- projectCreatedDates()
       paramFactories <- Generators.commandParametersLists
-      plan           <- compositePlanEntities(planEntities(paramFactories: _*)).run(created)
+      plan           <- compositePlanEntities(planEntitiesList(paramFactories: _*)).run(created)
     } yield plan
 }

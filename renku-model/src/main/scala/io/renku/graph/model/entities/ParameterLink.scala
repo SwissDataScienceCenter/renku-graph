@@ -60,7 +60,7 @@ object ParameterLink {
     }
 
   implicit def decoder: JsonLDDecoder[ParameterLink] =
-    JsonLDDecoder.instance { cursor =>
+    JsonLDDecoder.entity(Ontology.entityTypes) { cursor =>
       for {
         id     <- cursor.downEntityId.as[ResourceId]
         source <- cursor.downField(Ontology.linkSource).as[ParamResourceId]
