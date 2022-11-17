@@ -92,9 +92,9 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
     )
 
   private lazy val authHeader: AccessToken => Headers = {
-    case ProjectAccessToken(token)  => Headers(Authorization(Token(Bearer, token)))
-    case OAuthAccessToken(token)    => Headers(Authorization(Token(Bearer, token)))
-    case PersonalAccessToken(token) => Headers(Header.Raw(ci"PRIVATE-TOKEN", token))
+    case ProjectAccessToken(token)   => Headers(Authorization(Token(Bearer, token)))
+    case UserOAuthAccessToken(token) => Headers(Authorization(Token(Bearer, token)))
+    case PersonalAccessToken(token)  => Headers(Header.Raw(ci"PRIVATE-TOKEN", token))
   }
 
   private def basicAuthHeader(basicAuth: BasicAuthCredentials) =

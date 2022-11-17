@@ -58,9 +58,9 @@ trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll 
   protected implicit class MappingBuilderOps(mappingBuilder: MappingBuilder) {
 
     lazy val withAccessToken: Option[AccessToken] => MappingBuilder = {
-      case Some(ProjectAccessToken(token))  => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
-      case Some(OAuthAccessToken(token))    => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
-      case Some(PersonalAccessToken(token)) => mappingBuilder.withHeader("PRIVATE-TOKEN", equalTo(token))
+      case Some(ProjectAccessToken(token))   => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
+      case Some(UserOAuthAccessToken(token)) => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
+      case Some(PersonalAccessToken(token))  => mappingBuilder.withHeader("PRIVATE-TOKEN", equalTo(token))
       case None                             => mappingBuilder
     }
   }

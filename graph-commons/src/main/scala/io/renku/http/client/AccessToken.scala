@@ -37,10 +37,10 @@ object AccessToken {
       extends TinyTypeFactory[PersonalAccessToken](new PersonalAccessToken(_))
       with NonBlank[PersonalAccessToken]
 
-  final class OAuthAccessToken private (val value: String) extends AnyVal with UserAccessToken
-  object OAuthAccessToken
-      extends TinyTypeFactory[OAuthAccessToken](new OAuthAccessToken(_))
-      with NonBlank[OAuthAccessToken]
+  final class UserOAuthAccessToken private (val value: String) extends AnyVal with UserAccessToken
+  object UserOAuthAccessToken
+      extends TinyTypeFactory[UserOAuthAccessToken](new UserOAuthAccessToken(_))
+      with NonBlank[UserOAuthAccessToken]
 
   final class ProjectAccessToken private (val value: String) extends AnyVal with AccessToken
   object ProjectAccessToken
@@ -53,8 +53,10 @@ object AccessToken {
   implicit val accessTokenEncoder: Encoder[AccessToken] = {
     case ProjectAccessToken(token) =>
       Json.obj("projectAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
-    case OAuthAccessToken(token) =>
-      Json.obj("oauthAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
+    case UserOAuthAccessToken(token) =>
+      Json.obj(
+        "userOAuthAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8))
+      )
     case PersonalAccessToken(token) =>
       Json.obj("personalAccessToken" -> Json.fromString(new String(base64Encoder.encode(token.getBytes(UTF_8)), UTF_8)))
   }
@@ -67,7 +69,7 @@ object AccessToken {
     maybeExtract("projectAccessToken", as = ProjectAccessToken.from)
       .flatMap {
         case token @ Some(_) => token.asRight
-        case None            => maybeExtract("oauthAccessToken", as = OAuthAccessToken.from)
+        case None            => maybeExtract("userOAuthAccessToken", as = UserOAuthAccessToken.from)
       }
       .flatMap {
         case token @ Some(_) => token.asRight

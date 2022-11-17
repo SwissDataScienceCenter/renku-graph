@@ -22,7 +22,7 @@ import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.{oauthAccessTokens, personalAccessTokens}
+import io.renku.generators.CommonGraphGenerators.{userOAuthAccessTokens, personalAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
@@ -58,7 +58,7 @@ class ProjectPathFinderSpec
 
     "return fetched project info if service responds with OK and a valid body - oauth access token case" in new TestCase {
 
-      val oauthAccessToken = oauthAccessTokens.generateOne
+      val oauthAccessToken = userOAuthAccessTokens.generateOne
 
       stubFor {
         get(s"/api/v4/projects/$projectId")

@@ -56,20 +56,20 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
     }
   }
 
-  "OAuthAccessToken" should {
+  "UserOAuthAccessToken" should {
 
     "be a Sensitive" in {
-      oauthAccessTokens.generateOne shouldBe a[Sensitive]
+      userOAuthAccessTokens.generateOne shouldBe a[Sensitive]
     }
 
     "be instantiatable from a non-blank String" in {
       forAll(nonEmptyStrings()) { value =>
-        OAuthAccessToken.from(value).map(_.value) shouldBe Right(value)
+        UserOAuthAccessToken.from(value).map(_.value) shouldBe Right(value)
       }
     }
 
     "fail instantiation for a blank String" in {
-      val Left(exception) = OAuthAccessToken.from(" ")
+      val Left(exception) = UserOAuthAccessToken.from(" ")
 
       exception shouldBe an[IllegalArgumentException]
     }
@@ -103,9 +103,9 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
     }
 
     "decode OAuthAccessToken" in {
-      val accessToken  = oauthAccessTokens.generateOne
+      val accessToken  = userOAuthAccessTokens.generateOne
       val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
-      json"""{"oauthAccessToken": $encodedToken}""".as[AccessToken] shouldBe Right(accessToken)
+      json"""{"userOAuthAccessToken": $encodedToken}""".as[AccessToken] shouldBe Right(accessToken)
     }
 
     "decode ProjectAccessToken" in {
@@ -129,9 +129,9 @@ class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
     }
 
     "encode OAuthAccessToken" in {
-      val accessToken: AccessToken = oauthAccessTokens.generateOne
+      val accessToken: AccessToken = userOAuthAccessTokens.generateOne
       val encodedToken = new String(base64Encoder.encode(accessToken.value.getBytes(UTF_8)), UTF_8)
-      accessToken.asJson shouldBe json"""{"oauthAccessToken": $encodedToken}"""
+      accessToken.asJson shouldBe json"""{"userOAuthAccessToken": $encodedToken}"""
     }
 
     "encode ProjectAccessToken" in {

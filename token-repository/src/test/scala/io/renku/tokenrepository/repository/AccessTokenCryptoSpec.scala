@@ -106,9 +106,9 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers with TableD
   }
 
   private lazy val tokenScenarios = Table(
-    "Token type"            -> "token",
-    "Project Access Token"  -> projectAccessTokens.generateOne,
-    "OAuth Access Token"    -> oauthAccessTokens.generateOne,
-    "Personal Access Token" -> personalAccessTokens.generateOne
+    "Token type"              -> "token",
+    "Project Access Token"    -> projectAccessTokens.generateOne,
+    "User OAuth Access Token" -> userOAuthAccessTokens.generateOne,
+    "Personal Access Token"   -> personalAccessTokens.generateOne
   )
 }

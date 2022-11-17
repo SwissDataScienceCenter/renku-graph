@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.ErrorMessage._
-import io.renku.http.client.AccessToken.OAuthAccessToken
+import io.renku.http.client.AccessToken.UserOAuthAccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model.AuthUser
@@ -72,7 +72,7 @@ class AuthenticationSpec
     "return a function which fails authenticating the given request " +
       "if it contains an Authorization token that gets rejected by the authenticator" in new TestCase {
 
-        val accessToken = Gen.oneOf(oauthAccessTokens, personalAccessTokens).generateOne
+        val accessToken = Gen.oneOf(userOAuthAccessTokens, personalAccessTokens).generateOne
         val exception   = securityExceptions.generateOne
         (authenticator.authenticate _)
           .expects(accessToken)
@@ -110,7 +110,7 @@ class AuthenticationSpec
     "return a function which fails authenticating the given request " +
       "if it contains an Authorization token that gets rejected by the authenticator" in new TestCase {
 
-        val accessToken = Gen.oneOf(oauthAccessTokens, personalAccessTokens).generateOne
+        val accessToken = Gen.oneOf(userOAuthAccessTokens, personalAccessTokens).generateOne
         val exception   = securityExceptions.generateOne
         (authenticator.authenticate _)
           .expects(accessToken)
@@ -188,12 +188,11 @@ class AuthenticationSpec
   }
 
   private lazy val tokenScenarios = Table(
-    "Token type"            -> "Value",
-    "OAuth Access Token"    -> oauthAccessTokens.generateOne,
-    "Personal Access Token" -> personalAccessTokens.generateOne,
+    "Token type"              -> "Value",
+    "User OAuth Access Token" -> userOAuthAccessTokens.generateOne,
+    "Personal Access Token"   -> personalAccessTokens.generateOne,
     // just by looking at the header we cannot distinguish between OAuth and Project token
     // and always map Bearer token as OAuthAccessToken
-    "Project Access Token" -> projectAccessTokens.map(t => OAuthAccessToken(t.value)).generateOne
+    "Project Access Token" -> projectAccessTokens.map(t => UserOAuthAccessToken(t.value)).generateOne
   )
-
 }

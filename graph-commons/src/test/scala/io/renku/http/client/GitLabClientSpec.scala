@@ -239,9 +239,9 @@ class GitLabClientSpec
   }
 
   private lazy val tokenScenarios = Table(
-    "token type"            -> "token",
-    "Project Access Token"  -> projectAccessTokens.generateOne,
-    "OAuth Access Token"    -> oauthAccessTokens.generateOne,
-    "Personal Access Token" -> personalAccessTokens.generateOne
+    "token type"              -> "token",
+    "Project Access Token"    -> projectAccessTokens.generateOne,
+    "User OAuth Access Token" -> userOAuthAccessTokens.generateOne,
+    "Personal Access Token"   -> personalAccessTokens.generateOne
   )
 }

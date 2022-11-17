@@ -65,7 +65,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactor
 
     "respond with NO_CONTENT if the OAuth Access Token association was successful" in new TestCase {
 
-      val accessToken: AccessToken = oauthAccessTokens.generateOne
+      val accessToken: AccessToken = userOAuthAccessTokens.generateOne
 
       (tokensAssociator
         .associate(_: Id, _: AccessToken))

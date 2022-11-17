@@ -69,10 +69,10 @@ object CommonGraphGenerators {
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
   } yield PersonalAccessToken(chars.mkString(""))
 
-  implicit val oauthAccessTokens: Gen[OAuthAccessToken] = for {
+  implicit val userOAuthAccessTokens: Gen[UserOAuthAccessToken] = for {
     length <- Gen.choose(5, 40)
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
-  } yield OAuthAccessToken(chars.mkString(""))
+  } yield UserOAuthAccessToken(chars.mkString(""))
 
   implicit val projectAccessTokens: Gen[ProjectAccessToken] = for {
     chars <- Gen.listOfN(20, Gen.oneOf(('A' to 'Z').map(_.toString) ++ ('a' to 'z').map(_.toString)))
@@ -81,9 +81,9 @@ object CommonGraphGenerators {
   implicit val securityExceptions: Gen[EndpointSecurityException] =
     Gen.oneOf(AuthenticationFailure, AuthorizationFailure)
 
-  implicit val userAccessTokens: Gen[UserAccessToken] = Gen.oneOf(oauthAccessTokens, personalAccessTokens)
+  implicit val userAccessTokens: Gen[UserAccessToken] = Gen.oneOf(userOAuthAccessTokens, personalAccessTokens)
 
-  implicit val accessTokens: Gen[AccessToken] = Gen.oneOf(projectAccessTokens, oauthAccessTokens, personalAccessTokens)
+  implicit val accessTokens: Gen[AccessToken] = Gen.oneOf(projectAccessTokens, userOAuthAccessTokens, personalAccessTokens)
 
   implicit val basicAuthUsernames: Gen[BasicAuthUsername] = nonEmptyStrings() map BasicAuthUsername.apply
   implicit val basicAuthPasswords: Gen[BasicAuthPassword] = nonEmptyStrings() map BasicAuthPassword.apply

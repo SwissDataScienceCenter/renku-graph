@@ -65,9 +65,9 @@ class GitLabRepoUrlFinderSpec extends AnyWordSpec with MockFactory with should.M
 
       forAll {
         Table(
-          "token type"           -> "token",
-          "Project Access Token" -> projectAccessTokens.generateOne,
-          "OAuth Access Token"   -> oauthAccessTokens.generateOne
+          "token type"              -> "token",
+          "Project Access Token"    -> projectAccessTokens.generateOne,
+          "User OAuth Access Token" -> userOAuthAccessTokens.generateOne
         )
       } { (tokenType, accessToken: AccessToken) =>
         s"return '$protocol://oauth2:<token>@$host:$port/$path.git' for $tokenType" in new TestCase {

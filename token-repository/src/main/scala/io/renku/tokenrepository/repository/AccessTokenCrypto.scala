@@ -59,9 +59,9 @@ private class AccessTokenCryptoImpl[F[_]: MonadThrow](
   } recoverWith meaningfulError
 
   private lazy val serialize: AccessToken => String = {
-    case ProjectAccessToken(token)  => Json.obj("projectAccessToken" -> Json.fromString(token)).noSpaces
-    case OAuthAccessToken(token)    => Json.obj("oauth" -> Json.fromString(token)).noSpaces
-    case PersonalAccessToken(token) => Json.obj("personal" -> Json.fromString(token)).noSpaces
+    case ProjectAccessToken(token)   => Json.obj("projectAccessToken" -> Json.fromString(token)).noSpaces
+    case UserOAuthAccessToken(token) => Json.obj("oauth" -> Json.fromString(token)).noSpaces
+    case PersonalAccessToken(token)  => Json.obj("personal" -> Json.fromString(token)).noSpaces
   }
 
   private def validate(value: String): F[EncryptedAccessToken] =
@@ -77,7 +77,7 @@ private class AccessTokenCryptoImpl[F[_]: MonadThrow](
     maybeExtract("projectAccessToken", as = ProjectAccessToken.from)
       .flatMap {
         case token @ Some(_) => token.asRight
-        case None            => maybeExtract("oauth", as = OAuthAccessToken.from)
+        case None            => maybeExtract("oauth", as = UserOAuthAccessToken.from)
       }
       .flatMap {
         case token @ Some(_) => token.asRight
