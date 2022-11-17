@@ -50,7 +50,7 @@ class HookTokenCryptoImpl[F[_]: MonadThrow](
 
   override def encrypt(hookToken: HookToken): F[SerializedHookToken] =
     for {
-      serializedToken  <- serialize(hookToken)
+      serializedToken  <- serialize(hookToken).pure[F]
       encoded          <- encryptAndEncode(serializedToken)
       validatedDecoded <- validate(encoded)
     } yield validatedDecoded
@@ -62,21 +62,18 @@ class HookTokenCryptoImpl[F[_]: MonadThrow](
     } yield deserialized
   } recoverWith meaningfulError
 
-  private def serialize(hook: HookToken): F[String] = pure {
+  private def serialize(hook: HookToken): String =
     Json.obj("projectId" -> Json.fromInt(hook.projectId.value)).noSpaces
-  }
 
-  private def validate(value: String): F[SerializedHookToken] =
-    MonadThrow[F].fromEither[SerializedHookToken] {
-      SerializedHookToken.from(value)
-    }
+  private def validate(value: String): F[SerializedHookToken] = MonadThrow[F].fromEither[SerializedHookToken] {
+    SerializedHookToken.from(value)
+  }
 
   private implicit val hookTokenDecoder: Decoder[HookToken] = (cursor: HCursor) =>
     cursor.downField("projectId").as[Id].map(HookToken)
 
   private def deserialize(json: String): F[HookToken] = MonadThrow[F].fromEither {
-    parse(json)
-      .flatMap(_.as[HookToken])
+    parse(json).flatMap(_.as[HookToken])
   }
 
   private lazy val meaningfulError: PartialFunction[Throwable, F[HookToken]] = { case NonFatal(cause) =>
@@ -88,9 +85,7 @@ object HookTokenCrypto {
 
   import io.renku.config.ConfigLoader._
 
-  def apply[F[_]: MonadThrow](
-      config: Config = ConfigFactory.load()
-  ): F[HookTokenCrypto[F]] =
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load()): F[HookTokenCrypto[F]] =
     find[F, Secret]("services.gitlab.hook-token-secret", config)
       .map(new HookTokenCryptoImpl[F](_))
 

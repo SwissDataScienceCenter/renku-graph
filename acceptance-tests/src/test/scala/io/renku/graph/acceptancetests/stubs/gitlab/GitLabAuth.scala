@@ -23,7 +23,7 @@ import cats.data.{Kleisli, OptionT}
 import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.State
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken._
 import io.renku.http.server.security.model.AuthUser
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
@@ -40,7 +40,7 @@ private[gitlab] object GitLabAuth {
 
   def auth[F[_]: Async](state: State)(cont: AuthUser => HttpRoutes[F]): HttpRoutes[F] = {
     val authUser: Kleisli[F, Request[F], Either[String, AuthUser]] = Kleisli { req =>
-      req.headers.get[PersonalAccessToken].orElse(req.headers.get[OAuthAccessToken]) match {
+      req.headers.get[PersonalAccessToken].orElse(req.headers.get[UserOAuthAccessToken]) match {
         case None => "No token provided in request".asLeft[AuthUser].pure[F]
         case Some(token) =>
           GitLabStateQueries.findUserByToken(token)(state).toRight("User not found").pure[F]
@@ -55,7 +55,9 @@ private[gitlab] object GitLabAuth {
 
   def authOpt[F[_]: Async](state: State)(cont: Option[AuthUser] => HttpRoutes[F]): HttpRoutes[F] = {
     val authUser: Kleisli[F, Request[F], Either[String, Option[AuthUser]]] = Kleisli { req =>
-      req.headers.get[PersonalAccessToken].orElse(req.headers.get[OAuthAccessToken]) match {
+      req.headers
+        .get[UserOAuthAccessToken]
+        .orElse(req.headers.get[PersonalAccessToken]) match {
         case None => Option.empty[AuthUser].asRight[String].pure[F]
         case Some(token) =>
           GitLabStateQueries
@@ -74,8 +76,9 @@ private[gitlab] object GitLabAuth {
 
   def apply(user: AuthUser): Header.ToRaw =
     user.accessToken match {
-      case t: PersonalAccessToken => Header.ToRaw.modelledHeadersToRaw(t)
-      case t: OAuthAccessToken    => Header.ToRaw.modelledHeadersToRaw(t)
+      case t: ProjectAccessToken   => Header.ToRaw.modelledHeadersToRaw(t)
+      case t: UserOAuthAccessToken => Header.ToRaw.modelledHeadersToRaw(t)
+      case t: PersonalAccessToken  => Header.ToRaw.modelledHeadersToRaw(t)
     }
 
   implicit val privateTokenHeader: Header[PersonalAccessToken, Header.Single] =
@@ -85,7 +88,7 @@ private[gitlab] object GitLabAuth {
       value => PersonalAccessToken.from(value).leftMap(ex => ParseFailure(ex.getMessage, ""))
     )
 
-  implicit val oauthAccessToken: Header[OAuthAccessToken, Header.Single] = {
+  implicit val projectAccessToken: Header[ProjectAccessToken, Header.Single] = {
     val h: Header[Authorization, Header.Single] = Header[Authorization]
     Header.create(
       h.name,
@@ -93,7 +96,23 @@ private[gitlab] object GitLabAuth {
       (h.parse _).andThen(
         _.flatMap(header =>
           header.credentials match {
-            case Credentials.Token(AuthScheme.Bearer, token) => OAuthAccessToken(token).asRight
+            case Credentials.Token(AuthScheme.Bearer, token) => ProjectAccessToken(token).asRight
+            case _                                           => Left(ParseFailure("Invalid token", ""))
+          }
+        )
+      )
+    )
+  }
+
+  implicit val userOAuthAccessToken: Header[UserOAuthAccessToken, Header.Single] = {
+    val h: Header[Authorization, Header.Single] = Header[Authorization]
+    Header.create(
+      h.name,
+      v => h.value(Authorization(Credentials.Token(AuthScheme.Bearer, v.value))),
+      (h.parse _).andThen(
+        _.flatMap(header =>
+          header.credentials match {
+            case Credentials.Token(AuthScheme.Bearer, token) => UserOAuthAccessToken(token).asRight
             case _                                           => Left(ParseFailure("Invalid token", ""))
           }
         )

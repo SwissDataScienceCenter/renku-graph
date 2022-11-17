@@ -24,12 +24,14 @@ import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.ErrorMessage._
+import io.renku.http.client.AccessToken.UserOAuthAccessToken
 import io.renku.http.server.EndpointTester._
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model.AuthUser
 import io.renku.testtools.IOSpec
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{AuthedRoutes, Request, Response}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -46,13 +48,7 @@ class AuthenticationSpec
 
   "authenticateInNeeded" should {
 
-    val scenarios = Table(
-      "Token type"            -> "Value",
-      "Personal Access Token" -> personalAccessTokens.generateOne,
-      "OAuth Access Token"    -> oauthAccessTokens.generateOne
-    )
-
-    forAll(scenarios) { (tokenType, accessToken) =>
+    forAll(tokenScenarios) { (tokenType, accessToken) =>
       "return a function which succeeds authenticating " +
         s"if the given $tokenType is valid" in new TestCase {
 
@@ -76,7 +72,7 @@ class AuthenticationSpec
     "return a function which fails authenticating the given request " +
       "if it contains an Authorization token that gets rejected by the authenticator" in new TestCase {
 
-        val accessToken = accessTokens.generateOne
+        val accessToken = Gen.oneOf(userOAuthAccessTokens, personalAccessTokens).generateOne
         val exception   = securityExceptions.generateOne
         (authenticator.authenticate _)
           .expects(accessToken)
@@ -91,13 +87,7 @@ class AuthenticationSpec
 
   "authenticate" should {
 
-    val scenarios = Table(
-      "Token type"            -> "Value",
-      "Personal Access Token" -> personalAccessTokens.generateOne,
-      "OAuth Access Token"    -> oauthAccessTokens.generateOne
-    )
-
-    forAll(scenarios) { (tokenType, accessToken) =>
+    forAll(tokenScenarios) { (tokenType, accessToken) =>
       "return a function which succeeds authenticating " +
         s"if the given $tokenType is valid" in new TestCase {
 
@@ -120,7 +110,7 @@ class AuthenticationSpec
     "return a function which fails authenticating the given request " +
       "if it contains an Authorization token that gets rejected by the authenticator" in new TestCase {
 
-        val accessToken = accessTokens.generateOne
+        val accessToken = Gen.oneOf(userOAuthAccessTokens, personalAccessTokens).generateOne
         val exception   = securityExceptions.generateOne
         (authenticator.authenticate _)
           .expects(accessToken)
@@ -196,4 +186,13 @@ class AuthenticationSpec
     val authenticator  = mock[Authenticator[Try]]
     val authentication = new AuthenticationImpl[Try](authenticator)
   }
+
+  private lazy val tokenScenarios = Table(
+    "Token type"              -> "Value",
+    "User OAuth Access Token" -> userOAuthAccessTokens.generateOne,
+    "Personal Access Token"   -> personalAccessTokens.generateOne,
+    // just by looking at the header we cannot distinguish between OAuth and Project token
+    // and always map Bearer token as OAuthAccessToken
+    "Project Access Token" -> projectAccessTokens.map(t => UserOAuthAccessToken(t.value)).generateOne
+  )
 }

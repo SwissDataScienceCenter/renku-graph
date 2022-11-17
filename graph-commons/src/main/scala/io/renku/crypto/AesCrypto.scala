@@ -29,7 +29,6 @@ import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.Cipher.{DECRYPT_MODE, ENCRYPT_MODE}
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
-import scala.util.Try
 
 abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
     secret: Secret
@@ -52,22 +51,18 @@ abstract class AesCrypto[F[_]: MonadThrow, NONENCRYPTED, ENCRYPTED](
     c
   }
 
-  protected def encryptAndEncode(toEncryptAndEncode: String): F[String] = pure {
+  protected def encryptAndEncode(toEncryptAndEncode: String): F[String] = MonadThrow[F].catchNonFatal {
     new String(
       base64Encoder.encode(encryptingCipher.doFinal(toEncryptAndEncode.getBytes(UTF_8))),
       UTF_8
     )
   }
 
-  protected def decodeAndDecrypt(toDecodeAndDecrypt: String): F[String] = pure {
+  protected def decodeAndDecrypt(toDecodeAndDecrypt: String): F[String] = MonadThrow[F].catchNonFatal {
     new String(
       decryptingCipher.doFinal(base64Decoder.decode(toDecodeAndDecrypt.getBytes(UTF_8))),
       UTF_8
     )
-  }
-
-  protected def pure[T](value: => T): F[T] = MonadThrow[F].fromTry {
-    Try(value)
   }
 }
 

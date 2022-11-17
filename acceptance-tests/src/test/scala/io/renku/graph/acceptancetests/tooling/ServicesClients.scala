@@ -179,14 +179,15 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   import cats.syntax.all._
   import org.http4s.circe.jsonEncoderOf
   import org.http4s.{EntityEncoder, Method, Request, Response, Status}
+
   protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]
 
   val baseUrl: String Refined Url
 
-  def POST(url: String, maybeAccessToken: Option[AccessToken])(implicit ioRuntime: IORuntime): ClientResponse = {
+  def POST(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.POST, uri, maybeAccessToken))(mapResponse)
+      response <- send(request(Method.POST, uri, accessToken))(mapResponse)
     } yield response
   }.unsafeRunSync()
 
@@ -211,7 +212,7 @@ abstract class ServiceClient(implicit logger: Logger[IO])
   def GET(url: String, accessToken: AccessToken)(implicit ioRuntime: IORuntime): ClientResponse = {
     for {
       uri      <- validateUri(s"$baseUrl/$url")
-      response <- send(request(Method.GET, uri, maybeAccessToken = Some(accessToken)))(mapResponse)
+      response <- send(request(Method.GET, uri, accessToken.some))(mapResponse)
     } yield response
   }.unsafeRunSync()
 

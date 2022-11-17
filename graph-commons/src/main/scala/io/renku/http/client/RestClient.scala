@@ -27,7 +27,7 @@ import eu.timepit.refined.numeric.NonNegative
 import fs2.Stream
 import io.circe.Json
 import io.renku.control.Throttler
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken._
 import io.renku.http.client.RestClient._
 import io.renku.http.client.RestClientError._
 import io.renku.logging.ExecutionTimeRecorder
@@ -92,8 +92,9 @@ abstract class RestClient[F[_]: Async: Logger, ThrottlingTarget](
     )
 
   private lazy val authHeader: AccessToken => Headers = {
-    case PersonalAccessToken(token) => Headers(Header.Raw(ci"PRIVATE-TOKEN", token))
-    case OAuthAccessToken(token)    => Headers(Authorization(Token(Bearer, token)))
+    case ProjectAccessToken(token)   => Headers(Authorization(Token(Bearer, token)))
+    case UserOAuthAccessToken(token) => Headers(Authorization(Token(Bearer, token)))
+    case PersonalAccessToken(token)  => Headers(Header.Raw(ci"PRIVATE-TOKEN", token))
   }
 
   private def basicAuthHeader(basicAuth: BasicAuthCredentials) =

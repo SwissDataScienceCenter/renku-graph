@@ -45,7 +45,7 @@ class AccessTokenAssociatorImplSpec
 
   "associate" should {
 
-    List[AccessToken](personalAccessTokens.generateOne, oauthAccessTokens.generateOne) foreach { accessToken =>
+    List[AccessToken](personalAccessTokens.generateOne, userOAuthAccessTokens.generateOne) foreach { accessToken =>
       s"succeed if association projectId with a ${accessToken.getClass.getSimpleName} on a remote is successful" in new TestCase {
 
         stubFor {

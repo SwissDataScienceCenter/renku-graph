@@ -43,6 +43,7 @@ import org.http4s.{Method, Request, Response, Status, Uri}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 class GitLabClientSpec
@@ -50,6 +51,7 @@ class GitLabClientSpec
     with IOSpec
     with ExternalServiceStubbing
     with should.Matchers
+    with TableDrivenPropertyChecks
     with MockFactory {
 
   "get" should {
@@ -67,46 +69,39 @@ class GitLabClientSpec
       client.get(path, endpointName)(mapGetResponse).unsafeRunSync() shouldBe result
     }
 
-    "use the given access token and call mapResponse" in new TestCase {
+    forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
+      s"use the given $tokenType and call mapResponse" in new TestCase {
 
-      val returnValue = Gen
-        .oneOf(
-          notFound() -> List.empty[Json],
-          okJson(result.asJson.toString()).withHeader("X-Next-Page", maybeNextPage.map(_.show).getOrElse("")) ->
-            result
-        )
-        .generateOne
-
-      implicit val accessToken: Option[AccessToken] = accessTokens.generateOne.some
-      stubFor {
-        callMethod(GET, s"/api/v4/$path")
-          .withAccessToken(accessToken)
-          .willReturn(
-            returnValue._1
+        val returnValue = Gen
+          .oneOf(
+            notFound()                    -> List.empty[Json],
+            okJson(result.asJson.spaces2) -> result
           )
-      }
+          .generateOne
 
-      client.get(path, endpointName)(mapGetResponse).unsafeRunSync() shouldBe returnValue._2
+        stubFor {
+          callMethod(GET, s"/api/v4/$path")
+            .withAccessToken(accessToken.some)
+            .willReturn(returnValue._1)
+        }
+
+        client.get(path, endpointName)(mapGetResponse)(accessToken.some).unsafeRunSync() shouldBe returnValue._2
+      }
     }
 
-    "Handle 404 NOT FOUND without throwing" in new TestCase {
+    "handle 404 NOT FOUND without throwing" in new TestCase {
       stubFor {
         callMethod(GET, s"/api/v4/$path")
-          .willReturn(
-            notFound()
-          )
+          .willReturn(notFound())
       }
 
       client.get(path, endpointName)(mapGetResponse).unsafeRunSync() shouldBe List()
-
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
       stubFor {
         callMethod(GET, s"/api/v4/$path")
-          .willReturn(
-            unauthorized()
-          )
+          .willReturn(unauthorized())
       }
 
       intercept[UnauthorizedException] {
@@ -117,9 +112,7 @@ class GitLabClientSpec
     "return an Exception if remote client responds with status neither OK nor UNAUTHORIZED" in new TestCase {
       stubFor {
         callMethod(GET, s"/api/v4/$path")
-          .willReturn(
-            badRequest()
-          )
+          .willReturn(badRequest())
       }
 
       intercept[Exception](client.get(path, endpointName)(mapGetResponse).unsafeRunSync())
@@ -141,17 +134,19 @@ class GitLabClientSpec
 
   "post" should {
 
-    "send json to the endpoint" in new TestCase {
+    forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
+      s"send json with the $tokenType to the endpoint" in new TestCase {
 
-      val payload = jsons.generateOne
-      stubFor {
-        post(s"/api/v4/$path")
-          .withAccessToken(maybeAccessToken)
-          .withRequestBody(equalToJson(payload.spaces2))
-          .willReturn(aResponse().withStatus(Accepted.code))
+        val payload = jsons.generateOne
+        stubFor {
+          post(s"/api/v4/$path")
+            .withAccessToken(accessToken.some)
+            .withRequestBody(equalToJson(payload.spaces2))
+            .willReturn(aResponse().withStatus(Accepted.code))
+        }
+
+        client.post(path, endpointName, payload)(mapPostResponse)(accessToken.some).unsafeRunSync() shouldBe ()
       }
-
-      client.post(path, endpointName, payload)(mapPostResponse).unsafeRunSync() shouldBe ()
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
@@ -162,9 +157,7 @@ class GitLabClientSpec
         post(s"/api/v4/$path")
           .withAccessToken(maybeAccessToken)
           .withRequestBody(equalToJson(payload.spaces2))
-          .willReturn(
-            unauthorized()
-          )
+          .willReturn(unauthorized())
       }
 
       intercept[Exception] {
@@ -175,24 +168,24 @@ class GitLabClientSpec
 
   "delete" should {
 
-    "send json to the endpoint" in new TestCase {
+    forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
+      s"send json with the $tokenType to the endpoint" in new TestCase {
 
-      stubFor {
-        delete(s"/api/v4/$path")
-          .withAccessToken(maybeAccessToken)
-          .willReturn(aResponse().withStatus(Accepted.code))
+        stubFor {
+          delete(s"/api/v4/$path")
+            .withAccessToken(accessToken.some)
+            .willReturn(aResponse().withStatus(Accepted.code))
+        }
+
+        client.delete(path, endpointName)(mapDeleteResponse)(accessToken.some).unsafeRunSync() shouldBe ()
       }
-
-      client.delete(path, endpointName)(mapDeleteResponse).unsafeRunSync() shouldBe ()
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
 
       stubFor {
         delete(s"/api/v4/$path")
-          .willReturn(
-            unauthorized()
-          )
+          .willReturn(unauthorized())
       }
 
       intercept[UnauthorizedException] {
@@ -202,7 +195,7 @@ class GitLabClientSpec
   }
 
   private trait TestCase {
-    implicit val maybeAccessToken: Option[AccessToken] = personalAccessTokens.generateSome
+    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
 
     private implicit val logger: TestLogger[IO] = TestLogger()
     val apiCallRecorder = new GitLabApiCallRecorder(TestExecutionTimeRecorder[IO]())
@@ -236,7 +229,6 @@ class GitLabClientSpec
     val maybeNextPage = pages.generateOption
 
     val result = nonEmptyStringsList(5, 10).generateOne
-
   }
 
   private def callMethod(method: Method, uri: String): MappingBuilder = method match {
@@ -246,4 +238,10 @@ class GitLabClientSpec
     case POST   => post(uri)
   }
 
+  private lazy val tokenScenarios = Table(
+    "token type"              -> "token",
+    "Project Access Token"    -> projectAccessTokens.generateOne,
+    "User OAuth Access Token" -> userOAuthAccessTokens.generateOne,
+    "Personal Access Token"   -> personalAccessTokens.generateOne
+  )
 }

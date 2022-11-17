@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.config.GitLab
 import io.renku.control.{RateLimit, Throttler}
 import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.{GitLabUrl, projects}
+import io.renku.graph.model.{GitLabApiUrl, projects}
 import io.renku.http.client.{AccessToken, RestClient}
 import org.http4s.circe.jsonOf
 import org.typelevel.log4cats.Logger
@@ -34,7 +34,7 @@ trait ProjectPathFinder[F[_]] {
 }
 
 private class ProjectPathFinderImpl[F[_]: Async: Temporal: Logger](
-    gitLabUrl:       GitLabUrl,
+    gitLabUrl:       GitLabApiUrl,
     gitLabThrottler: Throttler[F, GitLab]
 ) extends RestClient(gitLabThrottler)
     with ProjectPathFinder[F] {
@@ -49,7 +49,7 @@ private class ProjectPathFinderImpl[F[_]: Async: Temporal: Logger](
   import org.http4s.dsl.io._
 
   def findProjectPath(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[Option[projects.Path]] = for {
-    uri     <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
+    uri     <- validateUri(s"$gitLabUrl/projects/$projectId")
     project <- send(request(GET, uri, maybeAccessToken))(mapResponse)
   } yield project
 
@@ -70,6 +70,6 @@ object ProjectPathFinder {
   def apply[F[_]: Async: Temporal: Logger]: F[ProjectPathFinder[F]] = for {
     gitLabRateLimit <- RateLimit.fromConfig[F, GitLab]("services.gitlab.rate-limit")
     gitLabThrottler <- Throttler[F, GitLab](gitLabRateLimit)
-    gitLabUrl       <- GitLabUrlLoader[F]()
+    gitLabUrl       <- GitLabUrlLoader[F]().map(_.apiV4)
   } yield new ProjectPathFinderImpl(gitLabUrl, gitLabThrottler)
 }

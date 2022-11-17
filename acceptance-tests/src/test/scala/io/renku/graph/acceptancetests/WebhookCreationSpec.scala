@@ -27,7 +27,6 @@ import io.renku.graph.acceptancetests.flows.AccessTokenPresence
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.http.server.security.model.AuthUser
 import org.http4s.Status._
 
 class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with ApplicationServices with AccessTokenPresence {
@@ -38,7 +37,7 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
 
       val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.zero).generateOne
 
-      val user: AuthUser = authUsers.generateOne
+      val user = authUsers.generateOne
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)
 
@@ -46,7 +45,7 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
       gitLabStub.setupProject(project)
 
       When("user does POST webhook-service/projects/:id/webhooks")
-      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks", Some(user.accessToken))
+      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks", user.accessToken)
 
       Then("he should get OK response back")
       response.status shouldBe Ok
@@ -54,7 +53,7 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
 
     Scenario("No Graph Services webhook on the project in GitLab") {
 
-      val user: AuthUser = authUsers.generateOne
+      val user    = authUsers.generateOne
       val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.one).generateOne
 
       Given("api user is authenticated")
@@ -72,7 +71,7 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
 
       When("user does POST webhook-service/projects/:id/webhooks")
-      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks", Some(user.accessToken))
+      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks", user.accessToken)
 
       Then("he should get CREATED response back")
       response.status shouldBe Created
