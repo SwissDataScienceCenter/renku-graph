@@ -22,13 +22,12 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.effect.kernel.Concurrent
 import cats.syntax.all._
-import io.renku.db.SessionResource
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.ProjectsTokensDB
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
@@ -74,10 +73,7 @@ class AssociateTokenEndpointImpl[F[_]: Concurrent: Logger](
 
 object AssociateTokenEndpoint {
 
-  def apply[F[_]: Async: Logger](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
+  def apply[F[_]: Async: Logger: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
-  ): F[AssociateTokenEndpoint[F]] =
-    TokenAssociator(sessionResource, queriesExecTimes)
-      .map(new AssociateTokenEndpointImpl[F](_))
+  ): F[AssociateTokenEndpoint[F]] = TokenAssociator(queriesExecTimes).map(new AssociateTokenEndpointImpl[F](_))
 }

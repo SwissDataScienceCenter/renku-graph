@@ -21,14 +21,14 @@ package io.renku.tokenrepository.repository.init
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import io.renku.db.SessionResource
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.association.ProjectPathFinder
 import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokenRemoverImpl}
-import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB, TokenRepositoryTypeSerializers}
+import io.renku.tokenrepository.repository.{AccessTokenCrypto, TokenRepositoryTypeSerializers}
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.implicits._
@@ -39,18 +39,18 @@ private trait ProjectPathAdder[F[_]] {
   def run(): F[Unit]
 }
 
-private class ProjectPathAdderImpl[F[_]: Spawn: Logger](
-    sessionResource:   SessionResource[F, ProjectsTokensDB],
+private class ProjectPathAdderImpl[F[_]: Spawn: Logger: SessionResource](
     accessTokenCrypto: AccessTokenCrypto[F],
     pathFinder:        ProjectPathFinder[F],
     tokenRemover:      TokenRemover[F]
 ) extends ProjectPathAdder[F]
     with TokenRepositoryTypeSerializers {
 
+  import MigrationTools._
   import accessTokenCrypto._
   import pathFinder._
 
-  def run(): F[Unit] = sessionResource.useK {
+  def run(): F[Unit] = SessionResource[F].useK {
     checkColumnExists >>= {
       case true  => Kleisli.liftF(Logger[F].info("'project_path' column exists"))
       case false => addColumn()
@@ -72,7 +72,7 @@ private class ProjectPathAdderImpl[F[_]: Spawn: Logger](
     } recoverWith logging
   }
 
-  private def addMissingPaths(): F[Unit] = sessionResource.useK {
+  private def addMissingPaths(): F[Unit] = SessionResource[F].useK {
     Kleisli { implicit session =>
       for {
         _ <- addPathIfMissing().run(session)
@@ -121,9 +121,6 @@ private class ProjectPathAdderImpl[F[_]: Spawn: Logger](
     Kleisli(_.prepare(query).use(_.execute(path ~ id)).void)
   }
 
-  private def execute(sql: Command[Void])(implicit session: Session[F]): F[Unit] =
-    session.execute(sql).void
-
   private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     Logger[F].error(exception)("'project_path' column adding failure")
     exception.raiseError[F, Unit]
@@ -132,12 +129,9 @@ private class ProjectPathAdderImpl[F[_]: Spawn: Logger](
 
 private object ProjectPathAdder {
 
-  def apply[F[_]: Async: Logger](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[ProjectPathAdder[F]] = for {
+  def apply[F[_]: Async: Logger: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[ProjectPathAdder[F]] = for {
     accessTokenCrypto <- AccessTokenCrypto[F]()
     pathFinder        <- ProjectPathFinder[F]
-    tokenRemover = new TokenRemoverImpl[F](sessionResource, queriesExecTimes)
-  } yield new ProjectPathAdderImpl[F](sessionResource, accessTokenCrypto, pathFinder, tokenRemover)
+    tokenRemover = new TokenRemoverImpl[F](queriesExecTimes)
+  } yield new ProjectPathAdderImpl[F](accessTokenCrypto, pathFinder, tokenRemover)
 }
