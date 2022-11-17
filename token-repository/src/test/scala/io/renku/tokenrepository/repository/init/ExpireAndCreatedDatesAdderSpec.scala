@@ -41,8 +41,10 @@ class ExpireAndCreatedDatesAdderSpec extends AnyWordSpec with IOSpec with DbInit
 
       datesAdder.run().unsafeRunSync() shouldBe ()
 
-      verifyColumnExists("projects_tokens", "expiry_date") shouldBe true
-      verifyColumnExists("projects_tokens", "created_at")  shouldBe true
+      verifyColumnExists("projects_tokens", "expiry_date")    shouldBe true
+      verifyColumnExists("projects_tokens", "created_at")     shouldBe true
+      verifyIndexExists("projects_tokens", "idx_expiry_date") shouldBe true
+      verifyIndexExists("projects_tokens", "idx_created_at")  shouldBe true
 
       logger.loggedOnly(Info("'expiry_date' column added"), Info("'created_at' column added"))
       logger.reset()

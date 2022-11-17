@@ -50,13 +50,13 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
   def execute[O](query: Kleisli[IO, Session[IO], O]): O =
     SessionResource[IO].useK(query).unsafeRunSync()
 
-  protected def tableExists(): Boolean = SessionResource[IO]
-    .useK {
-      val query: Query[Void, Boolean] = sql"""select exists (select * from projects_tokens);""".query(bool)
-      Kleisli[IO, Session[IO], Option[Boolean]](_.option(query).recover { case _ => None })
+  protected def tableExists(tableName: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String, Boolean] =
+        sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $varchar)".query(bool)
+      session.prepare(query).use(_.unique(tableName)).recover { case _ => false }
     }
-    .unsafeRunSync()
-    .isDefined
+  }
 
   protected def dropTable(table: String): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
@@ -76,6 +76,21 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
       session
         .prepare(query)
         .use(_.unique(table ~ column))
+        .recover { case _ => false }
+    }
+  }
+
+  def verifyIndexExists(table: String, indexName: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] =
+        sql"""SELECT EXISTS (
+               SELECT *
+               FROM pg_indexes
+               WHERE tablename = $varchar AND indexname = $varchar
+             )""".query(bool)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ indexName))
         .recover { case _ => false }
     }
   }
