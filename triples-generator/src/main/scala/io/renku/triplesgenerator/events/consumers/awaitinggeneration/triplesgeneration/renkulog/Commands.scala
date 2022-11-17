@@ -62,7 +62,7 @@ private object Commands {
       merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectPath)
 
     private lazy val findUrlTokenPart: Option[AccessToken] => String = {
-      case None                             => ""
+      case None                              => ""
       case Some(ProjectAccessToken(token))   => s"oauth2:$token@"
       case Some(UserOAuthAccessToken(token)) => s"oauth2:$token@"
       case Some(PersonalAccessToken(token))  => s"gitlab-ci-token:$token@"

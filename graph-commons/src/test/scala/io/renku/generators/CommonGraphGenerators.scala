@@ -83,7 +83,8 @@ object CommonGraphGenerators {
 
   implicit val userAccessTokens: Gen[UserAccessToken] = Gen.oneOf(userOAuthAccessTokens, personalAccessTokens)
 
-  implicit val accessTokens: Gen[AccessToken] = Gen.oneOf(projectAccessTokens, userOAuthAccessTokens, personalAccessTokens)
+  implicit val accessTokens: Gen[AccessToken] =
+    Gen.oneOf(projectAccessTokens, userOAuthAccessTokens, personalAccessTokens)
 
   implicit val basicAuthUsernames: Gen[BasicAuthUsername] = nonEmptyStrings() map BasicAuthUsername.apply
   implicit val basicAuthPasswords: Gen[BasicAuthPassword] = nonEmptyStrings() map BasicAuthPassword.apply

@@ -35,7 +35,7 @@ package object security {
     lazy val toHeader: Header.Raw = accessToken match {
       case UserOAuthAccessToken(token) => modelledHeadersToRaw(Authorization(Token(Bearer, token))).values.head
       case PersonalAccessToken(token)  => Header.Raw(ci"PRIVATE-TOKEN", token)
-      case ProjectAccessToken(token)  => modelledHeadersToRaw(Authorization(Token(Bearer, token))).values.head
+      case ProjectAccessToken(token)   => modelledHeadersToRaw(Authorization(Token(Bearer, token))).values.head
     }
   }
 }

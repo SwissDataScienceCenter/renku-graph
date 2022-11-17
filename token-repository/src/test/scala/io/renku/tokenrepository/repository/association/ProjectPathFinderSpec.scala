@@ -22,7 +22,7 @@ import cats.effect.IO
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.{userOAuthAccessTokens, personalAccessTokens}
+import io.renku.generators.CommonGraphGenerators.{personalAccessTokens, userOAuthAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._

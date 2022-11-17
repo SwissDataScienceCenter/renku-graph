@@ -22,7 +22,7 @@ import cats.data.{Kleisli, OptionT}
 import cats.syntax.all._
 import cats.{Applicative, MonadThrow}
 import io.renku.http.client.AccessToken
-import io.renku.http.client.AccessToken.{UserOAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken.{PersonalAccessToken, UserOAuthAccessToken}
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model._
 import org.http4s.AuthScheme.Bearer

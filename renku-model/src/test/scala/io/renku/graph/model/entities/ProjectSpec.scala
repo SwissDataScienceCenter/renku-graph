@@ -346,7 +346,9 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
         val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
 
-        actual.plans      shouldBe List(planDateCreated.set(plans.DateCreated(entitiesActivity.startTime.value))(entitiesPlan))
+        actual.plans shouldBe List(
+          planDateCreated.set(plans.DateCreated(entitiesActivity.startTime.value))(entitiesPlan)
+        )
         actual.activities shouldBe List(entitiesActivity)
       }
     }

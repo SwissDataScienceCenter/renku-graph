@@ -61,7 +61,7 @@ trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll 
       case Some(ProjectAccessToken(token))   => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
       case Some(UserOAuthAccessToken(token)) => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
       case Some(PersonalAccessToken(token))  => mappingBuilder.withHeader("PRIVATE-TOKEN", equalTo(token))
-      case None                             => mappingBuilder
+      case None                              => mappingBuilder
     }
   }
 }
