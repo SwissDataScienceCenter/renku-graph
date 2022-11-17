@@ -61,17 +61,17 @@ class ProjectPathAdderSpec
 
     "do nothing if the 'project_path' column already exists" in new TestCase {
       addProjectPath()
-      checkColumnExists shouldBe true
+      verifyColumnExists("projects_tokens", "project_path") shouldBe true
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ()
 
-      checkColumnExists shouldBe true
+      verifyColumnExists("projects_tokens", "project_path") shouldBe true
 
       logger.loggedOnly(Info("'project_path' column exists"))
     }
 
     "add the 'project_path' column if does not exist and add paths fetched from GitLab" in new TestCase {
-      checkColumnExists shouldBe false
+      verifyColumnExists("projects_tokens", "project_path") shouldBe false
 
       val project1Id             = projectIds.generateOne
       val project1Path           = projectPaths.generateOne
@@ -103,7 +103,7 @@ class ProjectPathAdderSpec
     }
 
     "add the 'project_path' column if does not exist and remove entries for non-existing projects in GitLab" in new TestCase {
-      checkColumnExists shouldBe false
+      verifyColumnExists("projects_tokens", "project_path") shouldBe false
 
       val project1Id             = projectIds.generateOne
       val project1TokenEncrypted = encryptedAccessTokens.generateOne
@@ -169,19 +169,6 @@ class ProjectPathAdderSpec
       session.execute(query).void
     }
   }
-
-  private def checkColumnExists: Boolean = sessionResource
-    .useK {
-      val query: Query[Void, Path] = sql"select project_path from projects_tokens limit 1"
-        .query(varchar)
-        .gmap[Path]
-      Kleisli {
-        _.option(query)
-          .map(_ => true)
-          .recover { case _ => false }
-      }
-    }
-    .unsafeRunSync()
 
   def insert(projectId: Id, encryptedToken: EncryptedAccessToken): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>

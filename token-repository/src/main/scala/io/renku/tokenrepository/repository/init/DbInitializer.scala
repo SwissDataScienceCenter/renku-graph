@@ -56,10 +56,13 @@ class DbInitializerImpl[F[_]: Async: Logger](migrators: List[Runnable[F, Unit]],
 object DbInitializer {
 
   def apply[F[_]: Async: Logger: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[DbInitializer[F]] = for {
-    tableCreator             <- ProjectsTokensTableCreator[F].pure[F]
-    pathAdder                <- ProjectPathAdder[F](queriesExecTimes)
-    duplicateProjectsRemover <- DuplicateProjectsRemover[F].pure[F]
-  } yield new DbInitializerImpl[F](List[Runnable[F, Unit]](tableCreator, pathAdder, duplicateProjectsRemover))
+    tableCreator               <- ProjectsTokensTableCreator[F].pure[F]
+    pathAdder                  <- ProjectPathAdder[F](queriesExecTimes)
+    duplicateProjectsRemover   <- DuplicateProjectsRemover[F].pure[F]
+    expireAndCreatedDatesAdder <- ExpireAndCreatedDatesAdder[F].pure[F]
+  } yield new DbInitializerImpl[F](
+    List[Runnable[F, Unit]](tableCreator, pathAdder, duplicateProjectsRemover, expireAndCreatedDatesAdder)
+  )
 
   private[init] type Runnable[F[_], R] = { def run(): F[R] }
 }

@@ -46,6 +46,7 @@ private class ProjectPathAdderImpl[F[_]: Spawn: Logger: SessionResource](
 ) extends ProjectPathAdder[F]
     with TokenRepositoryTypeSerializers {
 
+  import MigrationTools._
   import accessTokenCrypto._
   import pathFinder._
 
@@ -119,9 +120,6 @@ private class ProjectPathAdderImpl[F[_]: Spawn: Logger: SessionResource](
       sql"update projects_tokens set project_path = $projectPathEncoder where project_id = $projectIdEncoder".command
     Kleisli(_.prepare(query).use(_.execute(path ~ id)).void)
   }
-
-  private def execute(sql: Command[Void])(implicit session: Session[F]): F[Unit] =
-    session.execute(sql).void
 
   private lazy val logging: PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
     Logger[F].error(exception)("'project_path' column adding failure")

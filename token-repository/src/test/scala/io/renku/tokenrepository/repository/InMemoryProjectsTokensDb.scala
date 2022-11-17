@@ -65,6 +65,21 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
     }
   }
 
+  protected def verifyColumnExists(table: String, column: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] =
+        sql"""SELECT EXISTS (
+                SELECT *
+                FROM information_schema.columns
+                WHERE table_name = $varchar AND column_name = $varchar
+              )""".query(bool)
+      session
+        .prepare(query)
+        .use(_.unique(table ~ column))
+        .recover { case _ => false }
+    }
+  }
+
   protected def verifyTrue(sql: Command[Void]): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
       session.execute(sql).void

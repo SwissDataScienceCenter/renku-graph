@@ -37,7 +37,8 @@ trait DbMigrations {
   protected lazy val projectsTokensTableCreator: Migration = ProjectsTokensTableCreator[IO]
   protected lazy val projectPathAdded:           Migration = ProjectPathAdder(queriesExecTimes).unsafeRunSync()
   protected lazy val duplicateProjectsRemover:   Migration = DuplicateProjectsRemover[IO]
+  protected lazy val expireAndCreatedDatesAdder: Migration = ExpireAndCreatedDatesAdder[IO]
 
   protected lazy val allMigrations: List[Migration] =
-    List(projectsTokensTableCreator, projectPathAdded, duplicateProjectsRemover)
+    List(projectsTokensTableCreator, projectPathAdded, duplicateProjectsRemover, expireAndCreatedDatesAdder)
 }
