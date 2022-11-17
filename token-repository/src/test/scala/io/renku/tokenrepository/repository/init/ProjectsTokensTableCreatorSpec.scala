@@ -46,6 +46,6 @@ class ProjectsTokensTableCreatorSpec extends AnyWordSpec with IOSpec with DbInit
   }
 
   private trait TestCase {
-    val tableCreator = new ProjectsTokensTableCreatorImpl[IO](sessionResource)
+    val tableCreator = new ProjectsTokensTableCreatorImpl[IO]
   }
 }

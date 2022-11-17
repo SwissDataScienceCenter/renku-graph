@@ -24,6 +24,15 @@ import io.renku.db.DBConfigProvider
 
 sealed trait ProjectsTokensDB
 
+object ProjectsTokensDB {
+
+  type SessionResource[F[_]] = io.renku.db.SessionResource[F, ProjectsTokensDB]
+
+  object SessionResource {
+    def apply[F[_]](implicit sr: SessionResource[F]): SessionResource[F] = sr
+  }
+}
+
 class ProjectsTokensDbConfigProvider[F[_]: MonadThrow](
 ) extends DBConfigProvider[F, ProjectsTokensDB](
       namespace = "projects-tokens",

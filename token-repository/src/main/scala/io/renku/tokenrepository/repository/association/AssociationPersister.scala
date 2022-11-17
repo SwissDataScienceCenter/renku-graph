@@ -21,11 +21,12 @@ package io.renku.tokenrepository.repository.association
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTypeSerializers}
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
+import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import skunk._
 import skunk.data.Completion.Delete
 import skunk.implicits._
@@ -34,15 +35,13 @@ private trait AssociationPersister[F[_]] {
   def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): F[Unit]
 }
 
-private class AssociationPersisterImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient[F](Some(queriesExecTimes))
+private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
+    extends DbClient[F](Some(queriesExecTimes))
     with AssociationPersister[F]
     with TokenRepositoryTypeSerializers {
 
   override def persistAssociation(id: Id, path: Path, token: EncryptedAccessToken): F[Unit] =
-    sessionResource.useWithTransactionK {
+    SessionResource[F].useWithTransactionK {
       Kleisli { case (_, session) =>
         (deleteAssociation(id, path) >> insert(id, path, token)).run(session)
       }

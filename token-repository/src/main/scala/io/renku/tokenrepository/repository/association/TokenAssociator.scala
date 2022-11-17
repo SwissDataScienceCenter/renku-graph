@@ -22,13 +22,13 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.types.numeric
-import io.renku.db.SessionResource
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.AccessToken
 import io.renku.metrics.LabeledHistogram
+import io.renku.tokenrepository.repository.AccessTokenCrypto
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.deletion.{TokenRemover, TokenRemoverImpl}
 import io.renku.tokenrepository.repository.fetching.{PersistedTokensFinder, PersistedTokensFinderImpl}
-import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
@@ -93,14 +93,11 @@ private object TokenAssociator {
 
   private val maxRetries: numeric.NonNegInt = numeric.NonNegInt.unsafeFrom(3)
 
-  def apply[F[_]: Async: Logger](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[TokenAssociator[F]] = for {
+  def apply[F[_]: Async: Logger: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[TokenAssociator[F]] = for {
     pathFinder        <- ProjectPathFinder[F]
     accessTokenCrypto <- AccessTokenCrypto[F]()
-    persister    = new AssociationPersisterImpl(sessionResource, queriesExecTimes)
-    tokenRemover = new TokenRemoverImpl[F](sessionResource, queriesExecTimes)
-    tokenFinder  = new PersistedTokensFinderImpl[F](sessionResource, queriesExecTimes)
+    persister    = new AssociationPersisterImpl(queriesExecTimes)
+    tokenRemover = new TokenRemoverImpl[F](queriesExecTimes)
+    tokenFinder  = new PersistedTokensFinderImpl[F](queriesExecTimes)
   } yield new TokenAssociatorImpl[F](pathFinder, accessTokenCrypto, persister, tokenRemover, tokenFinder, maxRetries)
 }

@@ -49,8 +49,8 @@ object Microservice extends IOMicroservice {
       certificateLoader                  <- CertificateLoader[IO]
       sentryInitializer                  <- SentryInitializer[IO]
       queriesExecTimes                   <- QueriesExecutionTimes[IO]
-      dbInitializer                      <- DbInitializer(sessionResource, queriesExecTimes)
-      microserviceRoutes                 <- MicroserviceRoutes[IO](sessionResource, queriesExecTimes).map(_.routes)
+      dbInitializer                      <- DbInitializer(queriesExecTimes)
+      microserviceRoutes                 <- MicroserviceRoutes[IO](queriesExecTimes).map(_.routes)
       exitCode <- microserviceRoutes.use { routes =>
                     new MicroserviceRunner(
                       certificateLoader,

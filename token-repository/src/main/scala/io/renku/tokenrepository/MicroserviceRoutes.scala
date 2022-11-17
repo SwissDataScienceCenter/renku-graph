@@ -21,11 +21,10 @@ package io.renku.tokenrepository
 import cats.MonadThrow
 import cats.effect.{Async, Clock, Resource}
 import cats.syntax.all._
-import io.renku.db.SessionResource
 import io.renku.graph.http.server.binders.{ProjectId, ProjectPath}
 import io.renku.http.server.version
 import io.renku.metrics.{LabeledHistogram, MetricsRegistry, RoutesMetrics}
-import io.renku.tokenrepository.repository.ProjectsTokensDB
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
 import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
@@ -59,13 +58,12 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: Logger: MetricsRegistry](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
+  def apply[F[_]: Async: Logger: MetricsRegistry: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
   ): F[MicroserviceRoutes[F]] = for {
-    fetchTokenEndpoint     <- FetchTokenEndpoint(sessionResource, queriesExecTimes)
-    associateTokenEndpoint <- AssociateTokenEndpoint(sessionResource, queriesExecTimes)
-    deleteTokenEndpoint    <- DeleteTokenEndpoint(sessionResource, queriesExecTimes)
+    fetchTokenEndpoint     <- FetchTokenEndpoint(queriesExecTimes)
+    associateTokenEndpoint <- AssociateTokenEndpoint(queriesExecTimes)
+    deleteTokenEndpoint    <- DeleteTokenEndpoint(queriesExecTimes)
     versionRoutes          <- version.Routes[F]
   } yield new MicroserviceRoutes(fetchTokenEndpoint,
                                  associateTokenEndpoint,

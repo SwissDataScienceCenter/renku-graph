@@ -21,9 +21,8 @@ package io.renku.tokenrepository.repository.init
 import DbInitializer.Runnable
 import cats.effect._
 import cats.syntax.all._
-import io.renku.db.SessionResource
 import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.ProjectsTokensDB
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -56,13 +55,10 @@ class DbInitializerImpl[F[_]: Async: Logger](migrators: List[Runnable[F, Unit]],
 
 object DbInitializer {
 
-  def apply[F[_]: Async: Logger](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[DbInitializer[F]] = for {
-    tableCreator             <- ProjectsTokensTableCreator[F](sessionResource).pure[F]
-    pathAdder                <- ProjectPathAdder[F](sessionResource, queriesExecTimes)
-    duplicateProjectsRemover <- DuplicateProjectsRemover[F](sessionResource).pure[F]
+  def apply[F[_]: Async: Logger: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[DbInitializer[F]] = for {
+    tableCreator             <- ProjectsTokensTableCreator[F].pure[F]
+    pathAdder                <- ProjectPathAdder[F](queriesExecTimes)
+    duplicateProjectsRemover <- DuplicateProjectsRemover[F].pure[F]
   } yield new DbInitializerImpl[F](List[Runnable[F, Unit]](tableCreator, pathAdder, duplicateProjectsRemover))
 
   private[init] type Runnable[F[_], R] = { def run(): F[R] }

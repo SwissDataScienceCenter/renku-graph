@@ -21,8 +21,9 @@ package io.renku.tokenrepository.repository
 import cats.data.Kleisli
 import cats.effect.IO
 import com.dimafeng.testcontainers._
-import io.renku.db.{PostgresContainer, SessionResource}
+import io.renku.db.PostgresContainer
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import skunk._
@@ -36,7 +37,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
 
   override val container: PostgreSQLContainer = PostgresContainer.container(dbConfig)
 
-  lazy val sessionResource: SessionResource[IO, ProjectsTokensDB] = new SessionResource[IO, ProjectsTokensDB](
+  implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, ProjectsTokensDB](
     Session.single(
       host = container.host,
       database = dbConfig.name.value,
@@ -47,16 +48,15 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
   )
 
   def execute[O](query: Kleisli[IO, Session[IO], O]): O =
-    sessionResource.useK(query).unsafeRunSync()
+    SessionResource[IO].useK(query).unsafeRunSync()
 
-  protected def tableExists(): Boolean =
-    sessionResource
-      .useK {
-        val query: Query[Void, Boolean] = sql"""select exists (select * from projects_tokens);""".query(bool)
-        Kleisli[IO, Session[IO], Option[Boolean]](_.option(query).recover { case _ => None })
-      }
-      .unsafeRunSync()
-      .isDefined
+  protected def tableExists(): Boolean = SessionResource[IO]
+    .useK {
+      val query: Query[Void, Boolean] = sql"""select exists (select * from projects_tokens);""".query(bool)
+      Kleisli[IO, Session[IO], Option[Boolean]](_.option(query).recover { case _ => None })
+    }
+    .unsafeRunSync()
+    .isDefined
 
   protected def dropTable(table: String): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>

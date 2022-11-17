@@ -34,9 +34,9 @@ trait DbMigrations {
     TestLabeledHistogram[SqlStatement.Name]("query_id")
   protected implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 
-  protected lazy val projectsTokensTableCreator: Migration = ProjectsTokensTableCreator(sessionResource)
-  protected lazy val projectPathAdded: Migration = ProjectPathAdder(sessionResource, queriesExecTimes).unsafeRunSync()
-  protected lazy val duplicateProjectsRemover: Migration = DuplicateProjectsRemover(sessionResource)
+  protected lazy val projectsTokensTableCreator: Migration = ProjectsTokensTableCreator[IO]
+  protected lazy val projectPathAdded:           Migration = ProjectPathAdder(queriesExecTimes).unsafeRunSync()
+  protected lazy val duplicateProjectsRemover:   Migration = DuplicateProjectsRemover[IO]
 
   protected lazy val allMigrations: List[Migration] =
     List(projectsTokensTableCreator, projectPathAdded, duplicateProjectsRemover)

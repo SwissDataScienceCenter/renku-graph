@@ -23,11 +23,11 @@ import cats.data.OptionT
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.types.numeric
-import io.renku.db.SessionResource
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.http.client.AccessToken
 import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
+import io.renku.tokenrepository.repository.AccessTokenCrypto
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 
 import scala.util.control.NonFatal
 
@@ -74,13 +74,10 @@ private object TokenFinder {
 
   private val maxRetries = numeric.NonNegInt.unsafeFrom(3)
 
-  def apply[F[_]: MonadCancelThrow](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[TokenFinder[F]] = for {
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[TokenFinder[F]] = for {
     accessTokenCrypto <- AccessTokenCrypto[F]()
   } yield new TokenFinderImpl[F](
-    new PersistedTokensFinderImpl[F](sessionResource, queriesExecTimes),
+    new PersistedTokensFinderImpl[F](queriesExecTimes),
     accessTokenCrypto,
     maxRetries
   )

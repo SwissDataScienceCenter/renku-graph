@@ -21,10 +21,11 @@ package io.renku.tokenrepository.repository.deletion
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.db.{DbClient, SessionResource, SqlStatement}
+import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.Id
 import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTypeSerializers}
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
+import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import skunk.data.Completion
 import skunk.implicits._
 
@@ -32,14 +33,13 @@ private[repository] trait TokenRemover[F[_]] {
   def delete(projectId: Id): F[Unit]
 }
 
-private[repository] class TokenRemoverImpl[F[_]: MonadCancelThrow](
-    sessionResource:  SessionResource[F, ProjectsTokensDB],
+private[repository] class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource](
     queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
     with TokenRemover[F]
     with TokenRepositoryTypeSerializers {
 
-  override def delete(projectId: Id): F[Unit] = sessionResource.useK {
+  override def delete(projectId: Id): F[Unit] = SessionResource[F].useK {
     measureExecutionTime {
       SqlStatement(name = "remove token")
         .command[Id](sql"""delete from projects_tokens
