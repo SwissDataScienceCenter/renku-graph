@@ -39,9 +39,16 @@ object EntitiesGenerators extends EntitiesGenerators {
   type PlanGenFactory                              = ProjectBasedGenFactory[Plan]
 
   object ProjectBasedGenFactory {
-    def pure[A](a: A): ProjectBasedGenFactory[A] = Kleisli.pure(a)
-
+    def pure[A](a:   A):      ProjectBasedGenFactory[A] = Kleisli.pure(a)
     def liftF[A](fa: Gen[A]): ProjectBasedGenFactory[A] = Kleisli.liftF(fa)
+  }
+
+  final implicit class ProjectBasedGenFactoryOps[A](self: ProjectBasedGenFactory[A]) {
+    def generator: Gen[A] =
+      self.run(projectCreatedDates().generateOne)
+
+    def generateOne: A =
+      generator.generateOne
   }
 }
 

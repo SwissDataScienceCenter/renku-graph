@@ -112,15 +112,17 @@ trait ActivityGenerators {
       Gen.recursive[Plan] { recurse =>
         val spGen = stepPlanEntities(parameterFactories: _*)(planCommandsGen).run(dateCreated).map(_.widen)
         val cpGen =
-          compositePlanEntities(Kleisli(_ => recurse.toGeneratorOfList(min = 1, max = 4))).run(dateCreated).map(_.widen)
+          compositePlanEntities(Kleisli(_ => recurse.toGeneratorOfList(min = 2, max = 12)))
+            .run(dateCreated)
+            .map(_.widen)
         Gen.frequency(1 -> cpGen, 4 -> spGen)
       }
     )
 
-  def planEntitiesList(parameterFactories: CommandParameterFactory*)(implicit
-      planCommandsGen:                     Gen[Command]
+  def planEntitiesList(min: Int = 2, max: Int = 12, parameterFactories: List[CommandParameterFactory])(implicit
+      planCommandsGen:      Gen[Command]
   ): ProjectBasedGenFactory[List[Plan]] =
-    planEntities(parameterFactories: _*)(planCommandsGen).mapF(_.toGeneratorOfList(min = 1, max = 4))
+    planEntities(parameterFactories: _*)(planCommandsGen).mapF(_.toGeneratorOfList(min, max))
 
   def stepPlanEntities(
       parameterFactories:     CommandParameterFactory*
@@ -159,16 +161,18 @@ trait ActivityGenerators {
   private def createMappingsAndLinks(cp:    CompositePlan,
                                      plans: List[Plan]
   ): Gen[(List[ParameterMapping], List[ParameterLink])] = {
+    val planLen  = plans.size
     val maxN     = Gen.choose(0, math.min(5, plans.size))
     val mapPlans = maxN.flatMap(n => Gen.pick(n, plans).map(_.toList))
-    val linkPlans = (Gen.someOf(plans), Gen.someOf(plans)).mapN { (a, b) =>
-      a.zip(b).filter(t => t._1 != t._2).toList
-    }
+    val linkPlans = for {
+      from <- Gen.atLeastOne(plans.take(planLen / 2))
+      to   <- Gen.someOf(plans.diff(from))
+    } yield from.zip(to).toList
 
     for {
       mappingCandidates <- mapPlans
       mappings          <- mappingCandidates.flatTraverse(parameterMappingGen(cp))
-      linkCandidates    <- linkPlans
+      linkCandidates    <- if (planLen >= 2) linkPlans else Gen.const(List.empty[(Plan, Plan)])
       links             <- linkCandidates.traverse(parameterLinksGen)
     } yield (mappings, links.flatten)
   }

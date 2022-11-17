@@ -27,17 +27,20 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
+import io.renku.graph.model.entities.Generators.{compositePlanGen, compositePlanGenFactory, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.persons.Name
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword}
+import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
+import io.renku.graph.model.testentities.generators.genMonad
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 import monocle.Lens
-import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -385,167 +388,76 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "validate composite plans in a project failing to find referenced entities" in {
-//      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
-//        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
-//          this.validateCompositePlanData(plans)
-//      }
+      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
+        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
+          this.validateCompositePlanData(plans)
+      }
 
-      // TODO at least one mapping and one link
-//      val cp = compositePlanGen.generateOne
-//        .addLink(parameterLinkEntities.generateOne)
-//        .addParamMapping(parameterMappingEntities.generateOne)
-//        .to[entities.CompositePlan]
-//
-//      validate(List(cp)).fold(_.toList.toSet, _ => Set.empty) shouldBe (
-//        cp.plans.map(_.value).map(id => show"The subprocess plan $id is missing in the project.").toList.toSet ++
-//          cp.links.map(_.source).map(id => show"The source $id is not available in the set of plans.") ++
-//          cp.links.flatMap(_.sinks.toList).map(id => show"The sink $id is not available in the set of plans") ++
-//          cp.mappings
-//            .flatMap(_.mappedParameter.toList)
-//            .map(id => show"ParameterMapping '$id' does not exist in the set of plans.")
-//      )
+      val invalidPlanGen =
+        for {
+          cp <- compositePlanGenFactory()
+                  .mapF(
+                    _.filter(p => p.mappings.nonEmpty)
+                      .map(_.asInstanceOf[CompositePlan.NonModified])
+                  )
+          step <- stepPlanGenFactory
+        } yield cp.copy(plans = NonEmptyList.one(step))
+
+      val cp = invalidPlanGen.generateOne.to[entities.CompositePlan]
+
+      validate(List(cp)).fold(_.toList.toSet, _ => Set.empty) shouldBe (
+        cp.plans.map(_.value).map(id => show"The subprocess plan $id is missing in the project.").toList.toSet ++
+          cp.links.map(_.source).map(id => show"The source $id is not available in the set of plans.") ++
+          cp.links.flatMap(_.sinks.toList).map(id => show"The sink $id is not available in the set of plans") ++
+          cp.mappings
+            .flatMap(_.mappedParameter.toList)
+            .map(id => show"ParameterMapping '$id' does not exist in the set of plans.")
+      )
     }
 
-    "validate a correct composite plan" in {
-      // TODO revive
-//      val info           = gitLabProjectInfos.generateOne
-//      val paramFactories = Generators.commandParametersLists.generateOne
-//      val sp1 = stepPlanEntities(paramFactories: _*)
-//        .apply(info.dateCreated)
-//        .generateOne
-//        .to[entities.StepPlan]
-//      val sp2 = stepPlanEntities(paramFactories: _*)
-//        .apply(info.dateCreated)
-//        .generateOne
-//        .to[entities.StepPlan]
-//
-//      val link1 = (sp1.outputs.headOption, sp2.inputs.headOption).mapN { (sp1Out, sp2In) =>
-//        val pl = parameterLinkEntities.generateOne.toEntitiesMapping
-//        pl.copy(source = sp1Out.resourceId, sinks = NonEmptyList.one(sp2In.resourceId))
-//      }
-//      val mapping1 = sp1.inputs.headOption.map { sp1In =>
-//        val pm = parameterMappingEntities.generateOne.toEntitiesParameterMapping
-//        pm.copy(mappedParameter = NonEmptyList.of(sp1In.resourceId))
-//      }
-//
-//      val cp: entities.CompositePlan = compositePlanEntities()(info.dateCreated).generateOne
-//        .to[entities.CompositePlan]
-//        .asInstanceOf[entities.CompositePlan.NonModified]
-//        .copy(
-//          plans = NonEmptyList.of(sp1, sp2).map(_.resourceId),
-//          links = link1.toList,
-//          mappings = mapping1.toList
-//        )
-//
-//      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
-//        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
-//          this.validateCompositePlanData(plans)
-//      }
-//      validate(List(cp, sp1, sp2))
-//        .leftMap(_.toList.intercalate("; "))
-//        .fold(fail(_), identity)
-//
-//      val decoded = List[entities.Plan](cp, sp1, sp2).asJsonLD.flatten
-//        .fold(fail(_), identity)
-//        .cursor
-//        .as[List[entities.CompositePlan]]
-//
-//      decoded shouldBe Right(List(cp))
+    "validate a correct composite plan in a project" in {
+      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
+        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
+          this.validateCompositePlanData(plans)
+      }
+      val projectGen = renkuProjectEntitiesWithDatasetsAndActivities
+        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities)))
+
+      forAll(projectGen) { project =>
+        validate(project.to[entities.Project].plans)
+          .leftMap(_.toList.intercalate("; "))
+          .fold(fail(_), identity)
+
+        val decoded = project.asJsonLD.flatten
+          .fold(fail(_), identity)
+          .cursor
+          .as[List[entities.CompositePlan]]
+
+        decoded shouldBe Right(project.plans.filter(_.isInstanceOf[CompositePlan]).map(_.to[entities.Plan]))
+      }
     }
 
     "validate a composite plan that has references outside its children" in {
-//      val info           = gitLabProjectInfos.generateOne
-//      val paramFactories = Generators.commandParametersLists.generateOne
-//      val sp1 = stepPlanEntities(paramFactories: _*)
-//        .apply(info.dateCreated)
-//        .generateOne
-//        .to[entities.StepPlan]
-//      val sp2 = stepPlanEntities(paramFactories: _*)
-//        .apply(info.dateCreated)
-//        .generateOne
-//        .to[entities.StepPlan]
-//      val sp3 = stepPlanEntities(paramFactories: _*)
-//        .apply(info.dateCreated)
-//        .generateOne
-//        .to[entities.StepPlan]
-//
-//      val link1 = (sp1.outputs.headOption, sp2.inputs.headOption).mapN { (sp1Out, sp2In) =>
-//        val pl = parameterLinkEntities.generateOne.toEntitiesMapping
-//        pl.copy(source = sp1Out.resourceId, sinks = NonEmptyList.one(sp2In.resourceId))
-//      }
-//      val mapping1 = sp1.inputs.headOption.map { sp1In =>
-//        val pm = parameterMappingEntities.generateOne.toEntitiesParameterMapping
-//        pm.copy(mappedParameter = NonEmptyList.of(sp1In.resourceId))
-//      }
-//
-//      val cp: entities.CompositePlan = compositePlanEntities()(info.dateCreated).generateOne
-//        .to[entities.CompositePlan]
-//        .asInstanceOf[entities.CompositePlan.NonModified]
-//        .copy(
-//          plans = NonEmptyList.of(sp3).map(_.resourceId),
-//          links = link1.toList,
-//          mappings = mapping1.toList
-//        )
-//
-//      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
-//        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
-//          this.validateCompositePlanData(plans)
-//      }
-//      validate(List(cp, sp1, sp2, sp3)).isInvalid shouldBe true
-    }
+      val testPlan = compositePlanGen()
+        .filter(p => p.mappings.nonEmpty && p.plans.size > 1)
+        .generateOne
+        .asInstanceOf[CompositePlan.NonModified]
 
-    "validate a correct composite plan with references across multiple levels" in {
-//      val info           = gitLabProjectInfos.generateOne
-//      val paramFactories = Generators.commandParametersLists.generateOne
-//      val sps1 = List.fill(3)(
-//        stepPlanEntities(paramFactories: _*)
-//          .apply(info.dateCreated)
-//          .generateOne
-//          .to[entities.StepPlan]
-//      )
-//      val sps2 = List.fill(3)(
-//        stepPlanEntities(paramFactories: _*)
-//          .apply(info.dateCreated)
-//          .generateOne
-//          .to[entities.StepPlan]
-//      )
-//
-//      val link11 = (sps1.head.outputs.headOption, sps2.head.inputs.headOption).mapN { (sp1Out, sp2In) =>
-//        val pl = parameterLinkEntities.generateOne.toEntitiesMapping
-//        pl.copy(source = sp1Out.resourceId, sinks = NonEmptyList.one(sp2In.resourceId))
-//      }
-//      val mapping11 = sps1.head.inputs.headOption.map { sp1In =>
-//        val pm = parameterMappingEntities.generateOne.toEntitiesParameterMapping
-//        pm.copy(mappedParameter = NonEmptyList.of(sp1In.resourceId))
-//      }
-//      val mapping12 = sps2(1).inputs.headOption.map { sp2In =>
-//        val pm = parameterMappingEntities.generateOne.toEntitiesParameterMapping
-//        pm.copy(mappedParameter = NonEmptyList.of(sp2In.resourceId))
-//      }
-//
-//      val cp0: entities.CompositePlan = compositePlanEntities()(info.dateCreated).generateOne
-//        .to[entities.CompositePlan]
-//        .asInstanceOf[entities.CompositePlan.NonModified]
-//        .copy(
-//          plans = NonEmptyList.fromListUnsafe(sps2).map(_.resourceId)
-//        )
-//
-//      val cp: entities.CompositePlan = compositePlanEntities()(info.dateCreated).generateOne
-//        .to[entities.CompositePlan]
-//        .asInstanceOf[entities.CompositePlan.NonModified]
-//        .copy(
-//          plans = NonEmptyList.fromListUnsafe(cp0 :: sps1).map(_.resourceId),
-//          links = link11.toList,
-//          mappings = List(mapping11, mapping12).flatten
-//        )
-//
-//      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
-//        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
-//          this.validateCompositePlanData(plans)
-//      }
-//      validate(cp :: cp0 :: (sps1 ::: sps2))
-//        .leftMap(_.toList.intercalate("; "))
-//        .fold(fail(_), identity)
+      // find a plan belonging to some mapped parameter
+      val mappedPlan = testPlan.mappings.head.mappedParam.head.plan
+
+      // remove this plan from the children plan list
+      val invalidPlan = testPlan.copy(plans = NonEmptyList.fromListUnsafe(testPlan.plans.filterNot(_ == mappedPlan)))
+
+      // for convenience decode it all into a list
+      val decodeAll = invalidPlan.asJsonLD.flatten.fold(fail(_), identity).cursor.as[List[entities.Plan]]
+
+      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
+        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
+          this.validateCompositePlanData(plans)
+      }
+
+      validate(decodeAll.toOption.get).isInvalid shouldBe true
     }
 
     "return a DecodingFailure when there's a Person entity that cannot be decoded" in new TestCase {
@@ -1403,11 +1315,4 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
   private lazy val planDerivationOriginalId: Lens[entities.Plan.Derivation, plans.ResourceId] =
     Lens[entities.Plan.Derivation, plans.ResourceId](_.originalResourceId)(id => _.copy(originalResourceId = id))
-
-  def compositePlanGen: Gen[CompositePlan] =
-    for {
-      created        <- projectCreatedDates()
-      paramFactories <- Generators.commandParametersLists
-      plan           <- compositePlanEntities(planEntitiesList(paramFactories: _*)).run(created)
-    } yield plan
 }

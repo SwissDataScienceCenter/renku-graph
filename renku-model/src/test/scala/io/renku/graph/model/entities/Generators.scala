@@ -27,6 +27,8 @@ import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandOutput.
 import io.renku.graph.model.testentities.StepPlanCommandParameter._
 import io.renku.graph.model.testentities.StepPlan.CommandParameters.CommandParameterFactory
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.{CompositePlanGenFactory, ProjectBasedGenFactory, ProjectBasedGenFactoryOps, StepPlanGenFactory}
+import io.renku.graph.model.testentities.generators.genMonad
 import org.scalacheck.Gen
 
 private object Generators {
@@ -138,4 +140,19 @@ private object Generators {
     mappedOutputs      <- mappedCommandOutputObjects.toGeneratorOfList()
     implicitOutputs    <- implicitCommandOutputObjects.toGeneratorOfList()
   } yield explicitParameters ::: locationInputs ::: mappedInputs ::: implicitInputs ::: locationOutputs ::: mappedOutputs ::: implicitOutputs
+
+  def compositePlanGenFactory(minChildren: Int = 4, maxChildren: Int = 12): CompositePlanGenFactory =
+    for {
+      params <- ProjectBasedGenFactory.liftF(commandParametersLists)
+      plan   <- compositePlanEntities(planEntitiesList(minChildren, maxChildren, params))
+    } yield plan
+
+  def stepPlanGenFactory: StepPlanGenFactory =
+    for {
+      params <- ProjectBasedGenFactory.liftF(commandParametersLists)
+      plan   <- stepPlanEntities(params: _*)
+    } yield plan
+
+  def compositePlanGen(minChildren: Int = 4, maxChildren: Int = 12): Gen[CompositePlan] =
+    compositePlanGenFactory(minChildren, maxChildren).generateOne
 }
