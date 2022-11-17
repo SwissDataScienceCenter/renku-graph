@@ -37,7 +37,12 @@ object RenkuUrl
 final class GitLabUrl private (val value: String) extends AnyVal with UrlTinyType {
   def apiV4: GitLabApiUrl = GitLabApiUrl(this)
 }
-object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url[GitLabUrl] with UrlOps[GitLabUrl]
+object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url[GitLabUrl] with UrlOps[GitLabUrl] {
+  override val transform: String => Either[Throwable, String] = {
+    case v if v.endsWith("/") => v.substring(0, v.length - 1).asRight
+    case v                    => v.asRight
+  }
+}
 
 final class GitLabApiUrl private (val value: String) extends AnyVal with UrlTinyType
 object GitLabApiUrl
