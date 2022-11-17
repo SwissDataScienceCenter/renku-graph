@@ -595,11 +595,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val dateBeforeProject = timestamps(max = projectInfo.dateCreated.value.minusSeconds(1)).generateOne
       val activity = activityEntities(
         stepPlanEntities().map(_.replacePlanDateCreated(plans.DateCreated(dateBeforeProject)))
-      ).modify(
+      ).map(
         _.replaceStartTime(
           timestamps(min = dateBeforeProject, max = projectInfo.dateCreated.value).generateAs[activities.StartTime]
         )
-      )(projects.DateCreated(dateBeforeProject))
+      ).run(projects.DateCreated(dateBeforeProject))
         .generateOne
       val entitiesActivity = activity.to[entities.Activity]
       val jsonLD = cliLikeJsonLD(

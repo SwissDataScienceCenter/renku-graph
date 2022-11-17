@@ -103,7 +103,7 @@ trait ActivityGenerators {
     nonBlankStrings().map(v => ValueOverride(v.value))
 
   def activityEntities(planGen: StepPlanGenFactory): ActivityGenFactory =
-    executionPlanners(planGen, _: projects.DateCreated).map(_.buildProvenanceUnsafe())
+    Kleisli(executionPlanners(planGen, _: projects.DateCreated).map(_.buildProvenanceUnsafe()))
 
   def planEntities(
       parameterFactories:     CommandParameterFactory*
@@ -272,14 +272,10 @@ trait ActivityGenerators {
     executionPlanners(planGen, projectCreatedDates().generateOne)
 
   implicit class ActivityGenFactoryOps(factory: ActivityGenFactory) {
-
     def generateList(projectDateCreated: projects.DateCreated): List[Activity] =
       factory(projectDateCreated).generateList()
 
     def multiple: List[ActivityGenFactory] = List.fill(positiveInts(5).generateOne.value)(factory)
-
-    def modify(f: Activity => Activity): ActivityGenFactory =
-      projectCreationDate => factory(projectCreationDate).map(f)
   }
 
   def toAssociationPersonAgent: Activity => Activity = toAssociationPersonAgent(personEntities.generateOne)

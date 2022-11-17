@@ -313,7 +313,7 @@ object StepPlan {
     }
 
   lazy val ontology: Type = {
-    val planClass = Class(renku / "Plan", ParentClass(prov / "Plan"))
+    lazy val planClass = Class(renku / "Plan", ParentClass(Plan.ontology))
     Type.Def(
       planClass,
       ObjectProperties(
@@ -377,7 +377,7 @@ object CompositePlan {
     val entityTypes: EntityTypes =
       EntityTypes.of(renku / "CompositePlan", prov / "Plan", schema / "Action", schema / "CreativeWork")
 
-    val compositePlanType = Class(renku / "CompositePlan", ParentClass(prov / "Plan"))
+    val compositePlanType = Class(renku / "CompositePlan", ParentClass(Plan.ontology))
 
     val name               = schema / "name"
     val description        = schema / "description"

@@ -31,12 +31,14 @@ import org.scalacheck.Gen
 import java.time.Instant
 
 object EntitiesGenerators extends EntitiesGenerators {
+  type ProjectBasedGenFactory[A] = Kleisli[Gen, projects.DateCreated, A]
+
   type DatasetGenFactory[+P <: Dataset.Provenance] = projects.DateCreated => Gen[Dataset[P]]
-  type ProjectBasedGenFactory[A]                   = Kleisli[Gen, projects.DateCreated, A]
-  type ActivityGenFactory                          = projects.DateCreated => Gen[Activity]
-  type StepPlanGenFactory                          = ProjectBasedGenFactory[StepPlan]
-  type CompositePlanGenFactory                     = ProjectBasedGenFactory[CompositePlan]
-  type PlanGenFactory                              = ProjectBasedGenFactory[Plan]
+
+  type ActivityGenFactory      = ProjectBasedGenFactory[Activity]
+  type StepPlanGenFactory      = ProjectBasedGenFactory[StepPlan]
+  type CompositePlanGenFactory = ProjectBasedGenFactory[CompositePlan]
+  type PlanGenFactory          = ProjectBasedGenFactory[Plan]
 
   object ProjectBasedGenFactory {
     def pure[A](a:   A):      ProjectBasedGenFactory[A] = Kleisli.pure(a)
