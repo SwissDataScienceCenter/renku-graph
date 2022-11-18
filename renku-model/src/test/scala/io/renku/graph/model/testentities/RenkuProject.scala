@@ -103,7 +103,7 @@ object RenkuProject {
       dataset -> copy(datasets = datasets ::: dataset :: Nil)
     }
 
-    override def addUnlinkedPlan(plan: StepPlan): ProjectType =
+    override def addUnlinkedStepPlan(plan: StepPlan): ProjectType =
       copy(unlinkedPlans = plan :: unlinkedPlans)
 
     override def addCompositePlan(cp: CreateCompositePlan): WithoutParent =
@@ -176,7 +176,7 @@ object RenkuProject {
       dataset -> copy(datasets = datasets ::: dataset :: Nil)
     }
 
-    override def addUnlinkedPlan(plan: StepPlan): ProjectType = copy(unlinkedPlans = plan :: unlinkedPlans)
+    override def addUnlinkedStepPlan(plan: StepPlan): ProjectType = copy(unlinkedPlans = plan :: unlinkedPlans)
 
     override def addCompositePlan(cp: CreateCompositePlan): WithParent =
       copy(createCompositePlans = cp :: createCompositePlans)
@@ -205,7 +205,7 @@ object RenkuProject {
 
     def addDataset[P <: Dataset.Provenance](toAdd: DatasetGenFactory[P]): (Dataset[P], ProjectType)
 
-    def addUnlinkedPlan(plan: StepPlan): ProjectType
+    def addUnlinkedStepPlan(plan: StepPlan): ProjectType
 
     def addCompositePlan(cp: CreateCompositePlan): ProjectType
 
