@@ -112,11 +112,11 @@ trait ActivityGenerators {
       Gen.recursive[Plan] { recurse =>
         val spGen = stepPlanEntities(parameterFactories: _*)(planCommandsGen).run(dateCreated).map(_.widen)
         val cpGen =
-          compositePlanEntities(Kleisli(_ => recurse.toGeneratorOfList(min = 2, max = 12)))
+          compositePlanEntities(Kleisli(_ => recurse.toGeneratorOfList(min = 2, max = 6)))
             .run(dateCreated)
             .map(_.widen)
 
-        Gen.frequency(1 -> cpGen, 18 -> spGen)
+        Gen.frequency(1 -> cpGen, 10 -> spGen)
       }
     }
 
@@ -162,12 +162,14 @@ trait ActivityGenerators {
   private def createMappingsAndLinks(cp:    CompositePlan,
                                      plans: List[Plan]
   ): Gen[(List[ParameterMapping], List[ParameterLink])] = {
+    assert(plans.nonEmpty, "List of plans must not be empty")
     val planLen  = plans.size
-    val maxN     = Gen.choose(0, math.min(5, plans.size))
-    val mapPlans = maxN.flatMap(n => Gen.pick(n, plans).map(_.toList))
+    val nMapping = Gen.choose(1, math.max(1, planLen / 2))
+    val mapPlans = nMapping.flatMap(n => Gen.pick(n, plans).map(_.toList))
     val linkPlans = for {
-      from <- Gen.atLeastOne(plans.take(planLen / 2))
-      to   <- Gen.someOf(plans.diff(from))
+      nLinks <- nMapping
+      from   <- Gen.atLeastOne(plans.take(nLinks))
+      to     <- Gen.someOf(plans.diff(from))
     } yield from.zip(to).toList
 
     for {
