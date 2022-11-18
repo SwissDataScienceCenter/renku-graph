@@ -39,7 +39,7 @@ private object Generators {
     maybePrefix      <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue     <- nonEmptyStrings().toGeneratorOf(ParameterDefaultValue)
   } yield (position: Position) =>
-    (plan: Plan) => ExplicitCommandParameter(position, name, maybeDescription, maybePrefix, defaultValue, plan)
+    (plan: Plan) => ExplicitCommandParameter(position, name, maybeDescription, maybePrefix, defaultValue, plan.id)
 
   implicit lazy val implicitCommandParameterObjects: Gen[Position => Plan => CommandParameter] = for {
     name             <- commandParameterNames
@@ -47,7 +47,7 @@ private object Generators {
     maybePrefix      <- nonEmptyStrings().toGeneratorOf(Prefix).toGeneratorOfOptions
     defaultValue     <- nonEmptyStrings().toGeneratorOf(ParameterDefaultValue)
   } yield (_: Position) =>
-    (plan: Plan) => ImplicitCommandParameter(name, maybeDescription, maybePrefix, defaultValue, plan)
+    (plan: Plan) => ImplicitCommandParameter(name, maybeDescription, maybePrefix, defaultValue, plan.id)
 
   implicit lazy val locationCommandInputObjects: Gen[Position => Plan => LocationCommandInput] = for {
     name                <- commandParameterNames
@@ -57,7 +57,7 @@ private object Generators {
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
     (plan: Plan) =>
-      LocationCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan)
+      LocationCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan.id)
 
   implicit lazy val mappedCommandInputObjects: Gen[Position => Plan => MappedCommandInput] = for {
     name                <- commandParameterNames
@@ -67,7 +67,7 @@ private object Generators {
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (position: Position) =>
     (plan: Plan) =>
-      MappedCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan)
+      MappedCommandInput(position, name, maybeDescription, maybePrefix, defaultValue, maybeEncodingFormat, plan.id)
 
   lazy val implicitCommandInputObjects: Gen[Position => Plan => ImplicitCommandInput] = for {
     name                <- commandParameterNames
@@ -75,7 +75,7 @@ private object Generators {
     defaultValue        <- entityLocations.map(InputDefaultValue(_))
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (_: Position) =>
-    (plan: Plan) => ImplicitCommandInput(name, maybePrefix, defaultValue, maybeEncodingFormat, plan)
+    (plan: Plan) => ImplicitCommandInput(name, maybePrefix, defaultValue, maybeEncodingFormat, plan.id)
 
   implicit lazy val locationCommandOutputObjects: Gen[Position => Plan => LocationCommandOutput] = for {
     name                <- commandParameterNames
@@ -93,7 +93,7 @@ private object Generators {
                             defaultValue,
                             folderCreation,
                             maybeEncodingFormat,
-                            plan
+                            plan.id
       )
 
   implicit lazy val mappedCommandOutputObjects: Gen[Position => Plan => MappedCommandOutput] = for {
@@ -114,7 +114,7 @@ private object Generators {
                           folderCreation,
                           maybeEncodingFormat,
                           mappedTo,
-                          plan
+                          plan.id
       )
 
   implicit lazy val implicitCommandOutputObjects: Gen[Position => Plan => ImplicitCommandOutput] = for {
@@ -124,7 +124,7 @@ private object Generators {
     folderCreation      <- commandParameterFolderCreation
     maybeEncodingFormat <- commandParameterEncodingFormats.toGeneratorOfOptions
   } yield (_: Position) =>
-    (plan: Plan) => ImplicitCommandOutput(name, maybePrefix, defaultValue, folderCreation, maybeEncodingFormat, plan)
+    (plan: Plan) => ImplicitCommandOutput(name, maybePrefix, defaultValue, folderCreation, maybeEncodingFormat, plan.id)
 
   implicit val ioStreamOuts: Gen[IOStream.Out] = Gen.oneOf(
     IOStream.StdOut(IOStream.ResourceId((renkuUrl / nonEmptyStrings().generateOne).show)),

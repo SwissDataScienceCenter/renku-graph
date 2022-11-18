@@ -109,5 +109,5 @@ object Plan {
     }
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuUrl: RenkuUrl): EntityIdEncoder[R] =
-    EntityIdEncoder.instance(plan => ResourceId(plan.id).asEntityId)
+    EntityIdEncoder.instance(plan => plan.id.asEntityId)
 }

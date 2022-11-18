@@ -23,7 +23,7 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.commandParameters.IOStream.{StdErr, StdIn, StdOut}
 import io.renku.graph.model.commandParameters._
 import io.renku.graph.model.entityModel.Location
-import io.renku.graph.model.{RenkuUrl, commandParameters, entities}
+import io.renku.graph.model.{RenkuUrl, commandParameters, entities, plans}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -47,7 +47,7 @@ object StepPlanCommandParameter {
                                             maybeDescription: Option[Description],
                                             maybePrefix:      Option[Prefix],
                                             defaultValue:     ParameterDefaultValue,
-                                            plan:             Plan
+                                            planId:           plans.Identifier
   ) extends CommandParameter
       with ExplicitParameter
 
@@ -55,7 +55,7 @@ object StepPlanCommandParameter {
                                             maybeDescription: Option[Description],
                                             maybePrefix:      Option[Prefix],
                                             defaultValue:     ParameterDefaultValue,
-                                            plan:             Plan
+                                            planId:           plans.Identifier
   ) extends CommandParameter
 
   object CommandParameter {
@@ -68,7 +68,7 @@ object StepPlanCommandParameter {
                                    maybeDescription = None,
                                    maybePrefix = None,
                                    defaultValue = value,
-                                   plan
+                                   plan.id
           )
 
     implicit def toEntitiesCommandParameter(implicit
@@ -98,8 +98,8 @@ object StepPlanCommandParameter {
 
     implicit def entityIdEncoder[P <: CommandParameter](implicit renkuUrl: RenkuUrl): EntityIdEncoder[P] =
       EntityIdEncoder.instance {
-        case p: ExplicitCommandParameter => p.plan.asEntityId.asUrlEntityId / "parameters" / p.position
-        case p: ImplicitCommandParameter => p.plan.asEntityId.asUrlEntityId / "parameters" / p.name
+        case p: ExplicitCommandParameter => p.planId.asEntityId.asUrlEntityId / "parameters" / p.position
+        case p: ImplicitCommandParameter => p.planId.asEntityId.asUrlEntityId / "parameters" / p.name
       }
   }
 
@@ -128,7 +128,7 @@ object StepPlanCommandParameter {
             maybePrefix = None,
             defaultValue,
             maybeEncodingFormat = None,
-            plan
+            plan.id
           )
 
     def streamedFrom(defaultValue: InputDefaultValue): Position => Plan => MappedCommandInput =
@@ -141,7 +141,7 @@ object StepPlanCommandParameter {
             maybePrefix = None,
             defaultValue,
             maybeEncodingFormat = None,
-            plan
+            plan.id
           )
 
     final case class LocationCommandInput(position:            Position,
@@ -150,7 +150,7 @@ object StepPlanCommandParameter {
                                           maybePrefix:         Option[Prefix],
                                           defaultValue:        InputDefaultValue,
                                           maybeEncodingFormat: Option[EncodingFormat],
-                                          plan:                Plan
+                                          planId:              plans.Identifier
     ) extends CommandInput
         with ExplicitParameter
 
@@ -160,7 +160,7 @@ object StepPlanCommandParameter {
                                         maybePrefix:         Option[Prefix],
                                         defaultValue:        InputDefaultValue,
                                         maybeEncodingFormat: Option[EncodingFormat],
-                                        plan:                Plan
+                                        planId:              plans.Identifier
     )(implicit renkuUrl:                                     RenkuUrl)
         extends CommandInput
         with ExplicitParameter {
@@ -172,7 +172,7 @@ object StepPlanCommandParameter {
         maybePrefix:         Option[Prefix],
         defaultValue:        InputDefaultValue,
         maybeEncodingFormat: Option[EncodingFormat],
-        plan:                Plan
+        planId:              plans.Identifier
     ) extends CommandInput
 
     implicit def toEntitiesCommandInput(implicit
@@ -213,7 +213,7 @@ object StepPlanCommandParameter {
       JsonLDEncoder.instance(_.to[entities.StepPlanCommandParameter.CommandInput].asJsonLD)
 
     implicit def entityIdEncoder[I <: CommandInput](implicit renkuUrl: RenkuUrl): EntityIdEncoder[I] =
-      EntityIdEncoder.instance(input => input.plan.asEntityId.asUrlEntityId / "inputs" / input.name)
+      EntityIdEncoder.instance(input => input.planId.asEntityId.asUrlEntityId / "inputs" / input.name)
   }
 
   sealed trait CommandOutput extends CommandInputOrOutput {
@@ -238,7 +238,7 @@ object StepPlanCommandParameter {
             defaultValue = defaultValue,
             FolderCreation.no,
             maybeEncodingFormat = None,
-            plan
+            plan.id
           )
 
     def streamedFromLocation(defaultValue: Location, stream: IOStream.Out): Position => Plan => MappedCommandOutput =
@@ -262,7 +262,7 @@ object StepPlanCommandParameter {
             FolderCreation.no,
             maybeEncodingFormat = None,
             mappedTo = stream,
-            plan
+            plan.id
           )
 
     final case class LocationCommandOutput(position:            Position,
@@ -272,7 +272,7 @@ object StepPlanCommandParameter {
                                            defaultValue:        OutputDefaultValue,
                                            folderCreation:      FolderCreation,
                                            maybeEncodingFormat: Option[EncodingFormat],
-                                           plan:                Plan
+                                           planId:              plans.Identifier
     ) extends CommandOutput
         with ExplicitParameter
 
@@ -284,7 +284,7 @@ object StepPlanCommandParameter {
                                          folderCreation:      FolderCreation,
                                          maybeEncodingFormat: Option[EncodingFormat],
                                          mappedTo:            IOStream.Out,
-                                         plan:                Plan
+                                         planId:              plans.Identifier
     ) extends CommandOutput
         with ExplicitParameter
 
@@ -294,7 +294,7 @@ object StepPlanCommandParameter {
         defaultValue:        OutputDefaultValue,
         folderCreation:      FolderCreation,
         maybeEncodingFormat: Option[EncodingFormat],
-        plan:                Plan
+        planId:              plans.Identifier
     ) extends CommandOutput
 
     implicit def toEntitiesCommandOutput(implicit
@@ -338,6 +338,6 @@ object StepPlanCommandParameter {
       JsonLDEncoder.instance(_.to[entities.StepPlanCommandParameter.CommandOutput].asJsonLD)
 
     implicit def entityIdEncoder[O <: CommandOutput](implicit renkuUrl: RenkuUrl): EntityIdEncoder[O] =
-      EntityIdEncoder.instance(output => output.plan.asEntityId.asUrlEntityId / "outputs" / output.name)
+      EntityIdEncoder.instance(output => output.planId.asEntityId.asUrlEntityId / "outputs" / output.name)
   }
 }

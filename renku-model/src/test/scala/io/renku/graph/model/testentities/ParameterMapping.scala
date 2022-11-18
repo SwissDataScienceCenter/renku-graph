@@ -20,8 +20,7 @@ package io.renku.graph.model.testentities
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import io.renku.graph.model.entities
-import io.renku.graph.model.{RenkuUrl, commandParameters}
+import io.renku.graph.model.{RenkuUrl, commandParameters, entities, plans}
 import io.renku.graph.model.commandParameters.{Description, Name}
 import io.renku.jsonld.{EntityIdEncoder, JsonLDEncoder}
 import io.renku.jsonld.syntax._
@@ -33,21 +32,11 @@ final case class ParameterMapping(
     name:         Name,
     description:  Option[Description],
     defaultValue: String,
-    plan:         CompositePlan,
+    planId:       plans.Identifier,
     mappedParam:  NonEmptyList[CommandParameterBase]
 ) extends CommandParameterBase {
   override type DefaultValue = String
   override val maybePrefix: Option[commandParameters.Prefix] = None
-
-  override def hashCode(): Int = java.util.Objects.hashCode(id, name, description, defaultValue, mappedParam)
-
-  override def equals(obj: Any): Boolean =
-    obj match {
-      case o: ParameterMapping =>
-        o.id == id && o.name == name && o.description == description &&
-        o.defaultValue == defaultValue && o.mappedParam == mappedParam
-      case _ => false
-    }
 }
 
 object ParameterMapping {

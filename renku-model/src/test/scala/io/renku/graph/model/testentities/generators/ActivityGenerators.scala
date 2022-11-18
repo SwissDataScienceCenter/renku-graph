@@ -198,7 +198,7 @@ trait ActivityGenerators {
               name = mappingName,
               description = descr,
               defaultValue = defval.value,
-              plan = parent,
+              planId = parent.id,
               mappedParam = NonEmptyList.one(target)
             )
           })
@@ -218,7 +218,7 @@ trait ActivityGenerators {
               name = mappingName,
               description = descr,
               defaultValue = defval.value,
-              plan = parent,
+              planId = parent.id,
               mappedParam = NonEmptyList.one(targetMapping)
             )
           })

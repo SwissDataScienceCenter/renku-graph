@@ -18,7 +18,7 @@
 
 package io.renku.graph.model.testentities
 
-import io.renku.graph.model.RenkuUrl
+import io.renku.graph.model.{RenkuUrl, plans}
 import io.renku.graph.model.commandParameters.{Name, Prefix}
 import io.renku.jsonld.EntityIdEncoder
 import io.renku.jsonld.syntax._
@@ -29,7 +29,7 @@ trait CommandParameterBase {
   val name:         Name
   val maybePrefix:  Option[Prefix]
   val defaultValue: DefaultValue
-  val plan:         Plan
+  val planId:       plans.Identifier
 }
 
 object CommandParameterBase {

@@ -444,10 +444,11 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
         .asInstanceOf[CompositePlan.NonModified]
 
       // find a plan belonging to some mapped parameter
-      val mappedPlan: Plan = testPlan.mappings.head.mappedParam.head.plan
+      val mappedPlanId = testPlan.mappings.head.mappedParam.head.planId
 
       // remove this plan from the children plan list
-      val invalidPlan = testPlan.copy(plans = NonEmptyList.fromListUnsafe(testPlan.plans.filterNot(_ == mappedPlan)))
+      val invalidPlan =
+        testPlan.copy(plans = NonEmptyList.fromListUnsafe(testPlan.plans.filterNot(_.id == mappedPlanId)))
 
       // for convenience decode it all into a list
       val decodeAll = invalidPlan.asJsonLD.flatten.fold(fail(_), identity).cursor.as[List[entities.Plan]]
