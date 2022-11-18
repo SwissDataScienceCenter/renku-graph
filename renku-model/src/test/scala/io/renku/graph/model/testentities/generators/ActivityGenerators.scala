@@ -108,18 +108,19 @@ trait ActivityGenerators {
   def planEntities(
       parameterFactories:     CommandParameterFactory*
   )(implicit planCommandsGen: Gen[Command]): PlanGenFactory =
-    Kleisli(dateCreated =>
+    Kleisli { dateCreated =>
       Gen.recursive[Plan] { recurse =>
         val spGen = stepPlanEntities(parameterFactories: _*)(planCommandsGen).run(dateCreated).map(_.widen)
         val cpGen =
           compositePlanEntities(Kleisli(_ => recurse.toGeneratorOfList(min = 2, max = 12)))
             .run(dateCreated)
             .map(_.widen)
-        Gen.frequency(1 -> cpGen, 4 -> spGen)
-      }
-    )
 
-  def planEntitiesList(min: Int = 2, max: Int = 12, parameterFactories: List[CommandParameterFactory])(implicit
+        Gen.frequency(1 -> cpGen, 18 -> spGen)
+      }
+    }
+
+  def planEntitiesList(min: Int = 3, max: Int = 6, parameterFactories: List[CommandParameterFactory])(implicit
       planCommandsGen:      Gen[Command]
   ): ProjectBasedGenFactory[List[Plan]] =
     planEntities(parameterFactories: _*)(planCommandsGen).mapF(_.toGeneratorOfList(min, max))
@@ -140,7 +141,7 @@ trait ActivityGenerators {
       for {
         id       <- ProjectBasedGenFactory.liftF(planIdentifiers)
         name     <- ProjectBasedGenFactory.liftF(planNames)
-        creators <- ProjectBasedGenFactory.liftF(personEntities.toGeneratorOfList(max = 2))
+        creators <- ProjectBasedGenFactory.liftF(personEntities.toGeneratorOfList(max = 3))
         descr    <- ProjectBasedGenFactory.liftF(Gen.some(planDescriptions))
         kw       <- ProjectBasedGenFactory.liftF(planKeywords.toGeneratorOfList())
         cp = CompositePlan.NonModified(

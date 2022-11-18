@@ -141,7 +141,7 @@ private object Generators {
     implicitOutputs    <- implicitCommandOutputObjects.toGeneratorOfList()
   } yield explicitParameters ::: locationInputs ::: mappedInputs ::: implicitInputs ::: locationOutputs ::: mappedOutputs ::: implicitOutputs
 
-  def compositePlanGenFactory(minChildren: Int = 4, maxChildren: Int = 12): CompositePlanGenFactory =
+  def compositePlanGenFactory(minChildren: Int = 3, maxChildren: Int = 6): CompositePlanGenFactory =
     for {
       params <- ProjectBasedGenFactory.liftF(commandParametersLists)
       plan   <- compositePlanEntities(planEntitiesList(minChildren, maxChildren, params))
@@ -153,6 +153,6 @@ private object Generators {
       plan   <- stepPlanEntities(params: _*)
     } yield plan
 
-  def compositePlanGen(minChildren: Int = 4, maxChildren: Int = 12): Gen[CompositePlan] =
+  def compositePlanGen(minChildren: Int = 3, maxChildren: Int = 6): Gen[CompositePlan] =
     compositePlanGenFactory(minChildren, maxChildren).generateOne
 }

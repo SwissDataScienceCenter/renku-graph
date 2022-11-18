@@ -38,6 +38,16 @@ final case class ParameterMapping(
 ) extends CommandParameterBase {
   override type DefaultValue = String
   override val maybePrefix: Option[commandParameters.Prefix] = None
+
+  override def hashCode(): Int = java.util.Objects.hashCode(id, name, description, defaultValue, mappedParam)
+
+  override def equals(obj: Any): Boolean =
+    obj match {
+      case o: ParameterMapping =>
+        o.id == id && o.name == name && o.description == description &&
+        o.defaultValue == defaultValue && o.mappedParam == mappedParam
+      case _ => false
+    }
 }
 
 object ParameterMapping {

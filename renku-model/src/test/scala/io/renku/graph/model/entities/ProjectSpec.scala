@@ -438,13 +438,13 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "validate a composite plan that has references outside its children" in {
-      val testPlan = compositePlanGen()
-        .filter(p => p.mappings.nonEmpty && p.plans.size > 1)
+      val testPlan = compositePlanGen(minChildren = 5)
+        .suchThat(p => p.mappings.nonEmpty)
         .generateOne
         .asInstanceOf[CompositePlan.NonModified]
 
       // find a plan belonging to some mapped parameter
-      val mappedPlan = testPlan.mappings.head.mappedParam.head.plan
+      val mappedPlan: Plan = testPlan.mappings.head.mappedParam.head.plan
 
       // remove this plan from the children plan list
       val invalidPlan = testPlan.copy(plans = NonEmptyList.fromListUnsafe(testPlan.plans.filterNot(_ == mappedPlan)))
