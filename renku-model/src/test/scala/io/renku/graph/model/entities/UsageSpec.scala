@@ -21,7 +21,7 @@ package io.renku.graph.model.entities
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators.projectCreatedDates
-import io.renku.graph.model.testentities.CommandParameterBase.CommandInput
+import io.renku.graph.model.testentities.StepPlanCommandParameter.CommandInput
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities}
 import io.renku.jsonld.syntax._

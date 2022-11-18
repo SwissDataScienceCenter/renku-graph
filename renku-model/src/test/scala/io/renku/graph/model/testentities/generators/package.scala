@@ -16,25 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.ontology
+package io.renku.graph.model.testentities
 
-import cats.data.NonEmptyList
-import io.renku.graph.model.Schemas
-import io.renku.graph.model.entities.{CompositePlan, Project}
-import io.renku.jsonld.JsonLD
-import io.renku.jsonld.ontology.generateOntology
+import cats.Monad
+import org.scalacheck.Gen
 
-private trait OntologyGenerator {
-  def getOntology: JsonLD
-}
-
-private object OntologyGenerator {
-  private val types =
-    NonEmptyList.of(Project.ontology, CompositePlan.Ontology.typeDef)
-  private val instance = new OntologyGeneratorImpl(generateOntology(types, Schemas.renku))
-  def apply(): OntologyGenerator = instance
-}
-
-private class OntologyGeneratorImpl(generate: => JsonLD) extends OntologyGenerator {
-  override def getOntology: JsonLD = generate
+package object generators {
+  implicit val genMonad: Monad[Gen] = new Monad[Gen] {
+    override def pure[A](x:        A): Gen[A] = Gen.const(x)
+    override def flatMap[A, B](fa: Gen[A])(f: A => Gen[B]):            Gen[B] = fa.flatMap(f)
+    override def tailRecM[A, B](a: A)(f:      A => Gen[Either[A, B]]): Gen[B] = Gen.tailRecM(a)(f)
+  }
 }

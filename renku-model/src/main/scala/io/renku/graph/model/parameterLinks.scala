@@ -16,25 +16,18 @@
  * limitations under the License.
  */
 
-package io.renku.knowledgegraph.ontology
+package io.renku.graph.model
 
-import cats.data.NonEmptyList
-import io.renku.graph.model.Schemas
-import io.renku.graph.model.entities.{CompositePlan, Project}
-import io.renku.jsonld.JsonLD
-import io.renku.jsonld.ontology.generateOntology
+import io.renku.graph.model.views.EntityIdJsonLDOps
+import io.renku.tinytypes.constraints.Url
+import io.renku.tinytypes.{StringTinyType, TinyTypeFactory}
 
-private trait OntologyGenerator {
-  def getOntology: JsonLD
-}
+object parameterLinks {
+  class ResourceId private (val value: String) extends AnyVal with StringTinyType
 
-private object OntologyGenerator {
-  private val types =
-    NonEmptyList.of(Project.ontology, CompositePlan.Ontology.typeDef)
-  private val instance = new OntologyGeneratorImpl(generateOntology(types, Schemas.renku))
-  def apply(): OntologyGenerator = instance
-}
+  implicit object ResourceId
+      extends TinyTypeFactory[ResourceId](new ResourceId(_))
+      with Url[ResourceId]
+      with EntityIdJsonLDOps[ResourceId]
 
-private class OntologyGeneratorImpl(generate: => JsonLD) extends OntologyGenerator {
-  override def getOntology: JsonLD = generate
 }

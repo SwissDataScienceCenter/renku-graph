@@ -23,7 +23,7 @@ import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
 import io.renku.graph.model.commandParameters.ParameterDefaultValue
-import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput, CommandParameter}
+import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput, CommandParameter}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model.{GraphClass, entities, plans}
 import io.renku.jsonld.JsonLDDecoder._
@@ -165,24 +165,25 @@ class ParameterValueSpec extends AnyWordSpec with should.Matchers with ScalaChec
     }
   }
 
-  private lazy val planParametersLens: Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandParameter]] =
-    Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandParameter]](_.parameters) { params =>
+  private lazy val planParametersLens
+      : Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandParameter]] =
+    Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandParameter]](_.parameters) { params =>
       {
         case plan: entities.StepPlan.NonModified => plan.copy(parameters = params)
         case plan: entities.StepPlan.Modified    => plan.copy(parameters = params)
       }
     }
 
-  private lazy val planInputsLens: Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandInput]] =
-    Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandInput]](_.inputs) { inputs =>
+  private lazy val planInputsLens: Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandInput]] =
+    Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandInput]](_.inputs) { inputs =>
       {
         case plan: entities.StepPlan.NonModified => plan.copy(inputs = inputs)
         case plan: entities.StepPlan.Modified    => plan.copy(inputs = inputs)
       }
     }
 
-  private lazy val planOutputsLens: Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandOutput]] =
-    Lens[entities.StepPlan, List[entities.CommandParameterBase.CommandOutput]](_.outputs) { outputs =>
+  private lazy val planOutputsLens: Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandOutput]] =
+    Lens[entities.StepPlan, List[entities.StepPlanCommandParameter.CommandOutput]](_.outputs) { outputs =>
       {
         case plan: entities.StepPlan.NonModified => plan.copy(outputs = outputs)
         case plan: entities.StepPlan.Modified    => plan.copy(outputs = outputs)

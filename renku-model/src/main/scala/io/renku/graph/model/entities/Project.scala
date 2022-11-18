@@ -25,6 +25,7 @@ import cats.syntax.all._
 import io.renku.graph.model
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Dataset.Provenance
+import io.renku.graph.model.entities.PlanLens.{getPlanDerivation, setPlanDerivation}
 import io.renku.graph.model.projects._
 import io.renku.jsonld.JsonLDDecoder
 import io.renku.jsonld.ontology._
@@ -231,8 +232,9 @@ object RenkuProject {
     ): ValidatedNel[String, RenkuProject.WithParent] = (
       validateDatasets(datasets),
       validatePlansDates(plans),
-      updatePlansOriginalId(updatePlansDateCreated(plans, activities))
-    ) mapN { (_, _, updatedPlans) =>
+      updatePlansOriginalId(updatePlansDateCreated(plans, activities)),
+      validateCompositePlanData(plans)
+    ) mapN { (_, _, updatedPlans, _) =>
       val (syncedActivities, syncedDatasets, syncedPlans) =
         syncPersons(projectPersons = members ++ maybeCreator, activities, datasets, updatedPlans)
       RenkuProject.WithParent(
@@ -281,24 +283,24 @@ object RenkuProject {
     }
 
     protected def updatePlansOriginalId(plans: List[Plan]): ValidatedNel[String, List[Plan]] = {
-
       def findTopParent(derivedFrom: model.plans.DerivedFrom): ValidatedNel[String, Plan] =
-        findParentPlan(derivedFrom, plans) match {
-          case Validated.Valid(p: StepPlan.NonModified) => p.validNel
-          case Validated.Valid(p: StepPlan.Modified)    => findParentPlan(p.derivation.derivedFrom, plans)
-          case vp                                       => vp
+        findParentPlan(derivedFrom, plans).andThen { parentPlan =>
+          getPlanDerivation
+            .get(parentPlan)
+            .map(derivation => findTopParent(derivation.derivedFrom))
+            .getOrElse(parentPlan.validNel)
         }
 
-      plans
-        .foldLeft(List.empty[ValidatedNel[String, Plan]]) {
-          case (checked, p: StepPlan.NonModified) => p.validNel[String] :: checked
-          case (checked, p: StepPlan.Modified) =>
-            findTopParent(p.derivation.derivedFrom).map { parent =>
-              p.copy(derivation = p.derivation.copy(originalResourceId = parent.resourceId))
-            } :: checked
-        }
-        .sequence
-        .map(_.reverse)
+      plans.traverse { plan =>
+        getPlanDerivation
+          .get(plan)
+          .map(derivation =>
+            findTopParent(derivation.derivedFrom).map { topParent =>
+              setPlanDerivation.modify(_.copy(originalResourceId = topParent.resourceId))(plan)
+            }
+          )
+          .getOrElse(plan.validNel)
+      }
     }
 
     // The Plan dateCreated is updated only because of a bug on CLI which can produce Activities with dates before the Plan
@@ -331,22 +333,82 @@ object RenkuProject {
       )
 
     protected def validatePlansDates(plans: List[Plan]): ValidatedNel[String, Unit] =
-      plans
-        .foldLeft(List.empty[ValidatedNel[String, Unit]]) {
-          case (checked, _: StepPlan.NonModified) => ().validNel[String] :: checked
-          case (checked, p: StepPlan.Modified) =>
-            findParentPlan(p.derivation.derivedFrom, plans) match {
-              case Validated.Valid(parent) =>
-                Validated.cond(
-                  (p.dateCreated.value compareTo parent.dateCreated.value) >= 0,
-                  (),
-                  NonEmptyList.one(show"Plan ${p.resourceId} is older than it's parent ${parent.resourceId}")
-                ) :: checked
-              case vp => vp.void :: checked
+      plans.traverse { plan =>
+        getPlanDerivation
+          .get(plan)
+          .map { derivation =>
+            findParentPlan(derivation.derivedFrom, plans)
+              .andThen(parentPlan =>
+                Validated.condNel[String, Plan](
+                  (plan.dateCreated.value compareTo parentPlan.dateCreated.value) >= 0,
+                  plan,
+                  show"Plan ${plan.resourceId} is older than it's parent ${parentPlan.resourceId}"
+                )
+              )
+          }
+          .getOrElse(plan.validNel)
+      }.void
+
+    protected def validateCompositePlanData(projectPlans: List[Plan]): ValidatedNel[String, Unit] =
+      projectPlans.collect { case p: CompositePlan => p } match {
+        case Nil => Validated.validNel(())
+        case cps =>
+          val allPlans = projectPlans.groupMapReduce(_.resourceId)(identity)((a, _) => a)
+          cps.traverse_ { cp =>
+            val checkSubprocess = cp.plans.traverse_(validateSubprocessPlan(allPlans.keySet))
+            val subSteps        = ProjectLens.collectAllSubPlans(allPlans)(cp)
+            val subComp         = ProjectLens.collectAllSubCompositePlans(allPlans)(cp)
+            val inputParamIds = subSteps.flatMap { p =>
+              p.inputs.map(_.resourceId).toSet ++ p.parameters.map(_.resourceId).toSet
             }
-        }
-        .sequence
-        .void
+            val outputIds = subSteps.flatMap { p =>
+              p.outputs.map(_.resourceId).toSet
+            }
+            val mappingIds = subComp.flatMap { p =>
+              p.mappings.map(_.resourceId).toSet
+            }
+
+            val checkMappings =
+              cp.mappings.traverse_(validateParameterMapping(mappingIds ++ inputParamIds ++ outputIds))
+            val checkLinks = cp.links.traverse_(validateLinks(outputIds, inputParamIds))
+
+            checkLinks |+| checkMappings |+| checkSubprocess
+          }
+      }
+
+    private def validateSubprocessPlan(projectPlans: Set[plans.ResourceId])(
+        id:                                          plans.ResourceId
+    ): ValidatedNel[String, Unit] =
+      Validated.condNel(projectPlans.contains(id), (), show"The subprocess plan $id is missing in the project.")
+
+    private def validateParameterMapping(
+        relevantIds: Set[commandParameters.ResourceId]
+    )(pm:            ParameterMapping): ValidatedNel[String, Unit] =
+      pm.mappedParameter.traverse_ { id =>
+        Validated.condNel(
+          relevantIds.contains(id),
+          (),
+          show"ParameterMapping '$id' does not exist in the set of plans."
+        )
+      }
+
+    private def validateLinks(
+        outputIds:     Set[commandParameters.ResourceId],
+        inputParamIds: Set[commandParameters.ResourceId]
+    )(
+        pl: ParameterLink
+    ): ValidatedNel[String, Unit] = {
+      val checkSource = Validated.condNel(
+        outputIds.contains(pl.source),
+        (),
+        show"The source ${pl.source} is not available in the set of plans."
+      )
+      val checkSink = pl.sinks.traverse_(id =>
+        Validated.condNel(inputParamIds.contains(id), (), show"The sink $id is not available in the set of plans")
+      )
+
+      (checkSource |+| checkSink).void
+    }
 
     protected def syncPersons(projectPersons: Set[Person],
                               activities:     List[Activity],

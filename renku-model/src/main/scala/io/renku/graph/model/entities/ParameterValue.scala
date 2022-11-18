@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.graph.model.Schemas._
 import io.renku.graph.model.commandParameters
-import io.renku.graph.model.entities.CommandParameterBase._
+import io.renku.graph.model.entities.StepPlanCommandParameter._
 import io.renku.graph.model.entityModel.{Location, LocationLike}
 import io.renku.graph.model.parameterValues.{ResourceId, _}
 import io.renku.jsonld.JsonLDDecoder
@@ -149,9 +149,9 @@ object ParameterValue {
     ObjectProperties(
       ObjectProperty(
         schema / "valueReference",
-        CommandParameterBase.CommandParameter.ontology,
-        CommandParameterBase.CommandInput.ontology,
-        CommandParameterBase.CommandOutput.ontology
+        StepPlanCommandParameter.CommandParameter.ontology,
+        StepPlanCommandParameter.CommandInput.ontology,
+        StepPlanCommandParameter.CommandOutput.ontology
       )
     ),
     DataProperties(DataProperty(schema / "value", xsd / "string"))

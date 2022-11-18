@@ -19,6 +19,7 @@
 package io.renku.graph.model.entities
 
 import monocle.Lens
+import io.renku.graph.model.plans.{ResourceId => PlanResourceId}
 
 object ProjectLens {
 
@@ -29,4 +30,42 @@ object ProjectLens {
     case p: RenkuProject.WithoutParent => p.copy(plans = plans).asInstanceOf[P]
     case p => p
   })
+
+  /** Recursively collects all existing [[StepPlan]]s of all containing [[CompositePlan]]s.
+   * 
+   * The known plans are given via the `all` map. If a plan is not available in this map, but
+   * referenced in an composite plan, it will not be returned.
+   */
+  def collectAllSubPlans(all: Map[PlanResourceId, Plan])(start: Plan): Set[StepPlan] = {
+    @annotation.tailrec
+    def loop(result: Set[StepPlan], current: List[Plan]): Set[StepPlan] =
+      current match {
+        case Nil => result
+        case (p: CompositePlan) :: rest =>
+          loop(result, p.plans.toList.flatMap(all.get) ::: rest)
+        case (p: StepPlan) :: rest =>
+          loop(result + p, rest)
+      }
+
+    loop(Set.empty, List(start))
+  }
+
+  /** Recursively collects all existing [[CompositePlan]]s that are children of the given start plan.
+   * 
+   * The given `start` plan is not included in the result. Any plans that are referenced but don't 
+   * exist in the given `all` map, are not returned. 
+   */
+  def collectAllSubCompositePlans(all: Map[PlanResourceId, Plan])(start: CompositePlan): Set[CompositePlan] = {
+    @annotation.tailrec
+    def loop(result: Set[CompositePlan], current: List[Plan]): Set[CompositePlan] =
+      current match {
+        case Nil => result
+        case (p: CompositePlan) :: rest =>
+          loop(result + p, p.plans.toList.flatMap(all.get) ::: rest)
+        case (_: StepPlan) :: rest =>
+          loop(result, rest)
+      }
+
+    loop(Set.empty, start.plans.toList.flatMap(all.get))
+  }
 }

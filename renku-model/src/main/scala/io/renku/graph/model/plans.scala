@@ -20,7 +20,8 @@ package io.renku.graph.model
 
 import cats.syntax.all._
 import io.renku.graph.model.views.{AnyResourceRenderer, EntityIdJsonLDOps, TinyTypeJsonLDOps}
-import io.renku.jsonld.EntityId
+import io.renku.jsonld.syntax.JsonEncoderOps
+import io.renku.jsonld.{EntityId, EntityIdEncoder}
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 
@@ -49,7 +50,10 @@ object plans {
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank[Name] with TinyTypeJsonLDOps[Name]
 
   final class Identifier private (val value: String) extends AnyVal with StringTinyType
-  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank[Identifier]
+  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank[Identifier] {
+    implicit def entityIdEncoder(implicit renkuUrl: RenkuUrl): EntityIdEncoder[Identifier] =
+      EntityIdEncoder.instance(id => ResourceId(id).asEntityId)
+  }
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
   implicit object Description

@@ -86,7 +86,7 @@ class KGInfoFinderSpec
 
     "return activity association person agent resourceIds" in new TestCase {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
         .generateOne
         .to[entities.RenkuProject]
 

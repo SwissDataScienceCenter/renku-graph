@@ -25,7 +25,7 @@ import io.renku.generators.Generators.timestamps
 import io.renku.graph.model.GraphModelGenerators.{graphClasses, projectCreatedDates}
 import io.renku.graph.model.Schemas.{prov, renku}
 import io.renku.graph.model.entities.Activity.entityTypes
-import io.renku.graph.model.testentities.CommandParameterBase.{CommandInput, CommandOutput}
+import io.renku.graph.model.testentities.StepPlanCommandParameter.{CommandInput, CommandOutput}
 import io.renku.graph.model.testentities._
 import io.renku.graph.model._
 import io.renku.jsonld._

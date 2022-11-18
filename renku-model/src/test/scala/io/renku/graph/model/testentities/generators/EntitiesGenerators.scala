@@ -19,6 +19,7 @@
 package io.renku.graph.model.testentities
 package generators
 
+import cats.data.Kleisli
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
@@ -30,9 +31,27 @@ import org.scalacheck.Gen
 import java.time.Instant
 
 object EntitiesGenerators extends EntitiesGenerators {
+  type ProjectBasedGenFactory[A] = Kleisli[Gen, projects.DateCreated, A]
+
   type DatasetGenFactory[+P <: Dataset.Provenance] = projects.DateCreated => Gen[Dataset[P]]
-  type ActivityGenFactory                          = projects.DateCreated => Gen[Activity]
-  type StepPlanGenFactory                          = projects.DateCreated => Gen[StepPlan]
+
+  type ActivityGenFactory      = ProjectBasedGenFactory[Activity]
+  type StepPlanGenFactory      = ProjectBasedGenFactory[StepPlan]
+  type CompositePlanGenFactory = ProjectBasedGenFactory[CompositePlan]
+  type PlanGenFactory          = ProjectBasedGenFactory[Plan]
+
+  object ProjectBasedGenFactory {
+    def pure[A](a:   A):      ProjectBasedGenFactory[A] = Kleisli.pure(a)
+    def liftF[A](fa: Gen[A]): ProjectBasedGenFactory[A] = Kleisli.liftF(fa)
+  }
+
+  final implicit class ProjectBasedGenFactoryOps[A](self: ProjectBasedGenFactory[A]) {
+    def generator: Gen[A] =
+      self.run(projectCreatedDates().generateOne)
+
+    def generateOne: A =
+      generator.generateOne
+  }
 }
 
 private object Instances {
