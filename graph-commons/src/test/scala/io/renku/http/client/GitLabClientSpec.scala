@@ -56,6 +56,12 @@ class GitLabClientSpec
 
   "get" should {
 
+    val mapGetResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[List[String]]] = {
+      case (Ok, _, response)    => response.as[List[String]]
+      case (NotFound, _, _)     => List.empty[String].pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, List[String]]
+    }
+
     "fetch json from a given page" in new TestCase {
 
       stubFor {
@@ -132,7 +138,54 @@ class GitLabClientSpec
     }
   }
 
+  "head" should {
+
+    val mapHeadResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Boolean]] = { case (Ok, _, _) =>
+      true.pure[IO]
+    }
+
+    "send HEAD request to the given URL and apply the given mapping" in new TestCase {
+
+      stubFor {
+        callMethod(HEAD, s"/api/v4/$path")
+          .willReturn(ok())
+      }
+
+      client.head(path, endpointName)(mapHeadResponse).unsafeRunSync() shouldBe true
+    }
+
+    forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
+      s"use the given $tokenType and call mapResponse" in new TestCase {
+
+        stubFor {
+          callMethod(HEAD, s"/api/v4/$path")
+            .withAccessToken(accessToken.some)
+            .willReturn(ok())
+        }
+
+        client.head(path, endpointName)(mapHeadResponse)(accessToken.some).unsafeRunSync() shouldBe true
+      }
+    }
+
+    "return an Exception if remote responds with status different than expected in mapping" in new TestCase {
+
+      stubFor {
+        callMethod(HEAD, s"/api/v4/$path")
+          .willReturn(noContent())
+      }
+
+      val exception = intercept[Exception](client.head(path, endpointName)(mapHeadResponse).unsafeRunSync())
+
+      exception shouldBe a[RestClientError.UnexpectedResponseException]
+    }
+  }
+
   "post" should {
+
+    val mapPostResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+      case (Accepted, _, _)     => ().pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Unit]
+    }
 
     forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
       s"send json with the $tokenType to the endpoint" in new TestCase {
@@ -167,6 +220,11 @@ class GitLabClientSpec
   }
 
   "delete" should {
+
+    val mapDeleteResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+      case (Accepted, _, _)     => ().pure[IO]
+      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Unit]
+    }
 
     forAll(tokenScenarios) { (tokenType, accessToken: AccessToken) =>
       s"send json with the $tokenType to the endpoint" in new TestCase {
@@ -210,22 +268,6 @@ class GitLabClientSpec
       .fold(throw _, identity)
       .withQueryParams(queryParams)
 
-    implicit lazy val mapGetResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[List[String]]] = {
-      case (Ok, _, response)    => response.as[List[String]]
-      case (NotFound, _, _)     => List.empty[String].pure[IO]
-      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, List[String]]
-    }
-
-    lazy val mapPostResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-      case (Accepted, _, _)     => ().pure[IO]
-      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Unit]
-    }
-
-    lazy val mapDeleteResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-      case (Accepted, _, _)     => ().pure[IO]
-      case (Unauthorized, _, _) => UnauthorizedException.raiseError[IO, Unit]
-    }
-
     val maybeNextPage = pages.generateOption
 
     val result = nonEmptyStringsList(5, 10).generateOne
@@ -233,6 +275,7 @@ class GitLabClientSpec
 
   private def callMethod(method: Method, uri: String): MappingBuilder = method match {
     case GET    => get(uri)
+    case HEAD   => head(urlEqualTo(uri))
     case PUT    => put(uri)
     case DELETE => delete(uri)
     case POST   => post(uri)
