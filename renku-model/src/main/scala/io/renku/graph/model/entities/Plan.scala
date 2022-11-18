@@ -70,13 +70,13 @@ object Plan {
       // This prov/Plan can be a renku/Plan or renku/CompositePlan
       Class(prov / "Plan"),
       ObjectProperties(
-        ObjectProperty(CompositePlan.Ontology.creators, Person.ontology)
+        ObjectProperty(schema / "creator", Person.ontology)
       ),
       DataProperties(
-        DataProperty(CompositePlan.Ontology.name, xsd / "string"),
-        DataProperty(CompositePlan.Ontology.description, xsd / "string"),
-        DataProperty(CompositePlan.Ontology.dateCreated, xsd / "dateTime"),
-        DataProperty(CompositePlan.Ontology.keywords, xsd / "string")
+        DataProperty(schema / "name", xsd / "string"),
+        DataProperty(schema / "description", xsd / "string"),
+        DataProperty(schema / "dateCreated", xsd / "dateTime"),
+        DataProperty(schema / "keywords", xsd / "string")
       )
     )
 }
