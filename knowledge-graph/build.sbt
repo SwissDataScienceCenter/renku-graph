@@ -21,7 +21,7 @@ name := "knowledge-graph"
 Test / fork := true
 
 // log4j-core is needed only by widoco
-libraryDependencies += "ch.qos.logback"           % "logback-classic" % "1.4.4"
+libraryDependencies += "ch.qos.logback"           % "logback-classic" % "1.4.5"
 libraryDependencies += "org.apache.logging.log4j" % "log4j-core"      % "2.19.0"
 
 libraryDependencies += "com.github.dgarijo" % "widoco" % "1.4.17"
