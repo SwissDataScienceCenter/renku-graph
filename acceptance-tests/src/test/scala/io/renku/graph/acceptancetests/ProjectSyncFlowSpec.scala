@@ -31,7 +31,6 @@ import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphClass
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
-import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.http4s.Status.{NotFound, Ok}
 
@@ -46,7 +45,7 @@ class ProjectSyncFlowSpec extends AcceptanceSpec with ApplicationServices with T
 
     Scenario("There's a project_path change in GitLab for a repo that is already in KG") {
 
-      val user: AuthUser = authUsers.generateOne
+      val user                = authUsers.generateOne
       val testEntitiesProject = renkuProjectEntities(visibilityPublic).generateOne
       val project             = dataProjects(testEntitiesProject).generateOne
 

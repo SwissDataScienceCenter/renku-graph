@@ -27,7 +27,6 @@ import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators.{renkuProjectEntities, visibilityPublic}
-import io.renku.http.server.security.model.AuthUser
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status.{Accepted, Ok}
 import org.scalatest.concurrent.Eventually
@@ -43,7 +42,7 @@ class FastTractEventRouteSpec
 
     Scenario("Project with no events in the TS") {
 
-      val user: AuthUser = authUsers.generateOne
+      val user     = authUsers.generateOne
       val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commitId = commitIds.generateOne
 

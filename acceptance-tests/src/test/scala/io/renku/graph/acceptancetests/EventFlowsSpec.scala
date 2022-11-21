@@ -27,7 +27,6 @@ import io.renku.graph.acceptancetests.tooling._
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.http.server.security.model.AuthUser
 import io.renku.webhookservice.model.HookToken
 import org.http4s.Status._
 
@@ -37,7 +36,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
 
     Scenario("Valid events get through to the Triples store") {
 
-      val user: AuthUser = authUsers.generateOne
+      val user     = authUsers.generateOne
       val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commitId = commitIds.generateOne
 
@@ -65,7 +64,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
 
     Scenario("A non recoverable generation error arises and the events are reported as failed") {
 
-      val user: AuthUser = authUsers.generateOne
+      val user     = authUsers.generateOne
       val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commitId = commitIds.generateOne
 
@@ -95,7 +94,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
       "A recoverable error arises and the events are reported as a recoverable failure"
     ) {
 
-      val user: AuthUser = authUsers.generateOne
+      val user     = authUsers.generateOne
       val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commitId = commitIds.generateOne
 
@@ -125,7 +124,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
 
     Scenario("A non recoverable transformation error arises and the events are reported as a non recoverable failure") {
 
-      val user: AuthUser = authUsers.generateOne
+      val user     = authUsers.generateOne
       val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
       val commitId = commitIds.generateOne
 

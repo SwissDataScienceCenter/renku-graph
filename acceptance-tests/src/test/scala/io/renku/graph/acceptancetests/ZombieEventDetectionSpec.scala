@@ -35,7 +35,6 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.http.server.security.model.AuthUser
 import io.renku.microservices.MicroserviceIdentifier
 import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
@@ -66,7 +65,7 @@ class ZombieEventDetectionSpec
     s"An event which got stuck in either $GeneratingTriples or $TransformingTriples status " +
       s"should be detected and re-processes"
   ) {
-    val user: AuthUser = authUsers.generateOne
+    val user      = authUsers.generateOne
     val project   = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne
     val commitId  = commitIds.generateOne
     val eventDate = eventDates.generateOne
