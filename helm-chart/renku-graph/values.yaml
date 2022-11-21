@@ -95,6 +95,7 @@ tokenRepository:
   jvmXmx: 128M
   gitlab:
     rateLimit: 50/sec
+  projectTokenTTL: '1 year'
   connectionPool: 2
   tokenEncryption:
     ## A secret for signing access tokens stored in the database
