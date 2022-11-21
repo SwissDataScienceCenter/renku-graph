@@ -24,7 +24,8 @@ import io.renku.graph.model.projects
 import skunk.codec.all.{int4, varchar}
 import skunk.{Decoder, Encoder}
 
-private trait TokenRepositoryTypeSerializers {
+trait TokenRepositoryTypeSerializers {
+
   val projectIdDecoder: Decoder[projects.Id] = int4.map(projects.Id.apply)
   val projectIdEncoder: Encoder[projects.Id] = int4.values.contramap(_.value)
 
@@ -32,8 +33,8 @@ private trait TokenRepositoryTypeSerializers {
   val projectPathEncoder: Encoder[projects.Path] =
     varchar.values.contramap((b: projects.Path) => b.value)
 
-  val encryptedAccessTokenDecoder: Decoder[EncryptedAccessToken] =
+  private[repository] val encryptedAccessTokenDecoder: Decoder[EncryptedAccessToken] =
     varchar.emap(s => EncryptedAccessToken.from(s).leftMap(_.getMessage))
-  val encryptedAccessTokenEncoder: Encoder[EncryptedAccessToken] =
+  private[repository] val encryptedAccessTokenEncoder: Encoder[EncryptedAccessToken] =
     varchar.values.contramap((b: EncryptedAccessToken) => b.value)
 }

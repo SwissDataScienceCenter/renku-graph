@@ -21,6 +21,7 @@ package association
 
 import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
+import TokenStoringInfo.Project
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
@@ -29,7 +30,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import fetching.{PersistedTokensFinder, PersistedTokensFinderImpl}
-import io.renku.graph.model.projects.{Id, Path}
+import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.LabeledHistogram
@@ -73,24 +74,22 @@ private class TokenAssociatorImpl[F[_]: MonadThrow](
 
   private def createOrDelete(projectId: Id, token: AccessToken) =
     findProjectPath(projectId, token)
-      .cataF(tokenRemover delete projectId, generateNewToken(projectId, _, token))
+      .cataF(tokenRemover delete projectId, path => generateNewToken(Project(projectId, path), token))
 
-  private def generateNewToken(projectId: Id, projectPath: Path, token: AccessToken): F[Unit] =
+  private def generateNewToken(project: Project, token: AccessToken): F[Unit] =
     for {
-      newProjectToken       <- createPersonalAccessToken(projectId, token)
-      encryptedProjectToken <- encrypt(newProjectToken)
-      _                     <- persistOrRetry(projectId, projectPath, newProjectToken, encryptedProjectToken)
+      newTokenInfo   <- createPersonalAccessToken(project.id, token)
+      encryptedToken <- encrypt(newTokenInfo.token)
+      _ <- persistOrRetry(TokenStoringInfo(project, encryptedToken, newTokenInfo.dates), newTokenInfo.token)
     } yield ()
 
-  private def persistOrRetry(projectId:       Id,
-                             projectPath:     Path,
-                             token:           ProjectAccessToken,
-                             encryptedToken:  AccessTokenCrypto.EncryptedAccessToken,
+  private def persistOrRetry(storingInfo:     TokenStoringInfo,
+                             newToken:        ProjectAccessToken,
                              numberOfRetries: Int = 0
   ): F[Unit] =
-    persistAssociation(projectId, projectPath, encryptedToken) >>
-      verifyTokenIntegrity(projectId, token)
-        .recoverWith(retry(projectId, projectPath, token, encryptedToken, numberOfRetries))
+    persistAssociation(storingInfo) >>
+      verifyTokenIntegrity(storingInfo.project.id, newToken)
+        .recoverWith(retry(storingInfo, newToken, numberOfRetries))
 
   private def verifyTokenIntegrity(projectId: Id, token: ProjectAccessToken) =
     findStoredToken(projectId)
@@ -105,15 +104,12 @@ private class TokenAssociatorImpl[F[_]: MonadThrow](
         }
       )
 
-  private def retry(projectId:       Id,
-                    projectPath:     Path,
-                    token:           ProjectAccessToken,
-                    encryptedToken:  AccessTokenCrypto.EncryptedAccessToken,
+  private def retry(storingInfo:     TokenStoringInfo,
+                    newToken:        ProjectAccessToken,
                     numberOfRetries: Int
   ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(error) =>
-    if (numberOfRetries < maxRetries.value) {
-      persistOrRetry(projectId, projectPath, token, encryptedToken, numberOfRetries + 1)
-    } else error.raiseError[F, Unit]
+    if (numberOfRetries >= maxRetries.value) error.raiseError[F, Unit]
+    else persistOrRetry(storingInfo, newToken, numberOfRetries + 1)
   }
 }
 

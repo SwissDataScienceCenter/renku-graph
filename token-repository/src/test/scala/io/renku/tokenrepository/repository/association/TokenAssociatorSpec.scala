@@ -19,11 +19,16 @@
 package io.renku.tokenrepository.repository
 package association
 
+import AccessTokenCrypto.EncryptedAccessToken
+import Generators._
+import RepositoryGenerators._
 import cats.data.OptionT
 import cats.syntax.all._
+import deletion.TokenRemover
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
+import fetching.PersistedTokensFinder
 import io.renku.generators.CommonGraphGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -32,14 +37,10 @@ import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, UserAccessToken}
-import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.RepositoryGenerators._
-import io.renku.tokenrepository.repository.deletion.TokenRemover
-import io.renku.tokenrepository.repository.fetching.PersistedTokensFinder
-import io.renku.tokenrepository.repository.AccessTokenCrypto
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import TokenStoringInfo.Project
 
 import scala.util.{Failure, Try}
 
@@ -74,15 +75,19 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
-      val newProjectAccessToken = projectAccessTokens.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = newProjectAccessToken.pure[Try])
+      val tokenCreationInfo = tokenCreationInfos.generateOne
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
 
-      val encryptedNewAccessToken = encryptedAccessTokens.generateOne
-      givenTokenEncryption(newProjectAccessToken, returning = encryptedNewAccessToken.pure[Try])
+      val newTokenEncrypted = encryptedAccessTokens.generateOne
+      givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
 
-      givenTokenStoring(projectId, projectPath, encryptedNewAccessToken, returning = ().pure[Try])
+      givenTokenStoring(Project(projectId, projectPath),
+                        newTokenEncrypted,
+                        tokenCreationInfo.dates,
+                        returning = ().pure[Try]
+      )
 
-      givenIntegrityCheckPasses(projectId, newProjectAccessToken, encryptedNewAccessToken)
+      givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -98,15 +103,19 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
-      val newProjectAccessToken = projectAccessTokens.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = newProjectAccessToken.pure[Try])
+      val tokenCreationInfo = tokenCreationInfos.generateOne
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
 
-      val encryptedNewAccessToken = encryptedAccessTokens.generateOne
-      givenTokenEncryption(newProjectAccessToken, returning = encryptedNewAccessToken.pure[Try])
+      val newTokenEncrypted = encryptedAccessTokens.generateOne
+      givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
 
-      givenTokenStoring(projectId, projectPath, encryptedNewAccessToken, returning = ().pure[Try])
+      givenTokenStoring(Project(projectId, projectPath),
+                        newTokenEncrypted,
+                        tokenCreationInfo.dates,
+                        returning = ().pure[Try]
+      )
 
-      givenIntegrityCheckPasses(projectId, newProjectAccessToken, encryptedNewAccessToken)
+      givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -118,15 +127,19 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
-      val newProjectAccessToken = projectAccessTokens.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = newProjectAccessToken.pure[Try])
+      val tokenCreationInfo = tokenCreationInfos.generateOne
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
 
-      val encryptedNewAccessToken = encryptedAccessTokens.generateOne
-      givenTokenEncryption(newProjectAccessToken, returning = encryptedNewAccessToken.pure[Try])
+      val newTokenEncrypted = encryptedAccessTokens.generateOne
+      givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
 
-      givenTokenStoring(projectId, projectPath, encryptedNewAccessToken, returning = ().pure[Try])
+      givenTokenStoring(Project(projectId, projectPath),
+                        newTokenEncrypted,
+                        tokenCreationInfo.dates,
+                        returning = ().pure[Try]
+      )
 
-      givenIntegrityCheckPasses(projectId, newProjectAccessToken, encryptedNewAccessToken)
+      givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -153,20 +166,24 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
-      val newProjectAccessToken = projectAccessTokens.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = newProjectAccessToken.pure[Try])
+      val tokenCreationInfo = tokenCreationInfos.generateOne
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
 
-      val encryptedNewAccessToken = encryptedAccessTokens.generateOne
-      givenTokenEncryption(newProjectAccessToken, returning = encryptedNewAccessToken.pure[Try])
+      val newTokenEncrypted = encryptedAccessTokens.generateOne
+      givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
 
-      givenTokenStoring(projectId, projectPath, encryptedNewAccessToken, returning = ().pure[Try]).twice()
+      givenTokenStoring(Project(projectId, projectPath),
+                        newTokenEncrypted,
+                        tokenCreationInfo.dates,
+                        returning = ().pure[Try]
+      ).twice()
 
       val invalidEncryptedAfterStoring = encryptedAccessTokens.generateOne
       givenStoredTokenFinder(projectId, returning = OptionT.some(invalidEncryptedAfterStoring))
       val exception = exceptions.generateOne
       givenTokenDecryption(of = invalidEncryptedAfterStoring, returning = exception.raiseError[Try, AccessToken])
 
-      givenIntegrityCheckPasses(projectId, newProjectAccessToken, encryptedNewAccessToken)
+      givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -178,17 +195,21 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
-      val newProjectAccessToken = projectAccessTokens.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = newProjectAccessToken.pure[Try])
+      val tokenCreationInfo = tokenCreationInfos.generateOne
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
 
-      val encryptedNewAccessToken = encryptedAccessTokens.generateOne
-      givenTokenEncryption(newProjectAccessToken, returning = encryptedNewAccessToken.pure[Try])
+      val newTokenEncrypted = encryptedAccessTokens.generateOne
+      givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
 
-      givenTokenStoring(projectId, projectPath, encryptedNewAccessToken, returning = ().pure[Try]).twice()
+      givenTokenStoring(Project(projectId, projectPath),
+                        newTokenEncrypted,
+                        tokenCreationInfo.dates,
+                        returning = ().pure[Try]
+      ).twice()
 
       givenStoredTokenFinder(projectId, returning = OptionT.none)
 
-      givenIntegrityCheckPasses(projectId, newProjectAccessToken, encryptedNewAccessToken)
+      givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -208,13 +229,17 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
-      val newProjectAccessToken = projectAccessTokens.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = newProjectAccessToken.pure[Try])
+      val tokenCreationInfo = tokenCreationInfos.generateOne
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
 
-      val encryptedNewAccessToken = encryptedAccessTokens.generateOne
-      givenTokenEncryption(newProjectAccessToken, returning = encryptedNewAccessToken.pure[Try])
+      val newTokenEncrypted = encryptedAccessTokens.generateOne
+      givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
 
-      givenTokenStoring(projectId, projectPath, encryptedNewAccessToken, returning = ().pure[Try]).repeated(3)
+      givenTokenStoring(Project(projectId, projectPath),
+                        newTokenEncrypted,
+                        tokenCreationInfo.dates,
+                        returning = ().pure[Try]
+      ).repeated(3)
 
       givenStoredTokenFinder(projectId, returning = OptionT.none).repeated(3)
 
@@ -278,17 +303,17 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: UserAccessToken,
-                                 returning:       Try[ProjectAccessToken]
+                                 returning:       Try[TokenCreationInfo]
     ) = (projectAccessTokenCreator.createPersonalAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
 
-    def givenTokenStoring(projectId:      projects.Id,
-                          projectPath:    projects.Path,
+    def givenTokenStoring(project:        Project,
                           encryptedToken: EncryptedAccessToken,
+                          dates:          TokenDates,
                           returning:      Try[Unit]
     ) = (associationPersister.persistAssociation _)
-      .expects(projectId, projectPath, encryptedToken)
+      .expects(TokenStoringInfo(project, encryptedToken, dates))
       .returning(returning)
 
     def givenTokenRemoval(projectId: projects.Id, returning: Try[Unit]) =

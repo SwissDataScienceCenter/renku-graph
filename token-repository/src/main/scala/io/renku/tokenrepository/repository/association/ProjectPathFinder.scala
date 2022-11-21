@@ -26,7 +26,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 import org.typelevel.log4cats.Logger
 
-trait ProjectPathFinder[F[_]] {
+private trait ProjectPathFinder[F[_]] {
   def findProjectPath(projectId: projects.Id, accessToken: AccessToken): OptionT[F, projects.Path]
 }
 
@@ -57,7 +57,7 @@ private class ProjectPathFinderImpl[F[_]: Async: GitLabClient: Logger] extends P
   }
 }
 
-object ProjectPathFinder {
+private object ProjectPathFinder {
 
   def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectPathFinder[F]] =
     new ProjectPathFinderImpl[F].pure[F].widen

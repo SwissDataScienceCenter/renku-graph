@@ -28,7 +28,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import java.time.{LocalDate, Period}
 
 private trait ProjectAccessTokenCreator[F[_]] {
-  def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[ProjectAccessToken]
+  def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[TokenCreationInfo]
 }
 
 private object ProjectAccessTokenCreator {
@@ -59,28 +59,36 @@ private class ProjectAccessTokenCreatorImpl[F[_]: Async: GitLabClient](
   import org.http4s.implicits._
   import org.http4s.{EntityDecoder, Request, Response, Status}
 
-  override def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[ProjectAccessToken] = {
+  override def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[TokenCreationInfo] = {
     val payload = json"""{
       "name":       "renku",
       "scopes":     ["api", "read_repository"],
-      "expires_at": ${currentDate().plus(projectTokenTTL)}
+      "expires_at": ${currentDate() plus projectTokenTTL}
     }"""
     GitLabClient[F].post(uri"projects" / projectId.value / "access_tokens", "create-project-access-token", payload)(
       mapResponse
     )(accessToken.some)
   }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[ProjectAccessToken]] = {
-    case (Created, _, response) => response.as[ProjectAccessToken]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[TokenCreationInfo]] = {
+    case (Created, _, response) => response.as[TokenCreationInfo]
   }
 
-  private implicit lazy val tokenDecoder: EntityDecoder[F, ProjectAccessToken] = {
+  private implicit lazy val tokenDecoder: EntityDecoder[F, TokenCreationInfo] = {
     val tokenDecoder = decodeString.emap { value =>
       ProjectAccessToken.from(value).leftMap(_.getMessage)
     }
 
-    val fieldDecoder: Decoder[ProjectAccessToken] = _.downField("token").as(tokenDecoder)
+    val infoDecoder: Decoder[TokenCreationInfo] = cursor => {
+      import TokenDates._
+      import io.renku.tinytypes.json.TinyTypeDecoders._
+      for {
+        token       <- cursor.downField("token").as(tokenDecoder)
+        createdDate <- cursor.downField("created_at").as[CreatedAt]
+        expiryDate  <- cursor.downField("expires_at").as[ExpiryDate]
+      } yield TokenCreationInfo(token, TokenDates(createdDate, expiryDate))
+    }
 
-    jsonOf[F, ProjectAccessToken](Sync[F], fieldDecoder)
+    jsonOf[F, TokenCreationInfo](Sync[F], infoDecoder)
   }
 }

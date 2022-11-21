@@ -18,6 +18,7 @@
 
 package io.renku.tokenrepository.repository.association
 
+import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -74,9 +75,9 @@ class ProjectAccessTokenCreatorSpec
     }
 
     s"retrieve the created Project Access Token from the response with $Created status" in new TestCase {
-      val createdToken = projectAccessTokens.generateOne
-      mapResponse(Created, Request[IO](), Response[IO](Created).withEntity(glResponsePayload(createdToken)))
-        .unsafeRunSync() shouldBe createdToken
+      val creationInfo = tokenCreationInfos.generateOne
+      mapResponse(Created, Request[IO](), Response[IO](Created).withEntity(glResponsePayload(creationInfo)))
+        .unsafeRunSync() shouldBe creationInfo
     }
 
     s"fail for responses other than $Created" in new TestCase {
@@ -100,12 +101,14 @@ class ProjectAccessTokenCreatorSpec
 
     lazy val mapResponse = captureMapping(tokenCreator, gitLabClient)(
       findingMethod = _.createPersonalAccessToken(projectId, accessToken).unsafeRunSync(),
-      resultGenerator = projectAccessTokens.generateOne,
+      resultGenerator = tokenCreationInfos.generateOne,
       method = POST
     )
   }
 
-  private def glResponsePayload(projectAccessToken: ProjectAccessToken) = json"""{
-    "token": ${projectAccessToken.value}
+  private def glResponsePayload(creationInfo: TokenCreationInfo) = json"""{
+    "token":      ${creationInfo.token.value},
+    "created_at": ${creationInfo.dates.createdAt.value},
+    "expires_at": ${creationInfo.dates.expiryDate.value}
   }"""
 }

@@ -18,6 +18,7 @@
 
 package io.renku.tokenrepository.repository.association
 
+import TokenDates.{CreatedAt, ExpiryDate}
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
@@ -32,7 +33,7 @@ import skunk.data.Completion.Delete
 import skunk.implicits._
 
 private trait AssociationPersister[F[_]] {
-  def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): F[Unit]
+  def persistAssociation(storingInfo: TokenStoringInfo): F[Unit]
 }
 
 private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
@@ -40,38 +41,41 @@ private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
     with AssociationPersister[F]
     with TokenRepositoryTypeSerializers {
 
-  override def persistAssociation(id: Id, path: Path, token: EncryptedAccessToken): F[Unit] =
+  override def persistAssociation(storingInfo: TokenStoringInfo): F[Unit] =
     SessionResource[F].useWithTransactionK {
       Kleisli { case (_, session) =>
-        (deleteAssociation(id, path) >> insert(id, path, token)).run(session)
+        (deleteAssociation(storingInfo.project) >> insert(storingInfo)).run(session)
       }
     }
 
-  private def deleteAssociation(id: Id, path: Path) = measureExecutionTime {
+  private def deleteAssociation(project: TokenStoringInfo.Project) = measureExecutionTime {
     SqlStatement
       .named("associate token - delete")
       .command[Id ~ Path](sql"""
         DELETE FROM projects_tokens 
         WHERE project_id = $projectIdEncoder OR project_path = $projectPathEncoder
       """.command)
-      .arguments(id, path)
+      .arguments(project.id, project.path)
       .build
       .flatMapResult {
         case Delete(_) => ().pure[F]
         case completion =>
-          new Exception(s"Re-associating token for projectId = $id, projectPath = $path failed: $completion")
-            .raiseError[F, Unit]
+          new Exception(
+            s"Re-associating token for projectId = ${project.id}, projectPath = ${project.path} failed: $completion"
+          ).raiseError[F, Unit]
       }
   }
 
-  private def insert(id: Id, path: Path, token: EncryptedAccessToken) = measureExecutionTime {
+  private def insert(storingInfo: TokenStoringInfo) = measureExecutionTime {
     SqlStatement
       .named("associate token - insert")
-      .command[Id ~ Path ~ EncryptedAccessToken](sql"""
-        INSERT INTO projects_tokens (project_id, project_path, token)
-        VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)
+      .command[Id ~ Path ~ EncryptedAccessToken ~ CreatedAt ~ ExpiryDate](sql"""
+        INSERT INTO projects_tokens (project_id, project_path, token, created_at, expiry_date)
+        VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder, $createdAtEncoder, $expiryDateEncoder)
       """.command)
-      .arguments(id ~ path ~ token)
+      .arguments(
+        storingInfo.project.id ~ storingInfo.project.path ~ storingInfo.encryptedToken ~ storingInfo.dates.createdAt ~ storingInfo.dates.expiryDate
+      )
       .build
       .void
   } recoverWith { case SqlState.UniqueViolation(_) => Kleisli.pure(()) }

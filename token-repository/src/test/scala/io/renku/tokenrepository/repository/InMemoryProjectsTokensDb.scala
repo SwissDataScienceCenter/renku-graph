@@ -30,7 +30,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 
-trait InMemoryProjectsTokensDb extends ForAllTestContainer {
+trait InMemoryProjectsTokensDb extends ForAllTestContainer with TokenRepositoryTypeSerializers {
   self: Suite with IOSpec =>
 
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
