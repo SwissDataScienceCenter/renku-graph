@@ -45,15 +45,15 @@ private class TokenFinderImpl[F[_]: MonadThrow](
   import accessTokenCrypto._
 
   override def findToken(projectPath: Path): OptionT[F, AccessToken] = for {
-    encryptedToken <- tokenInRepoFinder.findToken(projectPath)
+    encryptedToken <- tokenInRepoFinder.findStoredToken(projectPath)
     accessToken <-
-      OptionT.liftF(decrypt(encryptedToken)) recoverWith retry(() => tokenInRepoFinder.findToken(projectPath))
+      OptionT.liftF(decrypt(encryptedToken)) recoverWith retry(() => tokenInRepoFinder.findStoredToken(projectPath))
   } yield accessToken
 
   override def findToken(projectId: Id): OptionT[F, AccessToken] = for {
-    encryptedToken <- tokenInRepoFinder.findToken(projectId)
+    encryptedToken <- tokenInRepoFinder.findStoredToken(projectId)
     accessToken <-
-      OptionT.liftF(decrypt(encryptedToken)) recoverWith retry(() => tokenInRepoFinder.findToken(projectId))
+      OptionT.liftF(decrypt(encryptedToken)) recoverWith retry(() => tokenInRepoFinder.findStoredToken(projectId))
   } yield accessToken
 
   private def retry(fetchToken:      () => OptionT[F, AccessTokenCrypto.EncryptedAccessToken],

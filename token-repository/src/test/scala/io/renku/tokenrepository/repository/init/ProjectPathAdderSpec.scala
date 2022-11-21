@@ -18,30 +18,13 @@
 
 package io.renku.tokenrepository.repository.init
 
-import cats.data.Kleisli
 import cats.effect.IO
-import cats.syntax.all._
-import io.renku.db.SqlStatement
-import io.renku.generators.CommonGraphGenerators.accessTokens
-import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.projects.{Id, Path}
-import io.renku.http.client.AccessToken
 import io.renku.interpreters.TestLogger.Level.Info
-import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.AccessTokenCrypto
-import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
-import io.renku.tokenrepository.repository.association.ProjectPathFinder
-import io.renku.tokenrepository.repository.deletion.TokenRemoverImpl
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import skunk._
-import skunk.codec.all._
-import skunk.implicits._
 
 class ProjectPathAdderSpec
     extends AnyWordSpec
@@ -59,125 +42,26 @@ class ProjectPathAdderSpec
 
   "run" should {
 
-    "do nothing if the 'project_path' column already exists" in new TestCase {
-      addProjectPath()
-      verifyColumnExists("projects_tokens", "project_path") shouldBe true
+    "add the 'project_path' column if does not exist and add paths fetched from GitLab" in new TestCase {
+
+      verifyColumnExists("projects_tokens", "project_path") shouldBe false
 
       projectPathAdder.run().unsafeRunSync() shouldBe ()
 
-      verifyColumnExists("projects_tokens", "project_path") shouldBe true
+      logger.loggedOnly(Info("'project_path' column added"))
+      logger.reset()
 
-      logger.loggedOnly(Info("'project_path' column exists"))
-    }
+      projectPathAdder.run().unsafeRunSync() shouldBe ()
 
-    "add the 'project_path' column if does not exist and add paths fetched from GitLab" in new TestCase {
-      verifyColumnExists("projects_tokens", "project_path") shouldBe false
+      logger.loggedOnly(Info("'project_path' column existed"))
 
-      val project1Id             = projectIds.generateOne
-      val project1Path           = projectPaths.generateOne
-      val project1TokenEncrypted = encryptedAccessTokens.generateOne
-      val project1Token          = accessTokens.generateOne
-      insert(project1Id, project1TokenEncrypted)
-      assumePathExistsInGitLab(project1Id, Some(project1Path), project1TokenEncrypted, project1Token)
-
-      val project2Id             = projectIds.generateOne
-      val project2Path           = projectPaths.generateOne
-      val project2TokenEncrypted = encryptedAccessTokens.generateOne
-      val project2Token          = accessTokens.generateOne
-      insert(project2Id, project2TokenEncrypted)
-      assumePathExistsInGitLab(project2Id, Some(project2Path), project2TokenEncrypted, project2Token)
-
-      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
-
-      eventually {
-        findToken(project1Path) shouldBe Some(project1TokenEncrypted.value)
-        findToken(project2Path) shouldBe Some(project2TokenEncrypted.value)
-      }
-
-      eventually {
-        logger.loggedOnly(Info("'project_path' column added"))
-      }
-      eventually {
-        verifyTrue(sql"DROP INDEX idx_project_path;".command)
-      }
-    }
-
-    "add the 'project_path' column if does not exist and remove entries for non-existing projects in GitLab" in new TestCase {
-      verifyColumnExists("projects_tokens", "project_path") shouldBe false
-
-      val project1Id             = projectIds.generateOne
-      val project1TokenEncrypted = encryptedAccessTokens.generateOne
-      val project1Token          = accessTokens.generateOne
-      insert(project1Id, project1TokenEncrypted)
-      assumePathExistsInGitLab(project1Id, None, project1TokenEncrypted, project1Token)
-
-      val project2Id             = projectIds.generateOne
-      val project2Path           = projectPaths.generateOne
-      val project2TokenEncrypted = encryptedAccessTokens.generateOne
-      val project2Token          = accessTokens.generateOne
-      insert(project2Id, project2TokenEncrypted)
-      assumePathExistsInGitLab(project2Id, Some(project2Path), project2TokenEncrypted, project2Token)
-
-      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
-
-      eventually {
-        findToken(project2Path) shouldBe Some(project2TokenEncrypted.value)
-      }
-
-      eventually {
-        verifyTrue(sql"DROP INDEX idx_project_path;".command)
-      }
-
-      eventually {
-        logger.loggedOnly(Info("'project_path' column added"))
-      }
+      verifyIndexExists("projects_tokens", "idx_project_path")
     }
   }
 
   private trait TestCase {
     logger.reset()
 
-    val accessTokenCrypto = mock[AccessTokenCrypto[IO]]
-    val pathFinder        = mock[ProjectPathFinder[IO]]
-    val queriesExecTimes  = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val tokenRemover      = new TokenRemoverImpl[IO](queriesExecTimes)
-    val projectPathAdder  = new ProjectPathAdderImpl[IO](accessTokenCrypto, pathFinder, tokenRemover)
-
-    def assumePathExistsInGitLab(projectId:        Id,
-                                 maybeProjectPath: Option[Path],
-                                 encryptedToken:   EncryptedAccessToken,
-                                 token:            AccessToken
-    ) = {
-      (accessTokenCrypto.decrypt _)
-        .expects(encryptedToken)
-        .returning(token.pure[IO])
-        .atLeastOnce()
-      (pathFinder
-        .findProjectPath(_: Id, _: Option[AccessToken]))
-        .expects(projectId, Some(token))
-        .returning(maybeProjectPath.pure[IO])
-        .atLeastOnce()
-    }
-  }
-
-  private def addProjectPath(): Unit = execute {
-    Kleisli[IO, Session[IO], Unit] { session =>
-      val query: Command[Void] =
-        sql"""ALTER TABLE projects_tokens
-              ADD COLUMN project_path VARCHAR;
-        """.command
-      session.execute(query).void
-    }
-  }
-
-  def insert(projectId: Id, encryptedToken: EncryptedAccessToken): Unit = execute {
-    Kleisli[IO, Session[IO], Unit] { session =>
-      val query: Command[Int ~ String] =
-        sql"""insert into
-              projects_tokens (project_id, token)
-              values ($int4, $varchar)
-         """.command
-      session.prepare(query).use(_.execute(projectId.value ~ encryptedToken.value)).map(assureInserted)
-    }
+    val projectPathAdder = new ProjectPathAdderImpl[IO]
   }
 }

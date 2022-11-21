@@ -22,6 +22,7 @@ import cats.MonadThrow
 import cats.effect.{Async, Clock, Resource}
 import cats.syntax.all._
 import io.renku.graph.http.server.binders.{ProjectId, ProjectPath}
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.version
 import io.renku.metrics.{LabeledHistogram, MetricsRegistry, RoutesMetrics}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
@@ -58,7 +59,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
 }
 
 private object MicroserviceRoutes {
-  def apply[F[_]: Async: Logger: MetricsRegistry: SessionResource](
+  def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
   ): F[MicroserviceRoutes[F]] = for {
     fetchTokenEndpoint     <- FetchTokenEndpoint(queriesExecTimes)

@@ -30,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class PersistedTokensFinderSpec extends AnyWordSpec with IOSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
 
-  "findToken" should {
+  "findStoredToken" should {
 
     "return token associated with the projectId" in new TestCase {
 
@@ -38,7 +38,7 @@ class PersistedTokensFinderSpec extends AnyWordSpec with IOSpec with InMemoryPro
 
       insert(projectId, projectPath, encryptedToken)
 
-      finder.findToken(projectId).value.unsafeRunSync() shouldBe Some(encryptedToken)
+      finder.findStoredToken(projectId).value.unsafeRunSync() shouldBe Some(encryptedToken)
     }
 
     "return token associated with the projectPath" in new TestCase {
@@ -47,11 +47,11 @@ class PersistedTokensFinderSpec extends AnyWordSpec with IOSpec with InMemoryPro
 
       insert(projectId, projectPath, encryptedToken)
 
-      finder.findToken(projectPath).value.unsafeRunSync() shouldBe Some(encryptedToken)
+      finder.findStoredToken(projectPath).value.unsafeRunSync() shouldBe Some(encryptedToken)
     }
 
     "return None if there's no token associated with the projectId" in new TestCase {
-      finder.findToken(projectId).value.unsafeRunSync() shouldBe None
+      finder.findStoredToken(projectId).value.unsafeRunSync() shouldBe None
     }
   }
 

@@ -22,6 +22,7 @@ import cats.effect._
 import io.renku.config.certificates.CertificateLoader
 import io.renku.config.sentry.SentryInitializer
 import io.renku.db.{SessionPoolResource, SessionResource}
+import io.renku.http.client.GitLabClient
 import io.renku.http.server.HttpServer
 import io.renku.logging.ApplicationLogger
 import io.renku.metrics.MetricsRegistry
@@ -46,10 +47,11 @@ object Microservice extends IOMicroservice {
   ) = sessionPoolResource.use { implicit sessionResource =>
     for {
       implicit0(mr: MetricsRegistry[IO]) <- MetricsRegistry[IO]()
+      implicit0(gc: GitLabClient[IO])    <- GitLabClient[IO]()
       certificateLoader                  <- CertificateLoader[IO]
       sentryInitializer                  <- SentryInitializer[IO]
+      dbInitializer                      <- DbInitializer[IO]
       queriesExecTimes                   <- QueriesExecutionTimes[IO]
-      dbInitializer                      <- DbInitializer(queriesExecTimes)
       microserviceRoutes                 <- MicroserviceRoutes[IO](queriesExecTimes).map(_.routes)
       exitCode <- microserviceRoutes.use { routes =>
                     new MicroserviceRunner(

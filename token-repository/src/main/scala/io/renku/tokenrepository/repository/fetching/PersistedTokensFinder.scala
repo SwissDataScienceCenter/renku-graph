@@ -30,8 +30,8 @@ import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import skunk.implicits._
 
 private[repository] trait PersistedTokensFinder[F[_]] {
-  def findToken(projectId:   Id):   OptionT[F, EncryptedAccessToken]
-  def findToken(projectPath: Path): OptionT[F, EncryptedAccessToken]
+  def findStoredToken(projectId:   Id):   OptionT[F, EncryptedAccessToken]
+  def findStoredToken(projectPath: Path): OptionT[F, EncryptedAccessToken]
 }
 
 private[repository] class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: SessionResource](
@@ -40,7 +40,7 @@ private[repository] class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: Sess
     with PersistedTokensFinder[F]
     with TokenRepositoryTypeSerializers {
 
-  override def findToken(projectId: Id): OptionT[F, EncryptedAccessToken] = run {
+  override def findStoredToken(projectId: Id): OptionT[F, EncryptedAccessToken] = run {
     SqlStatement(name = "find token - id")
       .select[Id, EncryptedAccessToken](
         sql"""select token from projects_tokens where project_id = $projectIdEncoder"""
@@ -50,7 +50,7 @@ private[repository] class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: Sess
       .build(_.option)
   }
 
-  override def findToken(projectPath: Path): OptionT[F, EncryptedAccessToken] = run {
+  override def findStoredToken(projectPath: Path): OptionT[F, EncryptedAccessToken] = run {
     SqlStatement(name = "find token - path")
       .select[Path, EncryptedAccessToken](
         sql"select token from projects_tokens where project_path = $projectPathEncoder"
