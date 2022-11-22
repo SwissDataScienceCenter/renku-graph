@@ -22,12 +22,10 @@ import EventContentGenerators._
 import cats.Show
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
-import fs2.Stream
 import io.circe.Json
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
-import io.renku.eventlog.eventpayload.EventPayloadFinder.PayloadData
-import io.renku.eventlog.eventpayload.{EventPayloadEndpoint, EventPayloadFinder}
+import io.renku.eventlog.eventpayload.EventPayloadEndpoint
 import io.renku.eventlog.events.producers.SubscriptionsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
@@ -50,7 +48,7 @@ import org.http4s.Method.{GET, POST}
 import org.http4s.QueryParamEncoder._
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.headers.{`Content-Length`, `Content-Type`}
+import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -346,20 +344,15 @@ class MicroserviceRoutesSpec
         uri"/events" / eventId.toString / projectPath.toString / "payload"
       )
 
-      val someData = PayloadData[IO](Stream(0, 10, -10, 5).map(_.toByte).covary[IO], 5L)
-      val finder   = mock[EventPayloadFinder[IO]]
-      (finder.findEventPayload _)
+      val someData = ByteVector(0, 10, -10, 5)
+      (eventPayloadEndpoint.getEventPayload _)
         .expects(eventId, projectPath)
-        .returning(someData.some)
+        .returning(Response[IO](Ok).withEntity(someData).pure[IO])
 
-      override val eventPayloadEndpoint = EventPayloadEndpoint[IO](finder)
+      val response = routes.call(request)
 
-      val response = routes.run(request)
-
-      response.status                                   shouldBe Ok
-      response.contentType                              shouldBe Some(`Content-Type`(application.`octet-stream`))
-      response.headers.get[`Content-Length`].get.length shouldBe someData.length
-      response.as[ByteVector].unsafeRunSync()           shouldBe someData.data.compile.to(ByteVector).unsafeRunSync()
+      response.status           shouldBe Ok
+      response.body[ByteVector] shouldBe someData
     }
   }
 

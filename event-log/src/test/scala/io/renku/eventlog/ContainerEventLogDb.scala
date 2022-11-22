@@ -49,9 +49,9 @@ trait ContainerEventLogDb extends ForAllTestContainer { self: Suite with IOSpec 
     Session.single(
       host = dbConfig.host,
       port = dbConfig.port,
-      user = dbConfig.user.value,
-      database = dbConfig.name.value,
-      password = Some(dbConfig.pass.value)
+      user = dbConfig.user,
+      database = dbConfig.name,
+      password = Some(dbConfig.pass)
     )
   )
 }

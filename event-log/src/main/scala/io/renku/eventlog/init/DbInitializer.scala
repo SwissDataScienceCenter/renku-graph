@@ -61,104 +61,103 @@ class DbInitializerImpl[F[_]: Temporal: Logger](migrators: List[DbMigrator[F]],
 }
 
 object DbInitializer {
+  def migrations[F[_]: MonadCancelThrow: Logger: SessionResource]: List[DbMigrator[F]] = List(
+    EventLogTableCreator[F],
+    ProjectPathAdder[F],
+    BatchDateAdder[F],
+    ProjectTableCreator[F],
+    ProjectPathRemover[F],
+    EventLogTableRenamer[F],
+    EventStatusRenamer[F],
+    EventPayloadTableCreator[F],
+    SubscriptionCategorySyncTimeTableCreator[F],
+    StatusesProcessingTimeTableCreator[F],
+    SubscriberTableCreator[F],
+    EventDeliveryTableCreator[F],
+    TimestampZoneAdder[F],
+    PayloadTypeChanger[F],
+    StatusChangeEventsTableCreator[F],
+    EventDeliveryEventTypeAdder[F],
+    EventDeliveryEventTypeAdder[F],
+    TSMigrationTableCreator[F],
+    CleanUpEventsTableCreator[F],
+    ProjectIdOnCleanUpTable[F],
+    FailedEventsRestorer[F](
+      "%Error: The repository is dirty. Please use the \"git\" command to clean it.%",
+      currentStatus = GenerationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%BadRequestException: POST http://renku-jena-master:3030/renku/update returned 400 Bad Request; body: Error 400: Lexical error%",
+      currentStatus = TransformationNonRecoverableFailure,
+      destinationStatus = TriplesGenerated,
+      discardingStatuses = TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%remote: HTTP Basic: Access denied%",
+      currentStatus = GenerationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%fatal: could not read Username for%",
+      currentStatus = GenerationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%Error: Cannot find object:%",
+      currentStatus = GenerationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%Not equal entity(ies) in json-ld%",
+      currentStatus = TransformationNonRecoverableFailure,
+      destinationStatus = TriplesGenerated,
+      discardingStatuses = TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%fatal: not removing ''.'' recursively without -r%",
+      currentStatus = GenerationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%Cannot decode % to Instant: Text % could not be parsed at index%",
+      currentStatus = TransformationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%DecodingFailure at : Invalid dataset data dateCreated%",
+      currentStatus = TransformationNonRecoverableFailure,
+      destinationStatus = TriplesGenerated,
+      discardingStatuses = TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%Multiple Person entities found for%",
+      currentStatus = TransformationNonRecoverableFailure,
+      destinationStatus = TriplesGenerated,
+      discardingStatuses = TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%More than one author ResourceId found for activity%",
+      currentStatus = TransformationNonRecoverableFailure,
+      destinationStatus = TriplesGenerated,
+      discardingStatuses = TriplesStore :: Nil
+    ),
+    FailedEventsRestorer[F](
+      "%You are using renku version % but this project requires at least version%",
+      currentStatus = GenerationNonRecoverableFailure,
+      destinationStatus = New,
+      discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
+    )
+  )
+
   def apply[F[_]: Temporal: Logger: SessionResource](isMigrating: Ref[F, Boolean]): F[DbInitializer[F]] =
     MonadCancelThrow[F].catchNonFatal {
-      new DbInitializerImpl[F](
-        migrators = List(
-          EventLogTableCreator[F],
-          ProjectPathAdder[F],
-          BatchDateAdder[F],
-          ProjectTableCreator[F],
-          ProjectPathRemover[F],
-          EventLogTableRenamer[F],
-          EventStatusRenamer[F],
-          EventPayloadTableCreator[F],
-          SubscriptionCategorySyncTimeTableCreator[F],
-          StatusesProcessingTimeTableCreator[F],
-          SubscriberTableCreator[F],
-          EventDeliveryTableCreator[F],
-          TimestampZoneAdder[F],
-          PayloadTypeChanger[F],
-          StatusChangeEventsTableCreator[F],
-          EventDeliveryEventTypeAdder[F],
-          EventDeliveryEventTypeAdder[F],
-          TSMigrationTableCreator[F],
-          CleanUpEventsTableCreator[F],
-          ProjectIdOnCleanUpTable[F],
-          FailedEventsRestorer[F](
-            "%Error: The repository is dirty. Please use the \"git\" command to clean it.%",
-            currentStatus = GenerationNonRecoverableFailure,
-            destinationStatus = New,
-            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%BadRequestException: POST http://renku-jena-master:3030/renku/update returned 400 Bad Request; body: Error 400: Lexical error%",
-            currentStatus = TransformationNonRecoverableFailure,
-            destinationStatus = TriplesGenerated,
-            discardingStatuses = TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%remote: HTTP Basic: Access denied%",
-            currentStatus = GenerationNonRecoverableFailure,
-            destinationStatus = New,
-            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%fatal: could not read Username for%",
-            currentStatus = GenerationNonRecoverableFailure,
-            destinationStatus = New,
-            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%Error: Cannot find object:%",
-            currentStatus = GenerationNonRecoverableFailure,
-            destinationStatus = New,
-            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%Not equal entity(ies) in json-ld%",
-            currentStatus = TransformationNonRecoverableFailure,
-            destinationStatus = TriplesGenerated,
-            discardingStatuses = TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%fatal: not removing ''.'' recursively without -r%",
-            currentStatus = GenerationNonRecoverableFailure,
-            destinationStatus = New,
-            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%Cannot decode % to Instant: Text % could not be parsed at index%",
-            currentStatus = TransformationNonRecoverableFailure,
-            destinationStatus = New,
-            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%DecodingFailure at : Invalid dataset data dateCreated%",
-            currentStatus = TransformationNonRecoverableFailure,
-            destinationStatus = TriplesGenerated,
-            discardingStatuses = TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%Multiple Person entities found for%",
-            currentStatus = TransformationNonRecoverableFailure,
-            destinationStatus = TriplesGenerated,
-            discardingStatuses = TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%More than one author ResourceId found for activity%",
-            currentStatus = TransformationNonRecoverableFailure,
-            destinationStatus = TriplesGenerated,
-            discardingStatuses = TriplesStore :: Nil
-          ),
-          FailedEventsRestorer[F](
-            "%You are using renku version % but this project requires at least version%",
-            currentStatus = GenerationNonRecoverableFailure,
-            destinationStatus = New,
-            discardingStatuses = TriplesGenerated :: TriplesStore :: Nil
-          )
-        ),
-        isMigrating
-      )
+      new DbInitializerImpl[F](migrations[F], isMigrating)
     }
 }

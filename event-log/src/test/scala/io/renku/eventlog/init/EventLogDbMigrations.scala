@@ -28,49 +28,5 @@ trait EventLogDbMigrations {
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 
-  protected[init] lazy val eventLogTableCreator:           DbMigrator[IO] = EventLogTableCreator[IO]
-  protected[init] lazy val projectPathAdder:               DbMigrator[IO] = ProjectPathAdder[IO]
-  protected[init] lazy val batchDateAdder:                 DbMigrator[IO] = BatchDateAdder[IO]
-  protected[init] lazy val projectTableCreator:            DbMigrator[IO] = ProjectTableCreator[IO]
-  protected[init] lazy val projectPathRemover:             DbMigrator[IO] = ProjectPathRemover[IO]
-  protected[init] lazy val eventLogTableRenamer:           DbMigrator[IO] = EventLogTableRenamer[IO]
-  protected[init] lazy val eventStatusRenamer:             DbMigrator[IO] = EventStatusRenamer[IO]
-  protected[init] lazy val eventPayloadTableCreator:       DbMigrator[IO] = EventPayloadTableCreator[IO]
-  protected[init] lazy val eventPayloadSchemaVersionAdder: DbMigrator[IO] = EventPayloadSchemaVersionAdder[IO]
-  protected[init] lazy val subscriptionCategorySyncTimeTableCreator: DbMigrator[IO] =
-    SubscriptionCategorySyncTimeTableCreator[IO]
-  protected[init] lazy val statusesProcessingTimeTableCreator: DbMigrator[IO] =
-    StatusesProcessingTimeTableCreator[IO]
-  protected[init] lazy val subscriberTableCreator:         DbMigrator[IO] = SubscriberTableCreator[IO]
-  protected[init] lazy val eventDeliveryTableCreator:      DbMigrator[IO] = EventDeliveryTableCreator[IO]
-  protected[init] lazy val timestampZoneAdder:             DbMigrator[IO] = TimestampZoneAdder[IO]
-  protected[init] lazy val payloadTypeChanger:             DbMigrator[IO] = PayloadTypeChanger[IO]
-  protected[init] lazy val statusChangeEventsTableCreator: DbMigrator[IO] = StatusChangeEventsTableCreator[IO]
-  protected[init] lazy val eventDeliveryEventTypeAdder:    DbMigrator[IO] = EventDeliveryEventTypeAdder[IO]
-  protected[init] lazy val tsMigrationTableCreator:        DbMigrator[IO] = TSMigrationTableCreator[IO]
-  protected[init] lazy val cleanUpEventsTableCreator:      DbMigrator[IO] = CleanUpEventsTableCreator[IO]
-  protected[init] lazy val projectIdOnCleanUpTable:        DbMigrator[IO] = ProjectIdOnCleanUpTable[IO]
-
-  protected[init] lazy val allMigrations: List[DbMigrator[IO]] = List(
-    eventLogTableCreator,
-    projectPathAdder,
-    batchDateAdder,
-    projectTableCreator,
-    projectPathRemover,
-    eventLogTableRenamer,
-    eventStatusRenamer,
-    eventPayloadTableCreator,
-    eventPayloadSchemaVersionAdder,
-    subscriptionCategorySyncTimeTableCreator,
-    statusesProcessingTimeTableCreator,
-    subscriberTableCreator,
-    eventDeliveryTableCreator,
-    timestampZoneAdder,
-    payloadTypeChanger,
-    statusChangeEventsTableCreator,
-    eventDeliveryEventTypeAdder,
-    tsMigrationTableCreator,
-    cleanUpEventsTableCreator,
-    projectIdOnCleanUpTable
-  )
+  protected[init] lazy val allMigrations: List[DbMigrator[IO]] = DbInitializer.migrations[IO]
 }

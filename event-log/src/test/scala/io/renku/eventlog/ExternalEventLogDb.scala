@@ -41,10 +41,10 @@ trait ExternalEventLogDb { self: IOSpec =>
   implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
     Session.single(
       host = dbConfig.host,
-      port = dbConfig.port.value,
-      user = dbConfig.user.value,
-      database = dbConfig.name.value,
-      password = Some(dbConfig.pass.value)
+      port = dbConfig.port,
+      user = dbConfig.user,
+      database = dbConfig.name,
+      password = Some(dbConfig.pass)
     )
   )
 }

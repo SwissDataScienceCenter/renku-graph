@@ -18,6 +18,6 @@
 
 package io.renku.eventlog.init
 
-private trait DbMigrator[F[_]] {
+trait DbMigrator[F[_]] {
   def run(): F[Unit]
 }

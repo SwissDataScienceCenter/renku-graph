@@ -24,7 +24,7 @@ import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.nonEmptyStrings
-import io.renku.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies, eventStatuses}
+import io.renku.graph.model.EventsGenerators.{batchDates, eventBodies, eventStatuses}
 import io.renku.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import io.renku.graph.model.projects
@@ -35,7 +35,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.codec.all._
 import skunk.implicits._
-import skunk.{Command, Query, ~}
+import skunk.{Command, ~}
 
 class PayloadTypeChangerSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
@@ -45,30 +45,6 @@ class PayloadTypeChangerSpec extends AnyWordSpec with IOSpec with DbInitSpec wit
   }
 
   "run" should {
-
-    "remove the schema_version and change the type of the payload column to bytea" in new TestCase {
-
-      tableExists("event_payload") shouldBe true
-
-      verify("event_payload", "payload", "text")
-      verify("event_payload", "schema_version", "text")
-
-      generateEvent(compoundEventIds.generateOne)
-
-      tableRefactor.run().unsafeRunSync() shouldBe ()
-
-      verify("event_payload", "payload", "bytea")
-      verifyColumnExists("event_payload", "schema_version") shouldBe false
-      execute[Long] {
-        Kleisli { session =>
-          val query: Query[skunk.Void, Long] = sql"""SELECT COUNT(*) FROM event_payload""".query(int8)
-          session.unique(query)
-        }
-      } shouldBe 0L
-
-      verifyIndexExists("event_payload", "idx_schema_version") shouldBe false
-
-    }
 
     "do nothing if the payload is already a bytea" in new TestCase {
 

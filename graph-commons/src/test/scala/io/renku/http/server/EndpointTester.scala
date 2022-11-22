@@ -54,9 +54,6 @@ object EndpointTester {
 
       def body[T](implicit decoder: EntityDecoder[IO, T]): T = runResponse.as[T].unsafeRunSync()
     }
-
-    def run(request: Request[IO])(implicit runtime: IORuntime) =
-      routes.use(_.run(request)).unsafeRunSync()
   }
 
   val notAvailableResponse: Response[IO] = Response(Status.ServiceUnavailable)
