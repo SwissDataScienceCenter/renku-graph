@@ -182,7 +182,7 @@ class WorkflowsEntitiesFinderSpec
       val wfs = results.results.collect { case e: model.Entity.Workflow => e }
       wfs should have size (project.plans.size)
 
-      wfs.map(_.workflowType) should contain theSameElementsAs List(WorkflowType.Basic, WorkflowType.Composite)
+      wfs.map(_.workflowType) should contain theSameElementsAs List(WorkflowType.Step, WorkflowType.Composite)
     }
   }
 }

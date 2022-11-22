@@ -95,7 +95,7 @@ package object entities {
       plan.maybeDescription,
       plan match {
         case _: CompositePlan => WorkflowType.Composite
-        case _: StepPlan      => WorkflowType.Basic
+        case _: StepPlan      => WorkflowType.Step
       }
     )
   }

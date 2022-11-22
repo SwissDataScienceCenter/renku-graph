@@ -170,7 +170,7 @@ private case object WorkflowsQuery extends EntityQuery[model.Entity.Workflow] {
       case _ if str.contains(CompositePlan.Ontology.typeDef.clazz.id.show) =>
         Right(WorkflowType.Composite)
       case _ if str.contains(StepPlan.ontology.clazz.id.show) =>
-        Right(WorkflowType.Basic)
+        Right(WorkflowType.Step)
       case _ =>
         Left(s"Unknown workflowType value: $str")
     }

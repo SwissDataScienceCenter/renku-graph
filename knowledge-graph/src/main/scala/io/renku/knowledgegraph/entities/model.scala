@@ -180,10 +180,10 @@ private object model {
       }
       object WorkflowType {
         case object Composite extends WorkflowType
-        case object Basic     extends WorkflowType
+        case object Step      extends WorkflowType
 
         val all: NonEmptyList[WorkflowType] =
-          NonEmptyList.of(Composite, Basic)
+          NonEmptyList.of(Composite, Step)
 
         def fromName(str: String): Either[String, WorkflowType] =
           all.find(_.name.equalsIgnoreCase(str)).toRight(s"Invalid workflowType name: $str")
