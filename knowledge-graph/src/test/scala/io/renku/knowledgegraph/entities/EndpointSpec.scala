@@ -40,6 +40,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.knowledgegraph.entities.Endpoint.Criteria.Filters
 import io.renku.knowledgegraph.entities.finder.EntitiesFinder
+import io.renku.knowledgegraph.entities.model.Entity.Workflow.WorkflowType
 import io.renku.knowledgegraph.entities.model.MatchingScore
 import io.renku.testtools.IOSpec
 import org.http4s.MediaType.application
@@ -168,6 +169,9 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
       (cursor.downField("rel").as[Rel] -> cursor.downField("namespace").as[projects.Namespace]).mapN(_ -> _)
     }
 
+    implicit val workflowTypeDecoder: Decoder[WorkflowType] =
+      Decoder.decodeString.emap(WorkflowType.fromName)
+
     def expectedNamespaces(path: projects.Path) = path.toNamespaces
       .foldLeft(List.empty[(Rel, List[projects.Namespace])]) {
         case (Nil, namespace) => List(Rel(namespace.show) -> List(namespace))
@@ -250,13 +254,14 @@ class EndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyC
         )
       case Endpoint.Criteria.Filters.EntityType.Workflow =>
         for {
-          score      <- cursor.downField("matchingScore").as[MatchingScore]
-          name       <- cursor.downField("name").as[plans.Name]
-          visibility <- cursor.downField("visibility").as[projects.Visibility]
-          date       <- cursor.downField("date").as[plans.DateCreated]
-          keywords   <- cursor.downField("keywords").as[List[plans.Keyword]]
-          maybeDesc  <- cursor.downField("description").as[Option[plans.Description]]
-        } yield model.Entity.Workflow(score, name, visibility, date, keywords, maybeDesc)
+          score        <- cursor.downField("matchingScore").as[MatchingScore]
+          name         <- cursor.downField("name").as[plans.Name]
+          visibility   <- cursor.downField("visibility").as[projects.Visibility]
+          date         <- cursor.downField("date").as[plans.DateCreated]
+          keywords     <- cursor.downField("keywords").as[List[plans.Keyword]]
+          maybeDesc    <- cursor.downField("description").as[Option[plans.Description]]
+          workflowType <- cursor.downField("workflowType").as[WorkflowType]
+        } yield model.Entity.Workflow(score, name, visibility, date, keywords, maybeDesc, workflowType)
       case Endpoint.Criteria.Filters.EntityType.Person =>
         for {
           score <- cursor.downField("matchingScore").as[MatchingScore]
