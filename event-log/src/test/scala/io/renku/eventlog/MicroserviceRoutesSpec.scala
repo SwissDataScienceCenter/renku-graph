@@ -25,13 +25,14 @@ import cats.syntax.all._
 import io.circe.Json
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
+import io.renku.eventlog.eventpayload.EventPayloadEndpoint
 import io.renku.eventlog.events.producers.SubscriptionsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.generators.CommonGraphGenerators.{httpStatuses, pages, perPages, sortingDirections}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{jsons, nonEmptyStrings}
-import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
+import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventIds, eventStatuses}
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.http.ErrorMessage.ErrorMessage
 import io.renku.http.InfoMessage.InfoMessage
@@ -54,6 +55,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.language.reflectiveCalls
 
@@ -63,6 +66,8 @@ class MicroserviceRoutesSpec
     with MockFactory
     with should.Matchers
     with TableDrivenPropertyChecks {
+
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   "GET /events" should {
     import EventsEndpoint.Criteria
@@ -328,12 +333,36 @@ class MicroserviceRoutesSpec
     }
   }
 
+  "GET /events/:event-id/:project-path/payload" should {
+    s"find event payload and return $Ok()" in new TestCase with IsNotMigrating {
+      val eventId     = eventIds.generateOne
+      val projectPath = projectPaths.generateOne
+
+      val request = Request[IO](
+        method = GET,
+        uri"/events" / eventId.toString / projectPath.toString / "payload"
+      )
+
+      val responseBody = jsons.generateOne
+      (eventPayloadEndpoint.getEventPayload _)
+        .expects(eventId, projectPath)
+        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[Json]  shouldBe responseBody
+    }
+  }
+
   private trait TestCase {
     val eventEndpoint            = mock[EventEndpoint[IO]]
     val eventsEndpoint           = mock[EventsEndpoint[IO]]
     val processingStatusEndpoint = mock[ProcessingStatusEndpoint[IO]]
     val subscriptionsEndpoint    = mock[SubscriptionsEndpoint[IO]]
     val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
+    val eventPayloadEndpoint     = mock[EventPayloadEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
     val isMigrating              = mock[Ref[IO, Boolean]]
     val versionRoutes            = mock[version.Routes[IO]]
@@ -343,6 +372,7 @@ class MicroserviceRoutesSpec
       processingStatusEndpoint,
       subscriptionsEndpoint,
       eventDetailsEndpoint,
+      eventPayloadEndpoint,
       routesMetrics,
       isMigrating,
       versionRoutes

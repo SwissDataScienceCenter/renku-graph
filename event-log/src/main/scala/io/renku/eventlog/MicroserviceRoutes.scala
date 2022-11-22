@@ -26,6 +26,7 @@ import cats.syntax.all._
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
+import io.renku.eventlog.eventpayload.EventPayloadEndpoint
 import io.renku.eventlog.events.producers.{EventProducersRegistry, SubscriptionsEndpoint}
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
@@ -55,6 +56,7 @@ private class MicroserviceRoutes[F[_]: Sync](
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     eventDetailsEndpoint:     EventDetailsEndpoint[F],
+    eventPayloadEndpoint:     EventPayloadEndpoint[F],
     routesMetrics:            RoutesMetrics[F],
     isMigrating:              Ref[F, Boolean],
     versionRoutes:            version.Routes[F]
@@ -78,6 +80,7 @@ private class MicroserviceRoutes[F[_]: Sync](
     case request @ GET  -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& since(since) +& until(until) +& page(page) +& perPage(perPage) +& sort(sortBy) => respond503IfMigrating(maybeFindEvents(validatedProjectPath, status, since, until, page, perPage, sortBy, request))
     case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
     case           GET  -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
+    case           GET  -> Root / "events" / EventId(eventId) / ProjectPath(projectPath) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectPath))
     case           GET  -> Root / "processing-status" :? `project-id`(maybeProjectId) => respond503IfMigrating(maybeFindProcessingStatus(maybeProjectId))
     case           GET  -> Root / "ping"                                              => Ok("pong")
     case           GET  -> Root / "migration-status"                                  => isMigrating.get.flatMap {isMigrating => Ok(json"""{"isMigrating": $isMigrating}""")}
@@ -227,14 +230,17 @@ private object MicroserviceRoutes {
     processingStatusEndpoint <- ProcessingStatusEndpoint(queriesExecTimes)
     subscriptionsEndpoint    <- SubscriptionsEndpoint(eventProducersRegistry)
     eventDetailsEndpoint     <- EventDetailsEndpoint(queriesExecTimes)
-    versionRoutes            <- version.Routes[F]
-  } yield new MicroserviceRoutes(eventEndpoint,
-                                 eventsEndpoint,
-                                 processingStatusEndpoint,
-                                 subscriptionsEndpoint,
-                                 eventDetailsEndpoint,
-                                 new RoutesMetrics[F],
-                                 isMigrating,
-                                 versionRoutes
+    eventPayloadEndpoint = EventPayloadEndpoint(queriesExecTimes)
+    versionRoutes <- version.Routes[F]
+  } yield new MicroserviceRoutes(
+    eventEndpoint,
+    eventsEndpoint,
+    processingStatusEndpoint,
+    subscriptionsEndpoint,
+    eventDetailsEndpoint,
+    eventPayloadEndpoint,
+    new RoutesMetrics[F],
+    isMigrating,
+    versionRoutes
   )
 }
