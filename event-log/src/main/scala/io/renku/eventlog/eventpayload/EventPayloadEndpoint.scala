@@ -10,6 +10,8 @@ import io.renku.http.InfoMessage._
 import io.renku.metrics.LabeledHistogram
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
+import org.http4s.headers.{`Content-Disposition`, `Content-Length`, `Content-Type`}
+import org.typelevel.ci._
 import org.typelevel.log4cats.Logger
 
 trait EventPayloadEndpoint[F[_]] {
@@ -24,13 +26,20 @@ object EventPayloadEndpoint {
 
   def apply[F[_]: Concurrent: Logger](payloadFinder: EventPayloadFinder[F]): EventPayloadEndpoint[F] =
     new EventPayloadEndpoint[F] with Http4sDsl[F] {
-      override def getEventPayload(eventId: EventId, projectPath: ProjectPath): F[Response[F]] =
+      def getEventPayload(eventId: EventId, projectPath: ProjectPath): F[Response[F]] =
         payloadFinder.findEventPayload(eventId, projectPath) match {
-          case Some(_) =>
-            ???
+          case Some(data) =>
+            for {
+              resp <- Ok(data.data.take(data.length))
+              name = s"${eventId.value}-${projectPath.value.replace('/', '_')}"
+              r = resp.withHeaders(
+                    `Content-Length`(data.length),
+                    `Content-Type`(MediaType.application.`octet-stream`),
+                    `Content-Disposition`("attachment", Map(ci"filename" -> name))
+                  )
+            } yield r
           case None =>
             NotFound(InfoMessage(show"Event/Project $eventId/$projectPath not found"))
         }
     }
-
 }

@@ -22,10 +22,12 @@ import EventContentGenerators._
 import cats.Show
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
+import fs2.Stream
 import io.circe.Json
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
-import io.renku.eventlog.eventpayload.EventPayloadEndpoint
+import io.renku.eventlog.eventpayload.EventPayloadFinder.PayloadData
+import io.renku.eventlog.eventpayload.{EventPayloadEndpoint, EventPayloadFinder}
 import io.renku.eventlog.events.producers.SubscriptionsEndpoint
 import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
@@ -48,7 +50,7 @@ import org.http4s.Method.{GET, POST}
 import org.http4s.QueryParamEncoder._
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.headers.`Content-Type`
+import org.http4s.headers.{`Content-Length`, `Content-Type`}
 import org.http4s.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -57,6 +59,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import scodec.bits.ByteVector
 
 import scala.language.reflectiveCalls
 
@@ -343,16 +346,20 @@ class MicroserviceRoutesSpec
         uri"/events" / eventId.toString / projectPath.toString / "payload"
       )
 
-      val responseBody = jsons.generateOne
-      (eventPayloadEndpoint.getEventPayload _)
+      val someData = PayloadData[IO](Stream(0, 10, -10, 5).map(_.toByte).covary[IO], 5L)
+      val finder   = mock[EventPayloadFinder[IO]]
+      (finder.findEventPayload _)
         .expects(eventId, projectPath)
-        .returning(Response[IO](Ok).withEntity(responseBody).pure[IO])
+        .returning(someData.some)
 
-      val response = routes.call(request)
+      override val eventPayloadEndpoint = EventPayloadEndpoint[IO](finder)
 
-      response.status      shouldBe Ok
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.body[Json]  shouldBe responseBody
+      val response = routes.run(request)
+
+      response.status                                   shouldBe Ok
+      response.contentType                              shouldBe Some(`Content-Type`(application.`octet-stream`))
+      response.headers.get[`Content-Length`].get.length shouldBe someData.length
+      response.as[ByteVector].unsafeRunSync()           shouldBe someData.data.compile.to(ByteVector).unsafeRunSync()
     }
   }
 
@@ -366,7 +373,7 @@ class MicroserviceRoutesSpec
     val routesMetrics            = TestRoutesMetrics()
     val isMigrating              = mock[Ref[IO, Boolean]]
     val versionRoutes            = mock[version.Routes[IO]]
-    val routes = new MicroserviceRoutes[IO](
+    def routes = new MicroserviceRoutes[IO](
       eventEndpoint,
       eventsEndpoint,
       processingStatusEndpoint,
