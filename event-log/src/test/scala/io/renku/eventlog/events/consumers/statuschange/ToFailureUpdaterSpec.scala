@@ -29,8 +29,9 @@ import io.renku.graph.model.events.{CompoundEventId, EventStatus}
 import EventStatus._
 import io.renku.eventlog._
 import EventContentGenerators.{eventDates, eventMessages}
+import StatusChangeEvent.{AllowedCombination, ToFailure}
 import cats.data.Kleisli
-import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{AllowedCombination, ToFailure}
+import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
@@ -247,6 +248,7 @@ class ToFailureUpdaterSpec
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val currentTime         = mockFunction[Instant]
     val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
     val queriesExecTimes    = TestLabeledHistogram[SqlStatement.Name]("query_id")
