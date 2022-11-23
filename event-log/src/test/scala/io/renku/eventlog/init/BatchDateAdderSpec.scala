@@ -42,9 +42,11 @@ import java.time.{LocalDateTime, ZoneOffset}
 
 class BatchDateAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
+  private[this] implicit val logger: TestLogger[IO] = TestLogger[IO]()
+
   protected[init] override lazy val migrationsToRun: List[DbMigrator[IO]] = List(
-    eventLogTableCreator,
-    projectPathAdder
+    EventLogTableCreator[IO],
+    ProjectPathAdder[IO]
   )
 
   "run" should {

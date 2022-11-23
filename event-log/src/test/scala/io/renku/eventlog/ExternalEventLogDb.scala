@@ -16,17 +16,35 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.init
+package io.renku.eventlog
 
-import cats.effect.IO
+import cats.effect._
+import eu.timepit.refined.auto._
+import io.renku.db.DBConfigProvider.DBConfig
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.interpreters.TestLogger
+import io.renku.testtools.IOSpec
+import natchez.Trace.Implicits.noop
+import skunk._
 
-trait EventLogDbMigrations {
+trait ExternalEventLogDb { self: IOSpec =>
 
-  implicit val sessionResource: SessionResource[IO]
+  val dbConfig: DBConfig[EventLogDB] =
+    DBConfig(
+      "localhost",
+      5432,
+      "event_log",
+      "renku",
+      "renku",
+      1
+    )
 
-  private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
-
-  protected[init] lazy val allMigrations: List[DbMigrator[IO]] = DbInitializer.migrations[IO]
+  implicit lazy val sessionResource: SessionResource[IO] = new io.renku.db.SessionResource[IO, EventLogDB](
+    Session.single(
+      host = dbConfig.host,
+      port = dbConfig.port,
+      user = dbConfig.user,
+      database = dbConfig.name,
+      password = Some(dbConfig.pass)
+    )
+  )
 }
