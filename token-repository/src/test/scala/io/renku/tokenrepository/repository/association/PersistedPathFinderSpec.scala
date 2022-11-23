@@ -42,7 +42,7 @@ class PersistedPathFinderSpec extends AnyWordSpec with IOSpec with InMemoryProje
     }
 
     "fail if there's no Path for the given Id" in new TestCase {
-      intercept[Exception]{
+      intercept[Exception] {
         (finder findPersistedProjectPath projectId).unsafeRunSync()
       }
     }

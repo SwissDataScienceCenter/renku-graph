@@ -21,7 +21,7 @@ package io.renku.graph.http.server.security
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.http.client.{UserAccessToken, GitLabClient}
+import io.renku.http.client.{GitLabClient, UserAccessToken}
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.security.{Authenticator, EndpointSecurityException}
