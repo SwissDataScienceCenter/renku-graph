@@ -19,11 +19,12 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import io.renku.eventlog.InMemoryEventLogDb
+import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.interpreters.TestLogger
 
 trait EventLogDbMigrations {
-  self: InMemoryEventLogDb =>
+
+  implicit val sessionResource: SessionResource[IO]
 
   private implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 
