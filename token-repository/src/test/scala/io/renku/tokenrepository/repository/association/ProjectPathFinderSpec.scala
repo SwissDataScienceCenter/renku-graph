@@ -19,114 +19,102 @@
 package io.renku.tokenrepository.repository.association
 
 import cats.effect.IO
-import com.github.tomakehurst.wiremock.client.WireMock._
+import cats.syntax.all._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
+import io.circe.Json
 import io.circe.literal._
-import io.renku.control.Throttler
-import io.renku.generators.CommonGraphGenerators.{personalAccessTokens, userOAuthAccessTokens}
+import io.renku.generators.CommonGraphGenerators.{accessTokens, personalAccessTokens, projectAccessTokens, userOAuthAccessTokens}
 import io.renku.generators.Generators.Implicits._
-import io.renku.graph.model.GitLabUrl
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.projects
+import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
-import io.renku.stubbing.ExternalServiceStubbing
-import io.renku.testtools.IOSpec
-import org.http4s.Status
+import io.renku.testtools.{GitLabClientTools, IOSpec}
+import org.http4s.implicits._
+import org.http4s.{Request, Response, Status, Uri}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
 
 class ProjectPathFinderSpec
     extends AnyWordSpec
     with IOSpec
+    with should.Matchers
     with MockFactory
-    with ExternalServiceStubbing
-    with should.Matchers {
+    with GitLabClientTools[IO]
+    with TableDrivenPropertyChecks {
 
   "findProjectPath" should {
 
-    "return fetched Project Path if service responds with OK and a valid body - personal access token case" in new TestCase {
+    forAll {
+      Table(
+        "Token type"              -> "token",
+        "Project Access Token"    -> projectAccessTokens.generateOne,
+        "User OAuth Access Token" -> userOAuthAccessTokens.generateOne,
+        "Personal Access Token"   -> personalAccessTokens.generateOne
+      )
+    } { (tokenType, accessToken: AccessToken) =>
+      s"return fetched Project's path if service responds with OK and a valid body - case when $tokenType given" in new TestCase {
 
-      val personalAccessToken = personalAccessTokens.generateOne
+        val endpointName: String Refined NonEmpty = "single-project"
+        (gitLabClient
+          .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Option[projects.Path]])(
+            _: Option[AccessToken]
+          ))
+          .expects(uri"projects" / projectId.value, endpointName, *, Option(accessToken))
+          .returning(projectPath.some.pure[IO])
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .willReturn(okJson(projectJson))
+        pathFinder.findProjectPath(projectId, accessToken).value.unsafeRunSync() shouldBe projectPath.some
       }
-
-      pathFinder.findProjectPath(projectId, Some(personalAccessToken)).unsafeRunSync() shouldBe Some(projectPath)
     }
 
-    "return fetched project info if service responds with OK and a valid body - oauth access token case" in new TestCase {
-
-      val oauthAccessToken = userOAuthAccessTokens.generateOne
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId")
-          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .willReturn(okJson(projectJson))
-      }
-
-      pathFinder.findProjectPath(projectId, Some(oauthAccessToken)).unsafeRunSync() shouldBe Some(projectPath)
+    "map OK response body to project path" in new TestCase {
+      mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(projectJson))
+        .unsafeRunSync() shouldBe projectPath.some
     }
 
-    "return None if service responds with NOT_FOUND" in new TestCase {
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId")
-          .willReturn(notFound())
-      }
-
-      pathFinder.findProjectPath(projectId, None).unsafeRunSync() shouldBe None
+    "map NOT_FOUND response to None" in new TestCase {
+      mapResponse(Status.NotFound, Request[IO](), Response[IO](Status.NotFound)).unsafeRunSync() shouldBe None
     }
 
-    "return None if remote client responds with UNAUTHORIZED" in new TestCase {
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId")
-          .willReturn(unauthorized())
-      }
-
-      pathFinder.findProjectPath(projectId, None).unsafeRunSync() shouldBe None
+    "map UNAUTHORIZED response to None" in new TestCase {
+      mapResponse(Status.Unauthorized, Request[IO](), Response[IO](Status.Unauthorized)).unsafeRunSync() shouldBe None
     }
 
-    "return a RuntimeException if remote client responds with status different than OK, NOT_FOUND or UNAUTHORIZED" in new TestCase {
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId")
-          .willReturn(badRequest().withBody("some error"))
-      }
-
+    "return an Exception if remote responds with status different than OK, NOT_FOUND or UNAUTHORIZED" in new TestCase {
       intercept[Exception] {
-        pathFinder.findProjectPath(projectId, None).unsafeRunSync()
-      }.getMessage shouldBe s"GET $gitLabApiUrl/projects/$projectId returned ${Status.BadRequest}; body: some error"
+        mapResponse(Status.BadRequest, Request[IO](), Response[IO](Status.BadRequest)).unsafeRunSync()
+      }
     }
 
     "return a RuntimeException if remote client responds with unexpected body" in new TestCase {
-
-      stubFor {
-        get(s"/api/v4/projects/$projectId")
-          .willReturn(okJson("{}"))
-      }
-
       intercept[Exception] {
-        pathFinder.findProjectPath(projectId, None).unsafeRunSync()
-      }.getMessage should startWith(
-        s"GET $gitLabApiUrl/projects/$projectId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
-      )
+        mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(Json.obj())).unsafeRunSync()
+      }
     }
   }
 
   private trait TestCase {
-    val gitLabApiUrl = GitLabUrl(externalServiceBaseUrl).apiV4
-    val projectId    = projectIds.generateOne
-    val projectPath  = projectPaths.generateOne
+    val projectId   = projectIds.generateOne
+    val projectPath = projectPaths.generateOne
 
-    private implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val pathFinder = new ProjectPathFinderImpl[IO](gitLabApiUrl, Throttler.noThrottling)
+    private implicit val logger: TestLogger[IO]   = TestLogger[IO]()
+    implicit val gitLabClient:   GitLabClient[IO] = mock[GitLabClient[IO]]
+    val pathFinder = new ProjectPathFinderImpl[IO]
 
-    lazy val projectJson: String = json"""{
+    lazy val projectJson = json"""{
       "id": ${projectId.value},
       "path_with_namespace": ${projectPath.value}
-    }""".noSpaces
+    }"""
+
+    lazy val mapResponse = captureMapping(pathFinder, gitLabClient)(
+      findingMethod = _.findProjectPath(projectId, accessTokens.generateOne).value.unsafeRunSync(),
+      resultGenerator = projectPaths.generateOption
+    )
   }
 }

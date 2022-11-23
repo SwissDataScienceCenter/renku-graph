@@ -20,7 +20,7 @@ package io.renku.knowledgegraph.entities
 package finder
 
 import cats.effect.IO
-import io.renku.generators.CommonGraphGenerators.accessTokens
+import io.renku.generators.CommonGraphGenerators.userAccessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.testentities.{Entity => _, _}
 import io.renku.http.rest.SortBy
@@ -107,6 +107,6 @@ trait FinderSpecOps {
   }
 
   implicit class PersonOps(person: Person) {
-    lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, accessTokens.generateOne)
+    lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, userAccessTokens.generateOne)
   }
 }

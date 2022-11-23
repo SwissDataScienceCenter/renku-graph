@@ -26,6 +26,7 @@ import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.http.client.AccessToken
 import org.http4s.Status._
 
 class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServices {
@@ -86,10 +87,14 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
       Then("he should get OK response back")
       response.status shouldBe Ok
 
-      And("the Access Token used in the POST should be added to the token repository")
+      And("a Project Access Token should created for the Project and added to the token repository")
       tokenRepositoryClient
         .GET(s"projects/${project.id}/tokens")
-        .jsonBody shouldBe user.accessToken.asJson
+        .jsonBody shouldBe gitLabStub
+        .query(_.projectAccessTokens(project.id))
+        .unsafeRunSync()
+        .asInstanceOf[AccessToken]
+        .asJson
 
       And("when the hook get deleted from GitLab")
       gitLabStub.removeWebhook(project.id)

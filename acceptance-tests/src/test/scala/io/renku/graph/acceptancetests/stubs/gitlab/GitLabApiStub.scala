@@ -22,16 +22,23 @@ import GitLabApiStub.State
 import GitLabStateQueries._
 import GitLabStateUpdates._
 import JsonEncoders._
-import cats.data.{NonEmptyList, OptionT}
+import cats.data.{EitherT, NonEmptyList, OptionT}
 import cats.effect._
 import cats.syntax.all._
 import com.comcast.ip4s.{Host, Port}
+import io.circe.Json
+import io.circe.literal._
+import io.circe.syntax._
+import io.renku.generators.CommonGraphGenerators.projectAccessTokens
+import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons.{GitLabId, Name}
 import io.renku.graph.model.projects.Id
 import io.renku.graph.model.testentities.Person
-import io.renku.http.client.AccessToken
+import io.renku.http.client.AccessToken.ProjectAccessToken
+import io.renku.http.client.UserAccessToken
 import org.http4s._
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.circe.CirceEntityCodec._
@@ -40,7 +47,7 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.server.{Router, Server}
 import org.typelevel.log4cats.Logger
 
-import java.time.Instant
+import java.time.{Instant, LocalDate}
 
 /** GitLab Api subset that operates off a in-memory state. The data can be manipulated using `update` and can be
  *  inspected using `query`. 
@@ -65,45 +72,58 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
     ) <+> stubIncomplete
 
   private def userRoutes: HttpRoutes[F] =
-    GitLabAuth.authF(stateRef) { authenticatedUser =>
-      HttpRoutes.of { case GET -> Root =>
-        Ok(authenticatedUser)
+    GitLabAuth.authF(stateRef) { authedReq =>
+      HttpRoutes.of {
+        case GET -> Root  => Ok(authedReq)
+        case HEAD -> Root => Ok()
       }
     }
 
   private def usersRoutes: HttpRoutes[F] =
-    GitLabAuth.authOptF(stateRef) { authenticatedUser =>
+    GitLabAuth.authOptF(stateRef) { maybeAuthedReq =>
       HttpRoutes.of {
         case GET -> Root / GitLabIdVar(id) =>
           query(findPersonById(id)).flatMap(OkOrNotFound(_))
-
-        case GET -> Root / GitLabIdVar(userId) / "projects" =>
-          if (userId.some == authenticatedUser.map(_.id)) query(projectsFor(userId.some)).flatMap(Ok(_))
-          else Ok(List.empty[Project])
+        case GET -> Root / GitLabIdVar(id) / "projects" =>
+          maybeAuthedReq match {
+            case Some(AuthedUser(userId, _)) =>
+              if (id == userId) query(projectsFor(id.some)).flatMap(Ok(_))
+              else Ok(List.empty[Project])
+            case Some(AuthedProject(projectId, _)) =>
+              query(findProjectById(projectId)).map(_.toList).flatMap(Ok(_))
+            case None =>
+              query(projectsFor(id.some)).flatMap(Ok(_))
+          }
       }
     }
 
   private def projectRoutes: HttpRoutes[F] =
-    GitLabAuth.authOptF(stateRef) { authenticatedUser =>
+    GitLabAuth.authOptF(stateRef) { maybeAuthedReq =>
       HttpRoutes.of {
         case GET -> Root / ProjectId(id) =>
-          query(findProject(id, authenticatedUser.map(_.id))).flatMap(OkOrNotFound(_))
+          query(findProjectById(id, maybeAuthedReq)).flatMap(OkOrNotFound(_))
 
         case GET -> Root / ProjectPath(path) =>
-          query(findProject(path, authenticatedUser.map(_.id))).flatMap(OkOrNotFound(_))
+          query(findProjectByPath(path, maybeAuthedReq)).flatMap(OkOrNotFound(_))
 
         case GET -> Root / ProjectPath(path) / ("users" | "members") =>
-          for {
-            project <- query(findProject(path, authenticatedUser.map(_.id)))
-            members = project.toList.flatMap(_.entitiesProject.members.toList)
-            resp <- Ok(members)
-          } yield resp
+          query(findProjectByPath(path, maybeAuthedReq))
+            .map(_.toList.flatMap(_.entitiesProject.members.toList))
+            .flatMap(Ok(_))
 
         case GET -> Root / ProjectId(id) / "repository" / "commits" =>
-          query(commitsFor(id, authenticatedUser.map(_.id))).flatMap(Ok(_))
+          query(commitsFor(id, maybeAuthedReq)).flatMap(Ok(_))
 
         case GET -> Root / ProjectId(id) / "repository" / "commits" / CommitIdVar(sha) =>
-          query(findCommit(id, authenticatedUser.map(_.id), sha)).flatMap(OkOrNotFound(_))
+          query(findCommit(id, maybeAuthedReq, sha)).flatMap(OkOrNotFound(_))
+
+        case req @ POST -> Root / ProjectId(projectId) / "access_tokens" =>
+          EitherT(req.as[Json].map(_.hcursor.downField("expires_at").as[LocalDate]))
+            .map(expiryDate => projectAccessTokens.generateOne -> expiryDate)
+            .semiflatTap(tokenAndExpiry => update(addProjectAccessToken(projectId, tokenAndExpiry._1)))
+            .semiflatMap(tokenAndExpiry => Created().map(_.withEntity(tokenAndExpiry.asJson)))
+            .leftSemiflatMap(err => BadRequest(s"No or invalid Project Access Token creation payload: ${err.message}"))
+            .merge
 
         case GET -> Root / ProjectId(id) / "hooks" =>
           query(findWebhooks(id)).flatMap(Ok(_))
@@ -117,7 +137,7 @@ final class GitLabApiStub[F[_]: Async: Logger](private val stateRef: Ref[F, Stat
             val msg =
               s"Unexpected request parameters: got action=$action, page=$page, expected action=pushed, page=1"
             logger.error(msg) *> BadRequest(msg)
-          } else query(findPushEvents(id, authenticatedUser.map(_.id))).flatMap(Ok(_))
+          } else query(findPushEvents(id, maybeAuthedReq)).flatMap(Ok(_))
 
         case DELETE -> Root / ProjectId(id) / "hooks" / IntVar(hookId) =>
           stateRef.modify(removeWebhook(id, hookId)).flatMap {
@@ -176,15 +196,16 @@ object GitLabApiStub {
     apply(State.empty)
 
   final case class State(
-      users:          Map[GitLabId, AccessToken],
-      persons:        List[Person],
-      projects:       List[Project],
-      webhooks:       List[Webhook],
-      commits:        Map[Id, NonEmptyList[CommitData]],
-      brokenProjects: Set[Id]
+      users:               Map[GitLabId, UserAccessToken],
+      projectAccessTokens: Map[Id, ProjectAccessToken],
+      persons:             List[Person],
+      projects:            List[Project],
+      webhooks:            List[Webhook],
+      commits:             Map[Id, NonEmptyList[CommitData]],
+      brokenProjects:      Set[Id]
   )
   object State {
-    val empty: State = State(Map.empty, Nil, Nil, Nil, Map.empty, Set.empty)
+    val empty: State = State(Map.empty, Map.empty, Nil, Nil, Nil, Map.empty, Set.empty)
   }
 
   final case class Webhook(webhookId: Int, projectId: Id, url: Uri)

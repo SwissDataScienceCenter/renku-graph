@@ -42,20 +42,21 @@ private class ExpireAndCreatedDatesAdderImpl[F[_]: Spawn: Logger: SessionResourc
   import skunk.implicits._
 
   override def run(): F[Unit] = SessionResource[F].useK {
-    addIfNotExists(column = "expiry_date") >> addIfNotExists(column = "created_at")
+    addIfNotExists(column = "expiry_date", "DATE") >> addIfNotExists(column = "created_at", "TIMESTAMPTZ")
   }
 
-  private def addIfNotExists(column: String) =
+  private def addIfNotExists(column: String, columnType: String) =
     checkColumnExists("projects_tokens", column) >>= {
       case true  => Kleisli.liftF(Logger[F].info(s"'$column' column existed"))
-      case false => addColumn(column)
+      case false => addColumn(column, columnType)
     }
 
-  private def addColumn(column: String): Kleisli[F, Session[F], Unit] = Kleisli { implicit session =>
-    for {
-      _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS #$column TIMESTAMPTZ".command)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_#$column ON projects_tokens(#$column)".command)
-      _ <- Logger[F].info(s"'$column' column added")
-    } yield ()
+  private def addColumn(column: String, columnType: String): Kleisli[F, Session[F], Unit] = Kleisli {
+    implicit session =>
+      for {
+        _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS #$column #$columnType".command)
+        _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_#$column ON projects_tokens(#$column)".command)
+        _ <- Logger[F].info(s"'$column' column added")
+      } yield ()
   }
 }

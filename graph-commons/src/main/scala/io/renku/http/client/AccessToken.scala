@@ -30,6 +30,8 @@ sealed trait AccessToken extends Any with StringTinyType with Sensitive
 
 sealed trait UserAccessToken extends Any with AccessToken
 
+sealed trait OAuthAccessToken extends Any with AccessToken
+
 object AccessToken {
 
   final class PersonalAccessToken private (val value: String) extends AnyVal with UserAccessToken
@@ -37,12 +39,12 @@ object AccessToken {
       extends TinyTypeFactory[PersonalAccessToken](new PersonalAccessToken(_))
       with NonBlank[PersonalAccessToken]
 
-  final class UserOAuthAccessToken private (val value: String) extends AnyVal with UserAccessToken
+  final class UserOAuthAccessToken private (val value: String) extends AnyVal with UserAccessToken with OAuthAccessToken
   object UserOAuthAccessToken
       extends TinyTypeFactory[UserOAuthAccessToken](new UserOAuthAccessToken(_))
       with NonBlank[UserOAuthAccessToken]
 
-  final class ProjectAccessToken private (val value: String) extends AnyVal with AccessToken
+  final class ProjectAccessToken private (val value: String) extends AnyVal with AccessToken with OAuthAccessToken
   object ProjectAccessToken
       extends TinyTypeFactory[ProjectAccessToken](new ProjectAccessToken(_))
       with NonBlank[ProjectAccessToken]

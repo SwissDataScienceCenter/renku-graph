@@ -46,7 +46,7 @@ private object DBUpdater {
     (_, infoRemover, execTimes) =>
       new ToTriplesStoreUpdater(infoRemover, execTimes).pure[F].widen[DBUpdater[F, ToTriplesStore]]
 
-  implicit def factoryToFailureUpdater[F[_]: Async]
+  implicit def factoryToFailureUpdater[F[_]: Async: Logger]
       : EventUpdaterFactory[F, ToFailure[ProcessingStatus, FailureStatus]] = (_, infoRemover, execTimes) =>
     new ToFailureUpdater(infoRemover, execTimes).pure[F].widen[DBUpdater[F, ToFailure[ProcessingStatus, FailureStatus]]]
 

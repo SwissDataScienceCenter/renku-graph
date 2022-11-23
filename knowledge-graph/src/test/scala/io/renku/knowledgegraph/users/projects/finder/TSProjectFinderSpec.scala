@@ -21,7 +21,7 @@ package finder
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.generators.CommonGraphGenerators.{accessTokens, authUsers}
+import io.renku.generators.CommonGraphGenerators.{authUsers, userAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.projects
 import io.renku.graph.model.testentities._
@@ -70,7 +70,7 @@ class TSProjectFinderSpec
 
       val authUser = personEntities(withGitLabId).generateOne
       val criteria = criterias.generateOne.copy(maybeUser =
-        AuthUser(authUser.maybeGitLabId.getOrElse(fail("AuthUser without GL id")), accessTokens.generateOne).some
+        AuthUser(authUser.maybeGitLabId.getOrElse(fail("AuthUser without GL id")), userAccessTokens.generateOne).some
       )
 
       val matchingMember = personEntities(withGitLabId).generateOne.copy(maybeGitLabId = criteria.userId.some)

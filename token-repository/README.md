@@ -120,6 +120,20 @@ Response body example:
 }
 ```
 
+## DB schema
+
+token-repository uses relational database as an internal storage. The DB has the following schema:
+
+`projects_tokens` table
+
+| column       | type        | constraints |
+|--------------|-------------|-------------|
+| project_id   | INT4        | PK NOT NULL |
+| project_path | VARCHAR     | NOT NULL    |
+| token        | VARCHAR     | NOT NULL    |
+| created_at   | TIMESTAMPTZ | NOT NULL    |
+| expiry_date  | DATE        | NOT NULL    |
+
 ## Trying out
 
 The token-repository is a part of multi-module sbt project thus it has to be built from the root level.

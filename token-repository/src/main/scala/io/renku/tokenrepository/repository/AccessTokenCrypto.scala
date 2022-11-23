@@ -59,7 +59,7 @@ private class AccessTokenCryptoImpl[F[_]: MonadThrow](
   } recoverWith meaningfulError
 
   private lazy val serialize: AccessToken => String = {
-    case ProjectAccessToken(token)   => Json.obj("projectAccessToken" -> Json.fromString(token)).noSpaces
+    case ProjectAccessToken(token)   => Json.obj("project" -> Json.fromString(token)).noSpaces
     case UserOAuthAccessToken(token) => Json.obj("oauth" -> Json.fromString(token)).noSpaces
     case PersonalAccessToken(token)  => Json.obj("personal" -> Json.fromString(token)).noSpaces
   }
@@ -74,7 +74,7 @@ private class AccessTokenCryptoImpl[F[_]: MonadThrow](
     def maybeExtract(field: String, as: String => Either[IllegalArgumentException, AccessToken]) =
       cursor.downField(field).as[Option[String]].flatMap(to(as))
 
-    maybeExtract("projectAccessToken", as = ProjectAccessToken.from)
+    maybeExtract("project", as = ProjectAccessToken.from)
       .flatMap {
         case token @ Some(_) => token.asRight
         case None            => maybeExtract("oauth", as = UserOAuthAccessToken.from)

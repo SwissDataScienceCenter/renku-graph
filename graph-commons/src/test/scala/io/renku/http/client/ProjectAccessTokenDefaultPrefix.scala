@@ -16,11 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.http.server.security
+package io.renku.http.client
 
-import io.renku.http.client.UserAccessToken
-import io.renku.http.server.security.model.AuthUser
+import cats.Show
 
-trait Authenticator[F[_]] {
-  def authenticate(accessToken: UserAccessToken): F[Either[EndpointSecurityException, AuthUser]]
+// This prefix is the default prefix for all Project and Personal Access Tokens GitLab generates.
+// The reason it cannot be used in production code either for validation or classification
+// is that it's configurable and may be different on various GL instances.
+case object ProjectAccessTokenDefaultPrefix {
+
+  val value: String = "glpat-"
+
+  override val toString: String = value
+
+  val show: Show[ProjectAccessTokenDefaultPrefix.type] = Show.show(_.value)
+
+  def exists(v: String): Boolean = v startsWith value
 }

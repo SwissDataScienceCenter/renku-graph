@@ -23,13 +23,15 @@ import cats.Monad
 import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.acceptancetests.data.Project
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
 import io.renku.graph.model.GraphModelGenerators
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.{Id, Path, Visibility}
 import io.renku.graph.model.testentities.Person
-import io.renku.http.client.AccessToken
-import io.renku.http.server.security.model.AuthUser
+import io.renku.http.client.AccessToken.ProjectAccessToken
+import io.renku.http.client.UserAccessToken
 
 /** Collection of functions to query the state in [[GitLabApiStub]]. */
 trait GitLabStateQueries {
@@ -60,20 +62,23 @@ trait GitLabStateQueries {
   def projectCommits(projectId: Id): StateQuery[List[CommitData]] =
     _.commits.get(projectId).map(_.toList).getOrElse(Nil)
 
-  def commitsFor(projectId: Id, user: Option[GitLabId]): StateQuery[List[CommitData]] =
+  def commitsFor(projectId: Id, maybeAuthedReq: Option[AuthedReq]): StateQuery[List[CommitData]] =
     for {
-      project <- findProject(projectId, user)
+      project <- findProjectById(projectId, maybeAuthedReq)
       commits <- project.traverse(p => projectCommits(p.id))
     } yield commits.getOrElse(Nil)
 
-  def findCommit(projectId: Id, user: Option[GitLabId], sha: CommitId): StateQuery[Option[CommitData]] =
-    commitsFor(projectId, user).andThen(_.find(_.commitId == sha))
+  def findCommit(projectId: Id, maybeAuthedReq: Option[AuthedReq], sha: CommitId): StateQuery[Option[CommitData]] =
+    commitsFor(projectId, maybeAuthedReq).andThen(_.find(_.commitId == sha))
 
-  def findPushEvents(projectId: Id, user: Option[GitLabId]): StateQuery[List[PushEvent]] =
-    commitsFor(projectId, user).andThen(_.map(_.toPushEvent(projectId)))
+  def findPushEvents(projectId: Id, maybeAuthedReq: Option[AuthedReq]): StateQuery[List[PushEvent]] =
+    commitsFor(projectId, maybeAuthedReq).andThen(_.map(_.toPushEvent(projectId)))
 
-  def findUserByToken(token: AccessToken): StateQuery[Option[AuthUser]] =
-    _.users.find(_._2 == token).map(AuthUser.tupled)
+  def findAuthedProject(token: ProjectAccessToken): StateQuery[Option[AuthedProject]] =
+    _.projectAccessTokens.find(_._2 == token).map(AuthedProject.tupled)
+
+  def findAuthedUser(token: UserAccessToken): StateQuery[Option[AuthedUser]] =
+    _.users.find(_._2 == token).map(AuthedUser.tupled)
 
   def findPersonById(id: GitLabId): StateQuery[Option[Person]] =
     _.persons.find(_.maybeGitLabId == id.some)
@@ -94,11 +99,29 @@ trait GitLabStateQueries {
       project = all.find(p => p.path == path)
     } yield project
 
+  def findProject(id: Id, path: Path): StateQuery[Option[Project]] =
+    _.projects.find(p => p.path == path && p.id == id)
+
   def findProjectById(id: Id): StateQuery[Option[Project]] =
     _.projects.find(_.id == id)
 
+  def findProjectById(id: Id, maybeAuthedReq: Option[AuthedReq]): StateQuery[Option[Project]] =
+    maybeAuthedReq match {
+      case Some(AuthedProject(`id`, _)) => findProjectById(id)
+      case Some(AuthedProject(_, _))    => _ => None
+      case Some(AuthedUser(userId, _))  => findProject(id, userId.some)
+      case None                         => findProject(id, None)
+    }
+
   def findProjectByPath(path: Path): StateQuery[Option[Project]] =
     _.projects.find(_.path == path)
+
+  def findProjectByPath(path: Path, maybeAuthedReq: Option[AuthedReq]): StateQuery[Option[Project]] =
+    maybeAuthedReq match {
+      case Some(AuthedProject(id, _))  => findProject(id, path)
+      case Some(AuthedUser(userId, _)) => findProject(path, userId.some)
+      case None                        => findProject(path, None)
+    }
 
   def findWebhooks(projectId: Id): StateQuery[List[Webhook]] =
     _.webhooks.filter(_.projectId == projectId)

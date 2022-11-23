@@ -31,7 +31,6 @@ import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServic
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.GraphClass
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalatest.concurrent.Eventually
@@ -52,7 +51,7 @@ class EventsProcessingStatusSpec
 
     Scenario("As a user I would like to see progress of events processing for my project") {
 
-      val user: AuthUser = authUsers.generateOne
+      val user    = authUsers.generateOne
       val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount(numberOfEvents.value)).generateOne
 
       When("there's no webhook for a given project in GitLab")

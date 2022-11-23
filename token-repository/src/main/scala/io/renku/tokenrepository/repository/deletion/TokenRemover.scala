@@ -33,9 +33,13 @@ private[repository] trait TokenRemover[F[_]] {
   def delete(projectId: Id): F[Unit]
 }
 
-private[repository] class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient[F](Some(queriesExecTimes))
+private[repository] object TokenRemover {
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): TokenRemover[F] =
+    new TokenRemoverImpl[F](queriesExecTimes)
+}
+
+private class TokenRemoverImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
+    extends DbClient[F](Some(queriesExecTimes))
     with TokenRemover[F]
     with TokenRepositoryTypeSerializers {
 

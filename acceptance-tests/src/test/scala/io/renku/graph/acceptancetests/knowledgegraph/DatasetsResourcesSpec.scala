@@ -38,7 +38,6 @@ import io.renku.http.client.AccessToken
 import io.renku.http.client.UrlEncoder.urlEncode
 import io.renku.http.rest.Links.Rel
 import io.renku.http.server.EndpointTester._
-import io.renku.http.server.security.model.AuthUser
 import io.renku.jsonld.syntax._
 import io.renku.tinytypes.json.TinyTypeDecoders._
 import org.http4s.Status._
@@ -52,8 +51,8 @@ class DatasetsResourcesSpec
     with TSData
     with DatasetsApiEncoders {
 
-  val creator: AuthUser = authUsers.generateOne
-  val user:    AuthUser = authUsers.generateOne
+  private val creator = authUsers.generateOne
+  private val user    = authUsers.generateOne
 
   private implicit val graph: GraphClass = GraphClass.Default
 

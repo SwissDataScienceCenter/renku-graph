@@ -23,8 +23,11 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.DbSpec
+import io.renku.generators.Generators.localDates
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
+import io.renku.generators.Generators.Implicits._
 import io.renku.tokenrepository.repository.init.DbMigrations
 import org.scalatest.TestSuite
 import skunk._
@@ -32,6 +35,7 @@ import skunk.codec.all._
 import skunk.data.Completion
 import skunk.implicits._
 
+import java.time.{LocalDate, OffsetDateTime}
 import scala.language.reflectiveCalls
 
 trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb with DbMigrations {
@@ -47,20 +51,26 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     }
   }
 
-  protected def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =
-    execute {
-      Kleisli[IO, Session[IO], Unit] { session =>
-        val query: Command[Int ~ String ~ String] =
-          sql"""insert into 
-            projects_tokens (project_id, project_path, token) 
-            values ($int4, $varchar, $varchar)
+  protected def insert(projectId:      Id,
+                       projectPath:    Path,
+                       encryptedToken: EncryptedAccessToken,
+                       expiryDate:     ExpiryDate = localDates(min = LocalDate.now().plusDays(1)).generateAs(ExpiryDate)
+  ): Unit = execute {
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[Int ~ String ~ String ~ OffsetDateTime ~ LocalDate] =
+        sql"""insert into projects_tokens (project_id, project_path, token, created_at, expiry_date)
+              values ($int4, $varchar, $varchar, $timestamptz, $date)
          """.command
-        session
-          .prepare(query)
-          .use(_.execute(projectId.value ~ projectPath.value ~ encryptedToken.value))
-          .map(assureInserted)
-      }
+      session
+        .prepare(query)
+        .use(
+          _.execute(
+            projectId.value ~ projectPath.value ~ encryptedToken.value ~ OffsetDateTime.now() ~ expiryDate.value
+          )
+        )
+        .map(assureInserted)
     }
+  }
 
   private lazy val assureInserted: Completion => Unit = {
     case Completion.Insert(1) => ()

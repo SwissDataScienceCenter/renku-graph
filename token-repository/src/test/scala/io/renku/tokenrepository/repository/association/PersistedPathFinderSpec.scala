@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.fetching
+package io.renku.tokenrepository.repository.association
 
 import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
@@ -24,42 +24,34 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
-import io.renku.tokenrepository.repository.RepositoryGenerators._
+import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class PersistedTokensFinderSpec extends AnyWordSpec with IOSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
+class PersistedPathFinderSpec extends AnyWordSpec with IOSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
 
-  "findStoredToken" should {
+  "findPersistedProjectPath" should {
 
-    "return token associated with the projectId" in new TestCase {
+    "return Path for the given project Id" in new TestCase {
 
-      val encryptedToken = encryptedAccessTokens.generateOne
+      val projectPath = projectPaths.generateOne
 
-      insert(projectId, projectPath, encryptedToken)
+      insert(projectId, projectPath, encryptedAccessTokens.generateOne)
 
-      finder.findStoredToken(projectId).value.unsafeRunSync() shouldBe Some(encryptedToken)
+      (finder findPersistedProjectPath projectId).unsafeRunSync() shouldBe projectPath
     }
 
-    "return token associated with the projectPath" in new TestCase {
-
-      val encryptedToken = encryptedAccessTokens.generateOne
-
-      insert(projectId, projectPath, encryptedToken)
-
-      finder.findStoredToken(projectPath).value.unsafeRunSync() shouldBe Some(encryptedToken)
-    }
-
-    "return None if there's no token associated with the projectId" in new TestCase {
-      finder.findStoredToken(projectId).value.unsafeRunSync() shouldBe None
+    "fail if there's no Path for the given Id" in new TestCase {
+      intercept[Exception] {
+        (finder findPersistedProjectPath projectId).unsafeRunSync()
+      }
     }
   }
 
   private trait TestCase {
-    val projectId   = projectIds.generateOne
-    val projectPath = projectPaths.generateOne
+    val projectId = projectIds.generateOne
 
     private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val finder                   = new PersistedTokensFinderImpl(queriesExecTimes)
+    val finder                   = new PersistedPathFinderImpl(queriesExecTimes)
   }
 }
