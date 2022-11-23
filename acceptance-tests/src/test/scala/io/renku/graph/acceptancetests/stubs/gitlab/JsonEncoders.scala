@@ -19,15 +19,19 @@
 package io.renku.graph.acceptancetests.stubs.gitlab
 
 import io.circe._
+import io.circe.literal._
 import io.circe.syntax._
 import io.renku.graph.acceptancetests.data.Project
 import io.renku.graph.acceptancetests.data.Project.Permissions._
 import io.renku.graph.acceptancetests.data.Project.{Permissions, Statistics}
 import io.renku.graph.acceptancetests.stubs.gitlab.GitLabApiStub.{CommitData, PushEvent, Webhook}
-import io.renku.graph.model.persons.GitLabId
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq
+import io.renku.graph.acceptancetests.stubs.gitlab.GitLabAuth.AuthedReq.{AuthedProject, AuthedUser}
 import io.renku.graph.model.testentities.{Parent, Person}
-import io.renku.http.server.security.model.AuthUser
+import io.renku.http.client.AccessToken.ProjectAccessToken
 import org.http4s.Uri
+
+import java.time.{Instant, LocalDate}
 
 trait JsonEncoders {
   implicit val uriEncoder: Encoder[Uri] =
@@ -67,6 +71,15 @@ trait JsonEncoders {
       )
     }
 
+  implicit val personalAccessTokenCreationEncoder: Encoder[(ProjectAccessToken, LocalDate)] =
+    Encoder.instance { case (token, expiryDate) =>
+      json"""{
+        "token":      ${token.value},
+        "created_at": ${Instant.now()},
+        "expires_at": $expiryDate
+      }"""
+    }
+
   implicit val webhookEncoder: Encoder[Webhook] =
     Encoder.instance(h => Map("id" -> h.webhookId.asJson, "url" -> h.url.asJson).asJson)
 
@@ -86,8 +99,11 @@ trait JsonEncoders {
         Json.obj("project_access" -> Json.Null, "group_access" -> group.accessLevel.asJson)
     }
 
-  implicit val authUserEncoder: Encoder[AuthUser] =
-    Encoder.encodeMap[String, GitLabId].contramap(user => Map("id" -> user.id))
+  implicit def authUserEncoder[AR <: AuthedReq]: Encoder[AR] =
+    Encoder.encodeMap[String, Json].contramap {
+      case AuthedUser(userId, _)       => Map("id" -> userId.asJson)
+      case AuthedProject(projectId, _) => Map("id" -> projectId.asJson)
+    }
 
   implicit val projectStatisticsEncoder: Encoder[Statistics] =
     Encoder.instance(stats =>

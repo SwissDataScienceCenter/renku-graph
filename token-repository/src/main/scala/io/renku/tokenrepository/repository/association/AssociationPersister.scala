@@ -29,11 +29,18 @@ import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToke
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import skunk._
+import skunk.data.Completion
 import skunk.data.Completion.Delete
 import skunk.implicits._
 
 private trait AssociationPersister[F[_]] {
-  def persistAssociation(storingInfo: TokenStoringInfo): F[Unit]
+  def persistAssociation(storingInfo: TokenStoringInfo):         F[Unit]
+  def updatePath(project:             TokenStoringInfo.Project): F[Unit]
+}
+
+private object AssociationPersister {
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): AssociationPersister[F] =
+    new AssociationPersisterImpl[F](queriesExecTimes)
 }
 
 private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
@@ -41,12 +48,15 @@ private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
     with AssociationPersister[F]
     with TokenRepositoryTypeSerializers {
 
-  override def persistAssociation(storingInfo: TokenStoringInfo): F[Unit] =
-    SessionResource[F].useWithTransactionK {
-      Kleisli { case (_, session) =>
-        (deleteAssociation(storingInfo.project) >> insert(storingInfo)).run(session)
-      }
+  override def persistAssociation(storingInfo: TokenStoringInfo): F[Unit] = SessionResource[F].useWithTransactionK {
+    Kleisli { case (_, session) =>
+      (deleteAssociation(storingInfo.project) >> insert(storingInfo)).run(session)
     }
+  }
+
+  override def updatePath(project: TokenStoringInfo.Project): F[Unit] = SessionResource[F].useK(
+    updatePathQuery(project)
+  )
 
   private def deleteAssociation(project: TokenStoringInfo.Project) = measureExecutionTime {
     SqlStatement
@@ -61,7 +71,7 @@ private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
         case Delete(_) => ().pure[F]
         case completion =>
           new Exception(
-            s"Re-associating token for projectId = ${project.id}, projectPath = ${project.path} failed: $completion"
+            s"re-associating token for projectId = ${project.id}, projectPath = ${project.path} failed: $completion"
           ).raiseError[F, Unit]
       }
   }
@@ -79,4 +89,24 @@ private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
       .build
       .void
   } recoverWith { case SqlState.UniqueViolation(_) => Kleisli.pure(()) }
+
+  private def updatePathQuery(project: TokenStoringInfo.Project) = measureExecutionTime {
+    SqlStatement
+      .named("associate token - update path")
+      .command[Path ~ Id](sql"""
+        UPDATE projects_tokens
+        SET project_path = $projectPathEncoder
+        WHERE project_id = $projectIdEncoder
+    """.command)
+      .arguments(project.path ~ project.id)
+      .build
+      .flatMapResult(failIfMultiUpdate(project.id))
+  }
+
+  private def failIfMultiUpdate(projectId: Id): Completion => F[Unit] = {
+    case Completion.Update(0 | 1) => ().pure[F]
+    case completion =>
+      new RuntimeException(s"Updating path for a projectId: $projectId failed with completion code $completion")
+        .raiseError[F, Unit]
+  }
 }

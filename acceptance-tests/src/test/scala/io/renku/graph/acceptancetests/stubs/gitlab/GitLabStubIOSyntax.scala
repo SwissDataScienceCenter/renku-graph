@@ -26,7 +26,7 @@ import io.renku.graph.model.RenkuUrl
 import io.renku.graph.model.events.CommitId
 import io.renku.graph.model.persons.GitLabId
 import io.renku.graph.model.projects.Id
-import io.renku.http.client.AccessToken
+import io.renku.http.client.UserAccessToken
 import io.renku.http.server.security.model.AuthUser
 import io.renku.testtools.IOSpec
 import org.http4s.Uri
@@ -42,7 +42,7 @@ trait GitLabStubIOSyntax { self: IOSpec =>
       self.update(GitLabStateUpdates.clearState).unsafeRunSync()
 
     /** Adds an authenticated gitlab user. */
-    def addAuthenticated(userId: GitLabId, token: AccessToken): Unit =
+    def addAuthenticated(userId: GitLabId, token: UserAccessToken): Unit =
       self.update(GitLabStateUpdates.addUser(userId, token)).unsafeRunSync()
 
     /** Adds an authenticated gitlab user. */

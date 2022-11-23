@@ -66,9 +66,9 @@ class ProjectSyncFlowSpec extends AcceptanceSpec with ApplicationServices with T
       When("project_path changes in GitLab")
       val updatedProject = project.copy(entitiesProject = testEntitiesProject.copy(path = projectPaths.generateOne))
       gitLabStub.replaceProject(updatedProject)
-      mockCommitDataOnTripleGenerator(updatedProject, updatedProject.entitiesProject.asJsonLD, commitId)
-      resetTriplesGenerator()
       givenAccessTokenPresentFor(updatedProject, user.accessToken)
+      resetTriplesGenerator()
+      mockCommitDataOnTripleGenerator(updatedProject, updatedProject.entitiesProject.asJsonLD, commitId)
 
       And("PROJECT_SYNC event is sent and handled")
       EventLog.forceCategoryEventTriggering(CategoryName("PROJECT_SYNC"), updatedProject.id)

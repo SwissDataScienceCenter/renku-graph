@@ -132,7 +132,7 @@ token-repository uses relational database as an internal storage. The DB has the
 | project_path | VARCHAR     | NOT NULL    |
 | token        | VARCHAR     | NOT NULL    |
 | created_at   | TIMESTAMPTZ | NOT NULL    |
-| expiry_date  | TIMESTAMPTZ | NOT NULL    |
+| expiry_date  | DATE        | NOT NULL    |
 
 ## Trying out
 

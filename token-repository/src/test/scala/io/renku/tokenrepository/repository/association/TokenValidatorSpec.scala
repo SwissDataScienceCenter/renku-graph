@@ -30,7 +30,7 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Method.HEAD
-import org.http4s.Status.{BadRequest, NotFound, Ok, Unauthorized}
+import org.http4s.Status.{BadRequest, Forbidden, NotFound, Ok, Unauthorized}
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
 import org.scalacheck.Gen
@@ -69,8 +69,9 @@ class TokenValidatorSpec
       Table(
         "Status"     -> "Expected Result",
         Ok           -> true,
-        NotFound     -> false,
-        Unauthorized -> false
+        Unauthorized -> false,
+        Forbidden    -> false,
+        NotFound     -> false
       )
     } { (status, result) =>
       s"map $status to true" in new TestCase {

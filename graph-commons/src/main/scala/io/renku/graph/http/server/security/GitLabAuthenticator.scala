@@ -21,7 +21,7 @@ package io.renku.graph.http.server.security
 import cats.effect.Async
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.http.client.{AccessToken, GitLabClient}
+import io.renku.http.client.{UserAccessToken, GitLabClient}
 import io.renku.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.renku.http.server.security.model.AuthUser
 import io.renku.http.server.security.{Authenticator, EndpointSecurityException}
@@ -36,11 +36,11 @@ class GitLabAuthenticatorImpl[F[_]: Async: GitLabClient: Logger] extends Authent
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def authenticate(accessToken: AccessToken): F[Either[EndpointSecurityException, AuthUser]] =
+  override def authenticate(accessToken: UserAccessToken): F[Either[EndpointSecurityException, AuthUser]] =
     GitLabClient[F].get(uri"user", "user")(mapResponse(accessToken))(accessToken.some)
 
   private def mapResponse(
-      accessToken: AccessToken
+      accessToken: UserAccessToken
   ): PartialFunction[(Status, Request[F], Response[F]), F[Either[EndpointSecurityException, AuthUser]]] = {
     case (Ok, _, response) =>
       implicit val entityDecoder: EntityDecoder[F, AuthUser] = decoder(accessToken)
@@ -49,7 +49,7 @@ class GitLabAuthenticatorImpl[F[_]: Async: GitLabClient: Logger] extends Authent
       AuthenticationFailure.asLeft[AuthUser].leftWiden[EndpointSecurityException].pure[F]
   }
 
-  private def decoder(accessToken: AccessToken): EntityDecoder[F, AuthUser] = {
+  private def decoder(accessToken: UserAccessToken): EntityDecoder[F, AuthUser] = {
 
     import io.renku.graph.model.persons
     import io.renku.tinytypes.json.TinyTypeDecoders._

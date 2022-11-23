@@ -142,7 +142,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       intercept[Exception] {
         tokenFinder.findToken(projectId).value.unsafeRunSync()
-      }.getMessage() shouldBe exception.getMessage
+      }.getMessage shouldBe exception.getMessage
     }
   }
 
@@ -248,7 +248,7 @@ class TokenFinderSpec extends AnyWordSpec with IOSpec with MockFactory with shou
 
       intercept[Exception] {
         tokenFinder.findToken(projectPath).value.unsafeRunSync()
-      }.getMessage() shouldBe exception.getMessage
+      }.getMessage shouldBe exception.getMessage
     }
   }
 

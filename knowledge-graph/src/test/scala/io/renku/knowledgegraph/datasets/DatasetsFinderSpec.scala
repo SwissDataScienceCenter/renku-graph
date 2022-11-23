@@ -913,7 +913,7 @@ class DatasetsFinderSpec
   private lazy val publicProjectEntities: Gen[RenkuProject.WithoutParent] = renkuProjectEntities(visibilityPublic)
 
   implicit class PersonOps(person: Person) {
-    lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, accessTokens.generateOne)
+    lazy val toAuthUser: AuthUser = AuthUser(person.maybeGitLabId.get, userAccessTokens.generateOne)
   }
 
   private implicit class DatasetAndProjectOps(datasetAndProject: (Dataset[Dataset.Provenance], RenkuProject)) {

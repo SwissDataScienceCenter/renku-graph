@@ -97,6 +97,39 @@ class AssociationPersisterSpec extends AnyWordSpec with IOSpec with InMemoryProj
       }
   }
 
+  "updatePath" should {
+
+    "replace the Path for the given project Id" in new TestCase {
+
+      associator.persistAssociation(tokenStoringInfo).unsafeRunSync() shouldBe ()
+
+      findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
+
+      val newPath = projectPaths.generateOne
+      associator.updatePath(Project(tokenStoringInfo.project.id, newPath)).unsafeRunSync() shouldBe ()
+
+      findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo
+        .copy(project = tokenStoringInfo.project.copy(path = newPath))
+        .some
+    }
+
+    "do nothing if project Path not changed" in new TestCase {
+
+      associator.persistAssociation(tokenStoringInfo).unsafeRunSync() shouldBe ()
+
+      associator.updatePath(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
+
+      findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
+    }
+
+    "do nothing if no project with the given Id" in new TestCase {
+
+      associator.updatePath(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
+
+      findTokenInfo(tokenStoringInfo.project.id) shouldBe None
+    }
+  }
+
   private trait TestCase {
     val tokenStoringInfo = tokenStoringInfos.generateOne
 

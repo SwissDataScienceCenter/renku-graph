@@ -90,9 +90,7 @@ class EventFlowsSpec extends AcceptanceSpec with ApplicationServices with TSProv
       EventLog.findEvents(project.id).map(_._2).toSet shouldBe Set(GenerationNonRecoverableFailure)
     }
 
-    Scenario(
-      "A recoverable error arises and the events are reported as a recoverable failure"
-    ) {
+    Scenario("A recoverable error arises and the events are reported as a recoverable failure") {
 
       val user     = authUsers.generateOne
       val project  = dataProjects(renkuProjectEntities(visibilityPublic)).generateOne

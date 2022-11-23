@@ -33,9 +33,6 @@ package object association {
     OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
   )
 
-  private[association] val expiryDateDecoder: Decoder[ExpiryDate] =
-    timestamptz.map(timestamp => ExpiryDate(timestamp.toInstant))
-  private[association] val expiryDateEncoder: Encoder[ExpiryDate] = timestamptz.values.contramap((b: ExpiryDate) =>
-    OffsetDateTime.ofInstant(b.value, b.value.atOffset(ZoneOffset.UTC).toZonedDateTime.getZone)
-  )
+  private[association] val expiryDateDecoder: Decoder[ExpiryDate] = date.map(date => ExpiryDate(date))
+  private[association] val expiryDateEncoder: Encoder[ExpiryDate] = date.values.contramap((b: ExpiryDate) => b.value)
 }

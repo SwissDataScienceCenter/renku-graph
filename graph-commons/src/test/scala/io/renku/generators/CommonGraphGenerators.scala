@@ -76,7 +76,7 @@ object CommonGraphGenerators {
 
   implicit val projectAccessTokens: Gen[ProjectAccessToken] = for {
     chars <- Gen.listOfN(20, Gen.oneOf(('A' to 'Z').map(_.toString) ++ ('a' to 'z').map(_.toString)))
-  } yield ProjectAccessToken(s"glpat-${chars.mkString("")}")
+  } yield ProjectAccessToken(s"$ProjectAccessTokenDefaultPrefix${chars.mkString("")}")
 
   implicit val securityExceptions: Gen[EndpointSecurityException] =
     Gen.oneOf(AuthenticationFailure, AuthorizationFailure)

@@ -34,7 +34,12 @@ private[repository] trait PersistedTokensFinder[F[_]] {
   def findStoredToken(projectPath: Path): OptionT[F, EncryptedAccessToken]
 }
 
-private[repository] class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: SessionResource](
+private[repository] object PersistedTokensFinder {
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): PersistedTokensFinder[F] =
+    new PersistedTokensFinderImpl[F](queriesExecTimes)
+}
+
+private class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: SessionResource](
     queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
     with PersistedTokensFinder[F]

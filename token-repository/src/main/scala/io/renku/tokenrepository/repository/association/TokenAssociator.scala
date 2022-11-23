@@ -25,12 +25,12 @@ import TokenStoringInfo.Project
 import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
-import deletion.{TokenRemover, TokenRemoverImpl}
+import deletion.TokenRemover
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
-import fetching.{PersistedTokensFinder, PersistedTokensFinderImpl}
-import io.renku.graph.model.projects.Id
+import fetching.PersistedTokensFinder
+import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.LabeledHistogram
@@ -39,15 +39,16 @@ import org.typelevel.log4cats.Logger
 import scala.util.control.NonFatal
 
 private trait TokenAssociator[F[_]] {
-  def associate(projectId: Id, token: AccessToken): F[Unit]
+  def associate(projectId: projects.Id, token: AccessToken): F[Unit]
 }
 
-private class TokenAssociatorImpl[F[_]: MonadThrow](
+private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
     projectPathFinder:         ProjectPathFinder[F],
     accessTokenCrypto:         AccessTokenCrypto[F],
     tokenValidator:            TokenValidator[F],
     projectAccessTokenCreator: ProjectAccessTokenCreator[F],
     associationPersister:      AssociationPersister[F],
+    persistedPathFinder:       PersistedPathFinder[F],
     tokenRemover:              TokenRemover[F],
     tokenFinder:               PersistedTokensFinder[F],
     maxRetries:                Int Refined NonNegative
@@ -55,33 +56,47 @@ private class TokenAssociatorImpl[F[_]: MonadThrow](
 
   import accessTokenCrypto._
   import associationPersister._
+  import persistedPathFinder._
   import projectAccessTokenCreator._
   import projectPathFinder._
   import tokenFinder._
   import tokenValidator._
 
-  override def associate(projectId: Id, token: AccessToken): F[Unit] =
-    findStoredToken(projectId).cataF(false.pure[F], validate) >>= {
-      case true  => ().pure[F]
-      case false => createOrDelete(projectId, token)
+  override def associate(projectId: projects.Id, token: AccessToken): F[Unit] =
+    findStoredToken(projectId).cataF(Option.empty[ProjectAccessToken].pure[F], decryptAndValidate) >>= {
+      case Some(validToken) => replacePathIfChanged(projectId, validToken)
+      case None             => createOrDelete(projectId, token)
     }
 
-  private def validate(encryptedToken: EncryptedAccessToken): F[Boolean] =
+  private def decryptAndValidate(encryptedToken: EncryptedAccessToken): F[Option[ProjectAccessToken]] =
     decrypt(encryptedToken) >>= {
-      case token: ProjectAccessToken => checkValid(token)
-      case _ => false.pure[F]
+      case token: ProjectAccessToken => checkValid(token).map(Option.when(_)(token))
+      case _ => Option.empty[ProjectAccessToken].pure[F]
     }
 
-  private def createOrDelete(projectId: Id, token: AccessToken) =
+  private def replacePathIfChanged(projectId: projects.Id, token: ProjectAccessToken): F[Unit] =
     findProjectPath(projectId, token)
-      .cataF(tokenRemover delete projectId, path => generateNewToken(Project(projectId, path), token))
+      .semiflatMap(actualPath =>
+        findPersistedProjectPath(projectId).flatMap {
+          case `actualPath` => ().pure[F]
+          case _            => updatePath(Project(projectId, actualPath))
+        }
+      )
+      .getOrElseF(removeToken(projectId))
 
-  private def generateNewToken(project: Project, token: AccessToken): F[Unit] =
-    for {
-      newTokenInfo   <- createPersonalAccessToken(project.id, token)
-      encryptedToken <- encrypt(newTokenInfo.token)
-      _ <- persistOrRetry(TokenStoringInfo(project, encryptedToken, newTokenInfo.dates), newTokenInfo.token)
-    } yield ()
+  private def createOrDelete(projectId: projects.Id, token: AccessToken) =
+    findProjectPath(projectId, token)
+      .cataF(removeToken(projectId), path => generateNewToken(Project(projectId, path), token))
+
+  private def removeToken(projectId: projects.Id) =
+    Logger[F].info(show"removing token as no project path found for project $projectId") >>
+      tokenRemover.delete(projectId)
+
+  private def generateNewToken(project: Project, token: AccessToken): F[Unit] = for {
+    newTokenInfo   <- createPersonalAccessToken(project.id, token)
+    encryptedToken <- encrypt(newTokenInfo.token)
+    _              <- persistOrRetry(TokenStoringInfo(project, encryptedToken, newTokenInfo.dates), newTokenInfo.token)
+  } yield ()
 
   private def persistOrRetry(storingInfo:     TokenStoringInfo,
                              newToken:        ProjectAccessToken,
@@ -91,7 +106,7 @@ private class TokenAssociatorImpl[F[_]: MonadThrow](
       verifyTokenIntegrity(storingInfo.project.id, newToken)
         .recoverWith(retry(storingInfo, newToken, numberOfRetries))
 
-  private def verifyTokenIntegrity(projectId: Id, token: ProjectAccessToken) =
+  private def verifyTokenIntegrity(projectId: projects.Id, token: ProjectAccessToken) =
     findStoredToken(projectId)
       .cataF(
         new Exception(show"Token associator - just saved token cannot be found for project: $projectId")
@@ -124,16 +139,15 @@ private object TokenAssociator {
     accessTokenCrypto         <- AccessTokenCrypto[F]()
     tokenValidator            <- TokenValidator[F]
     projectAccessTokenCreator <- ProjectAccessTokenCreator[F]()
-    persister    = new AssociationPersisterImpl(queriesExecTimes)
-    tokenRemover = new TokenRemoverImpl[F](queriesExecTimes)
-    tokenFinder  = new PersistedTokensFinderImpl[F](queriesExecTimes)
-  } yield new TokenAssociatorImpl[F](pathFinder,
-                                     accessTokenCrypto,
-                                     tokenValidator,
-                                     projectAccessTokenCreator,
-                                     persister,
-                                     tokenRemover,
-                                     tokenFinder,
-                                     maxRetries
+  } yield new TokenAssociatorImpl[F](
+    pathFinder,
+    accessTokenCrypto,
+    tokenValidator,
+    projectAccessTokenCreator,
+    AssociationPersister(queriesExecTimes),
+    PersistedPathFinder(queriesExecTimes),
+    TokenRemover(queriesExecTimes),
+    PersistedTokensFinder(queriesExecTimes),
+    maxRetries
   )
 }

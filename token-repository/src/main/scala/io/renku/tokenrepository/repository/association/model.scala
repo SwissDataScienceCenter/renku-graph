@@ -22,17 +22,17 @@ import io.renku.graph.model.projects
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.tinytypes.constraints.InstantNotInTheFuture
-import io.renku.tinytypes.{InstantTinyType, TinyTypeFactory}
+import io.renku.tinytypes.{InstantTinyType, LocalDateTinyType, TinyTypeFactory}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.association.TokenDates._
 
-import java.time.Instant
+import java.time.{Instant, LocalDate}
 
 private final case class TokenCreationInfo(token: ProjectAccessToken, dates: TokenDates)
 
-private final case class TokenDates(createdAt: CreatedAt, expiryDate: ExpiryDate)
+final case class TokenDates(createdAt: CreatedAt, expiryDate: ExpiryDate)
 
-private object TokenDates {
+object TokenDates {
   final class CreatedAt private (val value: Instant) extends AnyVal with InstantTinyType
 
   implicit object CreatedAt
@@ -40,7 +40,7 @@ private object TokenDates {
       with InstantNotInTheFuture[CreatedAt]
       with TinyTypeJsonLDOps[CreatedAt]
 
-  final class ExpiryDate private (val value: Instant) extends AnyVal with InstantTinyType
+  final class ExpiryDate private (val value: LocalDate) extends AnyVal with LocalDateTinyType
   implicit object ExpiryDate extends TinyTypeFactory[ExpiryDate](new ExpiryDate(_)) with TinyTypeJsonLDOps[ExpiryDate]
 }
 

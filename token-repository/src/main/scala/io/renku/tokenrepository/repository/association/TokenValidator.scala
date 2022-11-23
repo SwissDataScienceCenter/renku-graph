@@ -34,7 +34,7 @@ private object TokenValidator {
 
 private class TokenValidatorImpl[F[_]: MonadThrow: GitLabClient] extends TokenValidator[F] {
 
-  import org.http4s.Status.{NotFound, Ok, Unauthorized}
+  import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
   import org.http4s._
   import org.http4s.implicits._
 
@@ -42,8 +42,7 @@ private class TokenValidatorImpl[F[_]: MonadThrow: GitLabClient] extends TokenVa
     GitLabClient[F].head(uri"user", "user")(mapResponse)(token.some)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Boolean]] = {
-    case (Ok, _, _)           => true.pure[F]
-    case (NotFound, _, _)     => false.pure[F]
-    case (Unauthorized, _, _) => false.pure[F]
+    case (Ok, _, _)                                  => true.pure[F]
+    case (NotFound | Unauthorized | Forbidden, _, _) => false.pure[F]
   }
 }

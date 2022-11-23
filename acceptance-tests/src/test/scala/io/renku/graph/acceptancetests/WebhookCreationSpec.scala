@@ -27,6 +27,7 @@ import io.renku.graph.acceptancetests.flows.AccessTokenPresence
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
+import io.renku.http.client.AccessToken
 import org.http4s.Status._
 
 class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with ApplicationServices with AccessTokenPresence {
@@ -76,13 +77,14 @@ class WebhookCreationSpec extends AcceptanceSpec with ModelImplicits with Applic
       Then("he should get CREATED response back")
       response.status shouldBe Created
 
-      And("the Access Token used in the POST should be added to the token repository")
-
-      val expectedAccessTokenJson = user.accessToken.asJson
-
+      And("a Project Access Token should created for the Project and added to the token repository")
       tokenRepositoryClient
         .GET(s"projects/${project.id}/tokens")
-        .jsonBody shouldBe expectedAccessTokenJson
+        .jsonBody shouldBe gitLabStub
+        .query(_.projectAccessTokens(project.id))
+        .unsafeRunSync()
+        .asInstanceOf[AccessToken]
+        .asJson
     }
   }
 }
