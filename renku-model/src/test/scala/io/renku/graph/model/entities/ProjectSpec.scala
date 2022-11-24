@@ -19,7 +19,7 @@
 package io.renku.graph.model.entities
 
 import PlanLens._
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, ValidatedNel}
 import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.generators.Generators.Implicits._
@@ -27,11 +27,15 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
+import io.renku.graph.model.entities.Generators.{compositePlanGen, compositePlanGenFactory, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.persons.Name
 import io.renku.graph.model.projects.{DateCreated, Description, Keyword}
+import io.renku.graph.model.testentities.RenkuProject.CreateCompositePlan
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
+import io.renku.graph.model.testentities.generators.genMonad
 import io.renku.jsonld.JsonLDDecoder._
 import io.renku.jsonld.JsonLDEncoder.encodeOption
 import io.renku.jsonld._
@@ -346,9 +350,114 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
         val Right(actual :: Nil) = jsonLD.cursor.as(decodeList(entities.Project.decoder(info)))
 
-        actual.plans      shouldBe List(planDateCreated.set(plans.DateCreated(entitiesActivity.startTime.value))(entitiesPlan))
+        actual.plans shouldBe List(
+          planDateCreated.set(plans.DateCreated(entitiesActivity.startTime.value))(entitiesPlan)
+        )
         actual.activities shouldBe List(entitiesActivity)
       }
+    }
+
+    "update plans original id across multiple links" in {
+      val info    = gitLabProjectInfos.generateOne
+      val topPlan = stepPlanEntities().apply(info.dateCreated).generateOne
+      val plan1   = topPlan.createModification()
+      val plan2   = plan1.createModification()
+      val plan3   = plan2.createModification()
+      val plan4   = plan3.createModification()
+
+      val realPlans = List(topPlan, plan1, plan2, plan3, plan4).map(_.to[entities.Plan])
+
+      val update = new (List[entities.Plan] => ValidatedNel[String, List[entities.Plan]])
+        with entities.RenkuProject.ProjectFactory {
+        def apply(plans: List[entities.Plan]): ValidatedNel[String, List[entities.Plan]] =
+          this.updatePlansOriginalId(plans)
+      }
+
+      val updatedPlans = update(realPlans)
+        .fold(msgs => fail(s"updateOriginalIds failed: $msgs"), identity)
+        .groupBy(_.resourceId)
+        .view
+        .mapValues(_.head)
+        .toMap
+
+      realPlans.tail.foreach { plan =>
+        val updatedPlan = updatedPlans(plan.resourceId)
+        val derivation  = PlanLens.getPlanDerivation.get(updatedPlan).get
+        derivation.originalResourceId.value shouldBe realPlans.head.resourceId.value
+      }
+    }
+
+    "validate composite plans in a project failing to find referenced entities" in {
+      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
+        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
+          this.validateCompositePlanData(plans)
+      }
+
+      val invalidPlanGen =
+        for {
+          cp <- compositePlanGenFactory()
+                  .mapF(
+                    _.filter(p => p.mappings.nonEmpty)
+                      .map(_.asInstanceOf[CompositePlan.NonModified])
+                  )
+          step <- stepPlanGenFactory
+        } yield cp.copy(plans = NonEmptyList.one(step))
+
+      val cp = invalidPlanGen.generateOne.to[entities.CompositePlan]
+
+      validate(List(cp)).fold(_.toList.toSet, _ => Set.empty) shouldBe (
+        cp.plans.map(_.value).map(id => show"The subprocess plan $id is missing in the project.").toList.toSet ++
+          cp.links.map(_.source).map(id => show"The source $id is not available in the set of plans.") ++
+          cp.links.flatMap(_.sinks.toList).map(id => show"The sink $id is not available in the set of plans") ++
+          cp.mappings
+            .flatMap(_.mappedParameter.toList)
+            .map(id => show"ParameterMapping '$id' does not exist in the set of plans.")
+      )
+    }
+
+    "validate a correct composite plan in a project" in {
+      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
+        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
+          this.validateCompositePlanData(plans)
+      }
+      val projectGen = renkuProjectEntitiesWithDatasetsAndActivities
+        .map(_.addCompositePlan(CreateCompositePlan(compositePlanEntities)))
+
+      forAll(projectGen) { project =>
+        validate(project.to[entities.Project].plans)
+          .leftMap(_.toList.intercalate("; "))
+          .fold(fail(_), identity)
+
+        val decoded = project.asJsonLD.flatten
+          .fold(fail(_), identity)
+          .cursor
+          .as[List[entities.CompositePlan]]
+
+        decoded shouldBe Right(project.plans.filter(_.isInstanceOf[CompositePlan]).map(_.to[entities.Plan]))
+      }
+    }
+
+    "validate a composite plan that has references outside its children" in {
+      val testPlan = compositePlanGen()
+        .generateOne
+        .asInstanceOf[CompositePlan.NonModified]
+
+      // find a plan belonging to some mapped parameter
+      val mappedPlanId = testPlan.mappings.head.mappedParam.head.planId
+
+      // remove this plan from the children plan list
+      val invalidPlan =
+        testPlan.copy(plans = NonEmptyList.fromListUnsafe(testPlan.plans.filterNot(_.id == mappedPlanId)))
+
+      // for convenience decode it all into a list
+      val decodeAll = invalidPlan.asJsonLD.flatten.fold(fail(_), identity).cursor.as[List[entities.Plan]]
+
+      val validate = new (List[entities.Plan] => ValidatedNel[String, Unit]) with entities.RenkuProject.ProjectFactory {
+        def apply(plans: List[entities.Plan]): ValidatedNel[String, Unit] =
+          this.validateCompositePlanData(plans)
+      }
+
+      validate(decodeAll.toOption.get).isInvalid shouldBe true
     }
 
     "return a DecodingFailure when there's a Person entity that cannot be decoded" in new TestCase {
@@ -485,12 +594,12 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       val resourceId        = projects.ResourceId(projectInfo.path)
       val dateBeforeProject = timestamps(max = projectInfo.dateCreated.value.minusSeconds(1)).generateOne
       val activity = activityEntities(
-        stepPlanEntities().modify(_.replacePlanDateCreated(plans.DateCreated(dateBeforeProject)))
-      ).modify(
+        stepPlanEntities().map(_.replacePlanDateCreated(plans.DateCreated(dateBeforeProject)))
+      ).map(
         _.replaceStartTime(
           timestamps(min = dateBeforeProject, max = projectInfo.dateCreated.value).generateAs[activities.StartTime]
         )
-      )(projects.DateCreated(dateBeforeProject))
+      ).run(projects.DateCreated(dateBeforeProject))
         .generateOne
       val entitiesActivity = activity.to[entities.Activity]
       val jsonLD = cliLikeJsonLD(
@@ -1151,7 +1260,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
   private def activityWith(author: entities.Person): projects.DateCreated => (entities.Activity, entities.StepPlan) =
     dateCreated => {
-      val activity = activityEntities(stepPlanEntities().modify(_.removeCreators()))(dateCreated).generateOne
+      val activity = activityEntities(stepPlanEntities().map(_.removeCreators()))(dateCreated).generateOne
       activity.to[entities.Activity].copy(author = author) -> activity.plan.to[entities.StepPlan]
     }
 
@@ -1159,7 +1268,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
       agent: entities.Person
   ): projects.DateCreated => (entities.Activity, entities.StepPlan) =
     dateCreated => {
-      val activity         = activityEntities(stepPlanEntities().modify(_.removeCreators()))(dateCreated).generateOne
+      val activity         = activityEntities(stepPlanEntities().map(_.removeCreators()))(dateCreated).generateOne
       val entitiesActivity = activity.to[entities.Activity]
       val entitiesPlan     = activity.plan.to[entities.StepPlan]
       entitiesActivity.copy(association =

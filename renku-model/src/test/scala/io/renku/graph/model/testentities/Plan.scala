@@ -92,13 +92,22 @@ object Plan {
   ): StepPlan.NonModified = StepPlan.of(name, maybeCommand, dateCreated, creators, commandParameterFactories)
 
   implicit def toEntitiesPlan[P <: Plan](implicit renkuUrl: RenkuUrl): P => entities.Plan = {
-    case p: StepPlan.NonModified => p.to[entities.Plan](StepPlan.NonModified.toEntitiesStepPlan)
-    case p: StepPlan.Modified    => p.to[entities.Plan](StepPlan.Modified.toEntitiesStepPlan)
+    case p: StepPlan.NonModified      => p.to[entities.Plan](StepPlan.NonModified.toEntitiesStepPlan)
+    case p: StepPlan.Modified         => p.to[entities.Plan](StepPlan.Modified.toEntitiesStepPlan)
+    case p: CompositePlan.NonModified => p.to[entities.Plan](CompositePlan.NonModified.toEntitiesCompositePlan)
+    case p: CompositePlan.Modified    => p.to[entities.Plan](CompositePlan.Modified.toEntitiesCompositePlan)
   }
 
-  implicit def encoder[P <: Plan](implicit renkuUrl: RenkuUrl, graphClass: GraphClass): JsonLDEncoder[P] =
-    JsonLDEncoder.instance(_.to[entities.Plan].asJsonLD)
+  implicit def encoder[P <: Plan](implicit
+      renkuUrl:     RenkuUrl,
+      gitLabApiUrl: GitLabApiUrl,
+      graphClass:   GraphClass
+  ): JsonLDEncoder[P] =
+    JsonLDEncoder.instance {
+      case sp: StepPlan      => StepPlan.encoder.apply(sp)
+      case cp: CompositePlan => CompositePlan.jsonLDEncoder.apply(cp)
+    }
 
   implicit def entityIdEncoder[R <: Plan](implicit renkuUrl: RenkuUrl): EntityIdEncoder[R] =
-    EntityIdEncoder.instance(plan => ResourceId(plan.id).asEntityId)
+    EntityIdEncoder.instance(plan => plan.id.asEntityId)
 }

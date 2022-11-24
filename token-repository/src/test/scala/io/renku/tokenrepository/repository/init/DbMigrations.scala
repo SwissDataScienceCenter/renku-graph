@@ -19,9 +19,7 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
-import io.renku.db.SqlStatement
 import io.renku.interpreters.TestLogger
-import io.renku.metrics.{LabeledHistogram, TestLabeledHistogram}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
 
@@ -30,14 +28,13 @@ trait DbMigrations {
 
   protected type Migration = { def run(): IO[Unit] }
 
-  private lazy val queriesExecTimes: LabeledHistogram[IO] =
-    TestLabeledHistogram[SqlStatement.Name]("query_id")
   protected implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
 
-  protected lazy val projectsTokensTableCreator: Migration = ProjectsTokensTableCreator(sessionResource)
-  protected lazy val projectPathAdded: Migration = ProjectPathAdder(sessionResource, queriesExecTimes).unsafeRunSync()
-  protected lazy val duplicateProjectsRemover: Migration = DuplicateProjectsRemover(sessionResource)
+  protected lazy val projectsTokensTableCreator: Migration = ProjectsTokensTableCreator[IO]
+  protected lazy val projectPathAdded:           Migration = ProjectPathAdder[IO]
+  protected lazy val duplicateProjectsRemover:   Migration = DuplicateProjectsRemover[IO]
+  protected lazy val expireAndCreatedDatesAdder: Migration = ExpireAndCreatedDatesAdder[IO]
 
   protected lazy val allMigrations: List[Migration] =
-    List(projectsTokensTableCreator, projectPathAdded, duplicateProjectsRemover)
+    List(projectsTokensTableCreator, projectPathAdded, duplicateProjectsRemover, expireAndCreatedDatesAdder)
 }

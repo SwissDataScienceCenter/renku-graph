@@ -20,15 +20,14 @@ package io.renku.tokenrepository.repository.association
 
 import cats.MonadThrow
 import cats.effect.Async
-import cats.effect.kernel.{Concurrent, Temporal}
+import cats.effect.kernel.Concurrent
 import cats.syntax.all._
-import io.renku.db.SessionResource
 import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
-import io.renku.http.client.AccessToken
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.ProjectsTokensDB
+import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
@@ -55,8 +54,7 @@ class AssociateTokenEndpointImpl[F[_]: Concurrent: Logger](
     } yield response
   } recoverWith httpResponse(projectId)
 
-  private implicit lazy val accessTokenEntityDecoder: EntityDecoder[F, AccessToken] =
-    jsonOf[F, AccessToken]
+  private implicit lazy val entityDecoder: EntityDecoder[F, AccessToken] = jsonOf[F, AccessToken]
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
@@ -69,17 +67,13 @@ class AssociateTokenEndpointImpl[F[_]: Concurrent: Logger](
       BadRequest(ErrorMessage(exception))
     case NonFatal(exception) =>
       val errorMessage = ErrorMessage(s"Associating token with projectId: $projectId failed")
-      Logger[F].error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+      Logger[F].error(exception)(errorMessage.value) >> InternalServerError(errorMessage)
   }
 }
 
 object AssociateTokenEndpoint {
 
-  def apply[F[_]: Async: Temporal: Logger](
-      sessionResource:  SessionResource[F, ProjectsTokensDB],
+  def apply[F[_]: Async: GitLabClient: Logger: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
-  ): F[AssociateTokenEndpoint[F]] = for {
-    tokenAssociator <- TokenAssociator(sessionResource, queriesExecTimes)
-  } yield new AssociateTokenEndpointImpl[F](tokenAssociator)
+  ): F[AssociateTokenEndpoint[F]] = TokenAssociator(queriesExecTimes).map(new AssociateTokenEndpointImpl[F](_))
 }

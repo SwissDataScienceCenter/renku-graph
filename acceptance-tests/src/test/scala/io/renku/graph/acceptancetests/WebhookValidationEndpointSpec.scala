@@ -26,7 +26,7 @@ import io.renku.graph.acceptancetests.data.Project.Statistics.CommitsCount
 import io.renku.graph.acceptancetests.data.dataProjects
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices}
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
-import io.renku.http.server.security.model.AuthUser
+import io.renku.http.client.AccessToken
 import org.http4s.Status._
 
 class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServices {
@@ -35,7 +35,7 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
 
     Scenario("There's a Graph Services hook on a Public project in GitLab") {
       val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.zero).generateOne
-      val user: AuthUser = authUsers.generateOne
+      val user    = authUsers.generateOne
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)
 
@@ -43,7 +43,7 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
       gitLabStub.setupProject(project)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
-      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", Some(user.accessToken))
+      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", user.accessToken)
 
       Then("he should get OK response back")
       response.status shouldBe Ok
@@ -52,7 +52,7 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
     Scenario("There's no Graph Services hook on a Public project in GitLab") {
 
       val project = dataProjects(renkuProjectEntities(visibilityPublic), CommitsCount.zero).generateOne
-      val user: AuthUser = authUsers.generateOne
+      val user    = authUsers.generateOne
       Given("api user is authenticated")
       gitLabStub.addAuthenticated(user)
 
@@ -60,7 +60,7 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
       gitLabStub.addProject(project)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
-      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", Some(user.accessToken))
+      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", user.accessToken)
 
       Then("he should get NOT_FOUND response back")
       response.status shouldBe NotFound
@@ -68,7 +68,7 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
 
     Scenario("There's a Graph Services hook on a non-public project in GitLab") {
 
-      val user: AuthUser = authUsers.generateOne
+      val user = authUsers.generateOne
       val project = dataProjects(
         renkuProjectEntities(visibilityNonPublic).map(
           _.copy(maybeCreator = personEntities(user.id.some).generateOne.some)
@@ -82,22 +82,26 @@ class WebhookValidationEndpointSpec extends AcceptanceSpec with ApplicationServi
       gitLabStub.setupProject(project)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
-      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", Some(user.accessToken))
+      val response = webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", user.accessToken)
 
       Then("he should get OK response back")
       response.status shouldBe Ok
 
-      And("the Access Token used in the POST should be added to the token repository")
+      And("a Project Access Token should created for the Project and added to the token repository")
       tokenRepositoryClient
         .GET(s"projects/${project.id}/tokens")
-        .jsonBody shouldBe user.accessToken.asJson
+        .jsonBody shouldBe gitLabStub
+        .query(_.projectAccessTokens(project.id))
+        .unsafeRunSync()
+        .asInstanceOf[AccessToken]
+        .asJson
 
       And("when the hook get deleted from GitLab")
       gitLabStub.removeWebhook(project.id)
 
       And("user does POST webhook-service/projects/:id/webhooks/validation again")
       val afterDeletionResponse =
-        webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", Some(user.accessToken))
+        webhookServiceClient.POST(s"projects/${project.id}/webhooks/validation", user.accessToken)
 
       Then("he should get NOT_FOUND response back")
       afterDeletionResponse.status shouldBe NotFound

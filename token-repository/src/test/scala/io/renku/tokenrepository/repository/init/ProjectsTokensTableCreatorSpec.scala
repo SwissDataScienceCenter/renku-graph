@@ -31,13 +31,13 @@ class ProjectsTokensTableCreatorSpec extends AnyWordSpec with IOSpec with DbInit
   "run" should {
 
     "create the projects_tokens table if id does not exist" in new TestCase {
-      tableExists() shouldBe false
+      tableExists("projects_tokens") shouldBe false
 
       tableCreator.run().unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(Info("'projects_tokens' table created"))
 
-      tableExists() shouldBe true
+      tableExists("projects_tokens") shouldBe true
 
       tableCreator.run().unsafeRunSync() shouldBe ()
 
@@ -46,6 +46,6 @@ class ProjectsTokensTableCreatorSpec extends AnyWordSpec with IOSpec with DbInit
   }
 
   private trait TestCase {
-    val tableCreator = new ProjectsTokensTableCreatorImpl[IO](sessionResource)
+    val tableCreator = new ProjectsTokensTableCreatorImpl[IO]
   }
 }

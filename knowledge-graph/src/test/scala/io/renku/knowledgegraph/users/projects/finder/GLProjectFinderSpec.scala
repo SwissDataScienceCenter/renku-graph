@@ -35,7 +35,6 @@ import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.interpreters.TestLogger
-import io.renku.stubbing.ExternalServiceStubbing
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Status, Uri}
@@ -46,7 +45,6 @@ import org.scalatest.wordspec.AnyWordSpec
 class GLProjectFinderSpec
     extends AnyWordSpec
     with should.Matchers
-    with ExternalServiceStubbing
     with IOSpec
     with MockFactory
     with GitLabClientTools[IO] {

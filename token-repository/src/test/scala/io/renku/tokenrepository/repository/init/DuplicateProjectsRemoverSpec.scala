@@ -73,7 +73,7 @@ class DuplicateProjectsRemoverSpec extends AnyWordSpec with IOSpec with DbInitSp
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val deduplicator = new DuplicateProjectsRemoverImpl[IO](sessionResource)
+    val deduplicator = new DuplicateProjectsRemoverImpl[IO]
   }
 
   protected def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =

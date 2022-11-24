@@ -18,8 +18,9 @@
 
 package io.renku.knowledgegraph.ontology
 
+import cats.data.NonEmptyList
 import io.renku.graph.model.Schemas
-import io.renku.graph.model.entities.Project
+import io.renku.graph.model.entities.{CompositePlan, Project}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.ontology.generateOntology
 
@@ -28,7 +29,9 @@ private trait OntologyGenerator {
 }
 
 private object OntologyGenerator {
-  private val instance = new OntologyGeneratorImpl(generateOntology(Project.ontology, Schemas.renku))
+  private val types =
+    NonEmptyList.of(Project.ontology, CompositePlan.Ontology.typeDef)
+  private val instance = new OntologyGeneratorImpl(generateOntology(types, Schemas.renku))
   def apply(): OntologyGenerator = instance
 }
 

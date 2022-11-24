@@ -29,10 +29,10 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class StepPlanCommandParameterSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   GraphClass.all.foreach { implicit graphClass =>
-    show"CommandParameter.decode graphClass=$graphClass" should {
+    show"StepPlanCommandParameter.decode graphClass=$graphClass" should {
 
       "turn JsonLD of ExplicitCommandParameter entity into the ExplicitCommandParameter object" in {
         forAll(explicitCommandParameterObjects) { parameterFactory =>
@@ -42,8 +42,8 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
           plan.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
-            .as[List[entities.CommandParameterBase.CommandParameter]] shouldBe
-            List(parameter.to[entities.CommandParameterBase.CommandParameter]).asRight
+            .as[List[entities.StepPlanCommandParameter.CommandParameter]] shouldBe
+            List(parameter.to[entities.StepPlanCommandParameter.CommandParameter]).asRight
         }
       }
 
@@ -55,8 +55,8 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
           plan.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
-            .as[List[entities.CommandParameterBase.CommandParameter]] shouldBe
-            List(parameter.to[entities.CommandParameterBase.CommandParameter]).asRight
+            .as[List[entities.StepPlanCommandParameter.CommandParameter]] shouldBe
+            List(parameter.to[entities.StepPlanCommandParameter.CommandParameter]).asRight
         }
       }
     }
@@ -71,8 +71,8 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
           plan.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
-            .as[List[entities.CommandParameterBase.CommandInput]] shouldBe
-            List(parameter.to[entities.CommandParameterBase.CommandInput]).asRight
+            .as[List[entities.StepPlanCommandParameter.CommandInput]] shouldBe
+            List(parameter.to[entities.StepPlanCommandParameter.CommandInput]).asRight
         }
       }
 
@@ -84,8 +84,8 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
           plan.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
-            .as[List[entities.CommandParameterBase.CommandInput]] shouldBe
-            List(parameter.to[entities.CommandParameterBase.CommandInput]).asRight
+            .as[List[entities.StepPlanCommandParameter.CommandInput]] shouldBe
+            List(parameter.to[entities.StepPlanCommandParameter.CommandInput]).asRight
         }
       }
 
@@ -97,8 +97,8 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
           plan.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
-            .as[List[entities.CommandParameterBase.CommandInput]] shouldBe
-            List(parameter.to[entities.CommandParameterBase.CommandInput]).asRight
+            .as[List[entities.StepPlanCommandParameter.CommandInput]] shouldBe
+            List(parameter.to[entities.StepPlanCommandParameter.CommandInput]).asRight
         }
       }
     }
@@ -113,8 +113,8 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
           plan.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
-            .as[List[entities.CommandParameterBase.CommandOutput]] shouldBe
-            List(parameter.to[entities.CommandParameterBase.CommandOutput]).asRight
+            .as[List[entities.StepPlanCommandParameter.CommandOutput]] shouldBe
+            List(parameter.to[entities.StepPlanCommandParameter.CommandOutput]).asRight
         }
       }
 
@@ -126,8 +126,8 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
           plan.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
-            .as[List[entities.CommandParameterBase.CommandOutput]] shouldBe
-            List(parameter.to[entities.CommandParameterBase.CommandOutput]).asRight
+            .as[List[entities.StepPlanCommandParameter.CommandOutput]] shouldBe
+            List(parameter.to[entities.StepPlanCommandParameter.CommandOutput]).asRight
         }
       }
 
@@ -139,8 +139,8 @@ class CommandParameterBaseSpec extends AnyWordSpec with should.Matchers with Sca
           plan.asJsonLD.flatten
             .fold(throw _, identity)
             .cursor
-            .as[List[entities.CommandParameterBase.CommandOutput]] shouldBe
-            List(parameter.to[entities.CommandParameterBase.CommandOutput]).asRight
+            .as[List[entities.StepPlanCommandParameter.CommandOutput]] shouldBe
+            List(parameter.to[entities.StepPlanCommandParameter.CommandOutput]).asRight
         }
       }
     }

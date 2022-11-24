@@ -380,8 +380,17 @@ object Generators {
 
       def toGeneratorOf[TT](implicit ttFactory: T => TT): Gen[TT] = generator map ttFactory
 
-      private def generateExample[O](generator: Gen[O]): O =
-        generator.sample getOrElse generateExample(generator)
+      private def generateExample[O](generator: Gen[O]): O = {
+        @annotation.tailrec
+        def loop(tries: Int): O =
+          generator.sample match {
+            case Some(o)               => o
+            case None if tries >= 5000 => sys.error(s"Failed to generate example value after $tries tries")
+            case None                  => loop(tries + 1)
+          }
+
+        loop(0)
+      }
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)

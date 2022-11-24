@@ -19,10 +19,9 @@
 package io.renku.eventlog.events.consumers.statuschange
 
 import cats.data.Kleisli
-import cats.effect.MonadCancelThrow
+import cats.effect.Temporal
 import cats.effect.kernel.Async
 import cats.syntax.all._
-import eu.timepit.refined.api.Refined
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
@@ -32,13 +31,16 @@ import io.renku.graph.model.events.EventStatus.{FailureStatus, New, ProcessingSt
 import io.renku.graph.model.events.{EventId, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
+import org.typelevel.log4cats.Logger
+import skunk.SqlState.DeadlockDetected
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.~
+import skunk.{Session, ~}
 
 import java.time.{Duration, Instant}
+import scala.concurrent.duration._
 
-private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
+private class ToFailureUpdater[F[_]: Async: Logger](
     deliveryInfoRemover: DeliveryInfoRemover[F],
     queriesExecTimes:    LabeledHistogram[F],
     now:                 () => Instant = () => Instant.now
@@ -55,8 +57,11 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
     ancestorsUpdateResult <- maybeUpdateAncestors(event, eventUpdateResult)
   } yield ancestorsUpdateResult combine eventUpdateResult
 
-  private def updateEvent(event: ToFailure[ProcessingStatus, FailureStatus]) = measureExecutionTime {
-    SqlStatement[F](name = Refined.unsafeApply(s"to_${event.newStatus.value.toLowerCase} - status update"))
+  private def updateEvent(
+      event: ToFailure[ProcessingStatus, FailureStatus]
+  ): Kleisli[F, Session[F], DBUpdateResults.ForProjects] = measureExecutionTime {
+    SqlStatement
+      .named(s"to_${event.newStatus.value.toLowerCase} - status update")
       .command[FailureStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ ProcessingStatus](
         sql"""UPDATE event
               SET status = $eventFailureStatusEncoder,
@@ -86,6 +91,15 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
           new Exception(s"Could not update event ${event.eventId} to status ${event.newStatus}: $completion")
             .raiseError[F, DBUpdateResults.ForProjects]
       }
+  }.recoverWith(retryUpdating(event))
+
+  private def retryUpdating(
+      event: ToFailure[ProcessingStatus, FailureStatus]
+  ): PartialFunction[Throwable, Kleisli[F, Session[F], DBUpdateResults.ForProjects]] = { case DeadlockDetected(_) =>
+    Kleisli.liftF[F, Session[F], Unit] {
+      Logger[F].warn(show"Deadlock while updating event ${event.eventId} to ${event.newStatus}") >>
+        Temporal[F].sleep(1 second)
+    } >> updateEvent(event)
   }
 
   private def maybeUpdateAncestors(event:         ToFailure[ProcessingStatus, FailureStatus],
@@ -99,7 +113,8 @@ private class ToFailureUpdater[F[_]: MonadCancelThrow: Async](
 
   private def updateAncestorsStatus(event: ToFailure[ProcessingStatus, FailureStatus], newStatus: EventStatus) =
     measureExecutionTime {
-      SqlStatement(name = Refined.unsafeApply(s"to_${event.newStatus.value.toLowerCase} - ancestors update"))
+      SqlStatement
+        .named(s"to_${event.newStatus.value.toLowerCase} - ancestors update")
         .select[EventStatus ~ ExecutionDate ~ projects.Id ~ projects.Id ~ EventId ~ EventId, EventId](
           sql"""UPDATE event evt
                 SET status = $eventStatusEncoder, 

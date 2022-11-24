@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.testentities.CommandParameterBase._
+import io.renku.graph.model.testentities.StepPlanCommandParameter._
 import io.renku.graph.model.testentities._
 import io.renku.interpreters.TestLogger
 import io.renku.jsonld.syntax._
@@ -208,7 +208,7 @@ class NodeDetailsFinderSpec
               CommandInput.streamedFromLocation(input),
               CommandOutput.streamedFromLocation(output, CommandOutput.stdOut),
               CommandOutput.streamedFromLocation(errOutput, CommandOutput.stdErr)
-            ).andThen(genPlan => genPlan.map(_.replaceCommand(to = None))),
+            ).map(_.replaceCommand(to = None)),
             project
           ).map(
             _.planInputParameterValuesFromChecksum(input -> entityChecksums.generateOne) // add some override values

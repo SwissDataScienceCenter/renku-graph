@@ -26,6 +26,7 @@ import io.renku.graph.model.events.{BatchDate, CommitId, CompoundEventId, EventB
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.model.PerPage
 import io.renku.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
+import scodec.bits.ByteVector
 import skunk.codec.all._
 import skunk.{Decoder, Encoder}
 
@@ -119,4 +120,7 @@ trait TypeSerializers {
   val microserviceUrlEncoder: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
 
   val perPageEncoder: Encoder[PerPage] = int4.values.contramap(_.value)
+
+  val byteVectorDecoder: Decoder[ByteVector] =
+    bytea.map(ByteVector.view)
 }

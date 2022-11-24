@@ -74,7 +74,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val project = anyRenkuProjectEntities
         .withActivities(
-          activityEntities(stepPlanEntities()).modify(_.copy(author = oldPerson)),
+          activityEntities(stepPlanEntities()).map(_.copy(author = oldPerson)),
           activityEntities(stepPlanEntities())
         )
         .generateOne
@@ -93,7 +93,7 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
 
       val project = anyRenkuProjectEntities
         .withActivities(
-          activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent(oldPerson)),
+          activityEntities(stepPlanEntities()).map(toAssociationPersonAgent(oldPerson)),
           activityEntities(stepPlanEntities())
         )
         .generateOne
@@ -111,11 +111,11 @@ class ProjectFunctionsSpec extends AnyWordSpec with should.Matchers with ScalaCh
       val project = anyRenkuProjectEntities
         .withActivities(
           activityEntities(stepPlanEntities())
-            .modify(setPlanCreator(oldPerson))
-            .modify(toAssociationRenkuAgent(agentEntities.generateOne)),
+            .map(setPlanCreator(oldPerson))
+            .map(toAssociationRenkuAgent(agentEntities.generateOne)),
           activityEntities(stepPlanEntities())
-            .modify(setPlanCreator(oldPerson))
-            .modify(toAssociationRenkuAgent(agentEntities.generateOne))
+            .map(setPlanCreator(oldPerson))
+            .map(toAssociationRenkuAgent(agentEntities.generateOne))
         )
         .generateOne
         .to[entities.Project]

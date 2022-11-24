@@ -4,14 +4,14 @@ This is a microservice which provides CRUD operations for `projectId` -> `access
 
 ## API
 
-| Method | Path                       | Description                                        |
-|--------|----------------------------|----------------------------------------------------|
-| GET    | ```/metrics```             | Serves Prometheus metrics                          |
-| GET    | ```/ping```                | To check if service is healthy                     |
-| GET    | ```/projects/:id/tokens``` | Fetches an access token for the project id or path |
-| PUT    | ```/projects/:id/tokens``` | Associates the given token and project id          |
-| DELETE | ```/projects/:id/tokens``` | Deletes the token and project id association       |
-| GET    | ```/version```             | Returns info about service version                 |
+| Method | Path                       | Description                                                                             |
+|--------|----------------------------|-----------------------------------------------------------------------------------------|
+| GET    | ```/metrics```             | Serves Prometheus metrics                                                               |
+| GET    | ```/ping```                | To check if service is healthy                                                          |
+| GET    | ```/projects/:id/tokens``` | Fetches an access token for the project id or path                                      |
+| POST   | ```/projects/:id/tokens``` | Generates and stores a new Project Access Token for the given project if does not exist |
+| DELETE | ```/projects/:id/tokens``` | Deletes the token and project id association                                            |
+| GET    | ```/version```             | Returns info about service version                                                      |
 
 #### GET /metrics
 
@@ -119,6 +119,20 @@ Response body example:
   ]
 }
 ```
+
+## DB schema
+
+token-repository uses relational database as an internal storage. The DB has the following schema:
+
+`projects_tokens` table
+
+| column       | type        | constraints |
+|--------------|-------------|-------------|
+| project_id   | INT4        | PK NOT NULL |
+| project_path | VARCHAR     | NOT NULL    |
+| token        | VARCHAR     | NOT NULL    |
+| created_at   | TIMESTAMPTZ | NOT NULL    |
+| expiry_date  | DATE        | NOT NULL    |
 
 ## Trying out
 

@@ -18,40 +18,31 @@
 
 package io.renku.tokenrepository.repository.association
 
+import cats.data.OptionT
 import cats.effect.Async
-import cats.effect.kernel.Temporal
 import cats.syntax.all._
-import io.renku.config.GitLab
-import io.renku.control.{RateLimit, Throttler}
-import io.renku.graph.config.GitLabUrlLoader
-import io.renku.graph.model.{GitLabUrl, projects}
-import io.renku.http.client.{AccessToken, RestClient}
-import org.http4s.circe.jsonOf
+import eu.timepit.refined.auto._
+import io.renku.graph.model.projects
+import io.renku.http.client.{AccessToken, GitLabClient}
 import org.typelevel.log4cats.Logger
 
-trait ProjectPathFinder[F[_]] {
-  def findProjectPath(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[Option[projects.Path]]
+private trait ProjectPathFinder[F[_]] {
+  def findProjectPath(projectId: projects.Id, accessToken: AccessToken): OptionT[F, projects.Path]
 }
 
-private class ProjectPathFinderImpl[F[_]: Async: Temporal: Logger](
-    gitLabUrl:       GitLabUrl,
-    gitLabThrottler: Throttler[F, GitLab]
-) extends RestClient(gitLabThrottler)
-    with ProjectPathFinder[F] {
+private class ProjectPathFinderImpl[F[_]: Async: GitLabClient: Logger] extends ProjectPathFinder[F] {
 
+  import org.http4s.circe.jsonOf
   import cats.effect._
   import cats.syntax.all._
   import io.circe._
-  import io.renku.tinytypes.json.TinyTypeDecoders._
-  import org.http4s.Method.GET
-  import org.http4s.Status.Unauthorized
+  import org.http4s.Status.{NotFound, Ok, Unauthorized}
   import org.http4s._
-  import org.http4s.dsl.io._
+  import org.http4s.implicits._
 
-  def findProjectPath(projectId: projects.Id, maybeAccessToken: Option[AccessToken]): F[Option[projects.Path]] = for {
-    uri     <- validateUri(s"$gitLabUrl/api/v4/projects/$projectId")
-    project <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-  } yield project
+  def findProjectPath(projectId: projects.Id, accessToken: AccessToken): OptionT[F, projects.Path] = OptionT {
+    GitLabClient[F].get(uri"projects" / projectId.value, "single-project")(mapResponse)(accessToken.some)
+  }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[projects.Path]]] = {
     case (Ok, _, response)    => response.as[projects.Path].map(Option.apply)
@@ -60,16 +51,14 @@ private class ProjectPathFinderImpl[F[_]: Async: Temporal: Logger](
   }
 
   private implicit lazy val projectPathDecoder: EntityDecoder[F, projects.Path] = {
+    import io.renku.tinytypes.json.TinyTypeDecoders._
     lazy val decoder: Decoder[projects.Path] = _.downField("path_with_namespace").as[projects.Path]
     jsonOf[F, projects.Path](Sync[F], decoder)
   }
 }
 
-object ProjectPathFinder {
+private object ProjectPathFinder {
 
-  def apply[F[_]: Async: Temporal: Logger]: F[ProjectPathFinder[F]] = for {
-    gitLabRateLimit <- RateLimit.fromConfig[F, GitLab]("services.gitlab.rate-limit")
-    gitLabThrottler <- Throttler[F, GitLab](gitLabRateLimit)
-    gitLabUrl       <- GitLabUrlLoader[F]()
-  } yield new ProjectPathFinderImpl(gitLabUrl, gitLabThrottler)
+  def apply[F[_]: Async: GitLabClient: Logger]: F[ProjectPathFinder[F]] =
+    new ProjectPathFinderImpl[F].pure[F].widen
 }

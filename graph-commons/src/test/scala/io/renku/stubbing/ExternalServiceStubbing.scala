@@ -25,7 +25,7 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.renku.http.client.AccessToken
-import io.renku.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import io.renku.http.client.AccessToken._
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Suite}
 
 trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll {
@@ -57,11 +57,11 @@ trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll 
 
   protected implicit class MappingBuilderOps(mappingBuilder: MappingBuilder) {
 
-    def withAccessToken(maybeAccessToken: Option[AccessToken]): MappingBuilder =
-      maybeAccessToken match {
-        case Some(PersonalAccessToken(token)) => mappingBuilder.withHeader("PRIVATE-TOKEN", equalTo(token))
-        case Some(OAuthAccessToken(token))    => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
-        case None                             => mappingBuilder
-      }
+    lazy val withAccessToken: Option[AccessToken] => MappingBuilder = {
+      case Some(ProjectAccessToken(token))   => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
+      case Some(UserOAuthAccessToken(token)) => mappingBuilder.withHeader("Authorization", equalTo(s"Bearer $token"))
+      case Some(PersonalAccessToken(token))  => mappingBuilder.withHeader("PRIVATE-TOKEN", equalTo(token))
+      case None                              => mappingBuilder
+    }
   }
 }

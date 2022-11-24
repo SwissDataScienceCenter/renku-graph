@@ -26,7 +26,7 @@ import io.circe.Json
 import io.renku.generators.Generators.Implicits._
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
-import org.http4s.Method.{DELETE, GET, POST}
+import org.http4s.Method.{DELETE, GET, HEAD, POST}
 import org.http4s.{Method, Uri}
 import org.scalacheck.Gen
 import org.scalamock.matchers.ArgCapture.CaptureOne
@@ -47,6 +47,14 @@ trait GitLabClientTools[F[_]] {
       case GET =>
         (gitLabClient
           .get(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
+            _: Option[AccessToken]
+          ))
+          .expects(*, *, capture(responseMapping), *)
+          .returning(resultGenerator.generateOne.pure[F])
+          .repeat(expectedNumberOfCalls)
+      case HEAD =>
+        (gitLabClient
+          .head(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[F, ResultType])(
             _: Option[AccessToken]
           ))
           .expects(*, *, capture(responseMapping), *)

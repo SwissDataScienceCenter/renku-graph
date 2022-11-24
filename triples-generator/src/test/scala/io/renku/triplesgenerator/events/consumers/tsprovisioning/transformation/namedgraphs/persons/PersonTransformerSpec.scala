@@ -46,7 +46,7 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
       "and generate relevant pre data upload queries" in new TestCase {
         val persons = personEntities.generateSet()
         val project = anyProjectEntities
-          .modify(membersLens.modify(_ => persons) andThen creatorLens.modify(_ => None))
+          .map(membersLens.modify(_ => persons) andThen creatorLens.modify(_ => None))
           .generateOne
           .to[entities.Project]
 
@@ -82,7 +82,7 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
     "fail with RecoverableFailure if finding matching Person in KG fails with a network or HTTP error" in new TestCase {
       val person = personEntities.generateOne
       val project = anyProjectEntities
-        .modify(membersLens.modify(_ => Set(person)) andThen creatorLens.modify(_ => None))
+        .map(membersLens.modify(_ => Set(person)) andThen creatorLens.modify(_ => None))
         .generateOne
         .to[entities.Project]
 
@@ -102,7 +102,7 @@ class PersonTransformerSpec extends AnyWordSpec with should.Matchers with MockFa
     "fail with NonRecoverableFailure if finding matching Person in KG fails with an unknown exception" in new TestCase {
       val person = personEntities.generateOne
       val project = anyProjectEntities
-        .modify(membersLens.modify(_ => Set(person)) andThen creatorLens.modify(_ => None))
+        .map(membersLens.modify(_ => Set(person)) andThen creatorLens.modify(_ => None))
         .generateOne
         .to[entities.Project]
 

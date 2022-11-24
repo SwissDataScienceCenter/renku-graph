@@ -66,7 +66,7 @@ class ProjectHookCreatorSpec
 
     "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
-        override val accessToken: AccessToken = oauthAccessTokens.generateOne
+        override val accessToken: AccessToken = userOAuthAccessTokens.generateOne
 
         (gitLabClient
           .post(_: Uri, _: NES, _: Json)(_: ResponseMappingF[IO, Unit])(_: Option[AccessToken]))

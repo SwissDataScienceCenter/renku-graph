@@ -136,7 +136,7 @@ class UpdatesCreatorSpec
 
     "prepare delete query if the new Association's person agent is different from what's set in the TS" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -165,7 +165,7 @@ class UpdatesCreatorSpec
 
     "prepare delete query if there's more than one person agent for the Association set in the TS" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -219,7 +219,7 @@ class UpdatesCreatorSpec
 
     "prepare no queries if there's no Person agent in KG" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
@@ -230,7 +230,7 @@ class UpdatesCreatorSpec
 
     "prepare no queries if there's no change in association's person agent" in {
       val project = anyRenkuProjectEntities
-        .withActivities(activityEntities(stepPlanEntities()).modify(toAssociationPersonAgent))
+        .withActivities(activityEntities(stepPlanEntities()).map(toAssociationPersonAgent))
         .map(_.to[entities.RenkuProject])
         .generateOne
 
