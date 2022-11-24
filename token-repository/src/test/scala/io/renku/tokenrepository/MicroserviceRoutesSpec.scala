@@ -90,10 +90,10 @@ class MicroserviceRoutesSpec
       routes.call(Request(GET, uri"/projects" / projectPath.toString / "tokens")).status shouldBe Ok
     }
 
-    s"define a PUT /projects/:id/tokens endpoint returning $Ok when a valid projectId given" in new TestCase {
+    s"define a POST /projects/:id/tokens endpoint returning $Ok when a valid projectId given" in new TestCase {
 
       val projectId = projectIds.generateOne
-      val request   = Request[IO](PUT, uri"/projects" / projectId.toString / "tokens")
+      val request   = Request[IO](POST, uri"/projects" / projectId.toString / "tokens")
 
       (associateEndpoint
         .associateToken(_: projects.Id, _: Request[IO]))

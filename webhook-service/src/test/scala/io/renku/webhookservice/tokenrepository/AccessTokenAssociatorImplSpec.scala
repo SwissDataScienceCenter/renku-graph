@@ -49,12 +49,12 @@ class AccessTokenAssociatorImplSpec
       s"succeed if association projectId with a ${accessToken.getClass.getSimpleName} on a remote is successful" in new TestCase {
 
         stubFor {
-          put(s"/projects/$projectId/tokens")
+          post(s"/projects/$projectId/tokens")
             .withRequestBody(equalToJson(accessToken.asJson.noSpaces))
             .willReturn(noContent())
         }
 
-        associator.associate(projectId, accessToken).unsafeRunSync() shouldBe ((): Unit)
+        associator.associate(projectId, accessToken).unsafeRunSync() shouldBe ()
       }
     }
 
@@ -64,21 +64,20 @@ class AccessTokenAssociatorImplSpec
 
       val responseBody = ErrorMessage("some error").asJson.noSpaces
       stubFor {
-        put(s"/projects/$projectId/tokens")
+        post(s"/projects/$projectId/tokens")
           .withRequestBody(equalToJson(accessToken.asJson.noSpaces))
           .willReturn(badRequest.withBody(responseBody))
       }
 
       intercept[Exception] {
         associator.associate(projectId, accessToken).unsafeRunSync()
-      }.getMessage shouldBe s"PUT $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.BadRequest}; body: $responseBody"
+      }.getMessage shouldBe s"POST $tokenRepositoryUrl/projects/$projectId/tokens returned ${Status.BadRequest}; body: $responseBody"
     }
   }
 
   private trait TestCase {
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-
     val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
     val projectId          = projectIds.generateOne
 

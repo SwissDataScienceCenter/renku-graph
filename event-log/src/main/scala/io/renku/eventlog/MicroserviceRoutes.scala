@@ -79,7 +79,7 @@ private class MicroserviceRoutes[F[_]: Sync](
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ GET  -> Root / "events" :? `project-path`(validatedProjectPath) +& status(status) +& since(since) +& until(until) +& page(page) +& perPage(perPage) +& sort(sortBy) => respond503IfMigrating(maybeFindEvents(validatedProjectPath, status, since, until, page, perPage, sortBy, request))
     case request @ POST -> Root / "events"                                            => respond503IfMigrating(processEvent(request))
-    case           GET  -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
+    case           GET  -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => respond503IfMigrating(getDetails(CompoundEventId(eventId, projectId)))
     case           GET  -> Root / "events" / EventId(eventId) / ProjectPath(projectPath) / "payload"  => respond503IfMigrating(eventPayloadEndpoint.getEventPayload(eventId, projectPath))
     case           GET  -> Root / "processing-status" :? `project-id`(maybeProjectId) => respond503IfMigrating(maybeFindProcessingStatus(maybeProjectId))
     case           GET  -> Root / "ping"                                              => Ok("pong")

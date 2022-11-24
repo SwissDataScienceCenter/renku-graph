@@ -4,17 +4,18 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 ## API
 
-| Method | Path                                    | Description                                                    |
-|--------|-----------------------------------------|----------------------------------------------------------------|
-| GET    | ```/events```                           | Returns info about events                                      |
-| GET    | ```/events/:event-id/:project-id```     | Returns info about event with the given `id` and `project-id`  |
-| POST   | ```/events```                           | Sends an event for processing                                  |
-| GET    | ```/metrics```                          | Returns Prometheus metrics of the service                      |
-| GET    | ```/migration-status```                 | Returns whether or not DB is currently migrating               |
-| GET    | ```/ping```                             | Verifies service health                                        |
-| GET    | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
-| POST   | ```/subscriptions```                    | Adds a subscription for events                                 |
-| GET    | ```/version```                          | Returns info about service version |
+| Method | Path                                        | Description                                                                |
+|--------|---------------------------------------------|----------------------------------------------------------------------------|
+| GET    | ```/events```                               | Returns info about events                                                  |
+| GET    | ```/events/:event-id/:project-id```         | Returns info about event with the given `id` and `project-id`              |
+| GET    | ```/events/:event-id/:project-id/payload``` | Returns payload associated with the event having the `id` and `project-id` |
+| POST   | ```/events```                               | Sends an event for processing                                              |
+| GET    | ```/metrics```                              | Returns Prometheus metrics of the service                                  |
+| GET    | ```/migration-status```                     | Returns whether or not DB is currently migrating                           |
+| GET    | ```/ping```                                 | Verifies service health                                                    |
+| GET    | ```/processing-status?project-id=:id```     | Finds processing status of events belonging to a project                   |
+| POST   | ```/subscriptions```                        | Adds a subscription for events                                             |
+| GET    | ```/version```                              | Returns info about service version                                         |
 
 All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is migrating.
 
@@ -97,6 +98,21 @@ Response body example:
   "body": "JSON payload"
 }
 ```
+
+### GET /events/:event-id/:project-id/payload`
+
+Finds event's payload.
+
+**Response**
+
+| Status                          | Description                                                                |
+|---------------------------------|----------------------------------------------------------------------------|
+| OK (200)                        | If payload for the given event exists                                      |
+| NOT_FOUND (404)                 | If either no event or no payload for the given `event-id` and `project-id` |
+| INTERNAL SERVER ERROR (500)     | When there are problems                                                    |
+| SERVICE UNAVAILABLE ERROR (503) | When a migration is running                                                |
+
+Response contains a `application/gzip` binary format. In addition to `content-type`, `content-length` and `content-disposition` headers are given. 
 
 ### POST /events
 

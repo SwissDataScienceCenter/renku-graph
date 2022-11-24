@@ -52,7 +52,7 @@ private class MicroserviceRoutes[F[_]: MonadThrow](
     case           GET    -> Root / "ping"                                           => Ok("pong")
     case           GET    -> Root / "projects" / ProjectId(projectId) / "tokens"     => fetchToken(projectId)
     case           GET    -> Root / "projects" / ProjectPath(projectPath) / "tokens" => fetchToken(projectPath)
-    case request @ PUT    -> Root / "projects" / ProjectId(projectId) / "tokens"     => associateToken(projectId, request)
+    case request @ POST   -> Root / "projects" / ProjectId(projectId) / "tokens"     => associateToken(projectId, request)
     case           DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => deleteToken(projectId)
   }.withMetrics.map(_ <+> versionRoutes())
   // format: on
