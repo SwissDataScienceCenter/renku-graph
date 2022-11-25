@@ -52,13 +52,14 @@ object Microservice extends IOMicroservice {
       sentryInitializer                  <- SentryInitializer[IO]
       dbInitializer                      <- DbInitializer[IO]
       queriesExecTimes                   <- QueriesExecutionTimes[IO]
-      microserviceRoutes                 <- MicroserviceRoutes[IO](queriesExecTimes).map(_.routes)
-      exitCode <- microserviceRoutes.use { routes =>
+      microserviceRoutes                 <- MicroserviceRoutes[IO](queriesExecTimes)
+      exitCode <- microserviceRoutes.routes.use { routes =>
                     new MicroserviceRunner(
                       certificateLoader,
                       sentryInitializer,
                       dbInitializer,
-                      HttpServer[IO](serverPort = 9003, routes)
+                      HttpServer[IO](serverPort = 9003, routes),
+                      microserviceRoutes
                     ).run()
                   }
     } yield exitCode
@@ -66,16 +67,22 @@ object Microservice extends IOMicroservice {
 }
 
 private class MicroserviceRunner(
-    certificateLoader: CertificateLoader[IO],
-    sentryInitializer: SentryInitializer[IO],
-    dbInitializer:     DbInitializer[IO],
-    httpServer:        HttpServer[IO]
+    certificateLoader:  CertificateLoader[IO],
+    sentryInitializer:  SentryInitializer[IO],
+    dbInitializer:      DbInitializer[IO],
+    httpServer:         HttpServer[IO],
+    microserviceRoutes: MicroserviceRoutes[IO]
 ) {
 
-  def run(): IO[ExitCode] = for {
-    _      <- certificateLoader.run()
-    _      <- sentryInitializer.run()
-    _      <- dbInitializer.run()
-    result <- httpServer.run()
-  } yield result
+  def run()(implicit logger: Logger[IO]): IO[ExitCode] = for {
+    _ <- certificateLoader.run()
+    _ <- sentryInitializer.run()
+    _ <- Spawn[IO].start(
+           (dbInitializer.run() >> microserviceRoutes.notifyDBReady()).recoverWith { case ex =>
+             Logger[IO].error(ex)("DB initialization failed")
+           }.void
+         )
+    exitCode <- httpServer.run()
+    _        <- Logger[IO].info("Service started")
+  } yield exitCode
 }
