@@ -14,7 +14,8 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | GET    | ```/ping```                             | Verifies service health                                        |
 | GET    | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 | POST   | ```/subscriptions```                    | Adds a subscription for events                                 |
-| GET    | ```/version```                          | Returns info about service version |
+| GET    | ```/version```                          | Returns info about service version                             |
+| GET    | `/events/:event-id/:project-path/payload` | Returns an event payload                                    |
 
 All endpoints (except for `/ping` and `/metrics`) will return 503 while the database is migrating.
 
@@ -863,6 +864,27 @@ Response body example:
   ]
 }
 ```
+
+#### GET /events/:event-id/:project-path/payload
+
+Returns the event payload if it is available. The payload is a gzipped
+byte stream containing user supplied data to an event.
+
+**Response**
+
+```
+Content-Type: application/gzip
+Content-Length: <length>
+
+<bytes>
+```
+
+| Status                    | Description                               |
+|---------------------------|-------------------------------------------|
+| OK (200)                  | if the event and its payload exists       |
+| NOT FOUND (404)           | if the event or the payload doesn't exist |
+| SERVICE UNAVAILABLE (503) | if a db migration is currently running    |
+
 
 ## DB schema
 
