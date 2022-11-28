@@ -25,10 +25,15 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ExpireAndCreatedDatesAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers with MockFactory{
+class ExpiryAndCreatedDatesAdderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with DbInitSpec
+    with should.Matchers
+    with MockFactory {
 
   protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
-    case _: ExpireAndCreatedDatesAdder[IO] => false
+    case _: ExpiryAndCreatedDatesAdder[IO] => false
     case _ => true
   }
 
@@ -57,6 +62,6 @@ class ExpireAndCreatedDatesAdderSpec extends AnyWordSpec with IOSpec with DbInit
   }
 
   private trait TestCase {
-    val datesAdder = new ExpireAndCreatedDatesAdder[IO]
+    val datesAdder = new ExpiryAndCreatedDatesAdder[IO]
   }
 }

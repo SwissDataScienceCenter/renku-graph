@@ -60,7 +60,7 @@ object DbInitializer {
     ProjectsTokensTableCreator[F].pure[F],
     ProjectPathAdder[F].pure[F],
     DuplicateProjectsRemover[F].pure[F],
-    ExpireAndCreatedDatesAdder[F].pure[F],
+    ExpiryAndCreatedDatesAdder[F].pure[F],
     TokensMigrator[F](queriesExecTimes)
   ).sequence
 
