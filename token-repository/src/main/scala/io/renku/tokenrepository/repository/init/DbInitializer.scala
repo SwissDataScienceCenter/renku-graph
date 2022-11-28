@@ -61,7 +61,8 @@ object DbInitializer {
     ProjectPathAdder[F].pure[F],
     DuplicateProjectsRemover[F].pure[F],
     ExpiryAndCreatedDatesAdder[F].pure[F],
-    TokensMigrator[F](queriesExecTimes)
+    TokensMigrator[F](queriesExecTimes),
+    ExpiryAndCreatedDatesNotNull[F].pure[F]
   ).sequence
 
   def apply[F[_]: Async: GitLabClient: Logger: SessionResource](
