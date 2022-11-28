@@ -26,7 +26,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class ProjectsTokensTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override val migrationsToRun: List[Migration] = List.empty
+  protected override val migrationsToRun: List[DBMigration[IO]] = List.empty
 
   "run" should {
 
@@ -46,6 +46,6 @@ class ProjectsTokensTableCreatorSpec extends AnyWordSpec with IOSpec with DbInit
   }
 
   private trait TestCase {
-    val tableCreator = new ProjectsTokensTableCreatorImpl[IO]
+    val tableCreator = new ProjectsTokensTableCreator[IO]
   }
 }

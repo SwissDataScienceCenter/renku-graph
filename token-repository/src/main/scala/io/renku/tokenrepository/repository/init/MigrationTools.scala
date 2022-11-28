@@ -22,9 +22,9 @@ import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import skunk._
 import skunk.codec.all._
 import skunk.implicits._
-import skunk._
 
 private object MigrationTools {
 

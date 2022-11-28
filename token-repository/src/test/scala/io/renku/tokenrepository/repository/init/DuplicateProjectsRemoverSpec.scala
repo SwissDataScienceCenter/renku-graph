@@ -37,8 +37,8 @@ import skunk.{Command, Session, ~}
 
 class DuplicateProjectsRemoverSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: DuplicateProjectsRemoverImpl[_] => false
+  protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
+    case _: DuplicateProjectsRemover[IO] => false
     case _ => true
   }
 
@@ -73,7 +73,7 @@ class DuplicateProjectsRemoverSpec extends AnyWordSpec with IOSpec with DbInitSp
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val deduplicator = new DuplicateProjectsRemoverImpl[IO]
+    val deduplicator = new DuplicateProjectsRemover[IO]
   }
 
   protected def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =

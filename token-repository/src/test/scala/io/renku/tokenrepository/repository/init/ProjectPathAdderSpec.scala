@@ -35,8 +35,8 @@ class ProjectPathAdderSpec
     with IntegrationPatience
     with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: ProjectPathAdderImpl[_] => false
+  protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
+    case _: ProjectPathAdder[IO] => false
     case _ => true
   }
 
@@ -62,6 +62,6 @@ class ProjectPathAdderSpec
   private trait TestCase {
     logger.reset()
 
-    val projectPathAdder = new ProjectPathAdderImpl[IO]
+    val projectPathAdder = new ProjectPathAdder[IO]
   }
 }

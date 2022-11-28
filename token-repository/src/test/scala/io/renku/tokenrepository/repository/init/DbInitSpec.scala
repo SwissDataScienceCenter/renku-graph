@@ -19,6 +19,7 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.data.Kleisli
+import cats.effect.IO
 import cats.syntax.all._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.testtools.IOSpec
@@ -29,12 +30,10 @@ import skunk.data.Completion
 import skunk.implicits._
 import skunk.{Query, Void}
 
-import scala.language.reflectiveCalls
-
 trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeAndAfter {
   self: Suite with IOSpec =>
 
-  protected val migrationsToRun: List[Migration]
+  protected val migrationsToRun: List[DBMigration[IO]]
 
   before {
     findAllTables() foreach dropTable

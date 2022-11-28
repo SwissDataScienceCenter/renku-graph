@@ -23,11 +23,11 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.DbSpec
+import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.localDates
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
-import io.renku.generators.Generators.Implicits._
 import io.renku.tokenrepository.repository.init.DbMigrations
 import org.scalatest.TestSuite
 import skunk._
@@ -36,7 +36,6 @@ import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.{LocalDate, OffsetDateTime}
-import scala.language.reflectiveCalls
 
 trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb with DbMigrations {
   self: TestSuite with IOSpec =>

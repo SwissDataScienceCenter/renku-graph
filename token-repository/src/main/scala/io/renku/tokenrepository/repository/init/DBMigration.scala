@@ -18,15 +18,6 @@
 
 package io.renku.tokenrepository.repository.init
 
-import cats.effect.IO
-import io.renku.interpreters.TestLogger
-import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
-
-trait DbMigrations {
-  self: InMemoryProjectsTokensDb with IOSpec =>
-
-  protected implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
-
-  protected lazy val allMigrations: List[DBMigration[IO]] = DbInitializer.migrations[IO]
+trait DBMigration[F[_]] {
+  def run(): F[Unit]
 }

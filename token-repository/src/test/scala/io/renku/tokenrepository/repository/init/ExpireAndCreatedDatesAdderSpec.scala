@@ -26,8 +26,8 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class ExpireAndCreatedDatesAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: ExpireAndCreatedDatesAdder[_] => false
+  protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
+    case _: ExpireAndCreatedDatesAdder[IO] => false
     case _ => true
   }
 
@@ -56,6 +56,6 @@ class ExpireAndCreatedDatesAdderSpec extends AnyWordSpec with IOSpec with DbInit
   }
 
   private trait TestCase {
-    val datesAdder = new ExpireAndCreatedDatesAdderImpl[IO]
+    val datesAdder = new ExpireAndCreatedDatesAdder[IO]
   }
 }

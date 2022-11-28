@@ -26,17 +26,12 @@ import org.typelevel.log4cats.Logger
 import skunk.implicits._
 import skunk.{Command, Session}
 
-private trait DuplicateProjectsRemover[F[_]] {
-  def run(): F[Unit]
-}
-
 private object DuplicateProjectsRemover {
-  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: DuplicateProjectsRemover[F] =
-    new DuplicateProjectsRemoverImpl[F]
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: DBMigration[F] =
+    new DuplicateProjectsRemover[F]
 }
 
-private class DuplicateProjectsRemoverImpl[F[_]: MonadCancelThrow: Logger: SessionResource]
-    extends DuplicateProjectsRemover[F] {
+private class DuplicateProjectsRemover[F[_]: MonadCancelThrow: Logger: SessionResource] extends DBMigration[F] {
 
   override def run(): F[Unit] = SessionResource[F].useK {
     for {
