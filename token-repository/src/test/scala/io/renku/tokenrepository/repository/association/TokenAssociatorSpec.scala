@@ -166,6 +166,26 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
+    "delete token if stored token valid but new token creation failed with NotFound or Forbidden" in new TestCase {
+
+      val encryptedToken = encryptedAccessTokens.generateOne
+      givenStoredTokenFinder(projectId, returning = OptionT.some[Try](encryptedToken))
+
+      val storedAccessToken = projectAccessTokens.generateOne
+      givenTokenDecryption(of = encryptedToken, returning = storedAccessToken.pure[Try])
+
+      givenTokenValidation(of = storedAccessToken, returning = false.pure[Try])
+
+      val newProjectPath = projectPaths.generateOne
+      givenPathFinder(projectId, userAccessToken, returning = OptionT.some(newProjectPath))
+
+      givenProjectTokenCreator(projectId, userAccessToken, returning = None.pure[Try])
+
+      givenTokenRemoval(projectId, returning = ().pure[Try])
+
+      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+    }
+
     "retry if the token after storing couldn't be decrypted" in new TestCase {
 
       givenStoredTokenFinder(projectId, returning = OptionT.none)
@@ -174,7 +194,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.some.pure[Try])
 
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
@@ -203,7 +223,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.some.pure[Try])
 
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
@@ -237,7 +257,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.some.pure[Try])
 
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
@@ -317,7 +337,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: UserAccessToken,
-                                 returning:       Try[TokenCreationInfo]
+                                 returning:       Try[Option[TokenCreationInfo]]
     ) = (projectAccessTokenCreator.createPersonalAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
@@ -350,7 +370,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
     def givenSuccessfulTokenCreation(projectPath: projects.Path) = {
       val tokenCreationInfo = tokenCreationInfos.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.pure[Try])
+      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.some.pure[Try])
 
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])

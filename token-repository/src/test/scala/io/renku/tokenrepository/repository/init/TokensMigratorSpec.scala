@@ -76,7 +76,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
                                              )
         )
 
-        givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.pure[IO])
+        givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.some.pure[IO])
 
         val projectTokenEncrypted = encryptedAccessTokens.generateOne
         givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
@@ -107,6 +107,27 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       findToken(oldTokenProject.id)   shouldBe None
 
       logger.loggedOnly(Warn(show"$logPrefix $oldTokenProject token invalid; deleting"))
+    }
+
+    "remove the existing token if new token creation failed with Forbidden" in new TestCase {
+
+      insert(validTokenProject, validTokenEncrypted)
+
+      insertNonMigrated(oldTokenProject, oldTokenEncrypted)
+
+      val oldToken = accessTokens.generateOne
+      givenDecryption(oldTokenEncrypted, returning = oldToken.pure[IO])
+
+      givenTokenValidation(oldToken, returning = true.pure[IO])
+
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = None.pure[IO])
+
+      migration.run().unsafeRunSync() shouldBe ()
+
+      findToken(validTokenProject.id) shouldBe validTokenEncrypted.value.some
+      findToken(oldTokenProject.id)   shouldBe None
+
+      logger.loggedOnly(Warn(show"$logPrefix $oldTokenProject cannot generate new token; deleting"))
     }
 
     "log an error and remove the token if decryption fails" in new TestCase {
@@ -140,7 +161,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.pure[IO])
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.some.pure[IO])
 
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
@@ -165,14 +186,14 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       givenTokenValidation(oldToken, returning = true.pure[IO])
 
       val exception = exceptions.generateOne
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = exception.raiseError[IO, TokenCreationInfo])
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = exception.raiseError[IO, Option[TokenCreationInfo]])
       val projectToken = projectAccessTokens.generateOne
       val creationInfo =
         TokenCreationInfo(projectToken,
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.pure[IO])
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.some.pure[IO])
 
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
@@ -255,7 +276,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: AccessToken,
-                                 returning:       IO[TokenCreationInfo]
+                                 returning:       IO[Option[TokenCreationInfo]]
     ) = (projectAccessTokenCreator.createPersonalAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)

@@ -24,11 +24,12 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
+import org.http4s.Status.{Forbidden, NotFound}
 
 import java.time.{LocalDate, Period}
 
 private[tokenrepository] trait ProjectAccessTokenCreator[F[_]] {
-  def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[TokenCreationInfo]
+  def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[Option[TokenCreationInfo]]
 }
 
 private[tokenrepository] object ProjectAccessTokenCreator {
@@ -59,7 +60,9 @@ private class ProjectAccessTokenCreatorImpl[F[_]: Async: GitLabClient](
   import org.http4s.implicits._
   import org.http4s.{EntityDecoder, Request, Response, Status}
 
-  override def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[TokenCreationInfo] = {
+  override def createPersonalAccessToken(projectId:   projects.Id,
+                                         accessToken: AccessToken
+  ): F[Option[TokenCreationInfo]] = {
     val payload = json"""{
       "name":       "renku",
       "scopes":     ["api", "read_repository"],
@@ -70,8 +73,9 @@ private class ProjectAccessTokenCreatorImpl[F[_]: Async: GitLabClient](
     )(accessToken.some)
   }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[TokenCreationInfo]] = {
-    case (Created, _, response) => response.as[TokenCreationInfo]
+  private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[TokenCreationInfo]]] = {
+    case (Created, _, response)       => response.as[TokenCreationInfo].map(Option.apply)
+    case (Forbidden | NotFound, _, _) => Option.empty[TokenCreationInfo].pure[F]
   }
 
   private implicit lazy val tokenDecoder: EntityDecoder[F, TokenCreationInfo] = {

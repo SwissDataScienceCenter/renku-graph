@@ -89,6 +89,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
       .evalMap { case (proj, token) => deleteWhenInvalidWithRetry(proj, token) }
       .flatMap(maybeProjectAndToken => Stream.emits(maybeProjectAndToken.toList))
       .evalMap { case (proj, token) => createTokenWithRetry(proj, token) }
+      .flatMap(maybeProjectAndTokenInfo => Stream.emits(maybeProjectAndTokenInfo.toList))
       .evalMap { case (proj, newTokenInfo) => encrypt(newTokenInfo.token).map(enc => (proj, newTokenInfo, enc)) }
       .evalTap { case (proj, newTokenInfo, encToken) => persistWithRetry(proj, newTokenInfo, encToken) }
       .evalMap { case (proj, _, _) => Logger[F].info(show"$logPrefix $proj token created") }
@@ -135,10 +136,14 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
     }
   }.recoverWith(retry(deleteWhenInvalidWithRetry(project, token))(project))
 
-  private def createTokenWithRetry(project: Project, token: AccessToken): F[(Project, TokenCreationInfo)] =
-    createPersonalAccessToken(project.id, token)
-      .map(project -> _)
-      .recoverWith(retry(createTokenWithRetry(project, token))(project))
+  private def createTokenWithRetry(project: Project, token: AccessToken): F[Option[(Project, TokenCreationInfo)]] = {
+    createPersonalAccessToken(project.id, token) >>= {
+      case Some(creationInfo) => (project -> creationInfo).some.pure[F]
+      case None =>
+        Logger[F].warn(show"$logPrefix $project cannot generate new token; deleting") >>
+          delete(project.id).map(_ => Option.empty[(Project, TokenCreationInfo)])
+    }
+  }.recoverWith(retry(createTokenWithRetry(project, token))(project))
 
   private def persistWithRetry(project:        Project,
                                newTokenInfo:   TokenCreationInfo,

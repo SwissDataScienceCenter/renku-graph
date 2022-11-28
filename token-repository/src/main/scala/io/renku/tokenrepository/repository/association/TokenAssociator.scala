@@ -23,6 +23,7 @@ import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
 import TokenStoringInfo.Project
 import cats.MonadThrow
+import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import deletion.TokenRemover
@@ -86,17 +87,20 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
 
   private def createOrDelete(projectId: projects.Id, token: AccessToken) =
     findProjectPath(projectId, token)
-      .cataF(removeToken(projectId), path => generateNewToken(Project(projectId, path), token))
+      .map(Project(projectId, _))
+      .flatMap(maybeGenerateNewToken(_, token))
+      .getOrElseF(removeToken(projectId))
 
   private def removeToken(projectId: projects.Id) =
     Logger[F].info(show"removing token as no project path found for project $projectId") >>
       tokenRemover.delete(projectId)
 
-  private def generateNewToken(project: Project, token: AccessToken): F[Unit] = for {
-    newTokenInfo   <- createPersonalAccessToken(project.id, token)
-    encryptedToken <- encrypt(newTokenInfo.token)
-    _              <- persistOrRetry(TokenStoringInfo(project, encryptedToken, newTokenInfo.dates), newTokenInfo.token)
-  } yield ()
+  private def maybeGenerateNewToken(project: Project, token: AccessToken) =
+    OptionT(createPersonalAccessToken(project.id, token))
+      .semiflatMap { newTokenInfo =>
+        encrypt(newTokenInfo.token) >>=
+          (encToken => persistOrRetry(TokenStoringInfo(project, encToken, newTokenInfo.dates), newTokenInfo.token))
+      }
 
   private def persistOrRetry(storingInfo:     TokenStoringInfo,
                              newToken:        ProjectAccessToken,

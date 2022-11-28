@@ -42,6 +42,6 @@ private class TokenValidatorImpl[F[_]: MonadThrow: GitLabClient] extends TokenVa
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Boolean]] = {
     case (Ok, _, _)                                  => true.pure[F]
-    case (NotFound | Unauthorized | Forbidden, _, _) => false.pure[F]
+    case (Unauthorized | Forbidden | NotFound, _, _) => false.pure[F]
   }
 }
