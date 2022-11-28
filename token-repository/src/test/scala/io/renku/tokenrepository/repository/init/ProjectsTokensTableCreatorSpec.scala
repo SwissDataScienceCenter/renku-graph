@@ -21,10 +21,16 @@ package io.renku.tokenrepository.repository.init
 import cats.effect._
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectsTokensTableCreatorSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class ProjectsTokensTableCreatorSpec
+    extends AnyWordSpec
+    with IOSpec
+    with DbInitSpec
+    with should.Matchers
+    with MockFactory {
 
   protected override val migrationsToRun: List[DBMigration[IO]] = List.empty
 

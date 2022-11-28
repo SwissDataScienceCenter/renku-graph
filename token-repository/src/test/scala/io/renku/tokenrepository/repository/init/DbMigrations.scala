@@ -19,14 +19,21 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
+import io.renku.db.SqlStatement
+import io.renku.http.client.GitLabClient
 import io.renku.interpreters.TestLogger
+import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
+import org.scalamock.scalatest.MockFactory
 
 trait DbMigrations {
-  self: InMemoryProjectsTokensDb with IOSpec =>
+  self: InMemoryProjectsTokensDb with IOSpec with MockFactory =>
 
-  protected implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
+  implicit lazy val logger:            TestLogger[IO]       = TestLogger[IO]()
+  private implicit lazy val glClient:  GitLabClient[IO]     = mock[GitLabClient[IO]]
+  protected lazy val queriesExecTimes: TestLabeledHistogram = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
-  protected lazy val allMigrations: List[DBMigration[IO]] = DbInitializer.migrations[IO]
+  protected lazy val allMigrations: List[DBMigration[IO]] =
+    DbInitializer.migrations[IO](queriesExecTimes).unsafeRunSync()
 }

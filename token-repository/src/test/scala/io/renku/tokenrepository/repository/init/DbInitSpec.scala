@@ -24,14 +24,18 @@ import cats.syntax.all._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
+import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfter, Suite}
-import skunk.codec.all.{int4, name, varchar}
+import skunk.codec.all._
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.{Query, Void}
 
+import java.time.LocalDate
+
 trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeAndAfter {
-  self: Suite with IOSpec =>
+  self: Suite with IOSpec with MockFactory =>
 
   protected val migrationsToRun: List[DBMigration[IO]]
 
@@ -63,6 +67,15 @@ trait DbInitSpec extends InMemoryProjectsTokensDb with DbMigrations with BeforeA
       val query: Query[String, String] = sql"select token from projects_tokens where project_path = $varchar"
         .query(varchar)
       Kleisli(_.prepare(query).use(_.option(projectPath.value)))
+    }
+    .unsafeRunSync()
+
+  protected def findExpiryDate(projectId: Id): Option[ExpiryDate] = sessionResource
+    .useK {
+      val query: Query[Int, ExpiryDate] = sql"SELECT expiry_date FROM projects_tokens WHERE project_id = $int4"
+        .query(date)
+        .map { case expiryDate: LocalDate => ExpiryDate(expiryDate) }
+      Kleisli(_.prepare(query).use(_.option(projectId.value)))
     }
     .unsafeRunSync()
 

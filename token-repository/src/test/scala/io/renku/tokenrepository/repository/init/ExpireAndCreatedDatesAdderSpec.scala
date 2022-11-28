@@ -21,10 +21,11 @@ package io.renku.tokenrepository.repository.init
 import cats.effect.IO
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ExpireAndCreatedDatesAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class ExpireAndCreatedDatesAdderSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers with MockFactory{
 
   protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
     case _: ExpireAndCreatedDatesAdder[IO] => false

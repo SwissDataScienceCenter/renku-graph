@@ -21,14 +21,13 @@ package io.renku.tokenrepository.repository.association
 import cats.MonadThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.http.client.AccessToken.ProjectAccessToken
-import io.renku.http.client.GitLabClient
+import io.renku.http.client.{AccessToken, GitLabClient}
 
-private trait TokenValidator[F[_]] {
-  def checkValid(token: ProjectAccessToken): F[Boolean]
+private[tokenrepository] trait TokenValidator[F[_]] {
+  def checkValid(token: AccessToken): F[Boolean]
 }
 
-private object TokenValidator {
+private[tokenrepository] object TokenValidator {
   def apply[F[_]: MonadThrow: GitLabClient]: F[TokenValidator[F]] = new TokenValidatorImpl[F].pure[F].widen
 }
 
@@ -38,7 +37,7 @@ private class TokenValidatorImpl[F[_]: MonadThrow: GitLabClient] extends TokenVa
   import org.http4s._
   import org.http4s.implicits._
 
-  override def checkValid(token: ProjectAccessToken): F[Boolean] =
+  override def checkValid(token: AccessToken): F[Boolean] =
     GitLabClient[F].head(uri"user", "user")(mapResponse)(token.some)
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Boolean]] = {

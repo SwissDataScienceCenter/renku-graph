@@ -33,12 +33,12 @@ import skunk.data.Completion
 import skunk.data.Completion.Delete
 import skunk.implicits._
 
-private trait AssociationPersister[F[_]] {
+private[repository] trait AssociationPersister[F[_]] {
   def persistAssociation(storingInfo: TokenStoringInfo):         F[Unit]
   def updatePath(project:             TokenStoringInfo.Project): F[Unit]
 }
 
-private object AssociationPersister {
+private[repository] object AssociationPersister {
   def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): AssociationPersister[F] =
     new AssociationPersisterImpl[F](queriesExecTimes)
 }

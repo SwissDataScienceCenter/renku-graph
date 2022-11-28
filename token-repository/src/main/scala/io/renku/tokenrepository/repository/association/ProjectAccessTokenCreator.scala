@@ -27,11 +27,11 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 
 import java.time.{LocalDate, Period}
 
-private trait ProjectAccessTokenCreator[F[_]] {
+private[tokenrepository] trait ProjectAccessTokenCreator[F[_]] {
   def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[TokenCreationInfo]
 }
 
-private object ProjectAccessTokenCreator {
+private[tokenrepository] object ProjectAccessTokenCreator {
 
   import io.renku.config.ConfigLoader._
 

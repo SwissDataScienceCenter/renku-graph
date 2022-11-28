@@ -23,11 +23,10 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.generators.CommonGraphGenerators.projectAccessTokens
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.http.client.AccessToken.ProjectAccessToken
-import io.renku.http.client.GitLabClient
 import io.renku.http.client.RestClient.ResponseMappingF
+import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Method.HEAD
 import org.http4s.Status.{BadRequest, Forbidden, NotFound, Ok, Unauthorized}
@@ -51,18 +50,16 @@ class TokenValidatorSpec
 
     "return true if HEAD /user call to the the GL returns 200" in new TestCase {
 
-      val projectAccessToken = projectAccessTokens.generateOne
+      val accessToken = accessTokens.generateOne
 
       val endpointName: String Refined NonEmpty = "user"
       val validationResult = results.generateOne
       (gitLabClient
-        .head(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Boolean])(
-          _: Option[ProjectAccessToken]
-        ))
-        .expects(uri"user", endpointName, *, Option(projectAccessToken))
+        .head(_: Uri, _: String Refined NonEmpty)(_: ResponseMappingF[IO, Boolean])(_: Option[AccessToken]))
+        .expects(uri"user", endpointName, *, Option(accessToken))
         .returning(validationResult.pure[IO])
 
-      validator.checkValid(projectAccessToken).unsafeRunSync() shouldBe validationResult
+      validator.checkValid(accessToken).unsafeRunSync() shouldBe validationResult
     }
 
     forAll {
@@ -91,7 +88,7 @@ class TokenValidatorSpec
     val validator = new TokenValidatorImpl[IO]
 
     lazy val mapResponse = captureMapping(validator, gitLabClient)(
-      findingMethod = _.checkValid(projectAccessTokens.generateOne).unsafeRunSync(),
+      findingMethod = _.checkValid(accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = results.generateOne,
       method = HEAD
     )

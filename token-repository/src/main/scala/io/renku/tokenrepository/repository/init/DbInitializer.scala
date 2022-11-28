@@ -18,9 +18,10 @@
 
 package io.renku.tokenrepository.repository.init
 
-import cats.MonadThrow
 import cats.effect._
 import cats.syntax.all._
+import io.renku.http.client.GitLabClient
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import org.typelevel.log4cats.Logger
 
@@ -53,14 +54,17 @@ class DbInitializerImpl[F[_]: Async: Logger](migrators: List[DBMigration[F]],
 
 object DbInitializer {
 
-  def migrations[F[_]: Async: Logger: SessionResource]: List[DBMigration[F]] = List(
-    ProjectsTokensTableCreator[F],
-    ProjectPathAdder[F],
-    DuplicateProjectsRemover[F],
-    ExpireAndCreatedDatesAdder[F]
-  )
+  def migrations[F[_]: Async: GitLabClient: Logger: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[List[DBMigration[F]]] = List(
+    ProjectsTokensTableCreator[F].pure[F],
+    ProjectPathAdder[F].pure[F],
+    DuplicateProjectsRemover[F].pure[F],
+    ExpireAndCreatedDatesAdder[F].pure[F],
+    TokensMigrator[F](queriesExecTimes)
+  ).sequence
 
-  def apply[F[_]: Async: Logger: SessionResource]: F[DbInitializer[F]] = MonadThrow[F].catchNonFatal {
-    new DbInitializerImpl[F](migrations)
-  }
+  def apply[F[_]: Async: GitLabClient: Logger: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[DbInitializer[F]] = migrations[F](queriesExecTimes).map(new DbInitializerImpl[F](_))
 }

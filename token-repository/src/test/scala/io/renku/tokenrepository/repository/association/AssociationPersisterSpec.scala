@@ -33,12 +33,18 @@ import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
 
-class AssociationPersisterSpec extends AnyWordSpec with IOSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
+class AssociationPersisterSpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryProjectsTokensDbSpec
+    with should.Matchers
+    with MockFactory {
 
   "persistAssociation" should {
 

@@ -29,13 +29,19 @@ import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.codec.all.{int4, varchar}
 import skunk.implicits._
 import skunk.{Command, Session, ~}
 
-class DuplicateProjectsRemoverSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class DuplicateProjectsRemoverSpec
+    extends AnyWordSpec
+    with IOSpec
+    with DbInitSpec
+    with should.Matchers
+    with MockFactory {
 
   protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
     case _: DuplicateProjectsRemover[IO] => false

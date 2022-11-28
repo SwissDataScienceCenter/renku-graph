@@ -30,10 +30,10 @@ class ProjectPathAdderSpec
     extends AnyWordSpec
     with IOSpec
     with DbInitSpec
-    with MockFactory
     with Eventually
     with IntegrationPatience
-    with should.Matchers {
+    with should.Matchers
+    with MockFactory {
 
   protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
     case _: ProjectPathAdder[IO] => false

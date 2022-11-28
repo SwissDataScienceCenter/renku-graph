@@ -29,7 +29,8 @@ import io.renku.graph.model.projects.{Id, Path}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
 import io.renku.tokenrepository.repository.init.DbMigrations
-import org.scalatest.TestSuite
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.Suite
 import skunk._
 import skunk.codec.all._
 import skunk.data.Completion
@@ -38,7 +39,7 @@ import skunk.implicits._
 import java.time.{LocalDate, OffsetDateTime}
 
 trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb with DbMigrations {
-  self: TestSuite with IOSpec =>
+  self: Suite with IOSpec with MockFactory =>
 
   protected def initDb(): Unit =
     allMigrations.map(_.run()).sequence.void.unsafeRunSync()

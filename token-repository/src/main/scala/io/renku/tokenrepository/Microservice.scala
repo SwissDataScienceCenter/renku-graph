@@ -50,8 +50,8 @@ object Microservice extends IOMicroservice {
       implicit0(gc: GitLabClient[IO])    <- GitLabClient[IO]()
       certificateLoader                  <- CertificateLoader[IO]
       sentryInitializer                  <- SentryInitializer[IO]
-      dbInitializer                      <- DbInitializer[IO]
       queriesExecTimes                   <- QueriesExecutionTimes[IO]
+      dbInitializer                      <- DbInitializer[IO](queriesExecTimes)
       microserviceRoutes                 <- MicroserviceRoutes[IO](queriesExecTimes)
       exitCode <- microserviceRoutes.routes.use { routes =>
                     new MicroserviceRunner(
