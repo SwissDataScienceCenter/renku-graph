@@ -19,16 +19,16 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.data.Kleisli
-import cats.effect.Spawn
+import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import org.typelevel.log4cats.Logger
 
 private object ExpiryAndCreatedDatesNotNull {
-  def apply[F[_]: Spawn: Logger: SessionResource]: DBMigration[F] = new ExpiryAndCreatedDatesNotNull[F]
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource]: DBMigration[F] = new ExpiryAndCreatedDatesNotNull[F]
 }
 
-private class ExpiryAndCreatedDatesNotNull[F[_]: Spawn: Logger: SessionResource] extends DBMigration[F] {
+private class ExpiryAndCreatedDatesNotNull[F[_]: MonadCancelThrow: Logger: SessionResource] extends DBMigration[F] {
 
   import MigrationTools._
 
