@@ -7,7 +7,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | Method | Path                                        | Description                                                                |
 |--------|---------------------------------------------|----------------------------------------------------------------------------|
 | GET    | ```/events```                               | Returns info about events                                                  |
-| GET    | ```/events/:event-id/:project-id```         | Returns info about event with the given `id` and `project-id`              |
+| GET    | ```/events/:event-id/:project-path```         | Returns info about event with the given `id` and `project-path`              |
 | GET    | ```/events/:event-id/:project-id/payload``` | Returns payload associated with the event having the `id` and `project-id` |
 | POST   | ```/events```                               | Sends an event for processing                                              |
 | GET    | ```/metrics```                              | Returns Prometheus metrics of the service                                  |
@@ -99,7 +99,7 @@ Response body example:
 }
 ```
 
-### GET /events/:event-id/:project-id/payload`
+### GET /events/:event-id/:project-path/payload`
 
 Finds event's payload.
 
