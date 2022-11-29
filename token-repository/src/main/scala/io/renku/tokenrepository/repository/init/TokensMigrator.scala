@@ -74,14 +74,11 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
   import skunk.Void
   import skunk.implicits._
   import tokenCrypto._
-  import tokenRemover._
   import tokenValidator._
 
   override def run(): F[Unit] =
     Stream
-      .emit(())
-      .repeat
-      .evalMap(_ => findTokenWithoutDates)
+      .repeatEval(findTokenWithoutDates)
       .takeThrough(_.nonEmpty)
       .flatMap(maybeProjectAndToken => Stream.emits(maybeProjectAndToken.toList))
       .evalMap { case (proj, encToken) => decryptOrDelete(proj, encToken) }
@@ -122,7 +119,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
       .map(t => Option(project -> t))
       .recoverWith { case ex: Throwable =>
         Logger[F].error(ex)(show"$logPrefix $project token decryption failed; deleting") >>
-          delete(project.id) >>
+          tokenRemover.delete(project.id) >>
           Option.empty[(Project, AccessToken)].pure[F]
       }
 
@@ -131,7 +128,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
       case true => (project, token).some.pure[F]
       case false =>
         Logger[F].warn(show"$logPrefix $project token invalid; deleting") >>
-          delete(project.id) >>
+          tokenRemover.delete(project.id) >>
           Option.empty[(Project, AccessToken)].pure[F]
     }
   }.recoverWith(retry(deleteWhenInvalidWithRetry(project, token))(project))
@@ -141,7 +138,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
       case Some(creationInfo) => (project -> creationInfo).some.pure[F]
       case None =>
         Logger[F].warn(show"$logPrefix $project cannot generate new token; deleting") >>
-          delete(project.id).map(_ => Option.empty[(Project, TokenCreationInfo)])
+          tokenRemover.delete(project.id).map(_ => Option.empty[(Project, TokenCreationInfo)])
     }
   }.recoverWith(retry(createTokenWithRetry(project, token))(project))
 
