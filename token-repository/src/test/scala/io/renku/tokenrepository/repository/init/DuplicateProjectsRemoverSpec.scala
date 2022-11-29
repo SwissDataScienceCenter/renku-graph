@@ -29,16 +29,22 @@ import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk.codec.all.{int4, varchar}
 import skunk.implicits._
 import skunk.{Command, Session, ~}
 
-class DuplicateProjectsRemoverSpec extends AnyWordSpec with IOSpec with DbInitSpec with should.Matchers {
+class DuplicateProjectsRemoverSpec
+    extends AnyWordSpec
+    with IOSpec
+    with DbInitSpec
+    with should.Matchers
+    with MockFactory {
 
-  protected override lazy val migrationsToRun: List[Migration] = allMigrations.takeWhile {
-    case _: DuplicateProjectsRemoverImpl[_] => false
+  protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
+    case _: DuplicateProjectsRemover[IO] => false
     case _ => true
   }
 
@@ -73,7 +79,7 @@ class DuplicateProjectsRemoverSpec extends AnyWordSpec with IOSpec with DbInitSp
 
   private trait TestCase {
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val deduplicator = new DuplicateProjectsRemoverImpl[IO]
+    val deduplicator = new DuplicateProjectsRemover[IO]
   }
 
   protected def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Unit =

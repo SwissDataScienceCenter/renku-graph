@@ -18,6 +18,7 @@
 
 package io.renku.tokenrepository.repository.association
 
+import cats.Show
 import io.renku.graph.model.projects
 import io.renku.graph.model.views.TinyTypeJsonLDOps
 import io.renku.http.client.AccessToken.ProjectAccessToken
@@ -28,11 +29,11 @@ import io.renku.tokenrepository.repository.association.TokenDates._
 
 import java.time.{Instant, LocalDate}
 
-private final case class TokenCreationInfo(token: ProjectAccessToken, dates: TokenDates)
+private[repository] final case class TokenCreationInfo(token: ProjectAccessToken, dates: TokenDates)
 
-final case class TokenDates(createdAt: CreatedAt, expiryDate: ExpiryDate)
+private[repository] final case class TokenDates(createdAt: CreatedAt, expiryDate: ExpiryDate)
 
-object TokenDates {
+private[repository] object TokenDates {
   final class CreatedAt private (val value: Instant) extends AnyVal with InstantTinyType
 
   implicit object CreatedAt
@@ -44,11 +45,17 @@ object TokenDates {
   implicit object ExpiryDate extends TinyTypeFactory[ExpiryDate](new ExpiryDate(_)) with TinyTypeJsonLDOps[ExpiryDate]
 }
 
-private final case class TokenStoringInfo(project:        TokenStoringInfo.Project,
-                                          encryptedToken: EncryptedAccessToken,
-                                          dates:          TokenDates
+private[repository] final case class TokenStoringInfo(project:        TokenStoringInfo.Project,
+                                                      encryptedToken: EncryptedAccessToken,
+                                                      dates:          TokenDates
 )
 
-private object TokenStoringInfo {
+private[repository] object TokenStoringInfo {
   final case class Project(id: projects.Id, path: projects.Path)
+
+  object Project {
+    implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
+      s"projectId = $id, projectPath = $path"
+    }
+  }
 }

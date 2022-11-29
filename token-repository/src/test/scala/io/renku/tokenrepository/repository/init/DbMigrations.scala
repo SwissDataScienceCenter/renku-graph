@@ -19,22 +19,21 @@
 package io.renku.tokenrepository.repository.init
 
 import cats.effect.IO
+import io.renku.db.SqlStatement
+import io.renku.http.client.GitLabClient
 import io.renku.interpreters.TestLogger
+import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
+import org.scalamock.scalatest.MockFactory
 
 trait DbMigrations {
-  self: InMemoryProjectsTokensDb with IOSpec =>
+  self: InMemoryProjectsTokensDb with IOSpec with MockFactory =>
 
-  protected type Migration = { def run(): IO[Unit] }
+  implicit lazy val logger:            TestLogger[IO]       = TestLogger[IO]()
+  private implicit lazy val glClient:  GitLabClient[IO]     = mock[GitLabClient[IO]]
+  protected lazy val queriesExecTimes: TestLabeledHistogram = TestLabeledHistogram[SqlStatement.Name]("query_id")
 
-  protected implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
-
-  protected lazy val projectsTokensTableCreator: Migration = ProjectsTokensTableCreator[IO]
-  protected lazy val projectPathAdded:           Migration = ProjectPathAdder[IO]
-  protected lazy val duplicateProjectsRemover:   Migration = DuplicateProjectsRemover[IO]
-  protected lazy val expireAndCreatedDatesAdder: Migration = ExpireAndCreatedDatesAdder[IO]
-
-  protected lazy val allMigrations: List[Migration] =
-    List(projectsTokensTableCreator, projectPathAdded, duplicateProjectsRemover, expireAndCreatedDatesAdder)
+  protected lazy val allMigrations: List[DBMigration[IO]] =
+    DbInitializer.migrations[IO](queriesExecTimes).unsafeRunSync()
 }

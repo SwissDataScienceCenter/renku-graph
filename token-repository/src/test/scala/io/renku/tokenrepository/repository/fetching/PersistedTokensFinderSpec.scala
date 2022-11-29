@@ -25,10 +25,16 @@ import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators._
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class PersistedTokensFinderSpec extends AnyWordSpec with IOSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
+class PersistedTokensFinderSpec
+    extends AnyWordSpec
+    with IOSpec
+    with InMemoryProjectsTokensDbSpec
+    with should.Matchers
+    with MockFactory {
 
   "findStoredToken" should {
 

@@ -16,22 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.db
+package io.renku.tokenrepository.repository.init
 
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
-
-trait DbSpec extends BeforeAndAfterAll with BeforeAndAfter {
-  self: Suite =>
-
-  protected def initDb():           Unit
-  protected def prepareDbForTest(): Unit
-
-  protected override def beforeAll(): Unit = {
-    super.beforeAll()
-    initDb()
-  }
-
-  before {
-    prepareDbForTest()
-  }
+trait DBMigration[F[_]] {
+  def run(): F[Unit]
 }

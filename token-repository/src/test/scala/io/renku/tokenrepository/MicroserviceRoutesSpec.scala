@@ -19,7 +19,7 @@
 package io.renku.tokenrepository
 
 import cats.data.OptionT
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import io.renku.generators.CommonGraphGenerators.httpStatuses
 import io.renku.generators.Generators.Implicits._
@@ -50,23 +50,31 @@ class MicroserviceRoutesSpec
     with ScalaCheckPropertyChecks
     with should.Matchers {
 
-  "routes" should {
+  "GET /ping" should {
 
-    "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
+    "return OK with 'pong' body" in new TestCase {
       val response = routes.call(Request(GET, uri"/ping"))
 
       response.status       shouldBe Ok
       response.body[String] shouldBe "pong"
     }
+  }
 
-    "define a GET /metrics endpoint returning OK with some prometheus metrics" in new TestCase {
+  "GET /metrics" should {
+
+    "return OK with some prometheus metrics" in new TestCase {
       val response = routes.call(Request(GET, uri"/metrics"))
 
       response.status     shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
+  }
 
-    s"define a GET /projects/:id/tokens endpoint returning $Ok when a valid projectId is given" in new TestCase {
+  "GET /projects/:id/tokens" should {
+
+    s"return $Ok when a valid projectId is given" in new TestCase {
+
+      givenDBReady()
 
       val projectId = projectIds.generateOne
 
@@ -78,7 +86,15 @@ class MicroserviceRoutesSpec
       routes.call(Request(GET, uri"/projects" / projectId.toString / "tokens")).status shouldBe Ok
     }
 
-    s"define a GET /projects/:id/tokens endpoint returning $Ok when a valid projectPath is given" in new TestCase {
+    s"return $ServiceUnavailable for a valid projectId when DB migration is ongoing" in new TestCase {
+      routes
+        .call(Request(GET, uri"/projects" / projectIds.generateOne.toString / "tokens"))
+        .status shouldBe ServiceUnavailable
+    }
+
+    s"return $Ok when a valid projectPath is given" in new TestCase {
+
+      givenDBReady()
 
       val projectPath = projectPaths.generateOne
 
@@ -90,7 +106,18 @@ class MicroserviceRoutesSpec
       routes.call(Request(GET, uri"/projects" / projectPath.toString / "tokens")).status shouldBe Ok
     }
 
-    s"define a POST /projects/:id/tokens endpoint returning $Ok when a valid projectId given" in new TestCase {
+    s"return $ServiceUnavailable for a valid Project Path when DB migration is ongoing" in new TestCase {
+      routes
+        .call(Request(GET, uri"/projects" / projectPaths.generateOne.toString / "tokens"))
+        .status shouldBe ServiceUnavailable
+    }
+  }
+
+  "POST /projects/:id/tokens" should {
+
+    s"return $Ok when a valid projectId given" in new TestCase {
+
+      givenDBReady()
 
       val projectId = projectIds.generateOne
       val request   = Request[IO](POST, uri"/projects" / projectId.toString / "tokens")
@@ -103,7 +130,18 @@ class MicroserviceRoutesSpec
       (routes call request).status shouldBe NoContent
     }
 
-    s"define a DELETE /projects/:id/tokens endpoint returning $Ok when a valid projectId given" in new TestCase {
+    s"return $ServiceUnavailable for a valid projectId when DB migration is ongoing" in new TestCase {
+      routes
+        .call(Request(POST, uri"/projects" / projectIds.generateOne.toString / "tokens"))
+        .status shouldBe ServiceUnavailable
+    }
+  }
+
+  "DELETE /projects/:id/tokens" should {
+
+    s"return $Ok when a valid projectId given" in new TestCase {
+
+      givenDBReady()
 
       val projectId = projectIds.generateOne
       (deleteEndpoint
@@ -112,6 +150,12 @@ class MicroserviceRoutesSpec
         .returning(IO.pure(Response[IO](NoContent)))
 
       (routes call Request[IO](DELETE, uri"/projects" / projectId.toString / "tokens")).status shouldBe NoContent
+    }
+
+    s"return $ServiceUnavailable for a valid projectId when DB migration is ongoing" in new TestCase {
+      routes
+        .call(Request(DELETE, uri"/projects" / projectIds.generateOne.toString / "tokens"))
+        .status shouldBe ServiceUnavailable
     }
   }
 
@@ -128,13 +172,15 @@ class MicroserviceRoutesSpec
     val deleteEndpoint    = mock[deletion.DeleteTokenEndpoint[IO]]
     val routesMetrics     = TestRoutesMetrics()
     val versionRoutes     = mock[version.Routes[IO]]
-    val routes = new MicroserviceRoutes[IO](
+    private val microserviceRoutes = new MicroserviceRoutesImpl[IO](
       fetchEndpoint,
       associateEndpoint,
       deleteEndpoint,
       routesMetrics,
-      versionRoutes
-    ).routes.map(_.or(notAvailableResponse))
+      versionRoutes,
+      Ref.unsafe[IO, Boolean](false)
+    )
+    val routes = microserviceRoutes.routes.map(_.or(notAvailableResponse))
 
     val versionEndpointResponse = Response[IO](httpStatuses.generateOne)
     (versionRoutes.apply _)
@@ -143,5 +189,8 @@ class MicroserviceRoutesSpec
         import org.http4s.dsl.io.{GET => _, _}
         HttpRoutes.of[IO] { case GET -> Root / "version" => versionEndpointResponse.pure[IO] }
       }
+
+    def givenDBReady(): Unit =
+      microserviceRoutes.notifyDBReady().unsafeRunSync()
   }
 }

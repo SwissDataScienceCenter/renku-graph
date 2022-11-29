@@ -25,21 +25,28 @@ import io.renku.config.sentry.SentryInitializer
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.http.server.HttpServer
+import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.MockedRunnableCollaborators
 import io.renku.tokenrepository.repository.init.DbInitializer
+import org.http4s.HttpRoutes
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.language.reflectiveCalls
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
     with MockedRunnableCollaborators
+    with Eventually
     with MockFactory
     with should.Matchers {
 
   "run" should {
 
-    "return Success Exit Code if Sentry and the db initialize fine and http server starts up" in new TestCase {
+    "initialise Sentry, load certificate, initialise DB and start HTTP server" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
@@ -47,6 +54,12 @@ class MicroserviceRunnerSpec
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
+
+      logger.loggedOnly(Info("Service started"))
+
+      eventually(
+        microserviceRoutes.notifyDBCalled.get.unsafeRunSync() shouldBe true
+      )
     }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -70,16 +83,21 @@ class MicroserviceRunnerSpec
       } shouldBe exception
     }
 
-    "fail if db creation fails" in new TestCase {
+    "return Success ExitCode even if DB initialisation fails as the process is run in another thread" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(dbInitializer).fails(becauseOf = exception)
+      given(httpServer).succeeds(returning = ExitCode.Success)
 
-      intercept[Exception] {
-        runner.run().unsafeRunSync()
-      } shouldBe exception
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+
+      eventually {
+        logger.logged(Error("DB initialization failed", exception), Info("Service started"))
+      }
+
+      microserviceRoutes.notifyDBCalled.get.unsafeRunSync() shouldBe false
     }
 
     "fail if starting the http server fails" in new TestCase {
@@ -97,10 +115,17 @@ class MicroserviceRunnerSpec
   }
 
   private trait TestCase {
+    implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val certificateLoader = mock[CertificateLoader[IO]]
     val sentryInitializer = mock[SentryInitializer[IO]]
     val dbInitializer     = mock[DbInitializer[IO]]
     val httpServer        = mock[HttpServer[IO]]
-    val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, dbInitializer, httpServer)
+    val microserviceRoutes = new MicroserviceRoutes[IO] {
+      val notifyDBCalled: Ref[IO, Boolean] = Ref.unsafe(false)
+      override def notifyDBReady() = notifyDBCalled.set(true)
+      override def routes          = Resource.pure(HttpRoutes.empty[IO])
+    }
+    val runner =
+      new MicroserviceRunner(certificateLoader, sentryInitializer, dbInitializer, httpServer, microserviceRoutes)
   }
 }

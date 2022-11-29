@@ -19,7 +19,7 @@
 package io.renku.tokenrepository
 
 import cats.MonadThrow
-import cats.effect.{Async, Clock, Resource}
+import cats.effect._
 import cats.syntax.all._
 import io.renku.graph.http.server.binders.{ProjectId, ProjectPath}
 import io.renku.http.client.GitLabClient
@@ -30,32 +30,49 @@ import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
 import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
 import org.http4s.dsl.Http4sDsl
+import org.http4s.{HttpRoutes, Response}
 import org.typelevel.log4cats.Logger
 
-private class MicroserviceRoutes[F[_]: MonadThrow](
+private trait MicroserviceRoutes[F[_]] {
+  def notifyDBReady(): F[Unit]
+  def routes:          Resource[F, HttpRoutes[F]]
+}
+
+private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     fetchTokenEndpoint:     FetchTokenEndpoint[F],
     associateTokenEndpoint: AssociateTokenEndpoint[F],
     deleteTokenEndpoint:    DeleteTokenEndpoint[F],
     routesMetrics:          RoutesMetrics[F],
-    versionRoutes:          version.Routes[F]
+    versionRoutes:          version.Routes[F],
+    dbReady:                Ref[F, Boolean]
 )(implicit clock:           Clock[F])
-    extends Http4sDsl[F] {
+    extends Http4sDsl[F]
+    with MicroserviceRoutes[F] {
 
   import associateTokenEndpoint._
   import deleteTokenEndpoint._
   import fetchTokenEndpoint._
+  import io.renku.http.InfoMessage
+  import io.renku.http.InfoMessage._
   import org.http4s.HttpRoutes
   import routesMetrics._
 
+  override def notifyDBReady(): F[Unit] = dbReady.set(true)
+
   // format: off
-  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case           GET    -> Root / "ping"                                           => Ok("pong")
-    case           GET    -> Root / "projects" / ProjectId(projectId) / "tokens"     => fetchToken(projectId)
-    case           GET    -> Root / "projects" / ProjectPath(projectPath) / "tokens" => fetchToken(projectPath)
-    case request @ POST   -> Root / "projects" / ProjectId(projectId) / "tokens"     => associateToken(projectId, request)
-    case           DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => deleteToken(projectId)
+  override lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
+    case       GET    -> Root / "ping"                                           => Ok("pong")
+    case       GET    -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(fetchToken(projectId))
+    case       GET    -> Root / "projects" / ProjectPath(projectPath) / "tokens" => whenDBReady(fetchToken(projectPath))
+    case req @ POST   -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(associateToken(projectId, req))
+    case       DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(deleteToken(projectId))
   }.withMetrics.map(_ <+> versionRoutes())
   // format: on
+
+  private def whenDBReady(thunk: => F[Response[F]]): F[Response[F]] = dbReady.get >>= {
+    case true  => thunk
+    case false => ServiceUnavailable(InfoMessage("DB migration running"))
+  }
 }
 
 private object MicroserviceRoutes {
@@ -66,10 +83,12 @@ private object MicroserviceRoutes {
     associateTokenEndpoint <- AssociateTokenEndpoint(queriesExecTimes)
     deleteTokenEndpoint    <- DeleteTokenEndpoint(queriesExecTimes)
     versionRoutes          <- version.Routes[F]
-  } yield new MicroserviceRoutes(fetchTokenEndpoint,
-                                 associateTokenEndpoint,
-                                 deleteTokenEndpoint,
-                                 new RoutesMetrics[F],
-                                 versionRoutes
+    dbReady                <- Ref.of(false)
+  } yield new MicroserviceRoutesImpl(fetchTokenEndpoint,
+                                     associateTokenEndpoint,
+                                     deleteTokenEndpoint,
+                                     new RoutesMetrics[F],
+                                     versionRoutes,
+                                     dbReady
   )
 }

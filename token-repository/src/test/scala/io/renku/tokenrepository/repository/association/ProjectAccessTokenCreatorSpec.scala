@@ -26,17 +26,16 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Json
 import io.circe.literal._
-import io.renku.generators.CommonGraphGenerators.{accessTokens, projectAccessTokens}
+import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.durations
 import io.renku.graph.model.GraphModelGenerators.projectIds
-import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Method.POST
-import org.http4s.Status.{Created, Unauthorized}
+import org.http4s.Status.{BadRequest, Created, Forbidden, NotFound}
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
 import org.scalamock.scalatest.MockFactory
@@ -63,26 +62,32 @@ class ProjectAccessTokenCreatorSpec
         "scopes":     ["api", "read_repository"],
         "expires_at": ${now plus projectTokenTTL}
       }"""
-      val projectAccessToken = projectAccessTokens.generateOne
+      val creationInfo = tokenCreationInfos.generateOne
       (gitLabClient
-        .post(_: Uri, _: String Refined NonEmpty, _: Json)(_: ResponseMappingF[IO, ProjectAccessToken])(
+        .post(_: Uri, _: String Refined NonEmpty, _: Json)(_: ResponseMappingF[IO, Option[TokenCreationInfo]])(
           _: Option[AccessToken]
         ))
         .expects(uri"projects" / projectId.value / "access_tokens", endpointName, payload, *, Option(accessToken))
-        .returning(projectAccessToken.pure[IO])
+        .returning(creationInfo.some.pure[IO])
 
-      tokenCreator.createPersonalAccessToken(projectId, accessToken).unsafeRunSync() shouldBe projectAccessToken
+      tokenCreator.createPersonalAccessToken(projectId, accessToken).unsafeRunSync() shouldBe creationInfo.some
     }
 
     s"retrieve the created Project Access Token from the response with $Created status" in new TestCase {
       val creationInfo = tokenCreationInfos.generateOne
       mapResponse(Created, Request[IO](), Response[IO](Created).withEntity(glResponsePayload(creationInfo)))
-        .unsafeRunSync() shouldBe creationInfo
+        .unsafeRunSync() shouldBe creationInfo.some
     }
 
-    s"fail for responses other than $Created" in new TestCase {
+    Forbidden :: NotFound :: Nil foreach { status =>
+      s"retrieve the None for $status status" in new TestCase {
+        mapResponse(status, Request[IO](), Response[IO](status)).unsafeRunSync() shouldBe None
+      }
+    }
+
+    s"fail for responses other statuses" in new TestCase {
       intercept[Exception] {
-        mapResponse(Unauthorized, Request[IO](), Response[IO](Unauthorized)).unsafeRunSync()
+        mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest)).unsafeRunSync()
       }
     }
   }
@@ -101,7 +106,7 @@ class ProjectAccessTokenCreatorSpec
 
     lazy val mapResponse = captureMapping(tokenCreator, gitLabClient)(
       findingMethod = _.createPersonalAccessToken(projectId, accessToken).unsafeRunSync(),
-      resultGenerator = tokenCreationInfos.generateOne,
+      resultGenerator = tokenCreationInfos.generateSome,
       method = POST
     )
   }
