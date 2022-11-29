@@ -105,7 +105,8 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
         sql"""
         SELECT project_id, project_path, token
         FROM projects_tokens
-        WHERE expiry_date IS NULL"""
+        WHERE expiry_date IS NULL
+        LIMIT 1"""
           .query(projectIdDecoder ~ projectPathDecoder ~ encryptedAccessTokenDecoder)
           .map { case (id: projects.Id) ~ (path: projects.Path) ~ (token: EncryptedAccessToken) =>
             Project(id, path) -> token

@@ -57,29 +57,15 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
   "run" should {
 
-    "go through all the stored tokens that does not have the 'expiry_date' " +
-      "and generate and store a new Project Access Token if the existing token is valid" in new TestCase {
+    "for stored tokens that does not have the 'expiry_date' " +
+      "generate and store a new Project Access Token if the existing token is valid" in new TestCase {
 
         insert(validTokenProject, validTokenEncrypted)
 
         insertNonMigrated(oldTokenProject, oldTokenEncrypted)
 
-        val oldToken = accessTokens.generateOne
-        givenDecryption(oldTokenEncrypted, returning = oldToken.pure[IO])
-
-        givenTokenValidation(oldToken, returning = true.pure[IO])
-
-        val projectToken = projectAccessTokens.generateOne
-        val creationInfo = TokenCreationInfo(projectToken,
-                                             TokenDates(CreatedAt(Instant.now()),
-                                                        localDates(min = LocalDate.now()).generateAs(ExpiryDate)
-                                             )
-        )
-
-        givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.some.pure[IO])
-
-        val projectTokenEncrypted = encryptedAccessTokens.generateOne
-        givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
+        val (projectTokenEncrypted, creationInfo) =
+          givenSuccessfulTokenReplacement(oldTokenProject, oldTokenEncrypted)
 
         migration.run().unsafeRunSync() shouldBe ()
 
@@ -89,6 +75,33 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
         logger.loggedOnly(Info(show"$logPrefix $oldTokenProject token created"))
       }
+
+    "go through all the stored tokens without the 'expiry_date'" in new TestCase {
+
+      insert(validTokenProject, validTokenEncrypted)
+
+      insertNonMigrated(oldTokenProject, oldTokenEncrypted)
+      val (projectTokenEncrypted, creationInfo) =
+        givenSuccessfulTokenReplacement(oldTokenProject, oldTokenEncrypted)
+
+      val oldTokenProject1   = Project(projectIds.generateOne, projectPaths.generateOne)
+      val oldTokenEncrypted1 = encryptedAccessTokens.generateOne
+      insertNonMigrated(oldTokenProject1, oldTokenEncrypted1)
+      val (projectTokenEncrypted1, creationInfo1) =
+        givenSuccessfulTokenReplacement(oldTokenProject1, oldTokenEncrypted1)
+
+      migration.run().unsafeRunSync() shouldBe ()
+
+      findToken(validTokenProject.id)     shouldBe validTokenEncrypted.value.some
+      findToken(oldTokenProject.id)       shouldBe projectTokenEncrypted.value.some
+      findExpiryDate(oldTokenProject.id)  shouldBe creationInfo.dates.expiryDate.some
+      findToken(oldTokenProject1.id)      shouldBe projectTokenEncrypted1.value.some
+      findExpiryDate(oldTokenProject1.id) shouldBe creationInfo1.dates.expiryDate.some
+
+      logger.loggedOnly(Info(show"$logPrefix $oldTokenProject token created"),
+                        Info(show"$logPrefix $oldTokenProject1 token created")
+      )
+    }
 
     "remove the existing token if found token is invalid" in new TestCase {
 
@@ -186,7 +199,10 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       givenTokenValidation(oldToken, returning = true.pure[IO])
 
       val exception = exceptions.generateOne
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = exception.raiseError[IO, Option[TokenCreationInfo]])
+      givenProjectTokenCreator(oldTokenProject.id,
+                               oldToken,
+                               returning = exception.raiseError[IO, Option[TokenCreationInfo]]
+      )
       val projectToken = projectAccessTokens.generateOne
       val creationInfo =
         TokenCreationInfo(projectToken,
@@ -256,6 +272,29 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
           .use(_.execute(project.id ~ project.path ~ encryptedToken))
           .void
       }
+    }
+
+    def givenSuccessfulTokenReplacement(project:     Project,
+                                        oldTokenEnc: EncryptedAccessToken
+    ): (EncryptedAccessToken, TokenCreationInfo) = {
+
+      val oldToken = accessTokens.generateOne
+      givenDecryption(oldTokenEnc, returning = oldToken.pure[IO])
+
+      givenTokenValidation(oldToken, returning = true.pure[IO])
+
+      val projectToken = projectAccessTokens.generateOne
+      val creationInfo = TokenCreationInfo(
+        projectToken,
+        TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
+      )
+
+      givenProjectTokenCreator(project.id, oldToken, returning = creationInfo.some.pure[IO])
+
+      val projectTokenEncrypted = encryptedAccessTokens.generateOne
+      givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
+
+      projectTokenEncrypted -> creationInfo
     }
 
     def givenDecryption(encryptedToken: EncryptedAccessToken, returning: IO[AccessToken]) =
