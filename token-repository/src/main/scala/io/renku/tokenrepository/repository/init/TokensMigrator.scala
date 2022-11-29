@@ -79,8 +79,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
   override def run(): F[Unit] =
     Stream
       .repeatEval(findTokenWithoutDates)
-      .takeThrough(_.nonEmpty)
-      .flatMap(maybeProjectAndToken => Stream.emits(maybeProjectAndToken.toList))
+      .unNoneTerminate
       .evalMap { case (proj, encToken) => decryptOrDelete(proj, encToken) }
       .flatMap(maybeProjectAndToken => Stream.emits(maybeProjectAndToken.toList))
       .evalMap { case (proj, token) => deleteWhenInvalidWithRetry(proj, token) }
