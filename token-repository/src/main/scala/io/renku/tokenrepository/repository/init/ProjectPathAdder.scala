@@ -29,12 +29,12 @@ import skunk.implicits._
 
 import scala.util.control.NonFatal
 
-private trait ProjectPathAdder[F[_]] {
-  def run(): F[Unit]
+private object ProjectPathAdder {
+  def apply[F[_]: Async: Logger: SessionResource]: DBMigration[F] = new ProjectPathAdder[F]
 }
 
-private class ProjectPathAdderImpl[F[_]: Spawn: Logger: SessionResource]
-    extends ProjectPathAdder[F]
+private class ProjectPathAdder[F[_]: Spawn: Logger: SessionResource]
+    extends DBMigration[F]
     with TokenRepositoryTypeSerializers {
 
   import MigrationTools._
@@ -61,9 +61,4 @@ private class ProjectPathAdderImpl[F[_]: Spawn: Logger: SessionResource]
     Logger[F].error(exception)("'project_path' column adding failure")
     exception.raiseError[F, Unit]
   }
-}
-
-private object ProjectPathAdder {
-
-  def apply[F[_]: Async: Logger: SessionResource]: ProjectPathAdder[F] = new ProjectPathAdderImpl[F]
 }

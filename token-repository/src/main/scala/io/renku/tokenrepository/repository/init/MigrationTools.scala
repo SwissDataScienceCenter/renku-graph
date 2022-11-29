@@ -22,9 +22,9 @@ import cats.MonadThrow
 import cats.data.Kleisli
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
+import skunk._
 import skunk.codec.all._
 import skunk.implicits._
-import skunk._
 
 private object MigrationTools {
 
@@ -33,15 +33,38 @@ private object MigrationTools {
 
   def checkColumnExists[F[_]: MonadCancelThrow](table: String, column: String): Kleisli[F, Session[F], Boolean] =
     Kleisli { session =>
-      val query: Query[String ~ String, Boolean] =
-        sql"""SELECT EXISTS (
-            SELECT *
-            FROM information_schema.columns
-            WHERE table_name = $varchar AND column_name = $varchar
-          )""".query(bool)
+      val query: Query[String ~ String, Boolean] = sql"""
+        SELECT EXISTS (
+          SELECT *
+          FROM information_schema.columns
+          WHERE table_name = $varchar AND column_name = $varchar
+        )""".query(bool)
       session
         .prepare(query)
         .use(_.unique(table ~ column))
         .recover { case _ => false }
+    }
+
+  def checkColumnNullable[F[_]: MonadCancelThrow](table: String, column: String): Kleisli[F, Session[F], Boolean] =
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] = sql"""
+        SELECT is_nullable
+        FROM information_schema.columns
+        WHERE table_name = $varchar AND column_name = $varchar"""
+        .query(varchar(3))
+        .map {
+          case "YES" => true
+          case "NO"  => false
+          case other => throw new Exception(s"is_nullable for $table.$column has value $other")
+        }
+      session
+        .prepare(query)
+        .use(_.unique(table ~ column))
+        .recover { case _ => false }
+    }
+
+  def madeColumnNullable[F[_]: MonadCancelThrow](table: String, column: String): Kleisli[F, Session[F], Unit] =
+    Kleisli { implicit session =>
+      execute(sql"ALTER TABLE #$table ALTER COLUMN #$column SET NOT NULL".command)
     }
 }

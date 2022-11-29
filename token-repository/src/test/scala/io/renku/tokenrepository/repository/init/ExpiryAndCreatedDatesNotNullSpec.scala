@@ -22,46 +22,46 @@ import cats.effect.IO
 import io.renku.interpreters.TestLogger.Level.Info
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathAdderSpec
+class ExpiryAndCreatedDatesNotNullSpec
     extends AnyWordSpec
     with IOSpec
     with DbInitSpec
-    with Eventually
-    with IntegrationPatience
     with should.Matchers
     with MockFactory {
 
   protected override lazy val migrationsToRun: List[DBMigration[IO]] = allMigrations.takeWhile {
-    case _: ProjectPathAdder[IO] => false
+    case _: ExpiryAndCreatedDatesNotNull[IO] => false
     case _ => true
   }
 
   "run" should {
 
-    "add the 'project_path' column if does not exist and add paths fetched from GitLab" in new TestCase {
+    "make the expiry_date and created_at NOT NULL" in new TestCase {
 
-      verifyColumnExists("projects_tokens", "project_path") shouldBe false
+      verifyColumnNullable("projects_tokens", "expiry_date") shouldBe true
+      verifyColumnNullable("projects_tokens", "created_at")  shouldBe true
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ()
+      migration.run().unsafeRunSync() shouldBe ()
 
-      logger.loggedOnly(Info("'project_path' column added"))
+      verifyColumnNullable("projects_tokens", "expiry_date") shouldBe false
+      verifyColumnNullable("projects_tokens", "created_at")  shouldBe false
+
+      logger.loggedOnly(Info("'expiry_date' column made NOT NULL"), Info("'created_at' column made NOT NULL"))
+
       logger.reset()
 
-      projectPathAdder.run().unsafeRunSync() shouldBe ()
+      migration.run().unsafeRunSync() shouldBe ()
 
-      logger.loggedOnly(Info("'project_path' column existed"))
-
-      verifyIndexExists("projects_tokens", "idx_project_path")
+      logger.loggedOnly(Info("'expiry_date' column already NOT NULL"), Info("'created_at' column already NOT NULL"))
     }
   }
 
   private trait TestCase {
     logger.reset()
 
-    val projectPathAdder = new ProjectPathAdder[IO]
+    val migration = new ExpiryAndCreatedDatesNotNull[IO]
   }
 }

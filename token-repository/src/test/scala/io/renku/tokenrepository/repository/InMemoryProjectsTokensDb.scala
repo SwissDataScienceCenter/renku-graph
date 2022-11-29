@@ -80,6 +80,24 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer with TokenRepositoryT
     }
   }
 
+  protected def verifyColumnNullable(table: String, column: String): Boolean = execute[Boolean] {
+    Kleisli { session =>
+      val query: Query[String ~ String, Boolean] = sql"""
+        SELECT DISTINCT is_nullable
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE table_name = $varchar AND column_name = $varchar"""
+        .query(varchar(3))
+        .map {
+          case "YES" => true
+          case "NO"  => false
+          case other => throw new Exception(s"is_nullable for $table.$column has value $other")
+        }
+      session
+        .prepare(query)
+        .use(_.unique(table ~ column))
+    }
+  }
+
   def verifyIndexExists(table: String, indexName: String): Boolean = execute[Boolean] {
     Kleisli { session =>
       val query: Query[String ~ String, Boolean] =

@@ -18,21 +18,21 @@
 
 package io.renku.tokenrepository.repository.init
 
-import DbInitializer.Runnable
 import cats.effect._
 import cats.syntax.all._
+import io.renku.http.client.GitLabClient
+import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
 trait DbInitializer[F[_]] {
   def run(): F[Unit]
 }
 
-class DbInitializerImpl[F[_]: Async: Logger](migrators: List[Runnable[F, Unit]],
+class DbInitializerImpl[F[_]: Async: Logger](migrators: List[DBMigration[F]],
                                              retrySleepDuration: FiniteDuration = 20 seconds
 ) extends DbInitializer[F] {
 
@@ -54,14 +54,18 @@ class DbInitializerImpl[F[_]: Async: Logger](migrators: List[Runnable[F, Unit]],
 
 object DbInitializer {
 
-  def apply[F[_]: Async: Logger: SessionResource]: F[DbInitializer[F]] = for {
-    tableCreator               <- ProjectsTokensTableCreator[F].pure[F]
-    pathAdder                  <- ProjectPathAdder[F].pure[F]
-    duplicateProjectsRemover   <- DuplicateProjectsRemover[F].pure[F]
-    expireAndCreatedDatesAdder <- ExpireAndCreatedDatesAdder[F].pure[F]
-  } yield new DbInitializerImpl[F](
-    List[Runnable[F, Unit]](tableCreator, pathAdder, duplicateProjectsRemover, expireAndCreatedDatesAdder)
-  )
+  def migrations[F[_]: Async: GitLabClient: Logger: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[List[DBMigration[F]]] = List(
+    ProjectsTokensTableCreator[F].pure[F],
+    ProjectPathAdder[F].pure[F],
+    DuplicateProjectsRemover[F].pure[F],
+    ExpiryAndCreatedDatesAdder[F].pure[F],
+    TokensMigrator[F](queriesExecTimes),
+    ExpiryAndCreatedDatesNotNull[F].pure[F]
+  ).sequence
 
-  private[init] type Runnable[F[_], R] = { def run(): F[R] }
+  def apply[F[_]: Async: GitLabClient: Logger: SessionResource](
+      queriesExecTimes: LabeledHistogram[F]
+  ): F[DbInitializer[F]] = migrations[F](queriesExecTimes).map(new DbInitializerImpl[F](_))
 }

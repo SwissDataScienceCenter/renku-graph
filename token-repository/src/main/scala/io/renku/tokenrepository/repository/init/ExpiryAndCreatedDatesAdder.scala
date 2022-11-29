@@ -25,17 +25,11 @@ import cats.effect.Spawn
 import cats.syntax.all._
 import org.typelevel.log4cats.Logger
 
-private trait ExpireAndCreatedDatesAdder[F[_]] {
-  def run(): F[Unit]
+private object ExpiryAndCreatedDatesAdder {
+  def apply[F[_]: Spawn: Logger: SessionResource]: DBMigration[F] = new ExpiryAndCreatedDatesAdder[F]
 }
 
-private object ExpireAndCreatedDatesAdder {
-  def apply[F[_]: Spawn: Logger: SessionResource]: ExpireAndCreatedDatesAdder[F] =
-    new ExpireAndCreatedDatesAdderImpl[F]
-}
-
-private class ExpireAndCreatedDatesAdderImpl[F[_]: Spawn: Logger: SessionResource]
-    extends ExpireAndCreatedDatesAdder[F] {
+private class ExpiryAndCreatedDatesAdder[F[_]: Spawn: Logger: SessionResource] extends DBMigration[F] {
 
   import MigrationTools._
   import skunk._
