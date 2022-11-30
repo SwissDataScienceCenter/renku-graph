@@ -27,7 +27,7 @@ import io.renku.tokenrepository.repository.RepositoryGenerators._
 import io.renku.tokenrepository.repository.association.TokenDates._
 import org.scalacheck.Gen
 
-private object Generators {
+object Generators {
 
   val tokenCreatedAts:  Gen[CreatedAt]  = timestampsNotInTheFuture.toGeneratorOf(CreatedAt)
   val tokenExpiryDates: Gen[ExpiryDate] = localDates.toGeneratorOf(ExpiryDate)
@@ -38,9 +38,9 @@ private object Generators {
   val tokenCreationInfos: Gen[TokenCreationInfo] =
     (projectAccessTokens, tokenDates).mapN(TokenCreationInfo.apply)
 
-  private val projectInfos: Gen[TokenStoringInfo.Project] =
+  val projectObjects: Gen[TokenStoringInfo.Project] =
     (projectIds, projectPaths).mapN(TokenStoringInfo.Project.apply)
 
   val tokenStoringInfos: Gen[TokenStoringInfo] =
-    (projectInfos, encryptedAccessTokens, tokenDates).mapN(TokenStoringInfo.apply)
+    (projectObjects, encryptedAccessTokens, tokenDates).mapN(TokenStoringInfo.apply)
 }

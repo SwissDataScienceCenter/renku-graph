@@ -29,6 +29,7 @@ import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.MockedRunnableCollaborators
 import io.renku.tokenrepository.repository.init.DbInitializer
+import io.renku.tokenrepository.repository.refresh.TokensRefresher
 import org.http4s.HttpRoutes
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
@@ -57,9 +58,8 @@ class MicroserviceRunnerSpec
 
       logger.loggedOnly(Info("Service started"))
 
-      eventually(
-        microserviceRoutes.notifyDBCalled.get.unsafeRunSync() shouldBe true
-      )
+      verifyRoutesNotified
+      verifyTokenRefresherStarted
     }
 
     "fail if Certificate loading fails" in new TestCase {
@@ -120,12 +120,29 @@ class MicroserviceRunnerSpec
     val sentryInitializer = mock[SentryInitializer[IO]]
     val dbInitializer     = mock[DbInitializer[IO]]
     val httpServer        = mock[HttpServer[IO]]
+    val tokensRefresher = new TokensRefresher[IO] {
+      val started:        Ref[IO, Boolean] = Ref.unsafe(false)
+      override def run(): IO[Unit]         = started.set(true)
+    }
     val microserviceRoutes = new MicroserviceRoutes[IO] {
       val notifyDBCalled: Ref[IO, Boolean] = Ref.unsafe(false)
       override def notifyDBReady() = notifyDBCalled.set(true)
       override def routes          = Resource.pure(HttpRoutes.empty[IO])
     }
-    val runner =
-      new MicroserviceRunner(certificateLoader, sentryInitializer, dbInitializer, httpServer, microserviceRoutes)
+    val runner = new MicroserviceRunner(certificateLoader,
+                                        sentryInitializer,
+                                        dbInitializer,
+                                        tokensRefresher,
+                                        httpServer,
+                                        microserviceRoutes
+    )
+
+    def verifyRoutesNotified = eventually {
+      microserviceRoutes.notifyDBCalled.get.unsafeRunSync() shouldBe true
+    }
+
+    def verifyTokenRefresherStarted = eventually {
+      tokensRefresher.started.get.unsafeRunSync() shouldBe true
+    }
   }
 }
