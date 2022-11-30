@@ -156,4 +156,8 @@ private object Generators {
 
   def compositePlanGen(minChildren: Int = 3, maxChildren: Int = 6): Gen[CompositePlan] =
     compositePlanGenFactory(minChildren, maxChildren).generateOne
+
+  def compositePlanNonEmptyMappings: CompositePlanGenFactory =
+    compositePlanEntities(stepPlanGenFactory.mapF(_.toGeneratorOfList(min = 3)))
+      .mapF(_.suchThat(_.mappings.nonEmpty))
 }
