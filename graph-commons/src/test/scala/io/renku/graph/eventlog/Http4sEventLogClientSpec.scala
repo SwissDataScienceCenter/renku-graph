@@ -25,7 +25,7 @@ import io.circe.Encoder
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.eventlog.EventLogClient.{Result, SearchCriteria}
 import io.renku.graph.model.{EventContentGenerators, EventsGenerators, GraphModelGenerators}
-import io.renku.graph.model.events.{EventDate, EventStatus}
+import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.http.client.UrlEncoder
 import io.renku.interpreters.TestLogger
 import io.renku.stubbing.ExternalServiceStubbing
@@ -37,6 +37,7 @@ import org.scalatest.matchers.should
 import scodec.bits.ByteVector
 
 import java.time.temporal.ChronoUnit
+import io.renku.graph.eventlog.Http4sEventLogClientSpec.JsonEncoders._
 
 class Http4sEventLogClientSpec extends AnyWordSpec with IOSpec with ExternalServiceStubbing with should.Matchers {
 
@@ -64,7 +65,7 @@ class Http4sEventLogClientSpec extends AnyWordSpec with IOSpec with ExternalServ
 
       val result = client.getEvents(criteria).unsafeRunSync()
       val data   = result.toEither.fold(throw _, identity)
-      data shouldBe events.map(_.copy(maybeMessage = None))
+      data shouldBe events
     }
 
     "return failure" in {
@@ -133,4 +134,34 @@ class Http4sEventLogClientSpec extends AnyWordSpec with IOSpec with ExternalServ
 
   def param: String => String =
     UrlEncoder.urlEncode
+
+}
+
+object Http4sEventLogClientSpec {
+
+  /** Encoders as used by the microservice endpoint. */
+  object JsonEncoders {
+    import io.circe.Json
+    import io.circe.literal._
+    import io.circe.syntax._
+
+    implicit val statusProcessingTimeEncoder: Encoder[StatusProcessingTime] = { processingTime =>
+      json"""{
+          "status":         ${processingTime.status},
+          "processingTime": ${processingTime.processingTime}
+        }"""
+    }
+
+    implicit val eventInfoEncoder: Encoder[EventInfo] = eventInfo =>
+      json"""{
+            "id":              ${eventInfo.eventId},
+            "projectPath":     ${eventInfo.projectPath},
+            "status":          ${eventInfo.status},
+            "processingTimes": ${eventInfo.processingTimes},
+            "date" :           ${eventInfo.eventDate},
+            "executionDate":   ${eventInfo.executionDate}
+          }""".deepMerge(
+        eventInfo.maybeMessage.map(m => Json.obj("message" -> m.asJson)).getOrElse(Json.obj())
+      )
+  }
 }

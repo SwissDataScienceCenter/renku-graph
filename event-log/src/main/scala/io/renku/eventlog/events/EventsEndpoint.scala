@@ -21,10 +21,12 @@ package io.renku.eventlog.events
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Show}
+import io.circe.{Encoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.EventsEndpoint.Criteria._
+import io.renku.eventlog.events.EventsEndpoint.JsonEncoders
 import io.renku.graph.config.EventLogUrl
-import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus}
+import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus, StatusProcessingTime}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.http.rest.paging.PagingRequest
@@ -48,7 +50,7 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
   override def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]] =
     eventsFinder
       .findEvents(criteria)
-      .map(_.toHttpResponse[F, EventLogUrl](resourceUrl(request), EventLogUrl, EventInfo.jsonEncoder))
+      .map(_.toHttpResponse[F, EventLogUrl](resourceUrl(request), EventLogUrl, JsonEncoders.eventInfoEncoder))
       .recoverWith(httpResponse(request))
 
   private def resourceUrl(request: Request[F]) = EventLogUrl(show"$eventLogUrl${request.uri}")
@@ -121,5 +123,29 @@ object EventsEndpoint {
     case Filters.EventsSince(since)                => show"since: $since"
     case Filters.EventsUntil(until)                => show"until: $until"
     case Filters.EventsSinceAndUntil(since, until) => show"since: ${since.eventDate}; until: ${until.eventDate}"
+  }
+
+  object JsonEncoders {
+    import io.circe.literal._
+    import io.circe.syntax._
+
+    implicit val statusProcessingTimeEncoder: Encoder[StatusProcessingTime] = { processingTime =>
+      json"""{
+        "status":         ${processingTime.status},
+        "processingTime": ${processingTime.processingTime}
+      }"""
+    }
+
+    implicit val eventInfoEncoder: Encoder[EventInfo] = eventInfo =>
+      json"""{
+          "id":              ${eventInfo.eventId},
+          "projectPath":     ${eventInfo.projectPath},
+          "status":          ${eventInfo.status},
+          "processingTimes": ${eventInfo.processingTimes},
+          "date" :           ${eventInfo.eventDate},
+          "executionDate":   ${eventInfo.executionDate}
+        }""".deepMerge(
+        eventInfo.maybeMessage.map(m => Json.obj("message" -> m.asJson)).getOrElse(Json.obj())
+      )
   }
 }

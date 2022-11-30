@@ -22,7 +22,7 @@ import cats.Show
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.{Decoder, Encoder, Json}
+import io.circe.Decoder
 import io.circe.Decoder.decodeString
 import io.renku.data.ErrorMessage
 import io.renku.tinytypes._
@@ -258,15 +258,6 @@ object events {
 
   final case class StatusProcessingTime(status: EventStatus, processingTime: EventProcessingTime)
   object StatusProcessingTime {
-    implicit val jsonEncoder: Encoder[StatusProcessingTime] = {
-      import io.circe.literal._
-
-      processingTime => json"""{
-        "status":         ${processingTime.status},
-        "processingTime": ${processingTime.processingTime}
-      }"""
-    }
-
     implicit val jsonDecoder: Decoder[StatusProcessingTime] =
       Decoder.instance { cursor =>
         for {
@@ -287,23 +278,9 @@ object events {
           processingTimes <- cursor.downField("processingTimes").as[List[StatusProcessingTime]]
           date            <- cursor.downField("date").as[EventDate]
           executionDate   <- cursor.downField("executionDate").as[ExecutionDate]
-        } yield EventInfo(id, path, status, date, executionDate, None, processingTimes)
+          msg             <- cursor.downField("message").as[Option[EventMessage]]
+        } yield EventInfo(id, path, status, date, executionDate, msg, processingTimes)
       }
-
-    implicit val jsonEncoder: Encoder[EventInfo] = eventInfo => {
-      import io.circe.literal._
-
-      json"""{
-        "id":              ${eventInfo.eventId.value},
-        "projectPath":     ${eventInfo.projectPath.value},
-        "status":          ${eventInfo.status.value},
-        "processingTimes": ${eventInfo.processingTimes},
-        "date" :           ${eventInfo.eventDate},
-        "executionDate":   ${eventInfo.executionDate}
-      }""" deepMerge {
-        eventInfo.maybeMessage.map(message => json"""{"message": ${message.value}}""").getOrElse(Json.obj())
-      }
-    }
   }
 
   final class EventProcessingTime private (val value: Duration) extends AnyVal with DurationTinyType
