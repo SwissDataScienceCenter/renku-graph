@@ -273,7 +273,13 @@ object events {
     object ProjectIds {
       implicit val jsonDecoder: Decoder[ProjectIds] =
         io.circe.generic.semiauto.deriveDecoder[ProjectIds]
+
+      implicit val show: Show[ProjectIds] =
+        a => show"${a.id}/${a.path}"
     }
+
+    implicit val show: Show[EventInfo] =
+      Show.show(info => s"${info.eventId.show}/${info.project.show}/${info.status}")
 
     implicit val jsonDecoder: Decoder[EventInfo] =
       Decoder.instance { cursor =>
