@@ -180,6 +180,8 @@ class TokensRefresherSpec
         )
       }
     }
+
+    // 204 NoContent | 404 NotFound
   }
 
   private trait TestCase {

@@ -18,7 +18,14 @@
 
 package io.renku.tokenrepository.repository.refresh
 
+import io.renku.tinytypes.constraints.NonNegativeInt
+import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.association.TokenStoringInfo.Project
 
 private final case class TokenCloseExpiration(project: Project, encryptedToken: EncryptedAccessToken)
+
+private final class TokenId private (val value: Int) extends AnyVal with IntTinyType
+private object TokenId extends TinyTypeFactory[TokenId](new TokenId(_)) with NonNegativeInt[TokenId]
+
+private def aboutToExpireDate = 

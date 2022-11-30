@@ -62,16 +62,19 @@ private class ProjectAccessTokenCreatorImpl[F[_]: Async: GitLabClient](
 
   override def createPersonalAccessToken(projectId:   projects.Id,
                                          accessToken: AccessToken
-  ): F[Option[TokenCreationInfo]] = {
-    val payload = json"""{
-      "name":       "renku",
-      "scopes":     ["api", "read_repository"],
-      "expires_at": ${currentDate() plus projectTokenTTL}
-    }"""
-    GitLabClient[F].post(uri"projects" / projectId.value / "access_tokens", "create-project-access-token", payload)(
+  ): F[Option[TokenCreationInfo]] =
+    GitLabClient[F].post(uri"projects" / projectId.value / "access_tokens",
+                         "create-project-access-token",
+                         createPayload()
+    )(
       mapResponse
     )(accessToken.some)
-  }
+
+  private def createPayload() = json"""{
+    "name":       $renkuTokenName,
+    "scopes":     ["api", "read_repository"],
+    "expires_at": ${currentDate() plus projectTokenTTL}
+  }"""
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[TokenCreationInfo]]] = {
     case (Created, _, response)       => response.as[TokenCreationInfo].map(Option.apply)
