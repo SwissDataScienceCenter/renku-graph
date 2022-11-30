@@ -23,11 +23,10 @@ import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel}
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog._
-import io.renku.eventlog.events.EventsEndpoint.{Criteria, EventInfo, StatusProcessingTime}
-import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.eventlog.events.EventsEndpoint.Criteria
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.http.rest.paging.Paging.PagedResultsFinder
 import io.renku.http.rest.paging.model.{PerPage, Total}
@@ -79,17 +78,17 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
 
       private val whereEventDate: Option[Criteria.FiltersOnDate] => AppliedFragment = {
         case Some(Criteria.Filters.EventsSince(since)) =>
-          val fragment: Fragment[eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate] = sql"""
             WHERE evt.event_date >= $eventDateEncoder
           """
           fragment(since)
         case Some(Criteria.Filters.EventsUntil(until)) =>
-          val fragment: Fragment[eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate] = sql"""
             WHERE evt.event_date <= $eventDateEncoder
           """
           fragment(until)
         case Some(Criteria.Filters.EventsSinceAndUntil(since, until)) =>
-          val fragment: Fragment[(eventlog.EventDate ~ eventlog.EventDate)] = sql"""
+          val fragment: Fragment[(EventDate ~ EventDate)] = sql"""
             WHERE evt.event_date >= $eventDateEncoder
               AND evt.event_date <= $eventDateEncoder
           """
@@ -99,17 +98,17 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
 
       private val andEventDate: Option[Criteria.FiltersOnDate] => AppliedFragment = {
         case Some(Criteria.Filters.EventsSince(since)) =>
-          val fragment: Fragment[eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate] = sql"""
             AND evt.event_date >= $eventDateEncoder
           """
           fragment(since)
         case Some(Criteria.Filters.EventsUntil(until)) =>
-          val fragment: Fragment[eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate] = sql"""
             AND evt.event_date <= $eventDateEncoder
           """
           fragment(until)
         case Some(Criteria.Filters.EventsSinceAndUntil(since, until)) =>
-          val fragment: Fragment[eventlog.EventDate ~ eventlog.EventDate] = sql"""
+          val fragment: Fragment[EventDate ~ EventDate] = sql"""
             AND evt.event_date >= $eventDateEncoder
             AND evt.event_date <= $eventDateEncoder
           """

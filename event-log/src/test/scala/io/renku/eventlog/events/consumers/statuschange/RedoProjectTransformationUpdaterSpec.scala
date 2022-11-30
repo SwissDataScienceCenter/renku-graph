@@ -20,8 +20,8 @@ package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventMessages
-import io.renku.eventlog._
+import io.renku.graph.model.EventContentGenerators.eventMessages
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RedoProjectTransformation
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
@@ -31,7 +31,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events._
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec

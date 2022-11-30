@@ -22,16 +22,21 @@ import cats.Show
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.Decoder
+import io.circe.{Decoder, Encoder, Json}
 import io.circe.Decoder.decodeString
+import io.renku.data.ErrorMessage
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 import io.renku.tinytypes.contenttypes.ZippedContent
-import io.renku.tinytypes.json.TinyTypeDecoders.{durationDecoder, instantDecoder}
+import io.renku.tinytypes.json.TinyTypeDecoders._
 
 import java.time.{Clock, Duration, Instant}
 
 object events {
+
+  final class CreatedDate private (val value: Instant) extends AnyVal with InstantTinyType
+
+  object CreatedDate extends TinyTypeFactory[CreatedDate](new CreatedDate(_)) with InstantNotInTheFuture[CreatedDate]
 
   final case class CompoundEventId(id: EventId, projectId: projects.Id) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
@@ -97,6 +102,28 @@ object events {
 
   implicit object BatchDate extends TinyTypeFactory[BatchDate](new BatchDate(_)) with InstantNotInTheFuture[BatchDate] {
     def apply(clock: Clock): BatchDate = apply(clock.instant())
+  }
+
+  final class EventDate private (val value: Instant) extends AnyVal with InstantTinyType
+  object EventDate extends TinyTypeFactory[EventDate](new EventDate(_)) with BoundedInstant[EventDate] {
+    import java.time.temporal.ChronoUnit.HOURS
+
+    protected[this] override def maybeMax: Option[Instant] = Some(instantNow.plus(24, HOURS))
+
+    implicit val decoder: Decoder[EventDate] = instantDecoder(EventDate)
+  }
+
+  final class EventMessage private (val value: String) extends AnyVal with StringTinyType
+  object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) with NonBlank[EventMessage] {
+
+    implicit val decoder: Decoder[EventMessage] = stringDecoder(EventMessage)
+
+    def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage.withStackTrace(exception).value)
+  }
+
+  final class ExecutionDate private (val value: Instant) extends AnyVal with InstantTinyType
+  object ExecutionDate extends TinyTypeFactory[ExecutionDate](new ExecutionDate(_)) {
+    implicit val decoder: Decoder[ExecutionDate] = instantDecoder(ExecutionDate)
   }
 
   sealed trait EventStatus extends StringTinyType with Product with Serializable
@@ -217,6 +244,65 @@ object events {
   private object EventStatusInstantiator extends (String => EventStatus) {
     override def apply(value: String): EventStatus = EventStatus.all.find(_.value == value).getOrElse {
       throw new IllegalArgumentException(s"'$value' unknown EventStatus")
+    }
+  }
+
+  final case class EventInfo(eventId:         EventId,
+                             projectPath:     projects.Path,
+                             status:          EventStatus,
+                             eventDate:       EventDate,
+                             executionDate:   ExecutionDate,
+                             maybeMessage:    Option[EventMessage],
+                             processingTimes: List[StatusProcessingTime]
+  )
+
+  final case class StatusProcessingTime(status: EventStatus, processingTime: EventProcessingTime)
+  object StatusProcessingTime {
+    implicit val jsonEncoder: Encoder[StatusProcessingTime] = {
+      import io.circe.literal._
+
+      processingTime => json"""{
+        "status":         ${processingTime.status},
+        "processingTime": ${processingTime.processingTime}
+      }"""
+    }
+
+    implicit val jsonDecoder: Decoder[StatusProcessingTime] =
+      Decoder.instance { cursor =>
+        for {
+          status <- cursor.downField("status").as[EventStatus]
+          time   <- cursor.downField("processingTime").as[EventProcessingTime]
+        } yield StatusProcessingTime(status, time)
+      }
+  }
+
+  object EventInfo {
+
+    implicit val jsonDecoder: Decoder[EventInfo] =
+      Decoder.instance { cursor =>
+        for {
+          id              <- cursor.downField("id").as[EventId]
+          path            <- cursor.downField("projectPath").as[projects.Path]
+          status          <- cursor.downField("status").as[EventStatus]
+          processingTimes <- cursor.downField("processingTimes").as[List[StatusProcessingTime]]
+          date            <- cursor.downField("date").as[EventDate]
+          executionDate   <- cursor.downField("executionDate").as[ExecutionDate]
+        } yield EventInfo(id, path, status, date, executionDate, None, processingTimes)
+      }
+
+    implicit val jsonEncoder: Encoder[EventInfo] = eventInfo => {
+      import io.circe.literal._
+
+      json"""{
+        "id":              ${eventInfo.eventId.value},
+        "projectPath":     ${eventInfo.projectPath.value},
+        "status":          ${eventInfo.status.value},
+        "processingTimes": ${eventInfo.processingTimes},
+        "date" :           ${eventInfo.eventDate},
+        "executionDate":   ${eventInfo.executionDate}
+      }""" deepMerge {
+        eventInfo.maybeMessage.map(message => json"""{"message": ${message.value}}""").getOrElse(Json.obj())
+      }
     }
   }
 

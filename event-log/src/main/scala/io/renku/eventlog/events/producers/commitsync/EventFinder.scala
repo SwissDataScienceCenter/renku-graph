@@ -25,12 +25,11 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.EventDate
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.events.CategoryName
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events.{CompoundEventId, EventDate, EventId, EventStatus, LastSyncedDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk._

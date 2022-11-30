@@ -18,9 +18,8 @@
 
 package io.renku.eventlog.init
 
-import io.renku.eventlog.{EventDate, EventMessage}
 import io.renku.events.consumers.Project
-import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
+import io.renku.graph.model.events._
 
 private object model {
   case class Event(id:           EventId,

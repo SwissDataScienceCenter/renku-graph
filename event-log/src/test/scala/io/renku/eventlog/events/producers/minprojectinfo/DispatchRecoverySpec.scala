@@ -22,7 +22,7 @@ package minprojectinfo
 import Generators.sendingResults
 import cats.effect.IO
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventDates
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
 import io.renku.events.consumers.subscriptions.subscriberUrls

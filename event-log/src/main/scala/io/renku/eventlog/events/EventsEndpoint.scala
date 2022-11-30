@@ -21,13 +21,10 @@ package io.renku.eventlog.events
 import cats.effect.Async
 import cats.syntax.all._
 import cats.{MonadThrow, NonEmptyParallel, Show}
-import io.circe.{Encoder, Json}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog._
 import io.renku.eventlog.events.EventsEndpoint.Criteria._
-import io.renku.eventlog.events.EventsEndpoint.EventInfo
 import io.renku.graph.config.EventLogUrl
-import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
+import io.renku.graph.model.events.{EventDate, EventInfo, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.http.rest.paging.PagingRequest
@@ -51,7 +48,7 @@ class EventsEndpointImpl[F[_]: MonadThrow: Logger](eventsFinder: EventsFinder[F]
   override def findEvents(criteria: EventsEndpoint.Criteria, request: Request[F]): F[Response[F]] =
     eventsFinder
       .findEvents(criteria)
-      .map(_.toHttpResponse[F, EventLogUrl](resourceUrl(request), EventLogUrl, EventInfo.infoEncoder))
+      .map(_.toHttpResponse[F, EventLogUrl](resourceUrl(request), EventLogUrl, EventInfo.jsonEncoder))
       .recoverWith(httpResponse(request))
 
   private def resourceUrl(request: Request[F]) = EventLogUrl(show"$eventLogUrl${request.uri}")
@@ -124,40 +121,5 @@ object EventsEndpoint {
     case Filters.EventsSince(since)                => show"since: $since"
     case Filters.EventsUntil(until)                => show"until: $until"
     case Filters.EventsSinceAndUntil(since, until) => show"since: ${since.eventDate}; until: ${until.eventDate}"
-  }
-
-  final case class EventInfo(eventId:         EventId,
-                             projectPath:     projects.Path,
-                             status:          EventStatus,
-                             eventDate:       EventDate,
-                             executionDate:   ExecutionDate,
-                             maybeMessage:    Option[EventMessage],
-                             processingTimes: List[StatusProcessingTime]
-  )
-
-  final case class StatusProcessingTime(status: EventStatus, processingTime: EventProcessingTime)
-
-  object EventInfo {
-
-    implicit lazy val infoEncoder: Encoder[EventInfo] = eventInfo => {
-      import io.circe.literal._
-      import io.circe.syntax._
-
-      implicit val processingTimeEncoder: Encoder[StatusProcessingTime] = processingTime => json"""{
-        "status":         ${processingTime.status.value},
-        "processingTime": ${processingTime.processingTime.value}
-      }"""
-
-      json"""{
-        "id":              ${eventInfo.eventId.value},
-        "projectPath":     ${eventInfo.projectPath.value},
-        "status":          ${eventInfo.status.value},
-        "processingTimes": ${eventInfo.processingTimes.map(_.asJson)},
-        "date" :           ${eventInfo.eventDate.value.asJson},
-        "executionDate":   ${eventInfo.executionDate.value.asJson}
-      }""" deepMerge {
-        eventInfo.maybeMessage.map(message => json"""{"message": ${message.value}}""").getOrElse(Json.obj())
-      }
-    }
   }
 }

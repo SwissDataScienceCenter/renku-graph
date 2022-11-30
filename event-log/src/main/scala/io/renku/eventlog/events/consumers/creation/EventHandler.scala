@@ -24,12 +24,11 @@ import cats.syntax.all._
 import cats.{MonadThrow, Show}
 import io.circe.{ACursor, Decoder, DecodingFailure}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers._
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
-import io.renku.graph.model.events.{BatchDate, EventBody, EventId, EventStatus}
+import io.renku.graph.model.events.{BatchDate, EventBody, EventDate, EventId, EventMessage, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger

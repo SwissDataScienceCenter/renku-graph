@@ -20,7 +20,7 @@ package io.renku.eventlog.events.consumers.statuschange
 
 import cats.effect.IO
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.events.consumers.subscriptions.{subscriberIds, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls

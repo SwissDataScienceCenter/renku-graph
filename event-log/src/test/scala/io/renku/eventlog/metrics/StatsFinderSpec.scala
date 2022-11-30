@@ -22,8 +22,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog._
+import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec}
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.events.producers._
 import io.renku.events.CategoryName
 import io.renku.generators.Generators.Implicits._
@@ -31,7 +31,7 @@ import io.renku.generators.Generators.{jsons, nonEmptyList, nonEmptyStrings, pos
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec

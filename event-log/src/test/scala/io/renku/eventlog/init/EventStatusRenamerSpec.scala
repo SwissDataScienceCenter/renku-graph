@@ -23,12 +23,12 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal.JsonStringContext
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.init.model.Event
 import io.renku.eventlog.{events => _, _}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info

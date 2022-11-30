@@ -23,10 +23,9 @@ import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.RollbackToNew
-import io.renku.graph.model.events.EventId
+import io.renku.graph.model.events.{EventId, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{GeneratingTriples, New}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram

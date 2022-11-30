@@ -26,8 +26,9 @@ import cats.syntax.all._
 import cats.{MonadThrow, Parallel}
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.{ExecutionDate, TypeSerializers}
+import io.renku.eventlog.TypeSerializers
 import io.renku.events.consumers.Project
+import io.renku.graph.model.events.ExecutionDate
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
 import io.renku.graph.model.projects
 import io.renku.metrics.{LabeledGauge, LabeledHistogram}

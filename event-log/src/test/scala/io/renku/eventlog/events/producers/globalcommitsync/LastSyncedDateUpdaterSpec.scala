@@ -23,7 +23,7 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement.Name
-import io.renku.eventlog.EventContentGenerators.eventDates
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
 import io.renku.events.CategoryName

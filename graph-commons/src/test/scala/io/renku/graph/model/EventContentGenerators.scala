@@ -16,18 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events
+package io.renku.graph.model
 
-import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, executionDates}
-import io.renku.eventlog.events.EventsEndpoint.{EventInfo, StatusProcessingTime}
+import io.renku.generators.Generators.{nonEmptyStrings, timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.{eventIds, eventProcessingTimes, eventStatuses}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
-import io.renku.graph.model.events.EventStatus
-import io.renku.graph.model.projects
+import io.renku.graph.model.events._
 import org.scalacheck.Gen
 
-private object Generators {
+object EventContentGenerators {
+
+  implicit val eventDates:     Gen[EventDate]     = timestampsNotInTheFuture map EventDate.apply
+  implicit val createdDates:   Gen[CreatedDate]   = timestampsNotInTheFuture map CreatedDate.apply
+  implicit val executionDates: Gen[ExecutionDate] = timestamps map ExecutionDate.apply
+
+  implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
 
   def eventInfos(projectPathGen: Gen[projects.Path] = projectPaths): Gen[EventInfo] = for {
     id            <- eventIds

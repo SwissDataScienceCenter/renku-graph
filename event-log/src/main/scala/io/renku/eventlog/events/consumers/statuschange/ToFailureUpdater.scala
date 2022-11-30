@@ -26,9 +26,8 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToFailure
-import io.renku.eventlog.{EventMessage, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{FailureStatus, New, ProcessingStatus, TransformationNonRecoverableFailure, TransformationRecoverableFailure, TriplesGenerated}
-import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.graph.model.events.{EventId, EventMessage, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger

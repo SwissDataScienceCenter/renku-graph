@@ -25,10 +25,10 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventIds}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events._
 import EventStatus._
-import io.renku.eventlog._
-import EventContentGenerators.{eventDates, eventMessages}
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
 import StatusChangeEvent.{AllowedCombination, ToFailure}
 import cats.data.Kleisli
 import io.renku.interpreters.TestLogger

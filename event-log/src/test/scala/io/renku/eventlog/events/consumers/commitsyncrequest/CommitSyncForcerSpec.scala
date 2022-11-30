@@ -19,13 +19,14 @@
 package io.renku.eventlog.events.consumers.commitsyncrequest
 
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventDates
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.eventlog.events.producers._
-import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.events.Generators.categoryNames
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
+import io.renku.graph.model.events.EventDate
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory

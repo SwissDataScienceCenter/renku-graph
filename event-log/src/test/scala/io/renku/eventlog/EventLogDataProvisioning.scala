@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import cats.data.Kleisli
 import io.circe.Json
-import io.renku.eventlog.EventContentGenerators.eventMessages
+import io.renku.graph.model.EventContentGenerators.eventMessages
 import io.renku.eventlog.events.producers.eventdelivery._
 import io.renku.events.consumers
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
@@ -30,7 +30,7 @@ import io.renku.generators.Generators.timestampsNotInTheFuture
 import io.renku.graph.model.EventsGenerators.{eventBodies, eventIds, eventProcessingTimes, zippedEventPayloads}
 import io.renku.graph.model.GraphModelGenerators.projectPaths
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, TransformationRecoverableFailure, TransformingTriples, TriplesGenerated, TriplesStore}
-import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.graph.model.projects.Path
 import io.renku.microservices.MicroserviceBaseUrl

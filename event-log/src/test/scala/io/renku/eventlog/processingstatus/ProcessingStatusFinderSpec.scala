@@ -20,7 +20,7 @@ package io.renku.eventlog.processingstatus
 
 import cats.data.NonEmptyList
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._

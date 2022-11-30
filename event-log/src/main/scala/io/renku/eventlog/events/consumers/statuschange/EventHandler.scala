@@ -24,14 +24,13 @@ import cats.syntax.all._
 import cats.{Applicative, MonadThrow, Show}
 import io.circe.DecodingFailure
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.EventMessage
 import io.renku.eventlog.events.consumers.statuschange.DBUpdater.EventUpdaterFactory
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.renku.events.consumers._
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus, ZippedEventPayload}
+import io.renku.graph.model.events.{CompoundEventId, EventId, EventMessage, EventProcessingTime, EventStatus, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
 import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
