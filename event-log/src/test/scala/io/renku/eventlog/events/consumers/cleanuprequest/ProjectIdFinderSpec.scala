@@ -21,7 +21,7 @@ package io.renku.eventlog.events.consumers.cleanuprequest
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventDates
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._

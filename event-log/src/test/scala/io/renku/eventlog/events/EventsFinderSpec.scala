@@ -23,9 +23,8 @@ import EventsEndpoint._
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.events.Generators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.fixed
 import io.renku.graph.model.EventsGenerators._

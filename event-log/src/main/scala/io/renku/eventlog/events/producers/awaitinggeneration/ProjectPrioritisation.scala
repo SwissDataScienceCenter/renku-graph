@@ -25,8 +25,8 @@ import cats.data.NonEmptyList
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.renku.eventlog.EventDate
 import io.renku.eventlog.events.producers.UrlAndIdSubscribers.UrlAndIdSubscribers
+import io.renku.graph.model.events.EventDate
 import io.renku.graph.model.projects
 import io.renku.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 

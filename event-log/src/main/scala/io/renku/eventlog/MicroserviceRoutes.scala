@@ -32,7 +32,7 @@ import io.renku.eventlog.events.{EventEndpoint, EventsEndpoint}
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.events.consumers.EventConsumersRegistry
 import io.renku.graph.http.server.binders._
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events.{CompoundEventId, EventDate, EventStatus}
 import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._

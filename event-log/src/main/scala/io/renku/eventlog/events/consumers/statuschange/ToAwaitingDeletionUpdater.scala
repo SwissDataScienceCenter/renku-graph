@@ -24,11 +24,10 @@ import cats.kernel.Monoid
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
-import io.renku.eventlog.ExecutionDate
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToAwaitingDeletion
 import io.renku.graph.model.events.EventStatus.AwaitingDeletion
-import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.graph.model.events.{EventId, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 import skunk.implicits._

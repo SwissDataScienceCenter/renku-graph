@@ -22,8 +22,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import io.circe.literal._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages}
-import io.renku.eventlog._
+import io.renku.graph.model.EventContentGenerators.{eventDates, eventMessages}
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.{AllEventsToNew, ProjectEventsToNew}
 import io.renku.events.consumers.Project
 import io.renku.events.producers.EventSender
@@ -32,7 +32,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.{EventId, EventStatus}
+import io.renku.graph.model.events.{EventDate, EventId, EventStatus, ExecutionDate}
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec

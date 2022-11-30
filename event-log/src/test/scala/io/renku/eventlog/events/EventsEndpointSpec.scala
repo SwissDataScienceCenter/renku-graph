@@ -21,18 +21,16 @@ package io.renku.eventlog.events
 import cats.effect.IO
 import cats.syntax.all._
 import io.circe.Decoder
-import io.renku.eventlog.EventContentGenerators.eventDates
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.eventlog.events.EventsEndpoint._
-import io.renku.eventlog.events.Generators.eventInfos
-import io.renku.eventlog.{EventDate, EventMessage, ExecutionDate}
 import io.renku.generators.CommonGraphGenerators.{pagingRequests, pagingResponses, sortBys}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.config.EventLogUrl
 import io.renku.graph.model.EventsGenerators.eventStatuses
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus}
-import io.renku.graph.model.projects
+import io.renku.graph.model.events._
+import io.renku.graph.model.{EventContentGenerators, projects}
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.rest.paging.model.Total
@@ -77,7 +75,7 @@ class EventsEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with s
 
     s"$Ok with array of events if there are events found" in new TestCase {
 
-      val pagingResponse = pagingResponses(eventInfos()).generateOne
+      val pagingResponse = pagingResponses(EventContentGenerators.eventInfos()).generateOne
 
       (eventsFinder.findEvents _)
         .expects(criteria)

@@ -27,7 +27,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.Schemas.{prov, renku, schema}
 import io.renku.graph.model._
-import io.renku.graph.model.entities.Generators.{compositePlanGenFactory, stepPlanGenFactory}
+import io.renku.graph.model.entities.Generators.{compositePlanNonEmptyMappings, stepPlanGenFactory}
 import io.renku.graph.model.entities.Project.ProjectMember.{ProjectMemberNoEmail, ProjectMemberWithEmail}
 import io.renku.graph.model.entities.Project.{GitLabProjectInfo, ProjectMember}
 import io.renku.graph.model.persons.Name
@@ -395,10 +395,9 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
 
       val invalidPlanGen =
         for {
-          cp <- compositePlanGenFactory()
+          cp <- compositePlanNonEmptyMappings
                   .mapF(
-                    _.filter(p => p.mappings.nonEmpty)
-                      .map(_.asInstanceOf[CompositePlan.NonModified])
+                    _.map(_.asInstanceOf[CompositePlan.NonModified])
                   )
           step <- stepPlanGenFactory
         } yield cp.copy(plans = NonEmptyList.one(step))
@@ -438,9 +437,7 @@ class ProjectSpec extends AnyWordSpec with should.Matchers with ScalaCheckProper
     }
 
     "validate a composite plan that has references outside its children" in {
-      val testPlan = compositePlanEntities(stepPlanGenFactory.mapF(_.toGeneratorOfList(min = 3)))
-        .mapF(_.suchThat(_.mappings.nonEmpty))
-        .generateOne
+      val testPlan = compositePlanNonEmptyMappings.generateOne
         .asInstanceOf[CompositePlan.NonModified]
 
       // find a plan belonging to some mapped parameter

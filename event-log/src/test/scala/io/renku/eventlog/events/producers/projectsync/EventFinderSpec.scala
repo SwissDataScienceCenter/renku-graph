@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.producers.projectsync
 
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.SubscriptionDataProvisioning
 import io.renku.generators.Generators.Implicits._

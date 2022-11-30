@@ -29,6 +29,7 @@ import io.renku.graph.model.Schemas.renku
 import io.renku.graph.model._
 import io.renku.graph.model.entities.Generators._
 import io.renku.graph.model.testentities._
+import io.renku.graph.model.testentities.generators.EntitiesGenerators.ProjectBasedGenFactoryOps
 import io.renku.jsonld.{JsonLD, JsonLDEncoder}
 import io.renku.jsonld.JsonLDEncoder.encodeEntityId
 import io.renku.jsonld.parser._
@@ -167,7 +168,7 @@ class PlanSpec
     }
 
     "fail decode if a parameter maps to itself" in {
-      val plan = compositePlanGen().generateOne
+      val plan = compositePlanNonEmptyMappings.generateOne
       val pm_  = plan.mappings.head
       val pm   = pm_.copy(mappedParam = NonEmptyList.one(pm_))
 

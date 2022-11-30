@@ -25,7 +25,6 @@ import cats.{Applicative, MonadThrow}
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog._
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.consumers.creation.EventPersister.Result
 import io.renku.eventlog.events.consumers.creation.EventPersister.Result._

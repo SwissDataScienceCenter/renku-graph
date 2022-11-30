@@ -20,12 +20,11 @@ package io.renku.eventlog.init
 
 import cats.data.Kleisli
 import cats.effect.IO
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.{BatchDate, EventBody, EventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Info

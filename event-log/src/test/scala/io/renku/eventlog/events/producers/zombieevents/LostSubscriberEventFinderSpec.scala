@@ -20,7 +20,7 @@ package io.renku.eventlog.events.producers.zombieevents
 
 import cats.syntax.all._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls

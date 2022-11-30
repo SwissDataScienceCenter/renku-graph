@@ -22,8 +22,8 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.eventMessages
-import io.renku.eventlog._
+import io.renku.graph.model.EventContentGenerators.eventMessages
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.projectCleaner.ProjectCleaner
 import io.renku.eventlog.events.producers.{SubscriptionDataProvisioning, minprojectinfo}
@@ -37,7 +37,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, timestamps, timestampsNotInTheFuture}
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes, lastSyncedDates, zippedEventPayloads}
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.Error
 import io.renku.metrics.TestLabeledHistogram

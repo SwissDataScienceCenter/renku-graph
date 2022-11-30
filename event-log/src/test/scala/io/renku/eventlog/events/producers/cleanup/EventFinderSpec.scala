@@ -21,14 +21,14 @@ package io.renku.eventlog.events.producers.cleanup
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
-import io.renku.eventlog._
-import EventContentGenerators._
+import io.renku.eventlog.{CleanUpEventsProvisioning, InMemoryEventLogDbSpec}
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.events.consumers.ConsumersModelGenerators._
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects.Path
 import io.renku.interpreters.TestLogger
 import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}

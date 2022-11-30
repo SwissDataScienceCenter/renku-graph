@@ -20,8 +20,8 @@ package io.renku.eventlog.eventpayload
 
 import io.renku.db.SqlStatement
 import io.renku.eventlog.eventpayload.EventPayloadFinder.PayloadData
-import io.renku.eventlog.{EventContentGenerators, InMemoryEventLogDbSpec}
-import io.renku.graph.model.{EventsGenerators, GraphModelGenerators}
+import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.graph.model.{EventContentGenerators, EventsGenerators, GraphModelGenerators}
 import io.renku.testtools.IOSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.events.{EventStatus, ZippedEventPayload}

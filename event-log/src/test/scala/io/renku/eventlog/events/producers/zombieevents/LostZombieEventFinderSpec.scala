@@ -20,13 +20,13 @@ package io.renku.eventlog.events.producers.zombieevents
 
 import cats.syntax.all._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates}
-import io.renku.eventlog.{EventMessage, ExecutionDate, InMemoryEventLogDbSpec}
+import io.renku.graph.model.EventContentGenerators.{eventDates, executionDates}
+import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.relativeTimestamps
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses, processingStatuses}
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.{CompoundEventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should

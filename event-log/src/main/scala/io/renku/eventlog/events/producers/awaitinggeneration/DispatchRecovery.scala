@@ -22,13 +22,13 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.circe.literal._
-import io.renku.eventlog.EventMessage
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.DispatchRecovery
 import io.renku.eventlog.events.producers.EventsSender.SendingResult
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.events.producers.EventSender
 import io.renku.events.{CategoryName, EventRequestContent}
+import io.renku.graph.model.events.EventMessage
 import io.renku.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, New}
 import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger

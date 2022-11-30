@@ -22,10 +22,9 @@ import cats.Show
 import cats.implicits.showInterpolator
 import io.circe.literal._
 import io.circe.{Decoder, Encoder}
-import io.renku.eventlog.EventMessage
 import io.renku.events.consumers.Project
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{CompoundEventId, EventProcessingTime, ZippedEventPayload}
+import io.renku.graph.model.events.{CompoundEventId, EventMessage, EventProcessingTime, ZippedEventPayload}
 import io.renku.graph.model.projects
 import io.renku.tinytypes.json.TinyTypeDecoders._
 

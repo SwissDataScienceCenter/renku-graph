@@ -29,9 +29,8 @@ import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ProjectEventsToNew
 import io.renku.eventlog.events.consumers.statuschange.projectCleaner.ProjectCleaner
 import io.renku.eventlog.events.producers.minprojectinfo
-import io.renku.eventlog.{EventDate, ExecutionDate}
 import io.renku.events.consumers.Project
-import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events.{EventDate, EventStatus, ExecutionDate}
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, Skipped}
 import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder

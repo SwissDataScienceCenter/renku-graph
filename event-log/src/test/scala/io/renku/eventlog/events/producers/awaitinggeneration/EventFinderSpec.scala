@@ -24,15 +24,15 @@ import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog._
+import io.renku.graph.model.EventContentGenerators._
+import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.eventlog.events.producers.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.{LabeledGauge, TestLabeledHistogram}
 import io.renku.testtools.IOSpec

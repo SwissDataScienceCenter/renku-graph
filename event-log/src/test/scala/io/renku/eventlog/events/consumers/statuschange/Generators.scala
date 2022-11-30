@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.events.consumers.statuschange
 
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent._
 import io.renku.events.consumers.ConsumersModelGenerators._
 import io.renku.events.consumers.Project

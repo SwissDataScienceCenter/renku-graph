@@ -20,12 +20,12 @@ package io.renku.eventlog.events.consumers.zombieevents
 
 import cats.syntax.all._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog._
+import io.renku.graph.model.EventContentGenerators._
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.graph.model.events.EventStatus
+import io.renku.graph.model.events._
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting, GeneratingTriples, New, TransformingTriples, TriplesGenerated}
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec

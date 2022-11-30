@@ -42,10 +42,9 @@ private class RedoProjectTransformationUpdaterImpl[F[_]: Async](queriesExecTimes
     with TypeSerializers {
 
   import io.renku.db.SqlStatement
-  import io.renku.eventlog.ExecutionDate
   import io.renku.eventlog.events.producers.minprojectinfo
   import io.renku.graph.model.events.EventStatus.{TriplesGenerated, TriplesStore}
-  import io.renku.graph.model.events.{CompoundEventId, EventId}
+  import io.renku.graph.model.events.{CompoundEventId, EventId, ExecutionDate}
   import io.renku.graph.model.projects
   import skunk.data.Completion
   import skunk.implicits._

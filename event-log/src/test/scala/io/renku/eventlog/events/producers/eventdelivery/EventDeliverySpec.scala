@@ -22,7 +22,7 @@ package eventdelivery
 import TestCompoundIdEvent.testCompoundIdEvent
 import cats.effect.IO
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.graph.model.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls

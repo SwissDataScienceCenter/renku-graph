@@ -32,7 +32,7 @@ import io.renku.graph.acceptancetests.testing.AcceptanceTestPatience
 import io.renku.graph.acceptancetests.tooling.{AcceptanceSpec, ApplicationServices, ModelImplicits}
 import io.renku.graph.model.EventsGenerators.commitIds
 import io.renku.graph.model.events.EventStatus._
-import io.renku.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects._
 import io.renku.graph.model.testentities.generators.EntitiesGenerators._
 import io.renku.microservices.MicroserviceIdentifier

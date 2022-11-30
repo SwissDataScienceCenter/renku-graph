@@ -23,8 +23,8 @@ import GlobalCommitSyncEvent.{CommitsCount, CommitsInfo}
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.db.SqlStatement
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
+import io.renku.graph.model.EventContentGenerators._
+import io.renku.eventlog.InMemoryEventLogDbSpec
 import io.renku.events.consumers.ConsumersModelGenerators.consumerProjects
 import io.renku.events.consumers.Project
 import io.renku.generators.Generators.Implicits._
@@ -32,7 +32,7 @@ import io.renku.generators.Generators._
 import io.renku.graph.model.EventsGenerators._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
-import io.renku.graph.model.events.{CommitId, CompoundEventId, EventStatus, LastSyncedDate}
+import io.renku.graph.model.events._
 import io.renku.graph.model.projects
 import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
