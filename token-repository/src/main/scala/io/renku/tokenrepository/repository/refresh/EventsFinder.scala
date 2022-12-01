@@ -65,6 +65,6 @@ private class EventsFinderImpl[F[_]: MonadCancelThrow: SessionResource](
             TokenCloseExpiration(Project(id, path), token)
           }
       )
-      .arguments(LocalDate.now() plusDays 1)
+      .arguments(CloseExpirationDate().value)
       .build(_.option)
 }

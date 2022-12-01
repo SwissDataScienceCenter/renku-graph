@@ -57,6 +57,8 @@ object TokensRefresher {
     TokenRemover[F](queriesExecTimes),
     tokenCreator,
     AssociationPersister[F](queriesExecTimes),
+    ExpiredTokensFinder[F],
+    ExpiredTokensRevoker[F],
     expiredTokenCheckInterval
   )
 }
@@ -67,6 +69,8 @@ private class TokensRefresherImpl[F[_]: Async: Logger](eventsFinder: EventsFinde
                                                        tokenRemover:         TokenRemover[F],
                                                        tokenCreator:         ProjectAccessTokenCreator[F],
                                                        associationPersister: AssociationPersister[F],
+                                                       expiredTokensFinder:  ExpiredTokensFinder[F],
+                                                       expiredTokensRevoker: ExpiredTokensRevoker[F],
                                                        checkInterval:        FiniteDuration
 ) extends TokensRefresher[F] {
 
@@ -78,7 +82,12 @@ private class TokensRefresherImpl[F[_]: Async: Logger](eventsFinder: EventsFinde
   import tokenCrypto._
 
   override def run(): F[Unit] =
-    Temporal[F].andWait(refreshProcess, checkInterval).foreverM
+    Temporal[F]
+      .andWait(
+        ().pure[F] >> logProcessStart() >> refreshProcess >> logProcessEnd(),
+        checkInterval
+      )
+      .foreverM
 
   private lazy val refreshProcess = Stream
     .repeatEval(findEvent())
@@ -90,10 +99,19 @@ private class TokensRefresherImpl[F[_]: Async: Logger](eventsFinder: EventsFinde
     .flattenOption
     .evalMap(encryptNewToken)
     .evalMap(store)
-    .evalTap(event => Logger[F].info(show"$logPrefix ${event.project} token recreated"))
+    .evalTap { case (event, _) => Logger[F].info(show"$logPrefix ${event.project} token recreated") }
+    .evalMap(findExpiredTokens)
+    .flatMap(toStreamOfExpiredTokens)
+    .evalMap(revokeExpiredTokens)
     .compile
     .drain
-    .recoverWith(logError)
+    .recoverWith(logErrorAndContinue)
+
+  private def logProcessStart(): F[Unit] =
+    Logger[F].info(show"$logPrefix looking for tokens to refresh")
+
+  private def logProcessEnd(): F[Unit] =
+    Logger[F].info(show"$logPrefix no more tokens to refresh")
 
   private def decryptToken(event: TokenCloseExpiration) =
     decrypt(event.encryptedToken)
@@ -129,21 +147,43 @@ private class TokensRefresherImpl[F[_]: Async: Logger](eventsFinder: EventsFinde
       .map(enc => (event, creationInfo, enc))
   }
 
-  private lazy val store
-      : ((TokenCloseExpiration, TokenCreationInfo, EncryptedAccessToken)) => F[TokenCloseExpiration] = {
-    case (event, creationInfo, encToken) =>
-      persistAssociation(TokenStoringInfo(event.project, encToken, creationInfo.dates))
-        .adaptError(toProcessError(at = "storing", event.project))
-        .map(_ => event)
+  private lazy val store: ((TokenCloseExpiration, TokenCreationInfo, EncryptedAccessToken)) => F[
+    (TokenCloseExpiration, TokenCreationInfo)
+  ] = { case (event, creationInfo, encToken) =>
+    persistAssociation(TokenStoringInfo(event.project, encToken, creationInfo.dates))
+      .adaptError(toProcessError(at = "storing", event.project))
+      .map(_ => event -> creationInfo)
+  }
+
+  private lazy val findExpiredTokens: ((TokenCloseExpiration, TokenCreationInfo)) => F[
+    (TokenCloseExpiration, TokenCreationInfo, List[AccessTokenId])
+  ] = { case (event, creationInfo) =>
+    expiredTokensFinder
+      .findExpiredTokens(event.project.id, creationInfo.token)
+      .adaptError(toProcessError(at = "finding expired tokens", event.project))
+      .map(tokenIds => (event, creationInfo, tokenIds))
+  }
+
+  private lazy val toStreamOfExpiredTokens: (
+      (TokenCloseExpiration, TokenCreationInfo, List[AccessTokenId])
+  ) => Stream[F, (Project, AccessToken, AccessTokenId)] = { case (event, creationInfo, tokenIds) =>
+    Stream.emits(tokenIds.map(id => (event.project, creationInfo.token, id)))
+  }
+
+  private lazy val revokeExpiredTokens: ((Project, AccessToken, AccessTokenId)) => F[Unit] = {
+    case (project, accessToken, tokenId) =>
+      expiredTokensRevoker
+        .revokeToken(project.id, tokenId, accessToken)
+        .adaptError(toProcessError(at = "revoking expired token", project))
   }
 
   private def toProcessError(at: String, project: Project): PartialFunction[Throwable, Throwable] = { case ex =>
     ProcessException(project, at, cause = ex)
   }
 
-  private lazy val logError: PartialFunction[Throwable, F[Unit]] = {
-    case ex: ProcessException => Logger[F].error(ex.cause)(show"$logPrefix ${ex.getMessage}")
-    case ex => Logger[F].error(ex)(show"$logPrefix processing failure")
+  private lazy val logErrorAndContinue: PartialFunction[Throwable, F[Unit]] = {
+    case ex: ProcessException => Logger[F].error(ex.cause)(show"$logPrefix ${ex.getMessage}") >> refreshProcess
+    case ex => Logger[F].error(ex)(show"$logPrefix processing failure") >> refreshProcess
   }
 
   private case class ProcessException(project: Project, step: String, cause: Throwable)

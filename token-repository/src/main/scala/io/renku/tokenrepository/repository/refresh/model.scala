@@ -18,14 +18,25 @@
 
 package io.renku.tokenrepository.repository.refresh
 
+import io.circe.Decoder
 import io.renku.tinytypes.constraints.NonNegativeInt
+import io.renku.tinytypes.json.TinyTypeDecoders
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
 import io.renku.tokenrepository.repository.association.TokenStoringInfo.Project
+
+import java.time.LocalDate
 
 private final case class TokenCloseExpiration(project: Project, encryptedToken: EncryptedAccessToken)
 
-private final class TokenId private (val value: Int) extends AnyVal with IntTinyType
-private object TokenId extends TinyTypeFactory[TokenId](new TokenId(_)) with NonNegativeInt[TokenId]
+private final class AccessTokenId private (val value: Int) extends AnyVal with IntTinyType
+private object AccessTokenId
+    extends TinyTypeFactory[AccessTokenId](new AccessTokenId(_))
+    with NonNegativeInt[AccessTokenId] {
+  implicit val jsonDecoder: Decoder[AccessTokenId] = TinyTypeDecoders.intDecoder(this)
+}
 
-private def aboutToExpireDate = 
+private object CloseExpirationDate {
+  def apply(): ExpiryDate = ExpiryDate(LocalDate.now() plusDays 1)
+}
