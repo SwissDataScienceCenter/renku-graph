@@ -46,7 +46,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project the given path" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(max = 10)
+      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -56,7 +56,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -81,7 +81,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and the given PagingRequest" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -91,7 +91,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -113,7 +113,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and the given direction" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -123,7 +123,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -161,7 +161,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and status filter" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -171,7 +171,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -192,7 +192,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and since filters" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -202,7 +202,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -227,7 +227,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
 
     "return the List of events of the project with the given path and until filters" in new TestCase {
       val projectId = projectIds.generateOne
-      val infos     = eventInfos(fixed(projectPath)).generateList(min = 3, max = 10)
+      val infos     = eventInfos(fixed(projectPath), fixed(projectId)).generateList(min = 3, max = 10)
 
       infos foreach { info =>
         val eventId = CompoundEventId(info.eventId, projectId)
@@ -237,7 +237,7 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -265,14 +265,14 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val infos = eventInfos().generateList(min = 3, max = 10)
 
       infos foreach { info =>
-        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        val eventId = CompoundEventId(info.eventId, info.project.id)
         storeEvent(
           eventId,
           info.status,
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -298,14 +298,14 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val infos  = eventInfos().generateFixedSizeList(ofSize = 3).map(_.copy(status = status))
 
       infos foreach { info =>
-        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        val eventId = CompoundEventId(info.eventId, info.project.id)
         storeEvent(
           eventId,
           info.status,
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -333,14 +333,14 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val infos  = eventInfos().generateFixedSizeList(ofSize = 3).map(_.copy(status = status))
 
       infos foreach { info =>
-        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        val eventId = CompoundEventId(info.eventId, info.project.id)
         storeEvent(
           eventId,
           info.status,
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -367,14 +367,14 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val infos = eventInfos().generateList(min = 3, max = 10)
 
       infos foreach { info =>
-        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        val eventId = CompoundEventId(info.eventId, info.project.id)
         storeEvent(
           eventId,
           info.status,
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -399,14 +399,14 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val infos = eventInfos().generateList(min = 3, max = 10)
 
       infos foreach { info =>
-        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        val eventId = CompoundEventId(info.eventId, info.project.id)
         storeEvent(
           eventId,
           info.status,
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -431,14 +431,14 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val infos = eventInfos().generateList(min = 3, max = 10)
 
       infos foreach { info =>
-        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        val eventId = CompoundEventId(info.eventId, info.project.id)
         storeEvent(
           eventId,
           info.status,
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>
@@ -465,14 +465,14 @@ class EventsFinderSpec extends AnyWordSpec with IOSpec with InMemoryEventLogDbSp
       val info2       = eventInfos().generateOne.copy(eventId = id, status = eventStatus)
 
       List(info1, info2) foreach { info =>
-        val eventId = CompoundEventId(info.eventId, projectIds.generateOne)
+        val eventId = CompoundEventId(info.eventId, info.project.id)
         storeEvent(
           eventId,
           info.status,
           info.executionDate,
           info.eventDate,
           eventBodies.generateOne,
-          projectPath = info.projectPath,
+          projectPath = info.project.path,
           maybeMessage = info.maybeMessage
         )
         info.processingTimes.foreach(processingTime =>

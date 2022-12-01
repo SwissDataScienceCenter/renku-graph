@@ -64,7 +64,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
       }
 
       private val selectEventInfo: Fragment[Void] = sql"""
-        SELECT evt.event_id, prj.project_path, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
+        SELECT evt.event_id, prj.project_id, prj.project_path, evt.status, evt.event_date, evt.execution_date, evt.message,  COUNT(times.status)
         FROM event evt
       """
 
@@ -125,7 +125,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
       """
 
       private val groupBy: Fragment[Void] = sql"""
-        GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message, prj.project_path
+        GROUP BY evt.event_id, evt.status, evt.event_date, evt.execution_date, evt.message, prj.project_id, prj.project_path
       """
 
       private val orderBy: Criteria.Sorting.By => Fragment[Void] = {
@@ -184,19 +184,19 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
           .select[query.A, (EventInfo, Long)](
             query.fragment
               .query(
-                eventIdDecoder ~ projectPathDecoder ~ eventStatusDecoder ~ eventDateDecoder ~
+                eventIdDecoder ~ projectIdsDecoder ~ eventStatusDecoder ~ eventDateDecoder ~
                   executionDateDecoder ~ eventMessageDecoder.opt ~ int8
               )
               .map {
-                case (eventId:    EventId) ~
-                    (projectPath: projects.Path) ~
+                case (eventId:   EventId) ~
+                    (projectIds: EventInfo.ProjectIds) ~
                     (status: EventStatus) ~
                     (eventDate: EventDate) ~
                     (executionDate: ExecutionDate) ~
                     (maybeMessage: Option[EventMessage]) ~
                     (processingTimesCount: Long) =>
                   EventInfo(eventId,
-                            projectPath,
+                            projectIds,
                             status,
                             eventDate,
                             executionDate,
@@ -228,7 +228,7 @@ private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource](q
               )
           """.query(statusProcessingTimesDecoder)
           )
-          .arguments(eventInfo.eventId, eventInfo.projectPath)
+          .arguments(eventInfo.eventId, eventInfo.project.path)
           .build(_.toList)
       }
 

@@ -25,6 +25,7 @@ import eu.timepit.refined.numeric.Positive
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
 import io.renku.data.ErrorMessage
+import io.renku.graph.model.events.EventInfo.ProjectIds
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints._
 import io.renku.tinytypes.contenttypes.ZippedContent
@@ -248,7 +249,7 @@ object events {
   }
 
   final case class EventInfo(eventId:         EventId,
-                             projectPath:     projects.Path,
+                             project:         ProjectIds,
                              status:          EventStatus,
                              eventDate:       EventDate,
                              executionDate:   ExecutionDate,
@@ -268,18 +269,23 @@ object events {
   }
 
   object EventInfo {
+    final case class ProjectIds(id: projects.Id, path: projects.Path)
+    object ProjectIds {
+      implicit val jsonDecoder: Decoder[ProjectIds] =
+        io.circe.generic.semiauto.deriveDecoder[ProjectIds]
+    }
 
     implicit val jsonDecoder: Decoder[EventInfo] =
       Decoder.instance { cursor =>
         for {
           id              <- cursor.downField("id").as[EventId]
-          path            <- cursor.downField("projectPath").as[projects.Path]
+          projectIds      <- cursor.downField("project").as[ProjectIds]
           status          <- cursor.downField("status").as[EventStatus]
           processingTimes <- cursor.downField("processingTimes").as[List[StatusProcessingTime]]
           date            <- cursor.downField("date").as[EventDate]
           executionDate   <- cursor.downField("executionDate").as[ExecutionDate]
           msg             <- cursor.downField("message").as[Option[EventMessage]]
-        } yield EventInfo(id, path, status, date, executionDate, msg, processingTimes)
+        } yield EventInfo(id, projectIds, status, date, executionDate, msg, processingTimes)
       }
   }
 
