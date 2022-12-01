@@ -49,6 +49,11 @@ trait TypeSerializers {
   val projectPathEncoder: Encoder[projects.Path] =
     varchar.values.contramap((b: projects.Path) => b.value)
 
+  val projectIdsDecoder: Decoder[EventInfo.ProjectIds] =
+    (projectIdDecoder, projectPathDecoder).mapN(EventInfo.ProjectIds.apply)
+  val projectIdsEncoder: Encoder[EventInfo.ProjectIds] =
+    (projectIdEncoder, projectPathEncoder).contramapN(a => (a.id, a.path))
+
   val eventBodyDecoder: Decoder[EventBody] = text.map(EventBody.apply)
   val eventBodyEncoder: Encoder[EventBody] = text.values.contramap(_.value)
 

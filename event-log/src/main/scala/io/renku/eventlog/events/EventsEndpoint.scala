@@ -136,10 +136,13 @@ object EventsEndpoint {
       }"""
     }
 
+    implicit val projectIdsEncoder: Encoder[EventInfo.ProjectIds] = ids =>
+      json"""{ "id": ${ids.id}, "path": ${ids.path} }"""
+
     implicit val eventInfoEncoder: Encoder[EventInfo] = eventInfo =>
       json"""{
           "id":              ${eventInfo.eventId},
-          "projectPath":     ${eventInfo.projectPath},
+          "project":     ${eventInfo.project},
           "status":          ${eventInfo.status},
           "processingTimes": ${eventInfo.processingTimes},
           "date" :           ${eventInfo.eventDate},

@@ -152,15 +152,18 @@ object Http4sEventLogClientSpec {
         }"""
     }
 
+    implicit val projectIdsEncoder: Encoder[EventInfo.ProjectIds] = ids =>
+      json"""{ "id": ${ids.id}, "path": ${ids.path} }"""
+
     implicit val eventInfoEncoder: Encoder[EventInfo] = eventInfo =>
       json"""{
-            "id":              ${eventInfo.eventId},
-            "projectPath":     ${eventInfo.projectPath},
-            "status":          ${eventInfo.status},
-            "processingTimes": ${eventInfo.processingTimes},
-            "date" :           ${eventInfo.eventDate},
-            "executionDate":   ${eventInfo.executionDate}
-          }""".deepMerge(
+          "id":              ${eventInfo.eventId},
+          "project":     ${eventInfo.project},
+          "status":          ${eventInfo.status},
+          "processingTimes": ${eventInfo.processingTimes},
+          "date" :           ${eventInfo.eventDate},
+          "executionDate":   ${eventInfo.executionDate}
+        }""".deepMerge(
         eventInfo.maybeMessage.map(m => Json.obj("message" -> m.asJson)).getOrElse(Json.obj())
       )
   }

@@ -21,7 +21,8 @@ package io.renku.graph.model
 import io.renku.generators.Generators.{nonEmptyStrings, timestamps, timestampsNotInTheFuture}
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.EventsGenerators.{eventIds, eventProcessingTimes, eventStatuses}
-import io.renku.graph.model.GraphModelGenerators.projectPaths
+import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.graph.model.events.EventInfo.ProjectIds
 import io.renku.graph.model.events._
 import org.scalacheck.Gen
 
@@ -33,16 +34,27 @@ object EventContentGenerators {
 
   implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
 
-  def eventInfos(projectPathGen: Gen[projects.Path] = projectPaths): Gen[EventInfo] = for {
+  def eventInfos(
+      projectPathGen: Gen[projects.Path] = projectPaths,
+      projectIdGen:   Gen[projects.Id] = projectIds
+  ): Gen[EventInfo] = for {
     id            <- eventIds
     projectPath   <- projectPathGen
+    projectId     <- projectIdGen
     status        <- eventStatuses
     eventDate     <- eventDates
     executionDate <- executionDates
     maybeMessage  <- eventMessages.toGeneratorOfOptions
     processingTimes <-
       statusProcessingTimeObjects(status).toGeneratorOfList().map(_.sortBy(_.status)).map(_.distinctBy(_.status))
-  } yield EventInfo(id, projectPath, status, eventDate, executionDate, maybeMessage, processingTimes)
+  } yield EventInfo(id,
+                    ProjectIds(projectId, projectPath),
+                    status,
+                    eventDate,
+                    executionDate,
+                    maybeMessage,
+                    processingTimes
+  )
 
   def statusProcessingTimeObjects(lowerThan: EventStatus): Gen[StatusProcessingTime] = for {
     status         <- Gen.oneOf(EventStatus.statusesOrdered.takeWhile(Ordering[EventStatus].lteq(_, lowerThan)))
