@@ -21,7 +21,6 @@ package init
 
 import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
-import association.TokenStoringInfo.Project
 import association._
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._

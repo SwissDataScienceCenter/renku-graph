@@ -19,6 +19,7 @@
 package io.renku.tokenrepository.repository
 package refresh
 
+import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
 import association._
 import cats.effect.{Async, Temporal}
@@ -27,8 +28,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import deletion.TokenRemover
 import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.association.TokenStoringInfo.Project
 import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._

@@ -22,7 +22,6 @@ package refresh
 import AccessTokenCrypto.EncryptedAccessToken
 import RepositoryGenerators.encryptedAccessTokens
 import association.Generators._
-import association.TokenStoringInfo.Project
 import association._
 import cats.data.OptionT
 import cats.effect.std.Queue

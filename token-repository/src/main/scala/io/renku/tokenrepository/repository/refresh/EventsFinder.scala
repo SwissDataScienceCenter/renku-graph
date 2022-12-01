@@ -19,14 +19,13 @@
 package io.renku.tokenrepository.repository
 package refresh
 
+import AccessTokenCrypto.EncryptedAccessToken
+import ProjectsTokensDB.SessionResource
+import association.Project
 import cats.effect.MonadCancelThrow
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
-import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
-import io.renku.tokenrepository.repository.association.TokenStoringInfo.Project
 
 import java.time.LocalDate
 

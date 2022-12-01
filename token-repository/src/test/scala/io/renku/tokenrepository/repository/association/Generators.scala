@@ -38,8 +38,8 @@ object Generators {
   val tokenCreationInfos: Gen[TokenCreationInfo] =
     (projectAccessTokens, tokenDates).mapN(TokenCreationInfo.apply)
 
-  val projectObjects: Gen[TokenStoringInfo.Project] =
-    (projectIds, projectPaths).mapN(TokenStoringInfo.Project.apply)
+  val projectObjects: Gen[Project] =
+    (projectIds, projectPaths).mapN(Project.apply)
 
   val tokenStoringInfos: Gen[TokenStoringInfo] =
     (projectObjects, encryptedAccessTokens, tokenDates).mapN(TokenStoringInfo.apply)

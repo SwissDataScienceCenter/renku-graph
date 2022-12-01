@@ -16,15 +16,16 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.refresh
+package io.renku.tokenrepository.repository
+package refresh
 
+import AccessTokenCrypto.EncryptedAccessToken
+import association.Project
+import association.TokenDates.ExpiryDate
 import io.circe.Decoder
 import io.renku.tinytypes.constraints.NonNegativeInt
 import io.renku.tinytypes.json.TinyTypeDecoders
 import io.renku.tinytypes.{IntTinyType, TinyTypeFactory}
-import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
-import io.renku.tokenrepository.repository.association.TokenStoringInfo.Project
 
 import java.time.LocalDate
 
