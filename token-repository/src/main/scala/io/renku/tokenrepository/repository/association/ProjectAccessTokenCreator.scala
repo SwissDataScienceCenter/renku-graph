@@ -66,9 +66,7 @@ private class ProjectAccessTokenCreatorImpl[F[_]: Async: GitLabClient](
     GitLabClient[F].post(uri"projects" / projectId.value / "access_tokens",
                          "create-project-access-token",
                          createPayload()
-    )(
-      mapResponse
-    )(accessToken.some)
+    )(mapResponse)(accessToken.some)
 
   private def createPayload() = json"""{
     "name":       $renkuTokenName,

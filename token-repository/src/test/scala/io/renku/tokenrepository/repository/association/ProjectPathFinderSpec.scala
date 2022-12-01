@@ -78,8 +78,10 @@ class ProjectPathFinderSpec
         .unsafeRunSync() shouldBe projectPath.some
     }
 
-    "map NOT_FOUND response to None" in new TestCase {
-      mapResponse(Status.NotFound, Request[IO](), Response[IO](Status.NotFound)).unsafeRunSync() shouldBe None
+    Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach { status =>
+      s"map $status response to None" in new TestCase {
+        mapResponse(status, Request[IO](), Response[IO](status)).unsafeRunSync() shouldBe None
+      }
     }
 
     "map UNAUTHORIZED response to None" in new TestCase {
