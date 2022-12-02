@@ -36,14 +36,14 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.LocalDate
 
-class EventsFinderSpec
+class TokensToRefreshFinderSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryProjectsTokensDbSpec
     with should.Matchers
     with MockFactory {
 
-  "findEvent" should {
+  "findTokenToRefresh" should {
 
     "return an event for tokens with expiration date <= today + 1 day" in new TestCase {
 
@@ -61,13 +61,13 @@ class EventsFinderSpec
       val encryptedToken2 = encryptedAccessTokens.generateOne
       insert(project2.id, project2.path, encryptedToken2, localDates(max = LocalDate.now()).generateAs(ExpiryDate))
 
-      val Some(foundEvent1) = finder.findEvent().unsafeRunSync()
+      val Some(foundEvent1) = finder.findTokenToRefresh().unsafeRunSync()
       deleteToken(foundEvent1.project.id)
 
-      val Some(foundEvent2) = finder.findEvent().unsafeRunSync()
+      val Some(foundEvent2) = finder.findTokenToRefresh().unsafeRunSync()
       deleteToken(foundEvent2.project.id)
 
-      finder.findEvent().unsafeRunSync() shouldBe None
+      finder.findTokenToRefresh().unsafeRunSync() shouldBe None
 
       findToken(project1.id) shouldBe None
       findToken(project2.id) shouldBe None
@@ -76,6 +76,6 @@ class EventsFinderSpec
 
   private trait TestCase {
     private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val finder                   = new EventsFinderImpl[IO](queriesExecTimes)
+    val finder                   = new TokensToRefreshFinderImpl[IO](queriesExecTimes)
   }
 }

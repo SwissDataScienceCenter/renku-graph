@@ -29,26 +29,26 @@ import io.renku.metrics.LabeledHistogram
 
 import java.time.LocalDate
 
-private trait EventsFinder[F[_]] {
-  def findEvent(): F[Option[TokenCloseExpiration]]
+private trait TokensToRefreshFinder[F[_]] {
+  def findTokenToRefresh(): F[Option[TokenCloseExpiration]]
 }
 
-private object EventsFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): EventsFinder[F] =
-    new EventsFinderImpl[F](queriesExecTimes)
+private object TokensToRefreshFinder {
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): TokensToRefreshFinder[F] =
+    new TokensToRefreshFinderImpl[F](queriesExecTimes)
 }
 
-private class EventsFinderImpl[F[_]: MonadCancelThrow: SessionResource](
+private class TokensToRefreshFinderImpl[F[_]: MonadCancelThrow: SessionResource](
     queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
-    with EventsFinder[F]
+    with TokensToRefreshFinder[F]
     with TokenRepositoryTypeSerializers {
 
   import skunk._
   import skunk.codec.all.date
   import skunk.implicits._
 
-  override def findEvent(): F[Option[TokenCloseExpiration]] =
+  override def findTokenToRefresh(): F[Option[TokenCloseExpiration]] =
     SessionResource[F].useK(measureExecutionTime(query))
 
   private def query =

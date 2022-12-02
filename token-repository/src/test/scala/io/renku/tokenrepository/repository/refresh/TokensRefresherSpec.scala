@@ -239,10 +239,10 @@ class TokensRefresherSpec
     val logPrefix     = "project token refresh:"
     val checkInterval = 500 millis
 
-    val eventFinder = new EventsFinder[IO] {
+    val tokensToRefreshFinder = new TokensToRefreshFinder[IO] {
       val eventsQueue = Queue.unbounded[IO, IO[TokenCloseExpiration]].unsafeRunSync()
 
-      override def findEvent() = eventsQueue.tryTake.flatMap(_.sequence)
+      override def findTokenToRefresh() = eventsQueue.tryTake.flatMap(_.sequence)
     }
 
     val tokenCrypto = new AccessTokenCrypto[IO] {
@@ -309,7 +309,7 @@ class TokensRefresherSpec
     }
 
     implicit lazy val logger: TestLogger[IO] = TestLogger[IO]()
-    val refresher = new TokensRefresherImpl[IO](eventFinder,
+    val refresher = new TokensRefresherImpl[IO](tokensToRefreshFinder,
                                                 tokenCrypto,
                                                 tokenValidator,
                                                 tokenRemover,
@@ -345,10 +345,10 @@ class TokensRefresherSpec
     }
 
     def givenEventFinding(returning: TokenCloseExpiration): Unit =
-      (eventFinder.eventsQueue offer returning.pure[IO]).unsafeRunSync()
+      (tokensToRefreshFinder.eventsQueue offer returning.pure[IO]).unsafeRunSync()
 
     def givenEventFinding(throwing: Exception): Unit =
-      (eventFinder.eventsQueue offer throwing.raiseError[IO, TokenCloseExpiration]).unsafeRunSync()
+      (tokensToRefreshFinder.eventsQueue offer throwing.raiseError[IO, TokenCloseExpiration]).unsafeRunSync()
 
     def givenDecryption(encToken: EncryptedAccessToken, returning: AccessToken): Unit =
       tokenCrypto.state.update(_ + (returning -> encToken)).unsafeRunSync()

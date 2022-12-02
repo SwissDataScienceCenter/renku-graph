@@ -50,7 +50,7 @@ object TokensRefresher {
     tokenCreator              <- ProjectAccessTokenCreator[F]()
     expiredTokenCheckInterval <- find[F, FiniteDuration]("expired-project-token-check-interval", config)
   } yield new TokensRefresherImpl[F](
-    EventsFinder[F](queriesExecTimes),
+    TokensToRefreshFinder[F](queriesExecTimes),
     crypto,
     tokenValidator,
     TokenRemover[F](queriesExecTimes),
@@ -62,7 +62,7 @@ object TokensRefresher {
   )
 }
 
-private class TokensRefresherImpl[F[_]: Async: Logger](eventsFinder: EventsFinder[F],
+private class TokensRefresherImpl[F[_]: Async: Logger](tokensToRefreshFinder: TokensToRefreshFinder[F],
                                                        tokenCrypto:          AccessTokenCrypto[F],
                                                        tokenValidator:       TokenValidator[F],
                                                        tokenRemover:         TokenRemover[F],
@@ -76,7 +76,7 @@ private class TokensRefresherImpl[F[_]: Async: Logger](eventsFinder: EventsFinde
   private val logPrefix = "project token refresh:"
 
   import associationPersister._
-  import eventsFinder._
+  import tokensToRefreshFinder._
   import fs2.Stream
   import tokenCrypto._
 
@@ -89,7 +89,7 @@ private class TokensRefresherImpl[F[_]: Async: Logger](eventsFinder: EventsFinde
       .foreverM
 
   private lazy val refreshProcess = Stream
-    .repeatEval(findEvent())
+    .repeatEval(findTokenToRefresh())
     .unNoneTerminate
     .evalMap(decryptToken)
     .evalMap(deleteWhenInvalid)
