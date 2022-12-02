@@ -22,7 +22,6 @@ package association
 import AccessTokenCrypto.EncryptedAccessToken
 import Generators._
 import RepositoryGenerators._
-import TokenStoringInfo.Project
 import cats.data.OptionT
 import cats.syntax.all._
 import deletion.TokenRemover

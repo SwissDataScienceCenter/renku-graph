@@ -19,9 +19,14 @@
 package io.renku.tokenrepository.repository
 package init
 
+import AccessTokenCrypto.EncryptedAccessToken
+import RepositoryGenerators.encryptedAccessTokens
+import association.TokenDates.{CreatedAt, ExpiryDate}
+import association._
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
+import deletion.TokenRemover
 import io.renku.generators.CommonGraphGenerators.{accessTokens, projectAccessTokens}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{exceptions, localDates, timestampsNotInTheFuture}
@@ -32,13 +37,6 @@ import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.interpreters.TestLogger
 import io.renku.interpreters.TestLogger.Level.{Error, Info, Warn}
 import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.AccessTokenCrypto
-import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
-import io.renku.tokenrepository.repository.association.TokenDates.{CreatedAt, ExpiryDate}
-import io.renku.tokenrepository.repository.association.TokenStoringInfo.Project
-import io.renku.tokenrepository.repository.association._
-import io.renku.tokenrepository.repository.deletion.TokenRemover
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

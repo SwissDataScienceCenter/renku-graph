@@ -74,7 +74,25 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
 
   private lazy val assureInserted: Completion => Unit = {
     case Completion.Insert(1) => ()
-    case _                    => fail("insertion problem")
+    case c                    => fail(s"insertion problem: $c")
+  }
+
+  protected def deleteToken(projectId: Id): Unit = execute {
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[Int] =
+        sql"""DELETE FROM projects_tokens
+              WHERE project_id = $int4
+         """.command
+      session
+        .prepare(query)
+        .use(_.execute(projectId.value))
+        .map(assureDeleted)
+    }
+  }
+
+  private lazy val assureDeleted: Completion => Unit = {
+    case Completion.Delete(1) => ()
+    case c                    => fail(s"deletion problem: $c")
   }
 
   protected def findToken(projectPath: Path): Option[String] = sessionResource

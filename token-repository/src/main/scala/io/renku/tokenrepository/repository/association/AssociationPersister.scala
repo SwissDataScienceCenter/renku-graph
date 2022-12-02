@@ -16,8 +16,11 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository
+package association
 
+import AccessTokenCrypto.EncryptedAccessToken
+import ProjectsTokensDB.SessionResource
 import TokenDates.{CreatedAt, ExpiryDate}
 import cats.data.Kleisli
 import cats.effect._
@@ -25,17 +28,14 @@ import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.metrics.LabeledHistogram
-import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
-import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
 import skunk._
 import skunk.data.Completion
 import skunk.data.Completion.Delete
 import skunk.implicits._
 
 private[repository] trait AssociationPersister[F[_]] {
-  def persistAssociation(storingInfo: TokenStoringInfo):         F[Unit]
-  def updatePath(project:             TokenStoringInfo.Project): F[Unit]
+  def persistAssociation(storingInfo: TokenStoringInfo): F[Unit]
+  def updatePath(project:             Project):          F[Unit]
 }
 
 private[repository] object AssociationPersister {
@@ -54,11 +54,11 @@ private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
     }
   }
 
-  override def updatePath(project: TokenStoringInfo.Project): F[Unit] = SessionResource[F].useK(
+  override def updatePath(project: Project): F[Unit] = SessionResource[F].useK(
     updatePathQuery(project)
   )
 
-  private def deleteAssociation(project: TokenStoringInfo.Project) = measureExecutionTime {
+  private def deleteAssociation(project: Project) = measureExecutionTime {
     SqlStatement
       .named("associate token - delete")
       .command[Id ~ Path](sql"""
@@ -90,7 +90,7 @@ private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
       .void
   } recoverWith { case SqlState.UniqueViolation(_) => Kleisli.pure(()) }
 
-  private def updatePathQuery(project: TokenStoringInfo.Project) = measureExecutionTime {
+  private def updatePathQuery(project: Project) = measureExecutionTime {
     SqlStatement
       .named("associate token - update path")
       .command[Path ~ Id](sql"""

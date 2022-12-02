@@ -23,7 +23,6 @@ import AccessTokenCrypto.EncryptedAccessToken
 import RepositoryGenerators._
 import association.Generators.tokenStoringInfos
 import association.TokenDates._
-import association.TokenStoringInfo.Project
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._

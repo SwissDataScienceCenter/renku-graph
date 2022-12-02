@@ -36,7 +36,7 @@ private class ProjectPathFinderImpl[F[_]: Async: GitLabClient: Logger] extends P
   import cats.effect._
   import cats.syntax.all._
   import io.circe._
-  import org.http4s.Status.{NotFound, Ok, Unauthorized}
+  import org.http4s.Status.{Forbidden, NotFound, Ok, Unauthorized}
   import org.http4s._
   import org.http4s.implicits._
 
@@ -45,9 +45,8 @@ private class ProjectPathFinderImpl[F[_]: Async: GitLabClient: Logger] extends P
   }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[projects.Path]]] = {
-    case (Ok, _, response)    => response.as[projects.Path].map(Option.apply)
-    case (NotFound, _, _)     => Option.empty[projects.Path].pure[F]
-    case (Unauthorized, _, _) => Option.empty[projects.Path].pure[F]
+    case (Ok, _, response)                           => response.as[projects.Path].map(Option.apply)
+    case (Unauthorized | Forbidden | NotFound, _, _) => Option.empty[projects.Path].pure[F]
   }
 
   private implicit lazy val projectPathDecoder: EntityDecoder[F, projects.Path] = {

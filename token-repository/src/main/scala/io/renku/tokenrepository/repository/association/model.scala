@@ -45,17 +45,15 @@ private[repository] object TokenDates {
   implicit object ExpiryDate extends TinyTypeFactory[ExpiryDate](new ExpiryDate(_)) with TinyTypeJsonLDOps[ExpiryDate]
 }
 
-private[repository] final case class TokenStoringInfo(project:        TokenStoringInfo.Project,
+private[repository] final case class TokenStoringInfo(project:        Project,
                                                       encryptedToken: EncryptedAccessToken,
                                                       dates:          TokenDates
 )
 
-private[repository] object TokenStoringInfo {
-  final case class Project(id: projects.Id, path: projects.Path)
+private[repository] final case class Project(id: projects.Id, path: projects.Path)
 
-  object Project {
-    implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
-      s"projectId = $id, projectPath = $path"
-    }
+private[repository] object Project {
+  implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
+    s"projectId = $id, projectPath = $path"
   }
 }

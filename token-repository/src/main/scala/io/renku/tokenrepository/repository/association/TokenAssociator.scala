@@ -21,7 +21,6 @@ package association
 
 import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
-import TokenStoringInfo.Project
 import cats.MonadThrow
 import cats.data.OptionT
 import cats.effect.Async
