@@ -96,7 +96,7 @@ tokenRepository:
   gitlab:
     rateLimit: 50/sec
   projectTokenTTL: '365 days'
-  expiredProjectTokenCheckInterval: '24 hours'
+  projectTokenDuePeriod: '184 days'
   connectionPool: 2
   tokenEncryption:
     ## A secret for signing access tokens stored in the database

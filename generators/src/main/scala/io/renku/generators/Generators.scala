@@ -167,6 +167,9 @@ object Generators {
   def durations(min: FiniteDuration = 0 millis, max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
     choose(min.toMillis, max.toMillis) map (FiniteDuration(_, MILLISECONDS).toCoarsest)
 
+  def periods(min: LocalDate = LocalDate.EPOCH, max: LocalDate = LocalDate.now().plus(2000, JAVA_DAYS)): Gen[Period] =
+    Period.between(min, max)
+
   def relativePaths(minSegments: Int = 1,
                     maxSegments: Int = 10,
                     partsGenerator: Gen[String] = nonBlankStrings(

@@ -48,8 +48,8 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
   "associate" should {
 
-    "do nothing if there's a Project Access Token in the DB for the project " +
-      "and it's valid and project path has not changed" in new TestCase {
+    "do nothing if Project Access Token from the DB is valid, is not due for refresh " +
+      "and project path has not changed" in new TestCase {
 
         val encryptedToken = encryptedAccessTokens.generateOne
         givenStoredTokenFinder(projectId, returning = OptionT.some[Try](encryptedToken))
@@ -59,14 +59,29 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
         givenTokenValidation(of = projectAccessToken, returning = true.pure[Try])
 
-        val projectPath = projectPaths.generateOne
-        givenPathFinder(projectId, projectAccessToken, OptionT.some[Try](projectPath))
-        givenStoredPathFinder(projectId, returning = projectPath.pure[Try])
+        givenTokenDueCheck(projectId, returning = false.pure[Try])
+
+        givenPathHasNotChanged(projectId, projectAccessToken)
 
         tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
       }
 
-    "replace the stored token if it's invalid even if it's a Project Access Token" in new TestCase {
+    "replace the stored token if it's not a Project Access Token" in new TestCase {
+
+      val encryptedToken = encryptedAccessTokens.generateOne
+      givenStoredTokenFinder(projectId, returning = OptionT.some(encryptedToken))
+
+      givenTokenDecryption(of = encryptedToken, returning = userAccessTokens.generateOne.pure[Try])
+
+      val projectPath = projectPaths.generateOne
+      givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
+
+      givenSuccessfulTokenCreation(projectPath)
+
+      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+    }
+
+    "replace the stored token if it's invalid" in new TestCase {
 
       val encryptedToken = encryptedAccessTokens.generateOne
       givenStoredTokenFinder(projectId, returning = OptionT.some(encryptedToken))
@@ -84,13 +99,17 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
-    "replace the stored token if it's not a Project Access Token" in new TestCase {
+    "replace the stored token if it's due for refresh" in new TestCase {
 
       val encryptedToken = encryptedAccessTokens.generateOne
-      givenStoredTokenFinder(projectId, returning = OptionT.some[Try](encryptedToken))
+      givenStoredTokenFinder(projectId, returning = OptionT.some(encryptedToken))
 
-      val storedAccessToken = userAccessTokens.generateOne
-      givenTokenDecryption(of = encryptedToken, returning = storedAccessToken.pure[Try])
+      val projectAccessToken = projectAccessTokens.generateOne
+      givenTokenDecryption(of = encryptedToken, returning = projectAccessToken.pure[Try])
+
+      givenTokenValidation(of = projectAccessToken, returning = true.pure[Try])
+
+      givenTokenDueCheck(projectId, returning = true.pure[Try])
 
       val projectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
@@ -99,6 +118,29 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
+
+    "leave the stored Project Access Token untouched but update the path if " +
+      "the token is valid, it's not due for refresh " +
+      "but the path has not changed" in new TestCase {
+
+        val encryptedToken = encryptedAccessTokens.generateOne
+        givenStoredTokenFinder(projectId, returning = OptionT.some[Try](encryptedToken))
+
+        val projectAccessToken = projectAccessTokens.generateOne
+        givenTokenDecryption(of = encryptedToken, returning = projectAccessToken.pure[Try])
+
+        givenTokenValidation(of = projectAccessToken, returning = true.pure[Try])
+
+        givenTokenDueCheck(projectId, returning = false.pure[Try])
+
+        val newProjectPath = projectPaths.generateOne
+        givenPathFinder(projectId, projectAccessToken, OptionT.some[Try](newProjectPath))
+        givenStoredPathFinder(projectId, returning = projectPaths.generateOne.pure[Try])
+
+        givenPathUpdate(Project(projectId, newProjectPath), returning = ().pure[Try])
+
+        tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      }
 
     "store a new Project Access Token if there's none stored" in new TestCase {
 
@@ -112,13 +154,12 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
-    "remove the stored token (non Project Access Token) if project with the given Id does not exist" in new TestCase {
+    "remove the stored token (non Project Access Token) if project with the given id does not exist" in new TestCase {
 
       val encryptedToken = encryptedAccessTokens.generateOne
       givenStoredTokenFinder(projectId, returning = OptionT.some[Try](encryptedToken))
 
-      val storedAccessToken = userAccessTokens.generateOne
-      givenTokenDecryption(of = encryptedToken, returning = storedAccessToken.pure[Try])
+      givenTokenDecryption(of = encryptedToken, returning = userAccessTokens.generateOne.pure[Try])
 
       givenPathFinder(projectId, userAccessToken, returning = OptionT.none)
 
@@ -127,45 +168,25 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
-    "update project path associated with the given Id and token if changed in GitLab" in new TestCase {
+    "delete token if stored token is valid and not due for refresh " +
+      "but current project path cannot be found in GL" in new TestCase {
 
-      val encryptedToken = encryptedAccessTokens.generateOne
-      givenStoredTokenFinder(projectId, returning = OptionT.some[Try](encryptedToken))
+        val encryptedToken = encryptedAccessTokens.generateOne
+        givenStoredTokenFinder(projectId, returning = OptionT.some[Try](encryptedToken))
 
-      val storedAccessToken = projectAccessTokens.generateOne
-      givenTokenDecryption(of = encryptedToken, returning = storedAccessToken.pure[Try])
+        val storedAccessToken = projectAccessTokens.generateOne
+        givenTokenDecryption(of = encryptedToken, returning = storedAccessToken.pure[Try])
+        givenTokenValidation(of = storedAccessToken, returning = true.pure[Try])
+        givenTokenDueCheck(projectId, returning = false.pure[Try])
 
-      givenTokenValidation(of = storedAccessToken, returning = true.pure[Try])
+        givenPathFinder(projectId, storedAccessToken, returning = OptionT.none)
 
-      val newProjectPath = projectPaths.generateOne
-      givenPathFinder(projectId, storedAccessToken, returning = OptionT.some(newProjectPath))
+        givenTokenRemoval(projectId, returning = ().pure[Try])
 
-      val oldProjectPath = projectPaths.generateOne
-      givenStoredPathFinder(projectId, returning = oldProjectPath.pure[Try])
+        tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      }
 
-      givenPathUpdate(Project(projectId, newProjectPath), returning = ().pure[Try])
-
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
-    }
-
-    "delete token if stored token valid but current project path cannot be found" in new TestCase {
-
-      val encryptedToken = encryptedAccessTokens.generateOne
-      givenStoredTokenFinder(projectId, returning = OptionT.some[Try](encryptedToken))
-
-      val storedAccessToken = projectAccessTokens.generateOne
-      givenTokenDecryption(of = encryptedToken, returning = storedAccessToken.pure[Try])
-
-      givenTokenValidation(of = storedAccessToken, returning = true.pure[Try])
-
-      givenPathFinder(projectId, storedAccessToken, returning = OptionT.none)
-
-      givenTokenRemoval(projectId, returning = ().pure[Try])
-
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
-    }
-
-    "delete token if stored token valid but new token creation failed with NotFound or Forbidden" in new TestCase {
+    "delete token if new token creation failed with NotFound or Forbidden" in new TestCase {
 
       val encryptedToken = encryptedAccessTokens.generateOne
       givenStoredTokenFinder(projectId, returning = OptionT.some[Try](encryptedToken))
@@ -284,6 +305,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
     val projectPathFinder         = mock[ProjectPathFinder[Try]]
     val accessTokenCrypto         = mock[AccessTokenCrypto[Try]]
     val tokenValidator            = mock[TokenValidator[Try]]
+    val tokenDueChecker           = mock[TokenDueChecker[Try]]
     val projectAccessTokenCreator = mock[ProjectAccessTokenCreator[Try]]
     val associationPersister      = mock[AssociationPersister[Try]]
     val persistedPathFinder       = mock[PersistedPathFinder[Try]]
@@ -293,6 +315,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       projectPathFinder,
       accessTokenCrypto,
       tokenValidator,
+      tokenDueChecker,
       projectAccessTokenCreator,
       associationPersister,
       persistedPathFinder,
@@ -324,6 +347,11 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
         .expects(of)
         .returning(returning)
 
+    def givenTokenDueCheck(projectId: projects.Id, returning: Try[Boolean]) =
+      (tokenDueChecker.checkTokenDue _)
+        .expects(projectId)
+        .returning(returning)
+
     def givenStoredPathFinder(projectId: projects.Id, returning: Try[projects.Path]) =
       (persistedPathFinder.findPersistedProjectPath _)
         .expects(projectId)
@@ -333,6 +361,12 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       (projectPathFinder.findProjectPath _)
         .expects(projectId, accessToken)
         .returning(returning)
+
+    def givenPathHasNotChanged(projectId: projects.Id, accessToken: AccessToken) = {
+      val projectPath = projectPaths.generateOne
+      givenPathFinder(projectId, accessToken, OptionT.some[Try](projectPath))
+      givenStoredPathFinder(projectId, returning = projectPath.pure[Try])
+    }
 
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: UserAccessToken,

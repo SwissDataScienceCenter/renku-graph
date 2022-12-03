@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository
-package refresh
+package io.renku.tokenrepository.repository.association
 
-import association.TokenDates.ExpiryDate
-import association.renkuTokenName
+import Generators._
+import TokenDates.ExpiryDate
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -31,7 +30,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators._
+import io.renku.generators.Generators.{emptyOptionOf, fixed, localDates, nonEmptyStrings}
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -44,27 +43,28 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.LocalDate
+import java.time.LocalDate.now
+import java.time.{LocalDate, Period}
 
-class ExpiredTokensFinderSpec
+class TokensToRemoveFinderSpec
     extends AnyWordSpec
     with MockFactory
     with GitLabClientTools[IO]
     with IOSpec
     with should.Matchers {
 
-  "findExpiredTokens" should {
+  "checkTokenDue" should {
 
     s"do GET projects/:id/access_tokens to find expired '$renkuTokenName' tokens" in new TestCase {
 
       val endpointName: String Refined NonEmpty = "project-access-tokens"
 
       val allTokens = List(
-        tokenInfosWithExpiry(fixed(renkuTokenName), localDates(max = CloseExpirationDate().value)),
-        tokenInfosWithExpiry(fixed(renkuTokenName), fixed(CloseExpirationDate().value)),
+        tokenInfosWithExpiry(fixed(renkuTokenName), localDates(max = now() plus tokenDuePeriod)),
+        tokenInfosWithExpiry(fixed(renkuTokenName), fixed(now() plus tokenDuePeriod)),
         tokenInfosWithoutExpiry(fixed(renkuTokenName)),
-        tokenInfosWithExpiry(fixed(renkuTokenName), localDates(min = CloseExpirationDate().value plusDays 1)),
-        tokenInfosWithExpiry(expiryDates = localDates(max = CloseExpirationDate().value)),
+        tokenInfosWithExpiry(fixed(renkuTokenName), localDates(min = now() plus tokenDuePeriod plusDays 1)),
+        tokenInfosWithExpiry(expiryDates = localDates(max = now() plus tokenDuePeriod)),
         tokenInfosWithExpiry()
       ).map(_.generateOne)
 
@@ -73,7 +73,7 @@ class ExpiredTokensFinderSpec
         .expects(uri"projects" / projectId.value / "access_tokens", endpointName, *, Option(accessToken))
         .returning(allTokens.pure[IO])
 
-      finder.findExpiredTokens(projectId, accessToken).unsafeRunSync() shouldBe allTokens.take(3).map(_._1)
+      finder.findTokensToRemove(projectId, accessToken).unsafeRunSync() shouldBe allTokens.take(3).map(_._1)
     }
 
     "map OK response body to TokenInfo tuples" in new TestCase {
@@ -101,10 +101,11 @@ class ExpiredTokensFinderSpec
     val accessToken = accessTokens.generateOne
 
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
-    val finder = new ExpiredTokensFinderImpl[IO]
+    val tokenDuePeriod = Period.ofDays(5)
+    val finder         = new TokensToRemoveFinderImpl[IO](tokenDuePeriod)
 
     lazy val mapResponse = captureMapping(finder, gitLabClient)(
-      findingMethod = _.findExpiredTokens(projectId, accessTokens.generateOne).unsafeRunSync(),
+      findingMethod = _.findTokensToRemove(projectId, accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = tokenInfosWithoutExpiry().generateList()
     )
   }

@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.refresh
+package io.renku.tokenrepository.repository.association
 
+import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined

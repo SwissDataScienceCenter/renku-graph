@@ -35,7 +35,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Method.POST
-import org.http4s.Status.{BadRequest, Created, Forbidden, NotFound}
+import org.http4s.Status.{BadRequest, Created, Forbidden, InternalServerError, NotFound}
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
 import org.scalamock.scalatest.MockFactory
@@ -79,7 +79,7 @@ class ProjectAccessTokenCreatorSpec
         .unsafeRunSync() shouldBe creationInfo.some
     }
 
-    Forbidden :: NotFound :: Nil foreach { status =>
+    BadRequest :: Forbidden :: NotFound :: Nil foreach { status =>
       s"retrieve the None for $status status" in new TestCase {
         mapResponse(status, Request[IO](), Response[IO](status)).unsafeRunSync() shouldBe None
       }
@@ -87,7 +87,7 @@ class ProjectAccessTokenCreatorSpec
 
     s"fail for responses other statuses" in new TestCase {
       intercept[Exception] {
-        mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest)).unsafeRunSync()
+        mapResponse(InternalServerError, Request[IO](), Response[IO](InternalServerError)).unsafeRunSync()
       }
     }
   }

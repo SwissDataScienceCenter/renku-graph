@@ -16,18 +16,31 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.refresh
+package io.renku.tokenrepository.repository.association
 
+import cats.syntax.all._
+import com.typesafe.config.ConfigFactory
+import io.renku.generators.Generators.ints
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import java.time.LocalDate
+import java.time.Period
+import scala.jdk.CollectionConverters._
+import scala.util.Try
 
-class CloseExpirationDateSpec extends AnyWordSpec with should.Matchers {
+class ProjectTokenDuePeriodSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "apply" should {
-    "produce an ExpiryDate that is current date plus one day" in {
-      CloseExpirationDate().value shouldBe LocalDate.now().plusDays(1)
+
+    "read 'project-token-due-period' as Period from the config" in {
+      forAll(ints(min = 1, max = 2 * 365)) { duration =>
+        val config = ConfigFactory.parseMap(
+          Map("project-token-due-period" -> s"$duration days").asJava
+        )
+
+        ProjectTokenDuePeriod[Try](config) shouldBe Period.ofDays(duration).pure[Try]
+      }
     }
   }
 }

@@ -25,9 +25,9 @@ import java.time.{OffsetDateTime, ZoneOffset}
 
 package object association {
 
-  val renkuTokenName = "renku"
-
   import io.renku.tokenrepository.repository.association.TokenDates._
+
+  private[association] val renkuTokenName = "renku"
 
   private[association] val createdAtDecoder: Decoder[CreatedAt] =
     timestamptz.map(timestamp => CreatedAt(timestamp.toInstant))

@@ -46,6 +46,7 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
     projectPathFinder:         ProjectPathFinder[F],
     accessTokenCrypto:         AccessTokenCrypto[F],
     tokenValidator:            TokenValidator[F],
+    tokenDueChecker:           TokenDueChecker[F],
     projectAccessTokenCreator: ProjectAccessTokenCreator[F],
     associationPersister:      AssociationPersister[F],
     persistedPathFinder:       PersistedPathFinder[F],
@@ -54,27 +55,37 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
     maxRetries:                Int Refined NonNegative
 ) extends TokenAssociator[F] {
 
-  import accessTokenCrypto._
   import associationPersister._
   import persistedPathFinder._
   import projectAccessTokenCreator._
   import projectPathFinder._
   import tokenFinder._
+  import tokenDueChecker._
   import tokenValidator._
 
   override def associate(projectId: projects.Id, token: AccessToken): F[Unit] =
-    findStoredToken(projectId).cataF(Option.empty[ProjectAccessToken].pure[F], decryptAndValidate) >>= {
-      case Some(validToken) => replacePathIfChanged(projectId, validToken)
-      case None             => createOrDelete(projectId, token)
+    findStoredToken(projectId)
+      .flatMapF(decrypt >=> validate >=> checkIfDue(projectId))
+      .semiflatMap(replacePathIfChanged(projectId))
+      .getOrElseF(createOrDelete(projectId, token))
+
+  private lazy val decrypt: EncryptedAccessToken => F[Option[ProjectAccessToken]] = encryptedToken =>
+    accessTokenCrypto.decrypt(encryptedToken) map {
+      case token: ProjectAccessToken => token.some
+      case _ => Option.empty[ProjectAccessToken]
     }
 
-  private def decryptAndValidate(encryptedToken: EncryptedAccessToken): F[Option[ProjectAccessToken]] =
-    decrypt(encryptedToken) >>= {
-      case token: ProjectAccessToken => checkValid(token).map(Option.when(_)(token))
-      case _ => Option.empty[ProjectAccessToken].pure[F]
-    }
+  private lazy val validate: Option[ProjectAccessToken] => F[Option[ProjectAccessToken]] = {
+    case Some(token) => checkValid(token).map(Option.when(_)(token))
+    case _           => Option.empty[ProjectAccessToken].pure[F]
+  }
 
-  private def replacePathIfChanged(projectId: projects.Id, token: ProjectAccessToken): F[Unit] =
+  private def checkIfDue(projectId: projects.Id): Option[ProjectAccessToken] => F[Option[ProjectAccessToken]] = {
+    case Some(token) => checkTokenDue(projectId).map(Option.unless(_)(token))
+    case _           => Option.empty[ProjectAccessToken].pure[F]
+  }
+
+  private def replacePathIfChanged(projectId: projects.Id)(token: ProjectAccessToken): F[Unit] =
     findProjectPath(projectId, token)
       .semiflatMap(actualPath =>
         findPersistedProjectPath(projectId).flatMap {
@@ -97,7 +108,7 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
   private def maybeGenerateNewToken(project: Project, token: AccessToken) =
     OptionT(createPersonalAccessToken(project.id, token))
       .semiflatMap { newTokenInfo =>
-        encrypt(newTokenInfo.token) >>=
+        accessTokenCrypto.encrypt(newTokenInfo.token) >>=
           (encToken => persistOrRetry(TokenStoringInfo(project, encToken, newTokenInfo.dates), newTokenInfo.token))
       }
 
@@ -114,7 +125,7 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
       .cataF(
         new Exception(show"Token associator - just saved token cannot be found for project: $projectId")
           .raiseError[F, Unit],
-        decrypt(_) >>= {
+        accessTokenCrypto.decrypt(_) >>= {
           case `token` => ().pure[F]
           case _ =>
             new Exception(show"Token associator - just saved token integrity check failed for project: $projectId")
@@ -141,11 +152,13 @@ private object TokenAssociator {
     pathFinder                <- ProjectPathFinder[F]
     accessTokenCrypto         <- AccessTokenCrypto[F]()
     tokenValidator            <- TokenValidator[F]
+    tokenDueChecker           <- TokenDueChecker[F](queriesExecTimes)
     projectAccessTokenCreator <- ProjectAccessTokenCreator[F]()
   } yield new TokenAssociatorImpl[F](
     pathFinder,
     accessTokenCrypto,
     tokenValidator,
+    tokenDueChecker,
     projectAccessTokenCreator,
     AssociationPersister(queriesExecTimes),
     PersistedPathFinder(queriesExecTimes),

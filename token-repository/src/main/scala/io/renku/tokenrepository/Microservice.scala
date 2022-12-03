@@ -29,7 +29,6 @@ import io.renku.metrics.MetricsRegistry
 import io.renku.microservices.IOMicroservice
 import io.renku.tokenrepository.repository.init.DbInitializer
 import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
-import io.renku.tokenrepository.repository.refresh.TokensRefresher
 import io.renku.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 import natchez.Trace.Implicits.noop
 import org.typelevel.log4cats.Logger
@@ -53,14 +52,12 @@ object Microservice extends IOMicroservice {
       sentryInitializer                  <- SentryInitializer[IO]
       queriesExecTimes                   <- QueriesExecutionTimes[IO]
       dbInitializer                      <- DbInitializer[IO](queriesExecTimes)
-      tokensRefresher                    <- TokensRefresher[IO](queriesExecTimes)
       microserviceRoutes                 <- MicroserviceRoutes[IO](queriesExecTimes)
       exitCode <- microserviceRoutes.routes.use { routes =>
                     new MicroserviceRunner(
                       certificateLoader,
                       sentryInitializer,
                       dbInitializer,
-                      tokensRefresher,
                       HttpServer[IO](serverPort = 9003, routes),
                       microserviceRoutes
                     ).run()
@@ -73,7 +70,6 @@ private class MicroserviceRunner(
     certificateLoader:  CertificateLoader[IO],
     sentryInitializer:  SentryInitializer[IO],
     dbInitializer:      DbInitializer[IO],
-    tokensRefresher:    TokensRefresher[IO],
     httpServer:         HttpServer[IO],
     microserviceRoutes: MicroserviceRoutes[IO]
 ) {
@@ -87,10 +83,8 @@ private class MicroserviceRunner(
   } yield exitCode
 
   private def kickOffDBInit()(implicit logger: Logger[IO]) = Spawn[IO].start(
-    {
-      dbInitializer.run() >>
-        microserviceRoutes.notifyDBReady() >>
-        tokensRefresher.run()
-    }.recoverWith { case ex => Logger[IO].error(ex)("DB initialization failed") }.void
+    (dbInitializer.run() >> microserviceRoutes.notifyDBReady()).recoverWith { case ex =>
+      Logger[IO].error(ex)("DB initialization failed")
+    }.void
   )
 }
