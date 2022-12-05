@@ -27,8 +27,8 @@ import io.renku.graph.model.projects
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.AccessToken
 import io.renku.http.{ErrorMessage, InfoMessage}
-import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.Response
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -76,7 +76,6 @@ class FetchTokenEndpointImpl[F[_]: MonadThrow: Logger](tokenFinder: TokenFinder[
 }
 
 object FetchTokenEndpoint {
-  def apply[F[_]: MonadCancelThrow: Logger: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[FetchTokenEndpoint[F]] = TokenFinder(queriesExecTimes).map(new FetchTokenEndpointImpl[F](_))
+  def apply[F[_]: MonadCancelThrow: Logger: SessionResource: QueriesExecutionTimes]: F[FetchTokenEndpoint[F]] =
+    TokenFinder[F].map(new FetchTokenEndpointImpl[F](_))
 }

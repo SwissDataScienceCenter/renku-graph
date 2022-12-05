@@ -27,7 +27,7 @@ import cats.effect._
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.{Id, Path}
-import io.renku.metrics.LabeledHistogram
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import skunk._
 import skunk.data.Completion
 import skunk.data.Completion.Delete
@@ -39,12 +39,12 @@ private[repository] trait TokensPersister[F[_]] {
 }
 
 private[repository] object TokensPersister {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): TokensPersister[F] =
-    new TokensPersisterImpl[F](queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: TokensPersister[F] =
+    new TokensPersisterImpl[F]
 }
 
-private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient[F](Some(queriesExecTimes))
+private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with TokensPersister[F]
     with TokenRepositoryTypeSerializers {
 

@@ -24,16 +24,22 @@ import eu.timepit.refined.auto._
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus.TransformingTriples
 import io.renku.graph.model.projects
-import io.renku.metrics.{Gauge, LabeledGauge, MetricsRegistry}
+import io.renku.metrics.{LabeledGauge, LabeledGaugeImpl, MetricsRegistry}
+
+trait UnderTransformationGauge[F[_]] extends LabeledGauge[F, projects.Path]
 
 object UnderTransformationGauge {
 
-  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[LabeledGauge[F, projects.Path]] =
-    Gauge[F, projects.Path](
-      name = "events_under_transformation_count",
-      help = "Number of Events under triples transformation by project path.",
-      labelName = "project",
-      resetDataFetch =
-        () => statsFinder.countEvents(Set(TransformingTriples: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)
-    )
+  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[UnderTransformationGauge[F]] =
+    MetricsRegistry[F].register {
+      new LabeledGaugeImpl[F, projects.Path](
+        name = "events_under_transformation_count",
+        help = "Number of Events under triples transformation by project path.",
+        labelName = "project",
+        resetDataFetch =
+          () => statsFinder.countEvents(Set(TransformingTriples: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)
+      ) with UnderTransformationGauge[F]
+    }.widen
+
+  def apply[F[_]](implicit ev: UnderTransformationGauge[F]): UnderTransformationGauge[F] = ev
 }

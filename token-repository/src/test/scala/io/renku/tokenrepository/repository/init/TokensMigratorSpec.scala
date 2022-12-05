@@ -228,15 +228,14 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val tokenCrypto     = mock[AccessTokenCrypto[IO]]
     val tokenValidator  = mock[TokenValidator[IO]]
-    val tokenRemover    = TokenRemover[IO](queriesExecTimes)
+    val tokenRemover    = TokenRemover[IO]
     val tokensCreator   = mock[NewTokensCreator[IO]]
-    val tokensPersister = TokensPersister[IO](queriesExecTimes)
+    val tokensPersister = TokensPersister[IO]
     val migration = new TokensMigrator[IO](tokenCrypto,
                                            tokenValidator,
                                            tokenRemover,
                                            tokensCreator,
                                            tokensPersister,
-                                           queriesExecTimes,
                                            retryInterval = 500 millis
     )
 

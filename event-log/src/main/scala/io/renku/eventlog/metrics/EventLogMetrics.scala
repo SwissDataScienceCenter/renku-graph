@@ -20,6 +20,8 @@ package io.renku.eventlog.metrics
 
 import cats.effect.kernel.Temporal
 import cats.syntax.all._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.EventStatus
 import io.renku.metrics._
@@ -68,8 +70,9 @@ class EventLogMetricsImpl[F[_]: Temporal: Logger](
     statusesGauge set (status -> count.toDouble)
   }
 
-  private def logError(gaugeName: String): PartialFunction[Throwable, F[Unit]] = { case NonFatal(exception) =>
-    Logger[F].error(exception)(s"Problem with gathering metrics for $gaugeName")
+  private def logError(gaugeName: String Refined NonEmpty): PartialFunction[Throwable, F[Unit]] = {
+    case NonFatal(exception) =>
+      Logger[F].error(exception)(s"Problem with gathering metrics for $gaugeName")
   }
 }
 

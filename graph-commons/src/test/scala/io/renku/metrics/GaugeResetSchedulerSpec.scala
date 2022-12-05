@@ -20,6 +20,9 @@ package io.renku.metrics
 
 import cats.effect.IO
 import cats.syntax.all._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.config.MetricsConfigProvider
 import io.renku.generators.Generators.Implicits._
@@ -91,6 +94,7 @@ class GaugeResetSchedulerSpec
   }
 
   private trait TestCase {
+
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
     val gauge1                = new TestLabeledGauge
     val gauge2                = new TestLabeledGauge
@@ -104,8 +108,8 @@ class GaugeResetSchedulerSpec
 
     class TestLabeledGauge extends LabeledGauge[IO, Double] with PrometheusCollector {
 
-      override val name: String = "gauge"
-      override val help: String = "help"
+      override val name: String Refined NonEmpty = "gauge"
+      override val help: String Refined NonEmpty = "help"
 
       type Collector = LibGauge
       override lazy val wrappedCollector: LibGauge = LibGauge

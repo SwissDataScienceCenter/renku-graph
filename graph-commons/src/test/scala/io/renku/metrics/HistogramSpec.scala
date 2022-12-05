@@ -20,7 +20,6 @@ package io.renku.metrics
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.prometheus.client.{Histogram => LibHistogram}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
 import io.renku.metrics.MetricsTools._
@@ -49,8 +48,8 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
         val Success(histogram) = Histogram[Try](name, help, labelName, Seq(.1, 1))
 
         histogram.isInstanceOf[LabeledHistogram[Try]] shouldBe true
-        histogram.name                                shouldBe name.value
-        histogram.help                                shouldBe help.value
+        histogram.name                                shouldBe name
+        histogram.help                                shouldBe help
       }
 
     "has startTimer returning a timer measuring the elapsed time" in new TestCase {
@@ -93,8 +92,8 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
         val Success(histogram) = Histogram[Try](name, help, Seq(.1, 1))
 
         histogram.isInstanceOf[SingleValueHistogram[Try]] shouldBe true
-        histogram.name                                    shouldBe name.value
-        histogram.help                                    shouldBe help.value
+        histogram.name                                    shouldBe name
+        histogram.help                                    shouldBe help
       }
 
     "has startTimer returning a timer measuring the elapsed time" in new TestCase {
@@ -148,18 +147,18 @@ class LabeledHistogramSpec extends AnyWordSpec with MockFactory with should.Matc
 
       (duration * 1000) should be > sleepTime.toDouble
 
-      underlying.collectAllSamples.map(_._1)             should contain(label)
+      underlying.collectAllSamples.map(_._1)             should contain(label.value)
       underlying.collectAllSamples.map(_._2)             should contain(labelValue1)
       underlying.collectAllSamples.map(_._3).last * 1000 should be > sleepTime.toDouble
     }
   }
 
   private trait TestCase {
-    val label        = nonBlankStrings().generateOne.value
+    val label        = nonBlankStrings().generateOne
     private val name = nonBlankStrings().generateOne
     private val help = sentences().generateOne
-    val underlying   = LibHistogram.build(name.value, help.value).labelNames(label).create()
 
-    val histogram = new LabeledHistogramImpl[Try](underlying)
+    val histogram  = new LabeledHistogramImpl[Try](name, help, label, Seq(0.1))
+    val underlying = histogram.wrappedCollector
   }
 }

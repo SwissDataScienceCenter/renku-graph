@@ -26,8 +26,8 @@ import io.renku.graph.model.projects.Id
 import io.renku.http.ErrorMessage
 import io.renku.http.ErrorMessage._
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
@@ -73,7 +73,6 @@ class CreateTokenEndpointImpl[F[_]: Concurrent: Logger](
 
 object CreateTokenEndpoint {
 
-  def apply[F[_]: Async: GitLabClient: Logger: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[CreateTokenEndpoint[F]] = TokensCreator(queriesExecTimes).map(new CreateTokenEndpointImpl[F](_))
+  def apply[F[_]: Async: GitLabClient: Logger: SessionResource: QueriesExecutionTimes]: F[CreateTokenEndpoint[F]] =
+    TokensCreator[F].map(new CreateTokenEndpointImpl[F](_))
 }

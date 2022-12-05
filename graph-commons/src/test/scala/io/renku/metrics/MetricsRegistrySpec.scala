@@ -20,6 +20,8 @@ package io.renku.metrics
 
 import cats.effect.IO
 import com.typesafe.config.ConfigFactory
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators._
@@ -60,21 +62,19 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
   "EnabledMetricsRegistry.register" should {
 
     "register the given collector in the collector registry " +
-      "and returns the registered object" in {
+      "and returns the registered object" in new EnabledMetricsRegistryTestCase {
 
-        val registry = new EnabledMetricsRegistry[IO]
-
-        val gaugeName = nonEmptyStrings().generateOne
         val metricsCollector = new MetricsCollector with PrometheusCollector {
           override type Collector = LibGauge
           override val wrappedCollector: LibGauge = LibGauge
             .build()
-            .name(gaugeName)
-            .help("some gauge info")
+            .name(metricsCollectorName.value)
+            .help(metricsCollectorHelp.value)
             .labelNames("label")
             .create()
-          override val name: String = wrappedCollector.describe().asScala.head.name
-          override val help: String = wrappedCollector.describe().asScala.head.help
+
+          override val name: String Refined NonEmpty = metricsCollectorName
+          override val help: String Refined NonEmpty = metricsCollectorHelp
         }
 
         val registered = registry.register(metricsCollector).unsafeRunSync()
@@ -83,26 +83,24 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
 
         registry.maybeCollectorRegistry.flatMap(
           _.metricFamilySamples().asScala
-            .find(_.name == gaugeName)
+            .find(_.name == metricsCollectorName.value)
             .map(_.samples.asScala.map(_.value).toList)
         ) shouldBe Some(List())
       }
 
-    "return the already registered collector if another one with the same name is being registered" in {
+    "return the already registered collector if another one with the same name is being registered" in new EnabledMetricsRegistryTestCase {
 
-      val registry = new EnabledMetricsRegistry[IO]
-
-      val gaugeName = nonEmptyStrings().generateOne
       val initialMetricsCollector = new MetricsCollector with PrometheusCollector {
         override type Collector = LibGauge
         override val wrappedCollector: LibGauge = LibGauge
           .build()
-          .name(gaugeName)
-          .help("some gauge info")
+          .name(metricsCollectorName.value)
+          .help(metricsCollectorHelp.value)
           .labelNames("label")
           .create()
-        override val name: String = wrappedCollector.describe().asScala.head.name
-        override val help: String = wrappedCollector.describe().asScala.head.help
+
+        override val name: String Refined NonEmpty = metricsCollectorName
+        override val help: String Refined NonEmpty = metricsCollectorHelp
       }
 
       val registered = registry.register(initialMetricsCollector).unsafeRunSync()
@@ -113,35 +111,47 @@ class MetricsRegistrySpec extends AnyWordSpec with IOSpec with should.Matchers {
         override type Collector = LibGauge
         override val wrappedCollector: LibGauge = LibGauge
           .build()
-          .name(gaugeName)
-          .help("different name")
+          .name(metricsCollectorName.value)
+          .help(metricsCollectorHelp.value)
           .labelNames("label")
           .create()
-        override val name: String = wrappedCollector.describe().asScala.head.name
-        override val help: String = wrappedCollector.describe().asScala.head.help
+
+        override val name: String Refined NonEmpty = metricsCollectorName
+        override val help: String Refined NonEmpty = metricsCollectorHelp
       }
 
       registry.register(sameNameMetricsCollector).unsafeRunSync() shouldBe initialMetricsCollector
     }
   }
 
+  private trait EnabledMetricsRegistryTestCase {
+
+    val registry = new EnabledMetricsRegistry[IO]
+
+    val metricsCollectorName = nonBlankStrings().generateOne
+    val metricsCollectorHelp = nonBlankStrings().generateOne
+  }
+
   "DisabledMetricsRegistry.register" should {
+
+    val metricsCollectorName = nonBlankStrings().generateOne
+    val metricsCollectorHelp = nonBlankStrings().generateOne
 
     "not register the given collector in any registry" in {
 
       val registry = new DisabledMetricsRegistry[Try]
 
-      val gaugeName = "gauge_name"
       val metricsCollector = new MetricsCollector with PrometheusCollector {
         override type Collector = LibGauge
         override val wrappedCollector: LibGauge = LibGauge
           .build()
-          .name(gaugeName)
-          .help("some gauge info")
+          .name(metricsCollectorName.value)
+          .help(metricsCollectorHelp.value)
           .labelNames("label")
           .create()
-        override val name: String = wrappedCollector.describe().asScala.head.name
-        override val help: String = wrappedCollector.describe().asScala.head.help
+
+        override val name: String Refined NonEmpty = metricsCollectorName
+        override val help: String Refined NonEmpty = metricsCollectorHelp
       }
 
       registry register metricsCollector

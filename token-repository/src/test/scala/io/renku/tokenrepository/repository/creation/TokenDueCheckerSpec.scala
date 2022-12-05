@@ -19,16 +19,16 @@
 package io.renku.tokenrepository.repository.creation
 
 import cats.effect.IO
-import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.localDates
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.projects
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -75,9 +75,10 @@ class TokenDueCheckerSpec
 
   private trait TestCase {
 
-    private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val tokenDuePeriod           = Period.ofDays(5)
-    val dueChecker               = new TokenDueCheckerImpl[IO](tokenDuePeriod, queriesExecTimes)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val tokenDuePeriod = Period.ofDays(5)
+    val dueChecker     = new TokenDueCheckerImpl[IO](tokenDuePeriod)
   }
 
   private def insertToken(projectId: projects.Id, expiryDate: ExpiryDate): Unit =

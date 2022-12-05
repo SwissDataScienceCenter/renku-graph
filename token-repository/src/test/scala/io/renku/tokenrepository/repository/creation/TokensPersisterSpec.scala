@@ -21,17 +21,17 @@ package creation
 
 import AccessTokenCrypto.EncryptedAccessToken
 import RepositoryGenerators._
-import creation.Generators.tokenStoringInfos
-import creation.TokenDates._
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
+import creation.Generators.tokenStoringInfos
+import creation.TokenDates._
 import io.renku.generators.Generators.Implicits._
 import io.renku.graph.model.GraphModelGenerators._
 import io.renku.graph.model.projects
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -138,8 +138,9 @@ class TokensPersisterSpec
   private trait TestCase {
     val tokenStoringInfo = tokenStoringInfos.generateOne
 
-    private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val persister                = new TokensPersisterImpl[IO](queriesExecTimes)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val persister = new TokensPersisterImpl[IO]
   }
 
   private def findTokenInfo(projectId: projects.Id): Option[TokenStoringInfo] = sessionResource
