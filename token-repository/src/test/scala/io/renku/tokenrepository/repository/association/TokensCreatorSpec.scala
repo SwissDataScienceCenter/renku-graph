@@ -70,7 +70,7 @@ class TokensCreatorSpec
         .expects(uri"projects" / projectId.value / "access_tokens", endpointName, payload, *, Option(accessToken))
         .returning(creationInfo.some.pure[IO])
 
-      tokenCreator.createPersonalAccessToken(projectId, accessToken).unsafeRunSync() shouldBe creationInfo.some
+      tokenCreator.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync() shouldBe creationInfo.some
     }
 
     s"retrieve the created Project Access Token from the response with $Created status" in new TestCase {
@@ -105,7 +105,7 @@ class TokensCreatorSpec
     val tokenCreator    = new TokensCreatorImpl[IO](projectTokenTTL, currentDate)
 
     lazy val mapResponse = captureMapping(tokenCreator, gitLabClient)(
-      findingMethod = _.createPersonalAccessToken(projectId, accessToken).unsafeRunSync(),
+      findingMethod = _.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync(),
       resultGenerator = tokenCreationInfos.generateSome,
       method = POST
     )

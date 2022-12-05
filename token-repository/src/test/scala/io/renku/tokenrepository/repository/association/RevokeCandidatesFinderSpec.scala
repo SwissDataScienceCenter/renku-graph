@@ -46,7 +46,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.LocalDate.now
 import java.time.{LocalDate, Period}
 
-class TokensToRemoveFinderSpec
+class RevokeCandidatesFinderSpec
     extends AnyWordSpec
     with MockFactory
     with GitLabClientTools[IO]
@@ -102,7 +102,7 @@ class TokensToRemoveFinderSpec
 
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val tokenDuePeriod = Period.ofDays(5)
-    val finder         = new TokensToRemoveFinderImpl[IO](tokenDuePeriod)
+    val finder         = new RevokeCandidatesFinderImpl[IO](tokenDuePeriod)
 
     lazy val mapResponse = captureMapping(finder, gitLabClient)(
       findingMethod = _.findTokensToRemove(projectId, accessTokens.generateOne).unsafeRunSync(),

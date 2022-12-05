@@ -69,11 +69,11 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
   import associationPersister._
   import fs2.Stream
   import io.renku.db.SqlStatement
-  import tokensCreator._
   import skunk.Void
   import skunk.implicits._
   import tokenCrypto._
   import tokenValidator._
+  import tokensCreator._
 
   override def run(): F[Unit] =
     Stream
@@ -132,14 +132,14 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
     }
   }.recoverWith(retry(deleteWhenInvalidWithRetry(project, token))(project))
 
-  private def createTokenWithRetry(project: Project, token: AccessToken): F[Option[(Project, TokenCreationInfo)]] = {
-    createPersonalAccessToken(project.id, token) >>= {
-      case Some(creationInfo) => (project -> creationInfo).some.pure[F]
-      case None =>
-        Logger[F].warn(show"$logPrefix $project cannot generate new token; deleting") >>
-          tokenRemover.delete(project.id).map(_ => Option.empty[(Project, TokenCreationInfo)])
-    }
-  }.recoverWith(retry(createTokenWithRetry(project, token))(project))
+  private def createTokenWithRetry(project: Project, token: AccessToken): F[Option[(Project, TokenCreationInfo)]] =
+    createPersonalAccessToken(project.id, token)
+      .map(project -> _)
+      .flatTapNone(
+        Logger[F].warn(show"$logPrefix $project cannot generate new token; deleting") >> tokenRemover.delete(project.id)
+      )
+      .value
+      .recoverWith(retry(createTokenWithRetry(project, token))(project))
 
   private def persistWithRetry(project:        Project,
                                newTokenInfo:   TokenCreationInfo,

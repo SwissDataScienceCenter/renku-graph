@@ -77,6 +77,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       givenSuccessfulTokenCreation(projectPath)
+      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -95,6 +96,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       givenSuccessfulTokenCreation(projectPath)
+      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -115,6 +117,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       givenSuccessfulTokenCreation(projectPath)
+      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -150,6 +153,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       givenSuccessfulTokenCreation(projectPath)
+      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -199,7 +203,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       val newProjectPath = projectPaths.generateOne
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(newProjectPath))
 
-      givenProjectTokenCreator(projectId, userAccessToken, returning = None.pure[Try])
+      givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.none)
 
       givenTokenRemoval(projectId, returning = ().pure[Try])
 
@@ -214,7 +218,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.some.pure[Try])
+      givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.some(tokenCreationInfo))
 
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
@@ -232,6 +236,8 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
 
+      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
+
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
@@ -243,7 +249,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.some.pure[Try])
+      givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.some(tokenCreationInfo))
 
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
@@ -257,6 +263,8 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenStoredTokenFinder(projectId, returning = OptionT.none)
 
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
+
+      givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
       tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
     }
@@ -277,7 +285,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
 
       val tokenCreationInfo = tokenCreationInfos.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.some.pure[Try])
+      givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.some(tokenCreationInfo))
 
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
@@ -302,15 +310,17 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
     implicit val logger:    TestLogger[Try]         = TestLogger[Try]()
     private val maxRetries: Int Refined NonNegative = 2
-    val projectPathFinder    = mock[ProjectPathFinder[Try]]
-    val accessTokenCrypto    = mock[AccessTokenCrypto[Try]]
-    val tokenValidator       = mock[TokenValidator[Try]]
-    val tokenDueChecker      = mock[TokenDueChecker[Try]]
-    val tokensCreator        = mock[TokensCreator[Try]]
-    val associationPersister = mock[AssociationPersister[Try]]
-    val persistedPathFinder  = mock[PersistedPathFinder[Try]]
-    val tokenRemover         = mock[TokenRemover[Try]]
-    val tokenFinder          = mock[PersistedTokensFinder[Try]]
+    val projectPathFinder      = mock[ProjectPathFinder[Try]]
+    val accessTokenCrypto      = mock[AccessTokenCrypto[Try]]
+    val tokenValidator         = mock[TokenValidator[Try]]
+    val tokenDueChecker        = mock[TokenDueChecker[Try]]
+    val tokensCreator          = mock[TokensCreator[Try]]
+    val associationPersister   = mock[AssociationPersister[Try]]
+    val persistedPathFinder    = mock[PersistedPathFinder[Try]]
+    val tokenRemover           = mock[TokenRemover[Try]]
+    val tokensFinder           = mock[PersistedTokensFinder[Try]]
+    val revokeCandidatesFinder = mock[RevokeCandidatesFinder[Try]]
+    val tokensRevoker          = mock[TokensRevoker[Try]]
     val tokenAssociator = new TokenAssociatorImpl[Try](
       projectPathFinder,
       accessTokenCrypto,
@@ -320,12 +330,14 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       associationPersister,
       persistedPathFinder,
       tokenRemover,
-      tokenFinder,
+      tokensFinder,
+      revokeCandidatesFinder,
+      tokensRevoker,
       maxRetries
     )
 
     def givenStoredTokenFinder(projectId: projects.Id, returning: OptionT[Try, EncryptedAccessToken]) =
-      (tokenFinder
+      (tokensFinder
         .findStoredToken(_: Id))
         .expects(projectId)
         .returning(returning)
@@ -370,7 +382,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: UserAccessToken,
-                                 returning:       Try[Option[TokenCreationInfo]]
+                                 returning:       OptionT[Try, TokenCreationInfo]
     ) = (tokensCreator.createPersonalAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
@@ -403,7 +415,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
     def givenSuccessfulTokenCreation(projectPath: projects.Path) = {
       val tokenCreationInfo = tokenCreationInfos.generateOne
-      givenProjectTokenCreator(projectId, userAccessToken, returning = tokenCreationInfo.some.pure[Try])
+      givenProjectTokenCreator(projectId, userAccessToken, returning = OptionT.some(tokenCreationInfo))
 
       val newTokenEncrypted = encryptedAccessTokens.generateOne
       givenTokenEncryption(tokenCreationInfo.token, returning = newTokenEncrypted.pure[Try])
@@ -415,6 +427,19 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       )
 
       givenIntegrityCheckPasses(projectId, tokenCreationInfo.token, newTokenEncrypted)
+    }
+
+    def givenSuccessfulOldTokenRevoking(projectId: projects.Id, accessToken: AccessToken) = {
+      val tokensToRevoke = accessTokenIds.generateList()
+      (revokeCandidatesFinder.findTokensToRemove _)
+        .expects(projectId, accessToken)
+        .returning(tokensToRevoke.pure[Try])
+
+      tokensToRevoke foreach { tokenId =>
+        (tokensRevoker.revokeToken _)
+          .expects(projectId, tokenId, accessToken)
+          .returning(().pure[Try])
+      }
     }
   }
 }

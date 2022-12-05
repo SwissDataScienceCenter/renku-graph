@@ -27,16 +27,17 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import java.time.LocalDate.now
 import java.time.Period
 
-private trait TokensToRemoveFinder[F[_]] {
+private trait RevokeCandidatesFinder[F[_]] {
   def findTokensToRemove(projectId: projects.Id, accessToken: AccessToken): F[List[AccessTokenId]]
 }
 
-private object TokensToRemoveFinder {
-  def apply[F[_]: Async: GitLabClient] = ProjectTokenDuePeriod[F]().map(new TokensToRemoveFinderImpl[F](_))
+private object RevokeCandidatesFinder {
+  def apply[F[_]: Async: GitLabClient]: F[RevokeCandidatesFinder[F]] =
+    ProjectTokenDuePeriod[F]().map(new RevokeCandidatesFinderImpl[F](_))
 }
 
-private class TokensToRemoveFinderImpl[F[_]: Async: GitLabClient](tokenDuePeriod: Period)
-    extends TokensToRemoveFinder[F] {
+private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](tokenDuePeriod: Period)
+    extends RevokeCandidatesFinder[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder

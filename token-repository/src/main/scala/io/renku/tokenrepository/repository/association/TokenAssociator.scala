@@ -43,31 +43,34 @@ private trait TokenAssociator[F[_]] {
 }
 
 private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
-    projectPathFinder:    ProjectPathFinder[F],
-    accessTokenCrypto:    AccessTokenCrypto[F],
-    tokenValidator:       TokenValidator[F],
-    tokenDueChecker:      TokenDueChecker[F],
-    tokensCreator:        TokensCreator[F],
-    associationPersister: AssociationPersister[F],
-    persistedPathFinder:  PersistedPathFinder[F],
-    tokenRemover:         TokenRemover[F],
-    tokenFinder:          PersistedTokensFinder[F],
-    maxRetries:           Int Refined NonNegative
+    projectPathFinder:      ProjectPathFinder[F],
+    accessTokenCrypto:      AccessTokenCrypto[F],
+    tokenValidator:         TokenValidator[F],
+    tokenDueChecker:        TokenDueChecker[F],
+    tokensCreator:          TokensCreator[F],
+    associationPersister:   AssociationPersister[F],
+    persistedPathFinder:    PersistedPathFinder[F],
+    tokenRemover:           TokenRemover[F],
+    tokenFinder:            PersistedTokensFinder[F],
+    revokeCandidatesFinder: RevokeCandidatesFinder[F],
+    tokensRevoker:          TokensRevoker[F],
+    maxRetries:             Int Refined NonNegative
 ) extends TokenAssociator[F] {
 
   import associationPersister._
   import persistedPathFinder._
-  import projectPathFinder._
+  import revokeCandidatesFinder._
   import tokenDueChecker._
   import tokenFinder._
   import tokenValidator._
   import tokensCreator._
+  import tokensRevoker._
 
-  override def associate(projectId: projects.Id, token: AccessToken): F[Unit] =
+  override def associate(projectId: projects.Id, userToken: AccessToken): F[Unit] =
     findStoredToken(projectId)
       .flatMapF(decrypt >=> validate >=> checkIfDue(projectId))
       .semiflatMap(replacePathIfChanged(projectId))
-      .getOrElseF(createOrDelete(projectId, token))
+      .getOrElseF(createOrDelete(projectId, userToken))
 
   private lazy val decrypt: EncryptedAccessToken => F[Option[ProjectAccessToken]] = encryptedToken =>
     accessTokenCrypto.decrypt(encryptedToken) map {
@@ -86,7 +89,8 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
   }
 
   private def replacePathIfChanged(projectId: projects.Id)(token: ProjectAccessToken): F[Unit] =
-    findProjectPath(projectId, token)
+    projectPathFinder
+      .findProjectPath(projectId, token)
       .semiflatMap(actualPath =>
         findPersistedProjectPath(projectId).flatMap {
           case `actualPath` => ().pure[F]
@@ -95,26 +99,42 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
       )
       .getOrElseF(removeToken(projectId))
 
-  private def createOrDelete(projectId: projects.Id, token: AccessToken) =
-    findProjectPath(projectId, token)
-      .map(Project(projectId, _))
-      .flatMap(maybeGenerateNewToken(_, token))
+  private def createOrDelete(projectId: projects.Id, userToken: AccessToken) =
+    (findProjectPath(projectId, userToken) >>= createNewToken(userToken))
+      .semiflatMap(encrypt >=> persist >=> tryRevokingOldTokens(userToken))
       .getOrElseF(removeToken(projectId))
 
   private def removeToken(projectId: projects.Id) =
     Logger[F].info(show"removing token as no project path found for project $projectId") >>
       tokenRemover.delete(projectId)
 
-  private def maybeGenerateNewToken(project: Project, token: AccessToken) =
-    OptionT(createPersonalAccessToken(project.id, token))
-      .semiflatMap { newTokenInfo =>
-        accessTokenCrypto.encrypt(newTokenInfo.token) >>=
-          (encToken => persistOrRetry(TokenStoringInfo(project, encToken, newTokenInfo.dates), newTokenInfo.token))
+  private def findProjectPath(projectId: projects.Id, userToken: AccessToken): OptionT[F, Project] =
+    projectPathFinder.findProjectPath(projectId, userToken).map(Project(projectId, _))
+
+  private def createNewToken(userToken: AccessToken)(project: Project): OptionT[F, (Project, TokenCreationInfo)] =
+    createPersonalAccessToken(project.id, userToken).map(project -> _)
+
+  private lazy val encrypt: ((Project, TokenCreationInfo)) => F[(Project, TokenCreationInfo, EncryptedAccessToken)] = {
+    case (project, creationInfo) =>
+      accessTokenCrypto.encrypt(creationInfo.token).map((project, creationInfo, _))
+  }
+
+  private lazy val persist: ((Project, TokenCreationInfo, EncryptedAccessToken)) => F[Project] = {
+    case (project, creationInfo, encToken) =>
+      persistWithRetry(TokenStoringInfo(project, encToken, creationInfo.dates), creationInfo.token).map(_ => project)
+  }
+
+  private def tryRevokingOldTokens(userToken: AccessToken)(project: Project) =
+    findTokensToRemove(project.id, userToken)
+      .flatMap(_.map(revokeToken(project.id, _, userToken)).sequence)
+      .void
+      .recoverWith { case NonFatal(ex) =>
+        Logger[F].warn(ex)(show"removing old token in GitLab for project $project failed")
       }
 
-  private def persistOrRetry(storingInfo:     TokenStoringInfo,
-                             newToken:        ProjectAccessToken,
-                             numberOfRetries: Int = 0
+  private def persistWithRetry(storingInfo:     TokenStoringInfo,
+                               newToken:        ProjectAccessToken,
+                               numberOfRetries: Int = 0
   ): F[Unit] =
     persistAssociation(storingInfo) >>
       verifyTokenIntegrity(storingInfo.project.id, newToken)
@@ -138,7 +158,7 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
                     numberOfRetries: Int
   ): PartialFunction[Throwable, F[Unit]] = { case NonFatal(error) =>
     if (numberOfRetries >= maxRetries.value) error.raiseError[F, Unit]
-    else persistOrRetry(storingInfo, newToken, numberOfRetries + 1)
+    else persistWithRetry(storingInfo, newToken, numberOfRetries + 1)
   }
 }
 
@@ -154,6 +174,7 @@ private object TokenAssociator {
     tokenValidator            <- TokenValidator[F]
     tokenDueChecker           <- TokenDueChecker[F](queriesExecTimes)
     projectAccessTokenCreator <- TokensCreator[F]()
+    revokeCandidatesFinder    <- RevokeCandidatesFinder[F]
   } yield new TokenAssociatorImpl[F](
     pathFinder,
     accessTokenCrypto,
@@ -164,6 +185,8 @@ private object TokenAssociator {
     PersistedPathFinder(queriesExecTimes),
     TokenRemover(queriesExecTimes),
     PersistedTokensFinder(queriesExecTimes),
+    revokeCandidatesFinder,
+    TokensRevoker[F],
     maxRetries
   )
 }

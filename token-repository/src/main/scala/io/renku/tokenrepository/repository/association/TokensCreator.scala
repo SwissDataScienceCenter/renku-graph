@@ -18,6 +18,7 @@
 
 package io.renku.tokenrepository.repository.association
 
+import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -28,7 +29,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import java.time.{LocalDate, Period}
 
 private[tokenrepository] trait TokensCreator[F[_]] {
-  def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[Option[TokenCreationInfo]]
+  def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): OptionT[F, TokenCreationInfo]
 }
 
 private[tokenrepository] object TokensCreator {
@@ -61,11 +62,12 @@ private class TokensCreatorImpl[F[_]: Async: GitLabClient](
 
   override def createPersonalAccessToken(projectId:   projects.Id,
                                          accessToken: AccessToken
-  ): F[Option[TokenCreationInfo]] =
+  ): OptionT[F, TokenCreationInfo] = OptionT {
     GitLabClient[F].post(uri"projects" / projectId.value / "access_tokens",
                          "create-project-access-token",
                          createPayload()
     )(mapResponse)(accessToken.some)
+  }
 
   private def createPayload() = json"""{
     "name":       $renkuTokenName,

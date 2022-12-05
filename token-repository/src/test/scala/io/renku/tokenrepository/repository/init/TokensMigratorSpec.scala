@@ -23,7 +23,7 @@ import AccessTokenCrypto.EncryptedAccessToken
 import RepositoryGenerators.encryptedAccessTokens
 import association.TokenDates.{CreatedAt, ExpiryDate}
 import association._
-import cats.data.Kleisli
+import cats.data.{Kleisli, OptionT}
 import cats.effect.IO
 import cats.syntax.all._
 import deletion.TokenRemover
@@ -131,7 +131,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       givenTokenValidation(oldToken, returning = true.pure[IO])
 
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = None.pure[IO])
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = OptionT.none)
 
       migration.run().unsafeRunSync() shouldBe ()
 
@@ -172,7 +172,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.some.pure[IO])
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = OptionT.some(creationInfo))
 
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
@@ -199,7 +199,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       val exception = exceptions.generateOne
       givenProjectTokenCreator(oldTokenProject.id,
                                oldToken,
-                               returning = exception.raiseError[IO, Option[TokenCreationInfo]]
+                               returning = OptionT.liftF(exception.raiseError[IO, TokenCreationInfo])
       )
       val projectToken = projectAccessTokens.generateOne
       val creationInfo =
@@ -207,7 +207,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
                           TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
         )
 
-      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = creationInfo.some.pure[IO])
+      givenProjectTokenCreator(oldTokenProject.id, oldToken, returning = OptionT.some(creationInfo))
 
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
@@ -287,7 +287,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
         TokenDates(CreatedAt(Instant.now()), localDates(min = LocalDate.now()).generateAs(ExpiryDate))
       )
 
-      givenProjectTokenCreator(project.id, oldToken, returning = creationInfo.some.pure[IO])
+      givenProjectTokenCreator(project.id, oldToken, returning = OptionT.some(creationInfo))
 
       val projectTokenEncrypted = encryptedAccessTokens.generateOne
       givenEncryption(projectToken, returning = projectTokenEncrypted.pure[IO])
@@ -313,7 +313,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: AccessToken,
-                                 returning:       IO[Option[TokenCreationInfo]]
+                                 returning:       OptionT[IO, TokenCreationInfo]
     ) = (tokensCreator.createPersonalAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
