@@ -53,13 +53,13 @@ private object TokensMigrator {
 }
 
 private class TokensMigrator[F[_]: Async: SessionResource: Logger](
-                                                                    tokenCrypto:          AccessTokenCrypto[F],
-                                                                    tokenValidator:       TokenValidator[F],
-                                                                    tokenRemover:         TokenRemover[F],
-                                                                    tokensCreator:        NewTokensCreator[F],
-                                                                    associationPersister: TokensPersister[F],
-                                                                    queriesExecTimes:     LabeledHistogram[F],
-                                                                    retryInterval:        Duration = 5 seconds
+    tokenCrypto:          AccessTokenCrypto[F],
+    tokenValidator:       TokenValidator[F],
+    tokenRemover:         TokenRemover[F],
+    tokensCreator:        NewTokensCreator[F],
+    associationPersister: TokensPersister[F],
+    queriesExecTimes:     LabeledHistogram[F],
+    retryInterval:        Duration = 5 seconds
 ) extends DbClient[F](Some(queriesExecTimes))
     with DBMigration[F]
     with TokenRepositoryTypeSerializers {
@@ -116,19 +116,12 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
   private def decryptOrDelete(project: Project, encToken: EncryptedAccessToken): F[Option[(Project, AccessToken)]] =
     decrypt(encToken)
       .map(t => Option(project -> t))
-      .recoverWith { case ex: Throwable =>
-        Logger[F].error(ex)(show"$logPrefix $project token decryption failed; deleting") >>
-          tokenRemover.delete(project.id) >>
-          Option.empty[(Project, AccessToken)].pure[F]
-      }
+      .recoverWith { case _ => tokenRemover.delete(project.id) >> Option.empty[(Project, AccessToken)].pure[F] }
 
   private def deleteWhenInvalidWithRetry(project: Project, token: AccessToken): F[Option[(Project, AccessToken)]] = {
     checkValid(token) >>= {
-      case true => (project, token).some.pure[F]
-      case false =>
-        Logger[F].warn(show"$logPrefix $project token invalid; deleting") >>
-          tokenRemover.delete(project.id) >>
-          Option.empty[(Project, AccessToken)].pure[F]
+      case true  => (project, token).some.pure[F]
+      case false => tokenRemover.delete(project.id) >> Option.empty[(Project, AccessToken)].pure[F]
     }
   }.recoverWith(retry(deleteWhenInvalidWithRetry(project, token))(project))
 

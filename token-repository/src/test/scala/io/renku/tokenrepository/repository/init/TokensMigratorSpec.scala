@@ -21,11 +21,11 @@ package init
 
 import AccessTokenCrypto.EncryptedAccessToken
 import RepositoryGenerators.encryptedAccessTokens
-import creation.TokenDates.{CreatedAt, ExpiryDate}
-import creation._
 import cats.data.{Kleisli, OptionT}
 import cats.effect.IO
 import cats.syntax.all._
+import creation.TokenDates.{CreatedAt, ExpiryDate}
+import creation._
 import deletion.TokenRemover
 import io.renku.generators.CommonGraphGenerators.{accessTokens, projectAccessTokens}
 import io.renku.generators.Generators.Implicits._
@@ -35,7 +35,7 @@ import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.interpreters.TestLogger
-import io.renku.interpreters.TestLogger.Level.{Error, Info, Warn}
+import io.renku.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -116,8 +116,6 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       findToken(validTokenProject.id) shouldBe validTokenEncrypted.value.some
       findToken(oldTokenProject.id)   shouldBe None
-
-      logger.loggedOnly(Warn(show"$logPrefix $oldTokenProject token invalid; deleting"))
     }
 
     "remove the existing token if new token creation failed with Forbidden" in new TestCase {
@@ -137,8 +135,6 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
 
       findToken(validTokenProject.id) shouldBe validTokenEncrypted.value.some
       findToken(oldTokenProject.id)   shouldBe None
-
-      logger.loggedOnly(Warn(show"$logPrefix $oldTokenProject cannot generate new token; deleting"))
     }
 
     "log an error and remove the token if decryption fails" in new TestCase {
@@ -151,8 +147,6 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
       migration.run().unsafeRunSync() shouldBe ()
 
       findToken(oldTokenProject.id) shouldBe None
-
-      logger.loggedOnly(Error(show"$logPrefix $oldTokenProject token decryption failed; deleting", exception))
     }
 
     "retry for exceptions on token validation check" in new TestCase {
