@@ -57,13 +57,13 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     maxRetries:             Int Refined NonNegative
 ) extends TokensCreator[F] {
 
-  import tokensPersister._
+  import newTokensCreator._
   import persistedPathFinder._
   import revokeCandidatesFinder._
   import tokenDueChecker._
   import tokenFinder._
   import tokenValidator._
-  import newTokensCreator._
+  import tokensPersister._
   import tokensRevoker._
 
   override def create(projectId: projects.Id, userToken: AccessToken): F[Unit] =
@@ -97,16 +97,12 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
           case _            => updatePath(Project(projectId, actualPath))
         }
       )
-      .getOrElseF(removeToken(projectId))
+      .getOrElseF(tokenRemover.delete(projectId))
 
   private def createOrDelete(projectId: projects.Id, userToken: AccessToken) =
     (findProjectPath(projectId, userToken) >>= createNewToken(userToken))
-      .semiflatMap(encrypt >=> persist >=> tryRevokingOldTokens(userToken))
-      .getOrElseF(removeToken(projectId))
-
-  private def removeToken(projectId: projects.Id) =
-    Logger[F].info(show"removing token as no project path found for project $projectId") >>
-      tokenRemover.delete(projectId)
+      .semiflatMap(encrypt >=> persist >=> logSuccess >=> tryRevokingOldTokens(userToken))
+      .getOrElseF(tokenRemover.delete(projectId))
 
   private def findProjectPath(projectId: projects.Id, userToken: AccessToken): OptionT[F, Project] =
     projectPathFinder.findProjectPath(projectId, userToken).map(Project(projectId, _))
@@ -123,6 +119,9 @@ private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     case (project, creationInfo, encToken) =>
       persistWithRetry(TokenStoringInfo(project, encToken, creationInfo.dates), creationInfo.token).map(_ => project)
   }
+
+  private def logSuccess(project: Project): F[Project] =
+    Logger[F].info(show"token created for $project").map(_ => project)
 
   private def tryRevokingOldTokens(userToken: AccessToken)(project: Project) =
     findTokensToRemove(project.id, userToken)
