@@ -22,21 +22,21 @@ import cats.Id
 import cats.effect.MonadCancelThrow
 import io.renku.db.DbClient
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 
 private trait PersistedPathFinder[F[_]] {
   def findPersistedProjectPath(projectId: projects.Id): F[projects.Path]
 }
 
 private object PersistedPathFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): PersistedPathFinder[F] =
-    new PersistedPathFinderImpl[F](queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: PersistedPathFinder[F] =
+    new PersistedPathFinderImpl[F]
 }
 
-private class PersistedPathFinderImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient[F](Some(queriesExecTimes))
+private class PersistedPathFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with PersistedPathFinder[F]
     with TokenRepositoryTypeSerializers {
 

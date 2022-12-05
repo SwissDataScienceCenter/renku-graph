@@ -42,28 +42,27 @@ object Microservice extends IOMicroservice {
     exitCode            <- runMicroservice(sessionPoolResource)
   } yield exitCode
 
-  private def runMicroservice(
-      sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]
-  ) = sessionPoolResource.use { implicit sessionResource =>
-    for {
-      implicit0(mr: MetricsRegistry[IO]) <- MetricsRegistry[IO]()
-      implicit0(gc: GitLabClient[IO])    <- GitLabClient[IO]()
-      certificateLoader                  <- CertificateLoader[IO]
-      sentryInitializer                  <- SentryInitializer[IO]
-      queriesExecTimes                   <- QueriesExecutionTimes[IO]
-      dbInitializer                      <- DbInitializer[IO](queriesExecTimes)
-      microserviceRoutes                 <- MicroserviceRoutes[IO](queriesExecTimes)
-      exitCode <- microserviceRoutes.routes.use { routes =>
-                    new MicroserviceRunner(
-                      certificateLoader,
-                      sentryInitializer,
-                      dbInitializer,
-                      HttpServer[IO](serverPort = 9003, routes),
-                      microserviceRoutes
-                    ).run()
-                  }
-    } yield exitCode
-  }
+  private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]]) =
+    sessionPoolResource.use { implicit sessionResource =>
+      for {
+        implicit0(mr: MetricsRegistry[IO])        <- MetricsRegistry[IO]()
+        implicit0(qet: QueriesExecutionTimes[IO]) <- QueriesExecutionTimes[IO]()
+        implicit0(gc: GitLabClient[IO])           <- GitLabClient[IO]()
+        certificateLoader                         <- CertificateLoader[IO]
+        sentryInitializer                         <- SentryInitializer[IO]
+        dbInitializer                             <- DbInitializer[IO]
+        microserviceRoutes                        <- MicroserviceRoutes[IO]
+        exitCode <- microserviceRoutes.routes.use { routes =>
+                      new MicroserviceRunner(
+                        certificateLoader,
+                        sentryInitializer,
+                        dbInitializer,
+                        HttpServer[IO](serverPort = 9003, routes),
+                        microserviceRoutes
+                      ).run()
+                    }
+      } yield exitCode
+    }
 }
 
 private class MicroserviceRunner(

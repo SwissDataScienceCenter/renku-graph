@@ -23,10 +23,10 @@ import cats.effect._
 import eu.timepit.refined.auto._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects.{Id, Path}
-import io.renku.metrics.LabeledHistogram
 import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
 import io.renku.tokenrepository.repository.TokenRepositoryTypeSerializers
+import io.renku.tokenrepository.repository.metrics.QueriesExecutionTimes
 import skunk.implicits._
 
 private[repository] trait PersistedTokensFinder[F[_]] {
@@ -35,18 +35,18 @@ private[repository] trait PersistedTokensFinder[F[_]] {
 }
 
 private[repository] object PersistedTokensFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): PersistedTokensFinder[F] =
-    new PersistedTokensFinderImpl[F](queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: PersistedTokensFinder[F] =
+    new PersistedTokensFinderImpl[F]
 }
 
-private class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient[F](Some(queriesExecTimes))
+private class PersistedTokensFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with PersistedTokensFinder[F]
     with TokenRepositoryTypeSerializers {
 
   override def findStoredToken(projectId: Id): OptionT[F, EncryptedAccessToken] = run {
-    SqlStatement(name = "find token - id")
+    SqlStatement
+      .named("find token - id")
       .select[Id, EncryptedAccessToken](
         sql"""select token from projects_tokens where project_id = $projectIdEncoder"""
           .query(encryptedAccessTokenDecoder)
