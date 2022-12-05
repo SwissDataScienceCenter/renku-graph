@@ -17,7 +17,7 @@
  */
 
 package io.renku.tokenrepository.repository
-package association
+package creation
 
 import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
@@ -38,35 +38,35 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private trait TokenAssociator[F[_]] {
-  def associate(projectId: projects.Id, token: AccessToken): F[Unit]
+private trait TokensCreator[F[_]] {
+  def create(projectId: projects.Id, token: AccessToken): F[Unit]
 }
 
-private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
+private class TokensCreatorImpl[F[_]: MonadThrow: Logger](
     projectPathFinder:      ProjectPathFinder[F],
     accessTokenCrypto:      AccessTokenCrypto[F],
     tokenValidator:         TokenValidator[F],
     tokenDueChecker:        TokenDueChecker[F],
-    tokensCreator:          TokensCreator[F],
-    associationPersister:   AssociationPersister[F],
+    newTokensCreator:       NewTokensCreator[F],
+    tokensPersister:        TokensPersister[F],
     persistedPathFinder:    PersistedPathFinder[F],
     tokenRemover:           TokenRemover[F],
     tokenFinder:            PersistedTokensFinder[F],
     revokeCandidatesFinder: RevokeCandidatesFinder[F],
     tokensRevoker:          TokensRevoker[F],
     maxRetries:             Int Refined NonNegative
-) extends TokenAssociator[F] {
+) extends TokensCreator[F] {
 
-  import associationPersister._
+  import tokensPersister._
   import persistedPathFinder._
   import revokeCandidatesFinder._
   import tokenDueChecker._
   import tokenFinder._
   import tokenValidator._
-  import tokensCreator._
+  import newTokensCreator._
   import tokensRevoker._
 
-  override def associate(projectId: projects.Id, userToken: AccessToken): F[Unit] =
+  override def create(projectId: projects.Id, userToken: AccessToken): F[Unit] =
     findStoredToken(projectId)
       .flatMapF(decrypt >=> validate >=> checkIfDue(projectId))
       .semiflatMap(replacePathIfChanged(projectId))
@@ -136,7 +136,7 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
                                newToken:        ProjectAccessToken,
                                numberOfRetries: Int = 0
   ): F[Unit] =
-    persistAssociation(storingInfo) >>
+    persistToken(storingInfo) >>
       verifyTokenIntegrity(storingInfo.project.id, newToken)
         .recoverWith(retry(storingInfo, newToken, numberOfRetries))
 
@@ -162,26 +162,26 @@ private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
   }
 }
 
-private object TokenAssociator {
+private object TokensCreator {
 
   private val maxRetries: Int Refined NonNegative = 3
 
   def apply[F[_]: Async: GitLabClient: Logger: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
-  ): F[TokenAssociator[F]] = for {
+  ): F[TokensCreator[F]] = for {
     pathFinder                <- ProjectPathFinder[F]
     accessTokenCrypto         <- AccessTokenCrypto[F]()
     tokenValidator            <- TokenValidator[F]
     tokenDueChecker           <- TokenDueChecker[F](queriesExecTimes)
-    projectAccessTokenCreator <- TokensCreator[F]()
+    projectAccessTokenCreator <- NewTokensCreator[F]()
     revokeCandidatesFinder    <- RevokeCandidatesFinder[F]
-  } yield new TokenAssociatorImpl[F](
+  } yield new TokensCreatorImpl[F](
     pathFinder,
     accessTokenCrypto,
     tokenValidator,
     tokenDueChecker,
     projectAccessTokenCreator,
-    AssociationPersister(queriesExecTimes),
+    TokensPersister(queriesExecTimes),
     PersistedPathFinder(queriesExecTimes),
     TokenRemover(queriesExecTimes),
     PersistedTokensFinder(queriesExecTimes),

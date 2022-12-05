@@ -27,7 +27,7 @@ import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.localDates
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.testtools.IOSpec
-import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
+import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import io.renku.tokenrepository.repository.init.DbMigrations
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Suite

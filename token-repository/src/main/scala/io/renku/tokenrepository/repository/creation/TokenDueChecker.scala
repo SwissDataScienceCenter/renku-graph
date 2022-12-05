@@ -17,10 +17,10 @@
  */
 
 package io.renku.tokenrepository.repository
-package association
+package creation
 
 import ProjectsTokensDB.SessionResource
-import association.TokenDates.ExpiryDate
+import creation.TokenDates.ExpiryDate
 import cats.effect.MonadCancelThrow
 import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository.creation
 
 import cats.MonadThrow
 import cats.effect.Async
@@ -35,21 +35,21 @@ import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-trait AssociateTokenEndpoint[F[_]] {
-  def associateToken(projectId: Id, request: Request[F]): F[Response[F]]
+trait CreateTokenEndpoint[F[_]] {
+  def createToken(projectId: Id, request: Request[F]): F[Response[F]]
 }
 
-class AssociateTokenEndpointImpl[F[_]: Concurrent: Logger](
-    tokenAssociator: TokenAssociator[F]
+class CreateTokenEndpointImpl[F[_]: Concurrent: Logger](
+    tokensCreator: TokensCreator[F]
 ) extends Http4sDsl[F]
-    with AssociateTokenEndpoint[F] {
+    with CreateTokenEndpoint[F] {
 
-  import tokenAssociator._
+  import tokensCreator._
 
-  override def associateToken(projectId: Id, request: Request[F]): F[Response[F]] = {
+  override def createToken(projectId: Id, request: Request[F]): F[Response[F]] = {
     for {
       accessToken <- request.as[AccessToken] recoverWith badRequest
-      _           <- associate(projectId, accessToken)
+      _           <- create(projectId, accessToken)
       response    <- NoContent()
     } yield response
   } recoverWith httpResponse(projectId)
@@ -71,9 +71,9 @@ class AssociateTokenEndpointImpl[F[_]: Concurrent: Logger](
   }
 }
 
-object AssociateTokenEndpoint {
+object CreateTokenEndpoint {
 
   def apply[F[_]: Async: GitLabClient: Logger: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
-  ): F[AssociateTokenEndpoint[F]] = TokenAssociator(queriesExecTimes).map(new AssociateTokenEndpointImpl[F](_))
+  ): F[CreateTokenEndpoint[F]] = TokensCreator(queriesExecTimes).map(new CreateTokenEndpointImpl[F](_))
 }

@@ -17,7 +17,7 @@
  */
 
 package io.renku.tokenrepository.repository
-package association
+package creation
 
 import AccessTokenCrypto.EncryptedAccessToken
 import Generators._
@@ -44,9 +44,9 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Try}
 
-class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  "associate" should {
+  "create" should {
 
     "do nothing if Project Access Token from the DB is valid, is not due for refresh " +
       "and project path has not changed" in new TestCase {
@@ -63,7 +63,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
         givenPathHasNotChanged(projectId, projectAccessToken)
 
-        tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+        tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
       }
 
     "replace the stored token if it's not a Project Access Token" in new TestCase {
@@ -79,7 +79,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenSuccessfulTokenCreation(projectPath)
       givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
     "replace the stored token if it's invalid" in new TestCase {
@@ -98,7 +98,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenSuccessfulTokenCreation(projectPath)
       givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
     "replace the stored token if it's due for refresh" in new TestCase {
@@ -119,7 +119,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenSuccessfulTokenCreation(projectPath)
       givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
     "leave the stored Project Access Token untouched but update the path if " +
@@ -142,7 +142,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
         givenPathUpdate(Project(projectId, newProjectPath), returning = ().pure[Try])
 
-        tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+        tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
       }
 
     "store a new Project Access Token if there's none stored" in new TestCase {
@@ -155,7 +155,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       givenSuccessfulTokenCreation(projectPath)
       givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
     "remove the stored token (non Project Access Token) if project with the given id does not exist" in new TestCase {
@@ -169,7 +169,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
       givenTokenRemoval(projectId, returning = ().pure[Try])
 
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
     "delete token if stored token is valid and not due for refresh " +
@@ -187,7 +187,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
         givenTokenRemoval(projectId, returning = ().pure[Try])
 
-        tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+        tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
       }
 
     "delete token if new token creation failed with NotFound or Forbidden" in new TestCase {
@@ -207,7 +207,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
       givenTokenRemoval(projectId, returning = ().pure[Try])
 
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
     "retry if the token after storing couldn't be decrypted" in new TestCase {
@@ -238,7 +238,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
       givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
     "retry if the token after storing couldn't be found" in new TestCase {
@@ -266,7 +266,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
       givenSuccessfulOldTokenRevoking(projectId, userAccessToken)
 
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe ().pure[Try]
+      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
     }
 
     "fail if finding stored token fails" in new TestCase {
@@ -274,7 +274,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
       val exception = exceptions.generateOne.raiseError[Try, EncryptedAccessToken]
       givenStoredTokenFinder(projectId, returning = OptionT.liftF(exception))
 
-      tokenAssociator.associate(projectId, userAccessToken) shouldBe exception
+      tokensCreator.create(projectId, userAccessToken) shouldBe exception
     }
 
     "fail if retry process hit the max number of attempts" in new TestCase {
@@ -298,7 +298,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
       givenStoredTokenFinder(projectId, returning = OptionT.none).repeated(3)
 
-      val Failure(exception) = tokenAssociator.associate(projectId, userAccessToken)
+      val Failure(exception) = tokensCreator.create(projectId, userAccessToken)
 
       exception.getMessage shouldBe show"Token associator - just saved token cannot be found for project: $projectId"
     }
@@ -314,20 +314,20 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
     val accessTokenCrypto      = mock[AccessTokenCrypto[Try]]
     val tokenValidator         = mock[TokenValidator[Try]]
     val tokenDueChecker        = mock[TokenDueChecker[Try]]
-    val tokensCreator          = mock[TokensCreator[Try]]
-    val associationPersister   = mock[AssociationPersister[Try]]
+    val newTokensCreator       = mock[NewTokensCreator[Try]]
+    val tokensPersister        = mock[TokensPersister[Try]]
     val persistedPathFinder    = mock[PersistedPathFinder[Try]]
     val tokenRemover           = mock[TokenRemover[Try]]
     val tokensFinder           = mock[PersistedTokensFinder[Try]]
     val revokeCandidatesFinder = mock[RevokeCandidatesFinder[Try]]
     val tokensRevoker          = mock[TokensRevoker[Try]]
-    val tokenAssociator = new TokenAssociatorImpl[Try](
+    val tokensCreator = new TokensCreatorImpl[Try](
       projectPathFinder,
       accessTokenCrypto,
       tokenValidator,
       tokenDueChecker,
-      tokensCreator,
-      associationPersister,
+      newTokensCreator,
+      tokensPersister,
       persistedPathFinder,
       tokenRemover,
       tokensFinder,
@@ -383,7 +383,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: UserAccessToken,
                                  returning:       OptionT[Try, TokenCreationInfo]
-    ) = (tokensCreator.createPersonalAccessToken _)
+    ) = (newTokensCreator.createPersonalAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
 
@@ -391,12 +391,12 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
                           encryptedToken: EncryptedAccessToken,
                           dates:          TokenDates,
                           returning:      Try[Unit]
-    ) = (associationPersister.persistAssociation _)
+    ) = (tokensPersister.persistToken _)
       .expects(TokenStoringInfo(project, encryptedToken, dates))
       .returning(returning)
 
     def givenPathUpdate(project: Project, returning: Try[Unit]) =
-      (associationPersister.updatePath _)
+      (tokensPersister.updatePath _)
         .expects(project)
         .returning(returning)
 

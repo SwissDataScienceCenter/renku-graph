@@ -17,7 +17,7 @@
  */
 
 package io.renku.tokenrepository.repository
-package association
+package creation
 
 import RepositoryGenerators._
 import TokenDates._
@@ -45,6 +45,6 @@ object Generators {
   val tokenStoringInfos: Gen[TokenStoringInfo] =
     (projectObjects, encryptedAccessTokens, tokenDates).mapN(TokenStoringInfo.apply)
 
-  private[association] val accessTokenIds: Gen[AccessTokenId] =
+  private[creation] val accessTokenIds: Gen[AccessTokenId] =
     positiveInts().toGeneratorOf(v => AccessTokenId(v.value))
 }

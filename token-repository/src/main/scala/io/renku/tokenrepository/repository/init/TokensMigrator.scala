@@ -21,7 +21,7 @@ package init
 
 import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
-import association._
+import creation._
 import cats.effect.{Async, Temporal}
 import cats.syntax.all._
 import deletion.TokenRemover
@@ -41,8 +41,8 @@ private object TokensMigrator {
     accessTokenCrypto    <- AccessTokenCrypto[F]()
     tokenValidator       <- TokenValidator[F]
     tokenRemover         <- TokenRemover[F](queriesExecTimes).pure[F]
-    tokensCreator        <- TokensCreator[F]()
-    associationPersister <- AssociationPersister[F](queriesExecTimes).pure[F]
+    tokensCreator        <- NewTokensCreator[F]()
+    associationPersister <- TokensPersister[F](queriesExecTimes).pure[F]
   } yield new TokensMigrator[F](accessTokenCrypto,
                                 tokenValidator,
                                 tokenRemover,
@@ -53,13 +53,13 @@ private object TokensMigrator {
 }
 
 private class TokensMigrator[F[_]: Async: SessionResource: Logger](
-    tokenCrypto:          AccessTokenCrypto[F],
-    tokenValidator:       TokenValidator[F],
-    tokenRemover:         TokenRemover[F],
-    tokensCreator:        TokensCreator[F],
-    associationPersister: AssociationPersister[F],
-    queriesExecTimes:     LabeledHistogram[F],
-    retryInterval:        Duration = 5 seconds
+                                                                    tokenCrypto:          AccessTokenCrypto[F],
+                                                                    tokenValidator:       TokenValidator[F],
+                                                                    tokenRemover:         TokenRemover[F],
+                                                                    tokensCreator:        NewTokensCreator[F],
+                                                                    associationPersister: TokensPersister[F],
+                                                                    queriesExecTimes:     LabeledHistogram[F],
+                                                                    retryInterval:        Duration = 5 seconds
 ) extends DbClient[F](Some(queriesExecTimes))
     with DBMigration[F]
     with TokenRepositoryTypeSerializers {
@@ -145,7 +145,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
                                newTokenInfo:   TokenCreationInfo,
                                encryptedToken: EncryptedAccessToken
   ): F[Unit] =
-    persistAssociation(TokenStoringInfo(project, encryptedToken, newTokenInfo.dates))
+    persistToken(TokenStoringInfo(project, encryptedToken, newTokenInfo.dates))
       .recoverWith(retry(persistWithRetry(project, newTokenInfo, encryptedToken))(project))
 
   private def retry[O](thunk: => F[O])(project: Project): PartialFunction[Throwable, F[O]] = { case ex: Exception =>

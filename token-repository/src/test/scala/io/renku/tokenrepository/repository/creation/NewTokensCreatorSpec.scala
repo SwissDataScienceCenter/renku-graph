@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository.creation
 
 import Generators._
 import cats.effect.IO
@@ -45,7 +45,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.{LocalDate, Period}
 import scala.concurrent.duration._
 
-class TokensCreatorSpec
+class NewTokensCreatorSpec
     extends AnyWordSpec
     with MockFactory
     with GitLabClientTools[IO]
@@ -70,7 +70,7 @@ class TokensCreatorSpec
         .expects(uri"projects" / projectId.value / "access_tokens", endpointName, payload, *, Option(accessToken))
         .returning(creationInfo.some.pure[IO])
 
-      tokenCreator.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync() shouldBe creationInfo.some
+      tokensCreator.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync() shouldBe creationInfo.some
     }
 
     s"retrieve the created Project Access Token from the response with $Created status" in new TestCase {
@@ -102,9 +102,9 @@ class TokensCreatorSpec
     currentDate.expects().returning(now)
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val projectTokenTTL = Period.ofDays(durations(1 day, 730 days).generateOne.toDays.toInt)
-    val tokenCreator    = new TokensCreatorImpl[IO](projectTokenTTL, currentDate)
+    val tokensCreator   = new NewTokensCreatorImpl[IO](projectTokenTTL, currentDate)
 
-    lazy val mapResponse = captureMapping(tokenCreator, gitLabClient)(
+    lazy val mapResponse = captureMapping(tokensCreator, gitLabClient)(
       findingMethod = _.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync(),
       resultGenerator = tokenCreationInfos.generateSome,
       method = POST

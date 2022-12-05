@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository.creation
 
 import cats.data.OptionT
 import cats.effect.Async
@@ -28,26 +28,26 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 
 import java.time.{LocalDate, Period}
 
-private[tokenrepository] trait TokensCreator[F[_]] {
+private[tokenrepository] trait NewTokensCreator[F[_]] {
   def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): OptionT[F, TokenCreationInfo]
 }
 
-private[tokenrepository] object TokensCreator {
+private[tokenrepository] object NewTokensCreator {
 
   import io.renku.config.ConfigLoader._
 
   import scala.concurrent.duration.FiniteDuration
 
-  def apply[F[_]: Async: GitLabClient](config: Config = ConfigFactory.load()): F[TokensCreator[F]] =
+  def apply[F[_]: Async: GitLabClient](config: Config = ConfigFactory.load()): F[NewTokensCreator[F]] =
     find[F, FiniteDuration]("project-token-ttl", config)
       .map(duration => Period.ofDays(duration.toDays.toInt))
-      .map(projectTokenTTL => new TokensCreatorImpl[F](projectTokenTTL))
+      .map(projectTokenTTL => new NewTokensCreatorImpl[F](projectTokenTTL))
 }
 
-private class TokensCreatorImpl[F[_]: Async: GitLabClient](
+private class NewTokensCreatorImpl[F[_]: Async: GitLabClient](
     projectTokenTTL: Period,
     currentDate:     () => LocalDate = () => LocalDate.now()
-) extends TokensCreator[F] {
+) extends NewTokensCreator[F] {
 
   import cats.effect._
   import cats.syntax.all._

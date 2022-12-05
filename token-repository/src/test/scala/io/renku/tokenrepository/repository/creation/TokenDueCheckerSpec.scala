@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository.creation
 
 import cats.effect.IO
 import io.renku.db.SqlStatement
@@ -28,7 +28,7 @@ import io.renku.metrics.TestLabeledHistogram
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import io.renku.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
-import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
+import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

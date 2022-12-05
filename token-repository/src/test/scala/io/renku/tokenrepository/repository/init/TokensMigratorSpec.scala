@@ -21,8 +21,8 @@ package init
 
 import AccessTokenCrypto.EncryptedAccessToken
 import RepositoryGenerators.encryptedAccessTokens
-import association.TokenDates.{CreatedAt, ExpiryDate}
-import association._
+import creation.TokenDates.{CreatedAt, ExpiryDate}
+import creation._
 import cats.data.{Kleisli, OptionT}
 import cats.effect.IO
 import cats.syntax.all._
@@ -232,16 +232,16 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     val oldTokenEncrypted = encryptedAccessTokens.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tokenCrypto          = mock[AccessTokenCrypto[IO]]
-    val tokenValidator       = mock[TokenValidator[IO]]
-    val tokenRemover         = TokenRemover[IO](queriesExecTimes)
-    val tokensCreator        = mock[TokensCreator[IO]]
-    val associationPersister = AssociationPersister[IO](queriesExecTimes)
+    val tokenCrypto     = mock[AccessTokenCrypto[IO]]
+    val tokenValidator  = mock[TokenValidator[IO]]
+    val tokenRemover    = TokenRemover[IO](queriesExecTimes)
+    val tokensCreator   = mock[NewTokensCreator[IO]]
+    val tokensPersister = TokensPersister[IO](queriesExecTimes)
     val migration = new TokensMigrator[IO](tokenCrypto,
                                            tokenValidator,
                                            tokenRemover,
                                            tokensCreator,
-                                           associationPersister,
+                                           tokensPersister,
                                            queriesExecTimes,
                                            retryInterval = 500 millis
     )
@@ -249,8 +249,8 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     val logPrefix = "token migration:"
 
     def insert(project: Project, encryptedToken: EncryptedAccessToken) =
-      associationPersister
-        .persistAssociation(
+      tokensPersister
+        .persistToken(
           TokenStoringInfo(project,
                            encryptedToken,
                            TokenDates(timestampsNotInTheFuture.generateAs(CreatedAt), localDates.generateAs(ExpiryDate))

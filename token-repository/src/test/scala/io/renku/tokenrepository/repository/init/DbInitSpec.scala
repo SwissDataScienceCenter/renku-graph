@@ -24,7 +24,7 @@ import cats.syntax.all._
 import io.renku.graph.model.projects.{Id, Path}
 import io.renku.testtools.IOSpec
 import io.renku.tokenrepository.repository.InMemoryProjectsTokensDb
-import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
+import io.renku.tokenrepository.repository.creation.TokenDates.ExpiryDate
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfter, Suite}
 import skunk.codec.all._
