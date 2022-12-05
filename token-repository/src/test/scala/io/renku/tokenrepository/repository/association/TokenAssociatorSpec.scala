@@ -302,21 +302,21 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
 
     implicit val logger:    TestLogger[Try]         = TestLogger[Try]()
     private val maxRetries: Int Refined NonNegative = 2
-    val projectPathFinder         = mock[ProjectPathFinder[Try]]
-    val accessTokenCrypto         = mock[AccessTokenCrypto[Try]]
-    val tokenValidator            = mock[TokenValidator[Try]]
-    val tokenDueChecker           = mock[TokenDueChecker[Try]]
-    val projectAccessTokenCreator = mock[ProjectAccessTokenCreator[Try]]
-    val associationPersister      = mock[AssociationPersister[Try]]
-    val persistedPathFinder       = mock[PersistedPathFinder[Try]]
-    val tokenRemover              = mock[TokenRemover[Try]]
-    val tokenFinder               = mock[PersistedTokensFinder[Try]]
+    val projectPathFinder    = mock[ProjectPathFinder[Try]]
+    val accessTokenCrypto    = mock[AccessTokenCrypto[Try]]
+    val tokenValidator       = mock[TokenValidator[Try]]
+    val tokenDueChecker      = mock[TokenDueChecker[Try]]
+    val tokensCreator        = mock[TokensCreator[Try]]
+    val associationPersister = mock[AssociationPersister[Try]]
+    val persistedPathFinder  = mock[PersistedPathFinder[Try]]
+    val tokenRemover         = mock[TokenRemover[Try]]
+    val tokenFinder          = mock[PersistedTokensFinder[Try]]
     val tokenAssociator = new TokenAssociatorImpl[Try](
       projectPathFinder,
       accessTokenCrypto,
       tokenValidator,
       tokenDueChecker,
-      projectAccessTokenCreator,
+      tokensCreator,
       associationPersister,
       persistedPathFinder,
       tokenRemover,
@@ -371,7 +371,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: UserAccessToken,
                                  returning:       Try[Option[TokenCreationInfo]]
-    ) = (projectAccessTokenCreator.createPersonalAccessToken _)
+    ) = (tokensCreator.createPersonalAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
 

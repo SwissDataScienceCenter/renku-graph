@@ -43,25 +43,25 @@ private trait TokenAssociator[F[_]] {
 }
 
 private class TokenAssociatorImpl[F[_]: MonadThrow: Logger](
-    projectPathFinder:         ProjectPathFinder[F],
-    accessTokenCrypto:         AccessTokenCrypto[F],
-    tokenValidator:            TokenValidator[F],
-    tokenDueChecker:           TokenDueChecker[F],
-    projectAccessTokenCreator: ProjectAccessTokenCreator[F],
-    associationPersister:      AssociationPersister[F],
-    persistedPathFinder:       PersistedPathFinder[F],
-    tokenRemover:              TokenRemover[F],
-    tokenFinder:               PersistedTokensFinder[F],
-    maxRetries:                Int Refined NonNegative
+    projectPathFinder:    ProjectPathFinder[F],
+    accessTokenCrypto:    AccessTokenCrypto[F],
+    tokenValidator:       TokenValidator[F],
+    tokenDueChecker:      TokenDueChecker[F],
+    tokensCreator:        TokensCreator[F],
+    associationPersister: AssociationPersister[F],
+    persistedPathFinder:  PersistedPathFinder[F],
+    tokenRemover:         TokenRemover[F],
+    tokenFinder:          PersistedTokensFinder[F],
+    maxRetries:           Int Refined NonNegative
 ) extends TokenAssociator[F] {
 
   import associationPersister._
   import persistedPathFinder._
-  import projectAccessTokenCreator._
   import projectPathFinder._
-  import tokenFinder._
   import tokenDueChecker._
+  import tokenFinder._
   import tokenValidator._
+  import tokensCreator._
 
   override def associate(projectId: projects.Id, token: AccessToken): F[Unit] =
     findStoredToken(projectId)
@@ -153,7 +153,7 @@ private object TokenAssociator {
     accessTokenCrypto         <- AccessTokenCrypto[F]()
     tokenValidator            <- TokenValidator[F]
     tokenDueChecker           <- TokenDueChecker[F](queriesExecTimes)
-    projectAccessTokenCreator <- ProjectAccessTokenCreator[F]()
+    projectAccessTokenCreator <- TokensCreator[F]()
   } yield new TokenAssociatorImpl[F](
     pathFinder,
     accessTokenCrypto,

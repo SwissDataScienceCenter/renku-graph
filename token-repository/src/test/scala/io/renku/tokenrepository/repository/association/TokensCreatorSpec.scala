@@ -45,7 +45,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.{LocalDate, Period}
 import scala.concurrent.duration._
 
-class ProjectAccessTokenCreatorSpec
+class TokensCreatorSpec
     extends AnyWordSpec
     with MockFactory
     with GitLabClientTools[IO]
@@ -102,7 +102,7 @@ class ProjectAccessTokenCreatorSpec
     currentDate.expects().returning(now)
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val projectTokenTTL = Period.ofDays(durations(1 day, 730 days).generateOne.toDays.toInt)
-    val tokenCreator    = new ProjectAccessTokenCreatorImpl[IO](projectTokenTTL, currentDate)
+    val tokenCreator    = new TokensCreatorImpl[IO](projectTokenTTL, currentDate)
 
     lazy val mapResponse = captureMapping(tokenCreator, gitLabClient)(
       findingMethod = _.createPersonalAccessToken(projectId, accessToken).unsafeRunSync(),

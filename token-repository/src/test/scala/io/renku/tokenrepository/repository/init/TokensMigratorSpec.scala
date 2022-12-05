@@ -232,15 +232,15 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     val oldTokenEncrypted = encryptedAccessTokens.generateOne
 
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val tokenCrypto               = mock[AccessTokenCrypto[IO]]
-    val tokenValidator            = mock[TokenValidator[IO]]
-    val tokenRemover              = TokenRemover[IO](queriesExecTimes)
-    val projectAccessTokenCreator = mock[ProjectAccessTokenCreator[IO]]
-    val associationPersister      = AssociationPersister[IO](queriesExecTimes)
+    val tokenCrypto          = mock[AccessTokenCrypto[IO]]
+    val tokenValidator       = mock[TokenValidator[IO]]
+    val tokenRemover         = TokenRemover[IO](queriesExecTimes)
+    val tokensCreator        = mock[TokensCreator[IO]]
+    val associationPersister = AssociationPersister[IO](queriesExecTimes)
     val migration = new TokensMigrator[IO](tokenCrypto,
                                            tokenValidator,
                                            tokenRemover,
-                                           projectAccessTokenCreator,
+                                           tokensCreator,
                                            associationPersister,
                                            queriesExecTimes,
                                            retryInterval = 500 millis
@@ -314,7 +314,7 @@ class TokensMigratorSpec extends AnyWordSpec with IOSpec with DbInitSpec with sh
     def givenProjectTokenCreator(projectId:       projects.Id,
                                  userAccessToken: AccessToken,
                                  returning:       IO[Option[TokenCreationInfo]]
-    ) = (projectAccessTokenCreator.createPersonalAccessToken _)
+    ) = (tokensCreator.createPersonalAccessToken _)
       .expects(projectId, userAccessToken)
       .returning(returning)
   }

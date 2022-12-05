@@ -38,28 +38,28 @@ private object TokensMigrator {
   def apply[F[_]: Async: GitLabClient: SessionResource: Logger](
       queriesExecTimes: LabeledHistogram[F]
   ): F[DBMigration[F]] = for {
-    accessTokenCrypto         <- AccessTokenCrypto[F]()
-    tokenValidator            <- TokenValidator[F]
-    tokenRemover              <- TokenRemover[F](queriesExecTimes).pure[F]
-    projectAccessTokenCreator <- ProjectAccessTokenCreator[F]()
-    associationPersister      <- AssociationPersister[F](queriesExecTimes).pure[F]
+    accessTokenCrypto    <- AccessTokenCrypto[F]()
+    tokenValidator       <- TokenValidator[F]
+    tokenRemover         <- TokenRemover[F](queriesExecTimes).pure[F]
+    tokensCreator        <- TokensCreator[F]()
+    associationPersister <- AssociationPersister[F](queriesExecTimes).pure[F]
   } yield new TokensMigrator[F](accessTokenCrypto,
                                 tokenValidator,
                                 tokenRemover,
-                                projectAccessTokenCreator,
+                                tokensCreator,
                                 associationPersister,
                                 queriesExecTimes
   )
 }
 
 private class TokensMigrator[F[_]: Async: SessionResource: Logger](
-    tokenCrypto:               AccessTokenCrypto[F],
-    tokenValidator:            TokenValidator[F],
-    tokenRemover:              TokenRemover[F],
-    projectAccessTokenCreator: ProjectAccessTokenCreator[F],
-    associationPersister:      AssociationPersister[F],
-    queriesExecTimes:          LabeledHistogram[F],
-    retryInterval:             Duration = 5 seconds
+    tokenCrypto:          AccessTokenCrypto[F],
+    tokenValidator:       TokenValidator[F],
+    tokenRemover:         TokenRemover[F],
+    tokensCreator:        TokensCreator[F],
+    associationPersister: AssociationPersister[F],
+    queriesExecTimes:     LabeledHistogram[F],
+    retryInterval:        Duration = 5 seconds
 ) extends DbClient[F](Some(queriesExecTimes))
     with DBMigration[F]
     with TokenRepositoryTypeSerializers {
@@ -69,7 +69,7 @@ private class TokensMigrator[F[_]: Async: SessionResource: Logger](
   import associationPersister._
   import fs2.Stream
   import io.renku.db.SqlStatement
-  import projectAccessTokenCreator._
+  import tokensCreator._
   import skunk.Void
   import skunk.implicits._
   import tokenCrypto._
