@@ -38,6 +38,7 @@ import io.renku.graph.model.projects.Id
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, UserAccessToken}
 import io.renku.interpreters.TestLogger
+import io.renku.interpreters.TestLogger.Level.Warn
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -302,6 +303,28 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       exception.getMessage shouldBe show"Token associator - just saved token cannot be found for project: $projectId"
     }
+
+    "log a warning and succeed when token revoking fails" in new TestCase {
+
+      val encryptedToken = encryptedAccessTokens.generateOne
+      givenStoredTokenFinder(projectId, returning = OptionT.some(encryptedToken))
+
+      givenTokenDecryption(of = encryptedToken, returning = userAccessTokens.generateOne.pure[Try])
+
+      val projectPath = projectPaths.generateOne
+      givenPathFinder(projectId, userAccessToken, returning = OptionT.some(projectPath))
+
+      givenSuccessfulTokenCreation(projectPath)
+
+      val exception = exceptions.generateOne
+      givenTokensToRevokeFinding(projectId, userAccessToken, exception.raiseError[Try, List[AccessTokenId]])
+
+      tokensCreator.create(projectId, userAccessToken) shouldBe ().pure[Try]
+
+      logger.logged(
+        Warn(show"removing old token in GitLab for project ${Project(projectId, projectPath)} failed", exception)
+      )
+    }
   }
 
   private trait TestCase {
@@ -431,9 +454,7 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     def givenSuccessfulOldTokenRevoking(projectId: projects.Id, accessToken: AccessToken) = {
       val tokensToRevoke = accessTokenIds.generateList()
-      (revokeCandidatesFinder.findTokensToRemove _)
-        .expects(projectId, accessToken)
-        .returning(tokensToRevoke.pure[Try])
+      givenTokensToRevokeFinding(projectId, accessToken, returning = tokensToRevoke.pure[Try])
 
       tokensToRevoke foreach { tokenId =>
         (tokensRevoker.revokeToken _)
@@ -441,5 +462,12 @@ class TokensCreatorSpec extends AnyWordSpec with MockFactory with should.Matcher
           .returning(().pure[Try])
       }
     }
+
+    def givenTokensToRevokeFinding(projectId:   projects.Id,
+                                   accessToken: AccessToken,
+                                   returning:   Try[List[AccessTokenId]]
+    ) = (revokeCandidatesFinder.findTokensToRemove _)
+      .expects(projectId, accessToken)
+      .returning(returning)
   }
 }
