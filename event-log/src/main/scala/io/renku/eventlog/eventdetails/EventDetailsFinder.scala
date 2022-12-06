@@ -33,7 +33,7 @@ private trait EventDetailsFinder[F[_]] {
   def findDetails(eventId: CompoundEventId): F[Option[EventDetails]]
 }
 
-private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource:QueriesExecutionTimes]
+private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
     extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with EventDetailsFinder[F]
     with TypeSerializers {
@@ -57,7 +57,7 @@ private class EventDetailsFinderImpl[F[_]: MonadCancelThrow: SessionResource:Que
 }
 
 private object EventDetailsFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource:QueriesExecutionTimes]: F[EventDetailsFinder[F]] =
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[EventDetailsFinder[F]] =
     MonadThrow[F].catchNonFatal {
       new EventDetailsFinderImpl[F]
     }

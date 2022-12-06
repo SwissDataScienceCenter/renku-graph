@@ -117,9 +117,9 @@ private object EventHandler {
       eventsQueue: StatusChangeEventsQueue[F]
   ): F[EventHandler[F]] = for {
     deliveryInfoRemover <- DeliveryInfoRemover[F]
-    gaugesUpdater <- MonadThrow[F].catchNonFatal(new GaugesUpdaterImpl[F])
-    statusChanger <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](gaugesUpdater))
-    _             <- registerHandlers(eventsQueue, statusChanger)
+    gaugesUpdater       <- MonadThrow[F].catchNonFatal(new GaugesUpdaterImpl[F])
+    statusChanger       <- MonadThrow[F].catchNonFatal(new StatusChangerImpl[F](gaugesUpdater))
+    _                   <- registerHandlers(eventsQueue, statusChanger)
   } yield new EventHandler[F](categoryName, eventsQueue, statusChanger, deliveryInfoRemover)
 
   private def registerHandlers[F[_]: Async: AccessTokenFinder: Logger: QueriesExecutionTimes](

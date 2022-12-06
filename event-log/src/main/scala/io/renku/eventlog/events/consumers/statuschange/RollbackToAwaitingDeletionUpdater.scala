@@ -35,8 +35,8 @@ import skunk.~
 
 import java.time.Instant
 
-private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow:QueriesExecutionTimes](
-    now:              () => Instant = () => Instant.now
+private class RollbackToAwaitingDeletionUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DBUpdater[F, RollbackToAwaitingDeletion] {
 

@@ -39,8 +39,8 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class LongProcessingEventFinder[F[_]: Async: SessionResource:QueriesExecutionTimes](
-    now:              () => Instant = () => Instant.now
+private class LongProcessingEventFinder[F[_]: Async: SessionResource: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess

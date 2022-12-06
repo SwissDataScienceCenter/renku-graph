@@ -29,7 +29,7 @@ private trait EventProcessor[F[_]] {
 }
 
 private object EventProcessor {
-  def apply[F[_]: Async: SessionResource:QueriesExecutionTimes]: F[EventProcessor[F]] = for {
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[EventProcessor[F]] = for {
     projectIdFinder <- ProjectIdFinder[F]
     queue           <- CleanUpEventsQueue[F]
   } yield new EventProcessorImpl[F](projectIdFinder, queue)

@@ -34,8 +34,8 @@ import skunk.data.Completion
 
 import java.time.Instant
 
-private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource:QueriesExecutionTimes](
-                                                                       now: () => Instant = () => Instant.now
+private class EventFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventFinder[F, MinProjectInfoEvent]
     with SubscriptionTypeSerializers {

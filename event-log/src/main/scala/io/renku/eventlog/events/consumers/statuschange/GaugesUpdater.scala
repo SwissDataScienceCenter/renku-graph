@@ -45,7 +45,7 @@ private class GaugesUpdaterImpl[F[_]: Applicative: EventStatusGauges] extends Ga
             ),
             EventStatusGauges[F].underTransformation.update(path -> sum(TransformingTriples)),
             EventStatusGauges[F].awaitingDeletion.update(path    -> sum(AwaitingDeletion)),
-            EventStatusGauges[F].underDeletion.update(path            -> sum(Deleting))
+            EventStatusGauges[F].underDeletion.update(path       -> sum(Deleting))
           ).sequence
         }
         .toList

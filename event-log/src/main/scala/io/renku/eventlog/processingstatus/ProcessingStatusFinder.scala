@@ -41,7 +41,7 @@ trait ProcessingStatusFinder[F[_]] {
   def fetchStatus(projectId: Id): OptionT[F, ProcessingStatus]
 }
 
-class ProcessingStatusFinderImpl[F[_]: Async: SessionResource:QueriesExecutionTimes]
+class ProcessingStatusFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes]
     extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProcessingStatusFinder[F] {
 
@@ -81,7 +81,7 @@ class ProcessingStatusFinderImpl[F[_]: Async: SessionResource:QueriesExecutionTi
 }
 
 object ProcessingStatusFinder {
-  def apply[F[_]: Async: SessionResource:QueriesExecutionTimes]: F[ProcessingStatusFinder[F]] =
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[ProcessingStatusFinder[F]] =
     MonadThrow[F].catchNonFatal {
       new ProcessingStatusFinderImpl[F]
     }

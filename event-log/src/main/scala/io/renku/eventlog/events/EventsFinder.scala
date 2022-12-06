@@ -37,7 +37,7 @@ private trait EventsFinder[F[_]] {
   def findEvents(request: EventsEndpoint.Criteria): F[PagingResponse[EventInfo]]
 }
 
-private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource:QueriesExecutionTimes]
+private class EventsFinderImpl[F[_]: Async: NonEmptyParallel: SessionResource: QueriesExecutionTimes]
     extends DbClient[F](Some(QueriesExecutionTimes[F]))
     with EventsFinder[F]
     with Paging[EventInfo] {

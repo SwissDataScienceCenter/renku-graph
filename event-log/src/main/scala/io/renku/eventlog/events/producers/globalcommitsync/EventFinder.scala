@@ -40,7 +40,7 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class EventFinderImpl[F[_]: Async: SessionResource:QueriesExecutionTimes](
+private class EventFinderImpl[F[_]: Async: SessionResource: QueriesExecutionTimes](
     lastSyncedDateUpdater: LastSyncedDateUpdater[F],
     syncFrequency:         Duration,
     now:                   () => Instant = () => Instant.now

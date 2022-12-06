@@ -36,7 +36,7 @@ import skunk.~
 import java.time.Instant
 
 private class ToAwaitingDeletionUpdater[F[_]: MonadCancelThrow: QueriesExecutionTimes](
-    now:              () => Instant = () => Instant.now
+    now: () => Instant = () => Instant.now
 ) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DBUpdater[F, ToAwaitingDeletion] {
 

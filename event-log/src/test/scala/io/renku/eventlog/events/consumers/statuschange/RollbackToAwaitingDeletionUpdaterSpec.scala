@@ -71,10 +71,10 @@ class RollbackToAwaitingDeletionUpdaterSpec
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val currentTime      = mockFunction[Instant]
-    private implicit val metricsRegistry: TestMetricsRegistry[IO] = TestMetricsRegistry[IO]
+    val currentTime = mockFunction[Instant]
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
     private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
-    val dbUpdater        = new RollbackToAwaitingDeletionUpdater[IO](currentTime)
+    val dbUpdater = new RollbackToAwaitingDeletionUpdater[IO](currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

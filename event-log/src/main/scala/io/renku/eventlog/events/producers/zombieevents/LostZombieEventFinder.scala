@@ -38,7 +38,8 @@ import skunk.implicits._
 import java.time.Duration
 import java.time.Instant.now
 
-private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource:QueriesExecutionTimes] extends DbClient(Some(QueriesExecutionTimes[F]))
+private class LostZombieEventFinder[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {

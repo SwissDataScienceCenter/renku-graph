@@ -39,7 +39,7 @@ trait EventPayloadEndpoint[F[_]] {
 
 object EventPayloadEndpoint {
 
-  def apply[F[_]: Concurrent: SessionResource: Logger:QueriesExecutionTimes]: EventPayloadEndpoint[F] =
+  def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]: EventPayloadEndpoint[F] =
     apply[F](EventPayloadFinder[F])
 
   def apply[F[_]: Concurrent: Logger](payloadFinder: EventPayloadFinder[F]): EventPayloadEndpoint[F] =
