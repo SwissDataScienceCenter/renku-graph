@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository.creation
 
 import io.renku.db.SqlStatement
 import io.renku.generators.Generators.Implicits._

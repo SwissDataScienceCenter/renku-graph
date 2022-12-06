@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository.creation
 
 import Generators._
 import cats.effect.IO
@@ -35,7 +35,7 @@ import io.renku.http.client.{AccessToken, GitLabClient}
 import io.renku.http.server.EndpointTester._
 import io.renku.testtools.{GitLabClientTools, IOSpec}
 import org.http4s.Method.POST
-import org.http4s.Status.{BadRequest, Created, Forbidden, NotFound}
+import org.http4s.Status.{BadRequest, Created, Forbidden, InternalServerError, NotFound}
 import org.http4s.implicits._
 import org.http4s.{Request, Response, Uri}
 import org.scalamock.scalatest.MockFactory
@@ -45,7 +45,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.{LocalDate, Period}
 import scala.concurrent.duration._
 
-class ProjectAccessTokenCreatorSpec
+class NewTokensCreatorSpec
     extends AnyWordSpec
     with MockFactory
     with GitLabClientTools[IO]
@@ -70,7 +70,7 @@ class ProjectAccessTokenCreatorSpec
         .expects(uri"projects" / projectId.value / "access_tokens", endpointName, payload, *, Option(accessToken))
         .returning(creationInfo.some.pure[IO])
 
-      tokenCreator.createPersonalAccessToken(projectId, accessToken).unsafeRunSync() shouldBe creationInfo.some
+      tokensCreator.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync() shouldBe creationInfo.some
     }
 
     s"retrieve the created Project Access Token from the response with $Created status" in new TestCase {
@@ -79,7 +79,7 @@ class ProjectAccessTokenCreatorSpec
         .unsafeRunSync() shouldBe creationInfo.some
     }
 
-    Forbidden :: NotFound :: Nil foreach { status =>
+    BadRequest :: Forbidden :: NotFound :: Nil foreach { status =>
       s"retrieve the None for $status status" in new TestCase {
         mapResponse(status, Request[IO](), Response[IO](status)).unsafeRunSync() shouldBe None
       }
@@ -87,7 +87,7 @@ class ProjectAccessTokenCreatorSpec
 
     s"fail for responses other statuses" in new TestCase {
       intercept[Exception] {
-        mapResponse(BadRequest, Request[IO](), Response[IO](BadRequest)).unsafeRunSync()
+        mapResponse(InternalServerError, Request[IO](), Response[IO](InternalServerError)).unsafeRunSync()
       }
     }
   }
@@ -102,10 +102,10 @@ class ProjectAccessTokenCreatorSpec
     currentDate.expects().returning(now)
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val projectTokenTTL = Period.ofDays(durations(1 day, 730 days).generateOne.toDays.toInt)
-    val tokenCreator    = new ProjectAccessTokenCreatorImpl[IO](projectTokenTTL, currentDate)
+    val tokensCreator   = new NewTokensCreatorImpl[IO](projectTokenTTL, currentDate)
 
-    lazy val mapResponse = captureMapping(tokenCreator, gitLabClient)(
-      findingMethod = _.createPersonalAccessToken(projectId, accessToken).unsafeRunSync(),
+    lazy val mapResponse = captureMapping(tokensCreator, gitLabClient)(
+      findingMethod = _.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync(),
       resultGenerator = tokenCreationInfos.generateSome,
       method = POST
     )

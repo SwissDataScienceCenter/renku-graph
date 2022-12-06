@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository.creation
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -40,22 +40,22 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
+class CreateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactory with should.Matchers {
 
-  "associateToken" should {
+  "createToken" should {
 
     "respond with NO_CONTENT if the Personal Access Token association was successful" in new TestCase {
 
       val accessToken: AccessToken = personalAccessTokens.generateOne
-      (tokensAssociator
-        .associate(_: Id, _: AccessToken))
+      (tokensCreator
+        .create(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.unit)
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(accessToken.asJson)
 
-      val response = associateToken(projectId, request).unsafeRunSync()
+      val response = endpoint.createToken(projectId, request).unsafeRunSync()
 
       response.status                                shouldBe Status.NoContent
       response.body.compile.toVector.unsafeRunSync() shouldBe empty
@@ -67,15 +67,15 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactor
 
       val accessToken: AccessToken = userOAuthAccessTokens.generateOne
 
-      (tokensAssociator
-        .associate(_: Id, _: AccessToken))
+      (tokensCreator
+        .create(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(IO.unit)
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(accessToken.asJson)
 
-      val response = associateToken(projectId, request).unsafeRunSync()
+      val response = endpoint.createToken(projectId, request).unsafeRunSync()
 
       response.status                                shouldBe Status.NoContent
       response.body.compile.toVector.unsafeRunSync() shouldBe empty
@@ -87,7 +87,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactor
 
       val request = Request[IO](Method.PUT, uri"projects" / projectId.toString / "tokens")
 
-      val response = associateToken(projectId, request).unsafeRunSync()
+      val response = endpoint.createToken(projectId, request).unsafeRunSync()
 
       response.status      shouldBe Status.BadRequest
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -103,15 +103,15 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactor
       val accessToken: AccessToken = personalAccessTokens.generateOne
 
       val exception = exceptions.generateOne
-      (tokensAssociator
-        .associate(_: Id, _: AccessToken))
+      (tokensCreator
+        .create(_: Id, _: AccessToken))
         .expects(projectId, accessToken)
         .returning(exception.raiseError[IO, Unit])
 
       val request = Request(Method.PUT, uri"projects" / projectId.toString / "tokens")
         .withEntity(accessToken.asJson)
 
-      val response = associateToken(projectId, request).unsafeRunSync()
+      val response = endpoint.createToken(projectId, request).unsafeRunSync()
 
       response.status      shouldBe Status.InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -126,8 +126,8 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with IOSpec with MockFactor
 
     val projectId = projectIds.generateOne
 
-    val tokensAssociator = mock[TokenAssociator[IO]]
+    val tokensCreator = mock[TokensCreator[IO]]
     implicit val logger: TestLogger[IO] = TestLogger[IO]()
-    val associateToken = new AssociateTokenEndpointImpl[IO](tokensAssociator).associateToken _
+    val endpoint = new CreateTokenEndpointImpl[IO](tokensCreator)
   }
 }

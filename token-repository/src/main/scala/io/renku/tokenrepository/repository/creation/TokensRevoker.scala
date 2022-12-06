@@ -16,22 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.refresh
+package io.renku.tokenrepository.repository.creation
 
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
 
-private trait ExpiredTokensRevoker[F[_]] {
+private trait TokensRevoker[F[_]] {
   def revokeToken(projectId: projects.Id, tokenId: AccessTokenId, accessToken: AccessToken): F[Unit]
 }
 
-private object ExpiredTokensRevoker {
-  def apply[F[_]: Async: GitLabClient] = new ExpiredTokensRevokerImpl[F]
+private object TokensRevoker {
+  def apply[F[_]: Async: GitLabClient] = new TokensRevokerImpl[F]
 }
 
-private class ExpiredTokensRevokerImpl[F[_]: Async: GitLabClient] extends ExpiredTokensRevoker[F] {
+private class TokensRevokerImpl[F[_]: Async: GitLabClient] extends TokensRevoker[F] {
 
   import eu.timepit.refined.auto._
   import io.renku.http.tinytypes.TinyTypeURIEncoder._

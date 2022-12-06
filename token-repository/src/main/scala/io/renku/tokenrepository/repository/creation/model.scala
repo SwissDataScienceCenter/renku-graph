@@ -16,18 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository
+package creation
 
-import cats.Show
-import io.renku.graph.model.projects
+import AccessTokenCrypto.EncryptedAccessToken
+import TokenDates._
+import cats.{MonadThrow, Show}
+import io.circe.Decoder
 import io.renku.graph.model.views.TinyTypeJsonLDOps
+import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.AccessToken.ProjectAccessToken
-import io.renku.tinytypes.constraints.InstantNotInTheFuture
-import io.renku.tinytypes.{InstantTinyType, LocalDateTinyType, TinyTypeFactory}
-import io.renku.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
-import io.renku.tokenrepository.repository.association.TokenDates._
+import io.renku.tinytypes._
+import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonNegativeInt}
+import io.renku.tinytypes.json.TinyTypeDecoders
+import pureconfig.ConfigReader
 
-import java.time.{Instant, LocalDate}
+import java.time.{Instant, LocalDate, Period}
 
 private[repository] final case class TokenCreationInfo(token: ProjectAccessToken, dates: TokenDates)
 
@@ -53,7 +57,24 @@ private[repository] final case class TokenStoringInfo(project:        Project,
 private[repository] final case class Project(id: projects.Id, path: projects.Path)
 
 private[repository] object Project {
-  implicit lazy val show: Show[Project] = Show.show { case Project(id, path) =>
+  implicit lazy val show: Show[Project] = { case Project(id, path) =>
     s"projectId = $id, projectPath = $path"
   }
+}
+
+private final class AccessTokenId private (val value: Int) extends AnyVal with IntTinyType
+private object AccessTokenId
+    extends TinyTypeFactory[AccessTokenId](new AccessTokenId(_))
+    with NonNegativeInt[AccessTokenId] {
+  implicit val jsonDecoder: Decoder[AccessTokenId] = TinyTypeDecoders.intDecoder(this)
+}
+
+private object ProjectTokenDuePeriod {
+  import com.typesafe.config.{Config, ConfigFactory}
+  import io.renku.config.ConfigLoader.{find, urlTinyTypeReader}
+
+  private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = urlTinyTypeReader(GitLabUrl)
+
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[Period] =
+    find[F, Period]("project-token-due-period", config)
 }

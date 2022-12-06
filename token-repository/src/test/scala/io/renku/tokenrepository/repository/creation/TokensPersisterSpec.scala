@@ -17,12 +17,12 @@
  */
 
 package io.renku.tokenrepository.repository
-package association
+package creation
 
 import AccessTokenCrypto.EncryptedAccessToken
 import RepositoryGenerators._
-import association.Generators.tokenStoringInfos
-import association.TokenDates._
+import creation.Generators.tokenStoringInfos
+import creation.TokenDates._
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
@@ -38,19 +38,19 @@ import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
 
-class AssociationPersisterSpec
+class TokensPersisterSpec
     extends AnyWordSpec
     with IOSpec
     with InMemoryProjectsTokensDbSpec
     with should.Matchers
     with MockFactory {
 
-  "persistAssociation" should {
+  "persistToken" should {
 
     "insert the association " +
       "if there's no token for the given project id" in new TestCase {
 
-        associator.persistAssociation(tokenStoringInfo).unsafeRunSync() shouldBe ()
+        persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
         findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
       }
@@ -58,12 +58,12 @@ class AssociationPersisterSpec
     "update the given token " +
       "if there's a token for the project path and id" in new TestCase {
 
-        associator.persistAssociation(tokenStoringInfo).unsafeRunSync() shouldBe ()
+        persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
         findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
 
         val newToken = encryptedAccessTokens.generateOne
-        associator.persistAssociation(tokenStoringInfo.copy(encryptedToken = newToken)).unsafeRunSync() shouldBe ()
+        persister.persistToken(tokenStoringInfo.copy(encryptedToken = newToken)).unsafeRunSync() shouldBe ()
 
         findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.copy(encryptedToken = newToken).some
       }
@@ -71,7 +71,7 @@ class AssociationPersisterSpec
     "update the given token and project id" +
       "if there's a token for the project path but with different project id" in new TestCase {
 
-        associator.persistAssociation(tokenStoringInfo).unsafeRunSync() shouldBe ()
+        persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
         findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
 
@@ -79,7 +79,7 @@ class AssociationPersisterSpec
           tokenStoringInfo.copy(project = tokenStoringInfo.project.copy(id = projectIds.generateOne),
                                 encryptedToken = encryptedAccessTokens.generateOne
           )
-        associator.persistAssociation(newStoringInfo).unsafeRunSync() shouldBe ()
+        persister.persistToken(newStoringInfo).unsafeRunSync() shouldBe ()
 
         findTokenInfo(tokenStoringInfo.project.id) shouldBe None
         findTokenInfo(newStoringInfo.project.id)   shouldBe newStoringInfo.some
@@ -88,7 +88,7 @@ class AssociationPersisterSpec
     "update the given token and project path" +
       "if there's a token for the project id but with different project path" in new TestCase {
 
-        associator.persistAssociation(tokenStoringInfo).unsafeRunSync() shouldBe ()
+        persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
         findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
 
@@ -96,7 +96,7 @@ class AssociationPersisterSpec
           tokenStoringInfo.copy(project = tokenStoringInfo.project.copy(path = projectPaths.generateOne),
                                 encryptedToken = encryptedAccessTokens.generateOne
           )
-        associator.persistAssociation(newStoringInfo).unsafeRunSync() shouldBe ()
+        persister.persistToken(newStoringInfo).unsafeRunSync() shouldBe ()
 
         findTokenInfo(tokenStoringInfo.project.id) shouldBe newStoringInfo.some
       }
@@ -106,12 +106,12 @@ class AssociationPersisterSpec
 
     "replace the Path for the given project Id" in new TestCase {
 
-      associator.persistAssociation(tokenStoringInfo).unsafeRunSync() shouldBe ()
+      persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
       findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
 
       val newPath = projectPaths.generateOne
-      associator.updatePath(Project(tokenStoringInfo.project.id, newPath)).unsafeRunSync() shouldBe ()
+      persister.updatePath(Project(tokenStoringInfo.project.id, newPath)).unsafeRunSync() shouldBe ()
 
       findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo
         .copy(project = tokenStoringInfo.project.copy(path = newPath))
@@ -120,16 +120,16 @@ class AssociationPersisterSpec
 
     "do nothing if project Path not changed" in new TestCase {
 
-      associator.persistAssociation(tokenStoringInfo).unsafeRunSync() shouldBe ()
+      persister.persistToken(tokenStoringInfo).unsafeRunSync() shouldBe ()
 
-      associator.updatePath(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
+      persister.updatePath(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
 
       findTokenInfo(tokenStoringInfo.project.id) shouldBe tokenStoringInfo.some
     }
 
     "do nothing if no project with the given Id" in new TestCase {
 
-      associator.updatePath(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
+      persister.updatePath(tokenStoringInfo.project).unsafeRunSync() shouldBe ()
 
       findTokenInfo(tokenStoringInfo.project.id) shouldBe None
     }
@@ -139,7 +139,7 @@ class AssociationPersisterSpec
     val tokenStoringInfo = tokenStoringInfos.generateOne
 
     private val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val associator               = new AssociationPersisterImpl[IO](queriesExecTimes)
+    val persister                = new TokensPersisterImpl[IO](queriesExecTimes)
   }
 
   private def findTokenInfo(projectId: projects.Id): Option[TokenStoringInfo] = sessionResource

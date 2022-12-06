@@ -17,7 +17,7 @@
  */
 
 package io.renku.tokenrepository.repository
-package association
+package creation
 
 import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
@@ -33,22 +33,22 @@ import skunk.data.Completion
 import skunk.data.Completion.Delete
 import skunk.implicits._
 
-private[repository] trait AssociationPersister[F[_]] {
-  def persistAssociation(storingInfo: TokenStoringInfo): F[Unit]
-  def updatePath(project:             Project):          F[Unit]
+private[repository] trait TokensPersister[F[_]] {
+  def persistToken(storingInfo: TokenStoringInfo): F[Unit]
+  def updatePath(project:       Project):          F[Unit]
 }
 
-private[repository] object AssociationPersister {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): AssociationPersister[F] =
-    new AssociationPersisterImpl[F](queriesExecTimes)
+private[repository] object TokensPersister {
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): TokensPersister[F] =
+    new TokensPersisterImpl[F](queriesExecTimes)
 }
 
-private class AssociationPersisterImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
+private class TokensPersisterImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
     extends DbClient[F](Some(queriesExecTimes))
-    with AssociationPersister[F]
+    with TokensPersister[F]
     with TokenRepositoryTypeSerializers {
 
-  override def persistAssociation(storingInfo: TokenStoringInfo): F[Unit] = SessionResource[F].useWithTransactionK {
+  override def persistToken(storingInfo: TokenStoringInfo): F[Unit] = SessionResource[F].useWithTransactionK {
     Kleisli { case (_, session) =>
       (deleteAssociation(storingInfo.project) >> insert(storingInfo)).run(session)
     }

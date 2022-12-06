@@ -16,24 +16,28 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.refresh
+package io.renku.tokenrepository.repository.creation
 
+import TokenDates.ExpiryDate
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.graph.model.projects
 import io.renku.http.client.{AccessToken, GitLabClient}
-import io.renku.tokenrepository.repository.association.TokenDates.ExpiryDate
-import io.renku.tokenrepository.repository.association.renkuTokenName
 
-private trait ExpiredTokensFinder[F[_]] {
-  def findExpiredTokens(projectId: projects.Id, accessToken: AccessToken): F[List[AccessTokenId]]
+import java.time.LocalDate.now
+import java.time.Period
+
+private trait RevokeCandidatesFinder[F[_]] {
+  def findTokensToRemove(projectId: projects.Id, accessToken: AccessToken): F[List[AccessTokenId]]
 }
 
-private object ExpiredTokensFinder {
-  def apply[F[_]: Async: GitLabClient] = new ExpiredTokensFinderImpl[F]
+private object RevokeCandidatesFinder {
+  def apply[F[_]: Async: GitLabClient]: F[RevokeCandidatesFinder[F]] =
+    ProjectTokenDuePeriod[F]().map(new RevokeCandidatesFinderImpl[F](_))
 }
 
-private class ExpiredTokensFinderImpl[F[_]: Async: GitLabClient] extends ExpiredTokensFinder[F] {
+private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](tokenDuePeriod: Period)
+    extends RevokeCandidatesFinder[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
@@ -43,10 +47,10 @@ private class ExpiredTokensFinderImpl[F[_]: Async: GitLabClient] extends Expired
   import org.http4s.implicits._
   import org.http4s.{EntityDecoder, Request, Response, Status}
 
-  override def findExpiredTokens(projectId: projects.Id, accessToken: AccessToken): F[List[AccessTokenId]] =
+  override def findTokensToRemove(projectId: projects.Id, accessToken: AccessToken): F[List[AccessTokenId]] =
     GitLabClient[F]
       .get(uri"projects" / projectId.value / "access_tokens", "project-access-tokens")(mapResponse)(accessToken.some)
-      .map(_.filter(renkuTokens).filter(expired).map(_._1))
+      .map(_.filter(renkuTokens).filter(dueToRefresh).map(_._1))
 
   private type TokenInfo = (AccessTokenId, String, Option[ExpiryDate])
 
@@ -71,8 +75,8 @@ private class ExpiredTokensFinderImpl[F[_]: Async: GitLabClient] extends Expired
     name == renkuTokenName
   }
 
-  private lazy val expired: TokenInfo => Boolean = {
+  private lazy val dueToRefresh: TokenInfo => Boolean = {
     case (_, _, None)         => true
-    case (_, _, Some(expiry)) => (expiry.value compareTo CloseExpirationDate().value) <= 0
+    case (_, _, Some(expiry)) => (now().plus(tokenDuePeriod) compareTo expiry.value) >= 0
   }
 }

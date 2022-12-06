@@ -17,53 +17,53 @@
  */
 
 package io.renku.tokenrepository.repository
-package refresh
+package creation
 
-import AccessTokenCrypto.EncryptedAccessToken
 import ProjectsTokensDB.SessionResource
-import association.Project
+import creation.TokenDates.ExpiryDate
 import cats.effect.MonadCancelThrow
+import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.graph.model.projects
 import io.renku.metrics.LabeledHistogram
 
-import java.time.LocalDate
+import java.time.LocalDate.now
+import java.time.Period
 
-private trait TokensToRefreshFinder[F[_]] {
-  def findTokenToRefresh(): F[Option[TokenCloseExpiration]]
+private trait TokenDueChecker[F[_]] {
+  def checkTokenDue(projectId: projects.Id): F[Boolean]
 }
 
-private object TokensToRefreshFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): TokensToRefreshFinder[F] =
-    new TokensToRefreshFinderImpl[F](queriesExecTimes)
+private object TokenDueChecker {
+  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[TokenDueChecker[F]] =
+    ProjectTokenDuePeriod[F]().map(new TokenDueCheckerImpl[F](_, queriesExecTimes))
 }
 
-private class TokensToRefreshFinderImpl[F[_]: MonadCancelThrow: SessionResource](
+private class TokenDueCheckerImpl[F[_]: MonadCancelThrow: SessionResource](
+    tokenDuePeriod:   Period,
     queriesExecTimes: LabeledHistogram[F]
 ) extends DbClient[F](Some(queriesExecTimes))
-    with TokensToRefreshFinder[F]
+    with TokenDueChecker[F]
     with TokenRepositoryTypeSerializers {
 
-  import skunk._
-  import skunk.codec.all.date
   import skunk.implicits._
 
-  override def findTokenToRefresh(): F[Option[TokenCloseExpiration]] =
-    SessionResource[F].useK(measureExecutionTime(query))
+  override def checkTokenDue(projectId: projects.Id): F[Boolean] =
+    SessionResource[F].useK(measureExecutionTime(query(projectId))).map {
+      case None         => false
+      case Some(expiry) => (now().plus(tokenDuePeriod) compareTo expiry.value) >= 0
+    }
 
-  private def query =
+  private def query(projectId: projects.Id) =
     SqlStatement
-      .named(name = "find token close expiration")
-      .select[LocalDate, TokenCloseExpiration](
-        sql"""SELECT project_id, project_path, token
+      .named(name = "find token due")
+      .select[projects.Id, ExpiryDate](
+        sql"""SELECT expiry_date
               FROM projects_tokens
-              WHERE expiry_date <= $date
+              WHERE project_id = $projectIdEncoder
               LIMIT 1"""
-          .query(projectIdDecoder ~ projectPathDecoder ~ encryptedAccessTokenDecoder)
-          .map { case (id: projects.Id) ~ (path: projects.Path) ~ (token: EncryptedAccessToken) =>
-            TokenCloseExpiration(Project(id, path), token)
-          }
+          .query(expiryDateDecoder)
       )
-      .arguments(CloseExpirationDate().value)
+      .arguments(projectId)
       .build(_.option)
 }

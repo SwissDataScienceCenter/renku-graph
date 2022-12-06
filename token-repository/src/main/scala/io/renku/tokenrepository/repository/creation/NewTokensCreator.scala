@@ -16,38 +16,38 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.association
+package io.renku.tokenrepository.repository.creation
 
+import cats.data.OptionT
 import cats.effect.Async
 import cats.syntax.all._
 import com.typesafe.config.{Config, ConfigFactory}
 import io.renku.graph.model.projects
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.http.client.{AccessToken, GitLabClient}
-import org.http4s.Status.{Forbidden, NotFound}
 
 import java.time.{LocalDate, Period}
 
-private[tokenrepository] trait ProjectAccessTokenCreator[F[_]] {
-  def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): F[Option[TokenCreationInfo]]
+private[tokenrepository] trait NewTokensCreator[F[_]] {
+  def createPersonalAccessToken(projectId: projects.Id, accessToken: AccessToken): OptionT[F, TokenCreationInfo]
 }
 
-private[tokenrepository] object ProjectAccessTokenCreator {
+private[tokenrepository] object NewTokensCreator {
 
   import io.renku.config.ConfigLoader._
 
   import scala.concurrent.duration.FiniteDuration
 
-  def apply[F[_]: Async: GitLabClient](config: Config = ConfigFactory.load()): F[ProjectAccessTokenCreator[F]] =
+  def apply[F[_]: Async: GitLabClient](config: Config = ConfigFactory.load()): F[NewTokensCreator[F]] =
     find[F, FiniteDuration]("project-token-ttl", config)
       .map(duration => Period.ofDays(duration.toDays.toInt))
-      .map(projectTokenTTL => new ProjectAccessTokenCreatorImpl[F](projectTokenTTL))
+      .map(projectTokenTTL => new NewTokensCreatorImpl[F](projectTokenTTL))
 }
 
-private class ProjectAccessTokenCreatorImpl[F[_]: Async: GitLabClient](
+private class NewTokensCreatorImpl[F[_]: Async: GitLabClient](
     projectTokenTTL: Period,
     currentDate:     () => LocalDate = () => LocalDate.now()
-) extends ProjectAccessTokenCreator[F] {
+) extends NewTokensCreator[F] {
 
   import cats.effect._
   import cats.syntax.all._
@@ -55,18 +55,19 @@ private class ProjectAccessTokenCreatorImpl[F[_]: Async: GitLabClient](
   import io.circe.Decoder
   import io.circe.Decoder.decodeString
   import io.circe.literal._
-  import org.http4s.Status.Created
+  import org.http4s.Status.{BadRequest, Created, Forbidden, NotFound}
   import org.http4s.circe.jsonOf
   import org.http4s.implicits._
   import org.http4s.{EntityDecoder, Request, Response, Status}
 
   override def createPersonalAccessToken(projectId:   projects.Id,
                                          accessToken: AccessToken
-  ): F[Option[TokenCreationInfo]] =
+  ): OptionT[F, TokenCreationInfo] = OptionT {
     GitLabClient[F].post(uri"projects" / projectId.value / "access_tokens",
                          "create-project-access-token",
                          createPayload()
     )(mapResponse)(accessToken.some)
+  }
 
   private def createPayload() = json"""{
     "name":       $renkuTokenName,
@@ -75,8 +76,8 @@ private class ProjectAccessTokenCreatorImpl[F[_]: Async: GitLabClient](
   }"""
 
   private lazy val mapResponse: PartialFunction[(Status, Request[F], Response[F]), F[Option[TokenCreationInfo]]] = {
-    case (Created, _, response)       => response.as[TokenCreationInfo].map(Option.apply)
-    case (Forbidden | NotFound, _, _) => Option.empty[TokenCreationInfo].pure[F]
+    case (Created, _, response)                    => response.as[TokenCreationInfo].map(Option.apply)
+    case (BadRequest | Forbidden | NotFound, _, _) => Option.empty[TokenCreationInfo].pure[F]
   }
 
   private implicit lazy val tokenDecoder: EntityDecoder[F, TokenCreationInfo] = {

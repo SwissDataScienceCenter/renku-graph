@@ -26,7 +26,7 @@ import io.renku.http.client.GitLabClient
 import io.renku.http.server.version
 import io.renku.metrics.{LabeledHistogram, MetricsRegistry, RoutesMetrics}
 import io.renku.tokenrepository.repository.ProjectsTokensDB.SessionResource
-import io.renku.tokenrepository.repository.association.AssociateTokenEndpoint
+import io.renku.tokenrepository.repository.creation.CreateTokenEndpoint
 import io.renku.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import io.renku.tokenrepository.repository.fetching.FetchTokenEndpoint
 import org.http4s.dsl.Http4sDsl
@@ -40,7 +40,7 @@ private trait MicroserviceRoutes[F[_]] {
 
 private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     fetchTokenEndpoint:     FetchTokenEndpoint[F],
-    associateTokenEndpoint: AssociateTokenEndpoint[F],
+    associateTokenEndpoint: CreateTokenEndpoint[F],
     deleteTokenEndpoint:    DeleteTokenEndpoint[F],
     routesMetrics:          RoutesMetrics[F],
     versionRoutes:          version.Routes[F],
@@ -64,7 +64,7 @@ private class MicroserviceRoutesImpl[F[_]: MonadThrow](
     case       GET    -> Root / "ping"                                           => Ok("pong")
     case       GET    -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(fetchToken(projectId))
     case       GET    -> Root / "projects" / ProjectPath(projectPath) / "tokens" => whenDBReady(fetchToken(projectPath))
-    case req @ POST   -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(associateToken(projectId, req))
+    case req @ POST   -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(createToken(projectId, req))
     case       DELETE -> Root / "projects" / ProjectId(projectId) / "tokens"     => whenDBReady(deleteToken(projectId))
   }.withMetrics.map(_ <+> versionRoutes())
   // format: on
@@ -79,13 +79,13 @@ private object MicroserviceRoutes {
   def apply[F[_]: Async: GitLabClient: Logger: MetricsRegistry: SessionResource](
       queriesExecTimes: LabeledHistogram[F]
   ): F[MicroserviceRoutes[F]] = for {
-    fetchTokenEndpoint     <- FetchTokenEndpoint(queriesExecTimes)
-    associateTokenEndpoint <- AssociateTokenEndpoint(queriesExecTimes)
-    deleteTokenEndpoint    <- DeleteTokenEndpoint(queriesExecTimes)
-    versionRoutes          <- version.Routes[F]
-    dbReady                <- Ref.of(false)
+    fetchTokenEndpoint  <- FetchTokenEndpoint(queriesExecTimes)
+    createTokenEndpoint <- CreateTokenEndpoint(queriesExecTimes)
+    deleteTokenEndpoint <- DeleteTokenEndpoint(queriesExecTimes)
+    versionRoutes       <- version.Routes[F]
+    dbReady             <- Ref.of(false)
   } yield new MicroserviceRoutesImpl(fetchTokenEndpoint,
-                                     associateTokenEndpoint,
+                                     createTokenEndpoint,
                                      deleteTokenEndpoint,
                                      new RoutesMetrics[F],
                                      versionRoutes,

@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.tokenrepository.repository.refresh
+package io.renku.tokenrepository.repository.creation
 
+import Generators._
 import cats.effect.IO
 import cats.syntax.all._
 import eu.timepit.refined.api.Refined
@@ -38,7 +39,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ExpiredTokensRevokerSpec
+class TokensRevokerSpec
     extends AnyWordSpec
     with MockFactory
     with GitLabClientTools[IO]
@@ -56,7 +57,7 @@ class ExpiredTokensRevokerSpec
         .expects(uri"projects" / projectId / "access_tokens" / tokenId, endpointName, *, Option(accessToken))
         .returning(().pure[IO])
 
-      finder.revokeToken(projectId, tokenId, accessToken).unsafeRunSync() shouldBe ()
+      tokensRevoker.revokeToken(projectId, tokenId, accessToken).unsafeRunSync() shouldBe ()
     }
 
     Status.Ok :: Status.NoContent :: Status.Unauthorized :: Status.Forbidden :: Status.NotFound :: Nil foreach {
@@ -74,9 +75,9 @@ class ExpiredTokensRevokerSpec
     val accessToken = accessTokens.generateOne
 
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
-    val finder = new ExpiredTokensRevokerImpl[IO]
+    val tokensRevoker = new TokensRevokerImpl[IO]
 
-    lazy val mapResponse = captureMapping(finder, gitLabClient)(
+    lazy val mapResponse = captureMapping(tokensRevoker, gitLabClient)(
       findingMethod = _.revokeToken(projectId, tokenId, accessTokens.generateOne).unsafeRunSync(),
       resultGenerator = fixed(()),
       method = DELETE
