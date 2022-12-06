@@ -31,7 +31,7 @@ import io.renku.graph.metrics.SentEventsGauge
 import io.renku.http.client.RestClient
 import io.renku.http.client.RestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import io.renku.http.client.RestClientError.{ClientException, ConnectivityException, UnexpectedResponseException}
-import io.renku.metrics.{LabeledGauge, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.http4s.Method.POST
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, NotFound, ServiceUnavailable}
 import org.http4s._
@@ -50,7 +50,7 @@ trait EventSender[F[_]] {
 
 class EventSenderImpl[F[_]: Async: Logger](
     eventLogUrl:            EventLogUrl,
-    sentEventsGauge:        LabeledGauge[F, CategoryName],
+    sentEventsGauge:        SentEventsGauge[F],
     onErrorSleep:           FiniteDuration,
     retryInterval:          FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:             Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
