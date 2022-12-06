@@ -38,14 +38,15 @@ private[tokenrepository] object NewTokensCreator {
 
   import scala.concurrent.duration.FiniteDuration
 
-  def apply[F[_]: Async: GitLabClient](config: Config = ConfigFactory.load()): F[NewTokensCreator[F]] =
-    find[F, FiniteDuration]("project-token-ttl", config)
-      .map(duration => Period.ofDays(duration.toDays.toInt))
-      .map(projectTokenTTL => new NewTokensCreatorImpl[F](projectTokenTTL))
+  def apply[F[_]: Async: GitLabClient](config: Config = ConfigFactory.load()): F[NewTokensCreator[F]] = for {
+    tokenTTL  <- find[F, FiniteDuration]("project-token-ttl", config).map(ttl => Period.ofDays(ttl.toDays.toInt))
+    tokenName <- RenkuAccessTokenName[F]()
+  } yield new NewTokensCreatorImpl[F](tokenTTL, tokenName)
 }
 
 private class NewTokensCreatorImpl[F[_]: Async: GitLabClient](
     projectTokenTTL: Period,
+    renkuTokenName:  RenkuAccessTokenName,
     currentDate:     () => LocalDate = () => LocalDate.now()
 ) extends NewTokensCreator[F] {
 

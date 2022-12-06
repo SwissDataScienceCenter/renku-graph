@@ -55,15 +55,15 @@ class RevokeCandidatesFinderSpec
 
   "checkTokenDue" should {
 
-    s"do GET projects/:id/access_tokens to find expired '$renkuTokenName' tokens" in new TestCase {
+    "do GET projects/:id/access_tokens to find expired tokens with RenkuAccessTokenName" in new TestCase {
 
       val endpointName: String Refined NonEmpty = "project-access-tokens"
 
       val allTokens = List(
-        tokenInfosWithExpiry(fixed(renkuTokenName), localDates(max = now() plus tokenDuePeriod)),
-        tokenInfosWithExpiry(fixed(renkuTokenName), fixed(now() plus tokenDuePeriod)),
-        tokenInfosWithoutExpiry(fixed(renkuTokenName)),
-        tokenInfosWithExpiry(fixed(renkuTokenName), localDates(min = now() plus tokenDuePeriod plusDays 1)),
+        tokenInfosWithExpiry(fixed(renkuTokenName.value), localDates(max = now() plus tokenDuePeriod)),
+        tokenInfosWithExpiry(fixed(renkuTokenName.value), fixed(now() plus tokenDuePeriod)),
+        tokenInfosWithoutExpiry(fixed(renkuTokenName.value)),
+        tokenInfosWithExpiry(fixed(renkuTokenName.value), localDates(min = now() plus tokenDuePeriod plusDays 1)),
         tokenInfosWithExpiry(expiryDates = localDates(max = now() plus tokenDuePeriod)),
         tokenInfosWithExpiry()
       ).map(_.generateOne)
@@ -79,7 +79,7 @@ class RevokeCandidatesFinderSpec
     "map OK response body to TokenInfo tuples" in new TestCase {
 
       val tokens = Gen
-        .oneOf(tokenInfosWithExpiry(), tokenInfosWithoutExpiry(fixed(renkuTokenName)))
+        .oneOf(tokenInfosWithExpiry(), tokenInfosWithoutExpiry(fixed(renkuTokenName.value)))
         .generateList()
 
       mapResponse(Status.Ok, Request[IO](), Response[IO](Status.Ok).withEntity(tokens.asJson))
@@ -102,7 +102,8 @@ class RevokeCandidatesFinderSpec
 
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val tokenDuePeriod = Period.ofDays(5)
-    val finder         = new RevokeCandidatesFinderImpl[IO](tokenDuePeriod)
+    val renkuTokenName = nonEmptyStrings().generateAs(RenkuAccessTokenName(_))
+    val finder         = new RevokeCandidatesFinderImpl[IO](tokenDuePeriod, renkuTokenName)
 
     lazy val mapResponse = captureMapping(finder, gitLabClient)(
       findingMethod = _.findTokensToRemove(projectId, accessTokens.generateOne).unsafeRunSync(),

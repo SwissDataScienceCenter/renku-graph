@@ -33,11 +33,13 @@ private trait RevokeCandidatesFinder[F[_]] {
 
 private object RevokeCandidatesFinder {
   def apply[F[_]: Async: GitLabClient]: F[RevokeCandidatesFinder[F]] =
-    ProjectTokenDuePeriod[F]().map(new RevokeCandidatesFinderImpl[F](_))
+    (ProjectTokenDuePeriod[F](), RenkuAccessTokenName[F]())
+      .mapN(new RevokeCandidatesFinderImpl[F](_, _))
 }
 
-private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](tokenDuePeriod: Period)
-    extends RevokeCandidatesFinder[F] {
+private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](tokenDuePeriod: Period,
+                                                                    renkuTokenName: RenkuAccessTokenName
+) extends RevokeCandidatesFinder[F] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
@@ -72,7 +74,7 @@ private class RevokeCandidatesFinderImpl[F[_]: Async: GitLabClient](tokenDuePeri
   }
 
   private lazy val renkuTokens: TokenInfo => Boolean = { case (_, name, _) =>
-    name == renkuTokenName
+    name == renkuTokenName.value
   }
 
   private lazy val dueToRefresh: TokenInfo => Boolean = {

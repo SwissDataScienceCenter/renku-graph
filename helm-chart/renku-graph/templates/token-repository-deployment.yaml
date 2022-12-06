@@ -45,6 +45,8 @@ spec:
                   key: tokenRepository-tokenEncryption-secret
             - name: PROJECT_TOKEN_TTL
               value: "{{ .Values.tokenRepository.projectTokenTTL }}"
+            - name: PROJECT_TOKEN_NAME
+              value: "{{ .Values.tokenRepository.projectTokenName }}"
             - name: PROJECT_TOKEN_DUE_PERIOD
               value: "{{ .Values.tokenRepository.projectTokenDuePeriod }}"
             - name: TOKEN_REPOSITORY_POSTGRES_HOST
