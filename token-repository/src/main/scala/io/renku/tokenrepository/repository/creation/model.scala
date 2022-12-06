@@ -21,10 +21,13 @@ package creation
 
 import AccessTokenCrypto.EncryptedAccessToken
 import TokenDates._
+import cats.syntax.all._
 import cats.{MonadThrow, Show}
+import com.typesafe.config.{Config, ConfigFactory}
 import io.circe.Decoder
+import io.renku.config.ConfigLoader.find
+import io.renku.graph.model.projects
 import io.renku.graph.model.views.TinyTypeJsonLDOps
-import io.renku.graph.model.{GitLabUrl, projects}
 import io.renku.http.client.AccessToken.ProjectAccessToken
 import io.renku.tinytypes._
 import io.renku.tinytypes.constraints.{InstantNotInTheFuture, NonNegativeInt}
@@ -70,11 +73,19 @@ private object AccessTokenId
 }
 
 private object ProjectTokenDuePeriod {
-  import com.typesafe.config.{Config, ConfigFactory}
-  import io.renku.config.ConfigLoader.{find, urlTinyTypeReader}
-
-  private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = urlTinyTypeReader(GitLabUrl)
 
   def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[Period] =
     find[F, Period]("project-token-due-period", config)
+}
+
+final class RenkuAccessTokenName private (val value: String) extends StringTinyType
+private object RenkuAccessTokenName {
+
+  private implicit val reader: ConfigReader[RenkuAccessTokenName] =
+    ConfigReader.fromString(new RenkuAccessTokenName(_).asRight)
+
+  def apply(v: String): RenkuAccessTokenName = new RenkuAccessTokenName(v)
+
+  def apply[F[_]: MonadThrow](config: Config = ConfigFactory.load): F[RenkuAccessTokenName] =
+    find[F, RenkuAccessTokenName]("project-token-name", config)
 }

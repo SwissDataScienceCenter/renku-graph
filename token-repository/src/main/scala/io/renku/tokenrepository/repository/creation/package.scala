@@ -27,8 +27,6 @@ package object creation {
 
   import io.renku.tokenrepository.repository.creation.TokenDates._
 
-  private[creation] val renkuTokenName = "renku"
-
   private[creation] val createdAtDecoder: Decoder[CreatedAt] =
     timestamptz.map(timestamp => CreatedAt(timestamp.toInstant))
   private[creation] val createdAtEncoder: Encoder[CreatedAt] = timestamptz.values.contramap((b: CreatedAt) =>

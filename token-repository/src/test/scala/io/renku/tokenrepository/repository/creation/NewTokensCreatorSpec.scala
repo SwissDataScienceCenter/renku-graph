@@ -28,7 +28,7 @@ import io.circe.Json
 import io.circe.literal._
 import io.renku.generators.CommonGraphGenerators.accessTokens
 import io.renku.generators.Generators.Implicits._
-import io.renku.generators.Generators.durations
+import io.renku.generators.Generators.{durations, nonEmptyStrings}
 import io.renku.graph.model.GraphModelGenerators.projectIds
 import io.renku.http.client.RestClient.ResponseMappingF
 import io.renku.http.client.{AccessToken, GitLabClient}
@@ -58,7 +58,7 @@ class NewTokensCreatorSpec
 
       val endpointName: String Refined NonEmpty = "create-project-access-token"
       val payload = json"""{
-        "name":       "renku",
+        "name":       $renkuTokenName,
         "scopes":     ["api", "read_repository"],
         "expires_at": ${now plus projectTokenTTL}
       }"""
@@ -102,7 +102,8 @@ class NewTokensCreatorSpec
     currentDate.expects().returning(now)
     implicit val gitLabClient: GitLabClient[IO] = mock[GitLabClient[IO]]
     val projectTokenTTL = Period.ofDays(durations(1 day, 730 days).generateOne.toDays.toInt)
-    val tokensCreator   = new NewTokensCreatorImpl[IO](projectTokenTTL, currentDate)
+    val renkuTokenName  = nonEmptyStrings().generateAs(RenkuAccessTokenName(_))
+    val tokensCreator   = new NewTokensCreatorImpl[IO](projectTokenTTL, renkuTokenName, currentDate)
 
     lazy val mapResponse = captureMapping(tokensCreator, gitLabClient)(
       findingMethod = _.createPersonalAccessToken(projectId, accessToken).value.unsafeRunSync(),

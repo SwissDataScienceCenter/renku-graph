@@ -20,14 +20,15 @@ package io.renku.tokenrepository.repository.creation
 
 import cats.syntax.all._
 import com.typesafe.config.ConfigFactory
-import io.renku.generators.Generators.ints
+import io.renku.generators.Generators.Implicits._
+import io.renku.generators.Generators.{ints, nonEmptyStrings}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Period
 import scala.jdk.CollectionConverters._
-import scala.util.Try
+import scala.util.{Success, Try}
 
 class ProjectTokenDuePeriodSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
@@ -41,6 +42,24 @@ class ProjectTokenDuePeriodSpec extends AnyWordSpec with should.Matchers with Sc
 
         ProjectTokenDuePeriod[Try](config) shouldBe Period.ofDays(duration).pure[Try]
       }
+    }
+  }
+}
+
+class RenkuAccessTokenNameSpec extends AnyWordSpec with should.Matchers {
+
+  "apply" should {
+
+    "read 'project-token-name' as Period from the config" in {
+      val name = nonEmptyStrings().generateOne
+      val config = ConfigFactory.parseMap(
+        Map("project-token-name" -> name).asJava
+      )
+
+      val Success(actual) = RenkuAccessTokenName[Try](config)
+
+      actual              shouldBe a[RenkuAccessTokenName]
+      actual.value shouldBe name
     }
   }
 }
