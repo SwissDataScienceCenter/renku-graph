@@ -28,9 +28,9 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.events.producers
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{ChangeDate, MigrationStatus, TSMigtationTypeSerializers}
 import io.renku.events.consumers.subscriptions.SubscriberUrl
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.codec.all.int8
 import skunk.data.Completion
@@ -38,9 +38,9 @@ import skunk.implicits._
 
 import java.time.{Duration, Instant}
 
-private class EventFinder[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F],
-                                                        now: () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class EventFinder[F[_]: Async: SessionResource: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.EventFinder[F, MigrationRequestEvent]
     with TSMigtationTypeSerializers {
 
@@ -168,9 +168,8 @@ private object EventFinder {
   val SentStatusTimeout        = Duration ofHours 1
   val RecoverableStatusTimeout = Duration ofMinutes 2
 
-  def apply[F[_]: Async: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[producers.EventFinder[F, MigrationRequestEvent]] = MonadThrow[F].catchNonFatal {
-    new EventFinder[F](queriesExecTimes)
-  }
+  def apply[F[_]: Async: SessionResource: QueriesExecutionTimes]: F[producers.EventFinder[F, MigrationRequestEvent]] =
+    MonadThrow[F].catchNonFatal {
+      new EventFinder[F]()
+    }
 }

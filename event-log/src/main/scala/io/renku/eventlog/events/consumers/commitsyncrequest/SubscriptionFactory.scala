@@ -21,16 +21,15 @@ package io.renku.eventlog.events.consumers.commitsyncrequest
 import cats.effect.Concurrent
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
 
-  def apply[F[_]: Concurrent: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    handler <- EventHandler(queriesExecTimes)
+  def apply[F[_]: Concurrent: SessionResource: Logger: QueriesExecutionTimes]
+      : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
+    handler <- EventHandler[F]
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

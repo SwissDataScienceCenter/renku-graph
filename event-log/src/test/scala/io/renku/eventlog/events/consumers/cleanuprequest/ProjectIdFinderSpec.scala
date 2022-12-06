@@ -20,12 +20,12 @@ package io.renku.eventlog.events.consumers.cleanuprequest
 
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
-import io.renku.graph.model.EventContentGenerators.eventDates
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.generators.Generators.Implicits._
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.GraphModelGenerators._
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -54,7 +54,8 @@ class ProjectIdFinderSpec
   private trait TestCase {
     val path = projectPaths.generateOne
 
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val finder           = new ProjectIdFinderImpl[IO](queriesExecTimes)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val finder = new ProjectIdFinderImpl[IO]
   }
 }

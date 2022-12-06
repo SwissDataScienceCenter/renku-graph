@@ -28,10 +28,10 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects.Id
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.implicits._
 
@@ -41,8 +41,8 @@ trait ProcessingStatusFinder[F[_]] {
   def fetchStatus(projectId: Id): OptionT[F, ProcessingStatus]
 }
 
-class ProcessingStatusFinderImpl[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient(Some(queriesExecTimes))
+class ProcessingStatusFinderImpl[F[_]: Async: SessionResource:QueriesExecutionTimes]
+    extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProcessingStatusFinder[F] {
 
   import eu.timepit.refined.auto._
@@ -81,9 +81,9 @@ class ProcessingStatusFinderImpl[F[_]: Async: SessionResource](queriesExecTimes:
 }
 
 object ProcessingStatusFinder {
-  def apply[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[ProcessingStatusFinder[F]] =
+  def apply[F[_]: Async: SessionResource:QueriesExecutionTimes]: F[ProcessingStatusFinder[F]] =
     MonadThrow[F].catchNonFatal {
-      new ProcessingStatusFinderImpl(queriesExecTimes)
+      new ProcessingStatusFinderImpl[F]
     }
 }
 

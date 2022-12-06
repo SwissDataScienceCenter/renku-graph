@@ -27,11 +27,11 @@ import cats.{MonadThrow, Parallel}
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.Project
-import io.renku.graph.model.events.ExecutionDate
 import io.renku.graph.model.events.EventStatus.{AwaitingDeletion, Deleting}
+import io.renku.graph.model.events.ExecutionDate
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.data.Completion
@@ -39,12 +39,9 @@ import skunk.implicits._
 
 import java.time.Instant
 
-private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger](
-    awaitingDeletionGauge: LabeledGauge[F, projects.Path],
-    deletingGauge:         LabeledGauge[F, projects.Path],
-    queriesExecTimes:      LabeledHistogram[F],
-    now:                   () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger: QueriesExecutionTimes: EventStatusGauges](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventFinder[F, CleanUpEvent]
     with SubscriptionTypeSerializers
     with TypeSerializers {
@@ -140,21 +137,16 @@ private class EventFinderImpl[F[_]: Async: Parallel: SessionResource: Logger](
   private lazy val updateMetrics: Option[(CleanUpEvent, Int)] => Kleisli[F, Session[F], Unit] = {
     case Some(CleanUpEvent(Project(_, projectPath)) -> updatedRows) =>
       Kleisli.liftF {
-        for {
-          _ <- awaitingDeletionGauge.update((projectPath, updatedRows * -1))
-          _ <- deletingGauge.update((projectPath, updatedRows))
-        } yield ()
+        EventStatusGauges[F].awaitingDeletion.update((projectPath, updatedRows * -1)) >>
+          EventStatusGauges[F].underDeletion.update((projectPath, updatedRows))
       }
     case None => Kleisli.pure[F, Session[F], Unit](())
   }
 }
 
 private object EventFinder {
-  def apply[F[_]: Async: Parallel: SessionResource: Logger](
-      awaitingDeletionGauge: LabeledGauge[F, projects.Path],
-      deletingGauge:         LabeledGauge[F, projects.Path],
-      queriesExecTimes:      LabeledHistogram[F]
-  ): F[EventFinder[F, CleanUpEvent]] = MonadThrow[F].catchNonFatal {
-    new EventFinderImpl(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
+  def apply[F[_]: Async: Parallel: SessionResource: Logger: QueriesExecutionTimes: EventStatusGauges]
+      : F[EventFinder[F, CleanUpEvent]] = MonadThrow[F].catchNonFatal {
+    new EventFinderImpl[F]()
   }
 }

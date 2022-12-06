@@ -27,18 +27,22 @@ import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.projects
 import io.renku.metrics._
 
-object DeletingGauge {
+trait UnderDeletionGauge[F[_]] extends LabeledGauge[F, projects.Path]
+
+object UnderDeletionGauge {
 
   val NumberOfProjects: Int Refined Positive = 20
 
-  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[LabeledGauge[F, projects.Path]] =
-    Gauge[F, projects.Path](
-      name = "events_deleting_count",
-      help = "Number of Events being cleaned up",
-      labelName = "project",
-      resetDataFetch = () =>
-        statsFinder
-          .countEvents(Set(Deleting), maybeLimit = Some(NumberOfProjects))
-          .map(_.view.mapValues(_.toDouble).toMap)
-    )
+  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[UnderDeletionGauge[F]] =
+    MetricsRegistry[F].register {
+      new LabeledGaugeImpl[F, projects.Path](
+        name = "events_deleting_count",
+        help = "Number of Events being cleaned up",
+        labelName = "project",
+        resetDataFetch = () =>
+          statsFinder
+            .countEvents(Set(Deleting), maybeLimit = Some(NumberOfProjects))
+            .map(_.view.mapValues(_.toDouble).toMap)
+      ) with UnderDeletionGauge[F]
+    }.widen
 }

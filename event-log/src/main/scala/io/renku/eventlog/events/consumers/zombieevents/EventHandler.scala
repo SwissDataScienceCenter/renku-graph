@@ -25,26 +25,20 @@ import cats.effect.kernel.Spawn
 import cats.syntax.all._
 import io.circe.Decoder
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import io.renku.events.consumers.{ConcurrentProcessesLimiter, EventHandlingProcess, EventSchedulingResult}
 import io.renku.events.{CategoryName, EventRequestContent, consumers}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
-private class EventHandler[F[_]: Async: Logger](
-    override val categoryName:   CategoryName,
-    zombieStatusCleaner:         ZombieStatusCleaner[F],
-    awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
-    underGenerationGauge:        LabeledGauge[F, projects.Path],
-    awaitingTransformationGauge: LabeledGauge[F, projects.Path],
-    underTransformationGauge:    LabeledGauge[F, projects.Path],
-    awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
-    underDeletionGauge:          LabeledGauge[F, projects.Path]
+private class EventHandler[F[_]: Async: Logger: EventStatusGauges](
+    override val categoryName: CategoryName,
+    zombieStatusCleaner:       ZombieStatusCleaner[F]
 ) extends consumers.EventHandlerWithProcessLimiter[F](ConcurrentProcessesLimiter.withoutLimit) {
 
   override def createHandlingProcess(request: EventRequestContent): F[EventHandlingProcess[F]] =
@@ -71,11 +65,14 @@ private class EventHandler[F[_]: Async: Logger](
 
   private lazy val updateGauges: ZombieEvent => F[Unit] = {
     case ZombieEvent(_, projectPath, GeneratingTriples) =>
-      awaitingGenerationGauge.increment(projectPath) >> underGenerationGauge.decrement(projectPath)
+      EventStatusGauges[F].awaitingGeneration.increment(projectPath) >>
+        EventStatusGauges[F].underGeneration.decrement(projectPath)
     case ZombieEvent(_, projectPath, TransformingTriples) =>
-      awaitingTransformationGauge.increment(projectPath) >> underTransformationGauge.decrement(projectPath)
+      EventStatusGauges[F].awaitingTransformation.increment(projectPath) >>
+        EventStatusGauges[F].underTransformation.decrement(projectPath)
     case ZombieEvent(_, projectPath, Deleting) =>
-      awaitingDeletionGauge.increment(projectPath) >> underDeletionGauge.decrement(projectPath)
+      EventStatusGauges[F].awaitingDeletion.increment(projectPath) >>
+        EventStatusGauges[F].underDeletion.decrement(projectPath)
   }
 
   private implicit lazy val eventInfoToString: Show[ZombieEvent] = Show.show { event =>
@@ -100,24 +97,7 @@ private class EventHandler[F[_]: Async: Logger](
 }
 
 private object EventHandler {
-  def apply[F[_]: Async: SessionResource: Logger](
-      queriesExecTimes:            LabeledHistogram[F],
-      awaitingGenerationGauge:     LabeledGauge[F, projects.Path],
-      underGenerationGauge:        LabeledGauge[F, projects.Path],
-      awaitingTransformationGauge: LabeledGauge[F, projects.Path],
-      underTransformationGauge:    LabeledGauge[F, projects.Path],
-      awaitingDeletionGauge:       LabeledGauge[F, projects.Path],
-      underDeletionGauge:          LabeledGauge[F, projects.Path]
-  ): F[EventHandler[F]] = for {
-    zombieStatusCleaner <- ZombieStatusCleaner(queriesExecTimes)
-  } yield new EventHandler[F](
-    categoryName,
-    zombieStatusCleaner,
-    awaitingGenerationGauge,
-    underGenerationGauge,
-    awaitingTransformationGauge,
-    underTransformationGauge,
-    awaitingDeletionGauge,
-    underDeletionGauge
-  )
+  def apply[F[_]: Async: SessionResource: Logger: QueriesExecutionTimes: EventStatusGauges]: F[EventHandler[F]] = for {
+    zombieStatusCleaner <- ZombieStatusCleaner[F]
+  } yield new EventHandler[F](categoryName, zombieStatusCleaner)
 }

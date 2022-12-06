@@ -21,11 +21,11 @@ package io.renku.eventlog.eventpayload
 import cats.effect.Concurrent
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventId
 import io.renku.graph.model.projects.{Path => ProjectPath}
 import io.renku.http.InfoMessage
 import io.renku.http.InfoMessage._
-import io.renku.metrics.LabeledHistogram
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.{`Content-Disposition`, `Content-Length`, `Content-Type`}
@@ -39,8 +39,8 @@ trait EventPayloadEndpoint[F[_]] {
 
 object EventPayloadEndpoint {
 
-  def apply[F[_]: Concurrent: SessionResource: Logger](queriesExecTimes: LabeledHistogram[F]): EventPayloadEndpoint[F] =
-    apply[F](EventPayloadFinder(queriesExecTimes))
+  def apply[F[_]: Concurrent: SessionResource: Logger:QueriesExecutionTimes]: EventPayloadEndpoint[F] =
+    apply[F](EventPayloadFinder[F])
 
   def apply[F[_]: Concurrent: Logger](payloadFinder: EventPayloadFinder[F]): EventPayloadEndpoint[F] =
     new EventPayloadEndpoint[F] with Http4sDsl[F] {

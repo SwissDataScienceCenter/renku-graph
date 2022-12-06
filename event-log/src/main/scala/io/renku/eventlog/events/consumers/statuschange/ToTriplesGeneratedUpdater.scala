@@ -27,21 +27,20 @@ import io.renku.db.implicits._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.TypeSerializers._
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToTriplesGenerated
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events.{EventId, EventProcessingTime, EventStatus, ExecutionDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits._
 import skunk.{Session, ~}
 
 import java.time.Instant
 
-private class ToTriplesGeneratedUpdater[F[_]: Async](
+private class ToTriplesGeneratedUpdater[F[_]: Async: QueriesExecutionTimes](
     deliveryInfoRemover: DeliveryInfoRemover[F],
-    queriesExecTimes:    LabeledHistogram[F],
     now:                 () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with DBUpdater[F, ToTriplesGenerated] {
 
   private lazy val partitionSize = 50

@@ -25,15 +25,15 @@ import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 
 private trait ProjectRemover[F[_]] {
   def removeProject(projectId: projects.Id): F[Unit]
 }
 
-private class ProjectRemoverImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient(Some(queriesExecTimes))
+private class ProjectRemoverImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProjectRemover[F]
     with TypeSerializers {
   import skunk._
@@ -80,6 +80,6 @@ private class ProjectRemoverImpl[F[_]: MonadCancelThrow: SessionResource](querie
 }
 
 private object ProjectRemover {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[ProjectRemover[F]] =
-    MonadThrow[F].catchNonFatal(new ProjectRemoverImpl[F](queriesExecTimes: LabeledHistogram[F])).widen
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[ProjectRemover[F]] =
+    MonadThrow[F].catchNonFatal(new ProjectRemoverImpl[F]).widen
 }

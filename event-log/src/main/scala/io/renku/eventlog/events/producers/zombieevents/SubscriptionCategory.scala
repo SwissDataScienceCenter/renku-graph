@@ -26,17 +26,19 @@ import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers.UrlAndIdSubscriberTracker
 import io.renku.eventlog.events.producers.eventdelivery.EventDelivery
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private[producers] object SubscriptionCategory {
 
-  def apply[F[_]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[SubscriptionCategory[F]] = for {
+  def apply[F[
+      _
+  ]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes]
+      : F[SubscriptionCategory[F]] = for {
     subscribers      <- UrlAndIdSubscribers[F](categoryName)
-    eventsFinder     <- EventFinder(queriesExecTimes)
+    eventsFinder     <- EventFinder[F]
     dispatchRecovery <- LoggingDispatchRecovery[F, ZombieEvent](categoryName)
     eventDelivery    <- EventDelivery.noOp[F, ZombieEvent]
     eventsDistributor <- EventsDistributor(categoryName,

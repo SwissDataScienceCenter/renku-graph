@@ -26,18 +26,17 @@ import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers.{DispatchRecovery, SubscriptionTypeSerializers}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.events.consumers.subscriptions.SubscriberUrl
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import org.typelevel.log4cats.Logger
 import skunk.data.Completion
 
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: SessionResource: Logger](
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient(Some(queriesExecTimes))
+private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]
+    extends DbClient(Some(QueriesExecutionTimes[F]))
     with producers.DispatchRecovery[F, ProjectSyncEvent]
     with SubscriptionTypeSerializers {
 
@@ -72,9 +71,8 @@ private class DispatchRecoveryImpl[F[_]: MonadCancelThrow: SessionResource: Logg
 }
 
 private object DispatchRecovery {
-  def apply[F[_]: MonadCancelThrow: SessionResource: Logger](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[DispatchRecovery[F, ProjectSyncEvent]] = MonadCancelThrow[F].catchNonFatal {
-    new DispatchRecoveryImpl[F](queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow: SessionResource: Logger: QueriesExecutionTimes]
+      : F[DispatchRecovery[F, ProjectSyncEvent]] = MonadCancelThrow[F].catchNonFatal {
+    new DispatchRecoveryImpl[F]()
   }
 }

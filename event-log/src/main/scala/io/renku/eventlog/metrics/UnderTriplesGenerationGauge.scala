@@ -30,7 +30,7 @@ trait UnderTriplesGenerationGauge[F[_]] extends LabeledGauge[F, projects.Path]
 
 object UnderTriplesGenerationGauge {
 
-  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[LabeledGauge[F, projects.Path]] =
+  def apply[F[_]: MonadThrow: MetricsRegistry](statsFinder: StatsFinder[F]): F[UnderTriplesGenerationGauge[F]] =
     MetricsRegistry[F].register {
       new LabeledGaugeImpl[F, projects.Path](
         name = "events_under_triples_generation_count",

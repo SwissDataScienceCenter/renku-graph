@@ -26,17 +26,17 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.producers
 import io.renku.eventlog.events.producers._
 import io.renku.eventlog.events.producers.eventdelivery.EventDelivery
-import io.renku.metrics.{LabeledHistogram, MetricsRegistry}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private[producers] object SubscriptionCategory {
 
-  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[producers.SubscriptionCategory[F]] = for {
+  def apply[F[_]: Async: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes]
+      : F[producers.SubscriptionCategory[F]] = for {
     subscribers      <- UrlAndIdSubscribers[F](categoryName)
-    eventFinder      <- EventFinder(queriesExecTimes)
-    dispatchRecovery <- DispatchRecovery[F](queriesExecTimes)
+    eventFinder      <- EventFinder[F]
+    dispatchRecovery <- DispatchRecovery[F]
     eventDelivery    <- EventDelivery.noOp[F, MinProjectInfoEvent]
     eventsDistributor <- EventsDistributor(categoryName,
                                            subscribers,

@@ -25,11 +25,11 @@ import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.eventlog.events.producers.{SubscriptionTypeSerializers, globalcommitsync}
 import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.events.producers.{SubscriptionTypeSerializers, globalcommitsync}
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.events.{EventDate, LastSyncedDate}
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
@@ -40,11 +40,11 @@ private trait GlobalCommitSyncForcer[F[_]] {
   def moveGlobalCommitSync(projectId: projects.Id, projectPath: projects.Path): F[Unit]
 }
 
-private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F],
-                                                                                  syncFrequency:  Duration,
-                                                                                  delayOnRequest: Duration,
-                                                                                  now: () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class GlobalCommitSyncForcerImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+    syncFrequency:  Duration,
+    delayOnRequest: Duration,
+    now:            () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with GlobalCommitSyncForcer[F]
     with TypeSerializers
     with SubscriptionTypeSerializers {
@@ -91,13 +91,12 @@ private object GlobalCommitSyncForcer {
 
   import scala.concurrent.duration.FiniteDuration
 
-  def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F],
-      config:           Config = ConfigFactory.load()
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes](
+      config: Config = ConfigFactory.load()
   ): F[GlobalCommitSyncForcer[F]] = for {
     configFrequency      <- find[F, FiniteDuration]("global-commit-sync-frequency", config)
     syncFrequency        <- Duration.ofDays(configFrequency.toDays).pure[F]
     configDelayOnRequest <- find[F, FiniteDuration]("global-commit-sync-delay-on-request", config)
     delayOnRequest       <- Duration.ofMinutes(configDelayOnRequest.toMinutes).pure[F]
-  } yield new GlobalCommitSyncForcerImpl(queriesExecTimes, syncFrequency, delayOnRequest)
+  } yield new GlobalCommitSyncForcerImpl(syncFrequency, delayOnRequest)
 }

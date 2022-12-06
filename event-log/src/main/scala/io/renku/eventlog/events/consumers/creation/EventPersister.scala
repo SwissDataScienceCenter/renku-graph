@@ -28,10 +28,10 @@ import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.events.consumers.creation.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.events.consumers.creation.EventPersister.Result
 import io.renku.eventlog.events.consumers.creation.EventPersister.Result._
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
 import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram}
 import skunk._
 import skunk.implicits._
 
@@ -41,11 +41,9 @@ private trait EventPersister[F[_]] {
   def storeNewEvent(event: Event): F[Result]
 }
 
-private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
-    waitingEventsGauge: LabeledGauge[F, projects.Path],
-    queriesExecTimes:   LabeledHistogram[F],
-    now:                () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes: EventStatusGauges](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with EventPersister[F] {
 
   private val applicative = Applicative[F]
@@ -59,7 +57,7 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
         result <- insertIfNotDuplicate(event)(session)
                     .flatTap(_ => transaction.commit)
                     .recoverWith { case error => transaction.rollback(sp) >> error.raiseError[F, Result] }
-        _ <- whenA(aNewEventIsCreated(result))(waitingEventsGauge.increment(event.project.path))
+        _ <- whenA(aNewEventIsCreated(result))(EventStatusGauges[F].awaitingGeneration.increment(event.project.path))
       } yield result
     }
   }
@@ -194,11 +192,9 @@ private class EventPersisterImpl[F[_]: MonadCancelThrow: SessionResource](
 }
 
 private object EventPersister {
-  def apply[F[_]: MonadCancelThrow: SessionResource](
-      waitingEventsGauge: LabeledGauge[F, projects.Path],
-      queriesExecTimes:   LabeledHistogram[F]
-  ): F[EventPersisterImpl[F]] = MonadThrow[F].catchNonFatal {
-    new EventPersisterImpl[F](waitingEventsGauge, queriesExecTimes)
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes: EventStatusGauges]
+      : F[EventPersisterImpl[F]] = MonadThrow[F].catchNonFatal {
+    new EventPersisterImpl[F]()
   }
 
   sealed trait Result extends Product with Serializable

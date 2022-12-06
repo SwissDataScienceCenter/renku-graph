@@ -21,17 +21,17 @@ package io.renku.eventlog.events.consumers.statuschange
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.db.SqlStatement
-import io.renku.graph.model.EventContentGenerators.eventDates
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.eventlog.events.consumers.statuschange.StatusChangeEvent.ToTriplesStore
+import io.renku.eventlog.metrics.QueriesExecutionTimes
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.timestamps
+import io.renku.graph.model.EventContentGenerators.eventDates
 import io.renku.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes}
 import io.renku.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.graph.model.events.EventStatus._
 import io.renku.graph.model.events._
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -182,8 +182,9 @@ class ToTriplesStoreUpdaterSpec
 
     val currentTime         = mockFunction[Instant]
     val deliveryInfoRemover = mock[DeliveryInfoRemover[IO]]
-    val queriesExecTimes    = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val dbUpdater           = new ToTriplesStoreUpdater[IO](deliveryInfoRemover, queriesExecTimes, currentTime)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val dbUpdater = new ToTriplesStoreUpdater[IO](deliveryInfoRemover, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

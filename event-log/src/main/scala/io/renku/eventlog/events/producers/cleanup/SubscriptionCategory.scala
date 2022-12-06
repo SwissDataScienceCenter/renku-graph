@@ -25,27 +25,25 @@ import cats.effect._
 import cats.syntax.all._
 import eventdelivery._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.CategoryName
-import io.renku.graph.model.projects
-import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 private[producers] object SubscriptionCategory {
 
   val name: CategoryName = CategoryName("CLEAN_UP")
 
-  def apply[F[_]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry](
-      awaitingDeletionGauge: LabeledGauge[F, projects.Path],
-      deletingGauge:         LabeledGauge[F, projects.Path],
-      queriesExecTimes:      LabeledHistogram[F]
-  ): F[SubscriptionCategory[F]] = for {
+  def apply[F[
+      _
+  ]: Async: Parallel: SessionResource: UrlAndIdSubscriberTracker: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges]
+      : F[SubscriptionCategory[F]] = for {
     subscribers <- UrlAndIdSubscribers[F](name)
     eventDelivery <- eventdelivery.EventDelivery[F, CleanUpEvent](
-                       eventDeliveryIdExtractor = (event: CleanUpEvent) => DeletingProjectDeliverId(event.project.id),
-                       queriesExecTimes
+                       eventDeliveryIdExtractor = (event: CleanUpEvent) => DeletingProjectDeliverId(event.project.id)
                      )
     dispatchRecovery <- DispatchRecovery[F]
-    eventFinder      <- EventFinder(awaitingDeletionGauge, deletingGauge, queriesExecTimes)
+    eventFinder      <- EventFinder[F]
     eventsDistributor <-
       EventsDistributor(name, subscribers, eventFinder, eventDelivery, EventEncoder(encodeEvent), dispatchRecovery)
     deserializer <- UrlAndIdSubscriptionDeserializer[F, SubscriptionPayload](name, SubscriptionPayload.apply)

@@ -26,10 +26,10 @@ import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.CategoryName
 import io.renku.graph.model.events.LastSyncedDate
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 import skunk.data.Completion
 import skunk.implicits.{toIdOps, toStringOps}
 import skunk.{SqlState, ~}
@@ -39,16 +39,14 @@ private trait LastSyncedDateUpdater[F[_]] {
 }
 
 private object LastSyncedDateUpdater {
-  def apply[F[_]: MonadCancelThrow: SessionResource](
-      queriesExecTimes: LabeledHistogram[F]
-  ): F[LastSyncedDateUpdater[F]] = MonadThrow[F].catchNonFatal(
-    new LastSyncedDateUpdateImpl[F](queriesExecTimes)
-  )
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[LastSyncedDateUpdater[F]] =
+    MonadThrow[F].catchNonFatal(
+      new LastSyncedDateUpdateImpl[F]
+    )
 }
 
-private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow: SessionResource](
-    queriesExecTimes: LabeledHistogram[F]
-) extends DbClient(Some(queriesExecTimes))
+private class LastSyncedDateUpdateImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient(Some(QueriesExecutionTimes[F]))
     with LastSyncedDateUpdater[F]
     with SubscriptionTypeSerializers {
 

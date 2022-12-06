@@ -20,12 +20,13 @@ package io.renku.eventlog.events.producers
 
 import Generators._
 import cats.data.Kleisli
-import io.renku.db.SqlStatement
+import cats.effect.IO
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.events.consumers.subscriptions._
 import io.renku.generators.CommonGraphGenerators.microserviceBaseUrls
 import io.renku.generators.Generators.Implicits._
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.microservices.MicroserviceBaseUrl
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
@@ -75,7 +76,7 @@ class UrlAndIdSubscriberTrackerSpec
     "insert a new row in the subscriber table " +
       "if the subscriber exists but the source_url is different" in new TestCase {
         val otherSource  = microserviceBaseUrls.generateOne
-        val otherTracker = new UrlAndIdSubscriberTrackerImpl(queriesExecTimes, otherSource)
+        val otherTracker = new UrlAndIdSubscriberTrackerImpl[IO](otherSource)
         (otherTracker add subscriptionInfo).unsafeRunSync() shouldBe true
 
         findSubscriber(subscriptionInfo.subscriberUrl, otherSource) shouldBe Some(
@@ -144,9 +145,10 @@ class UrlAndIdSubscriberTrackerSpec
 
   private trait TestCase {
     val subscriptionInfo = urlAndIdSubscriptionInfos.generateOne
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val sourceUrl        = microserviceBaseUrls.generateOne
-    val tracker          = new UrlAndIdSubscriberTrackerImpl(queriesExecTimes, sourceUrl)
+    private implicit val metricsRegistry: TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    implicit val queriesExecTimes:        QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val sourceUrl = microserviceBaseUrls.generateOne
+    val tracker   = new UrlAndIdSubscriberTrackerImpl[IO](sourceUrl)
   }
 
   private def findSubscriber(subscriberUrl: SubscriberUrl,

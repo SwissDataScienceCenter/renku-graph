@@ -21,15 +21,15 @@ package io.renku.eventlog.events.producers.tsmigrationrequest
 import cats.effect.IO
 import cats.syntax.all._
 import io.renku.config.ServiceVersion
-import io.renku.db.SqlStatement
 import io.renku.eventlog.MigrationStatus._
 import io.renku.eventlog.TSMigrationGenerators.changeDates
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.eventlog.{ChangeDate, InMemoryEventLogDbSpec, MigrationStatus}
 import io.renku.events.consumers.subscriptions.{SubscriberUrl, subscriberUrls}
 import io.renku.generators.CommonGraphGenerators.serviceVersions
 import io.renku.generators.Generators.Implicits._
 import io.renku.generators.Generators.{timestamps, timestampsNotInTheFuture}
-import io.renku.metrics.TestLabeledHistogram
+import io.renku.metrics.TestMetricsRegistry
 import io.renku.testtools.IOSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -319,9 +319,10 @@ class EventFinderSpec
     val changeDate = changeDates.generateOne
     val now        = Instant.now().truncatedTo(MICROS)
 
-    val queriesExecTimes = TestLabeledHistogram[SqlStatement.Name]("query_id")
-    val currentTime      = mockFunction[Instant]
-    val finder           = new EventFinder[IO](queriesExecTimes, currentTime)
+    private implicit val metricsRegistry:  TestMetricsRegistry[IO]   = TestMetricsRegistry[IO]
+    private implicit val queriesExecTimes: QueriesExecutionTimes[IO] = QueriesExecutionTimes[IO]().unsafeRunSync()
+    val currentTime = mockFunction[Instant]
+    val finder      = new EventFinder[IO](currentTime)
 
     currentTime.expects().returning(now).anyNumberOfTimes()
   }

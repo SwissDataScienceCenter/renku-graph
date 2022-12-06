@@ -21,33 +21,19 @@ package io.renku.eventlog.events.consumers.statuschange
 import cats.effect.kernel.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
+import io.renku.eventlog.metrics.{EventStatusGauges, QueriesExecutionTimes}
 import io.renku.events.consumers.EventHandler
 import io.renku.events.consumers.subscriptions.SubscriptionMechanism
-import io.renku.graph.model.projects
 import io.renku.graph.tokenrepository.AccessTokenFinder
-import io.renku.metrics.{LabeledGauge, LabeledHistogram, MetricsRegistry}
+import io.renku.metrics.MetricsRegistry
 import org.typelevel.log4cats.Logger
 
 object SubscriptionFactory {
-  def apply[F[_]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry](
-      eventsQueue:                        StatusChangeEventsQueue[F],
-      awaitingTriplesGenerationGauge:     LabeledGauge[F, projects.Path],
-      underTriplesGenerationGauge:        LabeledGauge[F, projects.Path],
-      awaitingTriplesTransformationGauge: LabeledGauge[F, projects.Path],
-      underTriplesTransformationGauge:    LabeledGauge[F, projects.Path],
-      awaitingDeletionGauge:              LabeledGauge[F, projects.Path],
-      deletingGauge:                      LabeledGauge[F, projects.Path],
-      queriesExecTimes:                   LabeledHistogram[F]
+  def apply[F[
+      _
+  ]: Async: SessionResource: AccessTokenFinder: Logger: MetricsRegistry: QueriesExecutionTimes: EventStatusGauges](
+      eventsQueue: StatusChangeEventsQueue[F]
   ): F[(EventHandler[F], SubscriptionMechanism[F])] = for {
-    handler <- EventHandler(
-                 eventsQueue,
-                 queriesExecTimes,
-                 awaitingTriplesGenerationGauge,
-                 underTriplesGenerationGauge,
-                 awaitingTriplesTransformationGauge,
-                 underTriplesTransformationGauge,
-                 awaitingDeletionGauge,
-                 deletingGauge
-               )
+    handler <- EventHandler[F](eventsQueue)
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

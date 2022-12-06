@@ -23,20 +23,20 @@ import cats.syntax.all._
 import io.renku.db.{DbClient, SqlStatement}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 import io.renku.graph.model.projects
-import io.renku.metrics.LabeledHistogram
 
 private trait ProjectIdFinder[F[_]] {
   def findProjectId(projectPath: projects.Path): F[Option[projects.Id]]
 }
 
 private object ProjectIdFinder {
-  def apply[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[ProjectIdFinder[F]] =
-    new ProjectIdFinderImpl[F](queriesExecTimes).pure[F].widen
+  def apply[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]: F[ProjectIdFinder[F]] =
+    new ProjectIdFinderImpl[F].pure[F].widen
 }
 
-private class ProjectIdFinderImpl[F[_]: MonadCancelThrow: SessionResource](queriesExecTimes: LabeledHistogram[F])
-    extends DbClient(Some(queriesExecTimes))
+private class ProjectIdFinderImpl[F[_]: MonadCancelThrow: SessionResource: QueriesExecutionTimes]
+    extends DbClient(Some(QueriesExecutionTimes[F]))
     with ProjectIdFinder[F]
     with TypeSerializers {
   import skunk.implicits._

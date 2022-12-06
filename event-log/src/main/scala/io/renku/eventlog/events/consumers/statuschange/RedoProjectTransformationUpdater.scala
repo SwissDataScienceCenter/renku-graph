@@ -24,20 +24,20 @@ import cats.effect.Async
 import cats.syntax.all._
 import io.renku.db.DbClient
 import io.renku.eventlog.TypeSerializers
-import io.renku.metrics.LabeledHistogram
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 
 import java.time.Instant
 
 private trait RedoProjectTransformationUpdater[F[_]] extends DBUpdater[F, RedoProjectTransformation]
 
 private object RedoProjectTransformationUpdater {
-  def apply[F[_]: Async](queriesExecTimes: LabeledHistogram[F]): F[RedoProjectTransformationUpdater[F]] =
-    new RedoProjectTransformationUpdaterImpl[F](queriesExecTimes).pure.widen
+  def apply[F[_]: Async: QueriesExecutionTimes]: F[RedoProjectTransformationUpdater[F]] =
+    new RedoProjectTransformationUpdaterImpl[F]().pure.widen
 }
 
-private class RedoProjectTransformationUpdaterImpl[F[_]: Async](queriesExecTimes: LabeledHistogram[F],
-                                                                now: () => Instant = () => Instant.now
-) extends DbClient(Some(queriesExecTimes))
+private class RedoProjectTransformationUpdaterImpl[F[_]: Async: QueriesExecutionTimes](
+    now: () => Instant = () => Instant.now
+) extends DbClient(Some(QueriesExecutionTimes[F]))
     with RedoProjectTransformationUpdater[F]
     with TypeSerializers {
 

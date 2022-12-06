@@ -22,16 +22,16 @@ import cats.MonadThrow
 import cats.effect.Async
 import cats.syntax.all._
 import io.renku.eventlog.EventLogDB.SessionResource
-import io.renku.metrics.LabeledHistogram
+import io.renku.eventlog.metrics.QueriesExecutionTimes
 
 private trait EventProcessor[F[_]] {
   def process(event: CleanUpRequestEvent): F[Unit]
 }
 
 private object EventProcessor {
-  def apply[F[_]: Async: SessionResource](queriesExecTimes: LabeledHistogram[F]): F[EventProcessor[F]] = for {
-    projectIdFinder <- ProjectIdFinder[F](queriesExecTimes)
-    queue           <- CleanUpEventsQueue[F](queriesExecTimes)
+  def apply[F[_]: Async: SessionResource:QueriesExecutionTimes]: F[EventProcessor[F]] = for {
+    projectIdFinder <- ProjectIdFinder[F]
+    queue           <- CleanUpEventsQueue[F]
   } yield new EventProcessorImpl[F](projectIdFinder, queue)
 }
 
