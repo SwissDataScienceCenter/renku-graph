@@ -88,11 +88,9 @@ class ExecutionTimeRecorderImpl[F[_]: Sync: Clock: Logger](
       case (h: SingleValueHistogram[F], None)    => h.startTimer().map(_.some)
       case (h: LabeledHistogram[F], Some(label)) => h.startTimer(label.value).map(_.some)
       case (h: SingleValueHistogram[F], Some(label)) =>
-        Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}")
-        None.pure[F]
+        Logger[F].error(s"Label $label sent for a Single Value Histogram ${h.name}") >> None.pure[F]
       case (h: LabeledHistogram[F], None) =>
-        Logger[F].error(s"No label sent for a Labeled Histogram ${h.name}")
-        None.pure[F]
+        Logger[F].error(s"No label sent for a Labeled Histogram ${h.name}") >> None.pure[F]
     }
 }
 
