@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.events.consumers.projectsync
 
+import cats.Parallel
 import cats.effect.Async
 import cats.syntax.all._
-import cats.{NonEmptyParallel, Parallel}
 import io.renku.eventlog.EventLogDB.SessionResource
 import io.renku.eventlog.Microservice
 import io.renku.eventlog.metrics.QueriesExecutionTimes
@@ -36,7 +36,7 @@ object SubscriptionFactory {
 
   def apply[F[
       _
-  ]: Async: NonEmptyParallel: Parallel: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
+  ]: Async: Parallel: GitLabClient: AccessTokenFinder: SessionResource: Logger: MetricsRegistry: QueriesExecutionTimes]
       : F[(EventHandler[F], SubscriptionMechanism[F])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
                                categoryName,
